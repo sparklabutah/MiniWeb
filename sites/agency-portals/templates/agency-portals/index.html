@@ -1,0 +1,58 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}City of Cedar Grove - Official Website{% endblock %}
+{% block content %}
+<div class="hero">
+    <h2>Welcome to the City of Cedar Grove</h2>
+    <p>Your gateway to municipal services, permits, public records, and community information.</p>
+    <form class="search-box" action="{{ url_for('agency-portals.services_page') }}" method="get">
+        <input type="text" name="q" placeholder="Search services (e.g., building permit, utility bill)..." aria-label="Search services">
+        <button type="submit">Search</button>
+    </form>
+</div>
+
+<div class="main-content">
+    <h2 class="section-title">Quick Access Services</h2>
+    <div class="card-grid">
+        <div class="card">
+            <h3>Pay Your Bill</h3>
+            <p>Pay property taxes, utility bills, and other fees online.</p>
+            <a href="{{ url_for('agency-portals.pay_page') }}" class="card-link">Pay Now</a>
+        </div>
+        <div class="card">
+            <h3>Apply for a Permit</h3>
+            <p>Building, electrical, plumbing, and other permits.</p>
+            <a href="{{ url_for('agency-portals.permits_page') }}" class="card-link">View Permits</a>
+        </div>
+        <div class="card">
+            <h3>Public Records</h3>
+            <p>Access council minutes, budgets, ordinances, and more.</p>
+            <a href="{{ url_for('agency-portals.records_page') }}" class="card-link">Browse Records</a>
+        </div>
+        <div class="card">
+            <h3>Schedule Appointment</h3>
+            <p>Book a consultation with city departments.</p>
+            <a href="{{ url_for('agency-portals.book_page') }}" class="card-link">Book Now</a>
+        </div>
+    </div>
+
+    <h2 class="section-title">Latest Announcements</h2>
+    {% for ann in announcements %}
+    <div class="card" style="margin-bottom:.75rem;">
+        <h3>{{ ann.title }}</h3>
+        <p class="detail-meta"><span>{{ ann.date }}</span> <span>{{ ann.category }}</span></p>
+        <p>{{ ann.content[:200] }}{% if ann.content|length > 200 %}...{% endif %}</p>
+    </div>
+    {% endfor %}
+
+    <h2 class="section-title">City Departments</h2>
+    <div class="card-grid">
+        {% for dept in departments %}
+        <div class="card">
+            <h3><a href="{{ url_for('agency-portals.department_detail', dept_id=dept.id) }}">{{ dept.name }}</a></h3>
+            <p>{{ dept.description[:120] }}{% if dept.description|length > 120 %}...{% endif %}</p>
+            <p style="font-size:.8rem;color:#71767a;margin-top:.5rem;">{{ dept.phone }} | {{ dept.hours }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

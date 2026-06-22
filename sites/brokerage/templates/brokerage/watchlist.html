@@ -1,0 +1,79 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Watchlist — TradeCore{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Watchlist ({{ watched|length }})</h2>
+    <div id="wl-msg" class="msg msg-success"></div>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Price</th>
+                <th>Change</th>
+                <th>Change %</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in watched %}
+            <tr id="wl-{{ t.symbol }}">
+                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}"><strong>{{ t.symbol }}</strong></a></td>
+                <td>{{ t.name }}</td>
+                <td><span class="tag tag-{{ t.type }}">{{ t.type }}</span></td>
+                <td>${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</td>
+                <td class="{% if t.change >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change) }}</td>
+                <td class="{% if t.change_pct >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change_pct >= 0 }}{{ t.change_pct }}%</td>
+                <td><span class="market-status {% if t.market_open %}status-open{% else %}status-closed{% endif %}">{% if t.market_open %}Open{% else %}Closed{% endif %}</span></td>
+                <td><button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('{{ t.symbol }}')">Remove</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not watched %}
+    <p style="color:#8b949e;padding:1rem;">Your watchlist is empty.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Price Alerts ({{ alerts|length }})</h2>
+    <table>
+        <thead>
+            <tr><th>Symbol</th><th>Condition</th><th>Target Price</th></tr>
+        </thead>
+        <tbody>
+            {% for a in alerts %}
+            <tr>
+                <td><strong>{{ a.symbol }}</strong></td>
+                <td>{{ a.condition|title }}</td>
+                <td>${{ "%.2f"|format(a.price) if a.price >= 1 else "%.4f"|format(a.price) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not alerts %}
+    <p style="color:#8b949e;padding:1rem;">No alerts set.</p>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const BASE = "{{ url_for('brokerage.index') }}".replace(/\/$/, "");
+const USER_ID = {{ user.id }};
+async function removeFromWatchlist(sym) {
+    const r = await fetch(`${BASE}/api/watchlist/${USER_ID}/toggle`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({symbol: sym})
+    });
+    if (r.ok) {
+        document.getElementById("wl-" + sym)?.remove();
+        const msg = document.getElementById("wl-msg");
+        msg.textContent = sym + " removed from watchlist";
+        msg.style.display = "block";
+        setTimeout(() => msg.style.display = "none", 3000);
+    }
+}
+</script>
+{% endblock %}

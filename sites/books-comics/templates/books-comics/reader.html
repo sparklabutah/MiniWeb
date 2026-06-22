@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading: {{ book.title }} -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: Georgia, 'Times New Roman', serif; margin: 0; background: #faf7f2; }
+        .reader-header { background: #2d2d2d; color: #e8dfd3; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .reader-header h1 { font-size: 1rem; margin: 0; font-weight: normal; }
+        .reader-header a { color: #d4a574; text-decoration: none; font-size: .85rem; }
+        .reader-header a:hover { text-decoration: underline; }
+        .reader-body { max-width: 700px; margin: 2rem auto; padding: 0 2rem 4rem; }
+        .chapter-title { font-size: 1.5rem; color: #2d2d2d; margin: 0 0 1.5rem; text-align: center; border-bottom: 1px solid #e8dfd3; padding-bottom: 1rem; }
+        .chapter-content { font-size: 1.05rem; line-height: 1.9; color: #3a3a3a; white-space: pre-wrap; }
+        .reader-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e8dfd3; }
+        .reader-nav a { color: #8b4513; text-decoration: none; font-size: .9rem; padding: .5rem 1rem; border: 1px solid #d4c5b0; border-radius: .3rem; }
+        .reader-nav a:hover { background: #f5efe6; }
+        .reader-nav .disabled { color: #ccc; pointer-events: none; border-color: #eee; }
+        .chapter-select { margin-bottom: 1rem; text-align: center; }
+        .chapter-select select { padding: .4rem .8rem; border: 1px solid #d4c5b0; border-radius: .3rem; font-size: .9rem; background: #fff; }
+        .progress-bar { background: #e8dfd3; height: 4px; margin: .5rem 0; border-radius: 2px; }
+        .progress-fill { background: #8b4513; height: 100%; border-radius: 2px; transition: width .3s; }
+        .playback-controls { display: flex; gap: .5rem; align-items: center; justify-content: center; margin: 1rem 0; }
+        .playback-controls button { padding: .4rem .8rem; border: 1px solid #d4c5b0; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; color: #6b5b4f; }
+        .playback-controls button:hover { background: #f5efe6; }
+        .playback-controls input[type="range"] { width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="reader-header">
+        <a href="{{ url_for('books-comics.book_detail', book_id=book.id) }}">&larr; Back to Book Detail</a>
+        <h1>{{ current.title if current else 'Reading' }} ({{ chapter_num }}/{{ chapters|length }}) -- {{ book.title[:40] }}{% if book.title|length > 40 %}...{% endif %}</h1>
+        <div style="display:flex;gap:.8rem;align-items:center">
+            <a href="{{ url_for('books-comics.index') }}">Browse</a>
+            {% if not user %}
+            <a href="{{ url_for('books-comics.login_page') }}" style="background:#8b4513;color:#fff;padding:.3rem .8rem;border-radius:.3rem">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="reader-body">
+        <div class="chapter-select">
+            <select id="chapter-dropdown" onchange="goToChapter()">
+                {% for ch in chapters %}
+                <option value="{{ ch.chapter }}" {{ 'selected' if ch.chapter == chapter_num }}>{{ ch.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: {{ (chapter_num / chapters|length * 100)|int if chapters|length > 0 else 0 }}%"></div>
+        </div>
+
+        <div class="playback-controls">
+            <button onclick="prevChapter()" id="btn-prev">&laquo; Previous</button>
+            <label style="font-size:.8rem;color:#8b7b6f">Reading progress:</label>
+            <input type="range" id="progress-slider" min="0" max="100" value="{{ (chapter_num / chapters|length * 100)|int if chapters|length > 0 else 0 }}" oninput="updateProgress(this.value)">
+            <span id="progress-pct" style="font-size:.8rem;color:#8b7b6f">{{ (chapter_num / chapters|length * 100)|int if chapters|length > 0 else 0 }}%</span>
+            <button onclick="nextChapter()" id="btn-next">Next &raquo;</button>
+        </div>
+
+        {% if current %}
+        <h2 class="chapter-title">{{ current.title }}</h2>
+        <div class="chapter-content">{{ current.content }}</div>
+        {% else %}
+        <p style="text-align:center;color:#a09080">No content available for this chapter.</p>
+        {% endif %}
+
+        <div class="reader-nav">
+            {% if chapter_num > 1 %}
+            <a href="{{ url_for('books-comics.read_book', book_id=book.id, chapter=chapter_num - 1) }}">&larr; Previous Chapter</a>
+            {% else %}
+            <span class="disabled">&larr; Previous Chapter</span>
+            {% endif %}
+
+            {% if chapter_num < chapters|length %}
+            <a href="{{ url_for('books-comics.read_book', book_id=book.id, chapter=chapter_num + 1) }}">Next Chapter &rarr;</a>
+            {% else %}
+            <span class="disabled">Next Chapter &rarr;</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    const BOOK_ID = {{ book.id }};
+    const TOTAL_CHAPTERS = {{ chapters|length }};
+    const CURRENT_CHAPTER = {{ chapter_num }};
+
+    function goToChapter() {
+        const ch = document.getElementById('chapter-dropdown').value;
+        window.location.href = '{{ url_for("books-comics.read_book", book_id=book.id) }}?chapter=' + ch;
+    }
+
+    function prevChapter() {
+        if (CURRENT_CHAPTER > 1) {
+            window.location.href = '{{ url_for("books-comics.read_book", book_id=book.id) }}?chapter=' + (CURRENT_CHAPTER - 1);
+        }
+    }
+
+    function nextChapter() {
+        if (CURRENT_CHAPTER < TOTAL_CHAPTERS) {
+            window.location.href = '{{ url_for("books-comics.read_book", book_id=book.id) }}?chapter=' + (CURRENT_CHAPTER + 1);
+        }
+    }
+
+    function updateProgress(val) {
+        document.getElementById('progress-pct').textContent = val + '%';
+        document.getElementById('progress-fill').style.width = val + '%';
+        // Save progress if logged in
+        {% if user %}
+        fetch(`{{ url_for('books-comics.index') }}api/users/{{ user.id }}/reading-progress`.replace(/\/\//g, '/'), {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({book_id: BOOK_ID, chapter: CURRENT_CHAPTER, progress: parseInt(val)})
+        });
+        {% endif %}
+    }
+    </script>
+</body>
+</html>

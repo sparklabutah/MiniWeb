@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KSL Classifieds — Buy, Sell, Trade</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f5f7; color: #333; }
+        .header { background: #1b5e20; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #c8e6c9; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-post { background: #ff9800; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .header-nav .btn-post:hover { background: #f57c00; }
+        .cat-bar { background: #2e7d32; padding: .4rem 2rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .cat-bar a { color: #e8f5e9; text-decoration: none; font-size: .85rem; padding: .3rem .8rem; border-radius: .25rem; text-transform: capitalize; }
+        .cat-bar a:hover, .cat-bar a.active { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+        .search-bar { background: #fff; border-radius: .5rem; padding: 1rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .search-form { display: flex; gap: .5rem; }
+        .search-form input[type="text"] { flex: 1; padding: .6rem 1rem; border: 2px solid #e0e0e0; border-radius: .3rem; font-size: .95rem; }
+        .search-form input[type="text"]:focus { border-color: #2e7d32; outline: none; }
+        .search-form button { padding: .6rem 1.5rem; background: #1b5e20; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .95rem; }
+        .filters { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .8rem; align-items: center; }
+        .filters label { font-size: .82rem; color: #666; }
+        .filters select, .filters input[type="number"] { padding: .35rem .5rem; border: 1px solid #ccc; border-radius: .25rem; font-size: .82rem; }
+        .filters input[type="number"] { width: 90px; }
+        .filters .filter-radio { display: flex; gap: .5rem; align-items: center; }
+        .filters .filter-radio input[type="radio"] { margin: 0; }
+        .price-slider { width: 150px; }
+        .layout { display: flex; gap: 1rem; }
+        .sidebar { width: 220px; flex-shrink: 0; }
+        .sidebar-card { background: #fff; border-radius: .5rem; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .sidebar-card h3 { font-size: .9rem; color: #1b5e20; margin-bottom: .5rem; border-bottom: 1px solid #e8f5e9; padding-bottom: .3rem; }
+        .sidebar-card a { display: block; font-size: .85rem; color: #555; text-decoration: none; padding: .25rem 0; text-transform: capitalize; }
+        .sidebar-card a:hover { color: #1b5e20; }
+        .sidebar-card a.active { color: #1b5e20; font-weight: 600; }
+        .main-content { flex: 1; }
+        .result-count { font-size: .85rem; color: #888; margin-bottom: .8rem; }
+        .featured-section { margin-bottom: 1.5rem; }
+        .featured-section h2 { font-size: 1.1rem; color: #1b5e20; margin-bottom: .8rem; }
+        .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .listing-card { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: box-shadow .15s; }
+        .listing-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+        .listing-card img { width: 100%; height: 180px; object-fit: cover; }
+        .listing-card .card-body { padding: .8rem; }
+        .listing-card .card-price { font-size: 1.15rem; font-weight: 700; color: #1b5e20; margin-bottom: .2rem; }
+        .listing-card .card-title { font-size: .92rem; margin-bottom: .3rem; }
+        .listing-card .card-title a { color: #333; text-decoration: none; }
+        .listing-card .card-title a:hover { color: #1b5e20; }
+        .listing-card .card-meta { font-size: .78rem; color: #999; display: flex; justify-content: space-between; }
+        .listing-card .card-meta .cat-tag { background: #e8f5e9; color: #2e7d32; padding: .1rem .4rem; border-radius: .2rem; text-transform: capitalize; }
+        .listing-card .featured-badge { background: #ff9800; color: #fff; font-size: .7rem; padding: .15rem .5rem; position: absolute; top: .5rem; left: .5rem; border-radius: .2rem; font-weight: 600; }
+        .card-wrapper { position: relative; }
+        .no-results { text-align: center; color: #999; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('classifieds.index') }}">KSL Classifieds</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <a href="{{ url_for('classifieds.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('classifieds.post_listing_page') }}" class="btn-post">+ Post Listing</a>
+            <a href="{{ url_for('classifieds.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('classifieds.login_page') }}">Sign In</a>
+            <a href="{{ url_for('classifieds.register_page') }}">Register</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="cat-bar">
+        <a href="{{ url_for('classifieds.index') }}" class="{{ 'active' if not category }}">All</a>
+        {% for c in categories %}
+        <a href="{{ url_for('classifieds.category_page', cat_name=c) }}" class="{{ 'active' if category == c }}">{{ c }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="container">
+        <div class="search-bar">
+            <form class="search-form" method="get" action="{{ url_for('classifieds.index') }}">
+                <input type="text" name="q" placeholder="Search classifieds..." value="{{ q }}" autocomplete="off">
+                <button type="submit">Search</button>
+            </form>
+            <div class="filters">
+                <label>Category:
+                    <select name="category" id="filter-cat" onchange="applyFilters()">
+                        <option value="">All Categories</option>
+                        {% for c in categories %}
+                        <option value="{{ c }}" {{ 'selected' if category == c }}>{{ c | capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Condition:
+                    <select name="condition" id="filter-condition" onchange="applyFilters()">
+                        <option value="">Any</option>
+                        {% for co in conditions %}
+                        <option value="{{ co }}" {{ 'selected' if condition == co }}>{{ co | replace('_', ' ') | capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Min $:
+                    <input type="number" id="filter-price-min" value="{{ price_min if price_min else '' }}" min="0" placeholder="0" onchange="applyFilters()">
+                </label>
+                <label>Max $:
+                    <input type="number" id="filter-price-max" value="{{ price_max if price_max else '' }}" min="0" placeholder="Any" onchange="applyFilters()">
+                </label>
+                <label>Location:
+                    <select name="location" id="filter-location" onchange="applyFilters()">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc }}" {{ 'selected' if location == loc }}>{{ loc }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Sort:
+                    <select name="sort" id="filter-sort" onchange="applyFilters()">
+                        <option value="date" {{ 'selected' if sort == 'date' }}>Newest</option>
+                        <option value="price_low" {{ 'selected' if sort == 'price_low' }}>Price: Low to High</option>
+                        <option value="price_high" {{ 'selected' if sort == 'price_high' }}>Price: High to Low</option>
+                        <option value="title" {{ 'selected' if sort == 'title' }}>Title A-Z</option>
+                        <option value="views" {{ 'selected' if sort == 'views' }}>Most Popular</option>
+                    </select>
+                </label>
+                <label style="margin-left:.5rem">
+                    <a href="{{ url_for('classifieds.compare_page') }}" style="color:#1b5e20;font-size:.82rem">Compare</a>
+                </label>
+            </div>
+            <div class="filters" style="margin-top:.5rem">
+                <span style="font-size:.82rem;color:#666;margin-right:.3rem">Condition:</span>
+                <div class="filter-radio">
+                    <label style="font-size:.82rem"><input type="radio" name="cond_radio" value="" {{ 'checked' if not condition }} onchange="applyCondition(this.value)"> Any</label>
+                    {% for co in conditions %}
+                    <label style="font-size:.82rem"><input type="radio" name="cond_radio" value="{{ co }}" {{ 'checked' if condition == co }} onchange="applyCondition(this.value)"> {{ co | replace('_', ' ') | capitalize }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="sidebar">
+                <div class="sidebar-card">
+                    <h3>Categories</h3>
+                    <a href="{{ url_for('classifieds.index') }}" class="{{ 'active' if not category }}">All Categories</a>
+                    {% for c in categories %}
+                    <a href="{{ url_for('classifieds.category_page', cat_name=c) }}" class="{{ 'active' if category == c }}">{{ c }}</a>
+                    {% endfor %}
+                </div>
+                <div class="sidebar-card">
+                    <h3>Quick Links</h3>
+                    <a href="{{ url_for('classifieds.index', sort='date') }}">Newest Listings</a>
+                    <a href="{{ url_for('classifieds.index', sort='views') }}">Most Popular</a>
+                    <a href="{{ url_for('classifieds.index', sort='price_low') }}">Lowest Price</a>
+                    <a href="{{ url_for('classifieds.api_export', format='csv') }}">Export CSV</a>
+                </div>
+            </div>
+
+            <div class="main-content">
+                {% if featured and not q and not category %}
+                <div class="featured-section">
+                    <h2>Featured Listings</h2>
+                    <div class="listing-grid">
+                        {% for listing in featured[:4] %}
+                        <div class="listing-card">
+                            <div class="card-wrapper">
+                                <span class="featured-badge">FEATURED</span>
+                                <img src="https://placehold.co/300x200/EEE/999?text={{ listing.id }}" alt="{{ listing.title }}">
+                            </div>
+                            <div class="card-body">
+                                <div class="card-price">${{ "{:,.0f}".format(listing.price) }}</div>
+                                <div class="card-title"><a href="{{ url_for('classifieds.listing_detail', listing_id=listing.id) }}">{{ listing.title }} (#{{ listing.id }})</a></div>
+                                <div class="card-meta">
+                                    <span>{{ listing.location }}</span>
+                                    <span class="cat-tag">{{ listing.category }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="result-count">{{ listings|length }} listings found</div>
+
+                {% if listings %}
+                <div class="listing-grid">
+                    {% for listing in listings[:60] %}
+                    <div class="listing-card" data-id="{{ listing.id }}">
+                        <div class="card-wrapper">
+                            {% if listing.featured %}<span class="featured-badge">FEATURED</span>{% endif %}
+                            <img src="https://placehold.co/300x200/EEE/999?text={{ listing.id }}" alt="{{ listing.title }}">
+                        </div>
+                        <div class="card-body">
+                            <div class="card-price">${{ "{:,.0f}".format(listing.price) }}</div>
+                            <div class="card-title"><a href="{{ url_for('classifieds.listing_detail', listing_id=listing.id) }}">{{ listing.title }} (#{{ listing.id }})</a></div>
+                            <div class="card-meta">
+                                <span>{{ listing.location }}</span>
+                                <span class="cat-tag">{{ listing.category }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-results">No listings match your search criteria.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function applyFilters() {
+        const params = new URLSearchParams();
+        const q = document.querySelector('input[name="q"]');
+        if (q && q.value) params.set('q', q.value);
+        const cat = document.getElementById('filter-cat').value;
+        if (cat) params.set('category', cat);
+        const cond = document.getElementById('filter-condition').value;
+        if (cond) params.set('condition', cond);
+        const pmin = document.getElementById('filter-price-min').value;
+        if (pmin) params.set('price_min', pmin);
+        const pmax = document.getElementById('filter-price-max').value;
+        if (pmax) params.set('price_max', pmax);
+        const loc = document.getElementById('filter-location').value;
+        if (loc) params.set('location', loc);
+        const sort = document.getElementById('filter-sort').value;
+        if (sort) params.set('sort', sort);
+        window.location.href = '{{ url_for("classifieds.index") }}?' + params.toString();
+    }
+
+    function applyCondition(val) {
+        document.getElementById('filter-condition').value = val;
+        applyFilters();
+    }
+    </script>
+</body>
+</html>

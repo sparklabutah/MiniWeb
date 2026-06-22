@@ -1,0 +1,43 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Upload Document - City of Cedar Grove{% endblock %}
+{% block content %}
+<div class="main-content" style="max-width:700px;">
+    <h2 class="section-title">Upload a Document</h2>
+
+    {% if success %}
+    <div class="alert alert-success">
+        Document <strong>{{ uploaded_filename }}</strong> ({{ doc_type }}) has been uploaded successfully.
+    </div>
+    {% endif %}
+
+    {% if not success %}
+    <div class="detail-body">
+        <p style="margin-bottom:1rem;font-size:.9rem;">
+            Upload supporting documents for your permit applications, service requests, or identity verification.
+        </p>
+        <form method="post" action="{{ url_for('agency-portals.upload_submit') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="document_type">Document Type *</label>
+                <select id="document_type" name="document_type" required>
+                    <option value="">Select type</option>
+                    <option value="Permit Application">Permit Application</option>
+                    <option value="Identity Verification">Identity Verification</option>
+                    <option value="Proof of Residence">Proof of Residence</option>
+                    <option value="Business License">Business License</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="document">Select File *</label>
+                <input type="file" id="document" name="document" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="3" placeholder="Brief description of the document..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

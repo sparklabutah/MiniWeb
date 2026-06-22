@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerts - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}.top-bar{background:#232f3e;color:#fff;padding:0 1.5rem;height:48px;display:flex;align-items:center}.top-bar .logo{font-size:1.1rem;font-weight:700;color:#ff9900;text-decoration:none}.top-bar .logo span{color:#fff;font-weight:400;margin-left:.3rem}.nav-bar{background:#37475a;padding:0 1.5rem;display:flex;overflow-x:auto}.nav-bar a{color:#d5dbdb;text-decoration:none;padding:.6rem 1rem;font-size:.85rem;border-bottom:2px solid transparent}.nav-bar a:hover,.nav-bar a.active{color:#fff;border-bottom-color:#ff9900}.container{max-width:1200px;margin:0 auto;padding:1.5rem}.page-title{font-size:1.4rem;margin-bottom:1rem}.filters{display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:1rem;align-items:center;background:#fff;padding:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}.filters label{font-size:.8rem;color:#64748b}.filters select{padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem}.filters button{padding:.4rem 1rem;background:#232f3e;color:#fff;border:none;border-radius:4px;cursor:pointer}.result-count{font-size:.85rem;color:#64748b;margin-bottom:.8rem}table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}th{background:#f8f9fa;text-align:left;padding:.7rem 1rem;font-size:.8rem;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0}td{padding:.7rem 1rem;font-size:.88rem;border-bottom:1px solid #f0f2f5}tr:hover{background:#f8f9fa}.severity-badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600}.sev-critical{background:#f8d7da;color:#721c24}.sev-warning{background:#fff3cd;color:#856404}.status-active{color:#e74c3c;font-weight:600}.status-resolved{color:#27ae60}
+    </style>
+</head>
+<body>
+    <div class="top-bar"><a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a></div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a><a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a><a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a><a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a><a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a><a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a><a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a><a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a><a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a><a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a><a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a><a href="{{ url_for('cloud-dev-consoles.alerts_page') }}" class="active">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">Alerts</h1>
+        <form class="filters" method="GET">
+            <label>Status</label>
+            <select name="status"><option value="">All</option><option value="active" {% if status == 'active' %}selected{% endif %}>Active</option><option value="resolved" {% if status == 'resolved' %}selected{% endif %}>Resolved</option></select>
+            <label>Severity</label>
+            <select name="severity" id="severity-filter"><option value="">All</option><option value="critical" {% if severity == 'critical' %}selected{% endif %}>Critical</option><option value="warning" {% if severity == 'warning' %}selected{% endif %}>Warning</option></select>
+            <label>Category</label>
+            <select name="category"><option value="">All</option>{% for c in alert_categories %}<option value="{{ c }}" {% if category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+            <button type="submit">Apply</button>
+        </form>
+        <div class="result-count">{{ alerts|length }} alerts</div>
+        <table id="alerts-table">
+            <thead><tr><th>Name</th><th>Severity</th><th>Status</th><th>Resource</th><th>Condition</th><th>Category</th><th>Triggered</th><th>Ack</th></tr></thead>
+            <tbody>
+            {% for a in alerts %}
+            <tr>
+                <td>{{ a.name }}</td>
+                <td><span class="severity-badge sev-{{ a.severity }}">{{ a.severity }}</span></td>
+                <td><span class="status-{{ a.status }}">{{ a.status }}</span></td>
+                <td>{{ a.resource_name }}</td>
+                <td style="font-size:.8rem;">{{ a.condition }}</td>
+                <td>{{ a.category }}</td>
+                <td style="font-size:.8rem;white-space:nowrap;">{{ a.triggered_at }}</td>
+                <td>{% if a.acknowledged %}Yes{% else %}No{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

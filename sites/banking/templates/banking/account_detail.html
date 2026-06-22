@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account {{ account.account_number }} - SecureBank</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .main { max-width: 900px; margin: 2rem auto; padding: 0 2rem; }
+        .account-header { background: #fff; padding: 2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .account-header h2 { color: #0a2463; margin-bottom: .3rem; }
+        .account-header .acct-meta { color: #64748b; font-size: .9rem; }
+        .account-header .balance-big { font-size: 2rem; font-weight: 700; color: #1a1a2e; margin-top: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .7rem 1rem; font-size: .8rem; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
+        .credit { color: #059669; }
+        .debit { color: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('banking.index') }}">Dashboard</a>
+        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
+        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
+        <a href="{{ url_for('banking.pay_bills_page') }}">Pay Bills</a>
+        <a href="{{ url_for('banking.payees_page') }}">Payees</a>
+        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
+        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="main">
+        <div class="account-header">
+            <h2>{{ account.type|capitalize }} Account</h2>
+            <div class="acct-meta"><strong>Account Number:</strong> {{ account.account_number }} | Opened {{ account.opened_date }} | Status: {{ account.status|capitalize }}</div>
+            <div class="balance-big" style="{% if account.balance < 0 %}color:#dc2626{% endif %}">${{ "%.2f"|format(account.balance|abs) }}{% if account.balance < 0 %} owed{% endif %}</div>
+        </div>
+
+        <h3 style="color:#334155;margin-bottom:.8rem">Recent Transactions (showing up to 30)</h3>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td>{{ tx.date }}</td>
+                    <td>{{ tx.description }}</td>
+                    <td>{{ tx.category }}</td>
+                    <td class="{{ tx.type }}">{{ '-' if tx.type == 'debit' else '+' }}${{ "%.2f"|format(tx.amount) }}</td>
+                    <td>{{ tx.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

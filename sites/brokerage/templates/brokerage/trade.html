@@ -1,0 +1,136 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Trade — TradeCore{% endblock %}
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <h2>Place Order</h2>
+        <div id="trade-msg" class="msg"></div>
+        <form id="trade-form" style="display:flex;flex-direction:column;gap:0.8rem;margin-top:0.5rem;">
+            <label style="font-size:0.85rem;color:#8b949e;">Symbol
+                <select id="trade-symbol" style="width:100%;margin-top:0.3rem;">
+                    <option value="">Select security...</option>
+                    {% for t in tickers %}
+                    <option value="{{ t.symbol }}" {% if ticker and ticker.symbol == t.symbol %}selected{% endif %}>{{ t.symbol }} — {{ t.name }} (${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <div class="radio-group">
+                <label><input type="radio" name="side" value="buy" checked> Buy</label>
+                <label><input type="radio" name="side" value="sell"> Sell</label>
+            </div>
+
+            <div class="radio-group">
+                <label><input type="radio" name="order_type" value="market" checked> Market</label>
+                <label><input type="radio" name="order_type" value="limit"> Limit</label>
+                <label><input type="radio" name="order_type" value="stop_loss"> Stop Loss</label>
+            </div>
+
+            <label style="font-size:0.85rem;color:#8b949e;">Quantity
+                <div class="slider-container" style="margin-top:0.3rem;">
+                    <input type="range" id="qty-slider" min="1" max="100" value="1" oninput="document.getElementById('qty-val').value=this.value;updateEstimate();">
+                    <input type="number" id="qty-val" value="1" min="1" style="width:80px;" oninput="document.getElementById('qty-slider').value=this.value;updateEstimate();">
+                </div>
+            </label>
+
+            <label id="limit-price-label" style="font-size:0.85rem;color:#8b949e;display:none;">Limit/Stop Price
+                <input type="number" id="limit-price" step="0.01" style="width:100%;margin-top:0.3rem;">
+            </label>
+
+            <div id="estimate" style="font-size:0.9rem;color:#8b949e;padding:0.5rem;background:#0d1117;border-radius:0.375rem;">
+                Estimated total: <strong id="est-total">$0.00</strong>
+            </div>
+
+            {% if user %}
+            <div style="font-size:0.85rem;color:#8b949e;">
+                Buying Power: <strong>${{ "{:,.2f}".format(user.buying_power) }}</strong>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="placeOrder()">Submit Order</button>
+            {% else %}
+            <p style="color:#8b949e;font-size:0.85rem;"><a href="{{ url_for('brokerage.login_page') }}">Login</a> to place orders.</p>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Security Details</h2>
+        {% if ticker %}
+        <div style="margin-bottom:1rem;">
+            <div style="font-size:1.5rem;font-weight:700;">{{ ticker.symbol }}</div>
+            <div style="font-size:0.9rem;color:#8b949e;">{{ ticker.name }}</div>
+            <div style="font-size:1.8rem;font-weight:700;margin-top:0.5rem;">
+                ${{ "%.2f"|format(ticker.current_price) if ticker.current_price >= 1 else "%.4f"|format(ticker.current_price) }}
+            </div>
+            <div class="{% if ticker.change >= 0 %}positive{% else %}negative{% endif %}">
+                {{ "+" if ticker.change >= 0 }}${{ "%.2f"|format(ticker.change) }}
+                ({{ "+" if ticker.change_pct >= 0 }}{{ ticker.change_pct }}%)
+            </div>
+            <div style="margin-top:0.5rem;">
+                <span class="tag tag-{{ ticker.type }}">{{ ticker.type }}</span>
+                <span class="market-status {% if ticker.market_open %}status-open{% else %}status-closed{% endif %}" style="margin-left:0.5rem;">
+                    {% if ticker.market_open %}Open{% else %}Closed{% endif %}
+                </span>
+            </div>
+        </div>
+        {% else %}
+        <p style="color:#8b949e;">Select a security to see details.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const BASE = "{{ url_for('brokerage.index') }}".replace(/\/$/, "");
+const TICKERS = {{ tickers|tojson }};
+
+document.querySelectorAll('input[name="order_type"]').forEach(r => {
+    r.addEventListener("change", () => {
+        const lbl = document.getElementById("limit-price-label");
+        lbl.style.display = r.value === "market" && r.checked ? "none" : "block";
+    });
+});
+
+function updateEstimate() {
+    const sym = document.getElementById("trade-symbol").value;
+    const qty = parseFloat(document.getElementById("qty-val").value) || 0;
+    const t = TICKERS.find(t => t.symbol === sym);
+    const price = t ? t.current_price : 0;
+    document.getElementById("est-total").textContent = "$" + (price * qty).toFixed(2);
+}
+
+document.getElementById("trade-symbol").addEventListener("change", updateEstimate);
+
+async function placeOrder() {
+    const sym = document.getElementById("trade-symbol").value;
+    const side = document.querySelector('input[name="side"]:checked').value;
+    const orderType = document.querySelector('input[name="order_type"]:checked').value;
+    const qty = parseFloat(document.getElementById("qty-val").value);
+    const price = orderType !== "market" ? parseFloat(document.getElementById("limit-price").value) : null;
+
+    if (!sym) { showMsg("trade-msg", "Select a symbol", "error"); return; }
+
+    const r = await fetch(`${BASE}/api/orders`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            user_id: {{ user.id if user else 0 }},
+            symbol: sym, side: side, order_type: orderType,
+            quantity: qty, price: price
+        })
+    });
+    const data = await r.json();
+    if (r.ok) {
+        showMsg("trade-msg", `Order ${data.status}: ${data.side} ${data.quantity} ${data.symbol}`, "success");
+    } else {
+        showMsg("trade-msg", data.error || "Order failed", "error");
+    }
+}
+
+function showMsg(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = "msg msg-" + type;
+    el.style.display = "block";
+    setTimeout(() => el.style.display = "none", 5000);
+}
+</script>
+{% endblock %}

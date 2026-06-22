@@ -1,0 +1,66 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Options Chain — TradeCore{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Options Chain</h2>
+    <form method="GET" action="{{ url_for('brokerage.options_page') }}" class="filters">
+        <label>Underlying:
+            <select name="underlying" onchange="this.form.submit()">
+                <option value="">All</option>
+                {% for u in underlyings %}
+                <option value="{{ u }}" {% if underlying == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Type:
+            <select name="type" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option value="call" {% if opt_type == 'call' %}selected{% endif %}>Calls</option>
+                <option value="put" {% if opt_type == 'put' %}selected{% endif %}>Puts</option>
+            </select>
+        </label>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Underlying</th>
+                <th>Spot Price</th>
+                <th>Type</th>
+                <th>Strike</th>
+                <th>Expiry</th>
+                <th>Premium</th>
+                <th>IV</th>
+                <th>Delta</th>
+                <th>Gamma</th>
+                <th>Theta</th>
+                <th>Vega</th>
+                <th>Volume</th>
+                <th>Open Interest</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in options %}
+            <tr>
+                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=o.underlying) }}"><strong>{{ o.underlying }}</strong></a></td>
+                <td>{% if o.underlying in tickers_map %}${{ "%.2f"|format(tickers_map[o.underlying].current_price) }}{% endif %}</td>
+                <td><span class="tag {% if o.type == 'call' %}tag-index_fund{% else %}tag-crypto{% endif %}">{{ o.type }}</span></td>
+                <td>${{ "%.2f"|format(o.strike) }}</td>
+                <td>{{ o.expiry }}</td>
+                <td>${{ "%.2f"|format(o.premium) }}</td>
+                <td>{{ "%.0f"|format(o.iv * 100) }}%</td>
+                <td>{{ "%.2f"|format(o.delta) }}</td>
+                <td>{{ "%.2f"|format(o.gamma) }}</td>
+                <td>{{ "%.2f"|format(o.theta) }}</td>
+                <td>{{ "%.2f"|format(o.vega) }}</td>
+                <td>{{ "{:,}".format(o.volume) }}</td>
+                <td>{{ "{:,}".format(o.open_interest) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not options %}
+    <p style="color:#8b949e;padding:1rem;">No options found for the selected filters.</p>
+    {% endif %}
+</div>
+{% endblock %}

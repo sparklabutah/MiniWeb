@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}City of Cedar Grove{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1b1b1b; background: #f0f0f0; line-height: 1.6; }
+        a { color: #005ea2; text-decoration: underline; }
+        a:hover { color: #1a4480; }
+
+        /* Gov banner */
+        .gov-banner { background: #f0f0f0; padding: .25rem 1.5rem; font-size: .75rem; color: #71767a; border-bottom: 1px solid #dfe1e2; }
+        .gov-banner span { font-weight: 700; }
+
+        /* Header */
+        .site-header { background: #1b1b1b; color: #fff; padding: 0; }
+        .header-top { display: flex; align-items: center; justify-content: space-between; padding: .75rem 2rem; max-width: 1200px; margin: 0 auto; }
+        .header-top h1 { font-size: 1.4rem; margin: 0; font-weight: 700; }
+        .header-top h1 a { color: #fff; text-decoration: none; }
+        .header-top .auth-links a { color: #a9aeb1; text-decoration: none; font-size: .85rem; margin-left: 1rem; }
+        .header-top .auth-links a:hover { color: #fff; }
+
+        /* Nav */
+        .site-nav { background: #005ea2; }
+        .site-nav ul { list-style: none; display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 0; }
+        .site-nav li a { display: block; padding: .7rem 1.2rem; color: #fff; text-decoration: none; font-size: .9rem; font-weight: 600; }
+        .site-nav li a:hover, .site-nav li a.active { background: #1a4480; }
+
+        /* Dropdown */
+        .nav-dropdown { position: relative; }
+        .nav-dropdown .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #dfe1e2; min-width: 220px; z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,.1); }
+        .nav-dropdown:hover .dropdown-menu { display: block; }
+        .dropdown-menu a { color: #005ea2; padding: .5rem 1rem; font-weight: 400; display: block; }
+        .dropdown-menu a:hover { background: #f0f0f0; }
+
+        /* Main */
+        .main-content { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+
+        /* Hero */
+        .hero { background: #1a4480; color: #fff; padding: 2.5rem 2rem; text-align: center; }
+        .hero h2 { font-size: 2rem; margin-bottom: .5rem; }
+        .hero p { font-size: 1.1rem; opacity: .9; max-width: 700px; margin: 0 auto; }
+        .hero .search-box { margin-top: 1.5rem; display: flex; justify-content: center; gap: .5rem; }
+        .hero .search-box input { padding: .7rem 1rem; width: 400px; max-width: 90%; border: none; border-radius: .25rem; font-size: 1rem; }
+        .hero .search-box button { padding: .7rem 1.5rem; background: #e52207; color: #fff; border: none; border-radius: .25rem; cursor: pointer; font-size: 1rem; font-weight: 600; }
+
+        /* Cards */
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .card { background: #fff; border: 1px solid #dfe1e2; border-radius: .25rem; padding: 1.5rem; }
+        .card h3 { font-size: 1.1rem; margin-bottom: .5rem; color: #1a4480; }
+        .card p { font-size: .9rem; color: #565c65; }
+        .card .card-link { display: inline-block; margin-top: .75rem; font-size: .9rem; font-weight: 600; }
+
+        /* Section */
+        .section-title { font-size: 1.4rem; color: #1b1b1b; border-bottom: 3px solid #005ea2; padding-bottom: .5rem; margin-bottom: 1rem; margin-top: 2rem; }
+
+        /* Tables */
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: #fff; }
+        .data-table th { background: #1a4480; color: #fff; padding: .6rem .8rem; text-align: left; font-size: .85rem; font-weight: 600; }
+        .data-table td { padding: .6rem .8rem; border-bottom: 1px solid #dfe1e2; font-size: .85rem; }
+        .data-table tr:hover { background: #f0f0f0; }
+
+        /* Status badges */
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .15rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+        .badge-approved { background: #00a91c; color: #fff; }
+        .badge-pending { background: #ffbe2e; color: #1b1b1b; }
+        .badge-review { background: #00bde3; color: #1b1b1b; }
+        .badge-denied { background: #e52207; color: #fff; }
+        .badge-expired { background: #71767a; color: #fff; }
+
+        /* Forms */
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .3rem; color: #1b1b1b; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .6rem .8rem; border: 2px solid #565c65; border-radius: .25rem; font-size: .95rem; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #005ea2; outline: 2px solid #005ea2; outline-offset: 0; }
+        .btn { display: inline-block; padding: .7rem 1.5rem; font-size: .95rem; font-weight: 700; border: none; border-radius: .25rem; cursor: pointer; text-decoration: none; }
+        .btn-primary { background: #005ea2; color: #fff; }
+        .btn-primary:hover { background: #1a4480; color: #fff; }
+        .btn-danger { background: #e52207; color: #fff; }
+        .btn-secondary { background: #71767a; color: #fff; }
+
+        /* Filters */
+        .filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; background: #fff; padding: 1rem 1.5rem; border: 1px solid #dfe1e2; border-radius: .25rem; margin-bottom: 1.5rem; }
+        .filters .form-group { margin-bottom: 0; }
+        .filters label { font-size: .8rem; }
+        .filters select, .filters input { padding: .4rem .6rem; font-size: .85rem; }
+
+        /* Alerts */
+        .alert { padding: 1rem 1.5rem; border-radius: .25rem; margin-bottom: 1rem; font-size: .9rem; }
+        .alert-success { background: #ecf3ec; border-left: 4px solid #00a91c; color: #1b1b1b; }
+        .alert-error { background: #fce4ec; border-left: 4px solid #e52207; color: #1b1b1b; }
+        .alert-info { background: #e7f6f8; border-left: 4px solid #00bde3; color: #1b1b1b; }
+
+        /* Footer */
+        .site-footer { background: #1b1b1b; color: #a9aeb1; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 3rem; }
+        .site-footer a { color: #73b3e7; }
+
+        .result-count { font-size: .85rem; color: #71767a; margin-bottom: 1rem; }
+
+        /* Detail page */
+        .detail-header { background: #fff; border: 1px solid #dfe1e2; padding: 1.5rem; border-radius: .25rem; margin-bottom: 1.5rem; }
+        .detail-header h2 { color: #1a4480; margin-bottom: .5rem; }
+        .detail-meta { font-size: .85rem; color: #71767a; }
+        .detail-meta span { margin-right: 1.5rem; }
+        .detail-body { background: #fff; border: 1px solid #dfe1e2; padding: 1.5rem; border-radius: .25rem; }
+    </style>
+</head>
+<body>
+    <div class="gov-banner">
+        <span>An official website of the City of Cedar Grove</span>
+    </div>
+
+    <header class="site-header">
+        <div class="header-top">
+            <h1><a href="{{ url_for('agency-portals.index') }}">City of Cedar Grove</a></h1>
+            <div class="auth-links">
+                {% if user %}
+                    <a href="{{ url_for('agency-portals.dashboard') }}">My Account ({{ user.name }})</a>
+                    <a href="{{ url_for('agency-portals.logout') }}">Sign Out</a>
+                {% else %}
+                    <a href="{{ url_for('agency-portals.login_page') }}">Sign In</a>
+                    <a href="{{ url_for('agency-portals.register_page') }}">Create Account</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <nav class="site-nav">
+        <ul>
+            <li><a href="{{ url_for('agency-portals.index') }}">Home</a></li>
+            <li class="nav-dropdown">
+                <a href="{{ url_for('agency-portals.departments_page') }}">Departments</a>
+                <div class="dropdown-menu" id="dept-dropdown">
+                    {% for dept in departments if departments is defined %}
+                    <a href="{{ url_for('agency-portals.department_detail', dept_id=dept.id) }}">{{ dept.name }}</a>
+                    {% endfor %}
+                </div>
+            </li>
+            <li><a href="{{ url_for('agency-portals.services_page') }}">Services</a></li>
+            <li><a href="{{ url_for('agency-portals.permits_page') }}">Permits</a></li>
+            <li><a href="{{ url_for('agency-portals.records_page') }}">Public Records</a></li>
+            <li><a href="{{ url_for('agency-portals.announcements_page') }}">Announcements</a></li>
+            <li><a href="{{ url_for('agency-portals.pay_page') }}">Pay Online</a></li>
+            <li><a href="{{ url_for('agency-portals.book_page') }}">Schedule Appointment</a></li>
+        </ul>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+    <footer class="site-footer">
+        <p>City of Cedar Grove | 100 Civic Center Drive | Cedar Grove, State 00000</p>
+        <p>Phone: (555) 234-0000 | <a href="mailto:info@cedargrove.gov">info@cedargrove.gov</a></p>
+        <p style="margin-top:.5rem;">An official government website. All rights reserved.</p>
+    </footer>
+</body>
+</html>

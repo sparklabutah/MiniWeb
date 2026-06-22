@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo - Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #f8f9fa; color: #3c4043; }
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #dadce0; background: #fff; }
+        .header .logo { font-size: 22px; font-weight: 400; color: #5f6368; }
+        .header .logo span { color: #1a73e8; font-weight: 500; }
+        .header-nav a { font-size: 14px; color: #5f6368; text-decoration: none; padding: 6px 12px; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+        .dashboard { max-width: 900px; margin: 24px auto; padding: 0 24px; }
+        .welcome { font-size: 24px; font-weight: 400; color: #202124; margin-bottom: 4px; }
+        .user-email { font-size: 14px; color: #5f6368; margin-bottom: 24px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+        .stat-card { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #dadce0; }
+        .stat-card .stat-num { font-size: 32px; font-weight: 400; color: #1a73e8; }
+        .stat-card .stat-label { font-size: 13px; color: #5f6368; margin-top: 4px; }
+        .section-title { font-size: 16px; font-weight: 500; color: #202124; margin-bottom: 12px; border-bottom: 2px solid #1a73e8; padding-bottom: 8px; display: inline-block; }
+        .event-list { margin-bottom: 32px; }
+        .event-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #fff; border: 1px solid #dadce0; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #4285f4; }
+        .event-item.cat-work { border-left-color: #4285f4; }
+        .event-item.cat-personal { border-left-color: #0b8043; }
+        .event-item.cat-health { border-left-color: #d50000; }
+        .event-item .event-date { min-width: 90px; font-size: 12px; color: #5f6368; }
+        .event-item .event-info { flex: 1; }
+        .event-item .event-info a { font-size: 14px; color: #1a73e8; text-decoration: none; font-weight: 500; }
+        .event-item .event-info a:hover { text-decoration: underline; }
+        .event-item .event-info .meta { font-size: 12px; color: #5f6368; margin-top: 2px; }
+        .settings { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #dadce0; }
+        .settings .setting-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f3f4; font-size: 14px; }
+        .settings .setting-row:last-child { border-bottom: none; }
+        .settings .setting-label { color: #5f6368; }
+        .settings .setting-value { color: #202124; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo"><span>Calendar</span>Todo</div>
+        <div class="header-nav">
+            <a href="{{ url_for('calendar-todo.index') }}">Calendar</a>
+            <a href="{{ url_for('calendar-todo.logout') }}">Logout</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="welcome">Welcome, {{ user.name }}</div>
+        <div class="user-email">{{ user.email }}</div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-num">{{ events|length }}</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">{{ upcoming|length }}</div>
+                <div class="stat-label">Upcoming Events</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">{{ user.calendars|length }}</div>
+                <div class="stat-label">Calendars</div>
+            </div>
+        </div>
+
+        <div class="section-title">Upcoming Events</div>
+        <div class="event-list">
+            {% for event in upcoming[:10] %}
+            <div class="event-item cat-{{ event.category }}">
+                <div class="event-date">
+                    {{ event.start[:10] }}<br>
+                    {% if event.all_day %}All day{% else %}{{ event.start[11:16] }}{% endif %}
+                </div>
+                <div class="event-info">
+                    <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">{{ event.title }}</a>
+                    <div class="meta">{{ event.category|capitalize }} | {{ event.calendar }} | {{ event.priority|capitalize }} priority{% if event.location %} | {{ event.location }}{% endif %}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section-title">All Events</div>
+        <div class="event-list">
+            {% for event in events %}
+            <div class="event-item cat-{{ event.category }}">
+                <div class="event-date">
+                    {{ event.start[:10] }}<br>
+                    {% if event.all_day %}All day{% else %}{{ event.start[11:16] }}{% endif %}
+                </div>
+                <div class="event-info">
+                    <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">{{ event.title }}</a>
+                    <div class="meta">{{ event.category|capitalize }} | {{ event.calendar }} | {{ event.priority|capitalize }}{% if event.recurring %} | {{ event.recurring|capitalize }}{% endif %}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section-title">Settings</div>
+        <div class="settings">
+            <div class="setting-row">
+                <span class="setting-label">Default View</span>
+                <span class="setting-value">{{ user.settings.default_view|capitalize }}</span>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Timezone</span>
+                <span class="setting-value">{{ user.settings.timezone }}</span>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Week Starts On</span>
+                <span class="setting-value">{{ user.settings.week_start|capitalize }}</span>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Calendars</span>
+                <span class="setting-value">{{ user.calendars|join(', ') }}</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

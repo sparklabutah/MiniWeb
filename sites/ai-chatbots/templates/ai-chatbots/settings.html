@@ -1,0 +1,193 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}Settings - AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>Settings</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-container" style="max-width:600px;">
+    <h2>Preferences</h2>
+
+    <form id="settings-form" onsubmit="saveSettings(event)">
+        <div class="dropdown-group">
+            <label for="default_bot">Default Bot</label>
+            <select id="default_bot" name="default_bot">
+                {% for b in bots %}
+                <option value="{{ b }}" {% if user.preferences.default_bot == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="dropdown-group">
+            <label for="theme">Theme</label>
+            <select id="theme" name="theme">
+                <option value="dark" {% if user.preferences.theme == 'dark' %}selected{% endif %}>Dark</option>
+                <option value="light" {% if user.preferences.theme == 'light' %}selected{% endif %}>Light</option>
+            </select>
+        </div>
+
+        <div class="dropdown-group">
+            <label for="font_size">Font Size</label>
+            <select id="font_size" name="font_size">
+                <option value="small" {% if user.preferences.font_size == 'small' %}selected{% endif %}>Small</option>
+                <option value="medium" {% if user.preferences.font_size == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="large" {% if user.preferences.font_size == 'large' %}selected{% endif %}>Large</option>
+            </select>
+        </div>
+
+        <div class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="notifications" name="notifications" {% if user.preferences.notifications %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Enable Notifications</span>
+        </div>
+
+        <div class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="save_history" name="save_history" {% if user.preferences.save_history %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Save Chat History</span>
+        </div>
+
+        <div style="margin-top:16px;">
+            <h3 style="font-size:15px; margin-bottom:12px;">Subscription Plan</h3>
+            <div class="radio-group">
+                <label><input type="radio" name="subscription" value="free" {% if user.subscription == 'free' %}checked{% endif %}> Free Plan</label>
+                <label><input type="radio" name="subscription" value="pro" {% if user.subscription == 'pro' %}checked{% endif %}> Pro Plan</label>
+                <label><input type="radio" name="subscription" value="enterprise" {% if user.subscription == 'enterprise' %}checked{% endif %}> Enterprise Plan</label>
+            </div>
+        </div>
+
+        <button type="submit" class="form-btn">Save Settings</button>
+    </form>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Export Data</h3>
+        <div class="dropdown-group">
+            <label for="export_type">Export Type</label>
+            <select id="export_type">
+                <option value="conversations">My Conversations</option>
+                <option value="knowledge">Knowledge Base</option>
+                <option value="prompts">Prompts Library</option>
+            </select>
+        </div>
+        <div class="dropdown-group">
+            <label for="export_format">Format</label>
+            <select id="export_format">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+            </select>
+        </div>
+        <button class="btn-small btn-primary" onclick="exportData()">Export</button>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Upload Document to Knowledge Base</h3>
+        <form id="upload-form" onsubmit="uploadDoc(event)">
+            <div class="form-group">
+                <label for="upload_topic">Topic</label>
+                <input type="text" id="upload_topic" placeholder="Document topic">
+            </div>
+            <div class="form-group">
+                <label for="upload_category">Category</label>
+                <input type="text" id="upload_category" placeholder="e.g., programming, ai, data">
+            </div>
+            <div class="form-group">
+                <label for="upload_content">Content</label>
+                <textarea id="upload_content" rows="4" placeholder="Enter document content..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="upload_keywords">Keywords (comma-separated)</label>
+                <input type="text" id="upload_keywords" placeholder="e.g., docker, container, devops">
+            </div>
+            <button type="submit" class="btn-small btn-primary">Upload</button>
+        </form>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px; color:#ef4444;">Danger Zone</h3>
+        <p style="font-size:13px; color:#8e8ea0; margin-bottom:12px;">Delete all your conversations. This cannot be undone.</p>
+        <button class="btn-small btn-danger" onclick="deleteAllConvs()">Delete All Conversations</button>
+    </div>
+</div>
+
+<script>
+var userId = {{ user.id|tojson }};
+var baseUrl = {{ url_for('ai-chatbots.index')|tojson }};
+
+function saveSettings(e) {
+    e.preventDefault();
+    var prefs = {
+        default_bot: document.getElementById('default_bot').value,
+        theme: document.getElementById('theme').value,
+        font_size: document.getElementById('font_size').value,
+        notifications: document.getElementById('notifications').checked,
+        save_history: document.getElementById('save_history').checked
+    };
+    fetch(baseUrl + 'api/users/' + userId + '/preferences', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(prefs)
+    }).then(function(r) { return r.json(); })
+    .then(function() { alert('Settings saved!'); });
+
+    // Update subscription
+    var sub = document.querySelector('input[name="subscription"]:checked').value;
+    fetch(baseUrl + 'api/users/' + userId + '/subscription', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({plan: sub})
+    });
+}
+
+function exportData() {
+    var type = document.getElementById('export_type').value;
+    var fmt = document.getElementById('export_format').value;
+    var url = baseUrl + 'api/export?type=' + type + '&format=' + fmt;
+    if (type === 'conversations') url += '&user_id=' + userId;
+    window.open(url, '_blank');
+}
+
+function uploadDoc(e) {
+    e.preventDefault();
+    var topic = document.getElementById('upload_topic').value.trim();
+    var category = document.getElementById('upload_category').value.trim();
+    var content = document.getElementById('upload_content').value.trim();
+    var keywordsStr = document.getElementById('upload_keywords').value.trim();
+    var keywords = keywordsStr ? keywordsStr.split(',').map(function(k) { return k.trim(); }) : [];
+
+    if (!topic) { alert('Please enter a topic'); return; }
+    if (!content) { alert('Please enter content'); return; }
+
+    fetch(baseUrl + 'api/upload', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            topic: topic,
+            category: category || 'uploaded',
+            content: content,
+            keywords: keywords
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { alert('Uploaded: ' + data.topic + ' (ID: ' + data.id + ')'); });
+}
+
+function deleteAllConvs() {
+    if (!confirm('Delete ALL your conversations?')) return;
+    fetch(baseUrl + 'api/conversations?user_id=' + userId)
+    .then(function(r) { return r.json(); })
+    .then(function(convs) {
+        var promises = convs.map(function(c) {
+            return fetch(baseUrl + 'api/conversations/' + c.id, {method:'DELETE'});
+        });
+        return Promise.all(promises);
+    }).then(function() { alert('All conversations deleted.'); location.reload(); });
+}
+</script>
+{% endblock %}

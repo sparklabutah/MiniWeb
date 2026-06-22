@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TradeCore{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .topbar { background: #161b22; border-bottom: 1px solid #30363d; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .topbar .logo { font-size: 1.3rem; font-weight: 700; color: #58a6ff; }
+        .topbar nav a { margin-left: 1.2rem; font-size: 0.9rem; color: #8b949e; }
+        .topbar nav a:hover { color: #c9d1d9; text-decoration: none; }
+        .topbar nav a.active { color: #58a6ff; }
+        .topbar .market-status { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 0.25rem; }
+        .status-open { background: #0d4429; color: #3fb950; }
+        .status-closed { background: #3d1f00; color: #d29922; }
+
+        .container { max-width: 1280px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+        .card h2 { font-size: 1rem; color: #8b949e; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; }
+
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: #f0f6fc; }
+        .stat-label { font-size: 0.8rem; color: #8b949e; }
+        .positive { color: #3fb950; }
+        .negative { color: #f85149; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 0.6rem 0.8rem; font-size: 0.75rem; color: #8b949e; text-transform: uppercase; border-bottom: 1px solid #30363d; }
+        td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #21262d; font-size: 0.9rem; }
+        tr:hover { background: #1c2128; }
+
+        .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 0.375rem; font-size: 0.85rem; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; }
+        .btn:hover { background: #30363d; text-decoration: none; }
+        .btn-primary { background: #238636; border-color: #2ea043; color: #fff; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-danger { background: #da3633; border-color: #f85149; color: #fff; }
+        .btn-danger:hover { background: #f85149; }
+        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+
+        select, input[type="text"], input[type="number"], input[type="password"], input[type="date"] {
+            background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 0.4rem 0.6rem;
+            border-radius: 0.375rem; font-size: 0.85rem;
+        }
+        select:focus, input:focus { border-color: #58a6ff; outline: none; }
+
+        .filters { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+        .filters label { font-size: 0.8rem; color: #8b949e; }
+
+        .sparkline { display: inline-flex; align-items: flex-end; gap: 1px; height: 30px; }
+        .sparkline .bar { width: 4px; background: #58a6ff; border-radius: 1px 1px 0 0; min-height: 1px; }
+        .sparkline .bar.down { background: #f85149; }
+        .sparkline .bar.up { background: #3fb950; }
+
+        .chart-container { padding: 0.5rem 0; }
+        .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 0.5rem 0; }
+        .bar-chart .bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .bar-chart .bar-fill { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.3s; }
+        .bar-chart .bar-label { font-size: 0.6rem; color: #8b949e; margin-top: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50px; }
+
+        .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 600; }
+        .tag-stock { background: #1f3a5f; color: #58a6ff; }
+        .tag-crypto { background: #3d2800; color: #d29922; }
+        .tag-index_fund { background: #0d4429; color: #3fb950; }
+        .tag-futures { background: #3d1f3f; color: #bc8cff; }
+
+        .msg { display: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.85rem; margin: 0.5rem 0; }
+        .msg-success { background: #0d4429; color: #3fb950; border: 1px solid #2ea043; }
+        .msg-error { background: #3d1f00; color: #f85149; border: 1px solid #da3633; }
+
+        .radio-group { display: flex; gap: 0.5rem; }
+        .radio-group label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer; padding: 0.3rem 0.6rem; border: 1px solid #30363d; border-radius: 0.375rem; }
+        .radio-group input[type="radio"] { accent-color: #58a6ff; }
+        .radio-group label:has(input:checked) { border-color: #58a6ff; background: #1f2937; }
+
+        .slider-container { display: flex; align-items: center; gap: 0.5rem; }
+        .slider-container input[type="range"] { flex: 1; accent-color: #58a6ff; }
+        .slider-value { font-size: 0.85rem; min-width: 60px; text-align: right; }
+
+        .sim-clock { font-size: 0.75rem; color: #8b949e; }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <a href="{{ url_for('brokerage.index') }}" class="logo" style="text-decoration:none">TradeCore</a>
+            <span class="market-status {% if sim_time.weekday() < 5 %}status-open{% else %}status-closed{% endif %}">
+                {% if sim_time.weekday() < 5 %}Market Open{% else %}Market Closed{% endif %}
+            </span>
+            <span class="sim-clock">{{ sim_time.strftime('%b %d, %Y %I:%M %p') }} ET</span>
+        </div>
+        <nav>
+            <a href="{{ url_for('brokerage.index') }}">Markets</a>
+            <a href="{{ url_for('brokerage.options_page') }}">Options</a>
+            <a href="{{ url_for('brokerage.compare_page') }}">Compare</a>
+            {% if user %}
+            <a href="{{ url_for('brokerage.portfolio_page') }}">Portfolio</a>
+            <a href="{{ url_for('brokerage.orders_page') }}">Orders</a>
+            <a href="{{ url_for('brokerage.watchlist_page') }}">Watchlist</a>
+            <a href="{{ url_for('brokerage.trade_page') }}">Trade</a>
+            <a href="{{ url_for('brokerage.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('brokerage.login_page') }}">Login</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </nav>
+    </div>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

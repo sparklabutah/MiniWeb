@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} - Apex Dynamics Blog</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --card-bg: #fff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+        a { color: var(--accent); text-decoration: none; }
+        .navbar { background: var(--primary); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .navbar .logo { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .navbar .logo span { color: #3b82f6; }
+        .navbar nav { display: flex; align-items: center; }
+        .navbar nav a { color: #cbd5e1; margin-left: 1.5rem; font-size: .9rem; text-decoration: none; }
+        .navbar nav a:hover { color: #fff; }
+        .navbar .search-form { display: flex; margin-left: 1.5rem; }
+        .navbar .search-form input { padding: 4px 10px; border: 1px solid #475569; border-radius: 4px 0 0 4px; background: #1e293b; color: #e2e8f0; font-size: .85rem; width: 160px; }
+        .navbar .search-form button { padding: 4px 10px; background: var(--accent); color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: .85rem; }
+        .section { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+        .article { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 2.5rem; }
+        .article h1 { font-size: 1.6rem; color: var(--primary); margin-bottom: .75rem; }
+        .article .meta { font-size: .85rem; color: var(--text-light); margin-bottom: 1.5rem; }
+        .badge { display: inline-block; background: #eff6ff; color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: .78rem; margin-right: .3rem; }
+        .article .body { line-height: 1.8; font-size: 1rem; }
+        .tags { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .related { margin-top: 2rem; }
+        .related h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: 1rem; }
+        .related a { display: block; padding: .5rem 0; font-size: .95rem; }
+        .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 3rem; }
+        .footer a { color: #cbd5e1; margin: 0 .5rem; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('business-company.index') }}" class="logo">Apex<span>Dynamics</span></a>
+        <nav>
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Newsletter</a>
+            <form class="search-form" action="{{ url_for('business-company.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search..." aria-label="Search">
+                <button type="submit">Go</button>
+            </form>
+        </nav>
+    </div>
+
+    <div class="section">
+        <div class="article">
+            <img src="https://placehold.co/800x350/EEE/999?text=blog-{{ post.id }}" alt="{{ post.title }}" style="width: 100%; height: 300px; object-fit: cover; border-radius: 6px; margin-bottom: 1.5rem; display: block;">
+            <h1>{{ post.title }}</h1>
+            <div class="meta">
+                <span class="badge">{{ post.category }}</span>
+                {{ post.date }} &middot; By {{ post.author }}
+            </div>
+            <div class="body">{{ post.body }}</div>
+            <div class="tags">
+                {% for tag in post.tags %}
+                <span class="badge">{{ tag }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h2>Related Articles</h2>
+            {% for r in related %}
+            <a href="{{ url_for('business-company.blog_post', post_id=r.id) }}">{{ r.title }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Apex Dynamics Corp.</p>
+        <p style="margin-top:.5rem">
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+        </p>
+    </div>
+</body>
+</html>

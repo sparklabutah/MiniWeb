@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ paper.title }} — ScholarBase</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .header { border-bottom: 1px solid #e2e8f0; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; margin: 0; color: #1e3a5f; }
+        .detail { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .back-link { font-size: .9rem; display: inline-block; margin-bottom: 1rem; }
+        .detail h2 { font-size: 1.5rem; color: #1e293b; margin: 0 0 .5rem; line-height: 1.3; }
+        .authors { font-size: 1rem; color: #475569; margin-bottom: .5rem; }
+        .authors a { color: #3b82f6; text-decoration: none; }
+        .authors a:hover { text-decoration: underline; }
+        .meta-row { display: flex; flex-wrap: wrap; gap: .8rem; font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .meta-row .cat { background: #f1f5f9; padding: .2rem .6rem; border-radius: .25rem; color: #475569; text-decoration: none; }
+        .meta-row .cat:hover { background: #e2e8f0; }
+        .abstract-section { margin: 1.5rem 0; }
+        .abstract-section h3 { font-size: 1rem; color: #1e293b; margin: 0 0 .5rem; }
+        .abstract-text { font-size: .95rem; line-height: 1.7; color: #334155; }
+        .info-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+        .info-table th { text-align: left; color: #64748b; padding: .5rem .8rem; background: #f8fafc; width: 150px; }
+        .info-table td { padding: .5rem .8rem; color: #334155; }
+        .info-table tr { border-bottom: 1px solid #f1f5f9; }
+        .actions { display: flex; gap: .5rem; margin: 1rem 0; }
+        .btn { padding: .5rem 1rem; border: 1px solid #cbd5e1; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #475569; }
+        .btn:hover { background: #f1f5f9; }
+        .btn-primary { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+        .btn-primary:hover { background: #2d4a6f; }
+        .msg { display: none; font-size: .85rem; color: #059669; margin: .5rem 0; }
+        .related { margin-top: 2rem; }
+        .related h3 { font-size: 1rem; color: #1e293b; margin: 0 0 .8rem; }
+        .related-item { border-left: 3px solid #e2e8f0; padding: .5rem .8rem; margin-bottom: .5rem; }
+        .related-item a { font-size: .9rem; color: #1e3a5f; text-decoration: none; }
+        .related-item a:hover { text-decoration: underline; }
+        .related-meta { font-size: .8rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('academic-paper-db.index') }}" style="color:inherit;text-decoration:none">ScholarBase</a></h1>
+        <a href="/" class="back-link">&larr; MiniWeb</a>
+    </div>
+
+    <div class="detail">
+        <a href="{{ url_for('academic-paper-db.index') }}" class="back-link">&larr; Back to search</a>
+
+        <h2>{{ paper.title }}</h2>
+
+        <div class="authors">
+            {% for a in paper.authors %}
+            <a href="{{ url_for('academic-paper-db.index', q=a) }}">{{ a }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="meta-row">
+            <span>{{ paper.year }}</span>
+            {% for c in paper.categories %}
+            <a class="cat" href="{{ url_for('academic-paper-db.category_page', cat_name=c) }}">{{ c }}</a>
+            {% endfor %}
+            <span>arXiv: {{ paper.arxiv_id }}</span>
+        </div>
+
+        <div class="actions">
+            {% if user %}
+            <button class="btn btn-primary" onclick="savePaper({{ paper.id }})">Save Paper</button>
+            {% if paper.authors %}
+            <button class="btn" onclick="followAuthor('{{ paper.authors[0] }}')">Follow {{ paper.authors[0] }}</button>
+            {% endif %}
+            {% else %}
+            <a class="btn btn-primary" href="{{ url_for('academic-paper-db.login_page') }}">Sign in to save & follow</a>
+            {% endif %}
+        </div>
+        <div class="msg" id="action-msg"></div>
+
+        <div class="abstract-section">
+            <h3>Abstract</h3>
+            <p class="abstract-text">{{ paper.abstract }}</p>
+        </div>
+
+        <table class="info-table">
+            <tr><th>arXiv ID</th><td>{{ paper.arxiv_id }}</td></tr>
+            <tr><th>Categories</th><td>{{ paper.categories | join(', ') }}</td></tr>
+            <tr><th>Year</th><td>{{ paper.year }}</td></tr>
+            {% if paper.doi %}<tr><th>DOI</th><td>{{ paper.doi }}</td></tr>{% endif %}
+            {% if paper.journal_ref %}<tr><th>Journal</th><td>{{ paper.journal_ref }}</td></tr>{% endif %}
+            {% if paper.comments %}<tr><th>Comments</th><td>{{ paper.comments }}</td></tr>{% endif %}
+            <tr><th>Last Updated</th><td>{{ paper.update_date }}</td></tr>
+            <tr><th>Authors</th><td>{{ paper.authors | join(', ') }}</td></tr>
+        </table>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Papers ({{ paper.primary_category }})</h3>
+            {% for r in related %}
+            <div class="related-item">
+                <a href="{{ url_for('academic-paper-db.paper_detail', paper_id=r.id) }}">{{ r.title }}</a>
+                <div class="related-meta">{{ r.authors_str }} · {{ r.year }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if user %}
+    <script>
+    const BASE = "{{ url_for('academic-paper-db.index') }}".replace(/\/$/, "");
+    const USER_ID = {{ user.id }};
+
+    function showMsg(text) {
+        const el = document.getElementById("action-msg");
+        el.textContent = text;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 3000);
+    }
+
+    async function savePaper(pid) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({paper_id: pid})
+        });
+        if (r.ok) { const d = await r.json(); showMsg(`Paper ${d.action}!`); }
+    }
+
+    async function followAuthor(name) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({author: name})
+        });
+        if (r.ok) { const d = await r.json(); showMsg(`Author ${d.action}!`); }
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .top-bar { background: #232f3e; color: #fff; padding: 0 1.5rem; height: 48px; display: flex; align-items: center; justify-content: space-between; }
+        .top-bar .logo { font-size: 1.1rem; font-weight: 700; color: #ff9900; text-decoration: none; }
+        .top-bar .logo span { color: #fff; font-weight: 400; margin-left: .3rem; }
+        .nav-bar { background: #37475a; padding: 0 1.5rem; display: flex; gap: 0; overflow-x: auto; }
+        .nav-bar a { color: #d5dbdb; text-decoration: none; padding: .6rem 1rem; font-size: .85rem; white-space: nowrap; border-bottom: 2px solid transparent; }
+        .nav-bar a:hover, .nav-bar a.active { color: #fff; background: rgba(255,255,255,.08); border-bottom-color: #ff9900; }
+        .top-bar-right { display: flex; align-items: center; gap: 1rem; }
+        .top-bar-right a { color: #d5dbdb; text-decoration: none; font-size: .85rem; }
+        .top-bar-right a:hover { color: #ff9900; }
+        .search-bar { display: flex; align-items: center; background: #37475a; border-radius: 4px; padding: 0 .5rem; margin: 0 1rem; }
+        .search-bar input { background: transparent; border: none; color: #fff; padding: .4rem .5rem; font-size: .85rem; width: 250px; outline: none; }
+        .search-bar input::placeholder { color: #8899a6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: 1.5rem; color: #16213e; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: #fff; border-radius: 8px; padding: 1.2rem; border-left: 4px solid #ff9900; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .stat-card.critical { border-left-color: #e74c3c; }
+        .stat-card.success { border-left-color: #27ae60; }
+        .stat-card.info { border-left-color: #3498db; }
+        .stat-label { font-size: .8rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: #1a1a2e; margin: .3rem 0; }
+        .stat-detail { font-size: .8rem; color: #94a3b8; }
+        .section-title { font-size: 1.1rem; margin: 1.5rem 0 .8rem; color: #16213e; border-bottom: 1px solid #e2e8f0; padding-bottom: .5rem; }
+        .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
+        .service-card { background: #fff; border-radius: 6px; padding: 1rem; cursor: pointer; text-decoration: none; color: inherit; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: box-shadow .15s, transform .15s; border: 1px solid #e8ecef; }
+        .service-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); transform: translateY(-1px); }
+        .service-card .svc-name { font-weight: 600; font-size: .95rem; margin-bottom: .3rem; }
+        .service-card .svc-cat { font-size: .75rem; color: #64748b; }
+        .service-card .svc-status { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .7rem; font-weight: 600; margin-top: .4rem; }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-stopped { background: #f8d7da; color: #721c24; }
+        .status-running { background: #d4edda; color: #155724; }
+        .status-available { background: #d4edda; color: #155724; }
+        .alert-list { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .alert-item { display: flex; align-items: center; padding: .8rem 1rem; border-bottom: 1px solid #f0f2f5; gap: .8rem; }
+        .alert-item:last-child { border-bottom: none; }
+        .alert-severity { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .severity-critical { background: #e74c3c; }
+        .severity-warning { background: #f39c12; }
+        .alert-name { font-weight: 500; font-size: .9rem; }
+        .alert-resource { font-size: .8rem; color: #64748b; }
+        .alert-time { font-size: .75rem; color: #94a3b8; margin-left: auto; }
+        .dropdown-menu { position: relative; display: inline-block; }
+        .dropdown-menu select { padding: .4rem .8rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .85rem; background: #fff; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a>
+        <div class="search-bar">
+            <input type="text" placeholder="Search services, instances, logs..." id="global-search">
+        </div>
+        <div class="top-bar-right">
+            {% if user %}
+            <a href="{{ url_for('cloud-dev-consoles.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('cloud-dev-consoles.logout') }}">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('cloud-dev-consoles.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}" class="active">Home</a>
+        <a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a>
+        <a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a>
+        <a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a>
+        <a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a>
+        <a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a>
+        <a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a>
+        <a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a>
+        <a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a>
+        <a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a>
+        <a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a>
+        <a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+
+    <div class="container">
+        <h1 class="page-title">Console Home</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card success">
+                <div class="stat-label">Running Instances</div>
+                <div class="stat-value">{{ running_instances }}</div>
+                <div class="stat-detail">of {{ total_instances }} total</div>
+            </div>
+            <div class="stat-card {% if critical_alerts > 0 %}critical{% endif %}">
+                <div class="stat-label">Active Alerts</div>
+                <div class="stat-value">{{ active_alerts }}</div>
+                <div class="stat-detail">{{ critical_alerts }} critical</div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-label">Monthly Cost</div>
+                <div class="stat-value">${{ "%.2f"|format(total_cost) }}</div>
+                <div class="stat-detail">Budget: ${{ "%.2f"|format(total_budget) }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Services</div>
+                <div class="stat-value">{{ services|length }}</div>
+                <div class="stat-detail">across {{ categories|length }} categories</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Services by Category</h2>
+        {% for cat in categories %}
+        <h3 style="font-size:.9rem; color:#37475a; margin: 1rem 0 .5rem;">{{ cat }}</h3>
+        <div class="service-grid">
+            {% for svc in services if svc.category == cat %}
+            <a href="{{ url_for('cloud-dev-consoles.service_detail', service_id=svc.id) }}" class="service-card">
+                <div class="svc-name">{{ svc.name }}</div>
+                <div class="svc-cat">{{ svc.category }}</div>
+                <span class="svc-status status-{{ svc.status }}">{{ svc.status }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endfor %}
+
+        <h2 class="section-title">Recent Alerts</h2>
+        <div class="alert-list">
+            {% for alert in alerts if alert.status == 'active' %}
+            <div class="alert-item">
+                <div class="alert-severity severity-{{ alert.severity }}"></div>
+                <div>
+                    <div class="alert-name">{{ alert.name }}</div>
+                    <div class="alert-resource">{{ alert.resource_name }}</div>
+                </div>
+                <div class="alert-time">{{ alert.triggered_at }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('global-search').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const q = this.value.trim();
+            if (q) window.location.href = '{{ url_for("cloud-dev-consoles.services_page") }}?q=' + encodeURIComponent(q);
+        }
+    });
+    </script>
+</body>
+</html>

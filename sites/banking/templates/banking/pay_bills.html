@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay Bills - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .main { max-width: 900px; margin: 2rem auto; padding: 0 2rem; }
+        .main h2 { color: #0a2463; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .7rem 1rem; font-size: .78rem; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
+        .badge-due { background: #fef3c7; color: #92400e; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+        .badge-overdue { background: #fee2e2; color: #991b1b; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+        .badge-paid { background: #d1fae5; color: #065f46; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+        .btn-pay { background: #0a2463; color: #fff; border: none; padding: .4rem .8rem; border-radius: .3rem; cursor: pointer; font-size: .8rem; }
+        .btn-pay:hover { background: #1e3a6e; }
+        .btn-pay:disabled { background: #94a3b8; cursor: not-allowed; }
+        .alert { padding: .8rem 1rem; border-radius: .4rem; margin-bottom: 1rem; font-size: .9rem; }
+        .alert-success { background: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('banking.index') }}">Dashboard</a>
+        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
+        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
+        <a href="{{ url_for('banking.pay_bills_page') }}" class="active">Pay Bills</a>
+        <a href="{{ url_for('banking.payees_page') }}">Payees</a>
+        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
+        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="main">
+        <h2>Bills and Payments</h2>
+
+        {% if result %}
+        <div class="alert alert-success">{{ result }}</div>
+        {% endif %}
+
+        <table>
+            <thead>
+                <tr><th>Payee</th><th>Category</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Auto-Pay</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                {% for bill in bills %}
+                <tr>
+                    <td>{{ bill.payee_name }}</td>
+                    <td>{{ bill.category }}</td>
+                    <td>${{ "%.2f"|format(bill.amount) }}</td>
+                    <td>{{ bill.due_date }}</td>
+                    <td>
+                        {% if bill.status == 'paid' %}<span class="badge-paid">Paid</span>
+                        {% elif bill.status == 'overdue' %}<span class="badge-overdue">Overdue</span>
+                        {% else %}<span class="badge-due">Due</span>{% endif %}
+                    </td>
+                    <td>{{ 'Yes' if bill.auto_pay else 'No' }}</td>
+                    <td>
+                        {% if bill.status != 'paid' %}
+                        <button class="btn-pay" onclick="payBill({{ bill.id }})">Pay Now</button>
+                        {% else %}
+                        <button class="btn-pay" disabled>Paid</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    function payBill(billId) {
+        fetch('{{ url_for("banking.index") }}api/bills/' + billId + '/pay', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({account_id: null})
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'paid') location.reload();
+            else alert('Payment failed');
+        });
+    }
+    </script>
+</body>
+</html>

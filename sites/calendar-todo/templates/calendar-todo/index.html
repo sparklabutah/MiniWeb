@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #fff; color: #3c4043; font-size: 14px; }
+
+        /* ── Header bar ── */
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #dadce0; background: #fff; position: sticky; top: 0; z-index: 100; height: 48px; }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left .hamburger { font-size: 20px; color: #5f6368; cursor: pointer; padding: 4px 8px; border-radius: 50%; border: none; background: none; }
+        .header-left .hamburger:hover { background: #f1f3f4; }
+        .header-left .logo { font-size: 22px; font-weight: 400; color: #5f6368; white-space: nowrap; }
+        .header-left .logo span { color: #1a73e8; font-weight: 500; }
+        .header-center { display: flex; align-items: center; gap: 8px; }
+        .header-center .nav-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: none; cursor: pointer; font-size: 18px; color: #5f6368; display: flex; align-items: center; justify-content: center; }
+        .header-center .nav-btn:hover { background: #f1f3f4; }
+        .header-center .today-btn { padding: 6px 16px; border: 1px solid #dadce0; border-radius: 4px; background: #fff; font-size: 14px; color: #3c4043; cursor: pointer; font-weight: 500; }
+        .header-center .today-btn:hover { background: #f1f3f4; }
+        .header-center .week-label { font-size: 22px; font-weight: 400; color: #3c4043; min-width: 200px; }
+        .header-nav { display: flex; align-items: center; gap: 4px; }
+        .header-nav a, .header-nav button { font-size: 14px; color: #5f6368; text-decoration: none; padding: 6px 12px; border-radius: 4px; border: none; background: none; cursor: pointer; white-space: nowrap; }
+        .header-nav a:hover, .header-nav button:hover { background: #f1f3f4; }
+        .header-nav .btn-primary { background: #1a73e8; color: #fff; }
+        .header-nav .btn-primary:hover { background: #1557b0; }
+        .header-nav .search-toggle { font-size: 18px; }
+
+        /* ── App layout ── */
+        .app-layout { display: flex; height: calc(100vh - 48px); overflow: hidden; }
+
+        /* ── Sidebar ── */
+        .sidebar { width: 256px; border-right: 1px solid #dadce0; padding: 16px; flex-shrink: 0; overflow-y: auto; }
+        .sidebar .create-btn { width: 56px; height: 56px; border-radius: 50%; border: none; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; transition: box-shadow 0.2s; }
+        .sidebar .create-btn:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.16); }
+        .sidebar .create-btn svg { width: 36px; height: 36px; }
+
+        /* ── Mini calendar ── */
+        .mini-cal { margin-bottom: 16px; }
+        .mini-cal .mini-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .mini-cal .mini-cal-header .month-label { font-size: 14px; font-weight: 500; color: #3c4043; }
+        .mini-cal .mini-cal-header button { background: none; border: none; cursor: pointer; color: #5f6368; font-size: 16px; padding: 2px 6px; border-radius: 50%; }
+        .mini-cal .mini-cal-header button:hover { background: #f1f3f4; }
+        .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; text-align: center; }
+        .mini-cal-grid .mc-hdr { font-size: 10px; color: #70757a; padding: 4px 0; font-weight: 500; }
+        .mini-cal-grid .mc-day { font-size: 11px; padding: 3px 0; cursor: pointer; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: #3c4043; }
+        .mini-cal-grid .mc-day.out-month { color: #b0b0b0; }
+        .mini-cal-grid .mc-day.is-today { background: #1a73e8; color: #fff; font-weight: 700; }
+        .mini-cal-grid .mc-day.in-week { background: #e8f0fe; }
+        .mini-cal-grid .mc-day.in-week.is-today { background: #1a73e8; color: #fff; }
+        .mini-cal-grid .mc-day:hover { background: #f1f3f4; }
+        .mini-cal-grid .mc-day.is-today:hover { background: #1557b0; }
+
+        .sidebar h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #5f6368; margin: 14px 0 6px; font-weight: 500; }
+        .sidebar label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3c4043; padding: 3px 0; cursor: pointer; }
+        .sidebar select, .sidebar input[type="text"], .sidebar input[type="date"] {
+            width: 100%; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 12px; margin-bottom: 6px;
+        }
+
+        /* ── Search overlay ── */
+        .search-bar { padding: 8px 16px; border-bottom: 1px solid #dadce0; display: flex; gap: 8px; align-items: center; background: #f8f9fa; }
+        .search-bar input[type="text"] { flex: 1; padding: 8px 16px; border: 1px solid #dadce0; border-radius: 24px; font-size: 14px; background: #fff; }
+        .search-bar input[type="text"]:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px #e8f0fe; }
+        .search-bar button { padding: 8px 20px; background: #1a73e8; color: #fff; border: none; border-radius: 24px; font-size: 14px; cursor: pointer; }
+        .search-bar button:hover { background: #1557b0; }
+
+        /* ── Main content: week grid ── */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .week-grid-wrapper { flex: 1; overflow-y: auto; position: relative; }
+
+        /* Day column headers (sticky) */
+        .day-headers { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid #dadce0; background: #fff; position: sticky; top: 0; z-index: 10; }
+        .day-headers .gutter { border-right: 1px solid #dadce0; }
+        .day-header { text-align: center; padding: 8px 0 4px; border-right: 1px solid #e0e0e0; }
+        .day-header:last-child { border-right: none; }
+        .day-header .weekday { font-size: 11px; text-transform: uppercase; color: #70757a; letter-spacing: 0.5px; }
+        .day-header .date-num { font-size: 26px; font-weight: 400; color: #3c4043; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 50%; cursor: pointer; }
+        .day-header .date-num:hover { background: #f1f3f4; }
+        .day-header.is-today .weekday { color: #1a73e8; }
+        .day-header.is-today .date-num { background: #1a73e8; color: #fff; }
+        .day-header.is-today .date-num:hover { background: #1557b0; }
+
+        /* All-day row */
+        .allday-row { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid #dadce0; min-height: 24px; }
+        .allday-row .gutter { border-right: 1px solid #dadce0; font-size: 10px; color: #70757a; display: flex; align-items: center; justify-content: center; }
+        .allday-row .allday-cell { border-right: 1px solid #e0e0e0; padding: 2px 4px; }
+        .allday-row .allday-cell:last-child { border-right: none; }
+        .allday-event { font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #fff; margin-bottom: 1px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .allday-event a { color: #fff; text-decoration: none; }
+
+        /* Hour grid */
+        .hour-grid { display: grid; grid-template-columns: 56px repeat(7, 1fr); position: relative; }
+        .hour-gutter { position: relative; }
+        .hour-label { position: absolute; right: 8px; font-size: 10px; color: #70757a; transform: translateY(-50%); white-space: nowrap; }
+        .day-col { border-right: 1px solid #e0e0e0; position: relative; }
+        .day-col:last-child { border-right: none; }
+        .hour-line { border-top: 1px solid #e0e0e0; height: 48px; cursor: pointer; }
+        .hour-line:hover { background: #f8f9fa; }
+        .hour-line-gutter { border-top: 1px solid #e0e0e0; height: 48px; }
+
+        /* Events in grid */
+        .grid-event { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 2px 6px; font-size: 11px; color: #fff; overflow: hidden; cursor: pointer; z-index: 5; min-height: 20px; line-height: 1.3; border-left: 3px solid rgba(0,0,0,0.15); }
+        .grid-event a { color: #fff; text-decoration: none; display: block; }
+        .grid-event .ge-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .grid-event .ge-time { font-size: 10px; opacity: 0.9; }
+        .grid-event .ge-loc { font-size: 10px; opacity: 0.8; }
+        .grid-event:hover { filter: brightness(0.9); z-index: 6; }
+
+        /* Category colors */
+        .bg-work { background: #4285f4; }
+        .bg-personal { background: #0b8043; }
+        .bg-health { background: #d50000; }
+        .bg-default { background: #7986cb; }
+
+        /* Current time line */
+        .current-time-line { position: absolute; left: 0; right: 0; z-index: 8; pointer-events: none; }
+        .current-time-line::before { content: ''; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: #ea4335; border-radius: 50%; }
+        .current-time-line::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #ea4335; }
+
+        /* ── Create modal ── */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #fff; border-radius: 8px; padding: 0; width: 460px; max-width: 90vw; z-index: 201; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+        .modal .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: move; }
+        .modal .modal-header h2 { font-size: 16px; color: #202124; font-weight: 400; }
+        .modal .modal-header .close-btn { background: none; border: none; font-size: 20px; color: #5f6368; cursor: pointer; padding: 4px 8px; border-radius: 50%; }
+        .modal .modal-header .close-btn:hover { background: #f1f3f4; }
+        .modal .modal-body { padding: 0 16px 16px; }
+        .modal .modal-body input[type="text"], .modal .modal-body input[type="datetime-local"], .modal .modal-body select, .modal .modal-body textarea {
+            width: 100%; padding: 8px 0; border: none; border-bottom: 1px solid #dadce0; font-size: 14px; outline: none; font-family: inherit; margin-bottom: 4px;
+        }
+        .modal .modal-body input:focus, .modal .modal-body select:focus, .modal .modal-body textarea:focus { border-bottom-color: #1a73e8; }
+        .modal .modal-body .title-input { font-size: 22px; font-weight: 400; border-bottom: 2px solid #dadce0; padding: 8px 0 4px; }
+        .modal .modal-body .title-input:focus { border-bottom-color: #1a73e8; }
+        .modal .modal-body textarea { height: 48px; resize: vertical; border: 1px solid #dadce0; border-radius: 4px; padding: 8px; margin-top: 8px; }
+        .modal .modal-body .field-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+        .modal .modal-body .field-row label { font-size: 12px; color: #5f6368; min-width: 56px; }
+        .modal .modal-body .field-row select, .modal .modal-body .field-row input { flex: 1; }
+        .modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 16px; }
+        .modal .modal-actions button { padding: 8px 24px; border-radius: 4px; border: none; font-size: 14px; cursor: pointer; }
+        .modal .btn-cancel { background: none; color: #1a73e8; font-weight: 500; }
+        .modal .btn-cancel:hover { background: #e8f0fe; }
+        .modal .btn-save { background: #1a73e8; color: #fff; border-radius: 20px; }
+        .modal .btn-save:hover { background: #1557b0; }
+
+        /* ── Filter panel (collapsible in sidebar) ── */
+        .filter-section { border-top: 1px solid #dadce0; margin-top: 8px; padding-top: 8px; }
+        .sidebar .export-links a { font-size: 12px; color: #1a73e8; text-decoration: none; display: block; padding: 3px 0; }
+        .sidebar .export-links a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <!-- ═══ HEADER ═══ -->
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')" title="Menu">&#9776;</button>
+            <div class="logo"><span>Calendar</span>Todo</div>
+        </div>
+        <div class="header-center">
+            <a class="today-btn" href="{{ url_for('calendar-todo.index', week_offset=0) }}">Today</a>
+            <a class="nav-btn" href="{{ url_for('calendar-todo.index', week_offset=week_offset - 1) }}" title="Previous week">&#9664;</a>
+            <a class="nav-btn" href="{{ url_for('calendar-todo.index', week_offset=week_offset + 1) }}" title="Next week">&#9654;</a>
+            <span class="week-label">
+                {% set ws_parts = week_start.split('-') %}
+                {% set we_parts = week_end.split('-') %}
+                {% set months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+                {{ months[ws_parts[1]|int] }} {{ ws_parts[2]|int }} &ndash; {{ months[we_parts[1]|int] }} {{ we_parts[2]|int }}, {{ we_parts[0] }}
+            </span>
+        </div>
+        <div class="header-nav">
+            <button class="search-toggle" onclick="toggleSearch()" title="Search">&#128269;</button>
+            <a href="{{ url_for('calendar-todo.day_view', date_str=today) }}">Day</a>
+            <a href="{{ url_for('calendar-todo.index', week_offset=0) }}" style="font-weight:500;color:#1a73e8">Week</a>
+            {% if user %}
+            <a href="{{ url_for('calendar-todo.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('calendar-todo.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('calendar-todo.login_page') }}" class="btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <!-- ═══ SEARCH BAR ═══ -->
+    <div class="search-bar {{ 'open' if q }}" id="search-bar">
+        <form method="get" action="{{ url_for('calendar-todo.index') }}" style="display:flex;gap:8px;flex:1">
+            <input type="text" name="q" placeholder="Search events..." value="{{ q }}" autocomplete="off">
+            <input type="hidden" name="week_offset" value="{{ week_offset }}">
+            <button type="submit">Search</button>
+        </form>
+        <form id="semantic-form" onsubmit="semanticSearch(event)" style="display:flex;gap:8px;flex:1">
+            <input type="text" id="semantic-q" placeholder="Semantic search..." autocomplete="off">
+            <button type="submit">Semantic Search</button>
+        </form>
+    </div>
+    <div id="semantic-results" style="padding:4px 16px;font-size:13px;display:none;background:#e8f0fe;border-bottom:1px solid #dadce0;"></div>
+
+    <!-- ═══ APP LAYOUT ═══ -->
+    <div class="app-layout">
+        <!-- ── Sidebar ── -->
+        <div class="sidebar">
+            <button class="create-btn" onclick="openCreateModal()" title="Create event">
+                <svg viewBox="0 0 36 36"><path fill="#4285f4" d="M16 16V4h4v12h12v4H20v12h-4V20H4v-4z"/></svg>
+            </button>
+
+            <!-- Mini calendar -->
+            <div class="mini-cal">
+                <div class="mini-cal-header">
+                    <a href="{{ url_for('calendar-todo.index', week_offset=week_offset - 4) }}" title="Previous month" style="text-decoration:none;color:#5f6368;padding:2px 6px;border-radius:50%">&#9664;</a>
+                    <span class="month-label">{{ mini_cal_month }}</span>
+                    <a href="{{ url_for('calendar-todo.index', week_offset=week_offset + 4) }}" title="Next month" style="text-decoration:none;color:#5f6368;padding:2px 6px;border-radius:50%">&#9654;</a>
+                </div>
+                <div class="mini-cal-grid">
+                    <div class="mc-hdr">M</div><div class="mc-hdr">T</div><div class="mc-hdr">W</div><div class="mc-hdr">T</div><div class="mc-hdr">F</div><div class="mc-hdr">S</div><div class="mc-hdr">S</div>
+                    {% for d in mini_cal_days %}
+                    <div class="mc-day {{ 'out-month' if not d.in_month }} {{ 'is-today' if d.is_today }} {{ 'in-week' if d.in_week }}" title="{{ d.date }}">{{ d.day_num }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <h3>Calendars</h3>
+                {% for c in calendars %}
+                <label><input type="checkbox" value="{{ c }}" checked onchange="applyFilters()"> {{ c }}</label>
+                {% endfor %}
+
+                <h3>Category</h3>
+                <select id="filter-category" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {{ 'selected' if cat == c }}>{{ c|capitalize }}</option>
+                    {% endfor %}
+                </select>
+
+                <h3>Priority</h3>
+                <select id="filter-priority" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="high" {{ 'selected' if priority == 'high' }}>High</option>
+                    <option value="medium" {{ 'selected' if priority == 'medium' }}>Medium</option>
+                    <option value="low" {{ 'selected' if priority == 'low' }}>Low</option>
+                </select>
+
+                <h3>User</h3>
+                <select id="filter-user" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {{ 'selected' if uid == u.id }}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <h3>Sort</h3>
+                <select id="filter-sort" onchange="applyFilters()">
+                    <option value="date" {{ 'selected' if sort == 'date' }}>Date</option>
+                    <option value="title" {{ 'selected' if sort == 'title' }}>Title</option>
+                    <option value="priority" {{ 'selected' if sort == 'priority' }}>Priority</option>
+                </select>
+
+                <h3>Date Range</h3>
+                <label style="font-size:12px">From:</label>
+                <input type="date" id="filter-date-from" value="{{ date_from }}" onchange="applyFilters()">
+                <label style="font-size:12px">To:</label>
+                <input type="date" id="filter-date-to" value="{{ date_to }}" onchange="applyFilters()">
+            </div>
+
+            <div class="filter-section export-links">
+                <h3>Export</h3>
+                <a href="{{ url_for('calendar-todo.api_export', format='csv') }}">CSV</a>
+                <a href="{{ url_for('calendar-todo.api_export', format='ics') }}">ICS</a>
+                <a href="{{ url_for('calendar-todo.api_export', format='json') }}">JSON</a>
+            </div>
+        </div>
+
+        <!-- ── Main content: Week grid ── -->
+        <div class="main-content">
+            <!-- Day column headers -->
+            <div class="day-headers">
+                <div class="gutter"></div>
+                {% for day in week_days %}
+                <div class="day-header {{ 'is-today' if day.is_today }}">
+                    <div class="weekday">{{ day.weekday_short }}</div>
+                    <div class="date-num" onclick="openCreateModalForDay('{{ day.date }}')">{{ day.day_num }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- All-day events row -->
+            <div class="allday-row">
+                <div class="gutter" style="font-size:10px;color:#70757a;padding:4px">all-day</div>
+                {% for day in week_days %}
+                <div class="allday-cell">
+                    {% for event in day.events %}
+                    {% if event.all_day %}
+                    <div class="allday-event bg-{{ event.category }}">
+                        <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">{{ event.title }}</a>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hour grid -->
+            <div class="week-grid-wrapper" id="week-grid-wrapper">
+                <div class="hour-grid" id="hour-grid">
+                    <!-- Hour gutter (labels) -->
+                    <div class="hour-gutter">
+                        {% for h in range(6, 23) %}
+                        <div class="hour-line-gutter" data-hour="{{ h }}">
+                            <span class="hour-label" style="top: 0;">{% if h == 12 %}12 PM{% elif h > 12 %}{{ h - 12 }} PM{% else %}{{ h }} AM{% endif %}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 7 day columns -->
+                    {% for day in week_days %}
+                    <div class="day-col" data-date="{{ day.date }}" data-day-index="{{ loop.index0 }}">
+                        <!-- Hour slots for clicking -->
+                        {% for h in range(6, 23) %}
+                        <div class="hour-line" data-hour="{{ h }}" onclick="openCreateModalForSlot('{{ day.date }}', {{ h }})"></div>
+                        {% endfor %}
+
+                        <!-- Positioned events -->
+                        {% for event in day.events %}
+                        {% if not event.all_day %}
+                        {% set start_h = event.start[11:13]|int %}
+                        {% set start_m = event.start[14:16]|int %}
+                        {% set end_h = event.end[11:13]|int %}
+                        {% set end_m = event.end[14:16]|int %}
+                        {% set top_px = ((start_h - 6) * 48 + start_m * 48 // 60) %}
+                        {% set duration_min = (end_h - start_h) * 60 + (end_m - start_m) %}
+                        {% set height_px = (duration_min * 48 // 60) %}
+                        {% if height_px < 20 %}{% set height_px = 20 %}{% endif %}
+                        <div class="grid-event bg-{{ event.category }}" style="top: {{ top_px }}px; height: {{ height_px }}px;" title="{{ event.title }} ({{ event.start[11:16] }}-{{ event.end[11:16] }}){% if event.location %} @ {{ event.location }}{% endif %}">
+                            <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">
+                                <div class="ge-title">{{ event.title }}</div>
+                                <div class="ge-time">{{ event.start[11:16] }} - {{ event.end[11:16] }}</div>
+                                {% if event.location and height_px > 36 %}
+                                <div class="ge-loc">{{ event.location }}</div>
+                                {% endif %}
+                            </a>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                        <!-- Current time line -->
+                        {% if day.is_today %}
+                        <div class="current-time-line" id="current-time-line" style="display:none;"></div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ CREATE EVENT MODAL ═══ -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeCreateModal()"></div>
+    <div class="modal" id="create-modal">
+        <div class="modal-header">
+            <h2>New Event</h2>
+            <button class="close-btn" onclick="closeCreateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" class="title-input" id="new-title" placeholder="Add title">
+            <div class="field-row">
+                <label>Start</label>
+                <input type="datetime-local" id="new-start">
+            </div>
+            <div class="field-row">
+                <label>End</label>
+                <input type="datetime-local" id="new-end">
+            </div>
+            <div class="field-row">
+                <label>Category</label>
+                <select id="new-category">
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="health">Health</option>
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Calendar</label>
+                <select id="new-calendar">
+                    {% for c in calendars %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Priority</label>
+                <select id="new-priority">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Location</label>
+                <input type="text" id="new-location" placeholder="Add location">
+            </div>
+            <div class="field-row">
+                <label>User</label>
+                <select id="new-user-id">
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <textarea id="new-desc" placeholder="Add description"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeCreateModal()">Cancel</button>
+            <button class="btn-save" onclick="createEvent()">Save</button>
+        </div>
+    </div>
+
+    <script>
+    /* ── Scroll to ~8am on load ── */
+    (function() {
+        var wrapper = document.getElementById('week-grid-wrapper');
+        if (wrapper) {
+            // 8am = hour index 2 (from 6am) * 48px
+            wrapper.scrollTop = 2 * 48;
+        }
+    })();
+
+    /* ── Current time indicator ── */
+    (function() {
+        var today = '{{ today }}';
+        var line = document.getElementById('current-time-line');
+        if (!line) return;
+        // Parse simulated_today as "now" at current browser time of day
+        var now = new Date();
+        var h = now.getHours();
+        var m = now.getMinutes();
+        if (h >= 6 && h <= 22) {
+            var top = (h - 6) * 48 + (m * 48 / 60);
+            line.style.top = top + 'px';
+            line.style.display = 'block';
+        }
+    })();
+
+    /* ── Search toggle ── */
+    function toggleSearch() {
+        document.getElementById('search-bar').classList.toggle('open');
+        var input = document.querySelector('#search-bar input[name="q"]');
+        if (input) input.focus();
+    }
+
+    /* ── Semantic search ── */
+    function semanticSearch(e) {
+        e.preventDefault();
+        var q = document.getElementById('semantic-q').value.trim();
+        if (!q) return;
+        fetch('{{ url_for("calendar-todo.api_semantic_search") }}?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(events) {
+            var out = document.getElementById('semantic-results');
+            if (!events.length) { out.innerHTML = '<p>No results found.</p>'; out.style.display='block'; return; }
+            var html = '<strong>' + events.length + ' results:</strong><br>';
+            events.forEach(function(ev) {
+                html += '<a href="{{ url_for("calendar-todo.event_detail", event_id=0) }}'.replace('0', ev.id) + '">' + ev.title + '</a> (' + ev.category + ', ' + ev.start.substring(0,10) + ')<br>';
+            });
+            out.innerHTML = html;
+            out.style.display = 'block';
+        });
+    }
+
+    /* ── Filters ── */
+    function applyFilters() {
+        var params = new URLSearchParams();
+        params.set('week_offset', '{{ week_offset }}');
+        var q = document.querySelector('#search-bar input[name="q"]');
+        if (q && q.value) params.set('q', q.value);
+        var cat = document.getElementById('filter-category').value;
+        if (cat) params.set('category', cat);
+        var pri = document.getElementById('filter-priority').value;
+        if (pri) params.set('priority', pri);
+        var uid = document.getElementById('filter-user').value;
+        if (uid) params.set('user_id', uid);
+        var sort = document.getElementById('filter-sort').value;
+        if (sort) params.set('sort', sort);
+        var df = document.getElementById('filter-date-from').value;
+        if (df) params.set('date_from', df);
+        var dt = document.getElementById('filter-date-to').value;
+        if (dt) params.set('date_to', dt);
+        window.location.href = '{{ url_for("calendar-todo.index") }}?' + params.toString();
+    }
+
+    /* ── Create modal ── */
+    function openCreateModal() {
+        document.getElementById('modal-overlay').style.display = 'block';
+        document.getElementById('create-modal').style.display = 'block';
+        document.getElementById('new-title').focus();
+    }
+
+    function openCreateModalForDay(dateStr) {
+        openCreateModal();
+        document.getElementById('new-start').value = dateStr + 'T09:00';
+        document.getElementById('new-end').value = dateStr + 'T10:00';
+    }
+
+    function openCreateModalForSlot(dateStr, hour) {
+        openCreateModal();
+        var hh = String(hour).padStart(2, '0');
+        var hhEnd = String(hour + 1).padStart(2, '0');
+        document.getElementById('new-start').value = dateStr + 'T' + hh + ':00';
+        document.getElementById('new-end').value = dateStr + 'T' + hhEnd + ':00';
+    }
+
+    function closeCreateModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('create-modal').style.display = 'none';
+    }
+
+    function createEvent() {
+        var startVal = document.getElementById('new-start').value;
+        var endVal = document.getElementById('new-end').value;
+        var data = {
+            title: document.getElementById('new-title').value,
+            description: document.getElementById('new-desc').value,
+            category: document.getElementById('new-category').value,
+            calendar: document.getElementById('new-calendar').value,
+            start: startVal ? startVal + ':00' : '',
+            end: endVal ? endVal + ':00' : '',
+            location: document.getElementById('new-location').value,
+            priority: document.getElementById('new-priority').value,
+            user_id: parseInt(document.getElementById('new-user-id').value),
+        };
+        fetch('{{ url_for("calendar-todo.api_create_event") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            closeCreateModal();
+            window.location.reload();
+        });
+    }
+    </script>
+</body>
+</html>

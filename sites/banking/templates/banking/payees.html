@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payees - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 2rem; }
+        .main h2 { color: #0a2463; margin-bottom: 1rem; }
+        .add-payee { background: #fff; padding: 1.5rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .add-payee h3 { color: #334155; margin-bottom: .8rem; font-size: 1rem; }
+        .add-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .add-form input { padding: .5rem .7rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .add-form button { padding: .5rem 1rem; background: #0a2463; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .7rem 1rem; font-size: .78rem; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
+        .btn-delete { background: #dc2626; color: #fff; border: none; padding: .3rem .6rem; border-radius: .3rem; cursor: pointer; font-size: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('banking.index') }}">Dashboard</a>
+        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
+        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
+        <a href="{{ url_for('banking.pay_bills_page') }}">Pay Bills</a>
+        <a href="{{ url_for('banking.payees_page') }}" class="active">Payees</a>
+        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
+        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="main">
+        <h2>Manage Payees</h2>
+
+        <div class="add-payee">
+            <h3>Add New Payee</h3>
+            <div class="add-form">
+                <input type="text" id="payee-name" placeholder="Payee name" required>
+                <input type="text" id="payee-acct" placeholder="Account number">
+                <input type="text" id="payee-category" placeholder="Category">
+                <button onclick="addPayee()">Add Payee</button>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Nickname</th><th>Account</th><th>Category</th><th>Action</th></tr>
+            </thead>
+            <tbody id="payee-table">
+                {% for p in payees %}
+                <tr id="payee-{{ p.id }}">
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.nickname }}</td>
+                    <td>{{ p.account_number }}</td>
+                    <td>{{ p.category }}</td>
+                    <td><button class="btn-delete" onclick="deletePayee({{ p.id }})">Remove</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    function addPayee() {
+        var name = document.getElementById('payee-name').value;
+        var acct = document.getElementById('payee-acct').value;
+        var cat = document.getElementById('payee-category').value;
+        fetch('{{ url_for("banking.index") }}api/payees', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: {{ user.id }}, name: name, account_number: acct, category: cat || 'Other'})
+        }).then(r => r.json()).then(() => location.reload());
+    }
+    function deletePayee(id) {
+        fetch('{{ url_for("banking.index") }}api/payees/' + id, {method: 'DELETE'}).then(() => location.reload());
+    }
+    </script>
+</body>
+</html>

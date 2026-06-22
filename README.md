@@ -1,6 +1,8 @@
 # MiniWeb
 
-A lightweight, self-contained web platform for agentic benchmarking. One Flask process serves a search portal and any number of mini-sites, each with its own pages and JSON data.
+A lightweight, self-contained web platform for agentic benchmarking. One Flask process serves a search portal and any number of mini-sites, each with its own pages, JSON data, and verifiable tasks.
+
+**163 macros** from 4 web-agent datasets
 
 ## Quick Start
 
@@ -24,16 +26,34 @@ docker run -p 8080:8080 miniweb
 
 ```
 MiniWeb/
-├── run.py                  # Entry point
-├── requirements.txt        # Flask
-├── Dockerfile              # Optional container
+├── run.py                      # Entry point
+├── requirements.txt            # Flask
+├── Dockerfile                  # Optional container
 ├── app/
-│   ├── __init__.py         # Auto-discovers sites and mounts blueprints
-│   ├── portal/             # Search homepage
-│   └── static/             # Shared CSS
-└── sites/
-    ├── bookstore/          # Example site (fully functional)
-    └── _template/          # Copy to create a new site
+│   ├── __init__.py             # Auto-discovers sites and mounts blueprints
+│   ├── portal/                 # Search homepage
+│   └── static/                 # Shared CSS
+├── sites/
+│   ├── _template/              # Copy to create a new site
+│   ├── academic-paper-db/      # Full reference site (20 tasks, 21 macros)
+│   ├── bookstore/              # Minimal template (no tasks)
+│   └── <site-id>/              # Each site contains:
+│       ├── site.json           #   Metadata
+│       ├── doc/                #   User-written site description
+│       ├── config/config.json  #   Site config (num_data_points, etc.)
+│       ├── routes.py           #   Flask blueprint (with data interpreter)
+│       ├── data/               #   Raw data (original format, never rewritten)
+│       ├── data/.pristine/     #   Immutable reset baseline
+│       ├── templates/<id>/     #   Jinja2 templates
+│       ├── tasks.json          #   20 benchmark tasks
+│       ├── verifiers.py        #   Per-task verification
+│       ├── macro_verifiers.py  #   Per-macro verification
+│       └── reference_solutions.py  # Per-task solutions
+├── specs/                      # Site generation specs (JSON)
+├── scripts/                    # Generation & validation tools
+├── evaluation/                 # Browser-agent evaluation harness
+├── macros/                     # Macro research pipeline
+└── docs/                       # Documentation
 ```
 
 ## How It Works
@@ -44,56 +64,65 @@ No config files to edit. No routing to update. Just drop a folder and restart.
 
 ## Adding a New Site
 
-### Using the helper script
+### 1. Scaffold + prepare data and docs
 
 ```bash
 ./scripts/add_site.sh my-site "My Site Name" "A short description"
 ```
 
-This copies the template, renames files, and updates `site.json` and `routes.py` for you.
+Then:
+- Place raw data files in `sites/my-site/data/` (keep original format — never rewrite)
+- Write site description in `sites/my-site/doc/` (what the site is, how it uses the data, what real-world site to model after, temporal dynamics if any)
 
-### Manually
+### 2. Generate and validate
 
-1. Copy `sites/_template/` to `sites/my-site/`
-2. Rename `sites/my-site/templates/_template/` to `sites/my-site/templates/my-site/`
-3. Edit `sites/my-site/site.json`:
-   ```json
-   {
-       "id": "my-site",
-       "name": "My Site Name",
-       "description": "What this site does",
-       "tags": ["tag1", "tag2"]
-   }
-   ```
-4. Update the blueprint name and template references in `sites/my-site/routes.py`
-5. Add an `__init__.py` to the site directory
-6. Build your pages and data
-7. Restart: `python run.py`
+```bash
+python scripts/generate_site.py specs/my-site.json
+python scripts/validate_site.py my-site
+```
 
-## Site Anatomy
+### 3. Browser-eval loop (×N)
 
-Each site is a directory under `sites/` with:
+```bash
+python evaluation/run_eval.py --site my-site --model gemini-flash
+```
 
-| File | Purpose |
-|---|---|
-| `site.json` | Metadata (id, name, description, tags) |
-| `routes.py` | Flask Blueprint with routes |
-| `__init__.py` | Empty, makes the directory a Python package |
-| `templates/<id>/` | Jinja2 HTML templates |
-| `data/` | JSON data files |
+Run N times (currently 3), fixing issues between rounds.
+
+See [docs/miniweb_webgen_pipeline.md](docs/miniweb_webgen_pipeline.md) for the full pipeline.
+
+## Key Design Principles
+
+- **Original data format preserved**: Raw data in `data/` is never rewritten. `routes.py` contains a data interpreter that reads the raw format at runtime.
+- **Temporal simulation**: Sites with time-varying domains (stocks, weather, news) must simulate data changes over time.
+- **Macro-driven**: Every site implements a set of target macros, each with a dedicated verifier.
+- **Realistic tasks**: Tasks represent things a real user would actually do on the site.
+- **Self-contained sites**: Each site directory is fully isolated with all code, data, and templates.
+
+## Evaluation
+
+Run browser agents against benchmark tasks:
+
+```bash
+pip install -r evaluation/requirements.txt
+python evaluation/run_eval.py --site my-site --model gemini-flash
+```
+
+The agent receives only the natural-language instruction and interacts with the rendered UI through a real browser. Verifiers check backend state after each task.
+
+See [AGENTS.md](AGENTS.md) for supported models, CLI flags, and how to add new agents.
 
 ## API
 
 ### Portal
 
-- `GET /` -- search homepage
-- `GET /api/sites` -- list all sites (optional `?q=` filter)
+- `GET /` — search homepage
+- `GET /api/sites` — list all sites (optional `?q=` filter)
 
 ### Per-site
 
-Each site defines its own routes under `/sites/<id>/`. For example, the bookstore provides:
+Each site defines its own routes under `/sites/<id>/`. See the site's `routes.py` for available endpoints.
 
-- `GET /sites/bookstore/` -- book listing
-- `GET /sites/bookstore/book/<id>` -- book detail
-- `GET /sites/bookstore/api/books` -- JSON list (optional `?q=` filter)
-- `GET /sites/bookstore/api/books/<id>` -- JSON detail
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding sites, submitting PRs, and code style.

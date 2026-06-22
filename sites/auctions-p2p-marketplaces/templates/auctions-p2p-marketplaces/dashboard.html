@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BidMarket</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .topbar { background: #1a1a2e; color: #fff; padding: .4rem 2rem; font-size: .8rem; }
+        .topbar a { color: #ccc; text-decoration: none; margin-right: .8rem; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        .welcome { background: #fff; padding: 1.5rem; border-radius: .5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .welcome h1 { font-size: 1.3rem; color: #1a1a2e; }
+        .welcome .info { font-size: .85rem; color: #888; margin-top: .3rem; }
+        .tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
+        .tab { padding: .5rem 1rem; background: #e9ecef; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; border: none; }
+        .tab.active { background: #e94560; color: #fff; }
+        .section { background: #fff; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: none; }
+        .section.active { display: block; }
+        .section h2 { font-size: 1rem; color: #1a1a2e; margin-bottom: .8rem; border-bottom: 2px solid #e94560; padding-bottom: .3rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th { text-align: left; padding: .5rem; background: #f8f9fa; color: #555; }
+        td { padding: .5rem; border-bottom: 1px solid #eee; }
+        td a { color: #0f3460; text-decoration: none; }
+        .btn { padding: .3rem .7rem; border: none; border-radius: .2rem; cursor: pointer; font-size: .8rem; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .no-data { color: #888; font-style: italic; padding: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">BidMarket Home</a>
+        <a href="{{ url_for('auctions-p2p-marketplaces.create_listing_page') }}">Sell an Item</a>
+        <a href="{{ url_for('auctions-p2p-marketplaces.logout') }}">Logout</a>
+        <a href="/">MiniWeb</a>
+    </div>
+    <div class="container">
+        <div class="welcome">
+            <h1>Welcome, {{ user.name }}</h1>
+            <div class="info">@{{ user.username }} | {{ user.email }} | Member since {{ user.member_since }} | Rating: {{ user.rating }}/5.0</div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('listings')">My Listings</button>
+            <button class="tab" onclick="showTab('bids')">My Bids</button>
+            <button class="tab" onclick="showTab('watchlist')">Watchlist</button>
+            <button class="tab" onclick="showTab('messages')">Messages</button>
+        </div>
+
+        <div class="section active" id="tab-listings">
+            <h2>My Listings ({{ my_listings|length }})</h2>
+            {% if my_listings %}
+            <table>
+                <tr><th>Item</th><th>Price</th><th>Bids</th><th>Status</th><th>Actions</th></tr>
+                {% for p in my_listings %}
+                <tr>
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=p.id) }}">{{ p.name[:40] }}</a></td>
+                    <td>${{ "%.2f"|format(p.current_price) }}</td>
+                    <td>{{ p.num_bids }}</td>
+                    <td>{{ p.status }}</td>
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.edit_listing_page', listing_id=p.id) }}">Edit</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="no-data">You have no active listings.</div>
+            {% endif %}
+        </div>
+
+        <div class="section" id="tab-bids">
+            <h2>Items I'm Bidding On ({{ my_bids|length }})</h2>
+            {% if my_bids %}
+            <table>
+                <tr><th>Item</th><th>Current Price</th><th>Status</th></tr>
+                {% for p in my_bids %}
+                <tr>
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=p.id) }}">{{ p.name[:40] }}</a></td>
+                    <td>${{ "%.2f"|format(p.current_price) }}</td>
+                    <td>{{ p.status }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="no-data">You haven't placed any bids yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="section" id="tab-watchlist">
+            <h2>Watchlist ({{ watched|length }})</h2>
+            {% if watched %}
+            <table>
+                <tr><th>Item</th><th>Price</th><th>Bids</th><th>Status</th></tr>
+                {% for p in watched %}
+                <tr>
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=p.id) }}">{{ p.name[:40] }}</a></td>
+                    <td>${{ "%.2f"|format(p.current_price) }}</td>
+                    <td>{{ p.num_bids }}</td>
+                    <td>{{ p.status }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="no-data">Your watchlist is empty.</div>
+            {% endif %}
+        </div>
+
+        <div class="section" id="tab-messages">
+            <h2>Messages ({{ messages|length }})</h2>
+            {% if messages %}
+            <table id="messages-table">
+                <tr><th>Subject</th><th>From/To</th><th>Date</th><th>Actions</th></tr>
+                {% for m in messages %}
+                <tr data-msg-id="{{ m.id }}">
+                    <td>{{ m.subject[:30] }}</td>
+                    <td>{% if m.sender_id == user.id %}To: #{{ m.receiver_id }}{% else %}From: #{{ m.sender_id }}{% endif %}</td>
+                    <td>{{ m.timestamp[:10] }}</td>
+                    <td><button class="btn btn-danger" onclick="deleteMsg({{ m.id }})">Delete</button></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="no-data">No messages.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function showTab(name) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
+
+    function deleteMsg(msgId) {
+        if (!confirm('Delete this message?')) return;
+        fetch(BASE + '/api/messages/' + msgId, {method: 'DELETE'})
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    const row = document.querySelector('[data-msg-id="' + msgId + '"]');
+                    if (row) row.remove();
+                }
+            });
+    }
+    </script>
+</body>
+</html>

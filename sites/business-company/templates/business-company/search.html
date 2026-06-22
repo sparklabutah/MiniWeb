@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Apex Dynamics</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --card-bg: #fff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+        a { color: var(--accent); text-decoration: none; }
+        .navbar { background: var(--primary); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .navbar .logo { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .navbar .logo span { color: #3b82f6; }
+        .navbar nav { display: flex; align-items: center; }
+        .navbar nav a { color: #cbd5e1; margin-left: 1.5rem; font-size: .9rem; text-decoration: none; }
+        .navbar nav a:hover { color: #fff; }
+        .navbar .search-form { display: flex; margin-left: 1.5rem; }
+        .navbar .search-form input { padding: 4px 10px; border: 1px solid #475569; border-radius: 4px 0 0 4px; background: #1e293b; color: #e2e8f0; font-size: .85rem; width: 160px; }
+        .navbar .search-form button { padding: 4px 10px; background: var(--accent); color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: .85rem; }
+        .page-header { background: var(--primary); color: #fff; padding: 3rem 2rem; text-align: center; }
+        .page-header h1 { font-size: 2rem; margin-bottom: 1rem; }
+        .search-box { max-width: 600px; margin: 0 auto; display: flex; }
+        .search-box input { flex: 1; padding: .8rem 1rem; border: none; border-radius: 6px 0 0 6px; font-size: 1rem; }
+        .search-box button { padding: .8rem 1.5rem; background: var(--accent); color: #fff; border: none; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 1rem; font-weight: 600; }
+        .section { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .result-count { font-size: 1rem; color: var(--primary); font-weight: 600; margin-bottom: 1.5rem; }
+        .result-group { margin-bottom: 2rem; }
+        .result-group h2 { font-size: 1.2rem; color: var(--primary); margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 2px solid var(--border); }
+        .result-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: .5rem; }
+        .result-item h3 { font-size: 1rem; color: var(--primary); margin-bottom: .25rem; }
+        .result-item p { font-size: .85rem; color: var(--text-light); }
+        .badge { display: inline-block; background: #eff6ff; color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: .78rem; margin-right: .3rem; }
+        .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 2rem; }
+        .footer a { color: #cbd5e1; margin: 0 .5rem; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('business-company.index') }}" class="logo">Apex<span>Dynamics</span></a>
+        <nav>
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Newsletter</a>
+            <form class="search-form" action="{{ url_for('business-company.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search..." value="{{ q }}" aria-label="Search">
+                <button type="submit">Go</button>
+            </form>
+        </nav>
+    </div>
+
+    <div class="page-header">
+        <h1>Search</h1>
+        <form class="search-box" method="get" action="{{ url_for('business-company.search_page') }}">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search products, blog posts, team, services, jobs...">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="section">
+        {% if q %}
+        <div class="result-count">{{ total }} result(s) for "{{ q }}"</div>
+
+        {% if results.products %}
+        <div class="result-group">
+            <h2>Products ({{ results.products|length }})</h2>
+            {% for item in results.products %}
+            <div class="result-item">
+                <h3><a href="{{ url_for('business-company.product_detail', product_id=item.id) }}">{{ item.name }}</a></h3>
+                <p>{{ item.description }}</p>
+                <span class="badge">{{ item.category }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.posts %}
+        <div class="result-group">
+            <h2>Blog Posts ({{ results.posts|length }})</h2>
+            {% for item in results.posts %}
+            <div class="result-item">
+                <h3><a href="{{ url_for('business-company.blog_post', post_id=item.id) }}">{{ item.title }}</a></h3>
+                <p>{{ item.excerpt }}</p>
+                <span class="badge">{{ item.category }}</span> <span style="font-size:.8rem;color:var(--text-light)">{{ item.date }} by {{ item.author }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.team %}
+        <div class="result-group">
+            <h2>Team Members ({{ results.team|length }})</h2>
+            {% for item in results.team %}
+            <div class="result-item">
+                <h3><a href="{{ url_for('business-company.team_member', member_id=item.id) }}">{{ item.name }}</a></h3>
+                <p>{{ item.title }} - {{ item.department }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.services %}
+        <div class="result-group">
+            <h2>Services ({{ results.services|length }})</h2>
+            {% for item in results.services %}
+            <div class="result-item">
+                <h3>{{ item.name }}</h3>
+                <p>{{ item.description }}</p>
+                <span class="badge">{{ item.category }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.jobs %}
+        <div class="result-group">
+            <h2>Job Openings ({{ results.jobs|length }})</h2>
+            {% for item in results.jobs %}
+            <div class="result-item">
+                <h3><a href="{{ url_for('business-company.job_detail', job_id=item.id) }}">{{ item.title }}</a></h3>
+                <p>{{ item.department }} - {{ item.location }} ({{ item.type }})</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if total == 0 %}
+        <p style="text-align:center; color:var(--text-light); margin-top:2rem;">No results found. Try different search terms.</p>
+        {% endif %}
+
+        {% else %}
+        <p style="text-align:center; color:var(--text-light); margin-top:2rem;">Enter a search term above to find products, blog posts, team members, services, and job openings.</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Apex Dynamics Corp.</p>
+        <p style="margin-top:.5rem">
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+        </p>
+    </div>
+</body>
+</html>

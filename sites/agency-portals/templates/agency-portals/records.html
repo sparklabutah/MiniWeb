@@ -1,0 +1,70 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Public Records - City of Cedar Grove{% endblock %}
+{% block content %}
+<div class="main-content">
+    <h2 class="section-title">Public Records</h2>
+
+    <form class="filters" method="get" action="{{ url_for('agency-portals.records_page') }}">
+        <div class="form-group">
+            <label for="q">Search</label>
+            <input type="text" id="q" name="q" value="{{ q }}" placeholder="Search records...">
+        </div>
+        <div class="form-group">
+            <label for="type">Record Type</label>
+            <select id="type" name="type">
+                <option value="">All Types</option>
+                {% for rt in record_types %}
+                <option value="{{ rt }}" {{ 'selected' if rtype == rt }}>{{ rt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="department">Department</label>
+            <select id="department" name="department">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}" {{ 'selected' if dept_id == dept.id|string }}>{{ dept.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="date_from">From Date</label>
+            <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="form-group">
+            <label for="date_to">To Date</label>
+            <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+
+    <p class="result-count">{{ records|length }} record(s) found</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Doc ID</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Department</th>
+                <th>Date Published</th>
+                <th>Format</th>
+                <th>Pages</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>{{ r.doc_id }}</td>
+                <td>{{ r.title }}</td>
+                <td>{{ r.type }}</td>
+                <td>{{ r.department_name }}</td>
+                <td>{{ r.date_published }}</td>
+                <td>{{ r.file_format }}</td>
+                <td>{{ r.pages }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

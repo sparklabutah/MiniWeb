@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo - {{ event.title }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #fff; color: #3c4043; }
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #dadce0; }
+        .header .logo { font-size: 22px; font-weight: 400; color: #5f6368; }
+        .header .logo span { color: #1a73e8; font-weight: 500; }
+        .header-nav a { font-size: 14px; color: #5f6368; text-decoration: none; padding: 6px 12px; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+        .event-detail { max-width: 700px; margin: 32px auto; padding: 0 24px; }
+        .event-detail h1 { font-size: 28px; font-weight: 400; color: #202124; margin-bottom: 8px; }
+        .event-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-right: 8px; margin-bottom: 16px; }
+        .badge-work { background: #e8f0fe; color: #1a73e8; }
+        .badge-personal { background: #e6f4ea; color: #137333; }
+        .badge-health { background: #fce8e6; color: #c5221f; }
+        .badge-priority-high { background: #fce8e6; color: #c5221f; }
+        .badge-priority-medium { background: #fef7e0; color: #e37400; }
+        .badge-priority-low { background: #e6f4ea; color: #137333; }
+        .detail-row { display: flex; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
+        .detail-label { width: 120px; font-size: 13px; color: #5f6368; flex-shrink: 0; }
+        .detail-value { font-size: 14px; color: #202124; }
+        .attendees-list { list-style: none; padding: 0; }
+        .attendees-list li { font-size: 13px; padding: 2px 0; }
+        .actions { margin-top: 24px; display: flex; gap: 8px; }
+        .actions button, .actions a { padding: 8px 20px; border-radius: 4px; font-size: 14px; cursor: pointer; text-decoration: none; border: 1px solid #dadce0; background: #fff; color: #3c4043; }
+        .actions .btn-danger { color: #c5221f; border-color: #c5221f; }
+        .actions .btn-primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+
+        /* Edit form */
+        .edit-form { margin-top: 24px; border: 1px solid #dadce0; border-radius: 8px; padding: 20px; display: none; }
+        .edit-form label { display: block; font-size: 13px; color: #5f6368; margin: 8px 0 4px; }
+        .edit-form input, .edit-form select, .edit-form textarea { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; }
+        .edit-form textarea { height: 60px; }
+        .edit-form .form-actions { margin-top: 16px; display: flex; gap: 8px; }
+
+        /* Invite form */
+        .invite-form { margin-top: 16px; display: flex; gap: 8px; align-items: center; }
+        .invite-form input { padding: 8px; border: 1px solid #dadce0; border-radius: 4px; font-size: 13px; flex: 1; }
+        .invite-form button { padding: 8px 16px; background: #1a73e8; color: #fff; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo"><span>Calendar</span>Todo</div>
+        <div class="header-nav">
+            <a href="{{ url_for('calendar-todo.index') }}">Calendar</a>
+            <a href="{{ url_for('calendar-todo.day_view', date_str=event.start[:10]) }}">Day View</a>
+            {% if user %}
+            <a href="{{ url_for('calendar-todo.dashboard') }}">{{ user.name }}</a>
+            {% else %}
+            <a href="{{ url_for('calendar-todo.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="event-detail">
+        <h1>{{ event.title }}</h1>
+        <span class="event-badge badge-{{ event.category }}">{{ event.category|capitalize }}</span>
+        <span class="event-badge badge-priority-{{ event.priority }}">{{ event.priority|capitalize }} Priority</span>
+        {% if event.recurring %}
+        <span class="event-badge" style="background:#f3e8fd;color:#7627bb">{{ event.recurring|capitalize }}</span>
+        {% endif %}
+        <span class="event-badge" style="background:#f1f3f4;color:#5f6368">{{ event.status|capitalize }}</span>
+
+        <div class="detail-row">
+            <div class="detail-label">Date</div>
+            <div class="detail-value">{{ event.start[:10] }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Time</div>
+            <div class="detail-value">{% if event.all_day %}All day{% else %}{{ event.start[11:16] }} - {{ event.end[11:16] }}{% endif %}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Calendar</div>
+            <div class="detail-value">{{ event.calendar }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Location</div>
+            <div class="detail-value">{{ event.location or 'Not specified' }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Description</div>
+            <div class="detail-value">{{ event.description }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Owner</div>
+            <div class="detail-value">{{ owner.name if owner else 'Unknown' }} ({{ owner.email if owner else '' }})</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Reminder</div>
+            <div class="detail-value">{{ event.reminder_minutes }} minutes before</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Attendees</div>
+            <div class="detail-value">
+                {% if event.attendees %}
+                <ul class="attendees-list">
+                    {% for a in event.attendees %}
+                    <li>{{ a }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                No attendees
+                {% endif %}
+            </div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Created</div>
+            <div class="detail-value">{{ event.created_at }}</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-primary" onclick="toggleEditForm()">Edit</button>
+            <button onclick="toggleStatus({{ event.id }})">{{ 'Cancel' if event.status == 'confirmed' else 'Confirm' }}</button>
+            <button class="btn-danger" onclick="deleteEvent({{ event.id }})">Delete</button>
+        </div>
+
+        <div class="invite-form">
+            <input type="email" id="invite-email" placeholder="Invite by email...">
+            <button onclick="inviteUser({{ event.id }})">Invite</button>
+        </div>
+
+        <div class="edit-form" id="edit-form">
+            <h3 style="font-size:16px;margin-bottom:12px;color:#202124">Edit Event</h3>
+            <label>Title</label>
+            <input type="text" id="edit-title" value="{{ event.title }}">
+            <label>Description</label>
+            <textarea id="edit-desc">{{ event.description }}</textarea>
+            <label>Category</label>
+            <select id="edit-category">
+                <option value="work" {{ 'selected' if event.category == 'work' }}>Work</option>
+                <option value="personal" {{ 'selected' if event.category == 'personal' }}>Personal</option>
+                <option value="health" {{ 'selected' if event.category == 'health' }}>Health</option>
+            </select>
+            <label>Start</label>
+            <input type="datetime-local" id="edit-start" value="{{ event.start[:16] }}">
+            <label>End</label>
+            <input type="datetime-local" id="edit-end" value="{{ event.end[:16] }}">
+            <label>Location</label>
+            <input type="text" id="edit-location" value="{{ event.location }}">
+            <label>Priority</label>
+            <select id="edit-priority">
+                <option value="high" {{ 'selected' if event.priority == 'high' }}>High</option>
+                <option value="medium" {{ 'selected' if event.priority == 'medium' }}>Medium</option>
+                <option value="low" {{ 'selected' if event.priority == 'low' }}>Low</option>
+            </select>
+            <div class="form-actions">
+                <button class="btn-primary" onclick="saveEdit({{ event.id }})">Save Changes</button>
+                <button onclick="toggleEditForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function toggleEditForm() {
+        const form = document.getElementById('edit-form');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function saveEdit(eventId) {
+        const data = {
+            title: document.getElementById('edit-title').value,
+            description: document.getElementById('edit-desc').value,
+            category: document.getElementById('edit-category').value,
+            start: document.getElementById('edit-start').value + ':00',
+            end: document.getElementById('edit-end').value + ':00',
+            location: document.getElementById('edit-location').value,
+            priority: document.getElementById('edit-priority').value,
+        };
+        fetch('{{ url_for("calendar-todo.api_event", event_id=0) }}'.replace('/0', '/' + eventId), {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        }).then(r => r.json()).then(() => window.location.reload());
+    }
+
+    function deleteEvent(eventId) {
+        if (!confirm('Delete this event?')) return;
+        fetch('{{ url_for("calendar-todo.api_event", event_id=0) }}'.replace('/0', '/' + eventId), {
+            method: 'DELETE'
+        }).then(() => window.location.href = '{{ url_for("calendar-todo.index") }}');
+    }
+
+    function toggleStatus(eventId) {
+        fetch('{{ url_for("calendar-todo.api_toggle_event", event_id=0) }}'.replace('/0', '/' + eventId), {
+            method: 'POST'
+        }).then(() => window.location.reload());
+    }
+
+    function inviteUser(eventId) {
+        const email = document.getElementById('invite-email').value;
+        if (!email) return;
+        fetch('{{ url_for("calendar-todo.api_invite_to_event", event_id=0) }}'.replace('/0', '/' + eventId), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: email})
+        }).then(r => r.json()).then(() => window.location.reload());
+    }
+    </script>
+</body>
+</html>

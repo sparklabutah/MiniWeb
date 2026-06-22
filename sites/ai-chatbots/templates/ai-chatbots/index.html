@@ -1,0 +1,73 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>AI Chatbots Hub</h1>
+    <div>
+        {% if user %}
+        <span style="font-size:13px;color:#8e8ea0;">Welcome, {{ user.display_name }}</span>
+        {% else %}
+        <a href="{{ url_for('ai-chatbots.login_page') }}" class="btn-small btn-primary">Login</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="text-align:center; margin-top:40px;">
+    <h1>Welcome to AI Chatbots Hub</h1>
+    <p>Chat with AI assistants powered by advanced language models</p>
+</div>
+
+<div class="card-grid" style="max-width:800px; margin-top:32px;">
+    {% for bot_name in bots %}
+    <div class="card" style="text-align:center; cursor:pointer;" onclick="window.location='{{ url_for('ai-chatbots.chat_page') }}?bot={{ bot_name }}'">
+        <h3>{{ bot_name }}</h3>
+        <p style="margin-top:8px;">Start a conversation with {{ bot_name }}</p>
+        <button class="btn-small btn-primary" style="margin-top:12px;">Chat Now</button>
+    </div>
+    {% endfor %}
+</div>
+
+<div style="max-width:800px; margin:40px auto 0;">
+    <h2 style="font-size:18px; margin-bottom:16px;">Recent Conversations</h2>
+    {% if conversations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Bot</th>
+                <th>Messages</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conv in conversations %}
+            <tr>
+                <td><a href="{{ url_for('ai-chatbots.chat_page', conv_id=conv.id) }}" style="color:#19c37d;text-decoration:none;">{{ conv.title }}</a></td>
+                <td>{{ conv.bot }}</td>
+                <td>{{ conv.messages|length }}</td>
+                <td>{{ conv.updated_at[:10] }}</td>
+                <td>
+                    <button class="btn-small" onclick="deleteConv('{{ conv.id }}')">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#8e8ea0;">No conversations yet. Start chatting!</p>
+    {% endif %}
+</div>
+
+<script>
+function deleteConv(convId) {
+    if (!confirm('Delete this conversation?')) return;
+    fetch('{{ url_for("ai-chatbots.api_delete_conversation", conv_id="__CID__") }}'.replace('__CID__', convId), {
+        method: 'DELETE'
+    }).then(() => location.reload());
+}
+</script>
+{% endblock %}

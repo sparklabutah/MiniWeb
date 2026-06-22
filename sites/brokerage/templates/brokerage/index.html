@@ -1,0 +1,120 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Markets — TradeCore{% endblock %}
+{% block content %}
+<div class="grid-4" style="margin-bottom:1rem;">
+    {% set top_gainers = tickers|sort(attribute='change_pct', reverse=True) %}
+    <div class="card">
+        <h2>Top Gainer</h2>
+        {% if top_gainers %}
+        <div class="stat-value positive">{{ top_gainers[0].symbol }}</div>
+        <div class="stat-label">${{ top_gainers[0].current_price }} <span class="positive">+{{ top_gainers[0].change_pct }}%</span></div>
+        {% endif %}
+    </div>
+    {% set top_losers = tickers|sort(attribute='change_pct') %}
+    <div class="card">
+        <h2>Top Loser</h2>
+        {% if top_losers %}
+        <div class="stat-value negative">{{ top_losers[0].symbol }}</div>
+        <div class="stat-label">${{ top_losers[0].current_price }} <span class="negative">{{ top_losers[0].change_pct }}%</span></div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h2>Total Securities</h2>
+        <div class="stat-value">{{ tickers|length }}</div>
+        <div class="stat-label">Across all markets</div>
+    </div>
+    <div class="card">
+        <h2>Crypto 24/7</h2>
+        <div class="stat-value" style="color:#d29922;">{{ tickers|selectattr('type','equalto','crypto')|list|length }}</div>
+        <div class="stat-label">Cryptocurrencies available</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Market Overview</h2>
+    <form method="GET" action="{{ url_for('brokerage.index') }}" class="filters">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search tickers..." style="width:200px;">
+        <label>Sector:
+            <select name="sector" onchange="this.form.submit()">
+                <option value="">All Sectors</option>
+                {% for s in sectors %}
+                <option value="{{ s }}" {% if sec == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Type:
+            <select name="type" onchange="this.form.submit()">
+                <option value="">All Types</option>
+                {% for tp in types %}
+                <option value="{{ tp }}" {% if typ == tp %}selected{% endif %}>{{ tp }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Min Price:
+            <input type="number" name="price_min" value="{{ price_min }}" placeholder="0" style="width:80px;" step="0.01">
+        </label>
+        <label>Max Price:
+            <input type="number" name="price_max" value="{{ price_max }}" placeholder="Any" style="width:80px;" step="0.01">
+        </label>
+        <label>Sort:
+            <select name="sort" onchange="this.form.submit()">
+                <option value="market_cap" {% if sort == 'market_cap' %}selected{% endif %}>Market Cap</option>
+                <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Price High-Low</option>
+                <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Price Low-High</option>
+                <option value="change_desc" {% if sort == 'change_desc' %}selected{% endif %}>Gainers</option>
+                <option value="change_asc" {% if sort == 'change_asc' %}selected{% endif %}>Losers</option>
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A-Z</option>
+            </select>
+        </label>
+        <button type="submit" class="btn">Filter</button>
+    </form>
+
+    <table id="tickers-table">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Sector</th>
+                <th>Price</th>
+                <th>Change</th>
+                <th>Change %</th>
+                <th>Status</th>
+                <th>Chart</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tickers %}
+            <tr>
+                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}"><strong>{{ t.symbol }}</strong></a></td>
+                <td>{{ t.name }}</td>
+                <td><span class="tag tag-{{ t.type }}">{{ t.type }}</span></td>
+                <td>{{ t.sector }}</td>
+                <td>${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</td>
+                <td class="{% if t.change >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change) }}
+                </td>
+                <td class="{% if t.change_pct >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ "+" if t.change_pct >= 0 }}{{ t.change_pct }}%
+                </td>
+                <td>
+                    <span class="market-status {% if t.market_open %}status-open{% else %}status-closed{% endif %}">
+                        {% if t.market_open %}Open{% else %}Closed{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <div class="sparkline">
+                        {% set ns = namespace(prev=t.base_price) %}
+                        {% for i in range(5) %}
+                            {% set pct = ((t.current_price - t.base_price) / t.base_price * 20 + (i * 3)) %}
+                            {% set h = [3, (pct|abs + 5)|int, 28]|sort %}
+                            <div class="bar {% if t.change >= 0 %}up{% else %}down{% endif %}" style="height:{{ h[1] }}px;"></div>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

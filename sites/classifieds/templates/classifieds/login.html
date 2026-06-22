@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if mode == 'register' %}Register{% else %}Sign In{% endif %} — KSL Classifieds</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f5f7; color: #333; }
+        .header { background: #1b5e20; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #c8e6c9; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .form-card { max-width: 420px; margin: 3rem auto; padding: 2rem; background: #fff; border-radius: .5rem; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .form-card h2 { font-size: 1.3rem; color: #1b5e20; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .85rem; color: #555; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .95rem; }
+        .form-group input:focus { border-color: #2e7d32; outline: none; }
+        .btn-submit { width: 100%; padding: .7rem; background: #1b5e20; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; }
+        .btn-submit:hover { background: #2e7d32; }
+        .error { color: #d32f2f; font-size: .85rem; margin-bottom: 1rem; padding: .5rem; background: #fce4ec; border-radius: .3rem; }
+        .switch-link { text-align: center; margin-top: 1rem; font-size: .85rem; color: #777; }
+        .switch-link a { color: #1b5e20; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('classifieds.index') }}">KSL Classifieds</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('classifieds.index') }}">Browse</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    {% if mode == 'register' %}
+    <form class="form-card" method="post" action="{{ url_for('classifieds.register_submit') }}">
+        <h2>Create Account</h2>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" required>
+        </div>
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" name="name" id="name" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" name="email" id="email" required>
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" name="phone" id="phone">
+        </div>
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" name="location" id="location" placeholder="e.g. Salt Lake City">
+        </div>
+        <button type="submit" class="btn-submit">Create Account</button>
+        <div class="switch-link">Already have an account? <a href="{{ url_for('classifieds.login_page') }}">Sign In</a></div>
+    </form>
+    {% else %}
+    <form class="form-card" method="post" action="{{ url_for('classifieds.login_submit') }}">
+        <h2>Sign In</h2>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" required>
+        </div>
+        <button type="submit" class="btn-submit">Sign In</button>
+        <div class="switch-link">Don't have an account? <a href="{{ url_for('classifieds.register_page') }}">Register</a></div>
+    </form>
+    {% endif %}
+</body>
+</html>

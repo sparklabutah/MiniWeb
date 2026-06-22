@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - Apex Dynamics</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --card-bg: #fff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+        a { color: var(--accent); text-decoration: none; }
+        .navbar { background: var(--primary); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .navbar .logo { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .navbar .logo span { color: #3b82f6; }
+        .navbar nav { display: flex; align-items: center; }
+        .navbar nav a { color: #cbd5e1; margin-left: 1.5rem; font-size: .9rem; text-decoration: none; }
+        .navbar nav a:hover { color: #fff; }
+        .navbar .search-form { display: flex; margin-left: 1.5rem; }
+        .navbar .search-form input { padding: 4px 10px; border: 1px solid #475569; border-radius: 4px 0 0 4px; background: #1e293b; color: #e2e8f0; font-size: .85rem; width: 160px; }
+        .navbar .search-form button { padding: 4px 10px; background: var(--accent); color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: .85rem; }
+        .page-header { background: var(--primary); color: #fff; padding: 3rem 2rem; text-align: center; }
+        .page-header h1 { font-size: 2rem; }
+        .page-header p { color: #94a3b8; }
+        .section { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .toolbar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center; justify-content: space-between; }
+        .filters { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        .filters select, .filters input { padding: .4rem .8rem; border: 1px solid var(--border); border-radius: 4px; font-size: .85rem; }
+        .filters input { flex: 1; max-width: 300px; }
+        .filters button { padding: .4rem 1rem; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .post-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+        .post-card h3 { font-size: 1.1rem; color: var(--primary); margin-bottom: .4rem; }
+        .post-card p { font-size: .9rem; color: var(--text-light); line-height: 1.5; }
+        .post-card .meta { font-size: .8rem; color: var(--text-light); margin-bottom: .5rem; }
+        .badge { display: inline-block; background: #eff6ff; color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: .78rem; margin-right: .3rem; }
+        .result-count { font-size: .85rem; color: var(--text-light); margin-bottom: 1rem; }
+        .export-link { display: inline-block; background: #eff6ff; color: var(--accent); padding: 4px 12px; border-radius: 4px; font-size: .82rem; font-weight: 600; text-decoration: none; }
+        .export-link:hover { background: #dbeafe; text-decoration: none; }
+        .pagination { display: flex; gap: .5rem; justify-content: center; margin-top: 2rem; align-items: center; }
+        .pagination a, .pagination span { padding: .4rem .8rem; border: 1px solid var(--border); border-radius: 4px; font-size: .85rem; text-decoration: none; }
+        .pagination .active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .pagination a:hover { background: #eff6ff; text-decoration: none; }
+        .newsletter-box { background: var(--card-bg); border: 2px solid var(--accent); border-radius: 8px; padding: 1.5rem; margin-top: 2rem; text-align: center; }
+        .newsletter-box h3 { color: var(--primary); margin-bottom: .5rem; }
+        .newsletter-box p { font-size: .9rem; color: var(--text-light); margin-bottom: 1rem; }
+        .newsletter-box a { display: inline-block; background: var(--accent); color: #fff; padding: .5rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
+        .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 2rem; }
+        .footer a { color: #cbd5e1; margin: 0 .5rem; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('business-company.index') }}" class="logo">Apex<span>Dynamics</span></a>
+        <nav>
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Newsletter</a>
+            <form class="search-form" action="{{ url_for('business-company.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search..." aria-label="Search">
+                <button type="submit">Go</button>
+            </form>
+        </nav>
+    </div>
+
+    <div class="page-header">
+        <h1>Blog & Insights</h1>
+        <p>Thought leadership from the Apex Dynamics team</p>
+    </div>
+
+    <div class="section">
+        <div class="toolbar">
+            <form class="filters" method="get">
+                <select name="category">
+                    <option value="">All Categories</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {% if c == cat %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="q" placeholder="Search articles..." value="{{ q }}">
+                <button type="submit">Search</button>
+            </form>
+            <div>
+                <a href="{{ url_for('business-company.api_export', resource='posts', format='csv') }}" class="export-link">Export CSV</a>
+                <a href="{{ url_for('business-company.api_export', resource='posts', format='json') }}" class="export-link">Export JSON</a>
+            </div>
+        </div>
+
+        <div class="result-count">{{ total }} article(s){% if total_pages > 1 %} &middot; Page {{ page }} of {{ total_pages }}{% endif %}</div>
+
+        {% for post in posts %}
+        <div class="post-card" style="display: flex; gap: 1.5rem; align-items: flex-start;">
+            <img src="https://placehold.co/300x200/EEE/999?text=blog-{{ post.id }}" alt="{{ post.title }}" style="width: 200px; min-width: 200px; height: 140px; object-fit: cover; border-radius: 6px;">
+            <div>
+            <div class="meta">
+                <span class="badge">{{ post.category }}</span> {{ post.date }} &middot; By {{ post.author }}
+            </div>
+            <h3><a href="{{ url_for('business-company.blog_post', post_id=post.id) }}">{{ post.title }} <span style="font-size:.7em;color:#888">(Post #{{ post.id }})</span></a></h3>
+            <p>{{ post.excerpt }}</p>
+            <div class="meta" style="margin-top:.5rem">
+                {% for tag in post.tags %}
+                <span class="badge">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="?category={{ cat }}&q={{ q }}&page={{ page - 1 }}">Previous</a>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="active">{{ p }}</span>
+            {% else %}
+            <a href="?category={{ cat }}&q={{ q }}&page={{ p }}">{{ p }}</a>
+            {% endif %}
+            {% endfor %}
+            {% if page < total_pages %}
+            <a href="?category={{ cat }}&q={{ q }}&page={{ page + 1 }}">Next</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="newsletter-box">
+            <h3>Subscribe to Our Newsletter</h3>
+            <p>Get the latest blog posts and insights delivered to your inbox.</p>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Subscribe Now</a>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Apex Dynamics Corp.</p>
+        <p style="margin-top:.5rem">
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+        </p>
+    </div>
+</body>
+</html>

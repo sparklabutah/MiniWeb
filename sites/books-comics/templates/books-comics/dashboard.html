@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Library -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .header-nav a { margin-left: 1rem; font-size: .85rem; color: #6b5b4f; text-decoration: none; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .welcome { font-size: 1.2rem; color: #2d2d2d; margin-bottom: 1.5rem; }
+        .section-title { font-size: 1.1rem; color: #2d2d2d; margin: 1.5rem 0 .8rem; border-bottom: 1px solid #e8dfd3; padding-bottom: .3rem; }
+        .saved-item { border-bottom: 1px solid #f5efe6; padding: .6rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .saved-item a { color: #8b4513; text-decoration: none; font-size: .95rem; }
+        .saved-item a:hover { text-decoration: underline; }
+        .saved-meta { font-size: .8rem; color: #a09080; }
+        .btn-sm { padding: .3rem .7rem; border: 1px solid #d4c5b0; border-radius: .25rem; background: #fff; cursor: pointer; font-size: .8rem; color: #6b5b4f; }
+        .btn-sm:hover { background: #f5efe6; }
+        .tag { display: inline-block; background: #f5efe6; padding: .3rem .7rem; border-radius: .25rem; font-size: .85rem; color: #6b5b4f; margin: .2rem; }
+        .msg { display: none; font-size: .85rem; color: #2e7d32; margin: .5rem 0; }
+        .empty { color: #a09080; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('books-comics.index') }}">Browse</a>
+            <a href="{{ url_for('books-comics.cart_page') }}">Cart</a>
+            <a href="{{ url_for('books-comics.logout') }}">Logout</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="welcome">Welcome, {{ user.name }}</div>
+
+        <h2 class="section-title">Saved Books ({{ saved_books|length }})</h2>
+        <div id="save-msg" class="msg"></div>
+        {% if saved_books %}
+        {% for b in saved_books %}
+        <div class="saved-item" id="saved-{{ b.id }}">
+            <div>
+                <a href="{{ url_for('books-comics.book_detail', book_id=b.id) }}">{{ b.title }}</a>
+                <div class="saved-meta">{{ b.authors_str }} -- {{ b.year }} -- {{ b.rating }}</div>
+            </div>
+            <button class="btn-sm" onclick="unsaveBook({{ b.id }})">Remove</button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">No saved books yet. Browse and save books you are interested in.</p>
+        {% endif %}
+
+        <h2 class="section-title">Reading List ({{ reading_list|length }})</h2>
+        {% if reading_list %}
+        {% for b in reading_list %}
+        <div class="saved-item">
+            <div>
+                <a href="{{ url_for('books-comics.read_book', book_id=b.id) }}">{{ b.title }}</a>
+                <div class="saved-meta">{{ b.authors_str }}</div>
+            </div>
+            <a href="{{ url_for('books-comics.read_book', book_id=b.id) }}" class="btn-sm">Read</a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">No books in your reading list yet.</p>
+        {% endif %}
+
+        <h2 class="section-title">Followed Authors ({{ followed_authors|length }})</h2>
+        <div id="follow-msg" class="msg"></div>
+        {% if followed_authors %}
+        <div>
+            {% for a in followed_authors %}
+            <span class="tag">{{ a }} <button class="btn-sm" onclick="unfollowAuthor('{{ a }}')" style="border:none;background:none;cursor:pointer;color:#a09080">x</button></span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No followed authors yet.</p>
+        {% endif %}
+
+        <h2 class="section-title">Subscriptions ({{ subscriptions|length }})</h2>
+        {% if subscriptions %}
+        <div>
+            {% for s in subscriptions %}
+            <span class="tag">{{ s }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No category subscriptions yet.</p>
+        {% endif %}
+    </div>
+
+    <script>
+    const BASE = "{{ url_for('books-comics.index') }}".replace(/\/$/, "");
+    const USER_ID = {{ user.id }};
+
+    function showMsg(id, text) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 3000);
+    }
+
+    async function unsaveBook(bid) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({book_id: bid})
+        });
+        if (r.ok) {
+            showMsg("save-msg", "Book removed!");
+            document.getElementById("saved-" + bid)?.remove();
+        }
+    }
+
+    async function unfollowAuthor(name) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({author: name})
+        });
+        if (r.ok) {
+            showMsg("follow-msg", "Author unfollowed!");
+            setTimeout(() => location.reload(), 1000);
+        }
+    }
+    </script>
+</body>
+</html>

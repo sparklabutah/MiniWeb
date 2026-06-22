@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-login:hover { background: #1e3a6e; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .login-banner { max-width: 1000px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
+        .login-banner a { color: #0a2463; font-weight: 600; }
+        .welcome { max-width: 1000px; margin: 1.5rem auto; padding: 0 2rem; }
+        .welcome h2 { color: #0a2463; font-size: 1.4rem; margin-bottom: .3rem; }
+        .welcome p { color: #64748b; font-size: .9rem; }
+        .accounts-grid { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        .account-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid #0a2463; }
+        .account-card.checking { border-left-color: #0a2463; }
+        .account-card.savings { border-left-color: #059669; }
+        .account-card.credit { border-left-color: #dc2626; }
+        .account-card.loan { border-left-color: #d97706; }
+        .account-type { font-size: .75rem; text-transform: uppercase; font-weight: 700; letter-spacing: .05rem; color: #64748b; margin-bottom: .3rem; }
+        .account-number { font-size: .85rem; color: #94a3b8; margin-bottom: .5rem; }
+        .account-balance { font-size: 1.6rem; font-weight: 700; color: #1a1a2e; }
+        .account-balance.negative { color: #dc2626; }
+        .account-link { display: inline-block; margin-top: .8rem; font-size: .85rem; color: #4da6ff; text-decoration: none; }
+        .account-link:hover { text-decoration: underline; }
+        .quick-actions { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
+        .quick-actions h3 { color: #334155; font-size: 1rem; margin-bottom: .8rem; }
+        .action-buttons { display: flex; gap: .8rem; flex-wrap: wrap; }
+        .action-btn { background: #fff; border: 1.5px solid #e2e8f0; padding: .7rem 1.5rem; border-radius: .4rem; text-decoration: none; color: #0a2463; font-size: .9rem; font-weight: 500; }
+        .action-btn:hover { border-color: #4da6ff; background: #f8fbff; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; margin-top: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('banking.index') }}" class="active">Dashboard</a>
+        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
+        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
+        <a href="{{ url_for('banking.pay_bills_page') }}">Pay Bills</a>
+        <a href="{{ url_for('banking.payees_page') }}">Payees</a>
+        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
+        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
+        <a href="{{ url_for('banking.verify_identity_page') }}">Verify ID</a>
+        {% if logged_in %}
+        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    {% if not logged_in %}
+    <div class="login-banner">
+        Browsing as {{ user.name }} (demo mode). <a href="{{ url_for('banking.login_page') }}">Sign in</a> to access your own accounts or make changes.
+    </div>
+    {% endif %}
+
+    <div class="welcome">
+        <h2>Welcome, {{ user.name }}</h2>
+        <p>Last login: June 21, 2026</p>
+    </div>
+
+    <div class="accounts-grid">
+        {% for acct in accounts %}
+        <div class="account-card {{ acct.type }}">
+            <div class="account-type">{{ acct.type }} Account</div>
+            <div class="account-number">{{ acct.account_number }}</div>
+            <div class="account-balance {% if acct.balance < 0 %}negative{% endif %}">
+                ${{ "%.2f"|format(acct.balance|abs) }}{% if acct.balance < 0 %} owed{% endif %}
+            </div>
+            <a href="{{ url_for('banking.account_detail', account_id=acct.id) }}" class="account-link">View Details</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="quick-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+            <a href="{{ url_for('banking.transfer_page') }}" class="action-btn">Transfer Funds</a>
+            <a href="{{ url_for('banking.pay_bills_page') }}" class="action-btn">Pay a Bill</a>
+            <a href="{{ url_for('banking.transactions_page') }}" class="action-btn">View Transactions</a>
+            <a href="{{ url_for('banking.loans_page') }}" class="action-btn">Manage Loans</a>
+            <a href="{{ url_for('banking.settings_page') }}" class="action-btn">Account Settings</a>
+        </div>
+    </div>
+
+    <div class="footer">SecureBank Online -- FDIC Insured</div>
+</body>
+</html>

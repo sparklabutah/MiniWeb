@@ -1,0 +1,58 @@
+{
+    "site_id": "recipe-sharing",
+    "site_name": "TastyBites Recipe Hub",
+    "description": "Browse recipes, save favorites, plan meals, and share cooking tips",
+    "domain": "food/recipes",
+    "tags": ["food", "recipes", "cooking", "meal-planning", "social"],
+    "num_tasks": 20,
+
+    "entities": [
+        {
+            "name": "recipes",
+            "description": "Cooking recipes with ingredients, steps, and nutritional info",
+            "fields": ["id", "title", "cuisine", "category", "difficulty", "prep_time_min",
+                       "cook_time_min", "servings", "calories", "rating", "num_ratings",
+                       "author", "ingredients", "steps", "tags", "created", "image_url"],
+            "count": 30
+        },
+        {
+            "name": "users",
+            "description": "Users with saved recipes, meal plans, and shopping lists",
+            "fields": ["id", "username", "name", "email", "saved_recipes",
+                       "meal_plan", "shopping_list", "dietary_preferences"],
+            "count": 5
+        },
+        {
+            "name": "comments",
+            "description": "User comments on recipes with ratings",
+            "fields": ["id", "recipe_id", "user_id", "text", "rating", "date", "helpful_count"],
+            "count": 20
+        }
+    ],
+
+    "features": [
+        "GET /api/recipes — list all, filters: q, cuisine, category, difficulty, max_time, max_calories, min_rating, dietary, ingredient, sort, limit",
+        "GET /api/recipes/<id> — single recipe with ingredients and steps",
+        "GET /api/comments?recipe_id= — list comments",
+        "POST /api/comments — create comment",
+        "POST /api/comments/<id>/helpful — mark as helpful",
+        "GET /api/users/<id> — user profile with saved recipes and meal plan",
+        "POST /api/users/<id>/save — save recipe to favorites",
+        "DELETE /api/users/<id>/save/<recipe_id> — unsave",
+        "POST /api/users/<id>/meal-plan — add recipe to weekly meal plan",
+        "DELETE /api/users/<id>/meal-plan/<day> — remove from meal plan",
+        "GET /api/users/<id>/shopping-list — generate shopping list from meal plan",
+        "PUT /api/users/<id>/profile — update preferences",
+        "GET /api/stats — aggregate stats (popular cuisines, avg ratings, etc.)",
+        "GET /api/export/recipes?cuisine= — CSV export"
+    ],
+
+    "task_guidance": "Mix read-only lookups (find cheapest/fastest recipe, count by cuisine) with write operations (save recipe, add to meal plan, post comment). Include a task that generates a shopping list from the meal plan.",
+
+    "target_macros": [
+        "extract_by_extremum", "extract_by_quantity", "filter_by_attribute",
+        "filter_by_category", "search_by_keyword", "compare_by_attribute",
+        "compute_by_quantity", "add_to_collection", "create_by_form",
+        "export_to_file", "react_to_react", "edit_to_update"
+    ]
+}

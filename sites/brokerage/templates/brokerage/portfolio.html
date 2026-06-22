@@ -1,0 +1,79 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Portfolio — TradeCore{% endblock %}
+{% block content %}
+<div class="grid-3" style="margin-bottom:1rem;">
+    <div class="card">
+        <h2>Portfolio Value</h2>
+        <div class="stat-value">${{ "{:,.2f}".format(total_value) }}</div>
+        <div class="stat-label">Total Market Value</div>
+    </div>
+    <div class="card">
+        <h2>Total Gain/Loss</h2>
+        <div class="stat-value {% if total_gain >= 0 %}positive{% else %}negative{% endif %}">
+            {{ "+" if total_gain >= 0 }}${{ "{:,.2f}".format(total_gain) }}
+        </div>
+        <div class="stat-label {% if total_gain_pct >= 0 %}positive{% else %}negative{% endif %}">
+            {{ "+" if total_gain_pct >= 0 }}{{ total_gain_pct }}%
+        </div>
+    </div>
+    <div class="card">
+        <h2>Account</h2>
+        <div class="stat-value">${{ "{:,.2f}".format(user.cash_balance) }}</div>
+        <div class="stat-label">Cash Balance | {{ user.account_type|title }} Account</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Portfolio Allocation</h2>
+    {% if holdings %}
+    <div class="bar-chart" style="height:100px;">
+        {% set max_val = holdings|map(attribute='market_value')|max %}
+        {% for h in holdings %}
+        <div class="bar-col">
+            <div class="bar-fill" style="height:{{ (h.market_value / max_val * 90 + 5)|int }}px;
+                 background:{% if h.gain >= 0 %}#3fb950{% else %}#f85149{% endif %};"></div>
+            <div class="bar-label">{{ h.symbol }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Holdings ({{ holdings|length }})</h2>
+    <table id="holdings-table">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Shares</th>
+                <th>Avg Cost</th>
+                <th>Current Price</th>
+                <th>Market Value</th>
+                <th>Gain/Loss</th>
+                <th>Gain %</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in holdings %}
+            <tr>
+                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=h.symbol) }}"><strong>{{ h.symbol }}</strong></a></td>
+                <td>{{ h.name }}</td>
+                <td><span class="tag tag-{{ h.type }}">{{ h.type }}</span></td>
+                <td>{{ h.shares }}</td>
+                <td>${{ "%.2f"|format(h.avg_cost) if h.avg_cost >= 1 else "%.4f"|format(h.avg_cost) }}</td>
+                <td>${{ "%.2f"|format(h.current_price) if h.current_price >= 1 else "%.4f"|format(h.current_price) }}</td>
+                <td>${{ "{:,.2f}".format(h.market_value) }}</td>
+                <td class="{% if h.gain >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ "+" if h.gain >= 0 }}${{ "{:,.2f}".format(h.gain) }}
+                </td>
+                <td class="{% if h.gain_pct >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ "+" if h.gain_pct >= 0 }}{{ h.gain_pct }}%
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

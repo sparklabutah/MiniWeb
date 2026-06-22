@@ -1,0 +1,98 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}My Account - City of Cedar Grove{% endblock %}
+{% block content %}
+<div class="main-content">
+    <h2 class="section-title">My Account Dashboard</h2>
+
+    <div class="detail-header">
+        <h2>Welcome, {{ user.name }}</h2>
+        <div class="detail-meta">
+            <span><strong>Username:</strong> {{ user.username }}</span>
+            <span><strong>Email:</strong> {{ user.email }}</span>
+            <span><strong>Phone:</strong> {{ user.phone }}</span>
+            <span><strong>Verified:</strong> {{ "Yes" if user.verified else "No" }}</span>
+        </div>
+    </div>
+
+    {% if not user.verified %}
+    <div class="alert alert-info" style="margin-top:1rem;">
+        Your account is not yet verified. <a href="{{ url_for('agency-portals.verify_identity_page') }}">Verify your identity</a> to access all services.
+    </div>
+    {% endif %}
+
+    <h3 class="section-title">Saved Services</h3>
+    {% if saved_services %}
+    <div class="card-grid">
+        {% for s in saved_services %}
+        <div class="card">
+            <h3>{{ s.name }}</h3>
+            <p>{{ s.description[:100] }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#71767a;">No saved services yet.</p>
+    {% endif %}
+
+    {% if user.permits %}
+    <h3 class="section-title">My Permits</h3>
+    <table class="data-table">
+        <thead>
+            <tr><th>Code</th><th>Type</th><th>Address</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+            {% for p in user.permits %}
+            <tr>
+                <td>{{ p.code }}</td>
+                <td>{{ p.type }}</td>
+                <td>{{ p.address }}</td>
+                <td>{{ p.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if user.payments %}
+    <h3 class="section-title">Payment History</h3>
+    <table class="data-table">
+        <thead>
+            <tr><th>Confirmation</th><th>Type</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+            {% for p in user.payments %}
+            <tr>
+                <td>{{ p.confirmation }}</td>
+                <td>{{ p.type }}</td>
+                <td>${{ p.amount }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if user.appointments %}
+    <h3 class="section-title">My Appointments</h3>
+    <table class="data-table">
+        <thead>
+            <tr><th>Confirmation</th><th>Type</th><th>Date</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for a in user.appointments %}
+            <tr>
+                <td>{{ a.confirmation }}</td>
+                <td>{{ a.type }}</td>
+                <td>{{ a.date }}</td>
+                <td>{{ a.time }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <div style="margin-top:2rem;">
+        <a href="{{ url_for('agency-portals.pay_page') }}" class="btn btn-primary">Make a Payment</a>
+        <a href="{{ url_for('agency-portals.book_page') }}" class="btn btn-secondary" style="margin-left:.5rem;">Book Appointment</a>
+    </div>
+</div>
+{% endblock %}

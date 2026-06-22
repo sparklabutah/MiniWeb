@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Batch browser-agent evaluation for all built MiniWeb sites.
+#
+# Usage:
+#   # Request allocation first:
+#   salloc --partition=kmarino-gpu-grn --qos=kmarino-gpu-grn --account=kmarino \
+#          --gres=gpu:a800:2 --time=06:00:00 --ntasks=1 --mem=60G
+#
+#   # Then run inside the allocation:
+#   bash scripts/run_batch_eval.sh [OPTIONS]
+#
+# Options:
+#   --model MODEL         LLM backend (default: gpt)
+#   --workers N           Parallel browser instances per site (default: 4)
+#   --max-steps N         Max agent steps per task (default: 20)
+#   --rounds N            Browser-eval rounds per site (default: 3)
+#   --sites "a b c"       Only eval these sites (default: all built sites)
+#   --port-start N        Starting port for Flask servers (default: 8090)
+#   --parallel N          Sites to eval simultaneously (default: 2)
+#   --site-timeout N      Max seconds per site eval (default: 1800 = 30 min)
+#   --task-timeout N      Max seconds per task (default: 180 = 3 min)
+#   --dry-run             Print what would run without executing
+# =============================================================================
+set -uo pipefail
+# NOTE: not using set -e because background jobs may return non-zero
+# (e.g., eval failures, timeouts) and we want to continue processing
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
+# Defaults
+MODEL="gpt"
+WORKERS=8
+MAX_STEPS=20
+ROUNDS=3
+PORT_START=8090
+PARALLEL=4
+DRY_RUN=false
+SITES=""
+SITE_TIMEOUT=1800     # 30 min per site
+TASK_TIMEOUT=180      # 3 min per task
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --model) MODEL="$2"; shift 2 ;;
+        --workers) WORKERS="$2"; shift 2 ;;
+        --max-steps) MAX_STEPS="$2"; shift 2 ;;
+        --rounds) ROUNDS="$2"; shift 2 ;;
+        --sites) SITES="$2"; shift 2 ;;
+        --port-start) PORT_START="$2"; shift 2 ;;
+        --parallel) PARALLEL="$2"; shift 2 ;;
+        --site-timeout) SITE_TIMEOUT="$2"; shift 2 ;;
+        --task-timeout) TASK_TIMEOUT="$2"; shift 2 ;;
+        --dry-run) DRY_RUN=true; shift ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+done
+
+# Find conda
+CONDA_BIN="/scratch/general/vast/u1653932/miniforge3/condabin/conda"
+PYTHON="$CONDA_BIN run -n miniweb-eval python -u"
+
+# Load env vars
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
+# Discover built sites (have tasks.json)
+if [ -z "$SITES" ]; then
+    SITES=""
+    for site_dir in sites/*/; do
+        site=$(basename "$site_dir")
+        [[ "$site" == _* ]] && continue
+        [[ "$site" == __* ]] && continue
+        [ -f "$site_dir/tasks.json" ] || continue
+        SITES="$SITES $site"
+    done
+fi
+
+SITE_LIST=($SITES)
+TOTAL=${#SITE_LIST[@]}
+
+echo "============================================================"
+echo "  MiniWeb Batch Evaluation"
+echo "============================================================"
+echo "  Model:        $MODEL"
+echo "  Workers:      $WORKERS per site"
+echo "  Max steps:    $MAX_STEPS per task"
+echo "  Task timeout: ${TASK_TIMEOUT}s per task"
+echo "  Site timeout: ${SITE_TIMEOUT}s per site"
+echo "  Rounds:       $ROUNDS per site"
+echo "  Parallel:     $PARALLEL sites simultaneously"
+echo "  Sites:        $TOTAL"
+echo "  Sites list:   ${SITE_LIST[*]}"
+echo "============================================================"
+echo
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would evaluate these sites:"
+    PORT=$PORT_START
+    for site in "${SITE_LIST[@]}"; do
+        echo "  $site (port $PORT)"
+        PORT=$((PORT + 1))
+    done
+    exit 0
+fi
+
+# Log file
+LOG_DIR="$PROJECT_ROOT/evaluation/logs"
+mkdir -p "$LOG_DIR"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+MASTER_LOG="$LOG_DIR/batch_${MODEL}_${TIMESTAMP}.log"
+
+echo "Logging to: $MASTER_LOG"
+echo "Start time: $(date)" | tee "$MASTER_LOG"
+
+# Update TASK_TIMEOUT in tasks.py to match our setting
+sed -i "s/^TASK_TIMEOUT = .*/TASK_TIMEOUT = $TASK_TIMEOUT  # seconds per task/" evaluation/tasks.py
+
+# Reset all site data to pristine before starting
+echo "Resetting all site data to pristine..." | tee -a "$MASTER_LOG"
+for site in "${SITE_LIST[@]}"; do
+    pristine="sites/$site/data/.pristine"
+    if [ -d "$pristine" ]; then
+        for f in "$pristine"/*.json; do
+            [ -f "$f" ] && cp "$f" "sites/$site/data/$(basename "$f")"
+        done
+    fi
+done
+
+# Kill any leftover processes on a port
+kill_port() {
+    local port=$1
+    local pids
+    pids=$(lsof -ti ":$port" 2>/dev/null) || true
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# Run a single site eval with timeout
+run_site_eval() {
+    local site=$1
+    local port=$2
+    local round=$3
+    local site_log="$LOG_DIR/${site}_${MODEL}_r${round}_${TIMESTAMP}.log"
+
+    echo "[$(date +%H:%M:%S)] Starting $site round $round on port $port" | tee -a "$MASTER_LOG"
+
+    # Reset data before each round
+    pristine="sites/$site/data/.pristine"
+    if [ -d "$pristine" ]; then
+        for f in "$pristine"/*.json; do
+            [ -f "$f" ] && cp "$f" "sites/$site/data/$(basename "$f")"
+        done
+    fi
+
+    # Kill anything on the port first
+    kill_port "$port"
+
+    # Run with site-level timeout
+    timeout --kill-after=30 "$SITE_TIMEOUT" \
+        $PYTHON evaluation/run_eval.py \
+            --site "$site" \
+            --model "$MODEL" \
+            --port "$port" \
+            --workers "$WORKERS" \
+            --max-steps "$MAX_STEPS" \
+            > "$site_log" 2>&1
+
+    local exit_code=$?
+
+    # Clean up: kill the flask server on this port
+    kill_port "$port"
+
+    # Extract pass rate from output
+    local pass_rate=$(grep -oP '\d+/\d+ passed \(\K[0-9.]+' "$site_log" 2>/dev/null || echo "?")
+
+    if [ $exit_code -eq 0 ]; then
+        echo "[$(date +%H:%M:%S)] DONE $site round $round: ${pass_rate}% (log: $site_log)" | tee -a "$MASTER_LOG"
+    elif [ $exit_code -eq 124 ]; then
+        echo "[$(date +%H:%M:%S)] TIMEOUT $site round $round: killed after ${SITE_TIMEOUT}s (log: $site_log)" | tee -a "$MASTER_LOG"
+    else
+        echo "[$(date +%H:%M:%S)] FAIL $site round $round: exit=$exit_code (log: $site_log)" | tee -a "$MASTER_LOG"
+    fi
+
+    # Always return 0 so background wait doesn't kill the parent script
+    return 0
+}
+
+# Main evaluation loop
+COMPLETED=0
+FAILED=0
+
+for round in $(seq 1 $ROUNDS); do
+    echo "" | tee -a "$MASTER_LOG"
+    echo "==================== Round $round/$ROUNDS ====================" | tee -a "$MASTER_LOG"
+
+    # Process sites in batches of $PARALLEL
+    i=0
+    while [ $i -lt $TOTAL ]; do
+        PIDS=()
+
+        # Launch batch
+        for j in $(seq 0 $((PARALLEL - 1))); do
+            idx=$((i + j))
+            [ $idx -ge $TOTAL ] && break
+            site="${SITE_LIST[$idx]}"
+            port=$((PORT_START + j))
+
+            run_site_eval "$site" "$port" "$round" &
+            PIDS+=($!)
+        done
+
+        # Wait for batch to complete
+        for pid in "${PIDS[@]}"; do
+            wait "$pid" 2>/dev/null
+            if [ $? -eq 0 ]; then
+                COMPLETED=$((COMPLETED + 1))
+            else
+                FAILED=$((FAILED + 1))
+            fi
+        done
+
+        i=$((i + PARALLEL))
+    done
+done
+
+echo "" | tee -a "$MASTER_LOG"
+echo "============================================================" | tee -a "$MASTER_LOG"
+echo "  Batch evaluation complete" | tee -a "$MASTER_LOG"
+echo "  Total runs: $((TOTAL * ROUNDS))" | tee -a "$MASTER_LOG"
+echo "  Completed:  $COMPLETED" | tee -a "$MASTER_LOG"
+echo "  Failed:     $FAILED" | tee -a "$MASTER_LOG"
+echo "  End time:   $(date)" | tee -a "$MASTER_LOG"
+echo "============================================================" | tee -a "$MASTER_LOG"
+
+# Generate summary
+echo "" | tee -a "$MASTER_LOG"
+echo "Per-site best results:" | tee -a "$MASTER_LOG"
+for site in "${SITE_LIST[@]}"; do
+    latest=$(ls -td "sites/$site/results/${MODEL}_"* 2>/dev/null | head -1)
+    if [ -n "$latest" ] && [ -f "$latest/results.json" ]; then
+        rate=$($PYTHON -c "import json; d=json.load(open('$latest/results.json')); print(f'{d[\"passed\"]}/{d[\"total\"]} ({d[\"pass_rate\"]}%)')" 2>/dev/null || echo "?")
+        echo "  $site: $rate" | tee -a "$MASTER_LOG"
+    else
+        echo "  $site: no results" | tee -a "$MASTER_LOG"
+    fi
+done

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Listings - BidMarket</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .topbar { background: #1a1a2e; color: #fff; padding: .4rem 2rem; font-size: .8rem; }
+        .topbar a { color: #ccc; text-decoration: none; margin-right: .8rem; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        h1 { color: #1a1a2e; margin-bottom: 1rem; }
+        .compare-form { margin-bottom: 1.5rem; display: flex; gap: .5rem; }
+        .compare-form input { flex: 1; padding: .6rem; border: 1px solid #ddd; border-radius: .3rem; }
+        .compare-form button { padding: .6rem 1.2rem; background: #e94560; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-weight: 600; }
+        table { width: 100%; background: #fff; border-collapse: collapse; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+        th { background: #1a1a2e; color: #fff; padding: .7rem; text-align: left; }
+        td { padding: .6rem .7rem; border-bottom: 1px solid #eee; font-size: .9rem; }
+        tr:nth-child(even) td { background: #f8f9fa; }
+        .no-data { color: #888; text-align: center; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">BidMarket Home</a>
+        <a href="/">MiniWeb</a>
+    </div>
+    <div class="container">
+        <h1>Compare Listings</h1>
+        <div class="compare-form">
+            <input type="text" id="compare-ids" placeholder="Enter listing IDs separated by commas (e.g., 1,2,3)" value="{{ request.args.get('ids', '') }}">
+            <button onclick="doCompare()">Compare</button>
+        </div>
+
+        {% if selected %}
+        <table>
+            <tr>
+                <th>Attribute</th>
+                {% for p in selected %}
+                <th>{{ p.name[:30] }}</th>
+                {% endfor %}
+            </tr>
+            <tr><td><strong>ID</strong></td>{% for p in selected %}<td>{{ p.id }}</td>{% endfor %}</tr>
+            <tr><td><strong>Category</strong></td>{% for p in selected %}<td>{{ p.category }}</td>{% endfor %}</tr>
+            <tr><td><strong>Brand</strong></td>{% for p in selected %}<td>{{ p.brand }}</td>{% endfor %}</tr>
+            <tr><td><strong>Condition</strong></td>{% for p in selected %}<td>{{ p.condition }}</td>{% endfor %}</tr>
+            <tr><td><strong>Current Price</strong></td>{% for p in selected %}<td>${{ "%.2f"|format(p.current_price) }}</td>{% endfor %}</tr>
+            <tr><td><strong>Start Price</strong></td>{% for p in selected %}<td>${{ "%.2f"|format(p.start_price) }}</td>{% endfor %}</tr>
+            <tr><td><strong>Bids</strong></td>{% for p in selected %}<td>{{ p.num_bids }}</td>{% endfor %}</tr>
+            <tr><td><strong>Status</strong></td>{% for p in selected %}<td>{{ p.status }}</td>{% endfor %}</tr>
+            <tr><td><strong>Seller</strong></td>{% for p in selected %}<td>{{ p.seller_username }}</td>{% endfor %}</tr>
+            <tr><td><strong>Shipping</strong></td>{% for p in selected %}<td>{{ p.shipping }}</td>{% endfor %}</tr>
+            <tr><td><strong>Return Policy</strong></td>{% for p in selected %}<td>{{ p.return_policy }}</td>{% endfor %}</tr>
+            <tr><td><strong>Ends</strong></td>{% for p in selected %}<td>{{ p.auction_end[:10] }}</td>{% endfor %}</tr>
+        </table>
+        {% else %}
+        <div class="no-data">Enter listing IDs above to compare them side by side.</div>
+        {% endif %}
+    </div>
+
+    <script>
+    function doCompare() {
+        const ids = document.getElementById('compare-ids').value.trim();
+        if (ids) window.location.href = '{{ url_for("auctions-p2p-marketplaces.compare_page") }}?ids=' + ids;
+    }
+    </script>
+</body>
+</html>

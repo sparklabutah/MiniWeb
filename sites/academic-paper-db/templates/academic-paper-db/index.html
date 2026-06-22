@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScholarBase — Academic Paper Search</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; }
+        .header { border-bottom: 1px solid #e2e8f0; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.3rem; margin: 0; color: #1e3a5f; }
+        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
+        .header-nav a:hover { color: #1e3a5f; }
+        .search-section { max-width: 800px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .search-form { display: flex; gap: .5rem; }
+        .search-form input[type="text"] { flex: 1; padding: .7rem 1rem; border: 2px solid #cbd5e1; border-radius: .4rem; font-size: 1rem; }
+        .search-form input[type="text"]:focus { border-color: #3b82f6; outline: none; }
+        .search-form button { padding: .7rem 1.5rem; background: #1e3a5f; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .95rem; }
+        .filters { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1rem; align-items: center; }
+        .filters label { font-size: .85rem; color: #64748b; }
+        .filters select, .filters input[type="number"] { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .85rem; }
+        .filters input[type="number"] { width: 80px; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: .3rem .8rem; margin-top: .5rem; }
+        .checkbox-group label { font-size: .8rem; display: flex; align-items: center; gap: .25rem; cursor: pointer; }
+        .main { max-width: 800px; margin: 0 auto; padding: 0 1.5rem 3rem; }
+        .result-count { font-size: .85rem; color: #64748b; margin: 1rem 0; }
+        .paper-card { border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: .75rem; transition: border-color .15s; }
+        .paper-card:hover { border-color: #3b82f6; }
+        .paper-title { margin: 0 0 .3rem; font-size: 1.05rem; }
+        .paper-title a { color: #1e3a5f; text-decoration: none; }
+        .paper-title a:hover { text-decoration: underline; }
+        .paper-authors { font-size: .88rem; color: #475569; margin-bottom: .3rem; }
+        .paper-abstract { font-size: .85rem; color: #64748b; line-height: 1.5; margin-bottom: .4rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .paper-meta { font-size: .8rem; color: #94a3b8; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .paper-meta .cat { background: #f1f5f9; padding: .15rem .5rem; border-radius: .25rem; color: #475569; }
+        .no-results { text-align: center; color: #94a3b8; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ScholarBase</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('academic-paper-db.index') }}">Search</a>
+            {% for tc in categories %}
+            <a href="{{ url_for('academic-paper-db.category_page', cat_name=tc) }}">{{ tc }}</a>
+            {% endfor %}
+            {% if user %}
+            <a href="{{ url_for('academic-paper-db.dashboard') }}">Dashboard ({{ user.name }})</a>
+            <a href="{{ url_for('academic-paper-db.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('academic-paper-db.login_page') }}" style="background:#1e3a5f;color:#fff;padding:.3rem .8rem;border-radius:.3rem">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="search-section">
+        <form class="search-form" method="get" action="{{ url_for('academic-paper-db.index') }}">
+            <input type="text" name="q" placeholder="Search papers by title, author, or category..." value="{{ q }}" autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+        <div style="display:flex;gap:.5rem;margin-top:.8rem;align-items:center">
+            <label style="font-size:.85rem;color:#64748b">Go to Paper ID:</label>
+            <input type="number" id="paper-id-input" min="1" style="width:80px;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:.3rem;font-size:.85rem" placeholder="e.g. 3">
+            <button onclick="gotoPaper()" style="padding:.4rem .8rem;background:#1e3a5f;color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.85rem">Go</button>
+        </div>
+        <div class="filters">
+            <label>Category:
+                <select name="category" id="filter-cat" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {{ 'selected' if cat == c }}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>From year:
+                <input type="number" name="date_from" id="filter-from" value="{{ date_from }}" min="1990" max="2026" onchange="applyFilters()">
+            </label>
+            <label>To year:
+                <input type="number" name="date_to" id="filter-to" value="{{ date_to }}" min="1990" max="2026" onchange="applyFilters()">
+            </label>
+            <label>Sort:
+                <select name="sort" id="filter-sort" onchange="applyFilters()">
+                    <option value="date" {{ 'selected' if sort == 'date' }}>Newest first</option>
+                    <option value="title" {{ 'selected' if sort == 'title' }}>Title A-Z</option>
+                    <option value="relevance" {{ 'selected' if sort == 'relevance' }}>Relevance</option>
+                </select>
+            </label>
+            <label><a href="{{ url_for('academic-paper-db.compare_page') }}">Compare</a></label>
+            <label>
+                <a href="{{ url_for('academic-paper-db.api_export', format='csv') }}">Export CSV</a>
+            </label>
+        </div>
+        <div class="checkbox-group">
+            {% for c in categories %}
+            <label>
+                <input type="checkbox" name="cats" value="{{ c }}" {{ 'checked' if c in checked_cats }} onchange="applyFilters()"> {{ c }}
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="result-count">{{ papers|length }} papers found (showing first 50)</div>
+
+        {% if papers %}
+        {% for paper in papers[:50] %}
+        <div class="paper-card" data-id="{{ paper.id }}">
+            <h2 class="paper-title">
+                <a href="{{ url_for('academic-paper-db.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a>
+            </h2>
+            <div class="paper-authors">{{ paper.authors_str }}</div>
+            <div class="paper-abstract">{{ paper.abstract }}</div>
+            <div class="paper-meta">
+                <span>{{ paper.year }}</span>
+                {% for c in paper.categories %}
+                <span class="cat">{{ c }}</span>
+                {% endfor %}
+                {% if paper.doi %}
+                <span>DOI: {{ paper.doi }}</span>
+                {% endif %}
+                <span>arXiv: {{ paper.arxiv_id }}</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-results">No papers match your search criteria.</div>
+        {% endif %}
+    </div>
+
+    <script>
+    function gotoPaper() {
+        const pid = document.getElementById('paper-id-input').value;
+        if (pid) window.location.href = '{{ url_for("academic-paper-db.paper_detail", paper_id=0) }}'.replace('/0', '/' + pid);
+    }
+
+    function applyFilters() {
+        const params = new URLSearchParams();
+        const q = document.querySelector('input[name="q"]').value;
+        if (q) params.set('q', q);
+        const cat = document.getElementById('filter-cat').value;
+        if (cat) params.set('category', cat);
+        const dfrom = document.getElementById('filter-from').value;
+        if (dfrom) params.set('date_from', dfrom);
+        const dto = document.getElementById('filter-to').value;
+        if (dto) params.set('date_to', dto);
+        const sort = document.getElementById('filter-sort').value;
+        if (sort) params.set('sort', sort);
+        document.querySelectorAll('input[name="cats"]:checked').forEach(cb => {
+            params.append('cats', cb.value);
+        });
+        window.location.href = '{{ url_for("academic-paper-db.index") }}?' + params.toString();
+    }
+    </script>
+</body>
+</html>

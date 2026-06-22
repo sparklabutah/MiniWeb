@@ -1,0 +1,70 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Permits - City of Cedar Grove{% endblock %}
+{% block content %}
+<div class="main-content">
+    <h2 class="section-title">Permits & Applications</h2>
+
+    <form class="filters" method="get" action="{{ url_for('agency-portals.permits_page') }}">
+        <div class="form-group">
+            <label for="q">Search</label>
+            <input type="text" id="q" name="q" value="{{ q }}" placeholder="Search by type, applicant, code...">
+        </div>
+        <div class="form-group">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="">All Statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="type">Type</label>
+            <select id="type" name="type">
+                <option value="">All Types</option>
+                {% for t in types %}
+                <option value="{{ t }}" {{ 'selected' if ptype == t }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="date_from">From Date</label>
+            <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="form-group">
+            <label for="date_to">To Date</label>
+            <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+
+    <p class="result-count">{{ permits|length }} permit(s) found</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Permit Code</th>
+                <th>Type</th>
+                <th>Applicant</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Date Submitted</th>
+                <th>Fee</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in permits %}
+            <tr>
+                <td><a href="{{ url_for('agency-portals.permit_detail', permit_id=p.id) }}">{{ p.code }}</a></td>
+                <td>{{ p.type }}</td>
+                <td>{{ p.applicant }}</td>
+                <td>{{ p.address }}</td>
+                <td><span class="badge badge-{{ p.status|lower|replace(' ', '-')|replace('under review','review') }}">{{ p.status }}</span></td>
+                <td>{{ p.date_submitted }}</td>
+                <td>${{ "%.2f"|format(p.fee) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

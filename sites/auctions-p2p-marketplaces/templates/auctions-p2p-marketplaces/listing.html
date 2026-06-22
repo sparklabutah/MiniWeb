@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }} - BidMarket</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .topbar { background: #1a1a2e; color: #fff; padding: .4rem 2rem; font-size: .8rem; }
+        .topbar a { color: #ccc; text-decoration: none; margin-right: .8rem; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #888; margin-bottom: 1rem; }
+        .breadcrumb a { color: #0f3460; text-decoration: none; }
+        .listing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .listing-img { height: 350px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: .5rem; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2rem; padding: 2rem; text-align: center; overflow: hidden; position: relative; }
+        .listing-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; border-radius: .5rem; }
+        .listing-info h1 { font-size: 1.4rem; margin-bottom: .5rem; color: #1a1a2e; }
+        .price-box { background: #fff; border: 2px solid #e94560; border-radius: .5rem; padding: 1.2rem; margin: 1rem 0; }
+        .price-label { font-size: .85rem; color: #888; }
+        .price-value { font-size: 2rem; font-weight: 700; color: #e94560; }
+        .bid-count { font-size: .9rem; color: #555; margin-top: .3rem; }
+        .timer { background: #fff5f5; padding: .5rem 1rem; border-radius: .3rem; color: #e94560; font-weight: 600; display: inline-block; margin: .5rem 0; }
+        .bid-form { display: flex; gap: .5rem; margin-top: .8rem; }
+        .bid-form input { flex: 1; padding: .6rem; border: 1px solid #ddd; border-radius: .3rem; font-size: 1rem; }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .3rem; cursor: pointer; font-weight: 600; font-size: .9rem; }
+        .btn-bid { background: #e94560; color: #fff; }
+        .btn-bid:hover { background: #c73e55; }
+        .btn-watch { background: #0f3460; color: #fff; }
+        .btn-buy { background: #28a745; color: #fff; }
+        .meta-table { width: 100%; margin: 1rem 0; }
+        .meta-table td { padding: .4rem .8rem; border-bottom: 1px solid #eee; font-size: .9rem; }
+        .meta-table td:first-child { font-weight: 600; color: #555; width: 140px; }
+        .badge { font-size: .75rem; padding: .2rem .5rem; border-radius: .2rem; font-weight: 600; }
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-ended { background: #f8d7da; color: #721c24; }
+        .section { background: #fff; border-radius: .5rem; padding: 1.2rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .section h2 { font-size: 1.1rem; margin-bottom: .8rem; color: #1a1a2e; border-bottom: 2px solid #e94560; padding-bottom: .3rem; }
+        .bid-row { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f0f0f0; font-size: .85rem; }
+        .related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; }
+        .related-card { background: #f9f9f9; border-radius: .3rem; padding: .8rem; text-align: center; }
+        .related-card a { color: #1a1a2e; text-decoration: none; font-size: .85rem; font-weight: 600; }
+        .related-card .price { color: #e94560; font-weight: 700; }
+        .seller-box { background: #f8f9fa; border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+        .seller-box a { color: #0f3460; text-decoration: none; font-weight: 600; }
+        .stars { color: #f5a623; }
+        .description { line-height: 1.6; color: #555; margin-top: .5rem; }
+        .actions { display: flex; gap: .5rem; margin-top: .8rem; flex-wrap: wrap; }
+        .report-link { font-size: .8rem; color: #dc3545; cursor: pointer; margin-top: .5rem; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">BidMarket Home</a>
+        <a href="/">MiniWeb</a>
+        {% if user %}
+        <a href="{{ url_for('auctions-p2p-marketplaces.dashboard') }}">Dashboard</a>
+        {% endif %}
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">Home</a> >
+            <a href="{{ url_for('auctions-p2p-marketplaces.category_page', cat_name=product.category) }}">{{ product.category }}</a> >
+            {{ product.name }}
+        </div>
+
+        <div class="listing-grid">
+            <div class="listing-img">{% if product.image_url %}<img src="{{ product.image_url }}" alt="{{ product.name }}">{% else %}{{ product.name }}{% endif %}</div>
+            <div class="listing-info">
+                <h1>{{ product.name }}</h1>
+                <span class="badge badge-{{ product.status }}">{{ product.status|upper }}</span>
+
+                <div class="price-box">
+                    <div class="price-label">Current Bid</div>
+                    <div class="price-value">${{ "%.2f"|format(product.current_price) }}</div>
+                    <div class="bid-count">{{ product.num_bids }} bids | Starting at ${{ "%.2f"|format(product.start_price) }}</div>
+                    {% if product.buy_now_price %}
+                    <div style="margin-top:.5rem;font-size:.9rem">Buy It Now: <strong>${{ "%.2f"|format(product.buy_now_price) }}</strong></div>
+                    {% endif %}
+                </div>
+
+                <div class="timer">
+                    {% if product.status == 'active' %}Ends: {{ product.auction_end }}{% elif product.status == 'ended' %}Auction Ended{% else %}Starts: {{ product.auction_start }}{% endif %}
+                </div>
+
+                {% if product.status == 'active' %}
+                <div class="bid-form">
+                    <input type="number" id="bid-amount" step="0.01" min="{{ product.current_price + 0.01 }}" placeholder="Enter bid (${{ '%.2f'|format(product.current_price + 1) }} or more)">
+                    <button class="btn btn-bid" onclick="placeBid()">Place Bid</button>
+                </div>
+                {% if product.buy_now_price %}
+                <button class="btn btn-buy" style="margin-top:.5rem" onclick="buyNow()">Buy It Now - ${{ "%.2f"|format(product.buy_now_price) }}</button>
+                {% endif %}
+                {% endif %}
+
+                <div class="actions">
+                    <button class="btn btn-watch" onclick="watchItem()">Watch This Item</button>
+                    <button class="btn" style="background:#6c757d;color:#fff" onclick="saveItem()">Save</button>
+                </div>
+
+                <table class="meta-table">
+                    <tr><td>Condition</td><td>{{ product.condition }}</td></tr>
+                    <tr><td>Brand</td><td>{{ product.brand }}</td></tr>
+                    <tr><td>Category</td><td>{{ product.category }}</td></tr>
+                    <tr><td>Item ID</td><td>{{ product.asin }}</td></tr>
+                    <tr><td>Shipping</td><td>{{ product.shipping }}</td></tr>
+                    <tr><td>Location</td><td>{{ product.location }}</td></tr>
+                    <tr><td>Return Policy</td><td>{{ product.return_policy }}</td></tr>
+                    <tr><td>Payment</td><td>{{ product.payment_methods|join(', ') }}</td></tr>
+                    {% if product.color_options %}
+                    <tr><td>Colors</td><td>{{ product.color_options|join(', ') }}</td></tr>
+                    {% endif %}
+                    {% if product.size_options %}
+                    <tr><td>Sizes</td><td>{{ product.size_options|join(', ') }}</td></tr>
+                    {% endif %}
+                    <tr><td>Views</td><td>{{ product.views }}</td></tr>
+                    <tr><td>Watchers</td><td>{{ product.watchers }}</td></tr>
+                </table>
+
+                <div class="seller-box">
+                    <div>Seller: <a href="{{ url_for('auctions-p2p-marketplaces.seller_page', seller_id=product.seller_id) }}">{{ product.seller_username }}</a></div>
+                    {% if seller %}
+                    <div class="stars">Rating: {{ seller.rating }}/5.0</div>
+                    <div style="font-size:.85rem;color:#666">{{ seller.get('total_sales', 0) }} sales | Member since {{ seller.member_since }}</div>
+                    {% endif %}
+                    <button class="btn" style="background:#0f3460;color:#fff;margin-top:.5rem;font-size:.8rem" onclick="followSeller()">Follow Seller</button>
+                    <button class="btn" style="background:#6c757d;color:#fff;margin-top:.5rem;font-size:.8rem" onclick="contactSeller()">Contact Seller</button>
+                </div>
+
+                <span class="report-link" onclick="reportItem()">Report this listing</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Description</h2>
+            <div class="description">{{ product.description }}</div>
+        </div>
+
+        <div class="section">
+            <h2>Bid History ({{ bids|length }} bids)</h2>
+            {% if bids %}
+            <table style="width:100%;font-size:.85rem">
+                <tr style="background:#f8f9fa"><th style="padding:.5rem;text-align:left">Bidder</th><th style="text-align:right;padding:.5rem">Amount</th><th style="text-align:right;padding:.5rem">Time</th></tr>
+                {% for b in bids[:20] %}
+                <tr class="bid-row" style="display:table-row">
+                    <td style="padding:.4rem .5rem">Bidder #{{ b.bidder_id }}</td>
+                    <td style="text-align:right;padding:.4rem .5rem;color:#e94560;font-weight:600">${{ "%.2f"|format(b.amount) }}</td>
+                    <td style="text-align:right;padding:.4rem .5rem;color:#888">{{ b.timestamp[:16] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p style="color:#888">No bids yet. Be the first to bid!</p>
+            {% endif %}
+        </div>
+
+        {% if seller_ratings %}
+        <div class="section">
+            <h2>Seller Reviews</h2>
+            {% for r in seller_ratings[:5] %}
+            <div style="border-bottom:1px solid #eee;padding:.5rem 0">
+                <div class="stars">{{ '*' * r.score }}{{ '-' * (5 - r.score) }} ({{ r.score }}/5)</div>
+                <div style="font-size:.85rem;color:#555">{{ r.comment }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if related %}
+        <div class="section">
+            <h2>Similar Listings</h2>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-card">
+                    <a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=r.id) }}">{{ r.name[:40] }}</a>
+                    <div class="price">${{ "%.2f"|format(r.current_price) }}</div>
+                    <div style="font-size:.75rem;color:#888">{{ r.num_bids }} bids</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
+    const listingId = {{ product.id }};
+    const userId = {{ user.id if user else 'null' }};
+
+    function placeBid() {
+        const amount = parseFloat(document.getElementById('bid-amount').value);
+        if (!amount || isNaN(amount)) { alert('Enter a valid bid amount'); return; }
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/listings/' + listingId + '/bid', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({amount: amount, bidder_id: userId})
+        }).then(r => r.json()).then(d => {
+            if (d.success) { alert('Bid placed! New price: $' + d.new_price); location.reload(); }
+            else alert(d.error || 'Bid failed');
+        });
+    }
+
+    function watchItem() {
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/users/' + userId + '/watch', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({listing_id: listingId})
+        }).then(r => r.json()).then(d => alert(d.action === 'watched' ? 'Added to watchlist!' : 'Removed from watchlist'));
+    }
+
+    function saveItem() {
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/users/' + userId + '/save', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({listing_id: listingId})
+        }).then(r => r.json()).then(d => alert(d.action === 'saved' ? 'Saved!' : 'Unsaved'));
+    }
+
+    function followSeller() {
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/users/' + userId + '/follow', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({seller_id: {{ product.seller_id }}})
+        }).then(r => r.json()).then(d => alert(d.action === 'followed' ? 'Following seller!' : 'Unfollowed'));
+    }
+
+    function contactSeller() {
+        const body = prompt('Enter your message to the seller:');
+        if (!body) return;
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/messages', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({sender_id: userId, receiver_id: {{ product.seller_id }}, listing_id: listingId, subject: 'Question about: {{ product.name[:40] }}', body: body})
+        }).then(r => r.json()).then(d => { if (d.success) alert('Message sent!'); });
+    }
+
+    function reportItem() {
+        const reason = prompt('Reason for reporting (e.g., counterfeit, misleading):');
+        if (!reason) return;
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        fetch(BASE + '/api/listings/' + listingId + '/report', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reporter_id: userId, reason: reason, description: ''})
+        }).then(r => r.json()).then(d => { if (d.success) alert('Report submitted. Thank you.'); });
+    }
+
+    function buyNow() {
+        if (!userId) { window.location.href = BASE + '/login'; return; }
+        if (confirm('Buy this item now for ${{ "%.2f"|format(product.buy_now_price or 0) }}?')) {
+            window.location.href = BASE + '/listing/' + listingId + '?checkout=true';
+        }
+    }
+    </script>
+</body>
+</html>

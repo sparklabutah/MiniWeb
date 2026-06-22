@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo - Week View</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #fff; color: #3c4043; font-size: 14px; }
+
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #dadce0; background: #fff; position: sticky; top: 0; z-index: 100; height: 48px; }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header .logo { font-size: 22px; font-weight: 400; color: #5f6368; }
+        .header .logo span { color: #1a73e8; font-weight: 500; }
+        .header-center { display: flex; align-items: center; gap: 8px; }
+        .header-center .week-label { font-size: 22px; font-weight: 400; color: #3c4043; }
+        .header-nav a { font-size: 14px; color: #5f6368; text-decoration: none; padding: 6px 12px; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+
+        .week-wrapper { height: calc(100vh - 48px); overflow-y: auto; }
+
+        /* Day column headers */
+        .day-headers { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid #dadce0; background: #fff; position: sticky; top: 0; z-index: 10; }
+        .day-headers .gutter { border-right: 1px solid #dadce0; }
+        .day-header { text-align: center; padding: 8px 0 4px; border-right: 1px solid #e0e0e0; }
+        .day-header:last-child { border-right: none; }
+        .day-header .weekday { font-size: 11px; text-transform: uppercase; color: #70757a; letter-spacing: 0.5px; }
+        .day-header .date-num { font-size: 26px; font-weight: 400; color: #3c4043; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 50%; }
+        .day-header.is-today .weekday { color: #1a73e8; }
+        .day-header.is-today .date-num { background: #1a73e8; color: #fff; }
+
+        /* All-day row */
+        .allday-row { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid #dadce0; min-height: 24px; }
+        .allday-row .gutter { border-right: 1px solid #dadce0; font-size: 10px; color: #70757a; display: flex; align-items: center; justify-content: center; }
+        .allday-row .allday-cell { border-right: 1px solid #e0e0e0; padding: 2px 4px; }
+        .allday-row .allday-cell:last-child { border-right: none; }
+        .allday-event { font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #fff; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .allday-event a { color: #fff; text-decoration: none; }
+
+        /* Hour grid */
+        .hour-grid { display: grid; grid-template-columns: 56px repeat(7, 1fr); position: relative; }
+        .hour-gutter { position: relative; }
+        .hour-label { position: absolute; right: 8px; font-size: 10px; color: #70757a; transform: translateY(-50%); white-space: nowrap; }
+        .day-col { border-right: 1px solid #e0e0e0; position: relative; }
+        .day-col:last-child { border-right: none; }
+        .hour-line { border-top: 1px solid #e0e0e0; height: 48px; }
+        .hour-line-gutter { border-top: 1px solid #e0e0e0; height: 48px; }
+
+        /* Events */
+        .grid-event { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 2px 6px; font-size: 11px; color: #fff; overflow: hidden; cursor: pointer; z-index: 5; min-height: 20px; line-height: 1.3; border-left: 3px solid rgba(0,0,0,0.15); }
+        .grid-event a { color: #fff; text-decoration: none; display: block; }
+        .grid-event .ge-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .grid-event .ge-time { font-size: 10px; opacity: 0.9; }
+        .grid-event:hover { filter: brightness(0.9); z-index: 6; }
+
+        .bg-work { background: #4285f4; }
+        .bg-personal { background: #0b8043; }
+        .bg-health { background: #d50000; }
+        .bg-default { background: #7986cb; }
+
+        .current-time-line { position: absolute; left: 0; right: 0; z-index: 8; pointer-events: none; }
+        .current-time-line::before { content: ''; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: #ea4335; border-radius: 50%; }
+        .current-time-line::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #ea4335; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo"><span>Calendar</span>Todo</div>
+        </div>
+        <div class="header-center">
+            {% set months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+            {% set ws_parts = week_start.split('-') %}
+            {% set we_parts = week_end.split('-') %}
+            <span class="week-label">{{ months[ws_parts[1]|int] }} {{ ws_parts[2]|int }} &ndash; {{ months[we_parts[1]|int] }} {{ we_parts[2]|int }}, {{ we_parts[0] }}</span>
+        </div>
+        <div class="header-nav">
+            <a href="{{ url_for('calendar-todo.index') }}">Calendar</a>
+            {% if user %}
+            <a href="{{ url_for('calendar-todo.dashboard') }}">{{ user.name }}</a>
+            {% else %}
+            <a href="{{ url_for('calendar-todo.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="week-wrapper">
+        <!-- Day headers -->
+        <div class="day-headers">
+            <div class="gutter"></div>
+            {% for day in days %}
+            <div class="day-header {{ 'is-today' if day.date == today }}">
+                <div class="weekday">{{ day.weekday[:3]|upper }}</div>
+                <div class="date-num">{{ day.date[8:10]|int }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- All-day row -->
+        <div class="allday-row">
+            <div class="gutter">all-day</div>
+            {% for day in days %}
+            <div class="allday-cell">
+                {% for event in day.events %}
+                {% if event.all_day %}
+                <div class="allday-event bg-{{ event.category }}">
+                    <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">{{ event.title }}</a>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Hour grid -->
+        <div class="hour-grid">
+            <div class="hour-gutter">
+                {% for h in range(6, 23) %}
+                <div class="hour-line-gutter">
+                    <span class="hour-label" style="top: 0;">{% if h == 12 %}12 PM{% elif h > 12 %}{{ h - 12 }} PM{% else %}{{ h }} AM{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% for day in days %}
+            <div class="day-col">
+                {% for h in range(6, 23) %}
+                <div class="hour-line"></div>
+                {% endfor %}
+                {% for event in day.events %}
+                {% if not event.all_day %}
+                {% set start_h = event.start[11:13]|int %}
+                {% set start_m = event.start[14:16]|int %}
+                {% set end_h = event.end[11:13]|int %}
+                {% set end_m = event.end[14:16]|int %}
+                {% set top_px = ((start_h - 6) * 48 + start_m * 48 // 60) %}
+                {% set duration_min = (end_h - start_h) * 60 + (end_m - start_m) %}
+                {% set height_px = (duration_min * 48 // 60) %}
+                {% if height_px < 20 %}{% set height_px = 20 %}{% endif %}
+                <div class="grid-event bg-{{ event.category }}" style="top: {{ top_px }}px; height: {{ height_px }}px;" title="{{ event.title }}">
+                    <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">
+                        <div class="ge-title">{{ event.title }}</div>
+                        <div class="ge-time">{{ event.start[11:16] }} - {{ event.end[11:16] }}</div>
+                    </a>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% if day.date == today %}
+                <div class="current-time-line" id="current-time-line" style="display:none;"></div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var wrapper = document.querySelector('.week-wrapper');
+        if (wrapper) wrapper.scrollTop = 2 * 48;
+        var line = document.getElementById('current-time-line');
+        if (line) {
+            var now = new Date();
+            var h = now.getHours(), m = now.getMinutes();
+            if (h >= 6 && h <= 22) {
+                line.style.top = ((h - 6) * 48 + m * 48 / 60) + 'px';
+                line.style.display = 'block';
+            }
+        }
+    })();
+    </script>
+</body>
+</html>

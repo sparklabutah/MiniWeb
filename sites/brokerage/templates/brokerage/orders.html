@@ -1,0 +1,70 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Orders — TradeCore{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Order History</h2>
+    <form method="GET" action="{{ url_for('brokerage.orders_page') }}" class="filters">
+        <label>Status:
+            <select name="status" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open</option>
+                <option value="filled" {% if status_filter == 'filled' %}selected{% endif %}>Filled</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+        </label>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Type</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Filled</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in orders %}
+            <tr id="order-{{ o.id }}">
+                <td>{{ o.id }}</td>
+                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=o.symbol) }}"><strong>{{ o.symbol }}</strong></a></td>
+                <td class="{% if o.side == 'buy' %}positive{% else %}negative{% endif %}">{{ o.side|upper }}</td>
+                <td>{{ o.order_type }}</td>
+                <td>{{ o.quantity }}</td>
+                <td>{% if o.price %}${{ "%.2f"|format(o.price) }}{% else %}Market{% endif %}</td>
+                <td>{% if o.filled_price %}${{ "%.2f"|format(o.filled_price) }}{% else %}—{% endif %}</td>
+                <td>
+                    <span class="tag {% if o.status == 'filled' %}tag-index_fund{% elif o.status == 'open' %}tag-stock{% else %}tag-crypto{% endif %}">
+                        {{ o.status }}
+                    </span>
+                </td>
+                <td>{{ o.created_at[:16] }}</td>
+                <td>
+                    {% if o.status == 'open' %}
+                    <button class="btn btn-danger btn-sm" onclick="cancelOrder({{ o.id }})">Cancel</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not orders %}
+    <p style="color:#8b949e;padding:1rem;">No orders found.</p>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const BASE = "{{ url_for('brokerage.index') }}".replace(/\/$/, "");
+async function cancelOrder(orderId) {
+    const r = await fetch(`${BASE}/api/orders/${orderId}/cancel`, {method: "POST"});
+    if (r.ok) { location.reload(); }
+}
+</script>
+{% endblock %}

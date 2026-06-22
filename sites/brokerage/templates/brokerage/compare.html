@@ -1,0 +1,89 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Compare Securities — TradeCore{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Compare Securities</h2>
+    <form method="GET" action="{{ url_for('brokerage.compare_page') }}" class="filters">
+        <label>Select securities (comma-separated):
+            <input type="text" name="symbols" value="{{ selected|map(attribute='symbol')|join(',') }}" placeholder="e.g. AAPL,MSFT,GOOGL" style="width:300px;">
+        </label>
+        <button type="submit" class="btn btn-primary">Compare</button>
+    </form>
+</div>
+
+{% if selected %}
+<div class="card">
+    <h2>Comparison Chart</h2>
+    <div class="bar-chart" style="height:140px;">
+        {% set max_pct = selected|map(attribute='change_pct')|map('abs')|max %}
+        {% set chart_max = max_pct if max_pct > 0 else 1 %}
+        {% for t in selected %}
+        <div class="bar-col" style="flex:1;">
+            <div class="bar-fill" style="height:{{ (t.change_pct|abs / chart_max * 120 + 10)|int }}px;
+                 background:{% if t.change_pct >= 0 %}#3fb950{% else %}#f85149{% endif %};"></div>
+            <div class="bar-label">{{ t.symbol }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <div style="text-align:center;font-size:0.75rem;color:#8b949e;">Change % comparison</div>
+</div>
+
+<div class="card">
+    <h2>Side-by-Side</h2>
+    <table id="compare-table">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                {% for t in selected %}
+                <th>{{ t.symbol }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Name</td>
+                {% for t in selected %}<td>{{ t.name }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Type</td>
+                {% for t in selected %}<td><span class="tag tag-{{ t.type }}">{{ t.type }}</span></td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Sector</td>
+                {% for t in selected %}<td>{{ t.sector }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Price</td>
+                {% for t in selected %}<td>${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Change</td>
+                {% for t in selected %}
+                <td class="{% if t.change >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change) }}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td>Change %</td>
+                {% for t in selected %}
+                <td class="{% if t.change_pct >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change_pct >= 0 }}{{ t.change_pct }}%</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td>Market Cap</td>
+                {% for t in selected %}<td>{% if t.market_cap_b %}${{ t.market_cap_b }}B{% else %}N/A{% endif %}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Exchange</td>
+                {% for t in selected %}<td>{{ t.exchange }}</td>{% endfor %}
+            </tr>
+            <tr>
+                <td>Market Status</td>
+                {% for t in selected %}
+                <td><span class="market-status {% if t.market_open %}status-open{% else %}status-closed{% endif %}">{% if t.market_open %}Open{% else %}Closed{% endif %}</span></td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

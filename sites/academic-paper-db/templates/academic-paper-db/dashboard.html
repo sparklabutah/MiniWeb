@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — ScholarBase</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .header { border-bottom: 1px solid #e2e8f0; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; margin: 0; color: #1e3a5f; }
+        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .welcome { font-size: 1.2rem; color: #1e293b; margin-bottom: 1.5rem; }
+        .section-title { font-size: 1.1rem; color: #1e293b; margin: 1.5rem 0 .8rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .3rem; }
+        .saved-item { border-bottom: 1px solid #f1f5f9; padding: .6rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .saved-item a { color: #1e3a5f; text-decoration: none; font-size: .95rem; }
+        .saved-item a:hover { text-decoration: underline; }
+        .saved-meta { font-size: .8rem; color: #94a3b8; }
+        .btn-sm { padding: .3rem .7rem; border: 1px solid #cbd5e1; border-radius: .25rem; background: #fff; cursor: pointer; font-size: .8rem; color: #475569; }
+        .btn-sm:hover { background: #f1f5f9; }
+        .author-tag { display: inline-block; background: #f1f5f9; padding: .3rem .7rem; border-radius: .25rem; font-size: .85rem; color: #475569; margin: .2rem; }
+        .msg { display: none; font-size: .85rem; color: #059669; margin: .5rem 0; }
+        .empty { color: #94a3b8; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('academic-paper-db.index') }}" style="color:inherit;text-decoration:none">ScholarBase</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('academic-paper-db.index') }}">Search</a>
+            <a href="{{ url_for('academic-paper-db.logout') }}">Logout</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="welcome">Welcome, {{ user.name }}</div>
+
+        <h2 class="section-title">Saved Papers ({{ saved_papers|length }})</h2>
+        <div id="save-msg" class="msg"></div>
+        {% if saved_papers %}
+        {% for p in saved_papers %}
+        <div class="saved-item" id="saved-{{ p.id }}">
+            <div>
+                <a href="{{ url_for('academic-paper-db.paper_detail', paper_id=p.id) }}">{{ p.title }}</a>
+                <div class="saved-meta">{{ p.authors_str }} · {{ p.year }}</div>
+            </div>
+            <button class="btn-sm" onclick="unsavePaper({{ p.id }})">Remove</button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">No saved papers yet. Search and save papers you're interested in.</p>
+        {% endif %}
+
+        <h2 class="section-title">Followed Authors ({{ followed_authors|length }})</h2>
+        <div id="follow-msg" class="msg"></div>
+        {% if followed_authors %}
+        <div>
+            {% for a in followed_authors %}
+            <span class="author-tag">{{ a }} <button class="btn-sm" onclick="unfollowAuthor('{{ a }}')" style="border:none;background:none;cursor:pointer;color:#94a3b8">×</button></span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No followed authors yet.</p>
+        {% endif %}
+    </div>
+
+    <script>
+    const BASE = "{{ url_for('academic-paper-db.index') }}".replace(/\/$/, "");
+    const USER_ID = {{ user.id }};
+
+    function showMsg(id, text) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 3000);
+    }
+
+    async function unsavePaper(pid) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({paper_id: pid})
+        });
+        if (r.ok) {
+            showMsg("save-msg", "Paper removed!");
+            document.getElementById("saved-" + pid)?.remove();
+        }
+    }
+
+    async function unfollowAuthor(name) {
+        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({author: name})
+        });
+        if (r.ok) {
+            showMsg("follow-msg", "Author unfollowed!");
+            setTimeout(() => location.reload(), 1000);
+        }
+    }
+    </script>
+</body>
+</html>

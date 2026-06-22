@@ -1,0 +1,65 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Schedule Appointment - City of Cedar Grove{% endblock %}
+{% block content %}
+<div class="main-content" style="max-width:700px;">
+    <h2 class="section-title">Schedule an Appointment</h2>
+
+    {% if success %}
+    <div class="alert alert-success">
+        Your appointment has been booked successfully.
+        {% if booked_type %}<strong>{{ booked_type.name }}</strong> on {{ booked_date }} at {{ booked_time }}.{% endif %}
+    </div>
+    {% endif %}
+
+    {% if not success %}
+    <div class="detail-body">
+        <form method="post" action="{{ url_for('agency-portals.book_submit') }}">
+            <div class="form-group">
+                <label for="appointment_type">Appointment Type *</label>
+                <select id="appointment_type" name="appointment_type" required>
+                    <option value="">Select appointment type</option>
+                    {% for at in appointment_types %}
+                    <option value="{{ at.id }}">{{ at.name }} ({{ at.duration_min }} min, {{ at.available_days }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="date">Preferred Date *</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="form-group">
+                <label for="time">Preferred Time *</label>
+                <select id="time" name="time" required>
+                    <option value="">Select a time</option>
+                    <option value="09:00">9:00 AM</option>
+                    <option value="09:30">9:30 AM</option>
+                    <option value="10:00">10:00 AM</option>
+                    <option value="10:30">10:30 AM</option>
+                    <option value="11:00">11:00 AM</option>
+                    <option value="11:30">11:30 AM</option>
+                    <option value="13:00">1:00 PM</option>
+                    <option value="13:30">1:30 PM</option>
+                    <option value="14:00">2:00 PM</option>
+                    <option value="14:30">2:30 PM</option>
+                    <option value="15:00">3:00 PM</option>
+                    <option value="15:30">3:30 PM</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" value="{{ user.name if user else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" value="{{ user.email if user else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" name="phone" value="{{ user.phone if user else '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary">Book Appointment</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
