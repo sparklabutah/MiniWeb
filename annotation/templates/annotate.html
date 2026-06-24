@@ -128,13 +128,33 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
 
             <!-- STEP 1: Read/Write task -->
             <div class="step-panel active" id="step-1">
-                {% if mode == 'blank' %}
-                <h3>Step 1: Design Your Task</h3>
-                <p class="hint">Explore the site on the left first. Then write a clear instruction that a browser agent should follow. The instruction should say where to navigate, what to do, and what to report.</p>
-                <p class="hint" style="color:#f59e0b">Tip: Check the <a href="{{ url_for('annotation.dashboard') }}" target="_blank" style="color:#38bdf8">Dashboard</a> to see which sites need more tasks.</p>
+                {% if mode == 'prompt' %}
+                <h3>Step 1: Design a Task From This Prompt</h3>
+                {% if macro_prompt %}
+                <div style="background:#1e3a5f;border:1px solid #38bdf8;border-radius:.4rem;padding:.6rem;margin-bottom:.5rem">
+                    <div style="font-size:.72rem;color:#94a3b8;margin-bottom:.3rem">YOUR ASSIGNMENT</div>
+                    <div style="font-size:.85rem;color:#e2e8f0;margin-bottom:.3rem">
+                        Site: <strong style="color:#38bdf8">{{ macro_prompt.site_name }}</strong>
+                        · Difficulty: <strong style="color:{% if macro_prompt.difficulty == 'easy' %}#22c55e{% elif macro_prompt.difficulty == 'medium' %}#f59e0b{% else %}#ef4444{% endif %}">{{ macro_prompt.difficulty }}</strong>
+                    </div>
+                    <div style="font-size:.8rem;color:#e2e8f0">
+                        Macros to exercise:
+                        {% for m in macro_prompt.macros %}
+                        <span style="background:#334155;padding:.1rem .3rem;border-radius:.2rem;font-size:.7rem;margin-right:.2rem">{{ m }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <p class="hint">Explore the <strong>{{ macro_prompt.site_name }}</strong> site on the left. Write a task instruction that exercises the macros above. The instruction should tell a browser agent exactly where to navigate, what to do, and what to report.</p>
+                <a href="{{ url_for('annotation.annotate', mode='prompt') }}" class="btn btn-secondary btn-sm" style="margin-bottom:.5rem">🎲 Reshuffle (new prompt)</a>
                 {% else %}
+                <p class="hint">Select a site to get a macro prompt.</p>
+                {% endif %}
+                {% elif mode == 'queue' %}
                 <h3>Step 1: Review Draft Task</h3>
-                <p class="hint">Read the draft below. Try it on the site — if it's impossible or unclear, edit it or click Skip. The instruction should be specific enough that you know exactly what to do.</p>
+                <p class="hint">Read the draft below. Try it on the site — if it's impossible or unclear, edit it or click Skip.</p>
+                {% else %}
+                <h3>Step 1: Design Your Task</h3>
+                <p class="hint">Explore the site, then write a task instruction.</p>
                 {% endif %}
                 <label>Instruction</label>
                 <textarea id="instruction" rows="4" placeholder="{% if mode == 'blank' %}Write your task here. Example: Navigate to the Transactions page, filter by category 'Groceries', and report how many transactions match.{% endif %}">{{ draft.instruction if draft else '' }}</textarea>

@@ -176,6 +176,84 @@ def _load_drafts(site_id):
     return []
 
 
+def _generate_macro_prompt(sites, macros, coverage, preferred_site=None):
+    """Sample a random site + macro set for the annotator to build a task around.
+
+    Prioritizes under-covered macros and sites with fewer annotated tasks.
+    """
+    import random as rng
+
+    # Pick site — prefer sites with fewer tasks
+    site_pool = list(sites)  # all loaded sites are built (filtered in _load_sites)
+    if not site_pool:
+        return None
+    if preferred_site and preferred_site.strip():
+        site = next((s for s in site_pool if s["id"] == preferred_site), rng.choice(site_pool))
+    else:
+        # Weight toward sites with fewer annotated tasks
+        weights = [1.0 / (s.get("annotated_count", 0) + 1) for s in site_pool]
+        total = sum(weights)
+        weights = [w / total for w in weights]
+        site = rng.choices(site_pool, weights=weights, k=1)[0]
+
+    # Pick 2-4 macros that make sense for this site
+    # Get the site's own macros from its existing tasks
+    site_dir = SITES_DIR / site["id"]
+    site_macros = set()
+    tasks_file = site_dir / "tasks.json"
+    if tasks_file.exists():
+        try:
+            for t in json.loads(tasks_file.read_text()):
+                for m in t.get("macros", []):
+                    site_macros.add(m)
+        except:
+            pass
+    # Fall back to full macro list if site has no tasks
+    macro_pool = list(site_macros) if site_macros else list(macros)
+    if not macro_pool:
+        return None
+
+    # Weight toward under-covered macros on this specific site
+    site_coverage = {}
+    for t in _load_all_tasks():
+        if t.get("site") == site["id"]:
+            for m in t.get("macros", []):
+                site_coverage[m] = site_coverage.get(m, 0) + 1
+
+    macro_weights = [1.0 / (site_coverage.get(m, 0) + coverage.get(m, 0) + 1) for m in macro_pool]
+    total = sum(macro_weights)
+    macro_weights = [w / total for w in macro_weights]
+
+    n_macros = rng.choice([2, 2, 3, 3, 3, 4])
+    sampled_macros = []
+    remaining = list(zip(macro_pool, macro_weights))
+    for _ in range(n_macros):
+        if not remaining:
+            break
+        ms, ws = zip(*remaining)
+        total = sum(ws)
+        ws = [w / total for w in ws]
+        pick = rng.choices(ms, weights=ws, k=1)[0]
+        sampled_macros.append(pick)
+        remaining = [(m, w) for m, w in remaining if m != pick]
+
+    # Determine difficulty from macro count
+    if len(sampled_macros) <= 1:
+        difficulty = "easy"
+    elif len(sampled_macros) <= 3:
+        difficulty = "medium"
+    else:
+        difficulty = "hard"
+
+    return {
+        "site": site["id"],
+        "site_name": site.get("name", site["id"]),
+        "macros": sampled_macros,
+        "difficulty": difficulty,
+        "hint": f"Design a task on the {site.get('name', site['id'])} site that exercises: {' → '.join(sampled_macros)}",
+    }
+
+
 def _get_macro_coverage():
     tasks = _load_all_tasks()
     coverage = {}
@@ -202,25 +280,34 @@ def index():
 
 @annotation_bp.route("/task/<mode>")
 def annotate(mode):
-    """Annotation interface. mode: blank, queue, full"""
+    """Annotation interface. mode: prompt, queue"""
     site_id = request.args.get("site", "")
     draft_idx = request.args.get("idx", 0, type=int)
     sites = _load_sites()
     macros = _load_macros()
+    coverage = _get_macro_coverage()
 
     # Load draft if in queue mode
     draft = None
     drafts = []
-    if site_id and mode in ("queue", "full"):
+    if site_id and mode == "queue":
         drafts = _load_drafts(site_id)
         if drafts and 0 <= draft_idx < len(drafts):
             draft = drafts[draft_idx]
+
+    # Generate macro prompt if in prompt mode
+    macro_prompt = None
+    if mode == "prompt":
+        macro_prompt = _generate_macro_prompt(sites, macros, coverage, site_id)
+        if macro_prompt and not site_id:
+            site_id = macro_prompt["site"]
 
     return render_template("annotate.html",
                            mode=mode, site_id=site_id,
                            sites=sites, macros=macros,
                            draft=draft, draft_idx=draft_idx,
-                           total_drafts=len(drafts))
+                           total_drafts=len(drafts),
+                           macro_prompt=macro_prompt)
 
 
 # --- API ---
