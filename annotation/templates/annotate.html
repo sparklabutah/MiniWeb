@@ -120,9 +120,8 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
         <div class="steps-bar">
             <div class="step active" onclick="goStep(1)"><span class="num">1</span> Task</div>
             <div class="step" onclick="goStep(2)"><span class="num">2</span> Record</div>
-            <div class="step" onclick="goStep(3)"><span class="num">3</span> Macros</div>
-            <div class="step" onclick="goStep(4)"><span class="num">4</span> Answer</div>
-            <div class="step" onclick="goStep(5)"><span class="num">5</span> Verify</div>
+            <div class="step" onclick="goStep(3)"><span class="num">3</span> Answer</div>
+            <div class="step" onclick="goStep(4)"><span class="num">4</span> Verify</div>
         </div>
 
         <div class="step-content">
@@ -161,30 +160,15 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
 
                 <div class="nav-btns">
                     <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
-                    <button class="btn btn-primary" onclick="stopAndNext()">Stop & Label Macros →</button>
+                    <button class="btn btn-primary" onclick="stopAndNext()">Stop Recording →</button>
                 </div>
             </div>
 
-            <!-- STEP 3: Label macros (after trajectory) -->
+            <!-- STEP 3: Type answer -->
             <div class="step-panel" id="step-3">
-                <h3>Step 3: Label Macro Chain</h3>
-                <p class="hint">Based on what you did, select the macros in order.</p>
-                <label>Selected chain:</label>
-                <div id="selected-macros" style="min-height:20px;background:#0f172a;border:1px solid #334155;border-radius:.3rem;padding:.3rem;margin-bottom:.3rem;font-size:.68rem"></div>
-                <button class="btn btn-secondary btn-sm" onclick="clearMacros()">Clear</button>
-                <input type="text" id="macro-filter" placeholder="filter..." oninput="filterMacros()" style="margin-top:.3rem;font-size:.72rem">
-                <div class="macro-chips" id="macro-list">
-                    {% for m in macros %}<span class="macro-chip" onclick="toggleMacro('{{m}}',this)">{{m}}</span>{% endfor %}
-                </div>
-                <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
-                    <button class="btn btn-primary" onclick="goStep(4)">Type Answer →</button>
-                </div>
-            </div>
-
-            <!-- STEP 4: Type answer -->
-            <div class="step-panel" id="step-4">
-                <h3>Step 4: What's the Answer?</h3>
+                <h3>Step 3: What's the Answer?</h3>
+                <!-- Macros are NOT labeled by annotators (avoids selection bias).
+                     They get auto-inferred from trajectories post-hoc. -->
                 <p class="hint">Based on your walkthrough, what is the correct answer?</p>
                 <label>Answer</label>
                 <textarea id="final-answer" rows="2" placeholder="The answer you found..."></textarea>
@@ -198,14 +182,14 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
                 <label>Alternatives (one per line)</label>
                 <textarea id="alternatives" rows="2" placeholder="other valid answers..."></textarea>
                 <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(3)">← Back</button>
+                    <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
                     <button class="btn btn-primary" onclick="goToVerifiers()">Select Verifiers →</button>
                 </div>
             </div>
 
-            <!-- STEP 5: Select verifiers -->
-            <div class="step-panel" id="step-5">
-                <h3>Step 5: Select Verifiers</h3>
+            <!-- STEP 4: Select verifiers -->
+            <div class="step-panel" id="step-4">
+                <h3>Step 4: Select Verifiers</h3>
                 <p class="hint">Check which verifications should pass. Green = currently passing.</p>
                 <div id="verifier-checklist"></div>
                 <div style="display:flex;gap:.3rem;margin-top:.4rem">
@@ -295,7 +279,7 @@ function stopAndNext() {
     recording = false;
     clearInterval(recordInterval);
     updateRecUI();
-    goStep(3);
+    goStep(3); // Go to Answer step (macros are auto-inferred post-hoc)
 }
 
 function updateRecUI() {
@@ -495,7 +479,7 @@ function filterMacros() {
 // --- Verifiers ---
 function goToVerifiers() {
     populateVerifiers();
-    goStep(5);
+    goStep(4);
 }
 
 function populateVerifiers() {
@@ -636,7 +620,7 @@ async function submitTask() {
                 site, instruction,
                 expected_answer: document.getElementById('final-answer').value,
                 difficulty: document.getElementById('difficulty').value,
-                macros: selectedMacros,
+                macros: [],  // macros auto-inferred post-hoc from trajectory, not annotator-selected
                 eval: selectedVerifiers.map(v => v.config),
                 eval_logic: 'all',
                 trajectory,

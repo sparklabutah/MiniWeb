@@ -132,6 +132,12 @@ Weaknesses: risk of annotator laziness if they just rubber-stamp LLM drafts — 
 Key insight from Minh: reviewers value human involvement. The paper must honestly say every
 task was performed by a human. The LLM is a productivity tool for drafting, not a replacement.
 
+Key insight from Minh on macro labeling: if annotators select macros from a visible list,
+they will be biased toward familiar/common macros and ignore rare ones. Solution: annotators
+do NOT label macros during annotation. Macros are inferred post-hoc from the recorded
+trajectory by a separate automated process (LLM or rule-based). This also speeds up
+annotation (one fewer step) and produces more objective macro labels.
+
 
 ### Claude's synthesis (combining both + WebArena-Verified verifier design)
 
@@ -149,7 +155,7 @@ Interface: split-screen annotator
     Section 2 — Trajectory viewer
       live feed of recorded actions as annotator works in the iframe.
       each action shows: timestamp, action type (click/type/navigate), target element, URL.
-      annotator can tag each action with a macro from a dropdown.
+      annotator can tag each action with a macro from a dropdown. (Minh: No, a macro can be a subsequence of actions)
       after completing the task, annotator types the final answer they observed.
 
     Section 3 — Verifier builder
@@ -250,19 +256,3 @@ For the paper:
 
 
 ---
-
-
-## Implementation priority
-
-  1. Verifier primitives — normalizer library + three evaluator types + JSON config interpreter
-  2. LLM task candidate generator — pre-generate 60 drafts per site from routes + macros
-  3. Annotation UI — split-screen iframe + annotation panel (start simple, iterate)
-  4. Trajectory recording — browser extension or proxy capture integration
-  5. Grounding evaluator — extract navigation trace from browser-use, compare to required URLs
-  6. Duplicate detection + macro coverage dashboard
-  7. Cross-site task support — global data alignment, multi-site eval configs
-
-Timeline:
-  - Week 1: verifier library + evaluator framework + LLM generator + basic annotation UI
-  - Week 2-3: annotation sprint (4 annotators × 40h = 160h → ~2000 tasks at 4-5 min/task)
-  - Week 4: QC review, grounding checks, fix flagged tasks, finalize dataset
