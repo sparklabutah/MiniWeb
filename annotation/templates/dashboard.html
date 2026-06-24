@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — MiniWeb Annotation</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+.header { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 1.3rem; color: #38bdf8; }
+.header a { color: #94a3b8; text-decoration: none; margin-left: 1.5rem; }
+.main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
+h2 { font-size: 1.1rem; color: #f1f5f9; margin: 1.5rem 0 .8rem; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: .5rem; padding: 1.2rem; text-align: center; }
+.stat-card .num { font-size: 2rem; font-weight: 700; color: #38bdf8; }
+.stat-card .label { font-size: .8rem; color: #94a3b8; margin-top: .3rem; }
+
+.site-table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: .5rem; overflow: hidden; }
+.site-table th, .site-table td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #334155; font-size: .85rem; }
+.site-table th { color: #94a3b8; font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+.site-table .bar { height: 6px; background: #334155; border-radius: 3px; min-width: 50px; }
+.site-table .bar-fill { height: 100%; background: #38bdf8; border-radius: 3px; }
+
+.macro-heatmap { display: flex; flex-wrap: wrap; gap: .3rem; }
+.macro-cell { padding: .2rem .5rem; border-radius: .2rem; font-size: .7rem; }
+
+.task-list { list-style: none; }
+.task-list li { background: #1e293b; border: 1px solid #334155; border-radius: .3rem; padding: .6rem .8rem; margin-bottom: .4rem; font-size: .85rem; display: flex; gap: 1rem; align-items: center; }
+.task-list .tid { color: #38bdf8; font-family: monospace; min-width: 120px; }
+.task-list .instr { flex: 1; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-list .diff { font-size: .75rem; padding: .1rem .4rem; border-radius: .2rem; }
+.diff-easy { background: #064e3b; color: #34d399; }
+.diff-medium { background: #451a03; color: #fbbf24; }
+.diff-hard { background: #450a0a; color: #f87171; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>Annotation Dashboard</h1>
+    <div>
+        <a href="{{ url_for('index') }}">← Annotate</a>
+        <a href="{{ miniweb_url }}" target="_blank">MiniWeb ↗</a>
+    </div>
+</div>
+
+<div class="main">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="num">{{ tasks|length }}</div>
+            <div class="label">Total Tasks</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">{{ site_counts|length }}</div>
+            <div class="label">Sites Covered</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">{{ coverage|length }}</div>
+            <div class="label">Macros Covered</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">{{ diff_counts.easy + diff_counts.medium + diff_counts.hard }}</div>
+            <div class="label">E:{{ diff_counts.easy }} M:{{ diff_counts.medium }} H:{{ diff_counts.hard }}</div>
+        </div>
+    </div>
+
+    <h2>Tasks per Site</h2>
+    <table class="site-table">
+        <tr><th>Site</th><th>Tasks</th><th>Coverage</th></tr>
+        {% for site, count in site_counts|dictsort(by='value', reverse=true) %}
+        <tr>
+            <td>{{ site }}</td>
+            <td>{{ count }}</td>
+            <td><div class="bar"><div class="bar-fill" style="width: {{ [count / 60 * 100, 100]|min }}%"></div></div></td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Macro Coverage</h2>
+    <div class="macro-heatmap">
+        {% for macro in macros %}
+        {% set count = coverage.get(macro, 0) %}
+        <span class="macro-cell" style="background: {{ '#064e3b' if count >= 10 else '#451a03' if count >= 5 else '#450a0a' if count >= 1 else '#1e293b' }}; color: {{ '#34d399' if count >= 10 else '#fbbf24' if count >= 5 else '#f87171' if count >= 1 else '#475569' }}">
+            {{ macro }} ({{ count }})
+        </span>
+        {% endfor %}
+    </div>
+
+    <h2>Recent Tasks</h2>
+    <ul class="task-list">
+        {% for t in tasks[-20:]|reverse %}
+        <li>
+            <span class="tid">{{ t.task_id }}</span>
+            <span class="diff diff-{{ t.difficulty }}">{{ t.difficulty }}</span>
+            <span class="instr">{{ t.instruction }}</span>
+            <span style="color:#475569;font-size:.75rem">{{ t.annotator }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+</body>
+</html>

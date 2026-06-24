@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniWeb — Task Annotation</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+.header { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 1.4rem; color: #38bdf8; }
+.header .stats { font-size: .85rem; color: #94a3b8; }
+.header a { color: #38bdf8; text-decoration: none; margin-left: 1.5rem; }
+.main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
+h2 { font-size: 1.2rem; color: #f1f5f9; margin-bottom: 1rem; }
+.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 3rem; }
+.mode-card { background: #1e293b; border: 2px solid #334155; border-radius: .8rem; padding: 1.5rem; transition: border-color .2s; cursor: pointer; text-decoration: none; color: inherit; }
+.mode-card:hover { border-color: #38bdf8; }
+.mode-card h3 { font-size: 1.1rem; color: #f1f5f9; margin-bottom: .5rem; }
+.mode-card .tag { display: inline-block; background: #334155; color: #94a3b8; padding: .15rem .5rem; border-radius: .3rem; font-size: .75rem; margin-bottom: .8rem; }
+.mode-card p { font-size: .88rem; color: #94a3b8; line-height: 1.5; }
+.mode-card .est { font-size: .8rem; color: #38bdf8; margin-top: .8rem; }
+.sites-section { margin-bottom: 2rem; }
+.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; }
+.site-chip { background: #1e293b; border: 1px solid #334155; border-radius: .5rem; padding: .6rem .8rem; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; }
+.site-chip .name { color: #e2e8f0; }
+.site-chip .count { color: #38bdf8; font-size: .75rem; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>MiniWeb Task Annotation</h1>
+    <div class="stats">{{ task_count }} tasks annotated · {{ sites|length }} sites available · {{ macros|length }} macros in vocabulary</div>
+    <div>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ miniweb_url }}" target="_blank">MiniWeb ↗</a>
+    </div>
+</div>
+
+<div class="main">
+    <h2>Choose annotation mode</h2>
+    <div class="modes">
+        <a class="mode-card" href="{{ url_for('annotate', mode='blank') }}">
+            <h3>Blank Slate</h3>
+            <span class="tag">Kenny / Farhan</span>
+            <p>Design a task from scratch. Pick macros and a website, write the instruction, build verifiers manually. Full creative control.</p>
+            <div class="est">~8 min/task · Highest creativity</div>
+        </a>
+        <a class="mode-card" href="{{ url_for('annotate', mode='llm_draft') }}">
+            <h3>LLM Draft</h3>
+            <span class="tag">Minh</span>
+            <p>LLM proposes a task. You walk through it on the site, edit the instruction, select verifiers with live feedback. Must perform trajectory.</p>
+            <div class="est">~4 min/task · Fastest with quality</div>
+        </a>
+        <a class="mode-card" href="{{ url_for('annotate', mode='full') }}">
+            <h3>Full Suite</h3>
+            <span class="tag">Synthesis</span>
+            <p>Split-screen: site iframe + annotation panel. Auto-records trajectory, grounding verification, typed answer checking. All features.</p>
+            <div class="est">~5 min/task · Most thorough</div>
+        </a>
+    </div>
+
+    <div class="sites-section">
+        <h2>Sites (click to start annotating)</h2>
+        <div class="site-grid">
+            {% for site in sites %}
+            <a class="site-chip" href="{{ url_for('annotate', mode='full', site=site.id) }}" style="text-decoration:none">
+                <span class="name">{{ site.name or site.id }}</span>
+                <span class="count">{{ coverage.get(site.id, 0) }} tasks</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</body>
+</html>
