@@ -36,7 +36,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 label { display: block; font-size: .8rem; color: #94a3b8; margin: .8rem 0 .3rem; font-weight: 500; }
 label:first-child { margin-top: 0; }
 textarea, input[type="text"], input[type="number"], select { width: 100%; padding: .5rem; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: .3rem; font-size: .85rem; font-family: inherit; }
-textarea { min-height: 80px; resize: vertical; }
+textarea { min-height: 80px; resize: vertical; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; }
 textarea:focus, input:focus, select:focus { border-color: #38bdf8; outline: none; }
 
 .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
@@ -127,7 +127,7 @@ textarea:focus, input:focus, select:focus { border-color: #38bdf8; outline: none
                 {% endif %}
 
                 <label>Task Instruction</label>
-                <textarea id="instruction" rows="4" placeholder="Write the task instruction here..."></textarea>
+                <textarea id="instruction" rows="6" placeholder="Write the task instruction here..." style="white-space:pre-wrap;word-wrap:break-word"></textarea>
 
                 <label>Expected Answer</label>
                 <input type="text" id="expected-answer" placeholder="What should the correct answer be?">
@@ -424,17 +424,51 @@ function filterMacros() {
     });
 }
 
-// LLM draft generation (stub — would call an API endpoint)
+// LLM draft generation — reads actual site data to produce grounded tasks
 async function generateDraft() {
     const site = document.getElementById('site-select').value;
     if (!site) { alert('Select a site first'); return; }
-    document.getElementById('draft-status').textContent = 'Generating...';
-    // TODO: Call LLM API to generate task draft
-    // For now, show a placeholder
-    setTimeout(() => {
-        document.getElementById('instruction').value = `[LLM Draft] Navigate to the ${site} site and find...`;
-        document.getElementById('draft-status').textContent = 'Draft generated — edit and walk through before submitting';
-    }, 500);
+    document.getElementById('draft-status').textContent = 'Reading site data...';
+
+    try {
+        const resp = await fetch('/api/generate_draft', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({site: site})
+        });
+        const draft = await resp.json();
+
+        if (draft.error) {
+            document.getElementById('draft-status').textContent = 'Error: ' + draft.error;
+            return;
+        }
+
+        document.getElementById('instruction').value = draft.instruction || '';
+        if (draft.expected_answer) {
+            document.getElementById('expected-answer').value = draft.expected_answer;
+        }
+        if (draft.difficulty) {
+            setDifficulty(draft.difficulty, document.querySelector(`.diff-btn.${draft.difficulty}`));
+        }
+        // Pre-select macros from draft
+        if (draft.macros) {
+            selectedMacros = [];
+            document.querySelectorAll('.macro-chip').forEach(c => c.classList.remove('selected'));
+            for (const m of draft.macros) {
+                const chip = [...document.querySelectorAll('.macro-chip')].find(c => c.textContent.trim() === m);
+                if (chip) {
+                    chip.classList.add('selected');
+                    selectedMacros.push(m);
+                }
+            }
+            renderSelectedMacros();
+        }
+        const entity = draft.grounded_entity || {};
+        document.getElementById('draft-status').textContent =
+            `Draft grounded in: ${entity.source || 'site data'} → "${entity.name || '?'}" — now walk through it and edit`;
+    } catch (e) {
+        document.getElementById('draft-status').textContent = 'Error: ' + e.message;
+    }
 }
 
 // Submit
