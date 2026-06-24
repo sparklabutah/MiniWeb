@@ -249,7 +249,11 @@ For the paper:
   3. ✅ Trajectory recording (auto-capture with 3 observation types)
   4. ✅ Pre-generated task drafts (1412 across 27 sites)
   5. ✅ Task storage (directory per task: metadata + trajectory + HTML)
-  6. 🔲 Task draft quality improvement (LLM rewriter for natural instructions)
+  6. 🔲 Task draft grounding validation (some drafts reference entities that don't exist
+     on the page being queried — e.g., asking about a payee that's actually a merchant name.
+     Annotators must validate each draft by walking through it. Impossible tasks should be
+     skipped or rewritten. A future improvement: type-check entity placeholders against the
+     specific data collection each template queries.)
   7. 🔲 Duplicate detection (embedding similarity)
   8. 🔲 Screenshot capture (html2canvas or server-side)
   9. 🔲 Post-hoc macro inference from trajectories
