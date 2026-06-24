@@ -74,6 +74,10 @@ def create_app():
 
     register_site_blueprints(app)
 
+    # Register annotation interface (same origin — enables iframe + trajectory recording)
+    from annotation.app import annotation_bp
+    app.register_blueprint(annotation_bp)
+
     # Add overlay reset endpoint for eval harness
     @app.route("/_reset_data", methods=["POST"])
     def _reset_data():

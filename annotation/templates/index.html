@@ -32,27 +32,27 @@ h2 { font-size: 1.2rem; color: #f1f5f9; margin-bottom: 1rem; }
     <h1>MiniWeb Task Annotation</h1>
     <div class="stats">{{ task_count }} tasks annotated · {{ sites|length }} sites available · {{ macros|length }} macros in vocabulary</div>
     <div>
-        <a href="{{ url_for('dashboard') }}">Dashboard</a>
-        <a href="{{ miniweb_url }}" target="_blank">MiniWeb ↗</a>
+        <a href="{{ url_for('annotation.dashboard') }}">Dashboard</a>
+        <a href="/" target="_blank">MiniWeb ↗</a>
     </div>
 </div>
 
 <div class="main">
     <h2>Choose annotation mode</h2>
     <div class="modes">
-        <a class="mode-card" href="{{ url_for('annotate', mode='blank') }}">
+        <a class="mode-card" href="{{ url_for('annotation.annotate', mode='blank') }}">
             <h3>Blank Slate</h3>
             <span class="tag">Kenny / Farhan</span>
             <p>Design a task from scratch. Pick macros and a website, write the instruction, build verifiers manually. Full creative control.</p>
             <div class="est">~8 min/task · Highest creativity</div>
         </a>
-        <a class="mode-card" href="{{ url_for('annotate', mode='llm_draft') }}">
+        <a class="mode-card" href="{{ url_for('annotation.annotate', mode='queue') }}">
             <h3>LLM Draft</h3>
             <span class="tag">Minh</span>
             <p>LLM proposes a task. You walk through it on the site, edit the instruction, select verifiers with live feedback. Must perform trajectory.</p>
             <div class="est">~4 min/task · Fastest with quality</div>
         </a>
-        <a class="mode-card" href="{{ url_for('annotate', mode='full') }}">
+        <a class="mode-card" href="{{ url_for('annotation.annotate', mode='full') }}">
             <h3>Full Suite</h3>
             <span class="tag">Synthesis</span>
             <p>Split-screen: site iframe + annotation panel. Auto-records trajectory, grounding verification, typed answer checking. All features.</p>
@@ -65,7 +65,7 @@ h2 { font-size: 1.2rem; color: #f1f5f9; margin-bottom: 1rem; }
         <div class="site-grid">
             {% for site in sites %}
             {% if site.evaluated %}
-            <a class="site-chip" href="{{ url_for('annotate', mode='full', site=site.id) }}" style="text-decoration:none">
+            <a class="site-chip" href="{{ url_for('annotation.annotate', mode='queue', site=site.id) }}" style="text-decoration:none">
                 <span class="name">{{ site.name or site.id }}</span>
                 <span class="count">{{ coverage.get(site.id, 0) }} tasks</span>
             </a>
