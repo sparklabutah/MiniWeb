@@ -1,258 +1,268 @@
-Goal: at least 2000 tasks in total. Each tasks might require navigation among site (which we can count this time multiple time). Task should be rooted in macros, so macro centric construction
+# Task Annotation Interface — Brainstorm
 
-What we already have:
-- roughly 30 websites implemented with actual dataset
-- a verifier toolbox (not implemented, but should be easy to do). Verifiers are function that return true or false. A full task verifier is a boolean chain of multiple verifiers (WebArena)
-    + Text
-      > exact matching
-      > fuzzy matching
-      > must have
-    + Backend
-      > URL check
-      > web state check
+Goal: at least 2000 tasks in total. Each task might require navigation among sites (cross-site tasks count navigation time multiple times). Tasks should be rooted in macros — macro centric construction.
+
+Timeline: we have a month. 2000 high quality web tasks, each with verifiers, macro labels, and reference trajectories.
 
 
-What we are doing in this doc: we are trying to come up with the best interface for human annotator to annotate the task in the shortest amount of time. We have a month, and we hope to get at least 2000 high quality web tasks.
+## What we already have
+
+- ~30 websites implemented with real datasets
+- session-scoped data isolation (no Docker needed, in-memory overlay)
+- browser-agent eval harness that runs agents against tasks
+- macro vocabulary (163 macros from 4 benchmarks)
+- 20 construction-time validation tasks per site (scaffolding, not final benchmark tasks)
 
 
-Kenny and Farhan (PI) idea:
-Interface
-  + MiniWeb
-  + trajectory outliner (how many macros, dependencies, note that this is not macro specific, users will assign macro to it)
-  + verifier selection
-  + goal input
+## What we need to build
 
-How this work:
-  + a small sample of macros and sample of website
-  + user select macros and website based on the task they can design
-  + sth run in the backend to prevent duplicate
-
-
-Minh:
-Interface
-  + MiniWeb
-  + Proposed task (LLM generated)
-  + Macros lib by verbs
-  + Verifiers selection
-
-How this works
-  + task show up
-  + user record their trajectory try to solve that task
-  + user mark when task is complete, and choose verifiers that combine to build a task completion verifier
-  + user select relevant macro chain based on that task, we will see if this match what the LLM macros
+- a verifier toolbox that doesn't require writing Python per task
+- an annotation interface where humans can create tasks fast
+- a way to record reference trajectories during annotation
+- duplicate detection + macro coverage tracking
+- grounding verification — proof that agents actually navigated the site, not just answered from memory
 
 
 ---
 
-## Verifier Architecture (adopted from WebArena-Verified)
+
+## Verifier Toolbox
 
 Reference: https://github.com/ServiceNow/webarena-verified (ServiceNow, 2025)
 
-WebArena-Verified redesigned WebArena's evaluation to be more rigorous and structured.
-Their key insight: separate the **evaluation pipeline** into four clean steps, and use
-**typed normalization** so that "8", "8.0", "eight", "$8.00" all compare correctly
-when the expected type is "number".
+We adopt WebArena-Verified's approach: verifiers are declarative JSON configs, not Python functions. The eval harness interprets them at runtime.
 
-### WebArena-Verified's four-step evaluation:
+Three verifier types:
 
-  1. **Get actual value** — extract from agent response or network trace
-  2. **Get expected value** — from task config (with alternatives support)
-  3. **Normalize both** — schema-driven type conversion (string, number, currency,
-     date, URL, boolean, coordinates, etc.)
-  4. **Compare normalized values** — recursive structural matching with assertions
+  1. AgentResponseEvaluator
+     Checks the agent's final text answer against expected values.
+     Uses typed normalization so "8", "8.0", "$8", "eight" all match when type is "number".
+     Supports alternatives: expected can be ["107", "one hundred and seven"].
 
-Their type registry includes specialized normalizers for: string, number, boolean,
-currency, date, duration, distance, URL, coordinates, full_address, location_name,
-month, base64_string, json_string, markdown_string, string_list, empty.
+  2. BackendStateEvaluator
+     Calls site APIs after task completion, checks state changed correctly.
+     For mutation tasks: "add to cart" → GET /api/cart → check item is there.
+     For extraction tasks: cross-validate agent's answer against API response.
+     Comparison operators: equals, contains, not_contains, greater_than, less_than,
+     length_equals, exists, not_exists.
 
-Each type knows how to normalize messy real-world values. For example:
-  - NormalizedCurrency("$1,234.56") == NormalizedCurrency("1234.56")
-  - NormalizedDate("Jan 15, 2025") == NormalizedDate("2025-01-15")
-  - NormalizedURL("http://site.com/page/") == NormalizedURL("http://site.com/page")
+  3. GroundingEvaluator (inspired by WebArena-Verified's NetworkEventEvaluator)
+     Verifies the agent actually visited the right pages — didn't just guess from memory.
+     Checks the browser's navigation trace (URL history) during task execution.
+     Example: task says "look up the price on the product page" → verify agent actually
+     visited /sites/e-commerce/product/42, not just returned a number from training data.
 
-### What we adopt for MiniWeb:
+     This is critical for benchmark integrity. Without it, a model that memorized WebShop
+     product data could "pass" e-commerce tasks without ever opening the site.
 
-We adopt the four-step pipeline and typed normalization, but simplify for our context
-(MiniWeb is simpler than WebArena — no Docker, no network traces, one Flask app).
+     What it checks:
+       - agent visited required URLs during the task
+       - visits happened in the right order (searched before extracting)
+       - agent came FROM the right page (referer check — navigated via the UI, not URL bar)
+       - for mutation tasks: the right POST/PUT/DELETE request was made
 
-**MiniWeb evaluator types** (each ~10-30 lines of code):
+Typed normalizers (what we need):
+  string, number, boolean, date, currency, string_list, url
 
-  1. AgentResponseEvaluator — checks the agent's final text answer
-     Uses typed comparison: if expected is "8" and schema says "number",
-     then "There are 8 items" matches because 8 is extracted and compared as number.
-
-  2. BackendStateEvaluator — checks site API state after task completion
-     Calls GET/POST to site APIs, extracts values, compares with typed normalization.
-     This is what our current verifiers.py files do, but declarative instead of imperative.
-
-  3. URLEvaluator — checks the agent's final URL
-     For navigation tasks: "Navigate to the settings page" → verify URL contains /settings.
-
-**MiniWeb normalized types** (subset of WebArena-Verified, what we actually need):
-
-  | Type | Normalizes | Example |
-  |------|-----------|---------|
-  | string | case, whitespace, articles | "The Product" → "product" |
-  | number | comma, currency symbols, units | "$1,234" → 1234.0 |
-  | boolean | yes/no/true/false/1/0 | "yes" → true |
-  | date | various date formats | "Jan 15" → "2025-01-15" |
-  | currency | symbol + amount | "$29.99" → 29.99 |
-  | string_list | comma/newline separated | "a, b, c" → ["a","b","c"] |
-  | url | trailing slashes, protocol | "http://x.com/" → "x.com" |
-
-**Alternatives support** (directly from WebArena-Verified):
-  Expected values can have alternatives: ["success", "ok", "completed"]
-  means any of these is a valid answer. This handles ambiguous tasks where
-  multiple answers are correct.
-
-### Task evaluation config format:
-
-Each task specifies its evaluators declaratively in JSON (no Python code per task):
-
-```json
-{
-    "task_id": "e-commerce_042",
-    "instruction": "How many wireless headphones are there?",
+Task eval config format (per task, stored in JSON):
+  {
     "eval": [
-        {
-            "evaluator": "AgentResponseEvaluator",
-            "expected": {"retrieved_data": "107"},
-            "results_schema": {"type": "number"},
-            "alternatives": ["107", "one hundred seven"]
-        },
-        {
-            "evaluator": "BackendStateEvaluator",
-            "method": "GET",
-            "url": "/sites/e-commerce/api/products?q=wireless+headphones",
-            "expected_field": "length",
-            "expected_value": 107,
-            "comparison": "equals"
-        }
+      {"evaluator": "AgentResponseEvaluator", "type": "number", "expected": "107"},
+      {"evaluator": "BackendStateEvaluator", "endpoint": "GET /api/products?q=wireless", "field": "length", "comparison": "equals", "expected": 107},
+      {"evaluator": "GroundingEvaluator", "required_urls": ["/sites/e-commerce/"], "required_actions": ["search"]}
     ],
     "eval_logic": "all"
-}
-```
+  }
 
-A task's `eval` is a list of evaluator configs. `eval_logic` is "all" (AND) or "any" (OR).
-Each evaluator runs independently and produces assertions (pass/fail with detail messages).
-The task passes only if the combined logic is satisfied.
-
-### Comparison operators for BackendStateEvaluator:
-
-  | Operator | Meaning | Example |
-  |----------|---------|---------|
-  | equals | exact match (after normalization) | count == 107 |
-  | contains | substring/element present | response contains "wireless" |
-  | not_contains | substring/element absent | response does NOT contain "error" |
-  | greater_than | numeric comparison | price > 10 |
-  | less_than | numeric comparison | price < 100 |
-  | length_equals | array/string length | len(results) == 5 |
-  | exists | field is present and non-null | user.cart exists |
-  | not_exists | field is absent or null | document was deleted |
-
-### What this means for the annotation interface:
-
-The verifier builder in the annotation UI maps directly to this config:
-
-  Annotator selects:
-    1. Evaluator type (AgentResponse / BackendState / URL)
-    2. For AgentResponse: expected answer + type (string/number/date/...)
-    3. For BackendState: API endpoint + field + comparison + expected value
-    4. For each: whether it's a positive or negative check
-
-  The UI renders this as the checkbox panel with live green/red indicators.
-  Behind the scenes, it's building the JSON eval config above.
-
-  Annotator does NOT write code. They fill in fields and toggle checkboxes.
-  The harness interprets the config at eval time using the four-step pipeline.
+Each eval block is independent. The task passes only when all blocks pass (or any, configurable).
+Annotators build this config through the UI — they never write JSON directly.
 
 
 ---
 
-## Consolidated Annotation Interface Proposal
 
-Interface: Split-screen annotator
-  + LEFT: live MiniWeb site in an iframe (annotator interacts with the actual website)
-  + RIGHT: annotation panel with 3 sections:
+## Annotation Interface Proposals
+
+
+### Kenny and Farhan (PI) idea
+
+Interface:
+  + MiniWeb live in browser
+  + trajectory outliner sidebar (how many steps, dependencies between steps)
+  + verifier selection panel
+  + goal/instruction text input
+
+How it works:
+  + annotator gets a small sample of macros and a sample of websites
+  + annotator picks macros and a website, then designs a task that exercises those macros
+  + annotator performs the task, outlines the trajectory step by step
+  + annotator selects which verifiers apply from a checklist
+  + backend runs duplicate detection to prevent overlapping tasks
+  + backend tracks macro coverage so annotators prioritize gaps
+
+Strengths: fully human-driven, high creativity, annotator understands the task deeply
+Weaknesses: slower (blank page problem), requires annotators to know the macro vocabulary,
+  harder to ensure coverage balance without strong guidance
+
+
+### Minh's idea
+
+Interface:
+  + MiniWeb live in browser
+  + LLM-proposed task shown as starting point (annotator doesn't just accept it — must walk through)
+  + macro library organized by verbs (annotator picks relevant macros)
+  + verifier selection panel with live pass/fail indicators
+
+How it works:
+  + LLM pre-generates candidate tasks per site (from routes.py + macro list)
+  + candidate task shows up. annotator reads it
+  + annotator opens the site and actually tries to solve the task — trajectory is auto-recorded
+  + annotator marks when the task is complete
+  + annotator selects verifiers by toggling checkboxes. each checkbox has a live green/red indicator
+    showing whether that check currently passes. annotators can include negative verifiers too
+    (checks that should FAIL — e.g., "deleted item should NOT exist")
+  + annotator selects relevant macro chain. later compared to LLM's hidden proposal for QC
+  + annotator edits the task instruction if the LLM phrasing was wrong or unclear
+
+Strengths: faster (draft beats blank page), trajectory recorded automatically, live verifier
+  feedback means annotator catches bugs immediately
+Weaknesses: risk of annotator laziness if they just rubber-stamp LLM drafts — mitigated by
+  mandatory trajectory walkthrough (no "accept as-is" button)
+
+Key insight from Minh: reviewers value human involvement. The paper must honestly say every
+task was performed by a human. The LLM is a productivity tool for drafting, not a replacement.
+
+
+### Claude's synthesis (combining both + WebArena-Verified verifier design)
+
+Interface: split-screen annotator
+  + LEFT: live MiniWeb site in an iframe. annotator actually uses the site here.
+     browser extension auto-records all clicks/types/navigations as the trajectory.
+     for cross-site tasks, annotator navigates between sites within the same iframe.
+  + RIGHT: annotation panel with 4 sections:
 
     Section 1 — Task instruction
-      LLM-generated draft task is shown as a starting point (editable text field).
-      Annotator MUST attempt the task in the iframe before proceeding — no rubber-stamping.
-      Annotator edits the instruction if the LLM phrasing was unclear or wrong.
-      The LLM also generates a hidden macro chain and expected answer (used for validation
-      later, but the annotator doesn't see these to avoid biasing their walkthrough).
+      LLM draft shown as editable text. annotator reads it, tries it in the iframe,
+      then edits. the LLM also generates a hidden macro chain + expected answer
+      (annotator doesn't see these — used for QC comparison later).
 
-    Section 2 — Trajectory recording
-      Browser extension auto-records the annotator's clicks/types/navigations as they solve
-      the task in the iframe. This captures the reference trajectory automatically.
-      Annotator can annotate each step with the corresponding macro from the macro library.
-      After completing the task, annotator confirms the final answer they observed.
+    Section 2 — Trajectory viewer
+      live feed of recorded actions as annotator works in the iframe.
+      each action shows: timestamp, action type (click/type/navigate), target element, URL.
+      annotator can tag each action with a macro from a dropdown.
+      after completing the task, annotator types the final answer they observed.
 
-    Section 3 — Verifier builder (checkbox panel with live indicators)
-      Based on the WebArena-Verified evaluator architecture.
-      Shows evaluator configs as a checklist, each with a live green/red indicator.
+    Section 3 — Verifier builder
+      based on the WebArena-Verified evaluator architecture.
+      three tabs, one per evaluator type:
 
-      Annotator builds the eval config by adding evaluator blocks:
+      Tab A: Answer Check (AgentResponseEvaluator)
+        expected answer field (pre-filled from annotator's answer in Section 2)
+        type dropdown: string / number / boolean / date / currency / list
+        alternatives field: add multiple acceptable answers
+        🟢/🔴 live indicator
 
-        [+ Add Evaluator]
+      Tab B: Backend Check (BackendStateEvaluator)
+        endpoint field: GET /sites/email/api/folders/sent/count
+        field path: .count
+        comparison dropdown: equals / contains / not_contains / greater_than / exists / not_exists
+        expected value field
+        [+ Add another check] button for chaining
+        🟢/🔴 live indicator per check
 
-        Evaluator 1: AgentResponseEvaluator           🟢
-          Type: number
-          Expected: 107
-          Alternatives: "107", "one hundred seven"
+      Tab C: Grounding Check (GroundingEvaluator)
+        auto-populated from the recorded trajectory in Section 2
+        shows which URLs the annotator visited — these become the "required navigation" list
+        annotator toggles which visits are required vs incidental:
+          [x] /sites/e-commerce/          (required — agent must visit the site)
+          [x] /sites/e-commerce/product/42 (required — agent must view this product)
+          [ ] /sites/e-commerce/cart        (incidental — happened to visit but not required)
+        for mutation tasks, shows POST/PUT/DELETE requests that were made:
+          [x] POST /sites/e-commerce/cart/add  (required — agent must add to cart)
+        this prevents agents from answering from internal knowledge without navigating
 
-        Evaluator 2: BackendStateEvaluator             🟢
-          Endpoint: GET /sites/e-commerce/api/products?q=wireless
-          Field: length
-          Comparison: equals
-          Expected: 107
+      all three tabs contribute to the final eval config.
+      logic toggle: [x] ALL must pass  [ ] ANY must pass
 
-        Evaluator 3: BackendStateEvaluator             🟢
-          Endpoint: GET /sites/e-commerce/api/products?q=wireless
-          Field: [0].name
-          Comparison: contains
-          Expected: "wireless"
+    Section 4 — Macro chain
+      macro library sidebar organized by verb category
+      annotator drags macros into an ordered chain
+      compared to LLM's hidden chain after submission for QC
 
-        Logic: [x] ALL must pass  [ ] ANY must pass
+Annotator workflow (~4-5 min per task):
+  1. LLM draft appears. annotator reads it
+  2. annotator performs the task in the iframe (auto-recorded)
+  3. annotator types the answer they found, edits the instruction if needed
+  4. answer auto-fills into the Answer Check verifier
+  5. trajectory auto-fills into the Grounding Check verifier (annotator toggles required/incidental)
+  6. annotator adds Backend Check verifiers if the task involves mutations
+  7. annotator labels the macro chain
+  8. submit — backend validates (all verifiers must pass with the recorded answer), checks duplicates
 
-      Each evaluator block shows its current result (green/red) live after the
-      annotator completes the task in the iframe.
+Why the grounding check matters:
+  current LLMs have been trained on tons of web data. GPT-4o might "know" that Amazon sells
+  wireless headphones for $29.99 without ever opening the e-commerce site. The grounding
+  evaluator catches this — if the agent didn't visit /sites/e-commerce/product/42, it fails
+  even if the answer is correct. This is the difference between "the agent can navigate" and
+  "the agent can guess." For a web agent benchmark, we need to measure navigation, not memory.
 
-Annotator workflow (per task, ~4 min):
-  1. LLM task draft appears in the task panel. Annotator reads it.
-  2. Annotator opens the site in the iframe and actually performs the task (auto-recorded).
-  3. Annotator edits the task instruction if needed, confirms the answer they observed.
-  4. Annotator selects macro chain from the macro library.
-  5. Annotator builds eval config using the verifier builder (add evaluators, fill fields).
-     Live indicators show which checks pass.
-  6. Submit. Backend checks for duplicates (embedding similarity > 0.85 warns before saving).
+  WebArena-Verified does this via HAR (HTTP Archive) network traces from the browser.
+  We can do the same — browser-use already captures navigation events. The annotation
+  interface just needs to let the annotator mark which navigations are essential.
 
-Duplicate prevention + macro coverage:
-  + Live embedding index (sentence-transformers) flags similar existing tasks on submit.
-  + Dashboard shows macro coverage heatmap: which macros still need more tasks.
-  + Annotators are guided to under-covered macros/sites to ensure balanced coverage.
+
+---
+
+
+## Shared concerns across all proposals
+
+Duplicate prevention:
+  + live embedding index (sentence-transformers) flags similar tasks on submit
+  + if cosine similarity > 0.85 with existing task, show warning before saving
+  + annotators can still override if the tasks are genuinely different
+
+Macro coverage dashboard:
+  + shows heatmap: which macros × which sites have enough tasks
+  + annotators are guided to under-covered areas first
+  + target: every macro exercised by at least 10 tasks across 3+ sites
 
 Quality control:
-  + Every task has a human trajectory walkthrough (mandatory).
-  + Auto-validate on submit: run the eval config against the recorded answer. If it fails,
-    the task has a bug — annotator must fix before submitting.
-  + Second annotator review for a random 20% sample.
-  + Compare annotator's macro chain to LLM's hidden proposal — disagreements flag ambiguous tasks.
+  + every task has a mandatory human trajectory walkthrough
+  + auto-validate on submit: verifier config must pass with recorded answer
+  + second annotator reviews 20% random sample
+  + annotator macro chain compared to LLM hidden chain — disagreements flagged
+  + track per-annotator speed, acceptance rate, and disagreement rate
 
-For the paper: "All 2000 tasks were written and verified by human annotators through
-trajectory walkthroughs. Our evaluation framework adopts the four-step typed evaluation
-pipeline from WebArena-Verified (ServiceNow, 2025), extended with MiniWeb-specific
-backend state checking and macro-annotated task composition."
+Cross-site tasks:
+  + some tasks span 2-3 sites (e.g., "look up contact in CRM, email them")
+  + annotation interface supports this — iframe can navigate between sites
+  + grounding verifier checks navigation across multiple sites
+  + eval config specifies "sites": ["crm", "email"] so harness knows what's involved
+  + these are harder tasks (5+ macros), naturally fall into "hard" difficulty tier
 
-Implementation priority:
-  1. Typed normalizer library (string, number, boolean, date, currency, string_list, url)
-  2. Evaluator framework (AgentResponseEvaluator, BackendStateEvaluator, URLEvaluator)
-  3. LLM task candidate generator (pre-generates drafts per site from routes + macros)
-  4. Annotation UI (split-screen: iframe + panel with task/trajectory/verifier builder)
-  5. Trajectory auto-recording (browser extension or proxy-based capture)
+For the paper:
+  "All tasks were created and verified through human trajectory walkthroughs.
+  LLM-generated drafts were used to accelerate annotation, but every task was
+  manually performed, edited, and verified by a human annotator. Our evaluation
+  framework adopts the typed evaluation pipeline from WebArena-Verified
+  (ServiceNow, 2025), extended with grounding verification to ensure agents
+  navigate the web rather than relying on internal knowledge."
+
+
+---
+
+
+## Implementation priority
+
+  1. Verifier primitives — normalizer library + three evaluator types + JSON config interpreter
+  2. LLM task candidate generator — pre-generate 60 drafts per site from routes + macros
+  3. Annotation UI — split-screen iframe + annotation panel (start simple, iterate)
+  4. Trajectory recording — browser extension or proxy capture integration
+  5. Grounding evaluator — extract navigation trace from browser-use, compare to required URLs
   6. Duplicate detection + macro coverage dashboard
+  7. Cross-site task support — global data alignment, multi-site eval configs
 
-Estimated timeline:
-  - Week 1: evaluator framework + normalizers + LLM generator + basic UI
-  - Week 2-3: annotation sprint (4 annotators × 40h = 160h → ~2400 tasks at 4 min/task)
-  - Week 4: QC review, fix flagged tasks, finalize dataset
+Timeline:
+  - Week 1: verifier library + evaluator framework + LLM generator + basic annotation UI
+  - Week 2-3: annotation sprint (4 annotators × 40h = 160h → ~2000 tasks at 4-5 min/task)
+  - Week 4: QC review, grounding checks, fix flagged tasks, finalize dataset
