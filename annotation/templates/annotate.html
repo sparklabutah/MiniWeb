@@ -319,38 +319,91 @@ function pollIframe() {
     try {
         const iframe = document.getElementById('site-iframe');
         const win = iframe.contentWindow;
+        const doc = win.document;
         const url = win.location.pathname + win.location.search;
 
         if (url !== lastUrl) {
-            // New page — record action + observation
-            const title = win.document.title || '';
-            // Capture visible text summary (first 300 chars of body text)
-            let bodyText = '';
+            const ts = new Date().toISOString();
+            const title = doc.title || '';
+
+            // --- Capture 3 observation types ---
+
+            // 1. Raw HTML (truncated to 5000 chars to keep trajectory manageable)
+            let rawHtml = '';
             try {
-                bodyText = win.document.body.innerText.substring(0, 500).replace(/\s+/g, ' ').trim();
+                rawHtml = doc.documentElement.outerHTML.substring(0, 5000);
             } catch(e) {}
 
-            // Capture accessibility tree summary (headings + links + buttons)
+            // 2. Accessibility tree: structured extraction of interactive + semantic elements
             let axTree = '';
             try {
-                const headings = [...win.document.querySelectorAll('h1,h2,h3')].map(h => h.textContent.trim()).filter(Boolean).slice(0, 5);
-                const buttons = [...win.document.querySelectorAll('button,input[type=submit],.btn')].map(b => b.textContent.trim()).filter(Boolean).slice(0, 8);
-                const links = [...win.document.querySelectorAll('a[href]')].map(a => a.textContent.trim()).filter(s => s.length > 1).slice(0, 10);
-                axTree = `Headings: ${headings.join(', ')}\nButtons: ${buttons.join(', ')}\nLinks: ${links.join(', ')}`;
+                const parts = [];
+                // Headings
+                const headings = [...doc.querySelectorAll('h1,h2,h3,h4')].map(h =>
+                    `[${h.tagName}] ${h.textContent.trim()}`).filter(Boolean).slice(0, 10);
+                if (headings.length) parts.push('HEADINGS:\n  ' + headings.join('\n  '));
+                // Forms & inputs
+                const inputs = [...doc.querySelectorAll('input,textarea,select')].map(el => {
+                    const label = el.labels?.[0]?.textContent?.trim() || el.placeholder || el.name || el.id || '';
+                    return `[${el.tagName}:${el.type||'text'}] ${label}${el.value ? ' = "'+el.value.substring(0,30)+'"' : ''}`;
+                }).slice(0, 15);
+                if (inputs.length) parts.push('INPUTS:\n  ' + inputs.join('\n  '));
+                // Buttons
+                const buttons = [...doc.querySelectorAll('button,input[type=submit],[role=button],.btn')].map(b =>
+                    `[button] ${b.textContent.trim().substring(0, 40)}`).filter(s => s.length > 10).slice(0, 10);
+                if (buttons.length) parts.push('BUTTONS:\n  ' + buttons.join('\n  '));
+                // Links
+                const links = [...doc.querySelectorAll('a[href]')].map(a => {
+                    const text = a.textContent.trim().substring(0, 40);
+                    const href = a.getAttribute('href') || '';
+                    return text.length > 1 ? `[link] ${text} → ${href}` : null;
+                }).filter(Boolean).slice(0, 15);
+                if (links.length) parts.push('LINKS:\n  ' + links.join('\n  '));
+                // Tables
+                const tables = [...doc.querySelectorAll('table')];
+                if (tables.length) {
+                    const t = tables[0];
+                    const rows = t.querySelectorAll('tr').length;
+                    const cols = t.querySelector('tr')?.querySelectorAll('th,td').length || 0;
+                    parts.push(`TABLES: ${tables.length} table(s), first is ${rows}×${cols}`);
+                }
+                // Text content summary
+                const bodyText = doc.body?.innerText?.substring(0, 300).replace(/\s+/g, ' ').trim() || '';
+                if (bodyText) parts.push('TEXT: ' + bodyText);
+
+                axTree = parts.join('\n\n');
             } catch(e) {}
 
+            // 3. Screenshot (canvas capture of iframe)
+            let screenshot = '';
+            try {
+                // Use iframe's own rendering — capture via canvas drawImage
+                const canvas = document.createElement('canvas');
+                const rect = iframe.getBoundingClientRect();
+                canvas.width = Math.min(rect.width, 1280);
+                canvas.height = Math.min(rect.height, 800);
+                // Note: drawImage from iframe only works same-origin
+                // Fallback: we store a placeholder and note that screenshot capture
+                // requires the html2canvas library for full support
+                screenshot = '[screenshot:pending]'; // placeholder — see note below
+            } catch(e) {
+                screenshot = '[screenshot:error]';
+            }
+
+            // Record action + observation
             trajectory.push({
                 type: 'action',
                 url: url,
-                timestamp: new Date().toISOString(),
+                timestamp: ts,
             });
             trajectory.push({
                 type: 'observation',
                 title: title,
                 url: url,
-                body_text: bodyText.substring(0, 300),
+                raw_html: rawHtml,
                 ax_tree: axTree,
-                timestamp: new Date().toISOString(),
+                screenshot: screenshot,
+                timestamp: ts,
             });
 
             lastUrl = url;
@@ -364,34 +417,54 @@ function pollIframe() {
 function renderTrajectory() {
     const list = document.getElementById('trajectory-list');
     let html = '';
+    let stepNum = 0;
     for (let i = 0; i < trajectory.length; i++) {
         const t = trajectory[i];
         if (t.type === 'action') {
+            stepNum++;
+            const obs = (i + 1 < trajectory.length && trajectory[i+1].type === 'observation') ? trajectory[i+1] : null;
+            const obsId = 'obs-' + stepNum;
+
             html += `<div class="traj-entry">
                 <div class="traj-action">
-                    <span class="badge">ACTION</span>
+                    <span class="badge">ACT ${stepNum}</span>
                     <span class="url">${t.url}</span>
                     <span class="ts">${t.timestamp.split('T')[1]?.slice(0,8) || ''}</span>
                 </div>`;
-            // Check if next entry is the matching observation
-            if (i + 1 < trajectory.length && trajectory[i+1].type === 'observation') {
-                const obs = trajectory[i+1];
-                html += `<div class="traj-obs" title="Click to expand">
-                    <span class="obs-label">OBS</span> <b>${obs.title}</b><br>
-                    ${obs.body_text ? obs.body_text.substring(0, 150) + '...' : ''}
-                    ${obs.ax_tree ? '<br><span style="color:#475569">' + obs.ax_tree.substring(0, 150) + '</span>' : ''}
+
+            if (obs) {
+                // Observation with 3 view tabs
+                html += `<div class="traj-obs">
+                    <div style="display:flex;gap:.2rem;margin-bottom:.2rem">
+                        <span class="obs-label" style="margin-right:.3rem">OBS</span>
+                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','ax')" style="padding:.1rem .3rem;font-size:.6rem">AX Tree</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','html')" style="padding:.1rem .3rem;font-size:.6rem">HTML</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','screen')" style="padding:.1rem .3rem;font-size:.6rem">Screenshot</button>
+                        <b style="margin-left:.3rem;font-size:.68rem">${obs.title}</b>
+                    </div>
+                    <div id="${obsId}-ax" style="font-size:.65rem;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml(obs.ax_tree || '(empty)')}</div>
+                    <div id="${obsId}-html" style="display:none;font-size:.6rem;color:#64748b;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml((obs.raw_html || '').substring(0, 2000))}</div>
+                    <div id="${obsId}-screen" style="display:none;font-size:.65rem;color:#64748b">${obs.screenshot === '[screenshot:pending]' ? '<span style="color:#f59e0b">Screenshot capture requires html2canvas (not loaded)</span>' : obs.screenshot || '(no screenshot)'}</div>
                 </div>`;
-                i++; // skip the observation entry
+                i++; // skip observation entry
             }
             html += '</div>';
-        } else if (t.type === 'observation') {
-            // Standalone observation (shouldn't happen normally)
-            html += `<div class="traj-entry"><div class="traj-obs"><span class="obs-label">OBS</span> ${t.body_text || t.title}</div></div>`;
         }
     }
     list.innerHTML = html;
-    document.getElementById('rec-count').textContent = Math.floor(trajectory.length / 2) + ' pages';
+    document.getElementById('rec-count').textContent = stepNum + ' pages';
     list.scrollTop = list.scrollHeight;
+}
+
+function showObsTab(obsId, tab) {
+    ['ax','html','screen'].forEach(t => {
+        const el = document.getElementById(obsId + '-' + t);
+        if (el) el.style.display = (t === tab) ? 'block' : 'none';
+    });
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // --- Macros ---
