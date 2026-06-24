@@ -13,10 +13,14 @@ import argparse
 import importlib
 import importlib.util
 import json
+import os
 import socket
 import sys
 import threading
 from pathlib import Path
+
+# Disable data overlay — validation uses file-based reset between tasks
+os.environ["MINIWEB_NO_OVERLAY"] = "1"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))

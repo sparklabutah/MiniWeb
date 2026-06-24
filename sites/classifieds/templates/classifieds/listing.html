@@ -119,43 +119,43 @@
 
             <div class="actions">
                 {% if user %}
-                <button class="btn btn-primary" onclick="saveListing({{ listing.id }})">Save Listing</button>
+                <form method="post" action="{{ url_for('classifieds.save_listing', listing_id=listing.id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-primary">Save Listing</button>
+                </form>
                 {% if user.id == listing.seller_id %}
                 <a class="btn btn-warning" href="{{ url_for('classifieds.edit_listing_page', listing_id=listing.id) }}">Edit Listing</a>
-                <button class="btn btn-danger" onclick="deleteListing({{ listing.id }})">Delete Listing</button>
+                <form method="post" action="{{ url_for('classifieds.delete_listing', listing_id=listing.id) }}" style="display:inline" onsubmit="return confirm('Are you sure you want to delete this listing?')">
+                    <button type="submit" class="btn btn-danger">Delete Listing</button>
+                </form>
                 {% endif %}
-                <button class="btn" onclick="toggleReportForm()">Report Listing</button>
+                <button class="btn" onclick="document.getElementById('report-form').style.display=document.getElementById('report-form').style.display==='none'?'block':'none'">Report Listing</button>
                 {% else %}
                 <a class="btn btn-primary" href="{{ url_for('classifieds.login_page') }}">Sign in to save</a>
                 {% endif %}
             </div>
-            <div class="action-msg" id="action-msg"></div>
 
-            <div class="message-form" id="message-form">
+            {% if user and seller %}
+            <form class="message-form" method="post" action="{{ url_for('classifieds.send_message', listing_id=listing.id) }}" style="display:block;margin:1rem 0">
                 <h4 style="font-size:.9rem;margin-bottom:.5rem">Send Message to Seller</h4>
-                <input type="text" id="msg-subject" placeholder="Subject" value="Re: {{ listing.title }}">
-                <textarea id="msg-body" rows="3" placeholder="Your message..."></textarea>
-                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
-            </div>
+                <input type="hidden" name="recipient_id" value="{{ listing.seller_id }}">
+                <input type="text" name="subject" placeholder="Subject" value="Re: {{ listing.title }}">
+                <textarea name="body" rows="3" placeholder="Your message..."></textarea>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+            {% endif %}
 
-            <div class="report-form" id="report-form">
+            <form class="report-form" id="report-form" method="post" action="{{ url_for('classifieds.report_listing', listing_id=listing.id) }}" style="display:none">
                 <h4 style="font-size:.9rem;margin-bottom:.5rem">Report this Listing</h4>
-                <select id="report-reason">
+                <select name="reason">
                     <option value="spam">Spam</option>
                     <option value="scam">Scam / Fraud</option>
                     <option value="inappropriate">Inappropriate Content</option>
                     <option value="duplicate">Duplicate Listing</option>
                     <option value="other">Other</option>
                 </select>
-                <textarea id="report-desc" rows="2" placeholder="Describe the issue..."></textarea>
-                <button class="btn btn-danger" onclick="submitReport()">Submit Report</button>
-            </div>
-
-            <div class="actions" style="margin-top:1rem">
-                <label style="font-size:.85rem;color:#888">Upload image:</label>
-                <input type="file" id="upload-file" accept="image/*" style="font-size:.82rem">
-                <button class="btn" onclick="uploadImage()">Upload</button>
-            </div>
+                <textarea name="description" rows="2" placeholder="Describe the issue..."></textarea>
+                <button type="submit" class="btn btn-danger">Submit Report</button>
+            </form>
         </div>
 
         {% if related %}
@@ -176,77 +176,5 @@
         {% endif %}
     </div>
 
-    {% if user %}
-    <script>
-    const BASE = "{{ url_for('classifieds.index') }}".replace(/\/$/, "");
-    const USER_ID = {{ user.id }};
-
-    function showMsg(text) {
-        const el = document.getElementById("action-msg");
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 4000);
-    }
-
-    async function saveListing(lid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({listing_id: lid})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Listing ${d.action}!`); }
-    }
-
-    async function deleteListing(lid) {
-        if (!confirm("Are you sure you want to delete this listing?")) return;
-        const r = await fetch(`${BASE}/api/listings/${lid}`, { method: "DELETE" });
-        if (r.ok) { showMsg("Listing deleted!"); setTimeout(() => window.location.href = BASE, 1500); }
-    }
-
-    function toggleMessageForm() {
-        const f = document.getElementById("message-form");
-        f.style.display = f.style.display === "none" ? "block" : "none";
-    }
-
-    function toggleReportForm() {
-        const f = document.getElementById("report-form");
-        f.style.display = f.style.display === "none" ? "block" : "none";
-    }
-
-    async function sendMessage() {
-        const r = await fetch(`${BASE}/api/messages`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                listing_id: {{ listing.id }},
-                recipient_id: {{ listing.seller_id }},
-                subject: document.getElementById("msg-subject").value,
-                body: document.getElementById("msg-body").value
-            })
-        });
-        if (r.ok) { showMsg("Message sent!"); document.getElementById("message-form").style.display = "none"; }
-    }
-
-    async function submitReport() {
-        const r = await fetch(`${BASE}/api/reports`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                listing_id: {{ listing.id }},
-                reason: document.getElementById("report-reason").value,
-                description: document.getElementById("report-desc").value
-            })
-        });
-        if (r.ok) { showMsg("Report submitted. Thank you!"); document.getElementById("report-form").style.display = "none"; }
-    }
-
-    async function uploadImage() {
-        const file = document.getElementById("upload-file").files[0];
-        if (!file) { showMsg("Please select a file first."); return; }
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("listing_id", "{{ listing.id }}");
-        const r = await fetch(`${BASE}/api/upload`, { method: "POST", body: fd });
-        if (r.ok) { const d = await r.json(); showMsg(`Image ${d.filename} uploaded!`); }
-    }
-    </script>
-    {% endif %}
 </body>
 </html>

@@ -6,6 +6,8 @@ blueprint = Blueprint(
     "weather",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 @blueprint.route("/")
 def index():

@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 from flask import (
-    Blueprint, Response, abort, jsonify, render_template, request, session,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request,
+    session, url_for,
 )
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -29,6 +30,8 @@ blueprint = Blueprint(
     "banking",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -583,12 +586,118 @@ def pay_bills_page():
                            accounts=accounts, result=None, logged_in=logged_in)
 
 
+@blueprint.route("/pay-bills", methods=["POST"])
+def pay_bill_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+
+    bill_id = request.form.get("bill_id", type=int)
+    account_id = request.form.get("account_id", type=int)
+
+    bills = _load_bills()
+    bill = next((b for b in bills if b["id"] == bill_id), None)
+    user_bills = [b for b in bills if b["user_id"] == user["id"]]
+    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"] and a["type"] in ("checking", "savings")]
+
+    if not bill:
+        return render_template("banking/pay_bills.html", user=user, bills=user_bills,
+                               accounts=accounts, result="Bill not found.", logged_in=True)
+    if bill["status"] == "paid":
+        return render_template("banking/pay_bills.html", user=user, bills=user_bills,
+                               accounts=accounts, result="Bill already paid.", logged_in=True)
+
+    if account_id:
+        accts = _load_accounts()
+        acct = next((a for a in accts if a["id"] == account_id), None)
+        if acct:
+            acct["balance"] = round(acct["balance"] - bill["amount"], 2)
+            _save_accounts(accts)
+
+    bill["status"] = "paid"
+    _save_bills(bills)
+
+    txns = _load_transactions()
+    new_id = max(t["id"] for t in txns) + 1 if txns else 1
+    txns.insert(0, {
+        "id": new_id,
+        "account_id": account_id or 0,
+        "user_id": bill["user_id"],
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "description": f"Bill payment - {bill['payee_name']}",
+        "amount": bill["amount"],
+        "type": "debit",
+        "category": "Bills",
+        "status": "posted",
+        "reference": f"BILL{bill_id:06d}",
+    })
+    _save_transactions(txns)
+
+    user_bills = [b for b in _load_bills() if b["user_id"] == user["id"]]
+    return render_template("banking/pay_bills.html", user=user, bills=user_bills,
+                           accounts=accounts,
+                           result=f"Bill to {bill['payee_name']} paid successfully (${bill['amount']:.2f}).",
+                           logged_in=True)
+
+
 @blueprint.route("/payees")
 def payees_page():
     user, logged_in = _get_browsing_user()
     payees = [p for p in _load_payees() if p["user_id"] == user["id"]]
     return render_template("banking/payees.html", user=user, payees=payees,
-                           logged_in=logged_in)
+                           result=None, logged_in=logged_in)
+
+
+@blueprint.route("/payees/add", methods=["POST"])
+def add_payee_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+
+    name = request.form.get("name", "").strip()
+    account_number = request.form.get("account_number", "").strip()
+    category = request.form.get("category", "").strip() or "Other"
+    nickname = request.form.get("nickname", "").strip()
+
+    if not name:
+        payees = [p for p in _load_payees() if p["user_id"] == user["id"]]
+        return render_template("banking/payees.html", user=user, payees=payees,
+                               result="error", logged_in=True)
+
+    payees = _load_payees()
+    new_id = max(p["id"] for p in payees) + 1 if payees else 1
+    payee = {
+        "id": new_id,
+        "user_id": user["id"],
+        "name": name,
+        "account_number": account_number or f"PAY-{random.randint(10000,99999)}",
+        "category": category,
+        "nickname": nickname or (name.split()[0] if len(name.split()) > 1 else name[:8]),
+    }
+    payees.append(payee)
+    _save_payees(payees)
+
+    user_payees = [p for p in payees if p["user_id"] == user["id"]]
+    return render_template("banking/payees.html", user=user, payees=user_payees,
+                           result="added", logged_in=True)
+
+
+@blueprint.route("/payees/delete", methods=["POST"])
+def delete_payee_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+
+    payee_id = request.form.get("payee_id", type=int)
+    payees = _load_payees()
+    payee = next((p for p in payees if p["id"] == payee_id), None)
+    if payee:
+        payees = [p for p in payees if p["id"] != payee_id]
+        _save_payees(payees)
+
+    user_payees = [p for p in payees if p["user_id"] == user["id"]]
+    return render_template("banking/payees.html", user=user, payees=user_payees,
+                           result="deleted", logged_in=True)
 
 
 @blueprint.route("/loans")
@@ -596,7 +705,46 @@ def loans_page():
     user, logged_in = _get_browsing_user()
     loans = [l for l in _load_loans() if l["user_id"] == user["id"]]
     return render_template("banking/loans.html", user=user, loans=loans,
-                           logged_in=logged_in)
+                           result=None, logged_in=logged_in)
+
+
+@blueprint.route("/loans/pay", methods=["POST"])
+def pay_loan_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+
+    loan_id = request.form.get("loan_id", type=int)
+    amount = request.form.get("amount", type=float)
+    account_id = request.form.get("account_id", type=int)
+
+    loans = _load_loans()
+    loan = next((l for l in loans if l["id"] == loan_id), None)
+    if not loan:
+        user_loans = [l for l in loans if l["user_id"] == user["id"]]
+        return render_template("banking/loans.html", user=user, loans=user_loans,
+                               result="Loan not found.", logged_in=True)
+
+    if not amount or amount <= 0:
+        amount = loan["monthly_payment"]
+
+    loan["remaining_balance"] = round(loan["remaining_balance"] - amount, 2)
+    if loan["remaining_balance"] <= 0:
+        loan["remaining_balance"] = 0
+        loan["status"] = "paid_off"
+    _save_json(LOANS_FILE, loans)
+
+    if account_id:
+        accounts = _load_accounts()
+        acct = next((a for a in accounts if a["id"] == account_id), None)
+        if acct:
+            acct["balance"] = round(acct["balance"] - amount, 2)
+            _save_accounts(accounts)
+
+    user_loans = [l for l in _load_loans() if l["user_id"] == user["id"]]
+    return render_template("banking/loans.html", user=user, loans=user_loans,
+                           result=f"Payment of ${amount:.2f} applied. Remaining balance: ${loan['remaining_balance']:.2f}.",
+                           logged_in=True)
 
 
 @blueprint.route("/settings")
@@ -604,6 +752,78 @@ def settings_page():
     user, logged_in = _get_browsing_user()
     return render_template("banking/settings.html", user=user, result=None,
                            logged_in=logged_in)
+
+
+@blueprint.route("/settings", methods=["POST"])
+def settings_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    users = _load_users()
+    u = next((u for u in users if u["id"] == user["id"]), None)
+    if u:
+        for field in ("name", "email", "phone", "address"):
+            val = request.form.get(field, "").strip()
+            if val:
+                u[field] = val
+        _save_users(users)
+    user = _get_user(user["id"])
+    return render_template("banking/settings.html", user=user, result="success",
+                           logged_in=True)
+
+
+@blueprint.route("/transactions/delete", methods=["POST"])
+def delete_transaction_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    tx_id = request.form.get("tx_id", type=int)
+    txns = _load_transactions()
+    tx = next((t for t in txns if t["id"] == tx_id), None)
+    ref = tx["reference"] if tx else "unknown"
+    if tx:
+        txns = [t for t in txns if t["id"] != tx_id]
+        _save_transactions(txns)
+    # Redirect back to transactions page
+    return redirect(url_for("banking.transactions_page"))
+
+
+@blueprint.route("/transactions/flag", methods=["POST"])
+def flag_transaction_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    tx_id = request.form.get("tx_id", type=int)
+    txns = _load_transactions()
+    tx = next((t for t in txns if t["id"] == tx_id), None)
+    if tx:
+        tx["flagged"] = not tx.get("flagged", False)
+        _save_transactions(txns)
+    return redirect(url_for("banking.transactions_page"))
+
+
+@blueprint.route("/bills/configure", methods=["POST"])
+def configure_bill_submit():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    bill_id = request.form.get("bill_id", type=int)
+    bills = _load_bills()
+    bill = next((b for b in bills if b["id"] == bill_id), None)
+    if bill:
+        due_date = request.form.get("due_date", "").strip()
+        auto_pay = request.form.get("auto_pay", "").strip()
+        if due_date:
+            bill["due_date"] = due_date
+        if auto_pay:
+            bill["auto_pay"] = auto_pay.lower() in ("true", "yes", "on", "1")
+        _save_bills(bills)
+    user_bills = [b for b in _load_bills() if b["user_id"] == user["id"]]
+    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"] and a["type"] in ("checking", "savings")]
+    return render_template("banking/pay_bills.html", user=user, bills=user_bills,
+                           accounts=accounts,
+                           result=f"Bill #{bill_id} configured successfully." if bill else "Bill not found.",
+                           logged_in=True)
 
 
 # ---------------------------------------------------------------------------

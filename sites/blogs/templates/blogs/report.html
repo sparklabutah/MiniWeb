@@ -37,7 +37,7 @@
     <div class="report-wrap">
         <h1>Report Post</h1>
         <div class="post-ref">Reporting: "{{ post.title }}" by @{{ post.author_username }}</div>
-        <form id="report-form">
+        <form method="post" action="{{ url_for('blogs.form_report_post', post_id=post.id) }}">
             <div class="field">
                 <label>Reason</label>
                 <select name="reason" id="reason" required>
@@ -60,32 +60,6 @@
             </div>
             <button type="submit" class="submit-btn">Submit Report</button>
         </form>
-        <div id="result" class="result"></div>
     </div>
-    <script>
-    document.getElementById('report-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const data = {
-            reason: document.getElementById('reason').value,
-            details: document.getElementById('details').value,
-            reporter_username: document.getElementById('reporter').value || 'anonymous',
-        };
-        fetch('{{ url_for("blogs.api_report_post", post_id=post.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        }).then(r => r.json().then(d => ({ok: r.ok, data: d})))
-        .then(({ok, data}) => {
-            const el = document.getElementById('result');
-            if (ok) {
-                el.className = 'result success';
-                el.textContent = 'Report submitted. Report ID: ' + data.id;
-            } else {
-                el.className = 'result error';
-                el.textContent = data.error || 'Error submitting report.';
-            }
-        });
-    });
-    </script>
 </body>
 </html>

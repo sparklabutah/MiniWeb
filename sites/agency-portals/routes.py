@@ -20,6 +20,8 @@ blueprint = Blueprint(
     "agency-portals",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -406,13 +408,50 @@ def apply_submit(service_id):
     if service is None:
         abort(404)
     user = None
+    applicant_name = request.form.get("applicant_name", "").strip()
+    address = request.form.get("address", "").strip()
+    notes = request.form.get("notes", "").strip()
+
+    # Determine permit type from service name
+    permit_type = "Building"
+    sname = service.get("name", "").lower()
+    if "building" in sname:
+        permit_type = "Building"
+    elif "business" in sname:
+        permit_type = "Business"
+    elif "parking" in sname:
+        permit_type = "Parking"
+    elif "electrical" in sname:
+        permit_type = "Electrical"
+    elif "plumbing" in sname:
+        permit_type = "Plumbing"
+    else:
+        # Use first word of service name
+        permit_type = service.get("name", "General").split()[0]
+
+    permit_code = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
-    # In a real app, process application; here we just acknowledge
-    applicant_name = request.form.get("applicant_name", "").strip()
+        if user:
+            users = _load_users()
+            u = next((u for u in users if u["id"] == user["id"]), None)
+            if u:
+                user_permits = u.setdefault("permits", [])
+                permit_code = f"USR-PRM-{u['id']}-{len(user_permits)+1:03d}"
+                new_permit = {
+                    "code": permit_code,
+                    "type": permit_type,
+                    "address": address or u.get("address", ""),
+                    "description": notes,
+                    "status": "Submitted",
+                }
+                user_permits.append(new_permit)
+                _save_users(users)
+
     return render_template("agency-portals/apply.html",
                            service=service, user=user, success=True,
-                           applicant_name=applicant_name)
+                           applicant_name=applicant_name,
+                           permit_code=permit_code)
 
 
 @blueprint.route("/book", methods=["GET"])

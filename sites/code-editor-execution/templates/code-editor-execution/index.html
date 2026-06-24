@@ -3,14 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>CodeRunner -- Online Python IDE</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .header h1 .cursor { animation: blink 1s step-end infinite; color: #a6e3a1; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .4rem 2rem; display: flex; align-items: center; gap: 1.2rem; }
+        .nav-bar a { font-size: .9rem; color: #a6adc8; padding: .3rem .6rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; color: #cdd6f4; text-decoration: none; }
+        .nav-bar a.active { background: #313244; color: #89b4fa; font-weight: 600; }
+        .nav-bar .spacer { flex: 1; }
+        .btn-login-nav { background: #89b4fa; color: #1e1e2e !important; padding: .4rem 1rem !important; border-radius: .3rem; font-weight: 600; font-size: .9rem; }
+        .btn-login-nav:hover { background: #74c7ec; }
+
+        /* Search bar */
+        .search-bar { max-width: 960px; margin: 1.2rem auto .8rem; padding: 0 1.5rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+        .search-bar input { flex: 1; min-width: 200px; padding: .5rem .8rem; background: #313244; border: 1px solid #45475a; border-radius: .3rem; color: #cdd6f4; font-family: inherit; font-size: .85rem; }
+        .search-bar input:focus { border-color: #89b4fa; outline: none; }
+        .search-bar select { padding: .5rem; background: #313244; border: 1px solid #45475a; border-radius: .3rem; color: #cdd6f4; font-size: .8rem; }
+        .search-bar button { padding: .5rem 1rem; background: #89b4fa; color: #1e1e2e; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .85rem; }
+
+        /* Snippet cards */
+        .listing { max-width: 960px; margin: 0 auto 3rem; padding: 0 1.5rem; }
+        .listing-count { font-size: .85rem; color: #a6adc8; margin: .5rem 0 .8rem; }
+        .snippet-card { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: .6rem; display: flex; align-items: center; gap: 1rem; transition: border-color .15s; }
+        .snippet-card:hover { border-color: #89b4fa; }
+        .snippet-id { color: #6c7086; font-size: .8rem; font-family: monospace; min-width: 2rem; text-align: right; }
+        .snippet-info { flex: 1; }
+        .snippet-info .title { font-size: .95rem; color: #cdd6f4; font-weight: 600; }
+        .snippet-info .title:hover { color: #89b4fa; }
+        .snippet-info .preview { font-size: .8rem; color: #6c7086; margin-top: .2rem; font-family: monospace; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 500px; }
+        .snippet-meta { display: flex; gap: .5rem; align-items: center; }
+        .tag { font-size: .75rem; padding: .15rem .5rem; border-radius: .2rem; }
+        .tag-cat { color: #a6e3a1; background: rgba(166,227,161,.1); }
+        .tag-easy { color: #a6e3a1; background: rgba(166,227,161,.1); }
+        .tag-medium { color: #f9e2af; background: rgba(249,226,175,.1); }
+        .tag-hard { color: #f38ba8; background: rgba(243,139,168,.1); }
+        .snippet-actions { display: flex; gap: .4rem; }
+        .snippet-actions a { font-size: .8rem; padding: .3rem .7rem; background: #313244; border-radius: .25rem; color: #89b4fa; white-space: nowrap; }
+        .snippet-actions a:hover { background: #45475a; text-decoration: none; }
+        .snippet-actions a.btn-run-card { background: #a6e3a1; color: #1e1e2e; font-weight: 600; }
+
+        .no-results { text-align: center; color: #6c7086; padding: 3rem; font-style: italic; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="header">
+        <h1>&gt;_ CodeRunner<span class="cursor">|</span></h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}" class="active">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        {% if user %}
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard ({{ user.name }})</a>
+        <a href="{{ url_for('code-editor-execution.settings_page') }}">Settings</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('code-editor-execution.login_page') }}" class="btn-login-nav">Login / Sign In</a>
+        {% endif %}
+    </div>
+
+    <form class="search-bar" method="get" action="{{ url_for('code-editor-execution.index') }}">
+        <input type="text" name="q" placeholder="Search snippets by title, description, or category..." value="{{ q }}" autocomplete="off">
+        <select name="category">
+            <option value="">All Categories</option>
+            {% for c in categories %}<option value="{{ c }}" {{ 'selected' if cat == c }}>{{ c }}</option>{% endfor %}
+        </select>
+        <select name="difficulty">
+            <option value="">All Levels</option>
+            <option value="easy" {{ 'selected' if diff == 'easy' }}>Easy</option>
+            <option value="medium" {{ 'selected' if diff == 'medium' }}>Medium</option>
+            <option value="hard" {{ 'selected' if diff == 'hard' }}>Hard</option>
+        </select>
+        <select name="sort">
+            <option value="id" {{ 'selected' if sort == 'id' }}>Sort by ID</option>
+            <option value="title" {{ 'selected' if sort == 'title' }}>Sort by Title</option>
+            <option value="difficulty" {{ 'selected' if sort == 'difficulty' }}>Sort by Difficulty</option>
+            <option value="category" {{ 'selected' if sort == 'category' }}>Sort by Category</option>
+        </select>
+        <button type="submit">Search</button>
+    </form>
+
+    <div class="listing">
+        <div class="listing-count">{{ snippets|length }} snippets found</div>
+
+        {% if snippets %}
+        {% for snippet in snippets %}
+        <div class="snippet-card">
+            <span class="snippet-id">#{{ snippet.id }}</span>
+            <div class="snippet-info">
+                <a class="title" href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=snippet.id) }}">{{ snippet.title }}</a>
+                <div class="preview">{{ snippet.code.split('\n')[0][:80] }}</div>
+            </div>
+            <div class="snippet-meta">
+                <span class="tag tag-cat">{{ snippet.category }}</span>
+                <span class="tag tag-{{ snippet.difficulty }}">{{ snippet.difficulty }}</span>
+            </div>
+            <div class="snippet-actions">
+                <a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=snippet.id) }}">View</a>
+                <a href="{{ url_for('code-editor-execution.editor', snippet_id=snippet.id) }}" class="btn-run-card">Run in Editor</a>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-results">No snippets match your query.</div>
+        {% endif %}
     </div>
 </body>
 </html>

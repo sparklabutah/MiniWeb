@@ -3,14 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Discover - HeartLink</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; min-height: 100vh; }
+        .navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+        .navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+        .navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+        .navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; transition: background 0.2s; }
+        .navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+        .navbar .nav-links a.active { background: #667eea; color: #fff; }
+        .discover-container { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #888; }
+        .empty-state h2 { font-size: 1.3rem; color: #555; margin-bottom: 0.5rem; }
+        .profile-card { background: #fff; border-radius: 1.2rem; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+        .card-photo { width: 100%; height: 380px; background: linear-gradient(135deg, #667eea, #f093fb); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 5rem; font-weight: 700; position: relative; overflow: hidden; }
+        .card-photo img { width: 100%; height: 100%; object-fit: cover; }
+        .card-photo .verified-badge { position: absolute; top: 1rem; right: 1rem; background: #22c55e; color: #fff; padding: 0.3rem 0.7rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
+        .card-body { padding: 1.5rem; }
+        .card-body .name-age { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; }
+        .card-body .name-age span { font-weight: 400; color: #888; }
+        .card-body .location { color: #888; font-size: 0.9rem; margin: 0.3rem 0 0.8rem; }
+        .card-body .bio { color: #444; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1rem; }
+        .card-body .looking-for { display: inline-block; background: #f0ebff; color: #667eea; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.8rem; }
+        .interests { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+        .interests .tag { background: #f8f4ff; color: #8b5cf6; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.8rem; border: 1px solid #e8deff; }
+        .interests .tag.shared { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+        .card-actions { display: flex; gap: 1rem; padding: 0 1.5rem 1.5rem; }
+        .card-actions form { flex: 1; }
+        .btn-pass, .btn-like { width: 100%; padding: 0.85rem; border: none; border-radius: 0.8rem; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.15s, opacity 0.2s; }
+        .btn-pass { background: #f1f1f1; color: #888; }
+        .btn-pass:hover { background: #e5e5e5; }
+        .btn-like { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
+        .btn-like:hover { opacity: 0.9; transform: scale(1.02); }
+        .card-counter { text-align: center; color: #aaa; font-size: 0.85rem; margin-top: 1rem; }
+        .view-profile-link { display: block; text-align: center; padding: 0.5rem; color: #667eea; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .view-profile-link:hover { text-decoration: underline; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <nav class="navbar">
+        <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+        <div class="nav-links">
+            <a href="{{ url_for('dating.index') }}" class="active">Discover</a>
+            <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+            <a href="{{ url_for('dating.matches_page') }}">Matches</a>
+            <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+            <a href="{{ url_for('dating.logout') }}">Logout</a>
+        </div>
+    </nav>
+
+    <div class="discover-container">
+        {% if current_profile %}
+        <div class="profile-card">
+            <div class="card-photo">
+                {% if current_profile.photos %}<img src="{{ current_profile.photos[0] }}" alt="{{ current_profile.name }}">{% else %}{{ current_profile.name[0] }}{% endif %}
+                {% if current_profile.verified %}
+                <span class="verified-badge">Verified</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="name-age">{{ current_profile.name }}, <span>{{ current_profile.age }}</span></div>
+                <div class="location">{{ current_profile.location }}</div>
+                <span class="looking-for">{{ current_profile.looking_for | capitalize }}</span>
+                <p class="bio">{{ current_profile.bio }}</p>
+                <div class="interests">
+                    {% for interest in current_profile.interests %}
+                    {% if interest in user.interests %}
+                    <span class="tag shared" title="Shared interest">{{ interest }}</span>
+                    {% else %}
+                    <span class="tag">{{ interest }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            <a href="{{ url_for('dating.profile_detail', profile_id=current_profile.id) }}" class="view-profile-link">View Full Profile</a>
+            <div class="card-actions">
+                <form method="post" action="{{ url_for('dating.form_pass', profile_id=current_profile.id) }}">
+                    <button type="submit" class="btn-pass">Pass</button>
+                </form>
+                <form method="post" action="{{ url_for('dating.form_like', profile_id=current_profile.id) }}">
+                    <button type="submit" class="btn-like">Like</button>
+                </form>
+            </div>
+        </div>
+        <div class="card-counter">{{ profiles|length }} profile{{ 's' if profiles|length != 1 else '' }} to discover</div>
+        {% else %}
+        <div class="empty-state">
+            <h2>No more profiles</h2>
+            <p>Check back later for new people in your area, or adjust your preferences.</p>
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

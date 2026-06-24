@@ -9,7 +9,7 @@ import pathlib
 from collections import Counter
 from datetime import datetime, timedelta
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 EVENTS_FILE = SITE_DIR / "data" / "events.json"
@@ -20,6 +20,8 @@ blueprint = Blueprint(
     "calendar-todo",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -391,6 +393,105 @@ def login_submit():
     return render_template("calendar-todo/dashboard.html", user=user,
                            events=my_events, upcoming=upcoming,
                            today=today)
+
+
+# ---------------------------------------------------------------------------
+# HTML form routes — create / edit / delete / toggle (non-JS fallback)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/create", methods=["POST"])
+def form_create_event():
+    """Create event via HTML form POST, then redirect back."""
+    title = request.form.get("title", "").strip()
+    if not title:
+        return "Title is required", 400
+    user_id = request.form.get("user_id", type=int)
+    if user_id is None:
+        return "User ID is required", 400
+
+    event = {
+        "id": _next_event_id(),
+        "user_id": user_id,
+        "title": title,
+        "description": request.form.get("description", ""),
+        "category": request.form.get("category", "work"),
+        "calendar": request.form.get("calendar", "Work"),
+        "start": request.form.get("start", ""),
+        "end": request.form.get("end", ""),
+        "all_day": request.form.get("all_day") == "on",
+        "location": request.form.get("location", ""),
+        "recurring": request.form.get("recurring") or None,
+        "reminder_minutes": int(request.form.get("reminder_minutes", 15)),
+        "priority": request.form.get("priority", "medium"),
+        "status": "confirmed",
+        "attendees": [],
+        "color": request.form.get("color", "#4285f4"),
+        "created_at": datetime.now().isoformat(),
+    }
+    events = _load_events()
+    events.append(event)
+    _save_events(events)
+    return redirect(url_for("calendar-todo.event_detail", event_id=event["id"]))
+
+
+@blueprint.route("/event/<int:event_id>/edit", methods=["GET"])
+def event_edit_page(event_id):
+    events = _load_events()
+    event = next((e for e in events if e["id"] == event_id), None)
+    if event is None:
+        abort(404)
+    user = None
+    if "user_id" in session:
+        user = _get_user(session["user_id"])
+    users = _load_users()
+    categories = sorted(set(e.get("category", "") for e in events))
+    calendars = sorted(set(e.get("calendar", "") for e in events))
+    return render_template("calendar-todo/edit.html",
+                           event=event, user=user, users=users,
+                           categories=categories, calendars=calendars,
+                           today=_simulated_today())
+
+
+@blueprint.route("/event/<int:event_id>/edit", methods=["POST"])
+def form_edit_event(event_id):
+    """Edit event via HTML form POST, then redirect back."""
+    events = _load_events()
+    event = next((e for e in events if e["id"] == event_id), None)
+    if event is None:
+        abort(404)
+
+    for field in ["title", "description", "category", "calendar", "start", "end",
+                  "location", "priority", "status"]:
+        val = request.form.get(field)
+        if val is not None:
+            event[field] = val
+
+    _save_events(events)
+    return redirect(url_for("calendar-todo.event_detail", event_id=event_id))
+
+
+@blueprint.route("/event/<int:event_id>/delete", methods=["POST"])
+def form_delete_event(event_id):
+    """Delete event via HTML form POST, then redirect to index."""
+    events = _load_events()
+    event = next((e for e in events if e["id"] == event_id), None)
+    if event is None:
+        abort(404)
+    events = [e for e in events if e["id"] != event_id]
+    _save_events(events)
+    return redirect(url_for("calendar-todo.index"))
+
+
+@blueprint.route("/event/<int:event_id>/toggle", methods=["POST"])
+def form_toggle_event(event_id):
+    """Toggle event status via HTML form POST, then redirect back."""
+    events = _load_events()
+    event = next((e for e in events if e["id"] == event_id), None)
+    if event is None:
+        abort(404)
+    event["status"] = "cancelled" if event["status"] == "confirmed" else "confirmed"
+    _save_events(events)
+    return redirect(url_for("calendar-todo.event_detail", event_id=event_id))
 
 
 @blueprint.route("/logout")

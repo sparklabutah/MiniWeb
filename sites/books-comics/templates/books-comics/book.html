@@ -104,17 +104,26 @@
                 <div class="actions" style="display:flex;gap:.6rem;flex-wrap:wrap;margin:1rem 0">
                     <a class="btn btn-green" href="{{ url_for('books-comics.read_book', book_id=book.id) }}" style="font-size:1rem;padding:.6rem 1.5rem;font-weight:bold" id="read-button">Read This Book</a>
                     {% if user %}
-                    <button class="btn btn-primary" onclick="saveBook({{ book.id }})" id="save-button">Save to Library</button>
-                    <button class="btn" onclick="addToCart({{ book.id }})" id="cart-button" style="border:2px solid #8b4513;font-weight:600">Add to Cart</button>
+                    <form method="post" action="{{ url_for('books-comics.form_save_book', book_id=book.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-primary" id="save-button">Save to Library</button>
+                    </form>
+                    <form method="post" action="{{ url_for('books-comics.form_cart_add', book_id=book.id) }}" style="display:inline">
+                        <button type="submit" class="btn" id="cart-button" style="border:2px solid #8b4513;font-weight:600">Add to Cart</button>
+                    </form>
                     {% if book.authors %}
-                    <button class="btn" onclick="followAuthor('{{ book.authors[0] }}')" id="follow-button">Follow Author</button>
+                    <form method="post" action="{{ url_for('books-comics.form_follow_author', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="author" value="{{ book.authors[0] }}">
+                        <button type="submit" class="btn" id="follow-button">Follow Author</button>
+                    </form>
                     {% endif %}
-                    <button class="btn" onclick="subscribeCat('{{ book.category }}')" id="subscribe-button">Subscribe to {{ book.category }}</button>
+                    <form method="post" action="{{ url_for('books-comics.form_subscribe_category', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="category" value="{{ book.category }}">
+                        <button type="submit" class="btn" id="subscribe-button">Subscribe to {{ book.category }}</button>
+                    </form>
                     {% else %}
                     <a class="btn btn-primary" href="{{ url_for('books-comics.login_page') }}" style="font-weight:bold">Login to Save/Follow/Subscribe</a>
                     {% endif %}
                 </div>
-                <div class="msg" id="action-msg"></div>
             </div>
         </div>
 
@@ -149,11 +158,13 @@
         {% if user %}
         <div class="section">
             <h3>Rate This Book</h3>
-            <div class="rating-input">
-                <input type="range" id="rate-slider" min="1" max="5" step="0.5" value="4">
-                <span id="rate-value">4.0</span>
-                <button class="btn btn-primary" onclick="rateBook({{ book.id }})">Submit Rating</button>
-            </div>
+            <form method="post" action="{{ url_for('books-comics.form_rate_book', book_id=book.id) }}">
+                <div class="rating-input">
+                    <input type="range" id="rate-slider" name="rating" min="1" max="5" step="0.5" value="4">
+                    <span id="rate-value">4.0</span>
+                    <button type="submit" class="btn btn-primary">Submit Rating</button>
+                </div>
+            </form>
         </div>
         {% endif %}
 
@@ -161,8 +172,10 @@
             <h3>Reviews ({{ reviews|length }})</h3>
             {% if user %}
             <div style="margin-bottom:1rem">
-                <textarea id="review-text" placeholder="Write your review..."></textarea>
-                <button class="btn btn-primary" onclick="postReview({{ book.id }})" style="margin-top:.3rem">Post Review</button>
+                <form method="post" action="{{ url_for('books-comics.form_post_review', book_id=book.id) }}">
+                    <textarea id="review-text" name="text" placeholder="Write your review..."></textarea>
+                    <button type="submit" class="btn btn-primary" style="margin-top:.3rem">Post Review</button>
+                </form>
             </div>
             {% endif %}
             {% for r in reviews %}
@@ -170,7 +183,11 @@
                 <div class="review-text">{{ r.text }}</div>
                 <div class="review-meta">
                     {% if r.rating %}Rating: {{ r.rating }}{% endif %}
-                    <button class="btn" style="padding:.1rem .5rem;font-size:.75rem" onclick="reactReview({{ book.id }}, {{ r.id }})">Like ({{ r.reactions.like if r.reactions and r.reactions.like else 0 }})</button>
+                    <form method="post" action="{{ url_for('books-comics.form_react_review', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="review_id" value="{{ r.id }}">
+                        <input type="hidden" name="reaction" value="like">
+                        <button type="submit" class="btn" style="padding:.1rem .5rem;font-size:.75rem">Like ({{ r.reactions.like if r.reactions and r.reactions.like else 0 }})</button>
+                    </form>
                 </div>
             </div>
             {% endfor %}
@@ -190,9 +207,6 @@
     </div>
 
     <script>
-    const BASE = "{{ url_for('books-comics.index') }}".replace(/\/$/, "");
-    {% if user %}const USER_ID = {{ user.id }};{% endif %}
-
     const rateSlider = document.getElementById('rate-slider');
     const rateValue = document.getElementById('rate-value');
     if (rateSlider) {
@@ -200,74 +214,6 @@
             rateValue.textContent = parseFloat(rateSlider.value).toFixed(1);
         });
     }
-
-    function showMsg(text) {
-        const el = document.getElementById("action-msg");
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 3000);
-    }
-
-    {% if user %}
-    async function saveBook(bid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({book_id: bid})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Book ${d.action}!`); }
-    }
-
-    async function addToCart(bid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/cart`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({book_id: bid})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Book ${d.action} to cart!`); }
-    }
-
-    async function followAuthor(name) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({author: name})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Author ${d.action}!`); }
-    }
-
-    async function subscribeCat(cat) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/subscribe`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({category: cat})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`${d.action} to ${cat}!`); }
-    }
-
-    async function rateBook(bid) {
-        const rating = parseFloat(document.getElementById('rate-slider').value);
-        const r = await fetch(`${BASE}/api/books/${bid}/rate`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({book_id: bid, rating: rating, user_id: USER_ID})
-        });
-        if (r.ok) { showMsg(`Rated ${rating} stars!`); }
-    }
-
-    async function postReview(bid) {
-        const text = document.getElementById('review-text').value.trim();
-        if (!text) return;
-        const r = await fetch(`${BASE}/api/reviews/${bid}`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({text: text, user_id: USER_ID})
-        });
-        if (r.ok) { showMsg('Review posted!'); document.getElementById('review-text').value = ''; }
-    }
-
-    async function reactReview(bid, rid) {
-        const r = await fetch(`${BASE}/api/reviews/${bid}/react`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({review_id: rid, reaction: "like"})
-        });
-        if (r.ok) { showMsg('Liked!'); }
-    }
-    {% endif %}
     </script>
 </body>
 </html>

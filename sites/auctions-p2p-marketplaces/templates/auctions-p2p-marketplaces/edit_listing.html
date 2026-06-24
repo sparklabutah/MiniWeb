@@ -30,7 +30,7 @@
     <div class="container">
         <div class="form-card">
             <h1>Edit Listing: {{ product.name[:40] }}</h1>
-            <form id="edit-form">
+            <form id="edit-form" method="post" action="{{ url_for('auctions-p2p-marketplaces.edit_listing_submit', listing_id=product.id) }}">
                 <div class="form-group">
                     <label for="name">Item Name</label>
                     <input type="text" id="name" name="name" value="{{ product.name }}">
@@ -59,30 +59,10 @@
                     <label for="shipping">Shipping</label>
                     <input type="text" id="shipping" name="shipping" value="{{ product.shipping }}">
                 </div>
-                <button type="button" class="btn btn-save" onclick="saveListing()">Save Changes</button>
+                <button type="submit" class="btn btn-save">Save Changes</button>
             </form>
         </div>
     </div>
 
-    <script>
-    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
-
-    function saveListing() {
-        const form = document.getElementById('edit-form');
-        fetch(BASE + '/api/listings/{{ product.id }}', {
-            method: 'PUT', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                name: form.name.value,
-                description: form.description.value,
-                category: form.category.value,
-                condition: form.condition.value,
-                shipping: form.shipping.value,
-            })
-        }).then(r => r.json()).then(d => {
-            if (d.success) { alert('Listing updated!'); window.location.href = BASE + '/listing/{{ product.id }}'; }
-            else alert(d.error || 'Update failed');
-        });
-    }
-    </script>
 </body>
 </html>

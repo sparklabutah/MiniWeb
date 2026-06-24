@@ -10,8 +10,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from flask import (Blueprint, Response, abort, jsonify, render_template,
-                   request, session)
+from flask import (Blueprint, Response, abort, jsonify, redirect, render_template,
+                   request, session, url_for)
 
 
 def _get_openai_key():
@@ -38,6 +38,8 @@ blueprint = Blueprint(
     "ai-chatbots",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -430,7 +432,7 @@ def settings_page():
     if "user_id" in session:
         user = _get_user(session["user_id"])
     if not user:
-        return render_template("ai-chatbots/login.html", error=None, config=config)
+        return redirect(url_for("ai-chatbots.login_page"))
     return render_template("ai-chatbots/settings.html",
                            config=config, user=user,
                            bots=config.get("available_bots", ["Assistant"]))
@@ -516,6 +518,203 @@ def logout():
     config = _load_config()
     session.pop("user_id", None)
     return render_template("ai-chatbots/login.html", error=None, config=config)
+
+
+# ---------------------------------------------------------------------------
+# Form-based POST routes (for browser automation compatibility)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/form/chat", methods=["POST"])
+def form_chat():
+    """Send a chat message via HTML form POST. Creates/updates conversation."""
+    message = request.form.get("message", "").strip()
+    bot = request.form.get("bot", "Assistant")
+    conv_id = request.form.get("conversation_id", "").strip() or None
+
+    if not message:
+        return redirect(url_for("ai-chatbots.chat_page"))
+
+    convs = _load_conversations()
+
+    if conv_id:
+        conv = next((c for c in convs if c["id"] == conv_id), None)
+    else:
+        conv = None
+
+    if not conv:
+        conv_id = f"conv_{uuid.uuid4().hex[:8]}"
+        user_id = session.get("user_id", 0)
+        conv = {
+            "id": conv_id,
+            "user_id": user_id,
+            "title": message[:50],
+            "bot": bot,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "messages": [],
+            "shared": False,
+            "archived": False,
+        }
+        convs.append(conv)
+
+    conv["messages"].append({"role": "user", "content": message})
+    response = _generate_response(message, bot_name=bot,
+                                  conversation_history=conv["messages"])
+    conv["messages"].append({"role": "assistant", "content": response})
+    conv["updated_at"] = datetime.now(timezone.utc).isoformat()
+    _save_conversations(convs)
+
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+
+@blueprint.route("/form/conversation/<conv_id>/edit-title", methods=["POST"])
+def form_edit_title(conv_id):
+    """Update conversation title via form POST."""
+    new_title = request.form.get("title", "").strip()
+    if not new_title:
+        return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+    convs = _load_conversations()
+    conv = next((c for c in convs if c["id"] == conv_id), None)
+    if conv:
+        conv["title"] = new_title
+        conv["updated_at"] = datetime.now(timezone.utc).isoformat()
+        _save_conversations(convs)
+
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+
+@blueprint.route("/form/conversation/<conv_id>/delete", methods=["POST"])
+def form_delete_conversation(conv_id):
+    """Delete a conversation via form POST."""
+    convs = _load_conversations()
+    convs = [c for c in convs if c["id"] != conv_id]
+    _save_conversations(convs)
+    return redirect(url_for("ai-chatbots.chat_page"))
+
+
+@blueprint.route("/form/conversation/<conv_id>/share", methods=["POST"])
+def form_share_conversation(conv_id):
+    """Share a conversation via form POST."""
+    share_with = request.form.get("share_with", "public")
+
+    convs = _load_conversations()
+    conv = next((c for c in convs if c["id"] == conv_id), None)
+    if not conv:
+        return redirect(url_for("ai-chatbots.chat_page"))
+
+    conv["shared"] = True
+    conv["share_with"] = share_with
+    _save_conversations(convs)
+
+    user_id = conv.get("user_id")
+    if user_id:
+        users = _load_users()
+        user = next((u for u in users if u["id"] == user_id), None)
+        if user:
+            shared_list = user.setdefault("shared_conversations", [])
+            if conv_id not in shared_list:
+                shared_list.append(conv_id)
+            _save_users(users)
+
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+
+@blueprint.route("/form/settings", methods=["POST"])
+def form_save_settings():
+    """Save user preferences and subscription via form POST."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("ai-chatbots.login_page"))
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("ai-chatbots.login_page"))
+
+    prefs = user.setdefault("preferences", {})
+    prefs["default_bot"] = request.form.get("default_bot", prefs.get("default_bot", "Assistant"))
+    prefs["theme"] = request.form.get("theme", prefs.get("theme", "dark"))
+    prefs["font_size"] = request.form.get("font_size", prefs.get("font_size", "medium"))
+    prefs["notifications"] = request.form.get("notifications") == "on"
+    prefs["save_history"] = request.form.get("save_history") == "on"
+
+    sub = request.form.get("subscription", user.get("subscription", "free"))
+    user["subscription"] = sub
+
+    _save_users(users)
+    return redirect(url_for("ai-chatbots.settings_page"))
+
+
+@blueprint.route("/form/upload", methods=["POST"])
+def form_upload():
+    """Upload a document to the knowledge base via form POST."""
+    topic = request.form.get("topic", "").strip()
+    category = request.form.get("category", "uploaded").strip()
+    content = request.form.get("content", "").strip()
+    keywords_str = request.form.get("keywords", "").strip()
+    keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
+
+    if not topic or not content:
+        return redirect(url_for("ai-chatbots.settings_page"))
+
+    kb = _load_kb()
+    new_id = max((e["id"] for e in kb), default=0) + 1
+    new_entry = {
+        "id": new_id,
+        "topic": topic,
+        "category": category or "uploaded",
+        "keywords": keywords,
+        "content": content,
+        "follow_up": "",
+    }
+    kb.append(new_entry)
+
+    global _kb
+    _kb = kb
+    with open(KB_FILE, "w") as f:
+        json.dump(kb, f, indent=2)
+
+    return redirect(url_for("ai-chatbots.settings_page"))
+
+
+@blueprint.route("/form/delete-all-conversations", methods=["POST"])
+def form_delete_all_conversations():
+    """Delete all conversations for the current user via form POST."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("ai-chatbots.login_page"))
+
+    convs = _load_conversations()
+    convs = [c for c in convs if c["user_id"] != user_id]
+    _save_conversations(convs)
+    return redirect(url_for("ai-chatbots.settings_page"))
+
+
+@blueprint.route("/form/save-prompt", methods=["POST"])
+def form_save_prompt():
+    """Save/unsave a prompt for the current user via form POST."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("ai-chatbots.login_page"))
+
+    prompt_id = request.form.get("prompt_id", type=int)
+    if prompt_id is None:
+        return redirect(url_for("ai-chatbots.prompts_page"))
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("ai-chatbots.prompts_page"))
+
+    saved = user.setdefault("saved_prompts", [])
+    if prompt_id in saved:
+        saved.remove(prompt_id)
+    else:
+        saved.append(prompt_id)
+    _save_users(users)
+
+    return redirect(url_for("ai-chatbots.prompts_page"))
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,8 @@ from collections import Counter
 from datetime import datetime
 
 from flask import (
-    Blueprint, Response, abort, jsonify, render_template, request, session,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request,
+    session, url_for,
 )
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -24,6 +25,8 @@ blueprint = Blueprint(
     "classifieds",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -294,10 +297,7 @@ def post_listing_submit():
     _save_json(LISTINGS_FILE, listings)
     _reload_listings()
 
-    user = _get_user(session["user_id"])
-    return render_template("classifieds/listing.html", listing=new_listing,
-                           seller=user, related=[], user=user,
-                           message="Listing created successfully!")
+    return redirect(url_for("classifieds.listing_detail", listing_id=new_id))
 
 
 @blueprint.route("/edit/<int:listing_id>", methods=["GET"])
@@ -334,10 +334,7 @@ def edit_listing_submit(listing_id):
     _save_json(LISTINGS_FILE, listings)
     _reload_listings()
 
-    user = _get_user(session["user_id"])
-    return render_template("classifieds/listing.html", listing=listing,
-                           seller=user, related=[], user=user,
-                           message="Listing updated successfully!")
+    return redirect(url_for("classifieds.listing_detail", listing_id=listing_id))
 
 
 @blueprint.route("/dashboard")
@@ -444,6 +441,91 @@ def compare_page():
         selected = [l for l in listings if l["id"] in ids]
     return render_template("classifieds/compare.html", listings=listings,
                            selected=selected, categories=_categories)
+
+
+@blueprint.route("/listing/<int:listing_id>/delete", methods=["POST"])
+def delete_listing(listing_id):
+    if "user_id" not in session:
+        return render_template("classifieds/login.html", error=None, mode="login")
+    listings = list(_get_listings())
+    listing = next((l for l in listings if l["id"] == listing_id), None)
+    if not listing:
+        abort(404)
+    listing["status"] = "deleted"
+    _save_json(LISTINGS_FILE, listings)
+    _reload_listings()
+    return redirect(url_for("classifieds.dashboard"))
+
+
+@blueprint.route("/listing/<int:listing_id>/message", methods=["POST"])
+def send_message(listing_id):
+    if "user_id" not in session:
+        return render_template("classifieds/login.html", error=None, mode="login")
+    messages = _load_messages()
+    new_id = max(m["id"] for m in messages) + 1 if messages else 1
+    new_msg = {
+        "id": new_id,
+        "listing_id": listing_id,
+        "sender_id": session["user_id"],
+        "recipient_id": int(request.form.get("recipient_id", 0)),
+        "subject": request.form.get("subject", "").strip(),
+        "body": request.form.get("body", "").strip(),
+        "date_sent": datetime.now().isoformat(),
+        "read": False,
+    }
+    messages.append(new_msg)
+    _save_messages(messages)
+    return redirect(url_for("classifieds.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/listing/<int:listing_id>/report", methods=["POST"])
+def report_listing(listing_id):
+    reports = _load_reports()
+    new_id = max(r["id"] for r in reports) + 1 if reports else 1
+    new_report = {
+        "id": new_id,
+        "listing_id": listing_id,
+        "reporter_id": session.get("user_id"),
+        "reason": request.form.get("reason", "").strip(),
+        "description": request.form.get("description", "").strip(),
+        "date_reported": datetime.now().isoformat(),
+        "status": "pending",
+    }
+    reports.append(new_report)
+    _save_reports(reports)
+    return redirect(url_for("classifieds.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/listing/<int:listing_id>/save", methods=["POST"])
+def save_listing(listing_id):
+    if "user_id" not in session:
+        return render_template("classifieds/login.html", error=None, mode="login")
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        abort(404)
+    saved = user.setdefault("saved_listings", [])
+    if listing_id in saved:
+        saved.remove(listing_id)
+    else:
+        saved.append(listing_id)
+    _save_users(users)
+    return redirect(url_for("classifieds.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/unsave/<int:listing_id>", methods=["POST"])
+def unsave_listing(listing_id):
+    if "user_id" not in session:
+        return render_template("classifieds/login.html", error=None, mode="login")
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        abort(404)
+    saved = user.setdefault("saved_listings", [])
+    if listing_id in saved:
+        saved.remove(listing_id)
+    _save_users(users)
+    return redirect(url_for("classifieds.dashboard"))
 
 
 @blueprint.route("/messages")

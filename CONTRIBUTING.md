@@ -2,88 +2,88 @@
 
 ## Site Status
 
-| Site | Category | Desc | Built | Eval |
-|------|----------|------|-------|------|
-| academic-paper-db | Search & reference | yes | yes | yes |
-| agency-portals | Government / civic | yes | yes | yes |
-| ai-chatbots | Communication | yes | yes | |
-| auctions-p2p-marketplaces | Shopping & transactional | yes | yes | |
-| banking | Financial | yes | yes | |
-| blogs | Dynamic info / feeds | yes | yes | |
-| books-comics | Streaming & media | yes | yes | |
-| bookstore | (template) | | | |
-| brokerage | Financial | yes | yes | |
-| business-company | Static / informational | yes | yes | |
-| calendar-todo | Productivity | yes | yes | |
-| classifieds | Social media | yes | yes | |
-| cloud-dev-consoles | Productivity | yes | yes | |
-| cloud-storage-file-transfer | Productivity | | | |
-| code-editor-execution | Other | | | |
-| comparison-aggregators | Search & reference | | | |
-| conference-review-submission | Education / LMS | | | |
-| converters-calculators | Utilities | | | |
-| course-sites-classrooms | Education / LMS | | | |
-| credit-card | Financial | | | |
-| crm | Productivity | | | |
-| crowdfunding-donations | Shopping & transactional | | | |
-| dating | Communication | | | |
-| design-creative | Productivity | | | |
-| dictionaries-language-tools | Utilities | | | |
-| documentation-api-docs | Static / informational | | | |
-| documents | Editing | | | |
-| e-commerce | Shopping & transactional | | | |
-| email | Communication | | | |
-| flights-hotels | Shopping & transactional | | | |
-| forms-surveys | Productivity | | | |
-| forums | Social media | | | |
-| grocery | Shopping & transactional | | | |
-| handwritten-notes-whiteboards | Editing | | | |
-| health-fitness-tracking | Health | | | |
-| health-portals | Health | | | |
-| help-center-faq-kb | Static / informational | | | |
-| instant-messaging | Communication | | | |
-| insurance-loans | Shopping & transactional | | | |
-| job-sites | Shopping & transactional | | | |
-| live | Streaming & media | | | |
-| map-services | Maps & navigation | | | |
-| moocs-language-learning | Education / LMS | | | |
-| multimedia-posting | Social media | | | |
-| multiplayer-online | Gaming | | | |
-| music | Streaming & media | | | |
-| news | Dynamic info / feeds | | | |
-| password-managers | Utilities | | | |
-| personal-portfolio | Static / informational | | | |
-| petitions-voting-info | Government / civic | | | |
-| podcasts-audiobooks | Streaming & media | | | |
-| project-homepages | Static / informational | | | |
-| project-mgmt-issue-tracking | Productivity | | | |
-| qa-knowledge | Search & reference | | | |
-| rating-review | Social media | | | |
-| real-estate-buy-rent | Shopping & transactional | | | |
-| remote-calls | Communication | | | |
-| restaurants | Static / informational | | | |
-| ride-hailing-delivery | Shopping & transactional | | | |
-| scheduling-e-signature | Productivity | | | |
-| search-engines | Search & reference | | | |
-| single-player | Gaming | | | |
-| software-marketplace | Shopping & transactional | | | |
-| sports-esports | Dynamic info / feeds | | | |
-| spreadsheets-slides | Editing | | | |
-| stock-crypto-prices | Dynamic info / feeds | | | |
-| tax-filing-dmv-permits | Government / civic | | | |
-| team-chat-workspace | Communication | | | |
-| ticketing-events | Shopping & transactional | | | |
-| transit-directions | Maps & navigation | | | |
-| translation | Utilities | | | |
-| university-academic | Static / informational | | | |
-| url-shorteners-qr | Utilities | | | |
-| version-control | Productivity | | | |
-| video | Streaming & media | | | |
-| visual-how-to-guides | Search & reference | | | |
-| weather | Dynamic info / feeds | | | |
-| wikis | Search & reference | | | |
+| Site | Category | Desc | Built | Validated | Eval |
+|------|----------|------|-------|-----------|------|
+| academic-paper-db | Search & reference | yes | yes | 20/20 | yes |
+| agency-portals | Government / civic | yes | yes | 20/20 | yes |
+| ai-chatbots | Communication | yes | yes | 20/20 | |
+| auctions-p2p-marketplaces | Shopping & transactional | yes | yes | 28/28 | |
+| banking | Financial | yes | yes | 20/20 | |
+| blogs | Dynamic info / feeds | yes | yes | 20/20 | |
+| books-comics | Streaming & media | yes | yes | 20/20 | |
+| bookstore | (template) | | | | |
+| brokerage | Financial | yes | yes | 20/20 | |
+| business-company | Static / informational | yes | yes | 20/20 | |
+| calendar-todo | Productivity | yes | yes | 20/20 | |
+| classifieds | Social media | yes | yes | 20/20 | |
+| cloud-dev-consoles | Productivity | yes | yes | 20/20 | |
+| cloud-storage-file-transfer | Productivity | yes | | | |
+| code-editor-execution | Other | yes | yes | 19/20 | |
+| comparison-aggregators | Search & reference | yes | yes | 14/20 | |
+| conference-review-submission | Education / LMS | yes | yes | 20/20 | |
+| converters-calculators | Utilities | yes | yes | 20/20 | |
+| course-sites-classrooms | Education / LMS | yes | yes | 20/20 | |
+| credit-card | Financial | yes | yes | 20/20 | |
+| crm | Productivity | yes | yes | 19/20 | |
+| crowdfunding-donations | Shopping & transactional | yes | yes | 18/20 | |
+| dating | Communication | yes | yes | 13/20 | |
+| design-creative | Productivity | yes | yes | 18/20 | |
+| dictionaries-language-tools | Utilities | yes | yes | 20/20 | |
+| documentation-api-docs | Static / informational | yes | yes | 20/20 | |
+| documents | Editing | yes | yes | 20/20 | |
+| e-commerce | Shopping & transactional | yes | yes | 17/20 | |
+| email | Communication | yes | yes | 15/20 | |
+| flights-hotels | Shopping & transactional | yes | | | |
+| forms-surveys | Productivity | yes | | | |
+| forums | Social media | yes | | | |
+| grocery | Shopping & transactional | yes | | | |
+| handwritten-notes-whiteboards | Editing | yes | | | |
+| health-fitness-tracking | Health | yes | | | |
+| health-portals | Health | yes | | | |
+| help-center-faq-kb | Static / informational | yes | | | |
+| instant-messaging | Communication | yes | | | |
+| insurance-loans | Shopping & transactional | yes | | | |
+| job-sites | Shopping & transactional | yes | | | |
+| live | Streaming & media | yes | | | |
+| map-services | Maps & navigation | yes | | | |
+| moocs-language-learning | Education / LMS | yes | | | |
+| multimedia-posting | Social media | yes | | | |
+| multiplayer-online | Gaming | yes | | | |
+| music | Streaming & media | yes | | | |
+| news | Dynamic info / feeds | yes | | | |
+| password-managers | Utilities | yes | | | |
+| personal-portfolio | Static / informational | yes | | | |
+| petitions-voting-info | Government / civic | yes | | | |
+| podcasts-audiobooks | Streaming & media | yes | | | |
+| project-homepages | Static / informational | yes | | | |
+| project-mgmt-issue-tracking | Productivity | yes | | | |
+| qa-knowledge | Search & reference | yes | | | |
+| rating-review | Social media | yes | | | |
+| real-estate-buy-rent | Shopping & transactional | yes | | | |
+| remote-calls | Communication | yes | | | |
+| restaurants | Static / informational | yes | | | |
+| ride-hailing-delivery | Shopping & transactional | yes | | | |
+| scheduling-e-signature | Productivity | yes | | | |
+| search-engines | Search & reference | yes | | | |
+| single-player | Gaming | yes | | | |
+| software-marketplace | Shopping & transactional | yes | | | |
+| sports-esports | Dynamic info / feeds | yes | | | |
+| spreadsheets-slides | Editing | yes | | | |
+| stock-crypto-prices | Dynamic info / feeds | yes | | | |
+| tax-filing-dmv-permits | Government / civic | yes | | | |
+| team-chat-workspace | Communication | yes | | | |
+| ticketing-events | Shopping & transactional | yes | | | |
+| transit-directions | Maps & navigation | yes | | | |
+| translation | Utilities | yes | | | |
+| university-academic | Static / informational | yes | | | |
+| url-shorteners-qr | Utilities | yes | | | |
+| version-control | Productivity | yes | | | |
+| video | Streaming & media | yes | | | |
+| visual-how-to-guides | Search & reference | yes | | | |
+| weather | Dynamic info / feeds | yes | | | |
+| wikis | Search & reference | yes | | | |
 
-**12/78 built** · **2/78 evaluated** · **12/78 with descriptions**
+**27/78 built** · **27/78 validated** · **2/78 browser-evaluated** · **78/78 with descriptions**
 
 ## Getting Started (CHPC Quick Start)
 
@@ -109,7 +109,7 @@ ssh -L 8080:localhost:8080 <your-uid>@<chpc-node>
 # Then open http://localhost:8080
 ```
 
-All 12 built sites will be immediately available — no data download or generation needed.
+All 27 built sites will be immediately available — no data download or generation needed.
 
 ### Manual Setup (Non-CHPC)
 
@@ -133,6 +133,9 @@ Large datasets live at `/scratch/general/vast/u1653932/data_sources/` (group-rea
 | WebShop products | `.../data_sources/webshop/items_shuffle.json` | 5.2 GB | auctions, e-commerce, grocery |
 | WebShop attributes | `.../data_sources/webshop/items_ins_v2.json` | 178 MB | auctions, e-commerce, grocery |
 | Pressbooks | `.../data_sources/pressbooks/pressbooks-0000.json.gz` | 183 MB | books-comics |
+| PeerRead | `.../data_sources/PeerRead/data/` | ~50 MB | conference-review-submission |
+| Enron emails | `.../data_sources/enron/enron_mail_20150507.tar.gz` | 1.7 GB | email |
+| Wiktionary | `.../data_sources/wikidictionary/raw-wiktextract-data.jsonl` | 22 GB | dictionaries-language-tools |
 
 **Permissions:** If you can't read these files, ask `u1653932` to run `chmod -R g+rX /scratch/general/vast/u1653932/data_sources/`.
 

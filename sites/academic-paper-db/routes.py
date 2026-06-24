@@ -10,7 +10,7 @@ import random
 import re
 from collections import Counter
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 DATA_FILE = SITE_DIR / "data" / "291" / "arxiv-metadata-oai-snapshot.json"
@@ -21,6 +21,8 @@ blueprint = Blueprint(
     "academic-paper-db",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -339,10 +341,7 @@ def login_submit():
         return render_template("academic-paper-db/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
-    return render_template("academic-paper-db/dashboard.html", user=user,
-                           saved_papers=[p for p in _get_papers()
-                                         if p["id"] in user.get("saved_papers", [])],
-                           followed_authors=user.get("followed_authors", []))
+    return redirect(url_for("academic-paper-db.dashboard"))
 
 
 @blueprint.route("/logout")
@@ -361,6 +360,77 @@ def compare_page():
         selected = [p for p in papers if p["id"] in ids]
     return render_template("academic-paper-db/compare.html", papers=papers,
                            selected=selected)
+
+
+# ---------------------------------------------------------------------------
+# Form-based mutation routes (for browser automation compatibility)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/paper/<int:paper_id>/save", methods=["POST"])
+def form_save_paper(paper_id):
+    if "user_id" not in session:
+        return redirect(url_for("academic-paper-db.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("academic-paper-db.login_page"))
+    saved = user.setdefault("saved_papers", [])
+    if paper_id in saved:
+        saved.remove(paper_id)
+    else:
+        saved.append(paper_id)
+    _save_users(users)
+    return redirect(url_for("academic-paper-db.paper_detail", paper_id=paper_id))
+
+
+@blueprint.route("/author/<path:author_name>/follow", methods=["POST"])
+def form_follow_author(author_name):
+    if "user_id" not in session:
+        return redirect(url_for("academic-paper-db.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("academic-paper-db.login_page"))
+    followed = user.setdefault("followed_authors", [])
+    if author_name in followed:
+        followed.remove(author_name)
+    else:
+        followed.append(author_name)
+    _save_users(users)
+    referrer = request.form.get("redirect_to", "")
+    if referrer:
+        return redirect(referrer)
+    return redirect(url_for("academic-paper-db.dashboard"))
+
+
+@blueprint.route("/paper/<int:paper_id>/unsave", methods=["POST"])
+def form_unsave_paper(paper_id):
+    if "user_id" not in session:
+        return redirect(url_for("academic-paper-db.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("academic-paper-db.login_page"))
+    saved = user.setdefault("saved_papers", [])
+    if paper_id in saved:
+        saved.remove(paper_id)
+    _save_users(users)
+    return redirect(url_for("academic-paper-db.dashboard"))
+
+
+@blueprint.route("/author/<path:author_name>/unfollow", methods=["POST"])
+def form_unfollow_author(author_name):
+    if "user_id" not in session:
+        return redirect(url_for("academic-paper-db.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("academic-paper-db.login_page"))
+    followed = user.setdefault("followed_authors", [])
+    if author_name in followed:
+        followed.remove(author_name)
+    _save_users(users)
+    return redirect(url_for("academic-paper-db.dashboard"))
 
 
 # ---------------------------------------------------------------------------

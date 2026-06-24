@@ -206,12 +206,13 @@
     <div class="newsletter-section" id="newsletter">
         <h2>Subscribe to Our Newsletter</h2>
         <p>Stay up to date with the latest insights, product updates, and company news from Apex Dynamics.</p>
-        <form class="newsletter-form" id="newsletter-form" onsubmit="return submitNewsletter(event)">
+        <form class="newsletter-form" id="newsletter-form" method="post" action="{{ url_for('business-company.newsletter_subscribe') }}">
+            <input type="hidden" name="topics" value="product-updates">
+            <input type="hidden" name="topics" value="blog">
             <input type="email" name="email" id="newsletter-email" placeholder="Enter your email address" required>
             <button type="submit">Subscribe</button>
         </form>
         <a href="{{ url_for('business-company.newsletter_page') }}" class="newsletter-link">Manage your newsletter preferences &rarr;</a>
-        <div id="newsletter-msg" style="margin-top:.75rem; font-size:.9rem;"></div>
     </div>
 
     <div class="footer">
@@ -236,18 +237,6 @@
     </div>
 
     <script>
-    function submitNewsletter(e) {
-        e.preventDefault();
-        var email = document.getElementById('newsletter-email').value;
-        fetch('{{ url_for("business-company.api_subscribe") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({email: email, topics: ['product-updates', 'blog']})
-        }).then(function(r){return r.json()}).then(function(d){
-            document.getElementById('newsletter-msg').textContent = 'Successfully ' + d.action + '!';
-        });
-        return false;
-    }
     </script>
 </body>
 </html>

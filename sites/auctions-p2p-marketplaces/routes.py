@@ -10,7 +10,7 @@ import random
 import re
 from collections import Counter
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
@@ -27,6 +27,8 @@ blueprint = Blueprint(
     "auctions-p2p-marketplaces",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -361,8 +363,7 @@ def login_submit():
         return render_template("auctions-p2p-marketplaces/login.html",
                                error="Invalid username or password", mode="login")
     session["user_id"] = user["id"]
-    return render_template("auctions-p2p-marketplaces/dashboard.html",
-                           user=user, my_listings=[], my_bids=[], watched=[], messages=[])
+    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
 
 
 @blueprint.route("/register", methods=["POST"])
@@ -397,14 +398,13 @@ def register_submit():
     users.append(new_user)
     _save_users(users)
     session["user_id"] = new_id
-    return render_template("auctions-p2p-marketplaces/dashboard.html",
-                           user=new_user, my_listings=[], my_bids=[], watched=[], messages=[])
+    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
 
 
 @blueprint.route("/logout")
 def logout():
     session.pop("user_id", None)
-    return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
+    return redirect(url_for("auctions-p2p-marketplaces.login_page"))
 
 
 @blueprint.route("/compare")
@@ -431,7 +431,7 @@ def create_listing_page():
 @blueprint.route("/create-listing", methods=["POST"])
 def create_listing_submit():
     if "user_id" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
     user = _get_user(session["user_id"])
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
@@ -484,7 +484,7 @@ def create_listing_submit():
     _products = None
     _categories = None
 
-    return jsonify({"success": True, "listing_id": new_id})
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=new_id))
 
 
 @blueprint.route("/edit-listing/<int:listing_id>", methods=["GET"])
@@ -498,6 +498,209 @@ def edit_listing_page(listing_id):
     user = _get_user(session["user_id"])
     return render_template("auctions-p2p-marketplaces/edit_listing.html",
                            user=user, product=product, categories=_get_categories())
+
+
+# ---------------------------------------------------------------------------
+# Form-based POST routes (for browser automation compatibility)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/listing/<int:listing_id>/bid", methods=["POST"])
+def place_bid_form(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    user_id = session["user_id"]
+    amount = request.form.get("amount", "")
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+    products = _load_json(PRODUCTS_FILE)
+    product = next((p for p in products if p["id"] == listing_id), None)
+    if not product or product["status"] != "active" or amount <= product["current_price"]:
+        return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+    bids = _load_bids()
+    new_bid_id = max((b["bid_id"] for b in bids), default=0) + 1
+    bids.append({
+        "bid_id": new_bid_id,
+        "listing_id": listing_id,
+        "bidder_id": user_id,
+        "amount": amount,
+        "timestamp": "2026-06-21T12:00:00Z",
+        "auto_bid": False,
+    })
+    _save_bids(bids)
+
+    product["current_price"] = amount
+    product["num_bids"] += 1
+    _save_json(PRODUCTS_FILE, products)
+
+    global _products, _categories
+    _products = None
+    _categories = None
+
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/edit-listing/<int:listing_id>", methods=["POST"])
+def edit_listing_submit(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+
+    products = _load_json(PRODUCTS_FILE)
+    product = next((p for p in products if p["id"] == listing_id), None)
+    if not product:
+        abort(404)
+
+    for field in ["name", "description", "category", "condition", "shipping", "location"]:
+        val = request.form.get(field)
+        if val is not None:
+            product[field] = val.strip()
+
+    _save_json(PRODUCTS_FILE, products)
+
+    global _products, _categories
+    _products = None
+    _categories = None
+
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/listing/<int:listing_id>/delete", methods=["POST"])
+def delete_listing_form(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+
+    products = _load_json(PRODUCTS_FILE)
+    product = next((p for p in products if p["id"] == listing_id), None)
+    if product:
+        products.remove(product)
+        _save_json(PRODUCTS_FILE, products)
+
+        global _products, _categories
+        _products = None
+        _categories = None
+
+    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
+
+
+@blueprint.route("/listing/<int:listing_id>/watch", methods=["POST"])
+def watch_listing_form(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    user_id = session["user_id"]
+    watchlist = _load_watchlist()
+    existing = next((w for w in watchlist if w["user_id"] == user_id and w["listing_id"] == listing_id), None)
+    if existing:
+        watchlist.remove(existing)
+    else:
+        watchlist.append({"user_id": user_id, "listing_id": listing_id})
+    _save_watchlist(watchlist)
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/listing/<int:listing_id>/save", methods=["POST"])
+def save_listing_form(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    user_id = session["user_id"]
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user:
+        saved = user.setdefault("saved_listings", [])
+        if listing_id in saved:
+            saved.remove(listing_id)
+        else:
+            saved.append(listing_id)
+        _save_users(users)
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/seller/<int:seller_id>/follow", methods=["POST"])
+def follow_seller_form(seller_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    user_id = session["user_id"]
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user:
+        followed = user.setdefault("followed_sellers", [])
+        if seller_id in followed:
+            followed.remove(seller_id)
+        else:
+            followed.append(seller_id)
+        _save_users(users)
+    # Redirect back to the listing page if we came from one, otherwise seller page
+    referer = request.form.get("next") or request.referrer
+    if referer:
+        return redirect(referer)
+    return redirect(url_for("auctions-p2p-marketplaces.seller_page", seller_id=seller_id))
+
+
+@blueprint.route("/send-message", methods=["POST"])
+def send_message_form():
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    sender_id = session["user_id"]
+    receiver_id = request.form.get("receiver_id", type=int)
+    listing_id = request.form.get("listing_id", type=int)
+    subject = request.form.get("subject", "").strip()
+    body = request.form.get("body", "").strip()
+
+    if body and receiver_id:
+        messages = _load_messages()
+        new_id = max((m["id"] for m in messages), default=0) + 1
+        messages.append({
+            "id": new_id,
+            "listing_id": listing_id,
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "subject": subject or "No subject",
+            "body": body,
+            "timestamp": "2026-06-21T12:00:00Z",
+            "read": False,
+        })
+        _save_messages(messages)
+
+    next_url = request.form.get("next") or request.referrer
+    if next_url:
+        return redirect(next_url)
+    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
+
+
+@blueprint.route("/message/<int:msg_id>/delete", methods=["POST"])
+def delete_message_form(msg_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    messages = _load_messages()
+    msg = next((m for m in messages if m["id"] == msg_id), None)
+    if msg:
+        messages.remove(msg)
+        _save_messages(messages)
+    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
+
+
+@blueprint.route("/listing/<int:listing_id>/report", methods=["POST"])
+def report_listing_form(listing_id):
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page"))
+    reason = request.form.get("reason", "").strip()
+    description = request.form.get("description", "").strip()
+    if reason:
+        reports = _load_reports()
+        new_id = max((r["id"] for r in reports), default=0) + 1
+        reports.append({
+            "id": new_id,
+            "listing_id": listing_id,
+            "reporter_id": session["user_id"],
+            "reason": reason,
+            "description": description,
+            "timestamp": "2026-06-21T12:00:00Z",
+            "status": "pending",
+        })
+        _save_reports(reports)
+    return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
 
 # ---------------------------------------------------------------------------

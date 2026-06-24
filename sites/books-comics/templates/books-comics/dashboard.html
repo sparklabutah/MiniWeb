@@ -48,7 +48,10 @@
                 <a href="{{ url_for('books-comics.book_detail', book_id=b.id) }}">{{ b.title }}</a>
                 <div class="saved-meta">{{ b.authors_str }} -- {{ b.year }} -- {{ b.rating }}</div>
             </div>
-            <button class="btn-sm" onclick="unsaveBook({{ b.id }})">Remove</button>
+            <form method="post" action="{{ url_for('books-comics.form_unsave_book') }}" style="display:inline">
+                <input type="hidden" name="book_id" value="{{ b.id }}">
+                <button type="submit" class="btn-sm">Remove</button>
+            </form>
         </div>
         {% endfor %}
         {% else %}
@@ -75,7 +78,12 @@
         {% if followed_authors %}
         <div>
             {% for a in followed_authors %}
-            <span class="tag">{{ a }} <button class="btn-sm" onclick="unfollowAuthor('{{ a }}')" style="border:none;background:none;cursor:pointer;color:#a09080">x</button></span>
+            <span class="tag">{{ a }}
+                <form method="post" action="{{ url_for('books-comics.form_unfollow_author') }}" style="display:inline">
+                    <input type="hidden" name="author" value="{{ a }}">
+                    <button type="submit" class="btn-sm" style="border:none;background:none;cursor:pointer;color:#a09080">x</button>
+                </form>
+            </span>
             {% endfor %}
         </div>
         {% else %}
@@ -95,37 +103,6 @@
     </div>
 
     <script>
-    const BASE = "{{ url_for('books-comics.index') }}".replace(/\/$/, "");
-    const USER_ID = {{ user.id }};
-
-    function showMsg(id, text) {
-        const el = document.getElementById(id);
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 3000);
-    }
-
-    async function unsaveBook(bid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({book_id: bid})
-        });
-        if (r.ok) {
-            showMsg("save-msg", "Book removed!");
-            document.getElementById("saved-" + bid)?.remove();
-        }
-    }
-
-    async function unfollowAuthor(name) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({author: name})
-        });
-        if (r.ok) {
-            showMsg("follow-msg", "Author unfollowed!");
-            setTimeout(() => location.reload(), 1000);
-        }
-    }
     </script>
 </body>
 </html>

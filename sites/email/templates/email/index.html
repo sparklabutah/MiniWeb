@@ -3,14 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>WebMail -- {{ folder|capitalize }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f8fc; color: #202124; }
+        .top-bar { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .top-bar h1 { font-size: 1.3rem; color: #1a73e8; margin-right: auto; }
+        .top-bar .search-form { flex: 1; max-width: 600px; display: flex; }
+        .top-bar .search-form input { flex: 1; padding: 8px 14px; border: 1px solid #dfe1e5; border-radius: 24px; font-size: 0.95rem; outline: none; }
+        .top-bar .search-form input:focus { border-color: #1a73e8; box-shadow: 0 1px 4px rgba(26,115,232,.2); }
+        .top-bar .search-form button { margin-left: 8px; padding: 8px 16px; background: #1a73e8; color: #fff; border: none; border-radius: 24px; cursor: pointer; font-size: 0.9rem; }
+        .top-bar .user-info { font-size: 0.85rem; color: #5f6368; }
+        .top-bar .user-info a { color: #1a73e8; text-decoration: none; margin-left: 8px; }
+        .layout { display: flex; min-height: calc(100vh - 52px); }
+        .sidebar { width: 240px; background: #fff; border-right: 1px solid #e0e0e0; padding: 12px 0; flex-shrink: 0; }
+        .sidebar a.compose-btn { display: block; margin: 8px 16px 16px; padding: 14px 24px; background: #1a73e8; color: #fff; text-decoration: none; border-radius: 24px; text-align: center; font-size: 1rem; font-weight: 600; }
+        .sidebar a.compose-btn:hover { background: #1557b0; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+        .sidebar .folder-list { list-style: none; }
+        .sidebar .folder-list li { margin-bottom: 2px; }
+        .sidebar .folder-list li a { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; text-decoration: none; color: #202124; font-size: 1rem; font-weight: 500; border-radius: 0 24px 24px 0; margin-right: 12px; }
+        .sidebar .folder-list li a:hover { background: #f1f3f4; }
+        .sidebar .folder-list li a.active { background: #d3e3fd; color: #1a73e8; font-weight: 700; }
+        .sidebar .folder-list li .badge { background: #1a73e8; color: #fff; border-radius: 10px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600; }
+        .sidebar .folder-list li .badge.zero { display: none; }
+        .sidebar .folder-list li .total-badge { color: #5f6368; font-size: 0.85rem; }
+        .sidebar hr { margin: 8px 16px; border: none; border-top: 1px solid #e0e0e0; }
+        .sidebar .nav-link { display: block; padding: 10px 24px; text-decoration: none; color: #5f6368; font-size: 0.95rem; }
+        .sidebar .nav-link:hover { background: #f1f3f4; color: #202124; }
+        .main { flex: 1; padding: 0; }
+        .toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid #e0e0e0; background: #fff; font-size: 0.85rem; color: #5f6368; }
+        .toolbar .page-info { margin-left: auto; }
+        .email-list { background: #fff; }
+        .email-row .email-check { width: 24px; flex-shrink: 0; text-align: center; }
+        .email-row .email-check input { width: 14px; height: 14px; accent-color: #1a73e8; cursor: pointer; }
+        .email-row { display: flex; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; transition: background .1s; text-decoration: none; color: inherit; }
+        .email-row:hover { background: #f6f8fc; box-shadow: inset 3px 0 0 #1a73e8; }
+        .email-row.unread { font-weight: 600; }
+        .email-row.unread .email-subject { color: #202124; }
+        .email-row .email-star { width: 28px; text-align: center; cursor: pointer; color: #dadce0; font-size: 1.1rem; flex-shrink: 0; }
+        .email-row .email-star.starred { color: #f4b400; }
+        .email-row .email-from { width: 200px; flex-shrink: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #202124; }
+        .email-row .email-content { flex: 1; display: flex; overflow: hidden; min-width: 0; }
+        .email-row .email-subject { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #5f6368; }
+        .email-row .email-subject .subj-text { color: #202124; }
+        .email-row .email-preview { color: #5f6368; font-size: 0.85rem; margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .email-row .email-date { width: 100px; text-align: right; font-size: 0.8rem; color: #5f6368; flex-shrink: 0; }
+        .email-row.unread .email-date { color: #202124; font-weight: 600; }
+        .empty { text-align: center; padding: 48px; color: #5f6368; font-size: 1rem; }
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px; background: #fff; border-top: 1px solid #e0e0e0; }
+        .pagination a, .pagination span { padding: 6px 14px; border-radius: 4px; text-decoration: none; font-size: 0.9rem; }
+        .pagination a { color: #1a73e8; border: 1px solid #dadce0; }
+        .pagination a:hover { background: #f1f3f4; }
+        .pagination .current { background: #1a73e8; color: #fff; border: 1px solid #1a73e8; }
+        .pagination .disabled { color: #dadce0; border: 1px solid #dadce0; pointer-events: none; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="top-bar">
+        <h1><a href="{{ url_for('email.index') }}" style="color:inherit;text-decoration:none">WebMail</a></h1>
+        <form class="search-form" action="{{ url_for('email.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search mail..." autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+        <div class="user-info">
+            {{ user.name }}
+            <a href="{{ url_for('email.logout') }}">Sign out</a>
+        </div>
+    </div>
+    <div class="layout">
+        <div class="sidebar">
+            <a class="compose-btn" href="{{ url_for('email.compose_page') }}">Compose</a>
+            <ul class="folder-list">
+                {% set folders = ['inbox', 'sent', 'drafts', 'trash', 'spam'] %}
+                {% for f in folders %}
+                <li>
+                    <a href="{{ url_for('email.index', folder=f) }}" class="{{ 'active' if folder == f else '' }}">
+                        <span>{{ f|capitalize }}</span>
+                        <span>
+                            {% set c = counts.get(f, {}) %}
+                            {% if c.get('unread', 0) > 0 %}
+                            <span class="badge">{{ c.unread }}</span>
+                            {% endif %}
+                            <span class="total-badge">({{ c.get('total', 0) }})</span>
+                        </span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            <hr>
+            <a class="nav-link" href="{{ url_for('email.contacts_page') }}">Contacts</a>
+        </div>
+        <div class="main">
+            <div class="toolbar">
+                <span>{{ folder|capitalize }}</span>
+                <span>{{ total }} messages</span>
+                {% if total_pages > 1 %}
+                <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+                {% endif %}
+            </div>
+            <div class="email-list">
+                {% if emails %}
+                {% for e in emails %}
+                <a class="email-row {{ 'unread' if not e.is_read else '' }}" href="{{ url_for('email.message_detail', email_id=e.id) }}">
+                    <span class="email-check" onclick="event.preventDefault()"><input type="checkbox" title="Select"></span>
+                    <span class="email-star {{ 'starred' if e.is_starred else '' }}">&#9733;</span>
+                    <span class="email-from">{{ e.from_addr }}</span>
+                    <span class="email-content">
+                        <span class="email-subject"><span class="subj-text">{{ e.subject }}</span> &mdash; <span class="email-preview">{{ e.body_preview }}</span></span>
+                    </span>
+                    <span class="email-date">{{ e.date_display }}</span>
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="empty">No messages in {{ folder }}.</div>
+                {% endif %}
+            </div>
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="{{ url_for('email.index', folder=folder, page=page-1) }}">Previous</a>
+                {% else %}
+                <span class="disabled">Previous</span>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="current">{{ p }}</span>
+                    {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+                    <a href="{{ url_for('email.index', folder=folder, page=p) }}">{{ p }}</a>
+                    {% elif p == 4 and page > 5 %}
+                    <span>...</span>
+                    {% elif p == total_pages - 2 and page < total_pages - 4 %}
+                    <span>...</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="{{ url_for('email.index', folder=folder, page=page+1) }}">Next</a>
+                {% else %}
+                <span class="disabled">Next</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
     </div>
 </body>
 </html>

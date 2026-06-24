@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import date, timedelta
 
 from flask import (
-    Blueprint, Response, abort, jsonify, render_template, request, session,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for,
 )
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -24,6 +24,8 @@ blueprint = Blueprint(
     "business-company",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -627,6 +629,43 @@ def contact_submit():
     _save("contacts", contacts)
     _invalidate("contacts")
     return render_template("business-company/contact.html", success=True, error=None)
+
+
+@blueprint.route("/newsletter/subscribe", methods=["POST"])
+def newsletter_subscribe():
+    """Form-based newsletter subscription (browser-automation friendly)."""
+    email = request.form.get("email", "").strip()
+    name = request.form.get("name", "").strip()
+    topics = request.form.getlist("topics")
+    if not email:
+        return render_template("business-company/newsletter.html")
+
+    subscribers = _load("subscribers")
+    existing = next((s for s in subscribers if s["email"] == email), None)
+    if existing:
+        if existing["active"]:
+            existing["active"] = False
+            action = "unsubscribed"
+        else:
+            existing["active"] = True
+            action = "subscribed"
+        if topics:
+            existing["subscribed_topics"] = topics
+    else:
+        existing = {
+            "id": len(subscribers) + 1,
+            "email": email,
+            "name": name,
+            "subscribed_topics": topics if topics else ["blog"],
+            "active": True,
+        }
+        subscribers.append(existing)
+        action = "subscribed"
+    _save("subscribers", subscribers)
+    _invalidate("subscribers")
+    return render_template("business-company/newsletter.html",
+                           subscribe_success=True, subscribe_action=action,
+                           subscribe_email=email)
 
 
 # ---------------------------------------------------------------------------

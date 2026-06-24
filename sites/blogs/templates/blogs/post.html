@@ -127,31 +127,37 @@
                 <!-- Action buttons -->
                 <div class="action-bar">
                     {% if user %}
-                    <button class="btn-follow" id="follow-btn" onclick="followBlog('{{ post.author_username }}')">Follow @{{ post.author_username }}</button>
-                    <button class="btn-save" id="save-btn" onclick="savePost({{ post.id }})">Save Post</button>
+                    <form method="post" action="{{ url_for('blogs.form_follow_blog', post_id=post.id) }}" style="display:inline">
+                        <input type="hidden" name="blog" value="{{ post.author_username }}">
+                        <button type="submit" class="btn-follow" id="follow-btn">
+                            {% if post.author_username in user.get('followed_blogs', []) %}Unfollow{% else %}Follow{% endif %} @{{ post.author_username }}
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('blogs.form_save_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-save" id="save-btn">
+                            {% if post.id in user.get('saved_posts', []) %}Unsave{% else %}Save{% endif %} Post
+                        </button>
+                    </form>
                     {% for t in post.tags %}
-                    <button class="btn-subscribe" onclick="subscribeTag('{{ t }}')">Subscribe #{{ t }}</button>
+                    <form method="post" action="{{ url_for('blogs.form_subscribe_tag', post_id=post.id) }}" style="display:inline">
+                        <input type="hidden" name="tag" value="{{ t }}">
+                        <button type="submit" class="btn-subscribe">
+                            {% if t in user.get('subscribed_tags', []) %}Unsubscribe{% else %}Subscribe{% endif %} #{{ t }}
+                        </button>
+                    </form>
                     {% endfor %}
                     {% endif %}
-                    <div class="share-dropdown">
-                        <button onclick="toggleShare()">Share</button>
-                        <div class="share-options" id="share-menu">
-                            <a href="#" onclick="sharePost('twitter'); return false;">Twitter</a>
-                            <a href="#" onclick="sharePost('facebook'); return false;">Facebook</a>
-                            <a href="#" onclick="sharePost('link'); return false;">Copy Link</a>
-                        </div>
-                    </div>
                     <a class="btn btn-report" href="{{ url_for('blogs.report_page', post_id=post.id) }}">Report</a>
                 </div>
-                <div class="action-status" id="action-status"></div>
             </div>
         </div>
 
         <div class="comments-section">
             <h3>{{ comments|length }} Comments</h3>
             {% if user %}
-            <form id="comment-form" onsubmit="submitComment(event)" style="margin-bottom:1rem;display:flex;flex-direction:column;gap:.5rem;">
-                <textarea id="comment-body" placeholder="Write a comment..." rows="3" style="background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:.4rem;padding:.6rem;font-size:.85rem;resize:vertical;"></textarea>
+            <form method="post" action="{{ url_for('blogs.form_add_comment', post_id=post.id) }}" style="margin-bottom:1rem;display:flex;flex-direction:column;gap:.5rem;">
+                <input type="hidden" name="author_username" value="{{ user.username }}">
+                <textarea name="body" id="comment-body" placeholder="Write a comment..." rows="3" required style="background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:.4rem;padding:.6rem;font-size:.85rem;resize:vertical;"></textarea>
                 <button type="submit" style="align-self:flex-end;background:#7c83ff;color:#fff;border:none;padding:.45rem 1rem;border-radius:.4rem;cursor:pointer;font-weight:600;">Post Comment</button>
             </form>
             {% endif %}
@@ -181,100 +187,6 @@
         <a href="{{ url_for('blogs.index') }}" class="back-bottom">&larr; Back to posts</a>
     </div>
 
-    <script>
-    function showStatus(msg, type) {
-        var el = document.getElementById('action-status');
-        el.textContent = msg;
-        el.className = 'action-status show ' + type;
-        setTimeout(function() { el.className = 'action-status'; }, 4000);
-    }
-
-    function toggleShare() {
-        document.getElementById('share-menu').classList.toggle('open');
-    }
-
-    function sharePost(platform) {
-        fetch('{{ url_for("blogs.api_share_post", post_id=post.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({platform: platform})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            showStatus('Shared via ' + platform + '! Total shares: ' + d.total_shares, 'success');
-            document.getElementById('share-menu').classList.remove('open');
-        });
-    }
-
-    {% if user %}
-    function submitComment(e) {
-        e.preventDefault();
-        var body = document.getElementById('comment-body').value.trim();
-        if (!body) return;
-        fetch('{{ url_for("blogs.api_add_comment", post_id=post.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({body: body, author_username: '{{ user.username }}'})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            showStatus('Comment posted!', 'success');
-            setTimeout(function() { window.location.reload(); }, 1000);
-        }).catch(function() {
-            showStatus('Error posting comment', 'error');
-        });
-    }
-
-    function followBlog(blog) {
-        fetch('{{ url_for("blogs.api_follow_blog", user_id=user.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({blog: blog})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            var btn = document.getElementById('follow-btn');
-            if (d.action === 'followed') {
-                btn.textContent = 'Unfollow @' + blog;
-                showStatus('You are now following @' + blog, 'success');
-            } else {
-                btn.textContent = 'Follow @' + blog;
-                showStatus('You unfollowed @' + blog, 'success');
-            }
-        }).catch(function() {
-            showStatus('Error following blog', 'error');
-        });
-    }
-
-    function savePost(postId) {
-        fetch('{{ url_for("blogs.api_save_post", user_id=user.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({post_id: postId})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            var btn = document.getElementById('save-btn');
-            if (d.action === 'saved') {
-                btn.textContent = 'Unsave Post';
-                showStatus('Post saved! Total saved: ' + d.total_saved, 'success');
-            } else {
-                btn.textContent = 'Save Post';
-                showStatus('Post removed from saved.', 'success');
-            }
-        }).catch(function() {
-            showStatus('Error saving post', 'error');
-        });
-    }
-
-    function subscribeTag(tag) {
-        fetch('{{ url_for("blogs.api_subscribe_tag", user_id=user.id) }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({tag: tag})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.action === 'subscribed') {
-                showStatus('Subscribed to #' + tag, 'success');
-            } else {
-                showStatus('Unsubscribed from #' + tag, 'success');
-            }
-        }).catch(function() {
-            showStatus('Error subscribing to tag', 'error');
-        });
-    }
-    {% endif %}
-    </script>
+    <!-- All actions are now form-based, no JavaScript needed -->
 </body>
 </html>

@@ -36,9 +36,14 @@
         </div>
         <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
             <span style="font-size:12px; color:#8e8ea0;">Popularity: {{ prompt.popularity }}%</span>
-            <button class="btn-small btn-primary" onclick="usePrompt({{ prompt.id }})">Use</button>
+            <form method="get" action="{{ url_for('ai-chatbots.chat_page') }}" style="display:inline;">
+                <button type="submit" class="btn-small btn-primary">Use</button>
+            </form>
             {% if user %}
-            <button class="btn-small" onclick="savePrompt({{ prompt.id }})">Save</button>
+            <form method="post" action="{{ url_for('ai-chatbots.form_save_prompt') }}" style="display:inline;">
+                <input type="hidden" name="prompt_id" value="{{ prompt.id }}">
+                <button type="submit" class="btn-small">Save</button>
+            </form>
             {% endif %}
         </div>
     </div>
@@ -49,20 +54,4 @@
 <p style="text-align:center; color:#8e8ea0; margin-top:40px;">No prompts found.</p>
 {% endif %}
 
-<script>
-function usePrompt(promptId) {
-    window.location = '{{ url_for("ai-chatbots.chat_page") }}';
-}
-function savePrompt(promptId) {
-    var userId = {{ user.id|tojson if user else 'null' }};
-    if (!userId) { alert('Please login first'); return; }
-    fetch('{{ url_for("ai-chatbots.index") }}api/users/' + userId + '/save-prompt', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({prompt_id: promptId})
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { alert('Prompt ' + data.action + '!'); });
-}
-</script>
 {% endblock %}

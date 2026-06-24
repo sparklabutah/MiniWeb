@@ -52,42 +52,30 @@
     <div class="main">
         <div class="form-card">
             <h2>Account Settings</h2>
-            <div id="save-msg" style="display:none" class="alert-success">Settings saved successfully.</div>
-            <div class="form-group">
-                <label for="s-name">Full Name</label>
-                <input type="text" id="s-name" value="{{ user.name }}">
-            </div>
-            <div class="form-group">
-                <label for="s-email">Email</label>
-                <input type="email" id="s-email" value="{{ user.email }}">
-            </div>
-            <div class="form-group">
-                <label for="s-phone">Phone</label>
-                <input type="text" id="s-phone" value="{{ user.phone }}">
-            </div>
-            <div class="form-group">
-                <label for="s-address">Address</label>
-                <input type="text" id="s-address" value="{{ user.address }}">
-            </div>
-            <button class="btn-save" onclick="saveSettings()">Save Changes</button>
+            {% if result == 'success' %}
+            <div class="alert-success">Settings saved successfully.</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('banking.settings_submit') }}">
+                <div class="form-group">
+                    <label for="s-name">Full Name</label>
+                    <input type="text" name="name" id="s-name" value="{{ user.name }}">
+                </div>
+                <div class="form-group">
+                    <label for="s-email">Email</label>
+                    <input type="email" name="email" id="s-email" value="{{ user.email }}">
+                </div>
+                <div class="form-group">
+                    <label for="s-phone">Phone</label>
+                    <input type="text" name="phone" id="s-phone" value="{{ user.phone }}">
+                </div>
+                <div class="form-group">
+                    <label for="s-address">Address</label>
+                    <input type="text" name="address" id="s-address" value="{{ user.address }}">
+                </div>
+                <button type="submit" class="btn-save">Save Changes</button>
+            </form>
         </div>
     </div>
 
-    <script>
-    function saveSettings() {
-        fetch('{{ url_for("banking.index") }}api/users/{{ user.id }}/settings', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                name: document.getElementById('s-name').value,
-                email: document.getElementById('s-email').value,
-                phone: document.getElementById('s-phone').value,
-                address: document.getElementById('s-address').value
-            })
-        }).then(r => r.json()).then(() => {
-            document.getElementById('save-msg').style.display = 'block';
-        });
-    }
-    </script>
 </body>
 </html>

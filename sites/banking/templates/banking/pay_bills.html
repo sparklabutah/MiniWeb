@@ -78,7 +78,10 @@
                     <td>{{ 'Yes' if bill.auto_pay else 'No' }}</td>
                     <td>
                         {% if bill.status != 'paid' %}
-                        <button class="btn-pay" onclick="payBill({{ bill.id }})">Pay Now</button>
+                        <form method="post" action="{{ url_for('banking.pay_bill_submit') }}" style="display:inline">
+                            <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                            <button type="submit" class="btn-pay">Pay Now</button>
+                        </form>
                         {% else %}
                         <button class="btn-pay" disabled>Paid</button>
                         {% endif %}
@@ -87,19 +90,30 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div style="background:#fff;padding:1.5rem;border-radius:.5rem;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-top:1.5rem;">
+            <h3 style="color:#334155;margin-bottom:.8rem;font-size:1rem;">Configure Bill</h3>
+            <form method="post" action="{{ url_for('banking.configure_bill_submit') }}" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:end;">
+                <div>
+                    <label style="font-size:.82rem;color:#475569;display:block;">Bill ID</label>
+                    <input type="number" name="bill_id" placeholder="Bill ID" required style="padding:.5rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;width:80px;">
+                </div>
+                <div>
+                    <label style="font-size:.82rem;color:#475569;display:block;">Due Date</label>
+                    <input type="date" name="due_date" style="padding:.5rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
+                </div>
+                <div>
+                    <label style="font-size:.82rem;color:#475569;display:block;">Auto-Pay</label>
+                    <select name="auto_pay" style="padding:.5rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
+                        <option value="">No change</option>
+                        <option value="true">Enable</option>
+                        <option value="false">Disable</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-pay">Update Bill</button>
+            </form>
+        </div>
     </div>
 
-    <script>
-    function payBill(billId) {
-        fetch('{{ url_for("banking.index") }}api/bills/' + billId + '/pay', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({account_id: null})
-        }).then(r => r.json()).then(d => {
-            if (d.status === 'paid') location.reload();
-            else alert('Payment failed');
-        });
-    }
-    </script>
 </body>
 </html>

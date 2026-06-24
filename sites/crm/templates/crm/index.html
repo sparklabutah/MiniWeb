@@ -3,14 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>SalesPro CRM - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #0d9488; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.2rem; color: #0d9488; margin-bottom: 1rem; }
+        .stats-ribbon { display: flex; align-items: center; gap: 0; background: #fff; border-radius: 8px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; overflow: hidden; }
+        .stats-ribbon .stat { flex: 1; padding: .8rem 1rem; text-align: center; border-right: 1px solid #e2e8f0; }
+        .stats-ribbon .stat:last-child { border-right: none; }
+        .stats-ribbon .stat .label { font-size: .7rem; color: #718096; text-transform: uppercase; letter-spacing: .05em; }
+        .stats-ribbon .stat .value { font-size: 1.3rem; font-weight: 700; color: #0d9488; margin-top: .2rem; }
+        .stats-ribbon .stat .value.green { color: #276749; }
+        .stats-ribbon .stat .value.blue { color: #2b6cb0; }
+        .pipeline-section { margin-bottom: 2rem; }
+        .pipeline-bar { display: flex; gap: 2px; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: .5rem; }
+        .pipeline-bar .segment { display: flex; align-items: center; justify-content: center; color: #fff; font-size: .75rem; font-weight: 600; min-width: 30px; }
+        .pipeline-bar .segment.prospecting { background: #a0aec0; }
+        .pipeline-bar .segment.qualification { background: #63b3ed; }
+        .pipeline-bar .segment.proposal { background: #f6ad55; }
+        .pipeline-bar .segment.negotiation { background: #9f7aea; }
+        .pipeline-bar .segment.closed-won { background: #48bb78; }
+        .pipeline-bar .segment.closed-lost { background: #fc8181; }
+        .pipeline-legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; }
+        .pipeline-legend .item { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: #4a5568; }
+        .pipeline-legend .dot { width: 12px; height: 12px; border-radius: 3px; }
+        .pipeline-legend .dot.prospecting { background: #a0aec0; }
+        .pipeline-legend .dot.qualification { background: #63b3ed; }
+        .pipeline-legend .dot.proposal { background: #f6ad55; }
+        .pipeline-legend .dot.negotiation { background: #9f7aea; }
+        .pipeline-legend .dot.closed-won { background: #48bb78; }
+        .pipeline-legend .dot.closed-lost { background: #fc8181; }
+        .stage-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+        .stage-table th, .stage-table td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #e2e8f0; font-size: .88rem; }
+        .stage-table th { background: #edf2f7; color: #4a5568; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+        .stage-table td.amount { text-align: right; font-weight: 600; }
+        .stage-table a { color: #2b6cb0; text-decoration: none; }
+        .stage-table a:hover { text-decoration: underline; }
+        .activity-list { list-style: none; }
+        .activity-list li { background: #fff; border-radius: 6px; padding: .8rem 1rem; margin-bottom: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; gap: 1rem; align-items: flex-start; }
+        .activity-list .icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; flex-shrink: 0; color: #fff; }
+        .activity-list .icon.call { background: #3182ce; }
+        .activity-list .icon.email { background: #d69e2e; }
+        .activity-list .icon.meeting { background: #805ad5; }
+        .activity-list .icon.note { background: #718096; }
+        .activity-list .details { flex: 1; }
+        .activity-list .details .desc { font-size: .88rem; color: #2d3748; }
+        .activity-list .details .meta { font-size: .78rem; color: #a0aec0; margin-top: .2rem; }
+    </style>
 </head>
 <body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+        <h2>Sales Dashboard</h2>
+        <div class="stats-ribbon">
+            <div class="stat">
+                <div class="label">Pipeline</div>
+                <div class="value blue">${{ "{:,.0f}".format(total_pipeline) }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Revenue</div>
+                <div class="value green">${{ "{:,.0f}".format(total_revenue) }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Win Rate</div>
+                <div class="value">{{ win_rate }}%</div>
+            </div>
+            <div class="stat">
+                <div class="label">Forecast</div>
+                <div class="value blue">${{ "{:,.0f}".format(forecast) }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Deals</div>
+                <div class="value">{{ total_deals }}</div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Pipeline Overview</h2>
+            {% set total_count = stage_counts.values()|sum %}
+            {% if total_count > 0 %}
+            <div class="pipeline-bar">
+                {% for s in stages %}
+                {% if stage_counts[s] > 0 %}
+                <div class="segment {{ s }}" style="flex: {{ stage_counts[s] }};">{{ stage_counts[s] }}</div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="pipeline-legend">
+                {% for s in stages %}
+                <div class="item"><span class="dot {{ s }}"></span>{{ s|replace('-', ' ')|title }}: {{ stage_counts[s] }} (${{ "{:,.0f}".format(stage_values[s]) }})</div>
+                {% endfor %}
+            </div>
+            <table class="stage-table">
+                <thead><tr><th>Stage</th><th>Deals</th><th style="text-align:right">Total Value</th></tr></thead>
+                <tbody>
+                {% for s in stages %}
+                <tr>
+                    <td><a href="{{ url_for('crm.deals_page', stage=s) }}">{{ s|replace('-', ' ')|title }}</a></td>
+                    <td>{{ stage_counts[s] }}</td>
+                    <td class="amount">${{ "{:,.0f}".format(stage_values[s]) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Recent Activities</h2>
+        <ul class="activity-list">
+        {% for a in recent_activities %}
+            <li>
+                <div class="icon {{ a.type }}">
+                    {% if a.type == 'call' %}PH{% elif a.type == 'email' %}EM{% elif a.type == 'meeting' %}MT{% else %}NT{% endif %}
+                </div>
+                <div class="details">
+                    <div class="desc">{{ a.description }}</div>
+                    <div class="meta">{{ a.type|title }} &middot; {{ a._contact_name }} &middot; {{ a._user_name }} &middot; {{ a.date }}</div>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
     </div>
 </body>
 </html>

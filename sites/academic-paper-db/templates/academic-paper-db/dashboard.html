@@ -37,15 +37,16 @@
         <div class="welcome">Welcome, {{ user.name }}</div>
 
         <h2 class="section-title">Saved Papers ({{ saved_papers|length }})</h2>
-        <div id="save-msg" class="msg"></div>
         {% if saved_papers %}
         {% for p in saved_papers %}
-        <div class="saved-item" id="saved-{{ p.id }}">
+        <div class="saved-item">
             <div>
                 <a href="{{ url_for('academic-paper-db.paper_detail', paper_id=p.id) }}">{{ p.title }}</a>
                 <div class="saved-meta">{{ p.authors_str }} · {{ p.year }}</div>
             </div>
-            <button class="btn-sm" onclick="unsavePaper({{ p.id }})">Remove</button>
+            <form method="post" action="{{ url_for('academic-paper-db.form_unsave_paper', paper_id=p.id) }}" style="display:inline">
+                <button type="submit" class="btn-sm">Remove</button>
+            </form>
         </div>
         {% endfor %}
         {% else %}
@@ -53,11 +54,14 @@
         {% endif %}
 
         <h2 class="section-title">Followed Authors ({{ followed_authors|length }})</h2>
-        <div id="follow-msg" class="msg"></div>
         {% if followed_authors %}
         <div>
             {% for a in followed_authors %}
-            <span class="author-tag">{{ a }} <button class="btn-sm" onclick="unfollowAuthor('{{ a }}')" style="border:none;background:none;cursor:pointer;color:#94a3b8">×</button></span>
+            <span class="author-tag">{{ a }}
+                <form method="post" action="{{ url_for('academic-paper-db.form_unfollow_author', author_name=a) }}" style="display:inline">
+                    <button type="submit" class="btn-sm" style="border:none;background:none;cursor:pointer;color:#94a3b8">×</button>
+                </form>
+            </span>
             {% endfor %}
         </div>
         {% else %}
@@ -65,38 +69,5 @@
         {% endif %}
     </div>
 
-    <script>
-    const BASE = "{{ url_for('academic-paper-db.index') }}".replace(/\/$/, "");
-    const USER_ID = {{ user.id }};
-
-    function showMsg(id, text) {
-        const el = document.getElementById(id);
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 3000);
-    }
-
-    async function unsavePaper(pid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({paper_id: pid})
-        });
-        if (r.ok) {
-            showMsg("save-msg", "Paper removed!");
-            document.getElementById("saved-" + pid)?.remove();
-        }
-    }
-
-    async function unfollowAuthor(name) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({author: name})
-        });
-        if (r.ok) {
-            showMsg("follow-msg", "Author unfollowed!");
-            setTimeout(() => location.reload(), 1000);
-        }
-    }
-    </script>
 </body>
 </html>

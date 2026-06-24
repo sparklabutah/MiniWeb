@@ -76,7 +76,9 @@
             <div style="display:flex;align-items:center;gap:.3rem">
                 <span class="listing-price">${{ "{:,.0f}".format(l.price) }}</span>
                 <a class="btn-sm" href="{{ url_for('classifieds.edit_listing_page', listing_id=l.id) }}">Edit</a>
-                <button class="btn-sm" onclick="deleteListing({{ l.id }})">Delete</button>
+                <form method="post" action="{{ url_for('classifieds.delete_listing', listing_id=l.id) }}" style="display:inline">
+                    <button type="submit" class="btn-sm">Delete</button>
+                </form>
             </div>
         </div>
         {% endfor %}
@@ -94,7 +96,9 @@
             </div>
             <div style="display:flex;align-items:center;gap:.3rem">
                 <span class="listing-price">${{ "{:,.0f}".format(l.price) }}</span>
-                <button class="btn-sm" onclick="unsaveListing({{ l.id }})">Remove</button>
+                <form method="post" action="{{ url_for('classifieds.unsave_listing', listing_id=l.id) }}" style="display:inline">
+                    <button type="submit" class="btn-sm">Remove</button>
+                </form>
             </div>
         </div>
         {% endfor %}
@@ -116,30 +120,5 @@
         {% endif %}
     </div>
 
-    <script>
-    const BASE = "{{ url_for('classifieds.index') }}".replace(/\/$/, "");
-    const USER_ID = {{ user.id }};
-
-    function showMsg(text) {
-        const el = document.getElementById("action-msg");
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 3000);
-    }
-
-    async function deleteListing(lid) {
-        if (!confirm("Delete this listing?")) return;
-        const r = await fetch(`${BASE}/api/listings/${lid}`, { method: "DELETE" });
-        if (r.ok) { showMsg("Listing deleted!"); document.getElementById("listing-" + lid)?.remove(); }
-    }
-
-    async function unsaveListing(lid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({listing_id: lid})
-        });
-        if (r.ok) { showMsg("Listing removed!"); document.getElementById("saved-" + lid)?.remove(); }
-    }
-    </script>
 </body>
 </html>

@@ -27,7 +27,12 @@
                 <td class="{% if t.change >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change) }}</td>
                 <td class="{% if t.change_pct >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change_pct >= 0 }}{{ t.change_pct }}%</td>
                 <td><span class="market-status {% if t.market_open %}status-open{% else %}status-closed{% endif %}">{% if t.market_open %}Open{% else %}Closed{% endif %}</span></td>
-                <td><button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('{{ t.symbol }}')">Remove</button></td>
+                <td>
+                    <form method="post" action="{{ url_for('brokerage.form_watchlist_toggle') }}" style="display:inline">
+                        <input type="hidden" name="symbol" value="{{ t.symbol }}">
+                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -60,20 +65,5 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const BASE = "{{ url_for('brokerage.index') }}".replace(/\/$/, "");
-const USER_ID = {{ user.id }};
-async function removeFromWatchlist(sym) {
-    const r = await fetch(`${BASE}/api/watchlist/${USER_ID}/toggle`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({symbol: sym})
-    });
-    if (r.ok) {
-        document.getElementById("wl-" + sym)?.remove();
-        const msg = document.getElementById("wl-msg");
-        msg.textContent = sym + " removed from watchlist";
-        msg.style.display = "block";
-        setTimeout(() => msg.style.display = "none", 3000);
-    }
-}
 </script>
 {% endblock %}

@@ -47,7 +47,7 @@ Each site under `sites/<id>/` is a self-contained Flask blueprint:
 
 **Note on tasks**: The `tasks.json` generated during site construction exists to validate that the site works correctly during the build process. These are **not** the final benchmark tasks. The actual evaluation tasks will be generated via a separate macro-driven task generation pipeline (not yet defined).
 
-**Reference sites**: `academic-paper-db/` is the full reference pattern (20 tasks, 21 macros verified, browser-eval complete). `bookstore/` is the minimal template example (no tasks). `_template/` is the scaffold starter.
+**Reference sites**: `academic-paper-db/` is the full reference pattern (20 tasks, 21 macros verified, browser-eval complete). `bookstore/` is the minimal template example (no tasks). `_template/` is the scaffold starter. 27 sites are now fully built with routes, templates, tasks, and verifiers.
 
 ## Data Handling: Original Format + Interpreter
 

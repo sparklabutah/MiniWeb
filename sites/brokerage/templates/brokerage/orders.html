@@ -47,7 +47,9 @@
                 <td>{{ o.created_at[:16] }}</td>
                 <td>
                     {% if o.status == 'open' %}
-                    <button class="btn btn-danger btn-sm" onclick="cancelOrder({{ o.id }})">Cancel</button>
+                    <form method="post" action="{{ url_for('brokerage.form_cancel_order', order_id=o.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
+                    </form>
                     {% endif %}
                 </td>
             </tr>
@@ -61,10 +63,5 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const BASE = "{{ url_for('brokerage.index') }}".replace(/\/$/, "");
-async function cancelOrder(orderId) {
-    const r = await fetch(`${BASE}/api/orders/${orderId}/cancel`, {method: "POST"});
-    if (r.ok) { location.reload(); }
-}
 </script>
 {% endblock %}

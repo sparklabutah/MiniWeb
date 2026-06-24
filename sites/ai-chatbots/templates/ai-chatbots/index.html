@@ -51,7 +51,9 @@
                 <td>{{ conv.messages|length }}</td>
                 <td>{{ conv.updated_at[:10] }}</td>
                 <td>
-                    <button class="btn-small" onclick="deleteConv('{{ conv.id }}')">Delete</button>
+                    <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}" style="display:inline;" onsubmit="return confirm('Delete this conversation?');">
+                        <button type="submit" class="btn-small">Delete</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
@@ -62,12 +64,4 @@
     {% endif %}
 </div>
 
-<script>
-function deleteConv(convId) {
-    if (!confirm('Delete this conversation?')) return;
-    fetch('{{ url_for("ai-chatbots.api_delete_conversation", conv_id="__CID__") }}'.replace('__CID__', convId), {
-        method: 'DELETE'
-    }).then(() => location.reload());
-}
-</script>
 {% endblock %}

@@ -23,6 +23,8 @@ blueprint = Blueprint(
     "blogs",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -464,6 +466,160 @@ def compose_page():
     return render_template("blogs/compose.html", categories=categories, user=user)
 
 
+@blueprint.route("/compose", methods=["POST"])
+def form_create_post():
+    """Create post via HTML form POST."""
+    _ensure_data()
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    category = request.form.get("category", "Lifestyle").strip()
+    tags_str = request.form.get("tags", "").strip()
+    tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
+    image_url = request.form.get("image_url", "").strip() or None
+    author_username = request.form.get("author_username", "").strip()
+
+    if not title or not body:
+        return "Title and body required", 400
+    if not author_username:
+        return "Author username required", 400
+
+    users = _load_users()
+    author = next((u for u in users if u["username"] == author_username), None)
+    if not author:
+        return "Author not found", 404
+
+    posts = _load_posts()
+    new_id = max((p["id"] for p in posts), default=0) + 1
+
+    new_post = {
+        "id": new_id,
+        "title": title,
+        "body": body,
+        "author_id": author["id"],
+        "author_username": author["username"],
+        "author_display_name": author["display_name"],
+        "author_avatar": author["avatar"],
+        "category": category,
+        "tags": tags,
+        "image_url": image_url,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "notes_count": 0,
+        "is_pinned": False,
+        "shared_count": 0,
+    }
+
+    posts.insert(0, new_post)
+    POSTS_FILE.write_text(json.dumps(posts, indent=2))
+    return redirect(url_for("blogs.post_detail", post_id=new_id))
+
+
+@blueprint.route("/post/<int:post_id>/comment", methods=["POST"])
+def form_add_comment(post_id):
+    """Add comment via HTML form POST."""
+    _ensure_data()
+    body = request.form.get("body", "").strip()
+    author_username = request.form.get("author_username", "").strip()
+
+    if not body or not author_username:
+        return "Comment body and author required", 400
+
+    posts = _load_posts()
+    post = next((p for p in posts if p["id"] == post_id), None)
+    if not post:
+        abort(404)
+
+    users = _load_users()
+    author = next((u for u in users if u["username"] == author_username), None)
+    if not author:
+        return "Author not found", 404
+
+    comments = _load_comments()
+    new_id = max((c["id"] for c in comments), default=0) + 1
+    new_comment = {
+        "id": new_id,
+        "post_id": post_id,
+        "author_username": author["username"],
+        "author_display_name": author["display_name"],
+        "body": body,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+    }
+    comments.append(new_comment)
+    _save_comments(comments)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
+@blueprint.route("/post/<int:post_id>/follow", methods=["POST"])
+def form_follow_blog(post_id):
+    """Follow/unfollow blog author via HTML form POST."""
+    _ensure_data()
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page"))
+    user_id = session["user_id"]
+    blog = request.form.get("blog", "").strip()
+    if not blog:
+        return "Blog username required", 400
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    followed = user.setdefault("followed_blogs", [])
+    if blog in followed:
+        followed.remove(blog)
+    else:
+        followed.append(blog)
+    _save_users(users)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
+@blueprint.route("/post/<int:post_id>/save", methods=["POST"])
+def form_save_post(post_id):
+    """Save/unsave post via HTML form POST."""
+    _ensure_data()
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page"))
+    user_id = session["user_id"]
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    saved = user.setdefault("saved_posts", [])
+    if post_id in saved:
+        saved.remove(post_id)
+    else:
+        saved.append(post_id)
+    _save_users(users)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
+@blueprint.route("/post/<int:post_id>/subscribe", methods=["POST"])
+def form_subscribe_tag(post_id):
+    """Subscribe/unsubscribe tag via HTML form POST."""
+    _ensure_data()
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page"))
+    user_id = session["user_id"]
+    tag = request.form.get("tag", "").strip()
+    if not tag:
+        return "Tag required", 400
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    subscribed = user.setdefault("subscribed_tags", [])
+    if tag in subscribed:
+        subscribed.remove(tag)
+    else:
+        subscribed.append(tag)
+    _save_users(users)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
 @blueprint.route("/report/<int:post_id>", methods=["GET"])
 def report_page(post_id):
     _ensure_data()
@@ -475,6 +631,38 @@ def report_page(post_id):
     if "user_id" in session:
         user = _get_user(session["user_id"])
     return render_template("blogs/report.html", post=post, user=user)
+
+
+@blueprint.route("/report/<int:post_id>", methods=["POST"])
+def form_report_post(post_id):
+    """Report post via HTML form POST."""
+    _ensure_data()
+    reason = request.form.get("reason", "").strip()
+    details = request.form.get("details", "").strip()
+    reporter = request.form.get("reporter", "anonymous").strip()
+
+    if not reason:
+        return "Reason required", 400
+
+    posts = _load_posts()
+    post = next((p for p in posts if p["id"] == post_id), None)
+    if not post:
+        abort(404)
+
+    reports = _load_reports()
+    new_id = max((r["id"] for r in reports), default=0) + 1
+    new_report = {
+        "id": new_id,
+        "post_id": post_id,
+        "reporter_username": reporter,
+        "reason": reason,
+        "details": details,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "status": "pending",
+    }
+    reports.append(new_report)
+    _save_reports(reports)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
 
 
 # ---------------------------------------------------------------------------

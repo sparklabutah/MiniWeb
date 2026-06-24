@@ -11,7 +11,7 @@
 <div class="form-container" style="max-width:600px;">
     <h2>Preferences</h2>
 
-    <form id="settings-form" onsubmit="saveSettings(event)">
+    <form id="settings-form" method="post" action="{{ url_for('ai-chatbots.form_save_settings') }}">
         <div class="dropdown-group">
             <label for="default_bot">Default Bot</label>
             <select id="default_bot" name="default_bot">
@@ -88,22 +88,22 @@
 
     <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
         <h3 style="font-size:15px; margin-bottom:12px;">Upload Document to Knowledge Base</h3>
-        <form id="upload-form" onsubmit="uploadDoc(event)">
+        <form id="upload-form" method="post" action="{{ url_for('ai-chatbots.form_upload') }}">
             <div class="form-group">
                 <label for="upload_topic">Topic</label>
-                <input type="text" id="upload_topic" placeholder="Document topic">
+                <input type="text" id="upload_topic" name="topic" placeholder="Document topic">
             </div>
             <div class="form-group">
                 <label for="upload_category">Category</label>
-                <input type="text" id="upload_category" placeholder="e.g., programming, ai, data">
+                <input type="text" id="upload_category" name="category" placeholder="e.g., programming, ai, data">
             </div>
             <div class="form-group">
                 <label for="upload_content">Content</label>
-                <textarea id="upload_content" rows="4" placeholder="Enter document content..."></textarea>
+                <textarea id="upload_content" name="content" rows="4" placeholder="Enter document content..."></textarea>
             </div>
             <div class="form-group">
                 <label for="upload_keywords">Keywords (comma-separated)</label>
-                <input type="text" id="upload_keywords" placeholder="e.g., docker, container, devops">
+                <input type="text" id="upload_keywords" name="keywords" placeholder="e.g., docker, container, devops">
             </div>
             <button type="submit" class="btn-small btn-primary">Upload</button>
         </form>
@@ -112,7 +112,9 @@
     <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
         <h3 style="font-size:15px; margin-bottom:12px; color:#ef4444;">Danger Zone</h3>
         <p style="font-size:13px; color:#8e8ea0; margin-bottom:12px;">Delete all your conversations. This cannot be undone.</p>
-        <button class="btn-small btn-danger" onclick="deleteAllConvs()">Delete All Conversations</button>
+        <form method="post" action="{{ url_for('ai-chatbots.form_delete_all_conversations') }}" onsubmit="return confirm('Delete ALL your conversations?');">
+            <button type="submit" class="btn-small btn-danger">Delete All Conversations</button>
+        </form>
     </div>
 </div>
 
@@ -120,74 +122,12 @@
 var userId = {{ user.id|tojson }};
 var baseUrl = {{ url_for('ai-chatbots.index')|tojson }};
 
-function saveSettings(e) {
-    e.preventDefault();
-    var prefs = {
-        default_bot: document.getElementById('default_bot').value,
-        theme: document.getElementById('theme').value,
-        font_size: document.getElementById('font_size').value,
-        notifications: document.getElementById('notifications').checked,
-        save_history: document.getElementById('save_history').checked
-    };
-    fetch(baseUrl + 'api/users/' + userId + '/preferences', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(prefs)
-    }).then(function(r) { return r.json(); })
-    .then(function() { alert('Settings saved!'); });
-
-    // Update subscription
-    var sub = document.querySelector('input[name="subscription"]:checked').value;
-    fetch(baseUrl + 'api/users/' + userId + '/subscription', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({plan: sub})
-    });
-}
-
 function exportData() {
     var type = document.getElementById('export_type').value;
     var fmt = document.getElementById('export_format').value;
     var url = baseUrl + 'api/export?type=' + type + '&format=' + fmt;
     if (type === 'conversations') url += '&user_id=' + userId;
     window.open(url, '_blank');
-}
-
-function uploadDoc(e) {
-    e.preventDefault();
-    var topic = document.getElementById('upload_topic').value.trim();
-    var category = document.getElementById('upload_category').value.trim();
-    var content = document.getElementById('upload_content').value.trim();
-    var keywordsStr = document.getElementById('upload_keywords').value.trim();
-    var keywords = keywordsStr ? keywordsStr.split(',').map(function(k) { return k.trim(); }) : [];
-
-    if (!topic) { alert('Please enter a topic'); return; }
-    if (!content) { alert('Please enter content'); return; }
-
-    fetch(baseUrl + 'api/upload', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            topic: topic,
-            category: category || 'uploaded',
-            content: content,
-            keywords: keywords
-        })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { alert('Uploaded: ' + data.topic + ' (ID: ' + data.id + ')'); });
-}
-
-function deleteAllConvs() {
-    if (!confirm('Delete ALL your conversations?')) return;
-    fetch(baseUrl + 'api/conversations?user_id=' + userId)
-    .then(function(r) { return r.json(); })
-    .then(function(convs) {
-        var promises = convs.map(function(c) {
-            return fetch(baseUrl + 'api/conversations/' + c.id, {method:'DELETE'});
-        });
-        return Promise.all(promises);
-    }).then(function() { alert('All conversations deleted.'); location.reload(); });
 }
 </script>
 {% endblock %}

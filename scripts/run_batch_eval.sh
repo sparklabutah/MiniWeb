@@ -3,11 +3,12 @@
 # Batch browser-agent evaluation for all built MiniWeb sites.
 #
 # Usage:
-#   # Request allocation first:
-#   salloc --partition=kmarino-gpu-grn --qos=kmarino-gpu-grn --account=kmarino \
-#          --gres=gpu:a800:2 --time=06:00:00 --ntasks=1 --mem=60G
+#   # Option A: Submit as batch job (recommended):
+#   bash scripts/submit_eval.sh [-- OPTIONS]
 #
-#   # Then run inside the allocation:
+#   # Option B: Interactive allocation (no GPU needed):
+#   salloc --partition=kmarino-gpu-grn --qos=kmarino-gpu-grn --account=kmarino \
+#          --time=06:00:00 --ntasks=1 --mem=60G
 #   bash scripts/run_batch_eval.sh [OPTIONS]
 #
 # Options:
@@ -20,6 +21,7 @@
 #   --parallel N          Sites to eval simultaneously (default: 2)
 #   --site-timeout N      Max seconds per site eval (default: 1800 = 30 min)
 #   --task-timeout N      Max seconds per task (default: 180 = 3 min)
+#   --new-only            Skip sites that already have eval results
 #   --dry-run             Print what would run without executing
 # =============================================================================
 set -uo pipefail
@@ -32,12 +34,13 @@ cd "$PROJECT_ROOT"
 
 # Defaults
 MODEL="gpt"
-WORKERS=8
+WORKERS=6
 MAX_STEPS=20
-ROUNDS=3
+ROUNDS=1
 PORT_START=8090
-PARALLEL=4
+PARALLEL=6
 DRY_RUN=false
+NEW_ONLY=false
 SITES=""
 SITE_TIMEOUT=1800     # 30 min per site
 TASK_TIMEOUT=180      # 3 min per task
@@ -54,6 +57,7 @@ while [[ $# -gt 0 ]]; do
         --parallel) PARALLEL="$2"; shift 2 ;;
         --site-timeout) SITE_TIMEOUT="$2"; shift 2 ;;
         --task-timeout) TASK_TIMEOUT="$2"; shift 2 ;;
+        --new-only) NEW_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -80,6 +84,19 @@ if [ -z "$SITES" ]; then
         [ -f "$site_dir/tasks.json" ] || continue
         SITES="$SITES $site"
     done
+fi
+
+# Filter to new-only if requested (skip sites with existing results/)
+if [ "$NEW_ONLY" = true ]; then
+    FILTERED=""
+    for site in $SITES; do
+        if [ -d "sites/$site/results" ] && ls sites/$site/results/*/results.json &>/dev/null; then
+            echo "  SKIP (already evaluated): $site"
+        else
+            FILTERED="$FILTERED $site"
+        fi
+    done
+    SITES="$FILTERED"
 fi
 
 SITE_LIST=($SITES)

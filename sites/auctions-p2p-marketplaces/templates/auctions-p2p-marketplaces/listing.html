@@ -86,18 +86,22 @@
                 </div>
 
                 {% if product.status == 'active' %}
-                <div class="bid-form">
-                    <input type="number" id="bid-amount" step="0.01" min="{{ product.current_price + 0.01 }}" placeholder="Enter bid (${{ '%.2f'|format(product.current_price + 1) }} or more)">
-                    <button class="btn btn-bid" onclick="placeBid()">Place Bid</button>
-                </div>
+                <form method="post" action="{{ url_for('auctions-p2p-marketplaces.place_bid_form', listing_id=product.id) }}" class="bid-form">
+                    <input type="number" name="amount" step="0.01" min="{{ product.current_price + 0.01 }}" placeholder="Enter bid (${{ '%.2f'|format(product.current_price + 1) }} or more)" required>
+                    <button type="submit" class="btn btn-bid">Place Bid</button>
+                </form>
                 {% if product.buy_now_price %}
                 <button class="btn btn-buy" style="margin-top:.5rem" onclick="buyNow()">Buy It Now - ${{ "%.2f"|format(product.buy_now_price) }}</button>
                 {% endif %}
                 {% endif %}
 
                 <div class="actions">
-                    <button class="btn btn-watch" onclick="watchItem()">Watch This Item</button>
-                    <button class="btn" style="background:#6c757d;color:#fff" onclick="saveItem()">Save</button>
+                    <form method="post" action="{{ url_for('auctions-p2p-marketplaces.watch_listing_form', listing_id=product.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-watch">Watch This Item</button>
+                    </form>
+                    <form method="post" action="{{ url_for('auctions-p2p-marketplaces.save_listing_form', listing_id=product.id) }}" style="display:inline">
+                        <button type="submit" class="btn" style="background:#6c757d;color:#fff">Save</button>
+                    </form>
                 </div>
 
                 <table class="meta-table">
@@ -125,11 +129,32 @@
                     <div class="stars">Rating: {{ seller.rating }}/5.0</div>
                     <div style="font-size:.85rem;color:#666">{{ seller.get('total_sales', 0) }} sales | Member since {{ seller.member_since }}</div>
                     {% endif %}
-                    <button class="btn" style="background:#0f3460;color:#fff;margin-top:.5rem;font-size:.8rem" onclick="followSeller()">Follow Seller</button>
-                    <button class="btn" style="background:#6c757d;color:#fff;margin-top:.5rem;font-size:.8rem" onclick="contactSeller()">Contact Seller</button>
+                    <form method="post" action="{{ url_for('auctions-p2p-marketplaces.follow_seller_form', seller_id=product.seller_id) }}" style="display:inline">
+                        <input type="hidden" name="next" value="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=product.id) }}">
+                        <button type="submit" class="btn" style="background:#0f3460;color:#fff;margin-top:.5rem;font-size:.8rem">Follow Seller</button>
+                    </form>
                 </div>
 
-                <span class="report-link" onclick="reportItem()">Report this listing</span>
+                <div class="section" style="margin-top:.8rem">
+                    <h2>Contact Seller</h2>
+                    <form method="post" action="{{ url_for('auctions-p2p-marketplaces.send_message_form') }}">
+                        <input type="hidden" name="receiver_id" value="{{ product.seller_id }}">
+                        <input type="hidden" name="listing_id" value="{{ product.id }}">
+                        <input type="hidden" name="subject" value="Question about: {{ product.name[:40] }}">
+                        <input type="hidden" name="next" value="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=product.id) }}">
+                        <div style="margin-bottom:.5rem">
+                            <textarea name="body" placeholder="Enter your message to the seller..." style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.3rem;min-height:60px;font-size:.85rem" required></textarea>
+                        </div>
+                        <button type="submit" class="btn" style="background:#6c757d;color:#fff;font-size:.8rem">Send Message</button>
+                    </form>
+                </div>
+
+                <div style="margin-top:.8rem">
+                    <form method="post" action="{{ url_for('auctions-p2p-marketplaces.report_listing_form', listing_id=product.id) }}" style="display:inline">
+                        <input type="text" name="reason" placeholder="Reason (e.g., counterfeit)" style="padding:.3rem;border:1px solid #ddd;border-radius:.2rem;font-size:.8rem" required>
+                        <button type="submit" class="report-link" style="border:none;background:none;cursor:pointer">Report this listing</button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -185,71 +210,10 @@
     </div>
 
     <script>
-    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
-    const listingId = {{ product.id }};
-    const userId = {{ user.id if user else 'null' }};
-
-    function placeBid() {
-        const amount = parseFloat(document.getElementById('bid-amount').value);
-        if (!amount || isNaN(amount)) { alert('Enter a valid bid amount'); return; }
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/listings/' + listingId + '/bid', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({amount: amount, bidder_id: userId})
-        }).then(r => r.json()).then(d => {
-            if (d.success) { alert('Bid placed! New price: $' + d.new_price); location.reload(); }
-            else alert(d.error || 'Bid failed');
-        });
-    }
-
-    function watchItem() {
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/users/' + userId + '/watch', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({listing_id: listingId})
-        }).then(r => r.json()).then(d => alert(d.action === 'watched' ? 'Added to watchlist!' : 'Removed from watchlist'));
-    }
-
-    function saveItem() {
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/users/' + userId + '/save', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({listing_id: listingId})
-        }).then(r => r.json()).then(d => alert(d.action === 'saved' ? 'Saved!' : 'Unsaved'));
-    }
-
-    function followSeller() {
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/users/' + userId + '/follow', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({seller_id: {{ product.seller_id }}})
-        }).then(r => r.json()).then(d => alert(d.action === 'followed' ? 'Following seller!' : 'Unfollowed'));
-    }
-
-    function contactSeller() {
-        const body = prompt('Enter your message to the seller:');
-        if (!body) return;
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/messages', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({sender_id: userId, receiver_id: {{ product.seller_id }}, listing_id: listingId, subject: 'Question about: {{ product.name[:40] }}', body: body})
-        }).then(r => r.json()).then(d => { if (d.success) alert('Message sent!'); });
-    }
-
-    function reportItem() {
-        const reason = prompt('Reason for reporting (e.g., counterfeit, misleading):');
-        if (!reason) return;
-        if (!userId) { window.location.href = BASE + '/login'; return; }
-        fetch(BASE + '/api/listings/' + listingId + '/report', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({reporter_id: userId, reason: reason, description: ''})
-        }).then(r => r.json()).then(d => { if (d.success) alert('Report submitted. Thank you.'); });
-    }
-
     function buyNow() {
-        if (!userId) { window.location.href = BASE + '/login'; return; }
+        var BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
         if (confirm('Buy this item now for ${{ "%.2f"|format(product.buy_now_price or 0) }}?')) {
-            window.location.href = BASE + '/listing/' + listingId + '?checkout=true';
+            window.location.href = BASE + '/listing/{{ product.id }}?checkout=true';
         }
     }
     </script>

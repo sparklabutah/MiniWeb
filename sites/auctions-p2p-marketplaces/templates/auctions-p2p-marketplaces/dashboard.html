@@ -60,7 +60,12 @@
                     <td>${{ "%.2f"|format(p.current_price) }}</td>
                     <td>{{ p.num_bids }}</td>
                     <td>{{ p.status }}</td>
-                    <td><a href="{{ url_for('auctions-p2p-marketplaces.edit_listing_page', listing_id=p.id) }}">Edit</a></td>
+                    <td>
+                        <a href="{{ url_for('auctions-p2p-marketplaces.edit_listing_page', listing_id=p.id) }}">Edit</a>
+                        <form method="post" action="{{ url_for('auctions-p2p-marketplaces.delete_listing_form', listing_id=p.id) }}" style="display:inline;margin-left:.5rem">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </table>
@@ -116,7 +121,7 @@
                     <td>{{ m.subject[:30] }}</td>
                     <td>{% if m.sender_id == user.id %}To: #{{ m.receiver_id }}{% else %}From: #{{ m.sender_id }}{% endif %}</td>
                     <td>{{ m.timestamp[:10] }}</td>
-                    <td><button class="btn btn-danger" onclick="deleteMsg({{ m.id }})">Delete</button></td>
+                    <td><form method="post" action="{{ url_for('auctions-p2p-marketplaces.delete_message_form', msg_id=m.id) }}" style="display:inline"><button type="submit" class="btn btn-danger">Delete</button></form></td>
                 </tr>
                 {% endfor %}
             </table>
@@ -132,20 +137,6 @@
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById('tab-' + name).classList.add('active');
         event.target.classList.add('active');
-    }
-
-    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
-
-    function deleteMsg(msgId) {
-        if (!confirm('Delete this message?')) return;
-        fetch(BASE + '/api/messages/' + msgId, {method: 'DELETE'})
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    const row = document.querySelector('[data-msg-id="' + msgId + '"]');
-                    if (row) row.remove();
-                }
-            });
     }
     </script>
 </body>

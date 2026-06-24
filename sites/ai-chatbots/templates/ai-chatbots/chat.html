@@ -6,9 +6,17 @@
     <h1 id="chat-title">{% if current_conv %}{{ current_conv.title }}{% else %}New Chat{% endif %}</h1>
     <div style="display:flex;gap:8px;align-items:center;">
         {% if current_conv %}
-        <button class="btn-small" onclick="editTitle()" title="Edit conversation title">Edit Title</button>
-        <button class="btn-small" onclick="shareConv()" title="Share conversation">Share</button>
-        <button class="btn-small btn-danger" onclick="deleteConv()" title="Delete conversation">Delete</button>
+        <form method="post" action="{{ url_for('ai-chatbots.form_edit_title', conv_id=current_conv.id) }}" style="display:inline-flex;gap:4px;align-items:center;">
+            <input type="text" name="title" placeholder="New title" value="{{ current_conv.title }}" style="width:150px;padding:4px 8px;font-size:13px;">
+            <button type="submit" class="btn-small" title="Edit conversation title">Edit Title</button>
+        </form>
+        <form method="post" action="{{ url_for('ai-chatbots.form_share_conversation', conv_id=current_conv.id) }}" style="display:inline;">
+            <input type="hidden" name="share_with" value="public">
+            <button type="submit" class="btn-small" title="Share conversation">Share</button>
+        </form>
+        <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=current_conv.id) }}" style="display:inline;" onsubmit="return confirm('Delete this conversation?');">
+            <button type="submit" class="btn-small btn-danger" title="Delete conversation">Delete</button>
+        </form>
         {% endif %}
         <div class="bot-selector">
             <select id="bot-select" onchange="switchBot(this.value)">
@@ -53,122 +61,31 @@
 {% block bottom %}
 <div class="chat-input-area">
     <div class="chat-input-container">
-        <form id="chat-form" onsubmit="sendMessage(event)">
-            <textarea id="chat-input" class="chat-input" rows="1" placeholder="Send a message..." onkeydown="handleKey(event)"></textarea>
+        <form id="chat-form" method="post" action="{{ url_for('ai-chatbots.form_chat') }}">
+            <input type="hidden" name="conversation_id" value="{{ current_conv.id if current_conv else '' }}">
+            <input type="hidden" name="bot" id="bot-hidden" value="{{ bot }}">
+            <textarea id="chat-input" class="chat-input" name="message" rows="1" placeholder="Send a message..." onkeydown="handleKey(event)"></textarea>
             <button type="submit" class="send-btn" id="send-btn">Send</button>
         </form>
     </div>
 </div>
 
 <script>
-var conversationId = {{ current_conv.id|tojson if current_conv else 'null' }};
-var currentBot = {{ bot|tojson }};
-var baseUrl = {{ url_for('ai-chatbots.index')|tojson }};
-
 function switchBot(bot) {
-    currentBot = bot;
-    if (!conversationId) {
-        document.getElementById('chat-title').textContent = 'New Chat with ' + bot;
-    }
+    document.getElementById('bot-hidden').value = bot;
+    document.getElementById('chat-title').textContent = 'New Chat with ' + bot;
 }
 
 function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendMessage(e);
+        document.getElementById('chat-form').submit();
     }
 }
 
 function sendSuggestion(text) {
     document.getElementById('chat-input').value = text;
-    sendMessage(new Event('submit'));
-}
-
-function addMessage(role, content, botName) {
-    var container = document.getElementById('messages-container');
-    // Remove placeholder if present
-    var placeholder = container.querySelector('[style*="text-align:center"]');
-    if (placeholder) placeholder.remove();
-
-    var div = document.createElement('div');
-    div.className = 'message ' + (role === 'user' ? 'user-msg' : 'assistant-msg');
-    div.innerHTML = '<div class="message-role">' + (role === 'user' ? 'You' : (botName || currentBot)) + '</div>' +
-                    '<div class="message-content">' + escapeHtml(content) + '</div>';
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-}
-
-function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML.replace(/\n/g, '<br>');
-}
-
-function sendMessage(e) {
-    e.preventDefault();
-    var input = document.getElementById('chat-input');
-    var message = input.value.trim();
-    if (!message) return;
-
-    addMessage('user', message);
-    input.value = '';
-    document.getElementById('send-btn').disabled = true;
-
-    fetch(baseUrl + 'api/chat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            message: message,
-            bot: currentBot,
-            conversation_id: conversationId
-        })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        conversationId = data.conversation_id;
-        addMessage('assistant', data.response, data.bot);
-        document.getElementById('send-btn').disabled = false;
-        if (data.message_count <= 2) {
-            document.getElementById('chat-title').textContent = message.substring(0, 50);
-        }
-    })
-    .catch(function(err) {
-        addMessage('assistant', 'Sorry, an error occurred. Please try again.');
-        document.getElementById('send-btn').disabled = false;
-    });
-}
-
-function editTitle() {
-    var newTitle = prompt('Enter new title:', document.getElementById('chat-title').textContent.trim());
-    if (newTitle && conversationId) {
-        fetch(baseUrl + 'api/conversations/' + conversationId, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({title: newTitle})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            document.getElementById('chat-title').textContent = d.title;
-        });
-    }
-}
-
-function deleteConv() {
-    if (!conversationId || !confirm('Delete this conversation?')) return;
-    fetch(baseUrl + 'api/conversations/' + conversationId, {method: 'DELETE'})
-    .then(function() { window.location.href = baseUrl + 'chat'; });
-}
-
-function shareConv() {
-    if (!conversationId) return;
-    var shareWith = prompt('Share with (e.g. "public"):', 'public');
-    if (shareWith) {
-        fetch(baseUrl + 'api/conversations/' + conversationId + '/share', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({share_with: shareWith})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            alert('Conversation shared: ' + d.shared);
-        });
-    }
+    document.getElementById('chat-form').submit();
 }
 
 // Auto-scroll

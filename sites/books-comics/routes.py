@@ -12,7 +12,7 @@ import random
 import re
 from collections import Counter
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
@@ -25,6 +25,8 @@ blueprint = Blueprint(
     "books-comics",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -553,6 +555,183 @@ def login_submit():
 def logout():
     session.pop("user_id", None)
     return render_template("books-comics/login.html", error=None)
+
+
+# ---------------------------------------------------------------------------
+# Form POST routes (for browser-automation-friendly mutations)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/book/<int:book_id>/save", methods=["POST"])
+def form_save_book(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("books-comics.login_page"))
+    saved = user.setdefault("saved_books", [])
+    if book_id in saved:
+        saved.remove(book_id)
+    else:
+        saved.append(book_id)
+    _save_users(users)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/cart", methods=["POST"])
+def form_cart_add(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("books-comics.login_page"))
+    cart = user.setdefault("cart", [])
+    if book_id in cart:
+        cart.remove(book_id)
+    else:
+        cart.append(book_id)
+    _save_users(users)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/follow", methods=["POST"])
+def form_follow_author(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    author = request.form.get("author", "").strip()
+    if not author:
+        return redirect(url_for("books-comics.book_detail", book_id=book_id))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("books-comics.login_page"))
+    followed = user.setdefault("followed_authors", [])
+    if author in followed:
+        followed.remove(author)
+    else:
+        followed.append(author)
+    _save_users(users)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/subscribe", methods=["POST"])
+def form_subscribe_category(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    category = request.form.get("category", "").strip()
+    if not category:
+        return redirect(url_for("books-comics.book_detail", book_id=book_id))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("books-comics.login_page"))
+    subs = user.setdefault("subscriptions", [])
+    if category in subs:
+        subs.remove(category)
+    else:
+        subs.append(category)
+    _save_users(users)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/rate", methods=["POST"])
+def form_rate_book(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    rating = request.form.get("rating", "4")
+    try:
+        rating = float(rating)
+    except (TypeError, ValueError):
+        rating = 4.0
+    if rating < 1:
+        rating = 1
+    if rating > 5:
+        rating = 5
+    reviews = _load_reviews()
+    review = {
+        "id": len(reviews) + 1,
+        "book_id": book_id,
+        "user_id": user_id,
+        "text": "",
+        "rating": rating,
+    }
+    reviews.append(review)
+    _save_reviews(reviews)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/review", methods=["POST"])
+def form_post_review(book_id):
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    text = request.form.get("text", "").strip()
+    rating = request.form.get("rating", "")
+    if not text:
+        return redirect(url_for("books-comics.book_detail", book_id=book_id))
+    reviews = _load_reviews()
+    review = {
+        "id": len(reviews) + 1,
+        "book_id": book_id,
+        "user_id": user_id,
+        "text": text,
+        "rating": float(rating) if rating else None,
+    }
+    reviews.append(review)
+    _save_reviews(reviews)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/book/<int:book_id>/react", methods=["POST"])
+def form_react_review(book_id):
+    review_id = request.form.get("review_id", type=int)
+    reaction = request.form.get("reaction", "like")
+    reviews = _load_reviews()
+    review = next((r for r in reviews if r.get("id") == review_id), None)
+    if review:
+        reactions = review.setdefault("reactions", {})
+        current = reactions.get(reaction, 0)
+        reactions[reaction] = current + 1
+        _save_reviews(reviews)
+    return redirect(url_for("books-comics.book_detail", book_id=book_id))
+
+
+@blueprint.route("/dashboard/unsave", methods=["POST"])
+def form_unsave_book():
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    book_id = request.form.get("book_id", type=int)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user and book_id is not None:
+        saved = user.get("saved_books", [])
+        if book_id in saved:
+            saved.remove(book_id)
+        _save_users(users)
+    return redirect(url_for("books-comics.dashboard"))
+
+
+@blueprint.route("/dashboard/unfollow", methods=["POST"])
+def form_unfollow_author():
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    author = request.form.get("author", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user and author:
+        followed = user.get("followed_authors", [])
+        if author in followed:
+            followed.remove(author)
+        _save_users(users)
+    return redirect(url_for("books-comics.dashboard"))
 
 
 # ---------------------------------------------------------------------------

@@ -39,14 +39,14 @@
     </div>
     <div class="compose-wrap">
         <h1>Compose New Post</h1>
-        <form id="compose-form">
+        <form method="post" action="{{ url_for('blogs.form_create_post') }}">
             <div class="field">
                 <label>Title</label>
                 <input type="text" name="title" id="title" placeholder="Your post title..." required>
             </div>
             <div class="field">
                 <label>Body</label>
-                <textarea name="body" id="body" placeholder="Write your post..."></textarea>
+                <textarea name="body" id="body" placeholder="Write your post..." required></textarea>
             </div>
             <div class="field">
                 <label>Category</label>
@@ -70,36 +70,6 @@
             </div>
             <button type="submit" class="submit-btn">Publish Post</button>
         </form>
-        <div id="result" class="result"></div>
     </div>
-    <script>
-    document.getElementById('compose-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(t => t);
-        const data = {
-            title: document.getElementById('title').value,
-            body: document.getElementById('body').value,
-            category: document.getElementById('category').value,
-            tags: tags,
-            image_url: document.getElementById('image_url').value || null,
-            author_username: document.getElementById('author_username').value,
-        };
-        fetch('{{ url_for("blogs.api_create_post") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        }).then(r => r.json().then(d => ({ok: r.ok, data: d})))
-        .then(({ok, data}) => {
-            const el = document.getElementById('result');
-            if (ok) {
-                el.className = 'result success';
-                el.textContent = 'Post published! ID: ' + data.id;
-            } else {
-                el.className = 'result error';
-                el.textContent = data.error || 'Error creating post.';
-            }
-        });
-    });
-    </script>
 </body>
 </html>

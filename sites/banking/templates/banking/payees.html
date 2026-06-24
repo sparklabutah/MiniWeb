@@ -53,14 +53,22 @@
     <div class="main">
         <h2>Manage Payees</h2>
 
+        {% if result == 'added' %}
+        <div style="background:#d1fae5;color:#065f46;padding:.7rem 1rem;border-radius:.3rem;font-size:.85rem;margin-bottom:1rem;">Payee added successfully.</div>
+        {% elif result == 'deleted' %}
+        <div style="background:#d1fae5;color:#065f46;padding:.7rem 1rem;border-radius:.3rem;font-size:.85rem;margin-bottom:1rem;">Payee removed.</div>
+        {% elif result == 'error' %}
+        <div style="background:#fee2e2;color:#991b1b;padding:.7rem 1rem;border-radius:.3rem;font-size:.85rem;margin-bottom:1rem;">Payee name is required.</div>
+        {% endif %}
+
         <div class="add-payee">
             <h3>Add New Payee</h3>
-            <div class="add-form">
-                <input type="text" id="payee-name" placeholder="Payee name" required>
-                <input type="text" id="payee-acct" placeholder="Account number">
-                <input type="text" id="payee-category" placeholder="Category">
-                <button onclick="addPayee()">Add Payee</button>
-            </div>
+            <form method="post" action="{{ url_for('banking.add_payee_submit') }}" class="add-form">
+                <input type="text" name="name" placeholder="Payee name" required>
+                <input type="text" name="account_number" placeholder="Account number">
+                <input type="text" name="category" placeholder="Category">
+                <button type="submit">Add Payee</button>
+            </form>
         </div>
 
         <table>
@@ -74,27 +82,17 @@
                     <td>{{ p.nickname }}</td>
                     <td>{{ p.account_number }}</td>
                     <td>{{ p.category }}</td>
-                    <td><button class="btn-delete" onclick="deletePayee({{ p.id }})">Remove</button></td>
+                    <td>
+                        <form method="post" action="{{ url_for('banking.delete_payee_submit') }}" style="display:inline">
+                            <input type="hidden" name="payee_id" value="{{ p.id }}">
+                            <button type="submit" class="btn-delete">Remove</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <script>
-    function addPayee() {
-        var name = document.getElementById('payee-name').value;
-        var acct = document.getElementById('payee-acct').value;
-        var cat = document.getElementById('payee-category').value;
-        fetch('{{ url_for("banking.index") }}api/payees', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: {{ user.id }}, name: name, account_number: acct, category: cat || 'Other'})
-        }).then(r => r.json()).then(() => location.reload());
-    }
-    function deletePayee(id) {
-        fetch('{{ url_for("banking.index") }}api/payees/' + id, {method: 'DELETE'}).then(() => location.reload());
-    }
-    </script>
 </body>
 </html>

@@ -3,14 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>DesignFlow - Create Stunning Designs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+        .header { background: #fff; border-bottom: 1px solid #e8e8ef; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; color: #7c3aed; font-weight: 800; letter-spacing: -.5px; }
+        .header-nav { display: flex; align-items: center; gap: 1rem; }
+        .header-nav a { font-size: .9rem; color: #64748b; text-decoration: none; padding: .3rem .6rem; border-radius: .3rem; transition: background .15s; }
+        .header-nav a:hover { background: #f1f0ff; color: #7c3aed; }
+        .header-nav .btn-primary { background: #7c3aed; color: #fff; padding: .4rem 1rem; border-radius: .4rem; }
+        .header-nav .btn-primary:hover { background: #6d28d9; }
+
+        .hero { background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); padding: 2.5rem 2rem 2rem; text-align: center; }
+        .hero h2 { color: #fff; font-size: 1.8rem; margin-bottom: .5rem; }
+        .hero p { color: rgba(255,255,255,.85); font-size: 1rem; margin-bottom: 1.2rem; }
+
+        .search-bar { max-width: 600px; margin: 0 auto; display: flex; gap: .5rem; }
+        .search-bar input { flex: 1; padding: .7rem 1rem; border: none; border-radius: .4rem; font-size: .95rem; }
+        .search-bar input:focus { outline: 2px solid #7c3aed; }
+        .search-bar button { padding: .7rem 1.5rem; background: #1a1a2e; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; }
+
+        .filters { max-width: 1200px; margin: 1.2rem auto; padding: 0 2rem; display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+        .filters label { font-size: .85rem; color: #64748b; }
+        .filters select { padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; background: #fff; }
+        .cat-tabs { display: flex; gap: .3rem; flex-wrap: wrap; }
+        .cat-tab { padding: .35rem .8rem; border-radius: 2rem; font-size: .8rem; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #475569; text-decoration: none; transition: all .15s; }
+        .cat-tab:hover, .cat-tab.active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+        .main { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem 3rem; }
+        .result-count { font-size: .85rem; color: #94a3b8; margin-bottom: 1rem; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.2rem; }
+        .card { background: #fff; border-radius: .6rem; overflow: hidden; border: 1px solid #e8e8ef; transition: box-shadow .2s, transform .15s; }
+        .card:hover { box-shadow: 0 8px 25px rgba(124,58,237,.12); transform: translateY(-2px); }
+        .card-preview { height: 160px; display: flex; align-items: center; justify-content: center; font-size: .75rem; color: #94a3b8; position: relative; cursor: pointer; }
+        .card-preview::after { content: 'Use this template'; position: absolute; inset: 0; background: rgba(124,58,237,.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .9rem; font-weight: 600; opacity: 0; transition: opacity .2s; }
+        .card:hover .card-preview::after { opacity: 1; }
+        .card-preview .dims { position: absolute; top: .5rem; right: .5rem; background: rgba(0,0,0,.6); color: #fff; padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; }
+        .card-body { padding: .8rem 1rem; }
+        .card-body h3 { font-size: .95rem; margin-bottom: .3rem; }
+        .card-body h3 a { color: #1a1a2e; text-decoration: none; }
+        .card-body h3 a:hover { color: #7c3aed; }
+        .card-meta { font-size: .8rem; color: #94a3b8; display: flex; justify-content: space-between; }
+        .card-meta .cat { background: #f1f0ff; color: #7c3aed; padding: .1rem .5rem; border-radius: .2rem; font-size: .75rem; }
+        .no-results { text-align: center; color: #94a3b8; padding: 3rem; font-size: 1.1rem; }
+
+        .preview-bg { width: 100%; height: 100%; }
+        .bg-social-media { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .bg-presentation { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+        .bg-poster { background: linear-gradient(135deg, #f97316, #ef4444); }
+        .bg-logo { background: linear-gradient(135deg, #10b981, #059669); }
+        .bg-business-card { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+        .bg-flyer { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .bg-banner { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="header">
+        <h1>DesignFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('design-creative.index') }}">Templates</a>
+            <a href="{{ url_for('design-creative.assets_page') }}">Assets</a>
+            {% if user %}
+            <a href="{{ url_for('design-creative.projects_page') }}">My Projects</a>
+            <a href="{{ url_for('design-creative.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('design-creative.login_page') }}" class="btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
     </div>
+
+    <div class="hero">
+        <h2>What will you design today?</h2>
+        <p>Choose from {{ templates|length }} professional templates</p>
+        <form class="search-bar" method="get" action="{{ url_for('design-creative.index') }}">
+            <input type="text" name="q" placeholder="Search templates... (e.g. instagram, logo, poster)" value="{{ q }}" autocomplete="off">
+            {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="filters">
+        <div class="cat-tabs">
+            <a class="cat-tab {{ 'active' if not category }}" href="{{ url_for('design-creative.index', q=q, sort=sort) }}">All</a>
+            {% for cat in categories %}
+            <a class="cat-tab {{ 'active' if category == cat }}" href="{{ url_for('design-creative.index', q=q, category=cat, sort=sort) }}">{{ cat|replace('-', ' ')|title }}</a>
+            {% endfor %}
+        </div>
+        <label>Sort:
+            <select id="sort-select" onchange="applySort()">
+                <option value="popular" {{ 'selected' if sort == 'popular' }}>Most Popular</option>
+                <option value="name" {{ 'selected' if sort == 'name' }}>Name A-Z</option>
+                <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="main">
+        <div class="result-count">{{ templates|length }} templates found</div>
+
+        {% if templates %}
+        <div class="grid">
+            {% for tmpl in templates %}
+            <div class="card" data-id="{{ tmpl.id }}" data-category="{{ tmpl.category }}">
+                <div class="card-preview">
+                    <div class="preview-bg bg-{{ tmpl.category }}"></div>
+                    <span class="dims">{{ tmpl.dimensions }}</span>
+                </div>
+                <div class="card-body">
+                    <h3><a href="{{ url_for('design-creative.template_detail', template_id=tmpl.id) }}">{{ tmpl.title }}</a></h3>
+                    <div class="card-meta">
+                        <span class="cat">{{ tmpl.category|replace('-', ' ')|title }}</span>
+                        <span>{{ tmpl.use_count|int }} uses</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-results">No templates match your search. Try different keywords.</div>
+        {% endif %}
+    </div>
+
+    <script>
+    function applySort() {
+        const params = new URLSearchParams(window.location.search);
+        params.set('sort', document.getElementById('sort-select').value);
+        window.location.href = '{{ url_for("design-creative.index") }}?' + params.toString();
+    }
+    </script>
 </body>
 </html>

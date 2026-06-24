@@ -65,15 +65,23 @@
 
         <div class="actions">
             {% if user %}
-            <button class="btn btn-primary" onclick="savePaper({{ paper.id }})">Save Paper</button>
+            <form method="post" action="{{ url_for('academic-paper-db.form_save_paper', paper_id=paper.id) }}" style="display:inline">
+                <button type="submit" class="btn btn-primary">
+                    {% if paper.id in user.get('saved_papers', []) %}Unsave Paper{% else %}Save Paper{% endif %}
+                </button>
+            </form>
             {% if paper.authors %}
-            <button class="btn" onclick="followAuthor('{{ paper.authors[0] }}')">Follow {{ paper.authors[0] }}</button>
+            <form method="post" action="{{ url_for('academic-paper-db.form_follow_author', author_name=paper.authors[0]) }}" style="display:inline">
+                <input type="hidden" name="redirect_to" value="{{ url_for('academic-paper-db.paper_detail', paper_id=paper.id) }}">
+                <button type="submit" class="btn">
+                    {% if paper.authors[0] in user.get('followed_authors', []) %}Unfollow{% else %}Follow{% endif %} {{ paper.authors[0] }}
+                </button>
+            </form>
             {% endif %}
             {% else %}
             <a class="btn btn-primary" href="{{ url_for('academic-paper-db.login_page') }}">Sign in to save & follow</a>
             {% endif %}
         </div>
-        <div class="msg" id="action-msg"></div>
 
         <div class="abstract-section">
             <h3>Abstract</h3>
@@ -104,34 +112,5 @@
         {% endif %}
     </div>
 
-    {% if user %}
-    <script>
-    const BASE = "{{ url_for('academic-paper-db.index') }}".replace(/\/$/, "");
-    const USER_ID = {{ user.id }};
-
-    function showMsg(text) {
-        const el = document.getElementById("action-msg");
-        el.textContent = text;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 3000);
-    }
-
-    async function savePaper(pid) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/save`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({paper_id: pid})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Paper ${d.action}!`); }
-    }
-
-    async function followAuthor(name) {
-        const r = await fetch(`${BASE}/api/users/${USER_ID}/follow`, {
-            method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({author: name})
-        });
-        if (r.ok) { const d = await r.json(); showMsg(`Author ${d.action}!`); }
-    }
-    </script>
-    {% endif %}
 </body>
 </html>

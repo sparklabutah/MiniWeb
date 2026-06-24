@@ -3,14 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>SecureCard - Account Overview</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #2d3748; }
+        nav.topnav { background: #1a365d; padding: 0; display: flex; align-items: center; }
+        nav.topnav .brand { color: #fff; font-weight: 700; font-size: 1.2rem; padding: .8rem 1.5rem; }
+        nav.topnav a { color: #bee3f8; text-decoration: none; padding: .8rem 1rem; font-size: .95rem; display: inline-block; }
+        nav.topnav a:hover, nav.topnav a.active { color: #fff; background: rgba(255,255,255,0.1); }
+        nav.topnav .right { margin-left: auto; display: flex; align-items: center; }
+        nav.topnav .right span { color: #90cdf4; padding: 0 .8rem; font-size: .88rem; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.1rem; color: #1a365d; margin-bottom: .8rem; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .card { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .card .label { font-size: .8rem; color: #718096; text-transform: uppercase; margin-bottom: .2rem; }
+        .card .value { font-size: 1.3rem; font-weight: 700; color: #1a365d; }
+        .section { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.2rem; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; }
+        .section-header a { font-size: .85rem; color: #3182ce; text-decoration: none; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #edf2f7; font-size: .88rem; }
+        th { color: #718096; font-weight: 600; font-size: .78rem; text-transform: uppercase; }
+        td.amount { text-align: right; font-weight: 600; }
+    </style>
 </head>
 <body>
+    <nav class="topnav">
+        <span class="brand">SecureCard</span>
+        <a href="{{ url_for('credit-card.index') }}" class="active">Overview</a>
+        <a href="{{ url_for('credit-card.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('credit-card.statements_page') }}">Statements</a>
+        <a href="{{ url_for('credit-card.payments_page') }}">Payments</a>
+        <a href="{{ url_for('credit-card.rewards_page') }}">Rewards</a>
+        <a href="{{ url_for('credit-card.settings_page') }}">Settings</a>
+        <div class="right">
+            <span>{{ user.name }}</span>
+            <a href="{{ url_for('credit-card.logout') }}">Logout</a>
+        </div>
+    </nav>
+
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+        <h2>Account Overview</h2>
+
+        <div class="grid">
+            <div class="card">
+                <div class="label">Current Balance</div>
+                <div class="value">${{ "%.2f"|format(user.current_balance) }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Available Credit</div>
+                <div class="value">${{ "%.2f"|format(user.available_credit) }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Credit Limit</div>
+                <div class="value">${{ "%.2f"|format(user.credit_limit) }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Rewards Points</div>
+                <div class="value">{{ "{:,}".format(user.rewards_points) }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Minimum Payment Due</div>
+                <div class="value">${{ "%.2f"|format(user.minimum_payment) }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Payment Due Date</div>
+                <div class="value">{{ user.due_date }}</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>Recent Transactions</h2>
+                <a href="{{ url_for('credit-card.transactions_page') }}">View All Transactions</a>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right;">Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% for t in recent_transactions %}
+                    <tr>
+                        <td>{{ t.date }}</td>
+                        <td>{{ t.merchant }}</td>
+                        <td>{{ t.category }}</td>
+                        <td class="amount">${{ "%.2f"|format(t.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if recent_payments %}
+        <div class="section">
+            <div class="section-header">
+                <h2>Recent Payments</h2>
+                <a href="{{ url_for('credit-card.payments_page') }}">View All Payments</a>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Method</th><th style="text-align:right;">Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in recent_payments %}
+                    <tr>
+                        <td>{{ p.date }}</td>
+                        <td>{{ p.method|replace('_', ' ')|title }}</td>
+                        <td class="amount">${{ "%.2f"|format(p.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if latest_statement %}
+        <div class="section">
+            <div class="section-header">
+                <h2>Latest Statement: {{ latest_statement.period }}</h2>
+                <a href="{{ url_for('credit-card.statements_page') }}">All Statements</a>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Opening Balance</th><th>Charges</th><th>Payments</th><th>Interest</th><th>Closing Balance</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${{ "%.2f"|format(latest_statement.opening_balance) }}</td>
+                        <td>${{ "%.2f"|format(latest_statement.charges) }}</td>
+                        <td>${{ "%.2f"|format(latest_statement.payments) }}</td>
+                        <td>${{ "%.2f"|format(latest_statement.interest) }}</td>
+                        <td>${{ "%.2f"|format(latest_statement.closing_balance) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

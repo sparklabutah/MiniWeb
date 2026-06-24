@@ -3,14 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>EduPortal LMS - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: #166534; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; }
+        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-signin { background: #3b82f6; color: #fff; padding: .3rem .8rem; border-radius: .3rem; }
+        .main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .welcome { font-size: 1.1rem; color: #475569; margin-bottom: 1.5rem; }
+        .welcome strong { color: #1e293b; }
+        .section-title { font-size: 1.15rem; margin-bottom: 1rem; color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: .3rem; display: inline-block; }
+        .course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .course-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; transition: box-shadow .15s; }
+        .course-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .course-code { font-size: .8rem; color: #3b82f6; font-weight: 600; text-transform: uppercase; margin-bottom: .2rem; }
+        .course-title { font-size: 1.05rem; margin-bottom: .4rem; }
+        .course-title a { color: #1e293b; text-decoration: none; }
+        .course-title a:hover { color: #3b82f6; }
+        .course-meta { font-size: .85rem; color: #64748b; line-height: 1.6; }
+        .course-meta span { margin-right: 1rem; }
+        .badge { display: inline-block; background: #eff6ff; color: #3b82f6; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 500; }
+        .badge-dept { background: #f0fdf4; color: #16a34a; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="header">
+        <h1>EduPortal LMS</h1>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:.85rem;">{{ user.name }} ({{ user.role }})</span>
+            <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('course-sites-classrooms.login_page') }}" class="btn-signin">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        {% if user %}
+        <p class="welcome">Welcome back, <strong>{{ user.name }}</strong>. {{ courses|length }} courses available.</p>
+        {% else %}
+        <p class="welcome">Browse {{ courses|length }} available courses. <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign in</a> to access course materials.</p>
+        {% endif %}
+
+        <h2 class="section-title">All Courses</h2>
+        <div class="course-grid">
+            {% for course in courses %}
+            <div class="course-card" data-course-id="{{ course.id }}">
+                <div class="course-code">{{ course.code }}</div>
+                <h3 class="course-title">
+                    <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.title }}</a>
+                </h3>
+                <div class="course-meta">
+                    <span>Instructor: {{ instructor_map.get(course.instructor_id, 'TBA') }}</span><br>
+                    <span>{{ course.semester }}</span>
+                    <span>{{ course.credits }} credits</span>
+                    <span>{{ course.enrolled_students|length }} students</span><br>
+                    <span class="badge badge-dept">{{ course.department }}</span>
+                    <span class="badge">{{ course.modules|length }} modules</span>
+                </div>
+                <p style="font-size:.85rem;color:#64748b;margin-top:.5rem;line-height:1.5;">{{ course.description[:120] }}{% if course.description|length > 120 %}...{% endif %}</p>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </body>
 </html>

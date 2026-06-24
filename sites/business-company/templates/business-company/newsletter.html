@@ -68,9 +68,11 @@
             <h2>Subscribe to Our Newsletter</h2>
             <p>Choose the topics you are interested in and receive curated content from Apex Dynamics directly to your inbox.</p>
 
-            <div class="success-msg" id="subscribe-msg"></div>
+            {% if subscribe_success %}
+            <div class="success-msg" style="display:block">Successfully {{ subscribe_action }}! ({{ subscribe_email }})</div>
+            {% endif %}
 
-            <form id="subscribe-form" onsubmit="return submitSubscribe(event)">
+            <form id="subscribe-form" method="post" action="{{ url_for('business-company.newsletter_subscribe') }}">
                 <div class="form-group">
                     <label for="sub-name">Name</label>
                     <input type="text" id="sub-name" name="name" placeholder="Your name">
@@ -105,24 +107,6 @@
     </div>
 
     <script>
-    function submitSubscribe(e) {
-        e.preventDefault();
-        var email = document.getElementById('sub-email').value;
-        var name = document.getElementById('sub-name').value;
-        var checkboxes = document.querySelectorAll('input[name="topics"]:checked');
-        var topics = [];
-        checkboxes.forEach(function(cb) { topics.push(cb.value); });
-        fetch('{{ url_for("business-company.api_subscribe") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({email: email, name: name, topics: topics})
-        }).then(function(r){return r.json()}).then(function(d){
-            var msg = document.getElementById('subscribe-msg');
-            msg.textContent = 'Successfully ' + d.action + '! (' + email + ')';
-            msg.style.display = 'block';
-        });
-        return false;
-    }
     </script>
 </body>
 </html>

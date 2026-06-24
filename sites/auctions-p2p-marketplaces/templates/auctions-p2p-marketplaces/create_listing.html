@@ -38,7 +38,7 @@
             <div class="error">{{ error }}</div>
             {% endif %}
 
-            <form id="listing-form">
+            <form id="listing-form" method="post" action="{{ url_for('auctions-p2p-marketplaces.create_listing_submit') }}">
                 <div class="form-group">
                     <label for="name">Item Name *</label>
                     <input type="text" id="name" name="name" placeholder="What are you selling?" required>
@@ -100,53 +100,15 @@
                     </select>
                 </div>
 
-                <button type="button" class="btn-submit" onclick="submitListing()">List Item for Auction</button>
+                <button type="submit" class="btn-submit">List Item for Auction</button>
             </form>
         </div>
     </div>
 
     <script>
-    const BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
-
     document.getElementById('upload-area').addEventListener('click', function() {
         document.getElementById('file-input').click();
     });
-
-    function submitListing() {
-        const form = document.getElementById('listing-form');
-        const data = {
-            name: form.name.value,
-            description: form.description.value,
-            category: form.category.value,
-            condition: form.condition.value,
-            start_price: parseFloat(form.start_price.value),
-            brand: form.brand.value,
-            shipping: form.shipping.value,
-            seller_id: {{ user.id }},
-            seller_username: '{{ user.username }}'
-        };
-
-        fetch(BASE + '/api/listings', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        }).then(r => r.json()).then(d => {
-            if (d.success) {
-                // Upload image if selected
-                const fileInput = document.getElementById('file-input');
-                if (fileInput.files.length > 0) {
-                    const formData = new FormData();
-                    formData.append('file', fileInput.files[0]);
-                    fetch(BASE + '/api/listings/' + d.listing_id + '/upload', {
-                        method: 'POST', body: formData
-                    });
-                }
-                alert('Listing created successfully!');
-                window.location.href = BASE + '/listing/' + d.listing_id;
-            } else {
-                alert(d.error || 'Failed to create listing');
-            }
-        });
-    }
     </script>
 </body>
 </html>

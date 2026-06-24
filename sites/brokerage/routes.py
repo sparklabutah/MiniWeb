@@ -9,7 +9,8 @@ import random
 from collections import Counter
 from datetime import datetime, timedelta
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import (Blueprint, Response, abort, jsonify, redirect, render_template,
+                   request, session, url_for)
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
@@ -19,6 +20,8 @@ blueprint = Blueprint(
     "brokerage",
     __name__,
     template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
 )
 
 # ---------------------------------------------------------------------------
@@ -499,21 +502,7 @@ def login_submit():
         return render_template("brokerage/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
-    # Redirect to portfolio
-    portfolios = _load_portfolios()
-    portfolio = next((p for p in portfolios if p["user_id"] == user["id"]),
-                     {"user_id": user["id"], "holdings": []})
-    tickers_map = {t["symbol"]: t for t in _load_tickers()}
-    enriched = [_enrich_holding(h, tickers_map) for h in portfolio["holdings"]]
-    total_value = round(sum(h["market_value"] for h in enriched), 2)
-    total_gain = round(sum(h["gain"] for h in enriched), 2)
-    total_cost = round(sum(h["cost_basis"] for h in enriched), 2)
-    total_gain_pct = round((total_gain / total_cost) * 100, 2) if total_cost else 0
-    return render_template("brokerage/portfolio.html",
-                           user=user, holdings=enriched,
-                           total_value=total_value, total_gain=total_gain,
-                           total_gain_pct=total_gain_pct,
-                           sim_time=_get_sim_clock())
+    return redirect(url_for("brokerage.portfolio_page"))
 
 
 @blueprint.route("/logout")
@@ -536,6 +525,139 @@ def trade_page():
     return render_template("brokerage/trade.html",
                            ticker=ticker, tickers=tickers, user=user,
                            sim_time=_get_sim_clock())
+
+
+@blueprint.route("/trade", methods=["POST"])
+def trade_submit():
+    """Form-based order placement."""
+    if "user_id" not in session:
+        return redirect(url_for("brokerage.login_page"))
+    user_id = session["user_id"]
+    symbol = request.form.get("symbol", "").strip().upper()
+    side = request.form.get("side", "buy").strip()
+    order_type = request.form.get("order_type", "market").strip()
+    quantity = request.form.get("quantity", "0")
+    price = request.form.get("price", "")
+
+    try:
+        quantity = float(quantity)
+    except (TypeError, ValueError):
+        quantity = 0
+
+    if not symbol or not quantity:
+        return redirect(url_for("brokerage.trade_page", symbol=symbol))
+
+    tickers = _load_tickers()
+    ticker = next((t for t in tickers if t["symbol"] == symbol), None)
+    if not ticker:
+        return redirect(url_for("brokerage.trade_page"))
+
+    if not _is_market_open(ticker["type"]):
+        return redirect(url_for("brokerage.trade_page", symbol=symbol))
+
+    orders = _load_orders()
+    new_id = max((o["id"] for o in orders), default=0) + 1
+    current_price = _get_current_price(symbol) or ticker["base_price"]
+
+    limit_price = None
+    if price:
+        try:
+            limit_price = float(price)
+        except (TypeError, ValueError):
+            limit_price = None
+
+    sim_time = _get_sim_clock()
+    new_order = {
+        "id": new_id,
+        "user_id": user_id,
+        "symbol": symbol,
+        "side": side,
+        "order_type": order_type,
+        "quantity": quantity,
+        "price": limit_price,
+        "filled_price": current_price if order_type == "market" else None,
+        "status": "filled" if order_type == "market" else "open",
+        "created_at": sim_time.isoformat(),
+        "filled_at": sim_time.isoformat() if order_type == "market" else None,
+    }
+    orders.append(new_order)
+    _save_orders(orders)
+
+    if order_type == "market":
+        portfolios = _load_portfolios()
+        portfolio = next((p for p in portfolios if p["user_id"] == user_id), None)
+        if not portfolio:
+            portfolio = {"user_id": user_id, "holdings": []}
+            portfolios.append(portfolio)
+
+        holding = next((h for h in portfolio["holdings"] if h["symbol"] == symbol), None)
+        if side == "buy":
+            if holding:
+                total_cost = holding["shares"] * holding["avg_cost"] + quantity * current_price
+                holding["shares"] += quantity
+                holding["avg_cost"] = round(total_cost / holding["shares"], 2)
+            else:
+                portfolio["holdings"].append({
+                    "symbol": symbol,
+                    "shares": quantity,
+                    "avg_cost": current_price,
+                })
+        elif side == "sell":
+            if holding:
+                holding["shares"] = round(holding["shares"] - quantity, 6)
+                if holding["shares"] <= 0:
+                    portfolio["holdings"].remove(holding)
+
+        users = _load_users()
+        user = next((u for u in users if u["id"] == user_id), None)
+        if user:
+            cost = quantity * current_price
+            if side == "buy":
+                user["buying_power"] = round(user["buying_power"] - cost, 2)
+                user["cash_balance"] = round(user["cash_balance"] - cost, 2)
+            else:
+                user["buying_power"] = round(user["buying_power"] + cost, 2)
+                user["cash_balance"] = round(user["cash_balance"] + cost, 2)
+            _save_users(users)
+
+        _save_portfolios(portfolios)
+
+    return redirect(url_for("brokerage.orders_page"))
+
+
+@blueprint.route("/watchlist/toggle", methods=["POST"])
+def form_watchlist_toggle():
+    """Form-based watchlist toggle."""
+    if "user_id" not in session:
+        return redirect(url_for("brokerage.login_page"))
+    user_id = session["user_id"]
+    symbol = request.form.get("symbol", "").strip().upper()
+    if not symbol:
+        return redirect(url_for("brokerage.watchlist_page"))
+
+    watchlists = _load_watchlists()
+    wl = next((w for w in watchlists if w["user_id"] == user_id), None)
+    if not wl:
+        wl = {"user_id": user_id, "symbols": [], "alerts": []}
+        watchlists.append(wl)
+
+    if symbol in wl["symbols"]:
+        wl["symbols"].remove(symbol)
+    else:
+        wl["symbols"].append(symbol)
+    _save_watchlists(watchlists)
+    return redirect(url_for("brokerage.watchlist_page"))
+
+
+@blueprint.route("/orders/<int:order_id>/cancel", methods=["POST"])
+def form_cancel_order(order_id):
+    """Form-based order cancellation."""
+    orders = _load_orders()
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if order and order["status"] == "open":
+        order["status"] = "cancelled"
+        _save_orders(orders)
+    return redirect(url_for("brokerage.orders_page"))
 
 
 # ---------------------------------------------------------------------------

@@ -58,9 +58,32 @@ def create_app():
     )
     app.secret_key = "miniweb-dev-key-change-in-production"
 
+    # Initialize session-scoped data overlay.
+    # All reads/writes to sites/*/data/*.json are intercepted:
+    #   - Writes go to in-memory session store (never touch disk)
+    #   - Reads check session store first, fall back to .pristine/ on disk
+    # This means the live server is safe for multiple users and eval tasks
+    # are isolated. Pass MINIWEB_NO_OVERLAY=1 to disable (for validation).
+    import os
+    if not os.environ.get("MINIWEB_NO_OVERLAY"):
+        from app.data_overlay import init as init_overlay
+        init_overlay(str(SITES_DIR))
+
     from app.portal.routes import portal_bp
     app.register_blueprint(portal_bp)
 
     register_site_blueprints(app)
+
+    # Add overlay reset endpoint for eval harness
+    @app.route("/_reset_data", methods=["POST"])
+    def _reset_data():
+        from app.data_overlay import reset_session
+        reset_session()
+        return {"status": "reset"}
+
+    @app.route("/_overlay_stats")
+    def _overlay_stats():
+        from app.data_overlay import get_stats
+        return get_stats()
 
     return app

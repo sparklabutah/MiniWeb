@@ -359,23 +359,24 @@
     <!-- ═══ CREATE EVENT MODAL ═══ -->
     <div class="modal-overlay" id="modal-overlay" onclick="closeCreateModal()"></div>
     <div class="modal" id="create-modal">
+        <form method="post" action="{{ url_for('calendar-todo.form_create_event') }}" id="create-event-form">
         <div class="modal-header">
             <h2>New Event</h2>
-            <button class="close-btn" onclick="closeCreateModal()">&times;</button>
+            <button type="button" class="close-btn" onclick="closeCreateModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <input type="text" class="title-input" id="new-title" placeholder="Add title">
+            <input type="text" class="title-input" id="new-title" name="title" placeholder="Add title" required>
             <div class="field-row">
                 <label>Start</label>
-                <input type="datetime-local" id="new-start">
+                <input type="datetime-local" id="new-start" name="start" required>
             </div>
             <div class="field-row">
                 <label>End</label>
-                <input type="datetime-local" id="new-end">
+                <input type="datetime-local" id="new-end" name="end" required>
             </div>
             <div class="field-row">
                 <label>Category</label>
-                <select id="new-category">
+                <select id="new-category" name="category">
                     <option value="work">Work</option>
                     <option value="personal">Personal</option>
                     <option value="health">Health</option>
@@ -383,7 +384,7 @@
             </div>
             <div class="field-row">
                 <label>Calendar</label>
-                <select id="new-calendar">
+                <select id="new-calendar" name="calendar">
                     {% for c in calendars %}
                     <option value="{{ c }}">{{ c }}</option>
                     {% endfor %}
@@ -391,7 +392,7 @@
             </div>
             <div class="field-row">
                 <label>Priority</label>
-                <select id="new-priority">
+                <select id="new-priority" name="priority">
                     <option value="high">High</option>
                     <option value="medium" selected>Medium</option>
                     <option value="low">Low</option>
@@ -399,22 +400,23 @@
             </div>
             <div class="field-row">
                 <label>Location</label>
-                <input type="text" id="new-location" placeholder="Add location">
+                <input type="text" id="new-location" name="location" placeholder="Add location">
             </div>
             <div class="field-row">
                 <label>User</label>
-                <select id="new-user-id">
+                <select id="new-user-id" name="user_id">
                     {% for u in users %}
                     <option value="{{ u.id }}">{{ u.name }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <textarea id="new-desc" placeholder="Add description"></textarea>
+            <textarea id="new-desc" name="description" placeholder="Add description"></textarea>
         </div>
         <div class="modal-actions">
-            <button class="btn-cancel" onclick="closeCreateModal()">Cancel</button>
-            <button class="btn-save" onclick="createEvent()">Save</button>
+            <button type="button" class="btn-cancel" onclick="closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn-save">Save</button>
         </div>
+        </form>
     </div>
 
     <script>
@@ -516,29 +518,7 @@
         document.getElementById('create-modal').style.display = 'none';
     }
 
-    function createEvent() {
-        var startVal = document.getElementById('new-start').value;
-        var endVal = document.getElementById('new-end').value;
-        var data = {
-            title: document.getElementById('new-title').value,
-            description: document.getElementById('new-desc').value,
-            category: document.getElementById('new-category').value,
-            calendar: document.getElementById('new-calendar').value,
-            start: startVal ? startVal + ':00' : '',
-            end: endVal ? endVal + ':00' : '',
-            location: document.getElementById('new-location').value,
-            priority: document.getElementById('new-priority').value,
-            user_id: parseInt(document.getElementById('new-user-id').value),
-        };
-        fetch('{{ url_for("calendar-todo.api_create_event") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            closeCreateModal();
-            window.location.reload();
-        });
-    }
+    /* createEvent is now handled by form submission */
     </script>
 </body>
 </html>
