@@ -453,6 +453,71 @@ DOMAIN_TEMPLATES = {
             ("Log in as '{user}' (password: '{pwd}'). Navigate to Phones, add '{name}', '{name2}', and a third phone to Compare, then navigate to Compare and report which of the three has the largest battery.", ["authenticate_by_form", "navigate_by_route", "search_by_query", "save_by_toggle", "compare_from_table", "extract_by_route"]),
         ],
     },
+
+    # ===== ENTITY-FREE DOMAINS =====
+    "converters-calculators": {
+        "easy": [
+            ("Navigate to the Length Converter and report how many unit options are in the 'From' dropdown.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Temperature Converter, convert 100 Celsius to Fahrenheit, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Currency Converter, convert 100 USD to EUR, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the BMI Calculator, enter weight 85 kg and height 1.80 m, and report the BMI value.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Home page and report how many converter tools are listed.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Home page and report how many calculator tools are listed.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Weight Converter, convert 10 pounds to kilograms, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Number Base Converter, convert 255 from decimal to hexadecimal, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Volume Converter, convert 2 gallons to liters, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Speed Converter, convert 100 km/h to mph, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+        ],
+        "medium": [
+            ("Navigate to the Mortgage Calculator, enter principal $300,000, rate 6.5%, term 30 years, and report the monthly payment.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Tip Calculator, enter bill $85.50, tip 18%, split 3 ways, and report the per-person amount.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Currency Converter, convert 1000 JPY to USD, then convert that USD amount to EUR. Report the final EUR amount.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Temperature Converter, convert 0 Kelvin to both Celsius and Fahrenheit, and report both results.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Number Base Converter, convert the binary number 11111111 to decimal and then to hexadecimal. Report both results.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Mortgage Calculator, enter principal $500,000, rate 7.25%, term 15 years, and report the total interest paid over the life of the loan.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Area Converter, convert 1 acre to square meters, and report the result.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+            ("Navigate to the Length Converter, convert 5 miles to kilometers, then convert the result to meters. Report the final result in meters.", ["navigate_by_route", "submit_by_form", "extract_by_route"]),
+        ],
+        "hard": [
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to the Length Converter, convert 5 miles to kilometers, then click 'Save to History'. Navigate to your Dashboard and confirm the conversion appears in your history. Report the saved result.", ["authenticate_by_form", "navigate_by_route", "submit_by_form", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Perform three conversions: 100 USD to EUR, 5 miles to km, and 100 Celsius to Fahrenheit. Save each to your history. Then navigate to your Dashboard and report the total number of saved conversions.", ["authenticate_by_form", "navigate_by_route", "submit_by_form", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to the Currency Converter, convert 1000 JPY to USD, save it. Then convert that USD amount to EUR, save it. Navigate to Dashboard and report how many saved conversions you have.", ["authenticate_by_form", "navigate_by_route", "submit_by_form", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to the Mortgage Calculator, calculate payments for a $400,000 mortgage at 6% for 30 years. Save the result to history. Then navigate to Dashboard and confirm it appears. Report the monthly payment.", ["authenticate_by_form", "navigate_by_route", "submit_by_form", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Settings, change the default units to metric. Then navigate to the Length Converter and confirm the default 'From' unit is set to meters. Report yes or no.", ["authenticate_by_form", "navigate_by_route", "edit_by_form", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to your Dashboard, note the current history count. Then perform a Weight conversion (10 lb to kg), save it, return to Dashboard, and report the new count.", ["authenticate_by_form", "navigate_by_route", "extract_by_route", "submit_by_form", "save_by_toggle"]),
+        ],
+    },
+
+    "dating": {
+        "easy": [
+            ("Navigate to the Browse Profiles page and report how many profiles are listed.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, click on '{name}', and report their age and location.", ["navigate_by_route", "search_by_query", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page and report how many profiles are female.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, click on '{name}', and report their listed interests.", ["navigate_by_route", "search_by_query", "extract_by_route"]),
+            ("Navigate to the Discover page and report the name and age of the profile shown.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, filter by gender 'male', and report how many male profiles there are.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, click on '{name}', and report what they are looking for (relationship/casual/friendship).", ["navigate_by_route", "search_by_query", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page and report the name of the youngest profile listed.", ["navigate_by_route", "extract_by_route"]),
+        ],
+        "medium": [
+            ("Navigate to the Browse Profiles page, filter by 'looking for relationship', and report how many profiles match.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, filter by age range 25-30, and report how many profiles are in that range.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, search for profiles interested in 'hiking', and report how many results appear.", ["navigate_by_route", "search_by_query", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, click on '{name}', and then click on '{name2}'. Compare their interests — do they share any? Report the shared interests or 'none'.", ["navigate_by_route", "search_by_query", "compare_from_table", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, filter by gender 'female' and 'looking for relationship', and report how many profiles match both filters.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, find '{name}', and report all their profile details: age, gender, location, interests, and bio.", ["navigate_by_route", "search_by_query", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page and calculate the average age of all listed profiles. Report the average.", ["navigate_by_route", "extract_by_route"]),
+            ("Navigate to the Browse Profiles page, filter by location, and report how many unique locations are represented.", ["navigate_by_route", "filter_by_dropdown", "extract_by_route"]),
+        ],
+        "hard": [
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Discover, like the profile shown, then navigate to Matches and report whether a new match was formed. Report yes or no.", ["authenticate_by_form", "navigate_by_route", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Matches, open the first match conversation, send the message 'Hey there!', then confirm the message appears in the chat. Report yes or no.", ["authenticate_by_form", "navigate_by_route", "create_from_free_text", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Edit Profile, change your bio to 'Love adventure and coffee!', save, then navigate back to your profile and confirm the bio updated. Report the new bio.", ["authenticate_by_form", "navigate_by_route", "edit_by_form", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Discover, like 3 different profiles. Then navigate to Matches and report the total number of matches.", ["authenticate_by_form", "navigate_by_route", "save_by_toggle", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Edit Profile, update your age preference to min 25, max 35. Then navigate to Discover and report whether the shown profile is within that age range. Report yes or no.", ["authenticate_by_form", "navigate_by_route", "edit_by_form", "extract_by_route"]),
+            ("Log in as '{user}' (password: '{pwd}'). Navigate to Matches, count how many matches you have. Then send a message in two different match conversations. Report the number of matches and confirm both messages were sent.", ["authenticate_by_form", "navigate_by_route", "extract_by_route", "create_from_free_text"]),
+        ],
+    },
 }
 
 # Generic fallback for sites without specific templates
@@ -513,11 +578,17 @@ def load_site_context(site_id):
             except: pass
     ctx["users"] = ctx["data"].get("users", [])
 
-    # Extract entities
+    # Extract entities — include users as entities for social/profile-based sites
     name_keys = ["name", "title", "word", "subject", "merchant", "company", "campaign", "symbol", "headline", "topic"]
-    filter_keys = ["category", "status", "type", "stage", "sector", "os", "brand", "pos", "section", "folder"]
+    filter_keys = ["category", "status", "type", "stage", "sector", "os", "brand", "pos", "section", "folder",
+                   "gender", "looking_for", "location", "account_type"]
+
+    # For sites where users ARE the content (dating, classifieds), extract user profiles as entities
+    profile_sites = {"dating", "classifieds", "forums", "multiplayer-online"}
     for source, content in ctx["data"].items():
-        if source == "users" or not isinstance(content, list): continue
+        if source == "users" and site_id not in profile_sites:
+            continue
+        if not isinstance(content, list): continue
         for item in content:
             if not isinstance(item, dict): continue
             name = None
