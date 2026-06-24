@@ -126,12 +126,18 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
 
         <div class="step-content">
 
-            <!-- STEP 1: Read task -->
+            <!-- STEP 1: Read/Write task -->
             <div class="step-panel active" id="step-1">
-                <h3>Step 1: Read & Edit Task</h3>
-                <p class="hint">Read the instruction. Edit if unclear. Then start recording.</p>
+                {% if mode == 'blank' %}
+                <h3>Step 1: Design Your Task</h3>
+                <p class="hint">Explore the site on the left first. Then write a clear instruction that a browser agent should follow. The instruction should say where to navigate, what to do, and what to report.</p>
+                <p class="hint" style="color:#f59e0b">Tip: Check the <a href="{{ url_for('annotation.dashboard') }}" target="_blank" style="color:#38bdf8">Dashboard</a> to see which sites need more tasks.</p>
+                {% else %}
+                <h3>Step 1: Review Draft Task</h3>
+                <p class="hint">Read the draft below. Try it on the site — if it's impossible or unclear, edit it or click Skip. The instruction should be specific enough that you know exactly what to do.</p>
+                {% endif %}
                 <label>Instruction</label>
-                <textarea id="instruction" rows="4">{{ draft.instruction if draft else '' }}</textarea>
+                <textarea id="instruction" rows="4" placeholder="{% if mode == 'blank' %}Write your task here. Example: Navigate to the Transactions page, filter by category 'Groceries', and report how many transactions match.{% endif %}">{{ draft.instruction if draft else '' }}</textarea>
                 <label>Difficulty</label>
                 <div class="diff-selector">
                     {% set d = draft.difficulty if draft else 'medium' %}
