@@ -48,20 +48,80 @@ def _tasks_dir():
 
 def _load_all_tasks():
     tasks = []
-    for f in sorted(_tasks_dir().glob("*.json")):
-        try:
-            tasks.append(json.loads(f.read_text()))
-        except (json.JSONDecodeError, OSError):
-            pass
+    for d in sorted(_tasks_dir().iterdir()):
+        # Support both old format (flat .json) and new format (directory with task.json)
+        if d.is_dir() and (d / "task.json").exists():
+            try:
+                tasks.append(json.loads((d / "task.json").read_text()))
+            except (json.JSONDecodeError, OSError):
+                pass
+        elif d.is_file() and d.suffix == ".json":
+            try:
+                tasks.append(json.loads(d.read_text()))
+            except (json.JSONDecodeError, OSError):
+                pass
     return tasks
 
 
 def _save_task(task):
+    """Save task with heavy data (HTML, screenshots) in a subdirectory.
+
+    Structure:
+      annotation/tasks/<task_id>/
+        task.json          — lightweight metadata (instruction, macros, eval, answer)
+        trajectory.json    — action/observation sequence (ax_tree only, no raw HTML)
+        html/              — raw HTML snapshots per step (step_001.html, ...)
+        screenshots/       — screenshot files per step (step_001.png, ...)
+    """
     task_id = task.get("task_id", f"task_{uuid.uuid4().hex[:8]}")
     task["task_id"] = task_id
     task["created_at"] = datetime.now().isoformat()
-    path = _tasks_dir() / f"{task_id}.json"
-    path.write_text(json.dumps(task, indent=2))
+
+    # Create task directory
+    task_dir = _tasks_dir() / task_id
+    task_dir.mkdir(parents=True, exist_ok=True)
+    html_dir = task_dir / "html"
+    html_dir.mkdir(exist_ok=True)
+
+    # Extract heavy data from trajectory into separate files
+    trajectory = task.pop("trajectory", [])
+    clean_trajectory = []
+    step_num = 0
+
+    for entry in trajectory:
+        if entry.get("type") == "action":
+            step_num += 1
+            clean_trajectory.append({
+                "type": "action",
+                "step": step_num,
+                "url": entry.get("url", ""),
+                "timestamp": entry.get("timestamp", ""),
+            })
+        elif entry.get("type") == "observation":
+            # Save raw HTML to separate file
+            raw_html = entry.get("raw_html", "")
+            if raw_html:
+                (html_dir / f"step_{step_num:03d}.html").write_text(raw_html)
+
+            # Keep ax_tree in trajectory (lightweight), strip raw HTML
+            clean_trajectory.append({
+                "type": "observation",
+                "step": step_num,
+                "title": entry.get("title", ""),
+                "url": entry.get("url", ""),
+                "ax_tree": entry.get("ax_tree", ""),
+                "has_html": bool(raw_html),
+                "has_screenshot": entry.get("screenshot", "") not in ("", "[screenshot:pending]", "[screenshot:error]"),
+                "timestamp": entry.get("timestamp", ""),
+            })
+
+    # Save trajectory separately
+    (task_dir / "trajectory.json").write_text(json.dumps(clean_trajectory, indent=2))
+
+    # Save lightweight task metadata (no trajectory, no HTML)
+    task["trajectory_steps"] = step_num
+    (task_dir / "task.json").write_text(json.dumps(task, indent=2))
+
     return task_id
 
 
