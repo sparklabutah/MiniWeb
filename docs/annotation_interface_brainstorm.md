@@ -5,22 +5,27 @@ Goal: at least 2000 tasks in total. Each task might require navigation among sit
 Timeline: we have a month. 2000 high quality web tasks, each with verifiers, macro labels, and reference trajectories.
 
 
-## What we already have
+## What we already have (implemented)
 
-- ~30 websites implemented with real datasets
-- session-scoped data isolation (no Docker needed, in-memory overlay)
-- browser-agent eval harness that runs agents against tasks
+- 27 websites built with real datasets, all validated
+- session-scoped data isolation (in-memory overlay, no Docker)
+- browser-agent eval harness (browser-use + GPT-4o/Claude/Gemini)
 - macro vocabulary (163 macros from 4 benchmarks)
-- 20 construction-time validation tasks per site (scaffolding, not final benchmark tasks)
+- annotation interface at /annotate/ (same-origin as MiniWeb, 4-step wizard)
+- verifier toolbox: AgentResponseEvaluator, BackendStateEvaluator, GroundingEvaluator
+- typed normalizers: string, number, boolean, date, currency, string_list, url
+- 1412 pre-generated task drafts across 27 sites (in annotation/generated/)
+- task storage: annotation/tasks/<task_id>/ with task.json, trajectory.json, html/
 
 
-## What we need to build
+## What still needs work
 
-- a verifier toolbox that doesn't require writing Python per task
-- an annotation interface where humans can create tasks fast
-- a way to record reference trajectories during annotation
-- duplicate detection + macro coverage tracking
-- grounding verification — proof that agents actually navigated the site, not just answered from memory
+- task draft quality: current drafts are template-style ("What is the X of Y?"), need
+  WebArena/Mind2Web-style natural instructions ("Find me a hotel in NYC under $200")
+- macro labeling pipeline: auto-infer macros from trajectories post-hoc
+- duplicate detection: embedding similarity check on submit
+- screenshot capture: currently placeholder, needs html2canvas or server-side rendering
+- cross-site task support in the annotation interface
 
 
 ---
@@ -30,229 +35,227 @@ Timeline: we have a month. 2000 high quality web tasks, each with verifiers, mac
 
 Reference: https://github.com/ServiceNow/webarena-verified (ServiceNow, 2025)
 
-We adopt WebArena-Verified's approach: verifiers are declarative JSON configs, not Python functions. The eval harness interprets them at runtime.
+Implemented in annotation/evaluators.py. Declarative JSON configs, no Python per task.
 
 Three verifier types:
 
-  1. AgentResponseEvaluator
-     Checks the agent's final text answer against expected values.
-     Uses typed normalization so "8", "8.0", "$8", "eight" all match when type is "number".
-     Supports alternatives: expected can be ["107", "one hundred and seven"].
+  1. AgentResponseEvaluator — checks agent's text answer with typed normalization
+  2. BackendStateEvaluator — checks site API state (mutations, counts, existence)
+  3. GroundingEvaluator — verifies agent navigated the site (anti-cheating)
 
-  2. BackendStateEvaluator
-     Calls site APIs after task completion, checks state changed correctly.
-     For mutation tasks: "add to cart" → GET /api/cart → check item is there.
-     For extraction tasks: cross-validate agent's answer against API response.
-     Comparison operators: equals, contains, not_contains, greater_than, less_than,
-     length_equals, exists, not_exists.
-
-  3. GroundingEvaluator (inspired by WebArena-Verified's NetworkEventEvaluator)
-     Verifies the agent actually visited the right pages — didn't just guess from memory.
-     Checks the browser's navigation trace (URL history) during task execution.
-     Example: task says "look up the price on the product page" → verify agent actually
-     visited /sites/e-commerce/product/42, not just returned a number from training data.
-
-     This is critical for benchmark integrity. Without it, a model that memorized WebShop
-     product data could "pass" e-commerce tasks without ever opening the site.
-
-     What it checks:
-       - agent visited required URLs during the task
-       - visits happened in the right order (searched before extracting)
-       - agent came FROM the right page (referer check — navigated via the UI, not URL bar)
-       - for mutation tasks: the right POST/PUT/DELETE request was made
-
-Typed normalizers (what we need):
-  string, number, boolean, date, currency, string_list, url
-
-Task eval config format (per task, stored in JSON):
-  {
-    "eval": [
-      {"evaluator": "AgentResponseEvaluator", "type": "number", "expected": "107"},
-      {"evaluator": "BackendStateEvaluator", "endpoint": "GET /api/products?q=wireless", "field": "length", "comparison": "equals", "expected": 107},
-      {"evaluator": "GroundingEvaluator", "required_urls": ["/sites/e-commerce/"], "required_actions": ["search"]}
-    ],
-    "eval_logic": "all"
-  }
-
-Each eval block is independent. The task passes only when all blocks pass (or any, configurable).
-Annotators build this config through the UI — they never write JSON directly.
+Each task's eval config is a list of evaluator blocks with AND/OR logic.
+Annotators build this via the verifier checklist UI — never write JSON directly.
 
 
 ---
 
 
-## Annotation Interface Proposals
+## Annotation Workflow (implemented)
+
+4-step wizard at http://localhost:8080/annotate/
+
+  Step 1: READ TASK
+    Pre-generated draft is shown (from annotation/generated/<site>.json).
+    Annotator reads the instruction. Can edit freely — drafts are starting
+    points, not final. The instruction should be rewritten to sound like
+    a real user request, not a database query.
+
+    Good: "Find me the cheapest wireless headphones and add them to my cart"
+    Bad: "What is the price of product ID 42?"
+
+    Reference for task style: WebArena (Zhou et al., 2024) and Mind2Web
+    (Deng et al., 2023) — tasks should be natural language instructions
+    that a real person would give to an assistant. See examples:
+
+    WebArena style:
+      "Draft an email to the shop owner via their contact us form for a coupon as I am a student"
+      "Create a private NodeJS repository called web_agent_nodejs using the right template"
+      "Show me the route and driving time from the city where my customer Sophia Young lives to NYC"
+
+    Mind2Web style:
+      "Find used audi 100 sorted by best deal"
+      "Find the highest rated fast responding phone repair shop for data recovery in Houston"
+      "Find adults only, airfare included vacations in Mexico during the month of May"
+
+  Step 2: RECORD TRAJECTORY
+    Click "Start Recording". Navigate the site in the left iframe.
+    System auto-captures every page navigation as an action/observation pair:
+      - Action: the URL navigated to
+      - Observation (3 types captured simultaneously):
+        1. Raw HTML — document.outerHTML (first 5000 chars)
+        2. Accessibility tree — headings, inputs, buttons, links, tables, body text
+        3. Screenshot — placeholder (needs html2canvas integration)
+    Click "Stop Recording" when done solving the task.
+    Trajectory saved to annotation/tasks/<id>/trajectory.json (ax_tree only)
+    and annotation/tasks/<id>/html/ (raw HTML per step).
+
+  Step 3: TYPE ANSWER
+    Annotator types the correct answer they observed.
+    Selects answer type: string / number / boolean / list.
+    Can add alternative acceptable answers (one per line).
+
+  Step 4: SELECT VERIFIERS
+    Auto-populated checklist based on answer + trajectory:
+      [x] Answer match — pre-filled from step 3
+      [x] Grounding — pre-filled from recorded URLs
+      [ ] Backend count check — annotator fills endpoint + expected value
+      [ ] Backend existence check — verify item exists after mutation
+      [ ] Backend deletion check — verify item gone after deletion
+    Each verifier shows live 🟢/🔴 indicator via "Test All" button.
+    Annotator can add custom backend checks.
+
+  Submit → task saved → auto-advance to next draft.
+
+
+---
+
+
+## Key Design Decisions
+
+Macro labeling is NOT done by annotators:
+  If annotators select macros from a visible list, they bias toward common
+  macros they recognize and skip rare ones. This produces skewed coverage.
+  Instead, macros are inferred post-hoc from recorded trajectories by an
+  automated process (LLM-based or rule-based, looking at the URL sequence
+  and action types). This is more objective and faster for annotators.
+
+Task drafts are starting points, not final tasks:
+  The pre-generated drafts (annotation/generated/) are template-based and
+  need heavy rewriting by annotators. The draft gives structure (which site,
+  what difficulty, what entities to reference) but the annotator rewrites
+  the instruction in natural language. Drafts that can't be saved as real
+  tasks should be skipped.
+
+Observations are multi-modal:
+  Each trajectory step captures raw HTML, accessibility tree, and screenshot.
+  This mirrors what a browser agent would observe:
+    - Raw HTML: what the page source looks like
+    - AX tree: structured semantic content (what a screen reader would see)
+    - Screenshot: visual rendering (what a vision model would see)
+  All three are stored so we can experiment with different agent input modes.
+
+Grounding verification prevents cheating:
+  Without it, an LLM that memorized training data can "answer" questions
+  about products, prices, or facts without ever opening the website.
+  The GroundingEvaluator checks the agent's navigation trace — it must
+  have visited the relevant pages to get credit.
+
+
+---
+
+
+## Proposals (historical context)
 
 
 ### Kenny and Farhan (PI) idea
 
 Interface:
   + MiniWeb live in browser
-  + trajectory outliner sidebar (how many steps, dependencies between steps)
+  + trajectory outliner sidebar
   + verifier selection panel
   + goal/instruction text input
 
 How it works:
-  + annotator gets a small sample of macros and a sample of websites
-  + annotator picks macros and a website, then designs a task that exercises those macros
-  + annotator performs the task, outlines the trajectory step by step
-  + annotator selects which verifiers apply from a checklist
-  + backend runs duplicate detection to prevent overlapping tasks
-  + backend tracks macro coverage so annotators prioritize gaps
+  + annotator gets a small sample of macros and websites
+  + annotator designs a task from scratch
+  + annotator performs the task, outlines trajectory
+  + annotator selects verifiers from checklist
+  + backend tracks macro coverage and prevents duplicates
 
-Strengths: fully human-driven, high creativity, annotator understands the task deeply
-Weaknesses: slower (blank page problem), requires annotators to know the macro vocabulary,
-  harder to ensure coverage balance without strong guidance
+Strengths: fully human-driven, high creativity
+Weaknesses: slower (blank page problem), coverage hard to balance
 
 
 ### Minh's idea
 
 Interface:
   + MiniWeb live in browser
-  + LLM-proposed task shown as starting point (annotator doesn't just accept it — must walk through)
-  + macro library organized by verbs (annotator picks relevant macros)
-  + verifier selection panel with live pass/fail indicators
+  + LLM-proposed task as starting point
+  + verifier selection with live pass/fail indicators
 
 How it works:
-  + LLM pre-generates candidate tasks per site (from routes.py + macro list)
-  + candidate task shows up. annotator reads it
-  + annotator opens the site and actually tries to solve the task — trajectory is auto-recorded
-  + annotator marks when the task is complete
-  + annotator selects verifiers by toggling checkboxes. each checkbox has a live green/red indicator
-    showing whether that check currently passes. annotators can include negative verifiers too
-    (checks that should FAIL — e.g., "deleted item should NOT exist")
-  + annotator selects relevant macro chain. later compared to LLM's hidden proposal for QC
-  + annotator edits the task instruction if the LLM phrasing was wrong or unclear
+  + LLM pre-generates candidate tasks per site
+  + annotator walks through the task (mandatory — no rubber-stamping)
+  + annotator selects verifiers with live feedback
+  + annotator edits instruction if LLM phrasing was wrong
 
-Strengths: faster (draft beats blank page), trajectory recorded automatically, live verifier
-  feedback means annotator catches bugs immediately
-Weaknesses: risk of annotator laziness if they just rubber-stamp LLM drafts — mitigated by
-  mandatory trajectory walkthrough (no "accept as-is" button)
+Strengths: faster (draft beats blank page), live verifier feedback
+Weaknesses: risk of lazy annotators — mitigated by mandatory walkthrough
 
-Key insight from Minh: reviewers value human involvement. The paper must honestly say every
-task was performed by a human. The LLM is a productivity tool for drafting, not a replacement.
-
-Key insight from Minh on macro labeling: if annotators select macros from a visible list,
-they will be biased toward familiar/common macros and ignore rare ones. Solution: annotators
-do NOT label macros during annotation. Macros are inferred post-hoc from the recorded
-trajectory by a separate automated process (LLM or rule-based). This also speeds up
-annotation (one fewer step) and produces more objective macro labels.
+Key insights from Minh:
+  - Reviewers value human involvement — paper must honestly claim human authorship
+  - If annotators select macros from a list, they bias toward familiar ones.
+    Remove macro selection entirely — infer post-hoc from trajectories
+  - Task instructions must be natural (WebArena/Mind2Web style), not template queries
 
 
-### Claude's synthesis (combining both + WebArena-Verified verifier design)
+### Implemented synthesis
 
-Interface: split-screen annotator
-  + LEFT: live MiniWeb site in an iframe. annotator actually uses the site here.
-     browser extension auto-records all clicks/types/navigations as the trajectory.
-     for cross-site tasks, annotator navigates between sites within the same iframe.
-  + RIGHT: annotation panel with 4 sections:
+Combines Minh's LLM-draft approach with WebArena-Verified's verifier architecture.
+Runs as part of the MiniWeb Flask app (same origin, no cross-origin iframe issues).
 
-    Section 1 — Task instruction
-      LLM draft shown as editable text. annotator reads it, tries it in the iframe,
-      then edits. the LLM also generates a hidden macro chain + expected answer
-      (annotator doesn't see these — used for QC comparison later).
-
-    Section 2 — Trajectory viewer
-      live feed of recorded actions as annotator works in the iframe.
-      each action shows: timestamp, action type (click/type/navigate), target element, URL.
-      annotator can tag each action with a macro from a dropdown. (Minh: No, a macro can be a subsequence of actions)
-      after completing the task, annotator types the final answer they observed.
-
-    Section 3 — Verifier builder
-      based on the WebArena-Verified evaluator architecture.
-      three tabs, one per evaluator type:
-
-      Tab A: Answer Check (AgentResponseEvaluator)
-        expected answer field (pre-filled from annotator's answer in Section 2)
-        type dropdown: string / number / boolean / date / currency / list
-        alternatives field: add multiple acceptable answers
-        🟢/🔴 live indicator
-
-      Tab B: Backend Check (BackendStateEvaluator)
-        endpoint field: GET /sites/email/api/folders/sent/count
-        field path: .count
-        comparison dropdown: equals / contains / not_contains / greater_than / exists / not_exists
-        expected value field
-        [+ Add another check] button for chaining
-        🟢/🔴 live indicator per check
-
-      Tab C: Grounding Check (GroundingEvaluator)
-        auto-populated from the recorded trajectory in Section 2
-        shows which URLs the annotator visited — these become the "required navigation" list
-        annotator toggles which visits are required vs incidental:
-          [x] /sites/e-commerce/          (required — agent must visit the site)
-          [x] /sites/e-commerce/product/42 (required — agent must view this product)
-          [ ] /sites/e-commerce/cart        (incidental — happened to visit but not required)
-        for mutation tasks, shows POST/PUT/DELETE requests that were made:
-          [x] POST /sites/e-commerce/cart/add  (required — agent must add to cart)
-        this prevents agents from answering from internal knowledge without navigating
-
-      all three tabs contribute to the final eval config.
-      logic toggle: [x] ALL must pass  [ ] ANY must pass
-
-    Section 4 — Macro chain
-      macro library sidebar organized by verb category
-      annotator drags macros into an ordered chain
-      compared to LLM's hidden chain after submission for QC
-
-Annotator workflow (~4-5 min per task):
-  1. LLM draft appears. annotator reads it
-  2. annotator performs the task in the iframe (auto-recorded)
-  3. annotator types the answer they found, edits the instruction if needed
-  4. answer auto-fills into the Answer Check verifier
-  5. trajectory auto-fills into the Grounding Check verifier (annotator toggles required/incidental)
-  6. annotator adds Backend Check verifiers if the task involves mutations
-  7. annotator labels the macro chain
-  8. submit — backend validates (all verifiers must pass with the recorded answer), checks duplicates
-
-Why the grounding check matters:
-  current LLMs have been trained on tons of web data. GPT-4o might "know" that Amazon sells
-  wireless headphones for $29.99 without ever opening the e-commerce site. The grounding
-  evaluator catches this — if the agent didn't visit /sites/e-commerce/product/42, it fails
-  even if the answer is correct. This is the difference between "the agent can navigate" and
-  "the agent can guess." For a web agent benchmark, we need to measure navigation, not memory.
-
-  WebArena-Verified does this via HAR (HTTP Archive) network traces from the browser.
-  We can do the same — browser-use already captures navigation events. The annotation
-  interface just needs to let the annotator mark which navigations are essential.
+4-step wizard: Task → Record → Answer → Verify
+No macro selection (inferred post-hoc)
+Auto-recording trajectory with 3 observation types
+Declarative verifier configs with live testing
+Pre-generated drafts with prev/next navigation
+Task storage: lightweight metadata + separate HTML snapshots
 
 
 ---
 
 
-## Shared concerns across all proposals
+## Shared concerns
 
 Duplicate prevention:
-  + live embedding index (sentence-transformers) flags similar tasks on submit
-  + if cosine similarity > 0.85 with existing task, show warning before saving
-  + annotators can still override if the tasks are genuinely different
+  + embedding similarity check on submit (not yet implemented)
+  + warn if cosine similarity > 0.85 with existing task
 
-Macro coverage dashboard:
-  + shows heatmap: which macros × which sites have enough tasks
-  + annotators are guided to under-covered areas first
-  + target: every macro exercised by at least 10 tasks across 3+ sites
+Task instruction quality:
+  + drafts must be rewritten by annotators to sound natural
+  + reference: WebArena and Mind2Web task corpora in macros/datasets/
+  + avoid: "How many X are there?" "What is the Y of Z?"
+  + prefer: "Find me...", "Show me...", "I need to...", "Help me..."
 
 Quality control:
-  + every task has a mandatory human trajectory walkthrough
-  + auto-validate on submit: verifier config must pass with recorded answer
-  + second annotator reviews 20% random sample
-  + annotator macro chain compared to LLM hidden chain — disagreements flagged
-  + track per-annotator speed, acceptance rate, and disagreement rate
+  + mandatory trajectory walkthrough for every task
+  + auto-validate: verifier config must pass with recorded answer
+  + second annotator review for 20% random sample
+  + per-annotator metrics: speed, acceptance rate
 
 Cross-site tasks:
-  + some tasks span 2-3 sites (e.g., "look up contact in CRM, email them")
-  + annotation interface supports this — iframe can navigate between sites
-  + grounding verifier checks navigation across multiple sites
-  + eval config specifies "sites": ["crm", "email"] so harness knows what's involved
-  + these are harder tasks (5+ macros), naturally fall into "hard" difficulty tier
+  + iframe can navigate between sites (same Flask app)
+  + grounding verifier checks navigation across sites
+  + eval config specifies "sites": ["crm", "email"]
+  + naturally hard tasks (5+ macros)
 
 For the paper:
   "All tasks were created and verified through human trajectory walkthroughs.
   LLM-generated drafts were used to accelerate annotation, but every task was
-  manually performed, edited, and verified by a human annotator. Our evaluation
-  framework adopts the typed evaluation pipeline from WebArena-Verified
-  (ServiceNow, 2025), extended with grounding verification to ensure agents
-  navigate the web rather than relying on internal knowledge."
+  manually performed, edited, and verified by a human annotator. Macro labels
+  were inferred post-hoc from recorded trajectories to avoid annotator selection
+  bias. Our evaluation framework adopts the typed evaluation pipeline from
+  WebArena-Verified (ServiceNow, 2025), extended with grounding verification
+  to ensure agents navigate the web rather than relying on internal knowledge."
 
 
 ---
+
+
+## Implementation priority
+
+  1. ✅ Verifier primitives + evaluator framework
+  2. ✅ Annotation UI (4-step wizard, same-origin iframe)
+  3. ✅ Trajectory recording (auto-capture with 3 observation types)
+  4. ✅ Pre-generated task drafts (1412 across 27 sites)
+  5. ✅ Task storage (directory per task: metadata + trajectory + HTML)
+  6. 🔲 Task draft quality improvement (LLM rewriter for natural instructions)
+  7. 🔲 Duplicate detection (embedding similarity)
+  8. 🔲 Screenshot capture (html2canvas or server-side)
+  9. 🔲 Post-hoc macro inference from trajectories
+  10. 🔲 Cross-site task annotation support
+
+Timeline:
+  - Week 1: ✅ done — verifier framework, annotation UI, draft generator
+  - Week 2-3: annotation sprint (4 annotators × 40h → ~2000 tasks at 4 min/task)
+  - Week 4: QC review, macro inference, finalize dataset
