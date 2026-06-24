@@ -150,7 +150,7 @@ def index():
     user = _current_user()
     if not user:
         return render_template("credit-card/login.html", error=None, show_login_prompt=True,
-                               users=_load_users(), show_api_links=True)
+                               users=_load_json(USERS_FILE), show_api_links=True)
     transactions = _get_transactions()
     user_txns = sorted(
         [t for t in transactions if t["user_id"] == user["id"]],
@@ -337,7 +337,7 @@ def form_dispute_transaction(txn_id):
     txn = next((t for t in transactions if t["id"] == txn_id), None)
     if not txn or txn["user_id"] != session["user_id"]:
         abort(404)
-    txn["disputed"] = not txn["disputed"]
+    txn["disputed"] = not txn.get("disputed", False)
     _save_json(TRANSACTIONS_FILE, transactions)
     _reload_transactions()
     return redirect(url_for("credit-card.transactions_page"))
@@ -414,9 +414,9 @@ def api_transactions():
         ml = merchant.lower()
         results = [t for t in results if ml in t["merchant"].lower()]
     if disputed == "true":
-        results = [t for t in results if t["disputed"]]
+        results = [t for t in results if t.get("disputed", False)]
     elif disputed == "false":
-        results = [t for t in results if not t["disputed"]]
+        results = [t for t in results if not t.get("disputed", False)]
     if sort == "date_asc":
         results.sort(key=lambda t: t["date"])
     elif sort == "date_desc":
@@ -445,7 +445,7 @@ def api_dispute_transaction(txn_id):
     txn = next((t for t in transactions if t["id"] == txn_id), None)
     if not txn:
         return jsonify({"error": "Transaction not found"}), 404
-    txn["disputed"] = not txn["disputed"]
+    txn["disputed"] = not txn.get("disputed", False)
     _save_json(TRANSACTIONS_FILE, transactions)
     _reload_transactions()
     action = "disputed" if txn["disputed"] else "undisputed"
@@ -633,7 +633,7 @@ def api_stats():
     users = _get_users()
     total_txns = len(transactions)
     total_spend = sum(t["amount"] for t in transactions)
-    disputed_count = sum(1 for t in transactions if t["disputed"])
+    disputed_count = sum(1 for t in transactions if t.get("disputed", False))
     categories = {}
     for t in transactions:
         categories[t["category"]] = categories.get(t["category"], 0) + t["amount"]
