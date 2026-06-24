@@ -66,13 +66,14 @@ def _load_sites():
         if not (site_json.parent / "routes.py").exists():
             continue
         meta = json.loads(site_json.read_text())
-        # Check if site has tasks (is built)
         has_tasks = (site_json.parent / "tasks.json").exists()
+        has_results = (site_json.parent / "results").exists() and any((site_json.parent / "results").iterdir()) if (site_json.parent / "results").exists() else False
         routes_size = (site_json.parent / "routes.py").stat().st_size
-        if has_tasks or routes_size > 500:
+        if has_tasks and routes_size > 500:
             meta["built"] = True
+            meta["evaluated"] = has_results
             meta["url"] = f"/sites/{meta['id']}/"
-        sites.append(meta)
+            sites.append(meta)
     return sites
 
 
