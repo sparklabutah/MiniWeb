@@ -171,24 +171,107 @@ def api_get_task(task_id):
 
 @app.route("/api/generate_draft", methods=["POST"])
 def api_generate_draft():
-    """Generate a data-grounded task draft by reading the site's actual data and routes."""
+    """Generate a task draft using macro-chain-first approach:
+    1. Sample a macro chain (reject if duplicate)
+    2. Explore site data to ground the task in real entities
+    3. Compose a specific, data-grounded instruction
+    """
     data = request.get_json(silent=True) or {}
     site_id = data.get("site", "")
     if not site_id:
         return jsonify({"error": "No site specified"}), 400
 
     site_dir = PROJECT_ROOT / "sites" / site_id
-
-    # Load real data from the site to ground the task
-    draft = _generate_data_grounded_draft(site_id, site_dir)
+    draft = _macro_first_draft(site_id, site_dir)
     return jsonify(draft)
 
 
-def _generate_data_grounded_draft(site_id, site_dir):
-    """Generate task drafts grounded in actual site data."""
+def _macro_first_draft(site_id, site_dir):
+    """Macro-chain-first task generation:
+    Step 1: Sample a macro chain from the vocabulary
+    Step 2: Explore site data to find entities that match the chain
+    Step 3: Write a specific instruction grounded in real data
+    """
     rng = random.Random()
 
-    # Load site data files
+    # --- Step 0: Load site context ---
+    data_files = _load_site_data(site_dir)
+    users = data_files.get("users", [])
+    existing_chains = _load_existing_chains(site_dir)
+    entities = _extract_entities(data_files)
+
+    # --- Step 1: Sample a macro chain ---
+    # Define valid chain patterns by difficulty
+    easy_chains = [
+        ["navigate_by_route"],
+        ["search_by_query"],
+        ["extract_by_route"],
+        ["navigate_by_dropdown"],
+    ]
+    medium_chains = [
+        ["search_by_query", "extract_by_route"],
+        ["filter_by_dropdown", "extract_by_route"],
+        ["search_by_query", "sort_by_ranking", "extract_by_route"],
+        ["navigate_by_route", "extract_by_route", "compute_by_query"],
+        ["filter_by_dropdown", "sort_by_ranking", "extract_by_route"],
+        ["search_by_query", "filter_by_dropdown", "extract_by_route"],
+        ["navigate_by_dropdown", "extract_by_route", "compare_from_table"],
+    ]
+    hard_chains = [
+        ["authenticate_by_form", "search_by_query", "extract_by_route"],
+        ["authenticate_by_form", "navigate_by_route", "extract_by_route", "compute_by_query"],
+        ["authenticate_by_form", "search_by_query", "save_by_toggle", "extract_by_route"],
+        ["authenticate_by_form", "create_from_free_text", "extract_by_route"],
+        ["authenticate_by_form", "navigate_by_route", "edit_by_form", "extract_by_route"],
+        ["authenticate_by_form", "filter_by_dropdown", "sort_by_ranking", "extract_by_route", "compute_by_query"],
+        ["search_by_query", "navigate_by_route", "extract_by_route", "search_by_query", "compare_from_table"],
+    ]
+
+    # Pick difficulty and sample chain, rejecting duplicates
+    all_pools = [("easy", easy_chains), ("medium", medium_chains), ("hard", hard_chains)]
+    rng.shuffle(all_pools)
+
+    chain = None
+    difficulty = None
+    for diff, pool in all_pools:
+        rng.shuffle(pool)
+        for candidate in pool:
+            chain_key = tuple(candidate)
+            if chain_key not in existing_chains:
+                chain = candidate
+                difficulty = diff
+                break
+        if chain:
+            break
+
+    if not chain:
+        # All chains used — pick a random one anyway
+        pool = easy_chains + medium_chains + hard_chains
+        chain = rng.choice(pool)
+        difficulty = "easy" if len(chain) <= 1 else ("medium" if len(chain) <= 3 else "hard")
+
+    # --- Step 2: Explore data to find entities matching the chain ---
+    user = rng.choice(users) if users else None
+    entity = rng.choice(entities) if entities else None
+
+    # --- Step 3: Compose instruction from chain + data ---
+    instruction = _compose_instruction(chain, difficulty, site_id, entity, user, data_files, rng)
+
+    return {
+        "site": site_id,
+        "instruction": instruction,
+        "difficulty": difficulty,
+        "macros": chain,
+        "expected_answer": None,
+        "grounded_entity": {
+            "name": entity["name"] if entity else None,
+            "source": entity["source"] if entity else None,
+        },
+    }
+
+
+def _load_site_data(site_dir):
+    """Load all JSON data files from a site."""
     data_files = {}
     data_dir = site_dir / "data"
     if data_dir.exists():
@@ -196,133 +279,140 @@ def _generate_data_grounded_draft(site_id, site_dir):
             if f.name.startswith("."):
                 continue
             try:
-                content = json.loads(f.read_text())
-                data_files[f.stem] = content
+                data_files[f.stem] = json.loads(f.read_text())
             except (json.JSONDecodeError, OSError):
                 pass
+    return data_files
 
-    # Load existing tasks to get macro patterns
-    existing_macros = []
+
+def _load_existing_chains(site_dir):
+    """Load macro chains already used in existing + annotated tasks."""
+    chains = set()
+    # From construction tasks
     tasks_file = site_dir / "tasks.json"
     if tasks_file.exists():
         try:
             for t in json.loads(tasks_file.read_text()):
-                existing_macros.extend(t.get("macros", []))
+                chains.add(tuple(t.get("macros", [])))
         except (json.JSONDecodeError, OSError):
             pass
+    # From annotated tasks
+    for f in _tasks_dir().glob("*.json"):
+        try:
+            t = json.loads(f.read_text())
+            if t.get("site") == site_dir.name:
+                chains.add(tuple(t.get("macros", [])))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return chains
 
-    # Pick a random data entity to ground the task
-    users = data_files.get("users", [])
-    entity_name = None
-    entity_data = {}
-    entity_source = None
 
-    # Try to find interesting data entities — prefer ones with good name fields
-    name_keys = ["name", "title", "word", "subject", "merchant", "company", "campaign"]
-    best_entity = None
-    best_name = None
-    best_source = None
-
-    for key, content in data_files.items():
-        if key in ("users",):
+def _extract_entities(data_files):
+    """Extract named entities from data files for grounding tasks."""
+    name_keys = ["name", "title", "word", "subject", "merchant", "company",
+                 "campaign", "symbol", "sender", "from", "from_addr", "username",
+                 "slug", "question", "topic", "headline", "label", "description"]
+    entities = []
+    for source, content in data_files.items():
+        if source == "users":
             continue
-        if isinstance(content, list) and len(content) > 2 and isinstance(content[0], dict):
-            # Pick entities that have a meaningful name field
-            candidates = []
+        if isinstance(content, list):
             for item in content:
+                if not isinstance(item, dict):
+                    continue
                 for nk in name_keys:
                     val = item.get(nk)
                     if val and isinstance(val, str) and len(val) > 2:
-                        candidates.append((item, val, key))
+                        # Collect filterable fields
+                        filters = {}
+                        for fk, fv in item.items():
+                            if isinstance(fv, str) and fk in (
+                                "category", "status", "type", "stage", "difficulty", "tier",
+                                "role", "department", "gender", "looking_for", "funding_model",
+                                "os", "brand", "sector", "side", "order_type", "account_type",
+                                "section", "pos", "folder",
+                            ):
+                                filters[fk] = fv
+                        entities.append({
+                            "name": val,
+                            "source": source,
+                            "data": item,
+                            "filters": filters,
+                            "fields": {k: v for k, v in item.items()
+                                       if isinstance(v, (str, int, float)) and k not in ("id", "password")},
+                        })
                         break
-            if candidates:
-                entity_data, entity_name, entity_source = rng.choice(candidates)
-                best_entity = entity_data
-                best_name = entity_name
-                best_source = entity_source
-                break
+    return entities
 
-    if best_entity:
-        entity_name = best_name
-        entity_data = best_entity
-        entity_source = best_source
 
-    # Pick a random user for auth-required tasks
-    user = rng.choice(users) if users else None
+def _compose_instruction(chain, difficulty, site_id, entity, user, data_files, rng):
+    """Compose a natural language instruction from a macro chain + grounded data."""
+    site_label = site_id.replace("-", " ").replace("_", " ")
+    parts = []
 
-    # Generate task templates grounded in real data
-    templates = []
+    # Auth step
+    if "authenticate_by_form" in chain and user:
+        parts.append(f"Log in as '{user.get('username', '')}' (password: '{user.get('password', '')}').")
 
-    # Easy tasks (1 macro) — data extraction
-    if entity_name and entity_source:
-        templates.append({
-            "instruction": f"How many items are in the {entity_source.replace('_', ' ')} collection? Use the site's search or browse features to find the total count.",
-            "difficulty": "easy",
-            "macros": ["extract_by_route"],
-        })
-        if isinstance(entity_data, dict):
-            # Pick a real field from the entity
-            fields = [k for k, v in entity_data.items() if isinstance(v, (str, int, float)) and k not in ("id", "password")]
-            if fields:
-                field = rng.choice(fields)
-                val = entity_data[field]
-                templates.append({
-                    "instruction": f"Look up '{entity_name}' on the site. What is its {field.replace('_', ' ')}?",
-                    "difficulty": "easy",
-                    "macros": ["search_by_query", "extract_by_route"],
-                    "expected_answer": str(val),
-                })
+    # Navigation
+    if "navigate_by_route" in chain and entity:
+        parts.append(f"Go to the detail page for '{entity['name']}'.")
+    elif "navigate_by_dropdown" in chain and entity and entity.get("filters"):
+        fk, fv = next(iter(entity["filters"].items()))
+        parts.append(f"Navigate to the {fk.replace('_', ' ')} section for '{fv}'.")
 
-    if entity_source:
-        templates.append({
-            "instruction": f"Navigate to the site and search for '{entity_name}'. How many results appear?",
-            "difficulty": "easy",
-            "macros": ["search_by_query"],
-        })
+    # Search
+    if "search_by_query" in chain and entity:
+        parts.append(f"Search for '{entity['name']}'.")
 
-    # Medium tasks (2-3 macros) — search + filter + extract
-    if entity_data and isinstance(entity_data, dict):
-        # Find a filterable field
-        cat_fields = [k for k, v in entity_data.items() if isinstance(v, str) and k in (
-            "category", "status", "type", "stage", "difficulty", "tier", "role",
-            "department", "gender", "looking_for", "funding_model", "os", "brand",
-        )]
-        if cat_fields:
-            cf = rng.choice(cat_fields)
-            cv = entity_data[cf]
-            templates.append({
-                "instruction": f"Filter the {entity_source.replace('_', ' ')} by {cf.replace('_', ' ')} = '{cv}'. How many results match this filter?",
-                "difficulty": "medium",
-                "macros": ["filter_by_dropdown", "extract_by_route"],
-            })
+    # Filter
+    if "filter_by_dropdown" in chain and entity and entity.get("filters"):
+        fk, fv = rng.choice(list(entity["filters"].items()))
+        parts.append(f"Filter by {fk.replace('_', ' ')} = '{fv}'.")
 
-    # Hard tasks (4+ macros) — login + multi-step
-    if user:
-        uname = user.get("username", "")
-        pwd = user.get("password", "")
-        templates.append({
-            "instruction": f"Log in as '{uname}' (password: '{pwd}'). Navigate to the dashboard or profile page. How many saved/favorited items does this user have?",
-            "difficulty": "hard",
-            "macros": ["authenticate_by_form", "navigate_by_route", "extract_by_route"],
-        })
-        if entity_name:
-            templates.append({
-                "instruction": f"Log in as '{uname}' (password: '{pwd}'). Search for '{entity_name}', view its detail page, and save/favorite it. Then check your dashboard to confirm it was saved.",
-                "difficulty": "hard",
-                "macros": ["authenticate_by_form", "search_by_query", "navigate_by_route", "save_by_toggle", "extract_by_route"],
-            })
+    # Sort
+    if "sort_by_ranking" in chain:
+        sort_fields = ["name", "date", "price", "amount", "rating", "score"]
+        parts.append(f"Sort the results by {rng.choice(sort_fields)}.")
 
-    if not templates:
-        templates.append({
-            "instruction": f"Navigate to the {site_id} site. Explore the main page and report what the primary content type is and how many items are displayed.",
-            "difficulty": "easy",
-            "macros": ["navigate_by_route", "extract_by_route"],
-        })
+    # Extract / compute
+    if "extract_by_route" in chain and entity and entity.get("fields"):
+        field, val = rng.choice(list(entity["fields"].items()))
+        parts.append(f"What is the {field.replace('_', ' ')} of '{entity['name']}'?")
+    elif "extract_by_route" in chain:
+        parts.append("How many results are shown?")
 
-    draft = rng.choice(templates)
-    draft["site"] = site_id
-    draft["grounded_entity"] = {"name": entity_name, "source": entity_source}
-    return draft
+    if "compute_by_query" in chain:
+        parts.append("What is the total count or sum?")
+
+    # Mutation actions
+    if "save_by_toggle" in chain and entity:
+        parts.append(f"Save or favorite '{entity['name']}'.")
+    if "create_from_free_text" in chain:
+        parts.append("Create a new entry with a descriptive title and content.")
+    if "edit_by_form" in chain and entity:
+        parts.append(f"Edit the details of '{entity['name']}' — change one field.")
+
+    # Compare
+    if "compare_from_table" in chain:
+        parts.append("Compare the top two results side by side.")
+
+    # Verification step for mutation tasks
+    if any(m in chain for m in ("save_by_toggle", "create_from_free_text", "edit_by_form")):
+        parts.append("Verify the change was saved successfully.")
+
+    # Assemble
+    if parts:
+        instruction = " ".join(parts)
+    else:
+        # Fallback — still grounded
+        if entity:
+            instruction = f"On the {site_label} site, find '{entity['name']}' in the {entity['source'].replace('_', ' ')} and report its details."
+        else:
+            source = rng.choice([k for k in data_files if k != "users"]) if len(data_files) > 1 else site_label
+            instruction = f"On the {site_label} site, browse the {source.replace('_', ' ')} and report how many entries there are."
+
+    return instruction
 
 
 @app.route("/api/sites", methods=["GET"])
