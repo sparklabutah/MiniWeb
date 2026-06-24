@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPro CRM - {{ deal.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #718096; margin-bottom: 1rem; }
+        .breadcrumb a { color: #2b6cb0; text-decoration: none; }
+        .detail-card { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .detail-card h2 { font-size: 1.3rem; color: #1a365d; margin-bottom: .8rem; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 2rem; }
+        .detail-grid .field .label { font-size: .78rem; color: #a0aec0; text-transform: uppercase; letter-spacing: .04em; }
+        .detail-grid .field .val { font-size: .92rem; color: #2d3748; }
+        .detail-grid .field .val a { color: #2b6cb0; text-decoration: none; }
+        .stage-badge { display: inline-block; padding: .2rem .6rem; border-radius: 4px; font-size: .85rem; font-weight: 600; }
+        .stage-badge.prospecting { background: #edf2f7; color: #718096; }
+        .stage-badge.qualification { background: #ebf8ff; color: #2b6cb0; }
+        .stage-badge.proposal { background: #fefcbf; color: #975a16; }
+        .stage-badge.negotiation { background: #faf5ff; color: #6b46c1; }
+        .stage-badge.closed-won { background: #f0fff4; color: #276749; }
+        .stage-badge.closed-lost { background: #fff5f5; color: #c53030; }
+        .stage-progress { display: flex; gap: 3px; margin: 1rem 0; }
+        .stage-progress .step { flex: 1; height: 6px; border-radius: 3px; background: #e2e8f0; }
+        .stage-progress .step.active { background: #3182ce; }
+        .stage-progress .step.won { background: #48bb78; }
+        .stage-progress .step.lost { background: #fc8181; }
+        h3 { font-size: 1.05rem; color: #1a365d; margin-bottom: .8rem; margin-top: .5rem; }
+        .update-form { background: #fff; border-radius: 8px; padding: 1rem 1.5rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+        .update-form label { font-size: .85rem; font-weight: 600; color: #4a5568; }
+        .update-form select { padding: .4rem .6rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .88rem; }
+        .update-form button { padding: .4rem 1rem; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; font-size: .88rem; cursor: pointer; }
+        .update-form button:hover { background: #2c5282; }
+        .activity-item { background: #fff; border-radius: 6px; padding: .7rem 1rem; margin-bottom: .4rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+        .activity-item .desc { font-size: .88rem; }
+        .activity-item .meta { font-size: .78rem; color: #a0aec0; margin-top: .15rem; }
+        .log-form { background: #fff; border-radius: 8px; padding: 1.2rem 1.5rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-top: 1rem; }
+        .log-form h4 { font-size: .95rem; color: #1a365d; margin-bottom: .6rem; }
+        .log-form .form-row { display: flex; gap: .6rem; margin-bottom: .6rem; flex-wrap: wrap; }
+        .log-form select, .log-form input, .log-form textarea { padding: .4rem .6rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .85rem; font-family: inherit; }
+        .log-form textarea { width: 100%; min-height: 60px; resize: vertical; }
+        .log-form button { padding: .4rem 1rem; background: #38a169; color: #fff; border: none; border-radius: 6px; font-size: .85rem; cursor: pointer; }
+        .log-form button:hover { background: #2f855a; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a> &rsaquo; {{ deal.name }}
+        </div>
+        <div class="detail-card">
+            <h2>{{ deal.name }}</h2>
+            <div class="stage-progress">
+                {% for s in stages %}
+                {% if s != 'closed-lost' %}
+                <div class="step {% if deal.stage == 'closed-won' %}won{% elif deal.stage == 'closed-lost' %}lost{% elif stages.index(s) <= stages.index(deal.stage) %}active{% endif %}"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <div class="detail-grid">
+                <div class="field"><div class="label">Stage</div><div class="val"><span class="stage-badge {{ deal.stage }}">{{ deal.stage|replace('-', ' ')|title }}</span></div></div>
+                <div class="field"><div class="label">Amount</div><div class="val" style="font-weight:700; color:#2b6cb0;">${{ "{:,.0f}".format(deal.amount) }}</div></div>
+                <div class="field"><div class="label">Probability</div><div class="val">{{ deal.probability }}%</div></div>
+                <div class="field"><div class="label">Close Date</div><div class="val">{{ deal.close_date }}</div></div>
+                <div class="field"><div class="label">Company</div><div class="val"><a href="{{ url_for('crm.company_detail', company_id=deal.company_id) }}">{{ deal._company_name }}</a></div></div>
+                <div class="field"><div class="label">Contact</div><div class="val"><a href="{{ url_for('crm.contact_detail', contact_id=deal.contact_id) }}">{{ deal._contact_name }}</a></div></div>
+                <div class="field"><div class="label">Owner</div><div class="val">{{ deal._owner_name }}</div></div>
+                <div class="field"><div class="label">Created</div><div class="val">{{ deal.created_date }}</div></div>
+            </div>
+        </div>
+
+        {% if user %}
+        <form class="update-form" method="POST" action="{{ url_for('crm.form_update_deal_stage', deal_id=deal.id) }}">
+            <label>Update Stage:</label>
+            <select name="stage">
+                {% for s in stages %}
+                <option value="{{ s }}" {% if deal.stage == s %}selected{% endif %}>{{ s|replace('-', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Update</button>
+        </form>
+        {% endif %}
+
+        <h3>Activity Timeline ({{ activities|length }})</h3>
+        {% for a in activities %}
+        <div class="activity-item">
+            <div class="desc">{{ a.description }}</div>
+            <div class="meta">{{ a.type|title }} &middot; {{ a._contact_name }} &middot; {{ a._user_name }} &middot; {{ a.date }} &middot; {{ a.duration_minutes }}min</div>
+        </div>
+        {% endfor %}
+        {% if not activities %}
+        <p style="color:#a0aec0;">No activities recorded for this deal.</p>
+        {% endif %}
+
+        {% if user %}
+        <form class="log-form" method="POST" action="{{ url_for('crm.form_create_activity') }}">
+            <h4>Log Activity</h4>
+            <input type="hidden" name="deal_id" value="{{ deal.id }}">
+            <input type="hidden" name="contact_id" value="{{ deal.contact_id }}">
+            <input type="hidden" name="redirect_to" value="{{ url_for('crm.deal_detail', deal_id=deal.id) }}">
+            <div class="form-row">
+                <select name="type">
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="note">Note</option>
+                </select>
+                <input type="date" name="date" value="">
+                <input type="number" name="duration_minutes" placeholder="Minutes" min="0" style="width:90px;">
+            </div>
+            <textarea name="description" placeholder="Describe the activity..."></textarea>
+            <div style="margin-top:.4rem;"><button type="submit">Log Activity</button></div>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>

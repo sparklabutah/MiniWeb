@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ campaign.title }} - FundSpark</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; color: #00d09c; margin: 0; }
+        .header h1 span { color: #fff; }
+        .header-nav a { margin-left: 1rem; font-size: .85rem; color: #b0bec5; text-decoration: none; }
+        .header-nav a:hover { color: #00d09c; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .campaign-header { margin-bottom: 1.5rem; }
+        .campaign-category { font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; color: #00d09c; font-weight: 600; }
+        .campaign-title { font-size: 1.8rem; margin: .3rem 0; color: #1a1a2e; }
+        .campaign-creator { font-size: .9rem; color: #64748b; margin-bottom: .5rem; }
+        .status-badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+        .status-badge.funded { background: #d1fae5; color: #065f46; }
+        .status-badge.active { background: #dbeafe; color: #1e40af; }
+        .status-badge.expired { background: #f1f5f9; color: #64748b; }
+        .status-badge.cancelled { background: #fee2e2; color: #991b1b; }
+        .funding-section { background: #fff; border-radius: .6rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .funding-amount { font-size: 2rem; font-weight: 700; color: #00d09c; }
+        .funding-goal { font-size: 1rem; color: #64748b; }
+        .progress-wrap { background: #e2e8f0; border-radius: .3rem; height: 12px; margin: .8rem 0; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: .3rem; }
+        .progress-bar.funded { background: #00d09c; }
+        .progress-bar.active { background: #3b82f6; }
+        .progress-bar.expired { background: #94a3b8; }
+        .progress-bar.cancelled { background: #ef4444; }
+        .funding-stats { display: flex; gap: 2rem; margin-top: .8rem; }
+        .funding-stat { text-align: center; }
+        .funding-stat .val { font-size: 1.3rem; font-weight: 700; color: #1a1a2e; }
+        .funding-stat .lbl { font-size: .8rem; color: #64748b; }
+        .description { background: #fff; border-radius: .6rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .description h3 { margin-bottom: .8rem; font-size: 1.1rem; }
+        .description p { line-height: 1.7; color: #475569; }
+        .tiers { margin-bottom: 1.5rem; }
+        .tiers h3 { margin-bottom: .8rem; font-size: 1.1rem; }
+        .tier-card { background: #fff; border: 2px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: .75rem; transition: border-color .15s; }
+        .tier-card:hover { border-color: #00d09c; }
+        .tier-card.sold-out { opacity: .6; }
+        .tier-name { font-weight: 700; font-size: 1rem; }
+        .tier-amount { color: #00d09c; font-weight: 700; font-size: 1.2rem; margin: .3rem 0; }
+        .tier-desc { font-size: .9rem; color: #64748b; margin-bottom: .5rem; }
+        .tier-avail { font-size: .8rem; color: #94a3b8; }
+        .pledge-btn { display: inline-block; padding: .5rem 1.2rem; background: #00d09c; color: #1a1a2e; border: none; border-radius: .3rem; cursor: pointer; font-weight: 600; font-size: .9rem; text-decoration: none; margin-top: .5rem; }
+        .pledge-btn:hover { background: #00b386; }
+        .pledge-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .updates { margin-bottom: 1.5rem; }
+        .updates h3 { margin-bottom: .8rem; font-size: 1.1rem; }
+        .update-card { background: #fff; border-left: 4px solid #00d09c; padding: 1rem 1.2rem; margin-bottom: .6rem; border-radius: 0 .4rem .4rem 0; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+        .update-date { font-size: .8rem; color: #94a3b8; }
+        .update-title { font-weight: 600; margin: .2rem 0; }
+        .update-content { font-size: .9rem; color: #475569; line-height: 1.5; }
+        .update-form { background: #fff; border-radius: .5rem; padding: 1rem; margin-top: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+        .update-form h4 { margin-bottom: .5rem; }
+        .update-form input, .update-form textarea { width: 100%; padding: .5rem; border: 1px solid #cbd5e1; border-radius: .3rem; margin-bottom: .5rem; font-size: .9rem; font-family: inherit; }
+        .update-form textarea { height: 80px; resize: vertical; }
+        .related { margin-bottom: 2rem; }
+        .related h3 { margin-bottom: .8rem; font-size: 1.1rem; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+        .related-card { background: #fff; border-radius: .5rem; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .related-card .r-title { font-size: .9rem; font-weight: 600; margin-bottom: .3rem; }
+        .related-card .r-title a { color: #1a1a2e; text-decoration: none; }
+        .related-card .r-stats { font-size: .8rem; color: #64748b; }
+        .model-badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; font-weight: 600; background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('crowdfunding-donations.index') }}" style="color:inherit;text-decoration:none">Fund<span>Spark</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crowdfunding-donations.index') }}">Explore</a>
+            {% if user %}
+            <a href="{{ url_for('crowdfunding-donations.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('crowdfunding-donations.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crowdfunding-donations.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('crowdfunding-donations.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('crowdfunding-donations.category_page', cat_name=campaign.category) }}">{{ campaign.category|capitalize }}</a> &rsaquo;
+            {{ campaign.title }}
+        </div>
+
+        <div class="campaign-header">
+            <div class="campaign-category">{{ campaign.category }}</div>
+            <h2 class="campaign-title">{{ campaign.title }}</h2>
+            <div class="campaign-creator">
+                by {{ creator.name if creator else 'Unknown' }}
+                <span class="status-badge {{ campaign.status }}">{{ campaign.status }}</span>
+                <span class="model-badge">{{ campaign.funding_model }}</span>
+            </div>
+        </div>
+
+        <div class="funding-section">
+            <div class="funding-amount">${{ "{:,.0f}".format(campaign.raised_amount) }}</div>
+            <div class="funding-goal">raised of ${{ "{:,.0f}".format(campaign.goal_amount) }} goal</div>
+            <div class="progress-wrap">
+                <div class="progress-bar {{ campaign.status }}" style="width: {{ [campaign.funding_pct, 100]|min }}%"></div>
+            </div>
+            <div class="funding-stats">
+                <div class="funding-stat">
+                    <div class="val">{{ campaign.funding_pct }}%</div>
+                    <div class="lbl">funded</div>
+                </div>
+                <div class="funding-stat">
+                    <div class="val">{{ campaign.backer_count }}</div>
+                    <div class="lbl">backers</div>
+                </div>
+                <div class="funding-stat">
+                    <div class="val">{{ campaign.end_date }}</div>
+                    <div class="lbl">end date</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="description">
+            <h3>About this campaign</h3>
+            <p>{{ campaign.description }}</p>
+        </div>
+
+        <div class="tiers">
+            <h3>Reward Tiers</h3>
+            {% for tier in campaign.reward_tiers %}
+            <div class="tier-card {{ 'sold-out' if tier.quantity_claimed >= tier.quantity_available }}">
+                <div class="tier-name">{{ tier.name }}</div>
+                <div class="tier-amount">${{ tier.amount }}</div>
+                <div class="tier-desc">{{ tier.description }}</div>
+                <div class="tier-avail">{{ tier.quantity_available - tier.quantity_claimed }} of {{ tier.quantity_available }} remaining</div>
+                {% if campaign.status == 'active' and tier.quantity_claimed < tier.quantity_available %}
+                <form method="post" action="{{ url_for('crowdfunding-donations.form_pledge', campaign_id=campaign.id) }}" style="display:inline">
+                    <input type="hidden" name="tier_id" value="{{ tier.id }}">
+                    <input type="hidden" name="amount" value="{{ tier.amount }}">
+                    <button type="submit" class="pledge-btn">Back this tier</button>
+                </form>
+                {% elif tier.quantity_claimed >= tier.quantity_available %}
+                <button class="pledge-btn" disabled>Sold Out</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="updates">
+            <h3>Updates ({{ campaign.updates|length }})</h3>
+            {% for u in campaign.updates|reverse %}
+            <div class="update-card">
+                <div class="update-date">{{ u.date }}</div>
+                <div class="update-title">{{ u.title }}</div>
+                <div class="update-content">{{ u.content }}</div>
+            </div>
+            {% endfor %}
+            {% if campaign.updates|length == 0 %}
+            <p style="color:#94a3b8;font-size:.9rem">No updates yet.</p>
+            {% endif %}
+
+            {% if user and user.id == campaign.creator_id %}
+            <div class="update-form">
+                <h4>Post an Update</h4>
+                <form method="post" action="{{ url_for('crowdfunding-donations.form_post_update', campaign_id=campaign.id) }}">
+                    <input type="text" name="title" placeholder="Update title" required>
+                    <textarea name="content" placeholder="What's new with your campaign?" required></textarea>
+                    <button type="submit" class="pledge-btn">Post Update</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>More in {{ campaign.category|capitalize }}</h3>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-card">
+                    <div class="r-title"><a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=r.id) }}">{{ r.title }}</a></div>
+                    <div class="r-stats">${{ "{:,.0f}".format(r.raised_amount) }} raised - {{ r.funding_pct }}% funded</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

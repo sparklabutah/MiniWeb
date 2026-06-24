@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} - ShopHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #eaeded; color: #0f1111; }
+        .header { background: #131921; padding: .6rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .header .logo { color: #fff; font-size: 1.4rem; font-weight: 700; text-decoration: none; }
+        .header .logo span { color: #febd69; }
+        .header-nav { margin-left: auto; display: flex; gap: .6rem; align-items: center; }
+        .header-nav a { color: #fff; text-decoration: none; font-size: .9rem; padding: .3rem .5rem; border-radius: .3rem; }
+        .header-nav a:hover { background: #3a4553; color: #febd69; }
+        .nav-signin { background: #febd69 !important; color: #131921 !important; font-weight: 700; font-size: .95rem !important; padding: .4rem .8rem !important; }
+        .nav-signin:hover { background: #f3a847 !important; }
+        .nav-cart { background: #232f3e; font-weight: 600; }
+        .cart-badge { background: #febd69; color: #131921; padding: 0 6px; border-radius: 8px; font-size: .75rem; font-weight: 700; margin-left: 3px; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .main h2 { margin-bottom: .5rem; font-size: 1.4rem; }
+        .count { color: #565959; margin-bottom: 1rem; font-size: .9rem; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+        .product-card { background: #fff; border: 1px solid #d5d9d9; border-radius: .4rem; padding: 1rem; display: flex; flex-direction: column; }
+        .product-card h3 { font-size: .95rem; margin-bottom: .3rem; }
+        .product-card h3 a { color: #007185; text-decoration: none; }
+        .product-card h3 a:hover { text-decoration: underline; color: #c7511f; }
+        .product-card .price { color: #0f1111; font-weight: 600; font-size: 1.05rem; margin-bottom: .2rem; }
+        .product-card .brand { font-size: .8rem; color: #565959; margin-bottom: .3rem; }
+        .product-card .card-actions { margin-top: auto; padding-top: .5rem; }
+        .btn-add-cart { display: block; width: 100%; padding: .4rem; background: #ffd814; border: 1px solid #fcd200; border-radius: 1.2rem; cursor: pointer; font-size: .82rem; font-weight: 600; text-align: center; }
+        .btn-add-cart:hover { background: #f7ca00; }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: .5rem; margin-top: 1.5rem; padding: 1rem 0; }
+        .pagination a, .pagination span { display: inline-block; padding: .4rem .8rem; border: 1px solid #d5d9d9; border-radius: .3rem; text-decoration: none; font-size: .88rem; color: #0f1111; background: #fff; }
+        .pagination a:hover { background: #f7f7f7; }
+        .pagination .current { background: #febd69; border-color: #febd69; font-weight: 700; }
+        .pagination .disabled { color: #ccc; cursor: default; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('e-commerce.index') }}" class="logo">Shop<span>Hub</span></a>
+        <div class="header-nav">
+            <a href="{{ url_for('e-commerce.index') }}">Home</a>
+            {% if user %}
+            <a href="{{ url_for('e-commerce.orders_page') }}">Orders</a>
+            <a href="{{ url_for('e-commerce.wishlist_page') }}">Wishlist</a>
+            <a href="{{ url_for('e-commerce.cart_page') }}" class="nav-cart">Cart{% if user.cart|length > 0 %} <span class="cart-badge">{{ user.cart|length }}</span>{% endif %}</a>
+            <a href="{{ url_for('e-commerce.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('e-commerce.login_page') }}" class="nav-signin">Sign In</a>
+            <a href="{{ url_for('e-commerce.cart_page') }}" class="nav-cart">Cart</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="main">
+        <h2>{{ category }}</h2>
+        <p class="count">{{ total_results }} products (page {{ page }} of {{ total_pages }})</p>
+        <div class="product-grid">
+            {% for p in products %}
+            <div class="product-card">
+                <h3><a href="{{ url_for('e-commerce.product_detail', product_id=p.id) }}">{{ p.name }}</a></h3>
+                {% if p.brand %}<div class="brand">{{ p.brand }}</div>{% endif %}
+                {% if p.price %}<div class="price">${{ "%.2f"|format(p.price) }}</div>{% endif %}
+                <div class="card-actions">
+                    <form method="POST" action="{{ url_for('e-commerce.form_add_to_cart') }}">
+                        <input type="hidden" name="product_id" value="{{ p.id }}">
+                        <input type="hidden" name="quantity" value="1">
+                        <button type="submit" class="btn-add-cart">Add to Cart</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('e-commerce.category_page', cat_name=category, sort=sort, min_price=min_price, max_price=max_price, min_rating=min_rating, page=page-1) }}">Previous</a>
+            {% else %}
+            <span class="disabled">Previous</span>
+            {% endif %}
+
+            {% for pg in range(1, total_pages + 1) %}
+                {% if pg == page %}
+                <span class="current">{{ pg }}</span>
+                {% elif pg <= 3 or pg > total_pages - 2 or (pg >= page - 1 and pg <= page + 1) %}
+                <a href="{{ url_for('e-commerce.category_page', cat_name=category, sort=sort, min_price=min_price, max_price=max_price, min_rating=min_rating, page=pg) }}">{{ pg }}</a>
+                {% elif pg == 4 and page > 5 %}
+                <span>...</span>
+                {% elif pg == total_pages - 2 and page < total_pages - 4 %}
+                <span>...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('e-commerce.category_page', cat_name=category, sort=sort, min_price=min_price, max_price=max_price, min_rating=min_rating, page=page+1) }}">Next</a>
+            {% else %}
+            <span class="disabled">Next</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

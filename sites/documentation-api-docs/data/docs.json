@@ -1,0 +1,252 @@
+[
+  {
+    "id": 1,
+    "slug": "introduction",
+    "title": "Introduction to Kubernetes",
+    "section": "Getting Started",
+    "order": 1,
+    "content": "Kubernetes (K8s) is an open-source container orchestration platform originally designed by Google and now maintained by the Cloud Native Computing Foundation (CNCF). It automates the deployment, scaling, and management of containerized applications across clusters of machines.\n\nKubernetes groups containers into logical units called Pods for easy management and discovery. It provides a declarative API that lets you describe the desired state of your workloads, and the control plane continuously works to make the actual state match.\n\n## Key Features\n\n- **Automated rollouts and rollbacks**: Progressively roll out changes to your application or its configuration while monitoring health\n- **Service discovery and load balancing**: Kubernetes gives Pods their own IP addresses and a single DNS name for a set of Pods, and can load-balance across them\n- **Storage orchestration**: Automatically mount storage systems of your choice\u2014local, cloud providers, or network storage\n- **Self-healing**: Restarts containers that fail, replaces and reschedules containers when nodes die, and kills containers that don't respond to health checks\n- **Secret and configuration management**: Deploy and update secrets and application configuration without rebuilding images\n\n## Architecture Overview\n\nA Kubernetes cluster consists of a control plane and one or more worker nodes. The control plane components include the API server (kube-apiserver), etcd, scheduler (kube-scheduler), and controller manager (kube-controller-manager). Worker nodes run the kubelet agent and kube-proxy.",
+    "updated_at": "2026-06-01",
+    "tags": ["overview", "getting-started", "kubernetes", "architecture"]
+  },
+  {
+    "id": 2,
+    "slug": "installation",
+    "title": "Installing Kubernetes",
+    "section": "Getting Started",
+    "order": 2,
+    "content": "There are several ways to install and run a Kubernetes cluster, depending on your use case\u2014local development, testing, or production deployment.\n\n## Local Development with minikube\n\nminikube runs a single-node Kubernetes cluster on your local machine:\n\n```bash\n# Install minikube\ncurl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64\nsudo install minikube-linux-amd64 /usr/local/bin/minikube\n\n# Start a cluster\nminikube start\n\n# Verify\nkubectl get nodes\n```\n\n## Production with kubeadm\n\nkubeadm is the official tool for bootstrapping production-grade clusters:\n\n```bash\n# Initialize the control plane\nsudo kubeadm init --pod-network-cidr=10.244.0.0/16\n\n# Configure kubectl\nmkdir -p $HOME/.kube\nsudo cp /etc/kubernetes/admin.conf $HOME/.kube/config\n\n# Install a Pod network add-on (e.g., Flannel)\nkubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml\n\n# Join worker nodes\nkubeadm join <control-plane-ip>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>\n```\n\n## Managed Kubernetes Services\n\nCloud providers offer managed Kubernetes:\n- **Amazon EKS**: Elastic Kubernetes Service\n- **Google GKE**: Google Kubernetes Engine\n- **Azure AKS**: Azure Kubernetes Service\n\nManaged services handle control plane maintenance, upgrades, and high availability.",
+    "updated_at": "2026-05-28",
+    "tags": ["installation", "minikube", "kubeadm", "setup"]
+  },
+  {
+    "id": 3,
+    "slug": "quickstart",
+    "title": "Quickstart Guide",
+    "section": "Getting Started",
+    "order": 3,
+    "content": "Deploy your first application on Kubernetes in under 5 minutes using kubectl.\n\n## Prerequisites\n\n- A running Kubernetes cluster (minikube or any cluster)\n- kubectl CLI installed and configured\n\n## Step 1: Create a Deployment\n\n```bash\nkubectl create deployment hello-k8s --image=registry.k8s.io/e2e-test-images/agnhost:2.39 -- /agnhost netexec --http-port=8080\n```\n\n## Step 2: Expose as a Service\n\n```bash\nkubectl expose deployment hello-k8s --type=NodePort --port=8080\n```\n\n## Step 3: Access your application\n\n```bash\n# With minikube\nminikube service hello-k8s\n\n# Or get the URL directly\nkubectl get services hello-k8s\n```\n\n## Step 4: Scale the Deployment\n\n```bash\nkubectl scale deployment hello-k8s --replicas=3\nkubectl get pods\n```\n\n## Step 5: Clean up\n\n```bash\nkubectl delete service hello-k8s\nkubectl delete deployment hello-k8s\n```\n\nCongratulations! You have deployed, exposed, and scaled your first Kubernetes application.",
+    "updated_at": "2026-06-10",
+    "tags": ["quickstart", "tutorial", "getting-started", "kubectl"]
+  },
+  {
+    "id": 4,
+    "slug": "pods",
+    "title": "Pods",
+    "section": "Concepts",
+    "order": 4,
+    "content": "A Pod is the smallest deployable unit in Kubernetes. It represents a single instance of a running process in your cluster and can contain one or more containers that share storage and network resources.\n\n## Pod Specification\n\nPods are defined using YAML manifests:\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-pod\n  labels:\n    app: nginx\nspec:\n  containers:\n  - name: nginx\n    image: nginx:1.25\n    ports:\n    - containerPort: 80\n    resources:\n      requests:\n        memory: \"64Mi\"\n        cpu: \"250m\"\n      limits:\n        memory: \"128Mi\"\n        cpu: \"500m\"\n```\n\n## Pod Lifecycle\n\nPods go through several phases: Pending, Running, Succeeded, Failed, and Unknown. The kubelet monitors container health through liveness probes, readiness probes, and startup probes.\n\n## Multi-Container Pods\n\nPods can run multiple containers that share the same network namespace and storage volumes. Common patterns include sidecar containers (logging agents, proxies), init containers (setup tasks), and ambassador containers (API gateways).\n\n## Key Points\n\n- Pods are ephemeral\u2014they are not designed to survive failures\n- Use Deployments or StatefulSets to manage Pods in production\n- Each Pod gets a unique IP address within the cluster",
+    "updated_at": "2026-05-20",
+    "tags": ["pods", "containers", "workloads", "lifecycle"]
+  },
+  {
+    "id": 5,
+    "slug": "services",
+    "title": "Services",
+    "section": "Concepts",
+    "order": 5,
+    "content": "A Service is an abstraction that defines a logical set of Pods and a policy for accessing them. Services enable network connectivity to Pods by providing stable endpoints, even as individual Pods are created and destroyed.\n\n## Service Types\n\n| Type | Description |\n|------|-------------|\n| `ClusterIP` | Exposes the Service on an internal IP (default) |\n| `NodePort` | Exposes the Service on each node's IP at a static port |\n| `LoadBalancer` | Provisions an external load balancer from the cloud provider |\n| `ExternalName` | Maps the Service to a DNS name |\n\n## Example Service\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-service\nspec:\n  selector:\n    app: my-app\n  ports:\n  - protocol: TCP\n    port: 80\n    targetPort: 9376\n  type: ClusterIP\n```\n\n## Service Discovery\n\nKubernetes supports two modes of service discovery: environment variables and DNS. The built-in DNS server (CoreDNS) automatically creates DNS records for Services. A Service named `my-service` in namespace `default` is reachable at `my-service.default.svc.cluster.local`.\n\n## Endpoints\n\nWhen a Service selector matches Pod labels, Kubernetes automatically creates an Endpoints object mapping to the Pod IPs. Traffic is distributed across healthy endpoints using kube-proxy.",
+    "updated_at": "2026-05-15",
+    "tags": ["services", "networking", "load-balancing", "discovery"]
+  },
+  {
+    "id": 6,
+    "slug": "deployments",
+    "title": "Deployments",
+    "section": "Concepts",
+    "order": 6,
+    "content": "A Deployment provides declarative updates for Pods and ReplicaSets. You describe a desired state in a Deployment, and the Deployment controller changes the actual state to the desired state at a controlled rate.\n\n## Deployment Manifest\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: nginx-deployment\n  labels:\n    app: nginx\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: nginx\n  template:\n    metadata:\n      labels:\n        app: nginx\n    spec:\n      containers:\n      - name: nginx\n        image: nginx:1.25\n        ports:\n        - containerPort: 80\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1\n      maxUnavailable: 0\n```\n\n## Rolling Updates\n\nDeployments support rolling updates by default, gradually replacing old Pods with new ones. You can control the update speed with `maxSurge` and `maxUnavailable`.\n\n## Rollbacks\n\n```bash\n# Check rollout history\nkubectl rollout history deployment/nginx-deployment\n\n# Roll back to previous revision\nkubectl rollout undo deployment/nginx-deployment\n\n# Roll back to a specific revision\nkubectl rollout undo deployment/nginx-deployment --to-revision=2\n```\n\n## Scaling\n\n```bash\nkubectl scale deployment/nginx-deployment --replicas=5\n```\n\nDeployments can also be configured for Horizontal Pod Autoscaling based on CPU utilization or custom metrics.",
+    "updated_at": "2026-05-10",
+    "tags": ["deployments", "rolling-updates", "scaling", "workloads"]
+  },
+  {
+    "id": 7,
+    "slug": "namespaces",
+    "title": "Namespaces",
+    "section": "Concepts",
+    "order": 7,
+    "content": "Namespaces provide a mechanism for isolating groups of resources within a single Kubernetes cluster. They are intended for use in environments with many users spread across multiple teams or projects.\n\n## Default Namespaces\n\n| Namespace | Purpose |\n|-----------|--------|\n| `default` | The default namespace for objects with no other namespace |\n| `kube-system` | For objects created by the Kubernetes system |\n| `kube-public` | Readable by all users, reserved for cluster usage |\n| `kube-node-lease` | Holds Lease objects for node heartbeats |\n\n## Working with Namespaces\n\n```bash\n# List namespaces\nkubectl get namespaces\n\n# Create a namespace\nkubectl create namespace my-team\n\n# Run commands in a specific namespace\nkubectl get pods -n my-team\n\n# Set default namespace for kubectl context\nkubectl config set-context --current --namespace=my-team\n```\n\n## Resource Quotas\n\nNamespaces can have ResourceQuotas to limit aggregate resource consumption:\n\n```yaml\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: compute-quota\n  namespace: my-team\nspec:\n  hard:\n    requests.cpu: \"4\"\n    requests.memory: 8Gi\n    limits.cpu: \"8\"\n    limits.memory: 16Gi\n    pods: \"20\"\n```\n\nNot all resources are namespaced. Nodes, PersistentVolumes, and Namespaces themselves are cluster-scoped.",
+    "updated_at": "2026-04-22",
+    "tags": ["namespaces", "isolation", "multi-tenancy", "resource-quotas"]
+  },
+  {
+    "id": 8,
+    "slug": "configmaps-secrets",
+    "title": "ConfigMaps & Secrets",
+    "section": "Concepts",
+    "order": 8,
+    "content": "ConfigMaps and Secrets allow you to decouple configuration from container images, making applications portable and easier to manage.\n\n## ConfigMaps\n\nConfigMaps store non-confidential configuration data as key-value pairs:\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  DATABASE_HOST: \"postgres.default.svc\"\n  LOG_LEVEL: \"info\"\n  config.yaml: |\n    server:\n      port: 8080\n      timeout: 30s\n```\n\n## Secrets\n\nSecrets store sensitive data such as passwords, tokens, and keys. Values are base64-encoded:\n\n```yaml\napiVersion: v1\nkind: Secret\nmetadata:\n  name: db-credentials\ntype: Opaque\ndata:\n  username: YWRtaW4=\n  password: cGFzc3dvcmQxMjM=\n```\n\n## Using in Pods\n\nBoth ConfigMaps and Secrets can be consumed as environment variables or mounted as volumes:\n\n```yaml\nspec:\n  containers:\n  - name: app\n    envFrom:\n    - configMapRef:\n        name: app-config\n    - secretRef:\n        name: db-credentials\n    volumeMounts:\n    - name: config-volume\n      mountPath: /etc/config\n  volumes:\n  - name: config-volume\n    configMap:\n      name: app-config\n```\n\n## Best Practices\n\n- Never commit Secrets to version control\n- Use RBAC to restrict access to Secrets\n- Consider external secret management (Vault, Sealed Secrets)\n- Enable encryption at rest for etcd",
+    "updated_at": "2026-06-01",
+    "tags": ["configmaps", "secrets", "configuration", "security"]
+  },
+  {
+    "id": 9,
+    "slug": "pods-list",
+    "title": "List Pods",
+    "section": "API Reference",
+    "order": 9,
+    "content": "List all Pods in a given namespace.\n\n## Endpoint\n\n```\nGET /api/v1/namespaces/{namespace}/pods\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace to list Pods from |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter by label (e.g., `app=nginx`) |\n| `fieldSelector` | string | No | Filter by field (e.g., `status.phase=Running`) |\n| `limit` | integer | No | Maximum number of results to return |\n| `continue` | string | No | Token for paginating large result sets |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"PodList\",\n  \"metadata\": {\n    \"resourceVersion\": \"12345\"\n  },\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"nginx-pod\",\n        \"namespace\": \"default\",\n        \"labels\": {\"app\": \"nginx\"}\n      },\n      \"spec\": {\n        \"containers\": [{\"name\": \"nginx\", \"image\": \"nginx:1.25\"}]\n      },\n      \"status\": {\n        \"phase\": \"Running\",\n        \"podIP\": \"10.244.0.5\"\n      }\n    }\n  ]\n}\n```",
+    "updated_at": "2026-06-01",
+    "tags": ["pods", "list", "GET", "api"]
+  },
+  {
+    "id": 10,
+    "slug": "pods-create",
+    "title": "Create Pod",
+    "section": "API Reference",
+    "order": 10,
+    "content": "Create a new Pod in the specified namespace.\n\n## Endpoint\n\n```\nPOST /api/v1/namespaces/{namespace}/pods\n```\n\n## Request Body\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `metadata.name` | string | Yes | Pod name (must be unique within the namespace) |\n| `metadata.labels` | object | No | Key-value labels for the Pod |\n| `spec.containers` | array | Yes | List of containers to run in the Pod |\n| `spec.containers[].name` | string | Yes | Container name |\n| `spec.containers[].image` | string | Yes | Container image to use |\n| `spec.containers[].ports` | array | No | Ports to expose from the container |\n| `spec.volumes` | array | No | Volumes to make available to containers |\n\n## Example Request\n\n```bash\ncurl -X POST https://kubernetes.default.svc/api/v1/namespaces/default/pods \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"v1\",\n    \"kind\": \"Pod\",\n    \"metadata\": {\"name\": \"nginx-pod\", \"labels\": {\"app\": \"nginx\"}},\n    \"spec\": {\n      \"containers\": [{\n        \"name\": \"nginx\",\n        \"image\": \"nginx:1.25\",\n        \"ports\": [{\"containerPort\": 80}]\n      }]\n    }\n  }'\n```\n\n## Response (201 Created)\n\nReturns the created Pod object with server-populated fields including `status.phase` set to `Pending`.",
+    "updated_at": "2026-06-01",
+    "tags": ["pods", "create", "POST", "api"]
+  },
+  {
+    "id": 11,
+    "slug": "pods-delete",
+    "title": "Delete Pod",
+    "section": "API Reference",
+    "order": 11,
+    "content": "Delete a specific Pod from a namespace.\n\n## Endpoint\n\n```\nDELETE /api/v1/namespaces/{namespace}/pods/{name}\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace of the Pod |\n| `name` | string | The name of the Pod to delete |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `gracePeriodSeconds` | integer | No | Override grace period (default 30s) |\n| `propagationPolicy` | string | No | `Orphan`, `Background`, or `Foreground` |\n\n## Example Request\n\n```bash\ncurl -X DELETE https://kubernetes.default.svc/api/v1/namespaces/default/pods/nginx-pod \\\n  -H \"Authorization: Bearer $TOKEN\"\n```\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Pod\",\n  \"metadata\": {\n    \"name\": \"nginx-pod\",\n    \"namespace\": \"default\",\n    \"deletionTimestamp\": \"2026-06-01T12:00:00Z\",\n    \"deletionGracePeriodSeconds\": 30\n  },\n  \"status\": {\n    \"phase\": \"Running\"\n  }\n}\n```\n\n## Notes\n\n- The Pod enters a Terminating state and is given a grace period to shut down cleanly\n- Set `gracePeriodSeconds=0` for immediate deletion (requires `propagationPolicy=Background`)\n- Pods managed by a Deployment or ReplicaSet will be recreated automatically",
+    "updated_at": "2026-05-20",
+    "tags": ["pods", "delete", "DELETE", "api"]
+  },
+  {
+    "id": 12,
+    "slug": "services-list",
+    "title": "List Services",
+    "section": "API Reference",
+    "order": 12,
+    "content": "List all Services in the specified namespace.\n\n## Endpoint\n\n```\nGET /api/v1/namespaces/{namespace}/services\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace to list Services from |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter by label |\n| `limit` | integer | No | Maximum number of results |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"ServiceList\",\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"my-service\",\n        \"namespace\": \"default\"\n      },\n      \"spec\": {\n        \"type\": \"ClusterIP\",\n        \"selector\": {\"app\": \"my-app\"},\n        \"ports\": [{\"port\": 80, \"targetPort\": 9376, \"protocol\": \"TCP\"}],\n        \"clusterIP\": \"10.96.0.12\"\n      }\n    }\n  ]\n}\n```",
+    "updated_at": "2026-05-15",
+    "tags": ["services", "list", "GET", "api"]
+  },
+  {
+    "id": 13,
+    "slug": "services-create",
+    "title": "Create Service",
+    "section": "API Reference",
+    "order": 13,
+    "content": "Create a new Service in the specified namespace.\n\n## Endpoint\n\n```\nPOST /api/v1/namespaces/{namespace}/services\n```\n\n## Request Body\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `metadata.name` | string | Yes | Service name |\n| `spec.selector` | object | Yes | Label selector to match target Pods |\n| `spec.ports` | array | Yes | List of port configurations |\n| `spec.type` | string | No | `ClusterIP`, `NodePort`, `LoadBalancer`, or `ExternalName` |\n\n## Example Request\n\n```bash\ncurl -X POST https://kubernetes.default.svc/api/v1/namespaces/default/services \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"v1\",\n    \"kind\": \"Service\",\n    \"metadata\": {\"name\": \"web-service\"},\n    \"spec\": {\n      \"selector\": {\"app\": \"web\"},\n      \"ports\": [{\"port\": 80, \"targetPort\": 8080}],\n      \"type\": \"LoadBalancer\"\n    }\n  }'\n```\n\n## Response (201 Created)\n\nReturns the created Service object with `spec.clusterIP` assigned by the cluster.",
+    "updated_at": "2026-05-15",
+    "tags": ["services", "create", "POST", "api"]
+  },
+  {
+    "id": 14,
+    "slug": "services-delete",
+    "title": "Delete Service",
+    "section": "API Reference",
+    "order": 14,
+    "content": "Delete a Service from the specified namespace.\n\n## Endpoint\n\n```\nDELETE /api/v1/namespaces/{namespace}/services/{name}\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace of the Service |\n| `name` | string | The name of the Service to delete |\n\n## Example Request\n\n```bash\ncurl -X DELETE https://kubernetes.default.svc/api/v1/namespaces/default/services/web-service \\\n  -H \"Authorization: Bearer $TOKEN\"\n```\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Service\",\n  \"metadata\": {\n    \"name\": \"web-service\",\n    \"namespace\": \"default\"\n  },\n  \"status\": {\n    \"loadBalancer\": {}\n  }\n}\n```\n\n## Notes\n\n- Deleting a Service does not delete the Pods it targets\n- External load balancers provisioned by LoadBalancer-type Services will be cleaned up\n- Endpoints associated with the Service are also removed",
+    "updated_at": "2026-05-15",
+    "tags": ["services", "delete", "DELETE", "api"]
+  },
+  {
+    "id": 15,
+    "slug": "deployments-list",
+    "title": "List Deployments",
+    "section": "API Reference",
+    "order": 15,
+    "content": "List all Deployments in the specified namespace.\n\n## Endpoint\n\n```\nGET /apis/apps/v1/namespaces/{namespace}/deployments\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace to list Deployments from |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter by label (e.g., `app=nginx`) |\n| `limit` | integer | No | Maximum number of results |\n| `continue` | string | No | Pagination continuation token |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"apps/v1\",\n  \"kind\": \"DeploymentList\",\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"nginx-deployment\",\n        \"namespace\": \"default\"\n      },\n      \"spec\": {\n        \"replicas\": 3,\n        \"selector\": {\"matchLabels\": {\"app\": \"nginx\"}}\n      },\n      \"status\": {\n        \"readyReplicas\": 3,\n        \"availableReplicas\": 3\n      }\n    }\n  ]\n}\n```",
+    "updated_at": "2026-04-20",
+    "tags": ["deployments", "list", "GET", "api"]
+  },
+  {
+    "id": 16,
+    "slug": "deployments-create",
+    "title": "Create Deployment",
+    "section": "API Reference",
+    "order": 16,
+    "content": "Create a new Deployment in the specified namespace.\n\n## Endpoint\n\n```\nPOST /apis/apps/v1/namespaces/{namespace}/deployments\n```\n\n## Request Body\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `metadata.name` | string | Yes | Deployment name |\n| `spec.replicas` | integer | No | Number of desired Pods (default 1) |\n| `spec.selector` | object | Yes | Label selector for Pods |\n| `spec.template` | object | Yes | Pod template specification |\n| `spec.strategy` | object | No | Update strategy (`RollingUpdate` or `Recreate`) |\n\n## Example Request\n\n```bash\ncurl -X POST https://kubernetes.default.svc/apis/apps/v1/namespaces/default/deployments \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"apps/v1\",\n    \"kind\": \"Deployment\",\n    \"metadata\": {\"name\": \"web-app\"},\n    \"spec\": {\n      \"replicas\": 3,\n      \"selector\": {\"matchLabels\": {\"app\": \"web\"}},\n      \"template\": {\n        \"metadata\": {\"labels\": {\"app\": \"web\"}},\n        \"spec\": {\n          \"containers\": [{\"name\": \"web\", \"image\": \"nginx:1.25\", \"ports\": [{\"containerPort\": 80}]}]\n        }\n      }\n    }\n  }'\n```\n\n## Response (201 Created)\n\nReturns the created Deployment object.",
+    "updated_at": "2026-04-20",
+    "tags": ["deployments", "create", "POST", "api"]
+  },
+  {
+    "id": 17,
+    "slug": "deployments-update",
+    "title": "Update Deployment",
+    "section": "API Reference",
+    "order": 17,
+    "content": "Replace an existing Deployment with an updated specification. This triggers a rolling update if the Pod template has changed.\n\n## Endpoint\n\n```\nPUT /apis/apps/v1/namespaces/{namespace}/deployments/{name}\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace of the Deployment |\n| `name` | string | The name of the Deployment |\n\n## Request Body\n\nThe full Deployment object with the desired changes. The `metadata.resourceVersion` field must match the current version to avoid conflicts.\n\n## Example Request\n\n```bash\ncurl -X PUT https://kubernetes.default.svc/apis/apps/v1/namespaces/default/deployments/web-app \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"apps/v1\",\n    \"kind\": \"Deployment\",\n    \"metadata\": {\"name\": \"web-app\", \"resourceVersion\": \"12345\"},\n    \"spec\": {\n      \"replicas\": 5,\n      \"selector\": {\"matchLabels\": {\"app\": \"web\"}},\n      \"template\": {\n        \"metadata\": {\"labels\": {\"app\": \"web\"}},\n        \"spec\": {\n          \"containers\": [{\"name\": \"web\", \"image\": \"nginx:1.26\", \"ports\": [{\"containerPort\": 80}]}]\n        }\n      }\n    }\n  }'\n```\n\n## Response (200 OK)\n\nReturns the updated Deployment object. If the image changed, the rollout status can be monitored via `kubectl rollout status`.",
+    "updated_at": "2026-04-20",
+    "tags": ["deployments", "update", "PUT", "api", "rolling-update"]
+  },
+  {
+    "id": 18,
+    "slug": "deployments-delete",
+    "title": "Delete Deployment",
+    "section": "API Reference",
+    "order": 18,
+    "content": "Delete a Deployment and its managed ReplicaSets and Pods.\n\n## Endpoint\n\n```\nDELETE /apis/apps/v1/namespaces/{namespace}/deployments/{name}\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace of the Deployment |\n| `name` | string | The name of the Deployment to delete |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `propagationPolicy` | string | No | `Orphan` (keep Pods), `Background`, or `Foreground` (default) |\n| `gracePeriodSeconds` | integer | No | Grace period for Pod termination |\n\n## Example Request\n\n```bash\ncurl -X DELETE https://kubernetes.default.svc/apis/apps/v1/namespaces/default/deployments/web-app \\\n  -H \"Authorization: Bearer $TOKEN\"\n```\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"apps/v1\",\n  \"kind\": \"Deployment\",\n  \"metadata\": {\n    \"name\": \"web-app\",\n    \"namespace\": \"default\",\n    \"deletionTimestamp\": \"2026-06-01T14:00:00Z\"\n  }\n}\n```\n\n## Notes\n\n- By default, deleting a Deployment also deletes its ReplicaSets and all managed Pods\n- Use `propagationPolicy=Orphan` to keep the Pods running without management\n- Deleted Deployments cannot be recovered",
+    "updated_at": "2026-05-05",
+    "tags": ["deployments", "delete", "DELETE", "api"]
+  },
+  {
+    "id": 19,
+    "slug": "namespaces-list",
+    "title": "List Namespaces",
+    "section": "API Reference",
+    "order": 19,
+    "content": "List all Namespaces in the cluster.\n\n## Endpoint\n\n```\nGET /api/v1/namespaces\n```\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter namespaces by label |\n| `limit` | integer | No | Maximum number of results |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"NamespaceList\",\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"default\",\n        \"labels\": {\"kubernetes.io/metadata.name\": \"default\"}\n      },\n      \"status\": {\"phase\": \"Active\"}\n    },\n    {\n      \"metadata\": {\"name\": \"kube-system\"},\n      \"status\": {\"phase\": \"Active\"}\n    },\n    {\n      \"metadata\": {\"name\": \"kube-public\"},\n      \"status\": {\"phase\": \"Active\"}\n    }\n  ]\n}\n```\n\n## Notes\n\n- Namespaces are cluster-scoped resources (not namespaced themselves)\n- System namespaces (`kube-system`, `kube-public`, `kube-node-lease`) are created automatically\n- Namespace names must be valid DNS labels (lowercase alphanumeric and hyphens)",
+    "updated_at": "2026-04-10",
+    "tags": ["namespaces", "list", "GET", "api"]
+  },
+  {
+    "id": 20,
+    "slug": "namespaces-create",
+    "title": "Create Namespace",
+    "section": "API Reference",
+    "order": 20,
+    "content": "Create a new Namespace.\n\n## Endpoint\n\n```\nPOST /api/v1/namespaces\n```\n\n## Request Body\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `metadata.name` | string | Yes | Namespace name (DNS-compatible) |\n| `metadata.labels` | object | No | Labels for the namespace |\n\n## Example Request\n\n```bash\ncurl -X POST https://kubernetes.default.svc/api/v1/namespaces \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"v1\",\n    \"kind\": \"Namespace\",\n    \"metadata\": {\n      \"name\": \"staging\",\n      \"labels\": {\"env\": \"staging\"}\n    }\n  }'\n```\n\n## Response (201 Created)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Namespace\",\n  \"metadata\": {\n    \"name\": \"staging\",\n    \"labels\": {\"env\": \"staging\"},\n    \"creationTimestamp\": \"2026-06-01T10:00:00Z\"\n  },\n  \"status\": {\n    \"phase\": \"Active\"\n  }\n}\n```\n\n## Notes\n\n- Namespace names must be unique and follow DNS label rules\n- Deleting a namespace removes all resources within it\n- Avoid prefixing namespace names with `kube-`, which is reserved for system namespaces",
+    "updated_at": "2026-04-10",
+    "tags": ["namespaces", "create", "POST", "api"]
+  },
+  {
+    "id": 21,
+    "slug": "configmaps-list",
+    "title": "List ConfigMaps",
+    "section": "API Reference",
+    "order": 21,
+    "content": "List all ConfigMaps in the specified namespace.\n\n## Endpoint\n\n```\nGET /api/v1/namespaces/{namespace}/configmaps\n```\n\n## Path Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `namespace` | string | The namespace to list ConfigMaps from |\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter by label |\n| `limit` | integer | No | Maximum number of results |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"ConfigMapList\",\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"app-config\",\n        \"namespace\": \"default\"\n      },\n      \"data\": {\n        \"DATABASE_HOST\": \"postgres.default.svc\",\n        \"LOG_LEVEL\": \"info\"\n      }\n    }\n  ]\n}\n```\n\n## Notes\n\n- ConfigMaps are namespace-scoped resources\n- Data values are stored as plain-text strings\n- Binary data can be stored using the `binaryData` field",
+    "updated_at": "2026-05-25",
+    "tags": ["configmaps", "list", "GET", "api", "configuration"]
+  },
+  {
+    "id": 22,
+    "slug": "configmaps-create",
+    "title": "Create ConfigMap",
+    "section": "API Reference",
+    "order": 22,
+    "content": "Create a new ConfigMap in the specified namespace.\n\n## Endpoint\n\n```\nPOST /api/v1/namespaces/{namespace}/configmaps\n```\n\n## Request Body\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `metadata.name` | string | Yes | ConfigMap name |\n| `data` | object | No | Key-value pairs (string values) |\n| `binaryData` | object | No | Key-value pairs (base64-encoded binary values) |\n\n## Example Request\n\n```bash\ncurl -X POST https://kubernetes.default.svc/api/v1/namespaces/default/configmaps \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"apiVersion\": \"v1\",\n    \"kind\": \"ConfigMap\",\n    \"metadata\": {\"name\": \"app-settings\"},\n    \"data\": {\n      \"DATABASE_URL\": \"postgres://db:5432/myapp\",\n      \"CACHE_TTL\": \"600\"\n    }\n  }'\n```\n\n## Response (201 Created)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"ConfigMap\",\n  \"metadata\": {\n    \"name\": \"app-settings\",\n    \"namespace\": \"default\",\n    \"creationTimestamp\": \"2026-06-01T10:30:00Z\"\n  },\n  \"data\": {\n    \"DATABASE_URL\": \"postgres://db:5432/myapp\",\n    \"CACHE_TTL\": \"600\"\n  }\n}\n```",
+    "updated_at": "2026-05-25",
+    "tags": ["configmaps", "create", "POST", "api", "configuration"]
+  },
+  {
+    "id": 23,
+    "slug": "nodes-list",
+    "title": "List Nodes",
+    "section": "API Reference",
+    "order": 23,
+    "content": "List all Nodes in the cluster.\n\n## Endpoint\n\n```\nGET /api/v1/nodes\n```\n\n## Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `labelSelector` | string | No | Filter by label (e.g., `node-role.kubernetes.io/control-plane`) |\n| `fieldSelector` | string | No | Filter by field (e.g., `metadata.name=node-1`) |\n| `limit` | integer | No | Maximum number of results |\n\n## Response (200 OK)\n\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"NodeList\",\n  \"items\": [\n    {\n      \"metadata\": {\n        \"name\": \"node-1\",\n        \"labels\": {\n          \"kubernetes.io/os\": \"linux\",\n          \"node-role.kubernetes.io/control-plane\": \"\"\n        }\n      },\n      \"status\": {\n        \"conditions\": [\n          {\"type\": \"Ready\", \"status\": \"True\"}\n        ],\n        \"capacity\": {\n          \"cpu\": \"4\",\n          \"memory\": \"16Gi\",\n          \"pods\": \"110\"\n        },\n        \"nodeInfo\": {\n          \"kubeletVersion\": \"v1.30.0\",\n          \"containerRuntimeVersion\": \"containerd://1.7.2\",\n          \"osImage\": \"Ubuntu 22.04.4 LTS\"\n        }\n      }\n    }\n  ]\n}\n```\n\n## Notes\n\n- Nodes are cluster-scoped resources\n- The `Ready` condition indicates whether the node is healthy and able to accept Pods\n- Node capacity and allocatable resources help the scheduler make placement decisions",
+    "updated_at": "2026-06-15",
+    "tags": ["nodes", "list", "GET", "api", "cluster"]
+  },
+  {
+    "id": 24,
+    "slug": "kubectl",
+    "title": "kubectl CLI Reference",
+    "section": "Tools",
+    "order": 24,
+    "content": "kubectl is the official command-line tool for interacting with Kubernetes clusters. It communicates with the API server to manage resources.\n\n## Installation\n\n```bash\n# Linux\ncurl -LO \"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\"\nsudo install kubectl /usr/local/bin/kubectl\n\n# macOS (Homebrew)\nbrew install kubectl\n\n# Verify\nkubectl version --client\n```\n\n## Essential Commands\n\n| Command | Description |\n|---------|-------------|\n| `kubectl get <resource>` | List resources |\n| `kubectl describe <resource> <name>` | Show detailed info |\n| `kubectl create -f <file>` | Create from manifest |\n| `kubectl apply -f <file>` | Create or update from manifest |\n| `kubectl delete <resource> <name>` | Delete a resource |\n| `kubectl logs <pod>` | Print Pod logs |\n| `kubectl exec -it <pod> -- <cmd>` | Execute command in container |\n| `kubectl port-forward <pod> 8080:80` | Forward local port to Pod |\n\n## Context Management\n\n```bash\n# View current context\nkubectl config current-context\n\n# Switch context\nkubectl config use-context my-cluster\n\n# Set default namespace\nkubectl config set-context --current --namespace=my-namespace\n```\n\n## Output Formatting\n\n```bash\n# JSON output\nkubectl get pods -o json\n\n# Custom columns\nkubectl get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase\n\n# JSONPath\nkubectl get pods -o jsonpath='{.items[*].metadata.name}'\n```",
+    "updated_at": "2026-06-10",
+    "tags": ["kubectl", "cli", "tools", "installation", "commands"]
+  },
+  {
+    "id": 25,
+    "slug": "helm",
+    "title": "Helm Package Manager",
+    "section": "Tools",
+    "order": 25,
+    "content": "Helm is the package manager for Kubernetes. It uses charts\u2014collections of files that describe a related set of Kubernetes resources\u2014to simplify application deployment and management.\n\n## Installation\n\n```bash\n# Script install\ncurl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash\n\n# macOS (Homebrew)\nbrew install helm\n\n# Verify\nhelm version\n```\n\n## Key Concepts\n\n| Concept | Description |\n|---------|-------------|\n| Chart | A Helm package containing Kubernetes manifests |\n| Repository | A collection of charts available for download |\n| Release | An instance of a chart running in a cluster |\n| Values | Configuration that customizes a chart |\n\n## Common Commands\n\n```bash\n# Add a chart repository\nhelm repo add bitnami https://charts.bitnami.com/bitnami\nhelm repo update\n\n# Search for charts\nhelm search repo nginx\n\n# Install a chart\nhelm install my-release bitnami/nginx --namespace web --create-namespace\n\n# Customize with values\nhelm install my-release bitnami/nginx -f values.yaml\n\n# List releases\nhelm list --all-namespaces\n\n# Upgrade a release\nhelm upgrade my-release bitnami/nginx --set replicaCount=3\n\n# Uninstall a release\nhelm uninstall my-release --namespace web\n```\n\n## Creating Charts\n\n```bash\nhelm create my-chart\n```\n\nThis generates a chart directory with `Chart.yaml`, `values.yaml`, and template files. Helm uses Go templates to render Kubernetes manifests from chart templates and values.",
+    "updated_at": "2026-06-10",
+    "tags": ["helm", "package-manager", "tools", "charts", "installation"]
+  }
+]

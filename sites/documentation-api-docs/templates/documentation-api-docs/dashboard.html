@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CloudPulse Docs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f9fc; color: #3c4257; line-height: 1.6; }
+        .topnav { background: #0a2540; color: #fff; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topnav-brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: .5rem; }
+        .topnav-brand span { color: #80e9ff; }
+        .topnav-links { display: flex; align-items: center; gap: 1.2rem; }
+        .topnav-links a { color: #adbdcc; text-decoration: none; font-size: .875rem; }
+        .topnav-links a:hover { color: #fff; }
+        .layout { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: #1a1f36; color: #a3acb9; padding: 1.5rem 0; overflow-y: auto; position: sticky; top: 56px; height: calc(100vh - 56px); flex-shrink: 0; }
+        .sidebar-section { margin-bottom: 1.2rem; }
+        .sidebar-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #697386; padding: .4rem 1.5rem; }
+        .sidebar-link { display: block; padding: .35rem 1.5rem; font-size: .85rem; color: #a3acb9; text-decoration: none; transition: all .15s; border-left: 3px solid transparent; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+
+        .content { flex: 1; max-width: 800px; padding: 2.5rem 3rem; }
+        .content h1 { font-size: 1.8rem; color: #0a2540; margin-bottom: .3rem; }
+        .content .subtitle { font-size: .95rem; color: #697386; margin-bottom: 2rem; }
+
+        .info-card { background: #fff; border: 1px solid #e3e8ee; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .info-card h2 { font-size: 1.1rem; color: #0a2540; margin-bottom: .75rem; }
+        .info-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #697386; }
+        .info-value { color: #0a2540; font-weight: 500; }
+
+        .api-key-display { background: #1a1f36; color: #80e9ff; padding: .6rem 1rem; border-radius: 6px; font-family: 'SFMono-Regular', Menlo, monospace; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }
+        .copy-btn { background: rgba(255,255,255,.1); border: none; color: #adbdcc; padding: .3rem .6rem; border-radius: 4px; cursor: pointer; font-size: .8rem; }
+        .copy-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+        .bookmark-list { list-style: none; }
+        .bookmark-item { display: flex; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid #f0f0f0; }
+        .bookmark-item:last-child { border-bottom: none; }
+        .bookmark-item a { color: #3c4257; text-decoration: none; font-size: .9rem; }
+        .bookmark-item a:hover { color: #635bff; }
+        .bookmark-section { font-size: .7rem; background: #f0f0ff; color: #635bff; padding: .1rem .4rem; border-radius: 3px; }
+        .empty-state { text-align: center; color: #8898aa; padding: 2rem; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="{{ url_for('documentation-api-docs.index') }}" class="topnav-brand">CloudPulse <span>Docs</span></a>
+        <div class="topnav-links">
+            <a href="{{ url_for('documentation-api-docs.index') }}">Home</a>
+            <a href="{{ url_for('documentation-api-docs.api_reference') }}">API Reference</a>
+            <a href="{{ url_for('documentation-api-docs.changelog') }}">Changelog</a>
+            <a href="{{ url_for('documentation-api-docs.search_page') }}">Search</a>
+            <a href="{{ url_for('documentation-api-docs.dashboard') }}" style="color:#80e9ff">{{ user.name }}</a>
+            <a href="{{ url_for('documentation-api-docs.logout') }}">Logout</a>
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside class="sidebar">
+            {% for section_name, section_docs in ordered_sections %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">{{ section_name }}</div>
+                {% for d in section_docs %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=d.slug) }}" class="sidebar-link">{{ d.title }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </aside>
+
+        <main class="content">
+            <h1>Developer Dashboard</h1>
+            <p class="subtitle">Welcome back, {{ user.name }}</p>
+
+            <div class="info-card">
+                <h2>Account Details</h2>
+                <div class="info-row">
+                    <span class="info-label">Username</span>
+                    <span class="info-value">{{ user.username }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email</span>
+                    <span class="info-value">{{ user.email }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Role</span>
+                    <span class="info-value">{{ user.role }}</span>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h2>API Key</h2>
+                <p style="font-size:.85rem;color:#697386;margin-bottom:.5rem">Use this key to authenticate API requests</p>
+                <div class="api-key-display">
+                    <span id="api-key">{{ user.api_key }}</span>
+                    <button class="copy-btn" onclick="copyKey()">Copy</button>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h2>Bookmarked Pages ({{ bookmarked|length }})</h2>
+                {% if bookmarked %}
+                <ul class="bookmark-list">
+                    {% for doc in bookmarked %}
+                    <li class="bookmark-item">
+                        <a href="{{ url_for('documentation-api-docs.page', slug=doc.slug) }}">{{ doc.title }}</a>
+                        <span class="bookmark-section">{{ doc.section }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-state">
+                    No bookmarked pages yet. Browse the docs and bookmark pages you find useful.
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function copyKey() {
+        const key = document.getElementById('api-key').textContent;
+        navigator.clipboard.writeText(key).then(() => {
+            const btn = document.querySelector('.copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
+    }
+    </script>
+</body>
+</html>

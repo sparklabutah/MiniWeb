@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard -- OpenReview</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
+        .header { border-bottom: 2px solid #7c3aed; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.3rem; color: #7c3aed; }
+        .header h1 a { color: inherit; text-decoration: none; }
+        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .welcome { font-size: 1.2rem; color: #1e293b; margin-bottom: .3rem; }
+        .role-badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; background: #ede9fe; color: #7c3aed; margin-bottom: 1rem; }
+        .section-title { font-size: 1.1rem; color: #1e293b; margin: 1.5rem 0 .8rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .3rem; }
+        .paper-item { border-bottom: 1px solid #f1f5f9; padding: .6rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .paper-item a { color: #1e293b; text-decoration: none; font-size: .95rem; }
+        .paper-item a:hover { text-decoration: underline; color: #7c3aed; }
+        .paper-meta { font-size: .8rem; color: #94a3b8; }
+        .expertise-tags { margin-bottom: 1rem; }
+        .tag { display: inline-block; background: #f1f5f9; padding: .25rem .6rem; border-radius: .25rem; font-size: .8rem; color: #475569; margin: .2rem; }
+        .empty { color: #94a3b8; font-size: .9rem; font-style: italic; }
+        .review-summary { font-size: .8rem; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('conference-review-submission.index') }}">Papers</a>
+            <a href="{{ url_for('conference-review-submission.stats_page') }}">Statistics</a>
+            <a href="{{ url_for('conference-review-submission.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="welcome">Welcome, {{ user.name }}</div>
+        <span class="role-badge">{{ user.role | upper }}</span>
+
+        <div class="expertise-tags">
+            <strong style="font-size:.85rem;color:#64748b">Expertise:</strong>
+            {% for e in user.get('expertise', []) %}
+            <span class="tag">{{ e }}</span>
+            {% endfor %}
+        </div>
+
+        <h2 class="section-title">Assigned Papers ({{ assigned_papers|length }})</h2>
+        {% if assigned_papers %}
+        {% for p in assigned_papers %}
+        <div class="paper-item">
+            <div>
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=p.id) }}">{{ p.title }}</a>
+                <div class="paper-meta">{{ p.authors_str }} &middot; {{ p.decision }}</div>
+            </div>
+            <a href="{{ url_for('conference-review-submission.review_form', paper_id=p.id) }}" style="font-size:.8rem;color:#7c3aed">Write Review</a>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">No papers assigned yet.</p>
+        {% endif %}
+
+        <h2 class="section-title">Your Reviews ({{ reviewed_papers|length }})</h2>
+        {% if reviewed_papers %}
+        {% for p in reviewed_papers %}
+        <div class="paper-item">
+            <div>
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=p.id) }}">{{ p.title }}</a>
+                <div class="paper-meta">{{ p.authors_str }}</div>
+                {% set bid = bids.get(p.id|string, {}) %}
+                {% if bid.get('recommendation') %}
+                <div class="review-summary">Your score: {{ bid.recommendation }}/10 &middot; Confidence: {{ bid.confidence or 'N/A' }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">You have not reviewed any papers yet.</p>
+        {% endif %}
+
+        <h2 class="section-title">Your Bids ({{ (user.bids or {})|length }})</h2>
+        {% if user.bids %}
+        <p style="font-size:.9rem;color:#475569">You have placed bids on {{ (user.bids or {})|length }} paper(s).</p>
+        {% else %}
+        <p class="empty">No bids placed yet. Browse papers and bid on ones you'd like to review.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

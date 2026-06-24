@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matches - HeartLink</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; }
+.navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+.navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+.navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+.navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; transition: background 0.2s; }
+.navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+.navbar .nav-links a.active { background: #667eea; color: #fff; }
+.login-btn { display: inline-block; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff !important; padding: 0.5rem 1.2rem !important; border-radius: 2rem; font-weight: 600; text-decoration: none; font-size: 0.95rem; }
+.main { max-width: 600px; margin: 2rem auto; padding: 0 1.5rem; }
+h2 { margin-bottom: 1rem; color: #1a1a2e; }
+.match { background: #fff; border-radius: 0.8rem; padding: 1rem 1.2rem; margin-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.match-info h3 { font-size: 1rem; margin-bottom: 0.2rem; }
+.match-info h3 a { color: #667eea; text-decoration: none; }
+.match-info h3 a:hover { text-decoration: underline; }
+.match-info .preview { font-size: 0.85rem; color: #888; }
+.match-meta { text-align: right; }
+.match-date { font-size: 0.8rem; color: #aaa; }
+.unread-badge { display: inline-block; background: #f093fb; color: #fff; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 1rem; margin-top: 0.3rem; }
+.empty { text-align: center; color: #888; padding: 3rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+    <div class="nav-links">
+        <a href="{{ url_for('dating.index') }}">Discover</a>
+        <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        <a href="{{ url_for('dating.matches_page') }}" class="active">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
+    </div>
+</nav>
+<div class="main">
+<h2>Your Matches ({{ match_data|length }})</h2>
+{% if match_data %}
+{% for md in match_data %}
+<div class="match">
+<div class="match-info">
+<h3><a href="{{ url_for('dating.conversation', match_id=md.match.id) }}">{{ md.other.name }}</a></h3>
+<div class="preview">{% if md.last_message %}{{ md.last_message.content[:60] }}{% else %}Start a conversation!{% endif %}</div>
+</div>
+<div class="match-meta">
+<div class="match-date">{{ md.match.matched_date[:10] }}</div>
+{% if md.unread_count > 0 %}<span class="unread-badge">{{ md.unread_count }} new</span>{% endif %}
+</div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">No matches yet. Keep exploring!</div>
+{% endif %}
+</div>
+</body></html>

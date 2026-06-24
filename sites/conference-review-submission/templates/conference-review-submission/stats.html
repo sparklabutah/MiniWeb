@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conference Statistics -- OpenReview</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
+        .header { border-bottom: 2px solid #7c3aed; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.3rem; color: #7c3aed; }
+        .header h1 a { color: inherit; text-decoration: none; }
+        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
+        .main { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .page-title { font-size: 1.4rem; color: #1e293b; margin-bottom: 1.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; text-align: center; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: #7c3aed; }
+        .stat-label { font-size: .85rem; color: #64748b; margin-top: .3rem; }
+        .section-title { font-size: 1.1rem; color: #1e293b; margin: 2rem 0 1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .3rem; }
+        .score-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; overflow: hidden; }
+        .score-table th { text-align: left; padding: .6rem .8rem; background: #f8fafc; color: #64748b; font-size: .85rem; }
+        .score-table td { padding: .6rem .8rem; font-size: .9rem; color: #334155; border-top: 1px solid #f1f5f9; }
+        .bar-container { height: 20px; background: #f1f5f9; border-radius: .2rem; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: .2rem; }
+        .bar-accept { background: #10b981; }
+        .bar-reject { background: #ef4444; }
+        .comparison-row { display: flex; gap: 2rem; margin: 1rem 0; }
+        .comparison-box { flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; text-align: center; }
+        .comparison-box h4 { font-size: .9rem; color: #64748b; margin-bottom: .5rem; }
+        .comparison-box .val { font-size: 1.4rem; font-weight: 700; }
+        .val-accept { color: #10b981; }
+        .val-reject { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('conference-review-submission.index') }}">Papers</a>
+            <a href="{{ url_for('conference-review-submission.stats_page') }}">Statistics</a>
+            {% if user %}
+            <a href="{{ url_for('conference-review-submission.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('conference-review-submission.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h1 class="page-title">ICLR 2017 Conference Statistics</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ total }}</div>
+                <div class="stat-label">Total Submissions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color:#10b981">{{ accepted }}</div>
+                <div class="stat-label">Accepted</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color:#ef4444">{{ rejected }}</div>
+                <div class="stat-label">Rejected</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ acceptance_rate }}%</div>
+                <div class="stat-label">Acceptance Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ total_reviews }}</div>
+                <div class="stat-label">Total Reviews</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ avg_reviews_per_paper }}</div>
+                <div class="stat-label">Avg Reviews/Paper</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ unique_authors }}</div>
+                <div class="stat-label">Unique Authors</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ avg_overall }}</div>
+                <div class="stat-label">Avg Score (overall)</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Score Comparison: Accepted vs Rejected</h2>
+        <div class="comparison-row">
+            <div class="comparison-box">
+                <h4>Avg Score (Accepted)</h4>
+                <div class="val val-accept">{{ avg_accepted }}</div>
+            </div>
+            <div class="comparison-box">
+                <h4>Avg Score (Rejected)</h4>
+                <div class="val val-reject">{{ avg_rejected }}</div>
+            </div>
+            <div class="comparison-box">
+                <h4>Median Score (Overall)</h4>
+                <div class="val" style="color:#7c3aed">{{ median_score }}</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Score Distribution (by avg paper score)</h2>
+        <table class="score-table">
+            <thead>
+                <tr><th>Score Bucket</th><th>Count</th><th>Distribution</th></tr>
+            </thead>
+            <tbody>
+                {% for bucket in range(1, 11) %}
+                <tr>
+                    <td>{{ bucket }}</td>
+                    <td>{{ score_dist.get(bucket, 0) }}</td>
+                    <td>
+                        <div class="bar-container">
+                            {% set pct = (score_dist.get(bucket, 0) / total * 100) if total > 0 else 0 %}
+                            <div class="bar-fill {% if bucket >= 6 %}bar-accept{% else %}bar-reject{% endif %}" style="width: {{ pct * 3 }}%"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

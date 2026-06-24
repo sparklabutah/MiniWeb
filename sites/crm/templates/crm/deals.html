@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPro CRM - Deals Pipeline</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.2rem; color: #1a365d; margin-bottom: 1rem; }
+        .toolbar { display: flex; gap: .8rem; margin-bottom: 1.2rem; flex-wrap: wrap; align-items: center; }
+        .toolbar select { padding: .5rem .8rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem; background: #fff; }
+        .toolbar button { padding: .5rem 1rem; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; font-size: .9rem; cursor: pointer; }
+        .toolbar button:hover { background: #2c5282; }
+        .pipeline-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: .8rem; margin-bottom: 2rem; }
+        .stage-col { background: #fff; border-radius: 8px; padding: .8rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); min-height: 200px; }
+        .stage-col .stage-header { font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-bottom: .5rem; border-bottom: 3px solid #e2e8f0; margin-bottom: .6rem; display: flex; justify-content: space-between; align-items: center; }
+        .stage-col .stage-header .count { font-size: .75rem; background: #edf2f7; color: #4a5568; padding: .1rem .4rem; border-radius: 10px; }
+        .stage-col.prospecting .stage-header { border-color: #a0aec0; color: #718096; }
+        .stage-col.qualification .stage-header { border-color: #63b3ed; color: #2b6cb0; }
+        .stage-col.proposal .stage-header { border-color: #f6ad55; color: #975a16; }
+        .stage-col.negotiation .stage-header { border-color: #9f7aea; color: #6b46c1; }
+        .stage-col.closed-won .stage-header { border-color: #48bb78; color: #276749; }
+        .stage-col.closed-lost .stage-header { border-color: #fc8181; color: #c53030; }
+        .deal-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: .6rem; margin-bottom: .5rem; transition: border-color .15s; }
+        .deal-card:hover { border-color: #3182ce; }
+        .deal-card .deal-name { font-size: .85rem; font-weight: 600; margin-bottom: .2rem; }
+        .deal-card .deal-name a { color: #2d3748; text-decoration: none; }
+        .deal-card .deal-name a:hover { color: #2b6cb0; }
+        .deal-card .deal-meta { font-size: .75rem; color: #a0aec0; }
+        .deal-card .deal-amount { font-size: .85rem; font-weight: 700; color: #2b6cb0; margin-top: .2rem; }
+        @media (max-width: 1000px) {
+            .pipeline-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .pipeline-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <h2>Deals Pipeline</h2>
+        <form class="toolbar" method="GET" action="{{ url_for('crm.deals_page') }}">
+            <select name="stage" id="stage_filter">
+                <option value="">All Stages</option>
+                {% for s in stages %}
+                <option value="{{ s }}" {% if stage_filter == s %}selected{% endif %}>{{ s|replace('-', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+            <select name="owner_id" id="owner_filter">
+                <option value="">All Owners</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if owner_filter == u.id|string %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+
+        <div class="pipeline-grid">
+            {% for s in stages %}
+            <div class="stage-col {{ s }}">
+                <div class="stage-header">
+                    {{ s|replace('-', ' ')|title }}
+                    <span class="count">{{ pipeline[s]|length }}</span>
+                </div>
+                {% for d in pipeline[s] %}
+                <div class="deal-card">
+                    <div class="deal-name"><a href="{{ url_for('crm.deal_detail', deal_id=d.id) }}">{{ d.name }}</a></div>
+                    <div class="deal-meta">{{ d._company_name }} &middot; {{ d._owner_name }}</div>
+                    <div class="deal-amount">${{ "{:,.0f}".format(d.amount) }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

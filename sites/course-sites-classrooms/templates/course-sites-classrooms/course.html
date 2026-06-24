@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ course.code }} {{ course.title }} - EduPortal LMS</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; }
+        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem 3rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .course-header { margin-bottom: 1.5rem; }
+        .course-header h2 { font-size: 1.4rem; color: #1e293b; }
+        .course-header .meta { font-size: .9rem; color: #64748b; margin-top: .3rem; }
+        .badge { display: inline-block; background: #eff6ff; color: #3b82f6; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 500; }
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
+        .tab { padding: .6rem 1.2rem; font-size: .9rem; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab:hover { color: #1e293b; }
+        .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 500; }
+        .section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; }
+        .section h3 { font-size: 1rem; color: #1e293b; margin-bottom: .8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: .4rem; }
+        .module { margin-bottom: 1rem; }
+        .module-title { font-size: .95rem; font-weight: 600; color: #1e293b; margin-bottom: .4rem; }
+        .lesson { font-size: .85rem; color: #475569; padding: .3rem 0 .3rem 1rem; border-left: 2px solid #e2e8f0; margin-bottom: .2rem; }
+        .lesson .type-tag { font-size: .75rem; padding: .1rem .4rem; border-radius: .2rem; margin-left: .5rem; }
+        .type-lecture { background: #eff6ff; color: #3b82f6; }
+        .type-lab { background: #fef3c7; color: #d97706; }
+        .type-reading { background: #f0fdf4; color: #16a34a; }
+        .assignment-list { list-style: none; }
+        .assignment-item { padding: .6rem 0; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .assignment-item:last-child { border-bottom: none; }
+        .assignment-item a { color: #1e293b; text-decoration: none; font-size: .9rem; }
+        .assignment-item a:hover { color: #3b82f6; }
+        .assignment-type { font-size: .75rem; padding: .15rem .4rem; border-radius: .2rem; text-transform: uppercase; font-weight: 500; }
+        .type-homework { background: #eff6ff; color: #3b82f6; }
+        .type-exam { background: #fef2f2; color: #dc2626; }
+        .type-project { background: #f5f3ff; color: #7c3aed; }
+        .type-quiz { background: #fef3c7; color: #d97706; }
+        .due-date { font-size: .8rem; color: #94a3b8; }
+        .sidebar-info { font-size: .85rem; color: #475569; line-height: 1.7; }
+        .sidebar-info dt { font-weight: 600; color: #1e293b; }
+        .sidebar-info dd { margin-bottom: .5rem; }
+        .student-list { list-style: none; }
+        .student-list li { padding: .3rem 0; font-size: .85rem; color: #475569; }
+        .disc-preview { padding: .5rem 0; border-bottom: 1px solid #f1f5f9; }
+        .disc-preview:last-child { border-bottom: none; }
+        .disc-preview a { color: #1e293b; text-decoration: none; font-size: .9rem; }
+        .disc-preview a:hover { color: #3b82f6; }
+        .disc-meta { font-size: .8rem; color: #94a3b8; }
+        .pin-icon { color: #f59e0b; font-size: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('course-sites-classrooms.index') }}" style="color:inherit;text-decoration:none">EduPortal LMS</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:.85rem;color:#cbd5e1;">{{ user.name }}</span>
+            <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('course-sites-classrooms.index') }}">Courses</a> &raquo; {{ course.code }}
+        </div>
+
+        <div class="course-header">
+            <h2>{{ course.code }}: {{ course.title }}</h2>
+            <div class="meta">
+                {{ instructor.name if instructor else 'TBA' }} &middot;
+                {{ course.semester }} &middot;
+                {{ course.credits }} credits &middot;
+                <span class="badge">{{ course.department }}</span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <a class="tab active" href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">Overview</a>
+            <a class="tab" href="{{ url_for('course-sites-classrooms.gradebook', course_id=course.id) }}">Gradebook</a>
+            <a class="tab" href="{{ url_for('course-sites-classrooms.discussions_page', course_id=course.id) }}">Discussions ({{ discussions|length }})</a>
+        </div>
+
+        <div class="section">
+            <h3>Course Description</h3>
+            <p style="font-size:.9rem;color:#475569;line-height:1.6;">{{ course.description }}</p>
+        </div>
+
+        <div class="section">
+            <h3>Modules & Lessons</h3>
+            {% for module in course.modules %}
+            <div class="module">
+                <div class="module-title">Module {{ loop.index }}: {{ module.title }}</div>
+                {% for lesson in module.lessons %}
+                <div class="lesson">
+                    {{ lesson.title }}
+                    <span class="type-tag type-{{ lesson.type }}">{{ lesson.type }}</span>
+                    <span style="font-size:.75rem;color:#94a3b8;">{{ lesson.duration_min }} min</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h3>Assignments ({{ assignments|length }})</h3>
+            <ul class="assignment-list">
+                {% for a in assignments %}
+                <li class="assignment-item">
+                    <div>
+                        <a href="{{ url_for('course-sites-classrooms.assignment_detail', course_id=course.id, assignment_id=a.id) }}">{{ a.title }}</a>
+                        <span class="assignment-type type-{{ a.type }}">{{ a.type }}</span>
+                    </div>
+                    <div>
+                        <span class="due-date">Due: {{ a.due_date }}</span>
+                        <span style="font-size:.8rem;color:#64748b;margin-left:.5rem;">{{ a.points }} pts</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>Recent Discussions</h3>
+            {% for d in discussions[:5] %}
+            <div class="disc-preview">
+                {% if d.pinned %}<span class="pin-icon">[pinned]</span>{% endif %}
+                <a href="{{ url_for('course-sites-classrooms.discussions_page', course_id=course.id) }}">{{ d.title }}</a>
+                <div class="disc-meta">{{ d.author_name|default('Unknown') }} &middot; {{ d.replies|length }} replies</div>
+            </div>
+            {% endfor %}
+            {% if discussions|length == 0 %}
+            <p style="font-size:.85rem;color:#94a3b8;">No discussions yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Enrolled Students ({{ students|length }})</h3>
+            <ul class="student-list">
+                {% for s in students %}
+                <li>{{ s.name }} ({{ s.get('major', '') }}, {{ s.get('year', '') }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>Grade Weights</h3>
+            <dl class="sidebar-info">
+                {% for cat, weight in course.grade_weights.items() %}
+                <dt>{{ cat|capitalize }}</dt>
+                <dd>{{ (weight * 100)|int }}%</dd>
+                {% endfor %}
+            </dl>
+        </div>
+    </div>
+</body>
+</html>

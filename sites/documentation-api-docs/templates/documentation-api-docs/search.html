@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - CloudPulse Docs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f9fc; color: #3c4257; line-height: 1.6; }
+        .topnav { background: #0a2540; color: #fff; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topnav-brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: .5rem; }
+        .topnav-brand span { color: #80e9ff; }
+        .topnav-links { display: flex; align-items: center; gap: 1.2rem; }
+        .topnav-links a { color: #adbdcc; text-decoration: none; font-size: .875rem; }
+        .topnav-links a:hover { color: #fff; }
+        .topnav-links a.active { color: #80e9ff; }
+        .layout { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: #1a1f36; color: #a3acb9; padding: 1.5rem 0; overflow-y: auto; position: sticky; top: 56px; height: calc(100vh - 56px); flex-shrink: 0; }
+        .sidebar-section { margin-bottom: 1.2rem; }
+        .sidebar-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #697386; padding: .4rem 1.5rem; }
+        .sidebar-link { display: block; padding: .35rem 1.5rem; font-size: .85rem; color: #a3acb9; text-decoration: none; transition: all .15s; border-left: 3px solid transparent; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+
+        .content { flex: 1; max-width: 800px; padding: 2.5rem 3rem; }
+        .content h1 { font-size: 1.8rem; color: #0a2540; margin-bottom: 1.5rem; }
+        .search-form { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+        .search-form input { flex: 1; padding: .75rem 1rem; border: 2px solid #e3e8ee; border-radius: 8px; font-size: 1rem; }
+        .search-form input:focus { outline: none; border-color: #635bff; }
+        .search-form button { padding: .75rem 1.5rem; background: #635bff; color: #fff; border: none; border-radius: 8px; font-size: .95rem; cursor: pointer; }
+        .search-form button:hover { background: #5148c8; }
+        .result-count { font-size: .85rem; color: #8898aa; margin-bottom: 1rem; }
+        .result-card { background: #fff; border: 1px solid #e3e8ee; border-radius: 8px; padding: 1.2rem; margin-bottom: .75rem; transition: border-color .15s; }
+        .result-card:hover { border-color: #635bff; }
+        .result-card h3 { margin: 0 0 .3rem; font-size: 1rem; }
+        .result-card h3 a { color: #0a2540; text-decoration: none; }
+        .result-card h3 a:hover { color: #635bff; }
+        .result-card .section-badge { font-size: .7rem; background: #f0f0ff; color: #635bff; padding: .1rem .4rem; border-radius: 3px; }
+        .result-card .snippet { font-size: .85rem; color: #697386; margin-top: .4rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .result-card .tags { margin-top: .4rem; }
+        .result-card .tag { font-size: .7rem; background: #f6f9fc; color: #8898aa; padding: .1rem .35rem; border-radius: 3px; margin-right: .2rem; }
+        .no-results { text-align: center; color: #8898aa; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="{{ url_for('documentation-api-docs.index') }}" class="topnav-brand">CloudPulse <span>Docs</span></a>
+        <div class="topnav-links">
+            <a href="{{ url_for('documentation-api-docs.index') }}">Home</a>
+            <a href="{{ url_for('documentation-api-docs.api_reference') }}">API Reference</a>
+            <a href="{{ url_for('documentation-api-docs.changelog') }}">Changelog</a>
+            <a href="{{ url_for('documentation-api-docs.search_page') }}" class="active">Search</a>
+            {% if user %}
+            <a href="{{ url_for('documentation-api-docs.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('documentation-api-docs.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('documentation-api-docs.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside class="sidebar">
+            {% for section_name, section_docs in ordered_sections %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">{{ section_name }}</div>
+                {% for d in section_docs %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=d.slug) }}" class="sidebar-link">{{ d.title }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </aside>
+
+        <main class="content">
+            <h1>Search Documentation</h1>
+            <form class="search-form" method="get" action="{{ url_for('documentation-api-docs.search_page') }}">
+                <input type="text" name="q" placeholder="Search by keyword, topic, or API endpoint..." value="{{ q }}" autocomplete="off">
+                <button type="submit">Search</button>
+            </form>
+
+            {% if q %}
+            <div class="result-count">{{ results|length }} result{{ 's' if results|length != 1 else '' }} for "{{ q }}"</div>
+
+            {% if results %}
+            {% for doc in results %}
+            <div class="result-card">
+                <h3>
+                    <a href="{{ url_for('documentation-api-docs.page', slug=doc.slug) }}">{{ doc.title }}</a>
+                    <span class="section-badge">{{ doc.section }}</span>
+                </h3>
+                <div class="snippet">{{ doc.content[:200] }}</div>
+                <div class="tags">
+                    {% for tag in doc.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="no-results">No results found for "{{ q }}". Try different keywords.</div>
+            {% endif %}
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

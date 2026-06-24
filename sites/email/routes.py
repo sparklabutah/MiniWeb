@@ -623,6 +623,7 @@ def api_messages():
     q = request.args.get("q", "").strip()
     sort = request.args.get("sort", "date").strip()
     starred = request.args.get("starred", "").strip()
+    page = request.args.get("page", 0, type=int)  # 0 = no pagination
 
     if user_id:
         emails = _user_emails(user_id, folder=folder if folder else None)
@@ -645,7 +646,16 @@ def api_messages():
     elif sort == "from":
         emails.sort(key=lambda e: e.get("from_addr", "").lower())
 
-    return jsonify(emails)
+    total = len(emails)
+
+    # Optional API-level pagination
+    if page > 0:
+        start = (page - 1) * EMAILS_PER_PAGE
+        end = start + EMAILS_PER_PAGE
+        emails = emails[start:end]
+
+    return jsonify({"messages": emails, "total": total, "page": page,
+                    "per_page": EMAILS_PER_PAGE})
 
 
 @blueprint.route("/api/messages/<int:email_id>")
@@ -844,18 +854,13 @@ def api_folder_count(name):
         # Count across all users
         all_emails = list(_get_emails()) + _load_sent()
         emails_in_folder = [e for e in all_emails if e.get("folder") == name]
-        total = len(emails_in_folder)
-        unread = sum(1 for e in emails_in_folder if not e.get("is_read"))
-        return jsonify({"folder": name, "total": total, "count": total,
-                        "unread": unread})
+        return jsonify({"folder": name, "total": len(emails_in_folder),
+                        "unread": sum(1 for e in emails_in_folder if not e.get("is_read"))})
     emails = _user_emails(user_id, folder=name)
-    total = len(emails)
-    unread = sum(1 for e in emails if not e.get("is_read"))
     return jsonify({
         "folder": name,
-        "total": total,
-        "count": total,
-        "unread": unread
+        "total": len(emails),
+        "unread": sum(1 for e in emails if not e.get("is_read"))
     })
 
 

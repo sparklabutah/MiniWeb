@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPro CRM - {{ company.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #718096; margin-bottom: 1rem; }
+        .breadcrumb a { color: #2b6cb0; text-decoration: none; }
+        .detail-card { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .detail-card h2 { font-size: 1.3rem; color: #1a365d; margin-bottom: .8rem; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 2rem; }
+        .detail-grid .field .label { font-size: .78rem; color: #a0aec0; text-transform: uppercase; letter-spacing: .04em; }
+        .detail-grid .field .val { font-size: .92rem; color: #2d3748; }
+        .detail-grid .field .val a { color: #2b6cb0; text-decoration: none; }
+        h3 { font-size: 1.05rem; color: #1a365d; margin-bottom: .8rem; margin-top: .5rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #edf2f7; font-size: .85rem; }
+        th { background: #edf2f7; color: #4a5568; font-weight: 600; font-size: .78rem; text-transform: uppercase; }
+        td a { color: #2b6cb0; text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+        .stage-badge { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .78rem; font-weight: 600; }
+        .stage-badge.prospecting { background: #edf2f7; color: #718096; }
+        .stage-badge.qualification { background: #ebf8ff; color: #2b6cb0; }
+        .stage-badge.proposal { background: #fefcbf; color: #975a16; }
+        .stage-badge.negotiation { background: #faf5ff; color: #6b46c1; }
+        .stage-badge.closed-won { background: #f0fff4; color: #276749; }
+        .stage-badge.closed-lost { background: #fff5f5; color: #c53030; }
+        .badge { display: inline-block; background: #ebf8ff; color: #2b6cb0; padding: .15rem .5rem; border-radius: 4px; font-size: .78rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a> &rsaquo; {{ company.name }}
+        </div>
+        <div class="detail-card">
+            <h2>{{ company.name }}</h2>
+            <div class="detail-grid">
+                <div class="field"><div class="label">Industry</div><div class="val"><span class="badge">{{ company.industry }}</span></div></div>
+                <div class="field"><div class="label">Company Size</div><div class="val">{{ company.size }} employees</div></div>
+                <div class="field"><div class="label">Website</div><div class="val"><a href="{{ company.website }}" target="_blank">{{ company.website }}</a></div></div>
+                <div class="field"><div class="label">Annual Revenue</div><div class="val">${{ "{:,.0f}".format(company.annual_revenue) }}</div></div>
+                <div class="field"><div class="label">Address</div><div class="val">{{ company.address }}</div></div>
+            </div>
+        </div>
+
+        <h3>Contacts ({{ contacts|length }})</h3>
+        {% if contacts %}
+        <table>
+            <thead><tr><th>Name</th><th>Title</th><th>Email</th><th>Phone</th></tr></thead>
+            <tbody>
+            {% for c in contacts %}
+            <tr>
+                <td><a href="{{ url_for('crm.contact_detail', contact_id=c.id) }}">{{ c.name }}</a></td>
+                <td>{{ c.title }}</td>
+                <td>{{ c.email }}</td>
+                <td>{{ c.phone }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#a0aec0; margin-bottom:1.5rem;">No contacts at this company.</p>
+        {% endif %}
+
+        <h3>Deals ({{ deals|length }})</h3>
+        {% if deals %}
+        <table>
+            <thead><tr><th>Deal Name</th><th>Stage</th><th>Amount</th><th>Contact</th><th>Owner</th><th>Close Date</th></tr></thead>
+            <tbody>
+            {% for d in deals %}
+            <tr>
+                <td><a href="{{ url_for('crm.deal_detail', deal_id=d.id) }}">{{ d.name }}</a></td>
+                <td><span class="stage-badge {{ d.stage }}">{{ d.stage|replace('-', ' ')|title }}</span></td>
+                <td>${{ "{:,.0f}".format(d.amount) }}</td>
+                <td>{{ d._contact_name }}</td>
+                <td>{{ d._owner_name }}</td>
+                <td>{{ d.close_date }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#a0aec0;">No deals with this company.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

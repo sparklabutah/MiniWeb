@@ -7,137 +7,198 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #2d3748; }
-        nav.topnav { background: #1a365d; padding: 0; display: flex; align-items: center; }
-        nav.topnav .brand { color: #fff; font-weight: 700; font-size: 1.2rem; padding: .8rem 1.5rem; }
-        nav.topnav a { color: #bee3f8; text-decoration: none; padding: .8rem 1rem; font-size: .95rem; display: inline-block; }
-        nav.topnav a:hover, nav.topnav a.active { color: #fff; background: rgba(255,255,255,0.1); }
-        nav.topnav .right { margin-left: auto; display: flex; align-items: center; }
-        nav.topnav .right span { color: #90cdf4; padding: 0 .8rem; font-size: .88rem; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
-        h2 { font-size: 1.1rem; color: #1a365d; margin-bottom: .8rem; }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-        .card { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .card .label { font-size: .8rem; color: #718096; text-transform: uppercase; margin-bottom: .2rem; }
-        .card .value { font-size: 1.3rem; font-weight: 700; color: #1a365d; }
-        .section { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.2rem; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; }
+        .header { background: linear-gradient(135deg, #1a365d, #2a4a7f); color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .88rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .82rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.15rem; color: #1a365d; margin-bottom: 1rem; }
+
+        /* Card preview */
+        .card-preview { background: linear-gradient(135deg, #2b6cb0, #4299e1); border-radius: 16px; padding: 1.8rem; color: #fff; margin-bottom: 1.5rem; max-width: 420px; box-shadow: 0 4px 20px rgba(43,108,176,0.3); position: relative; overflow: hidden; }
+        .card-preview::before { content: ''; position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%; }
+        .card-preview .card-name { font-size: .85rem; letter-spacing: 1px; text-transform: uppercase; opacity: .8; margin-bottom: .8rem; }
+        .card-preview .card-number { font-size: 1.3rem; letter-spacing: 3px; margin-bottom: 1rem; }
+        .card-preview .card-holder { font-size: .9rem; }
+        .card-preview .card-tier { position: absolute; top: 1.2rem; right: 1.5rem; font-size: .75rem; background: rgba(255,255,255,0.2); padding: .2rem .6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .card-preview .frozen-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(229,62,62,0.9); padding: .5rem 1.5rem; border-radius: 6px; font-weight: 700; font-size: 1rem; letter-spacing: 2px; }
+
+        /* KPI cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+        .kpi-card .label { font-size: .78rem; color: #718096; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+        .kpi-card .value { font-size: 1.5rem; font-weight: 700; color: #1a365d; }
+        .kpi-card .value.red { color: #c53030; }
+        .kpi-card .value.green { color: #276749; }
+        .kpi-card .value.blue { color: #2b6cb0; }
+
+        /* Sections */
+        .section { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
+        .section-header h2 { margin-bottom: 0; }
         .section-header a { font-size: .85rem; color: #3182ce; text-decoration: none; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #edf2f7; font-size: .88rem; }
-        th { color: #718096; font-weight: 600; font-size: .78rem; text-transform: uppercase; }
-        td.amount { text-align: right; font-weight: 600; }
+        .section-header a:hover { text-decoration: underline; }
+
+        /* Transaction list */
+        .txn-list { list-style: none; }
+        .txn-list li { display: flex; justify-content: space-between; align-items: center; padding: .7rem 0; border-bottom: 1px solid #f0f4f8; }
+        .txn-list li:last-child { border-bottom: none; }
+        .txn-list .txn-info { flex: 1; }
+        .txn-list .txn-merchant { font-weight: 600; font-size: .9rem; color: #2d3748; }
+        .txn-list .txn-meta { font-size: .78rem; color: #a0aec0; margin-top: .1rem; }
+        .txn-list .txn-amount { font-weight: 700; font-size: .95rem; color: #2d3748; }
+        .txn-list .txn-amount.pending { color: #d69e2e; }
+
+        /* Spending chart */
+        .spending-bars { margin-top: .5rem; }
+        .spending-bar { display: flex; align-items: center; margin-bottom: .5rem; }
+        .spending-bar .cat-name { width: 110px; font-size: .82rem; color: #4a5568; flex-shrink: 0; }
+        .spending-bar .bar-track { flex: 1; height: 18px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 0 .6rem; }
+        .spending-bar .bar-fill { height: 100%; background: linear-gradient(90deg, #4299e1, #63b3ed); border-radius: 4px; min-width: 2px; }
+        .spending-bar .cat-amt { font-size: .82rem; font-weight: 600; color: #2d3748; width: 80px; text-align: right; flex-shrink: 0; }
+
+        /* Payment list */
+        .pay-list { list-style: none; }
+        .pay-list li { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f0f4f8; font-size: .88rem; }
+        .pay-list li:last-child { border-bottom: none; }
+        .pay-list .pay-amt { font-weight: 600; color: #276749; }
     </style>
 </head>
 <body>
-    <nav class="topnav">
-        <span class="brand">SecureCard</span>
-        <a href="{{ url_for('credit-card.index') }}" class="active">Overview</a>
-        <a href="{{ url_for('credit-card.transactions_page') }}">Transactions</a>
-        <a href="{{ url_for('credit-card.statements_page') }}">Statements</a>
-        <a href="{{ url_for('credit-card.payments_page') }}">Payments</a>
-        <a href="{{ url_for('credit-card.rewards_page') }}">Rewards</a>
-        <a href="{{ url_for('credit-card.settings_page') }}">Settings</a>
-        <div class="right">
-            <span>{{ user.name }}</span>
+    <div class="header">
+        <h1>SecureCard</h1>
+        <nav class="header-nav">
+            <a href="{{ url_for('credit-card.index') }}">Overview</a>
+            <a href="{{ url_for('credit-card.transactions_page') }}">Transactions</a>
+            <a href="{{ url_for('credit-card.statements_page') }}">Statements</a>
+            <a href="{{ url_for('credit-card.payments_page') }}">Payments</a>
+            <a href="{{ url_for('credit-card.rewards_page') }}">Rewards</a>
+            <a href="{{ url_for('credit-card.settings_page') }}">Settings</a>
+            <span class="user-info">{{ user.name }}</span>
             <a href="{{ url_for('credit-card.logout') }}">Logout</a>
-        </div>
-    </nav>
-
+        </nav>
+    </div>
     <div class="container">
-        <h2>Account Overview</h2>
+        <!-- Credit Card Visual -->
+        <div class="card-preview">
+            <div class="card-name">SecureCard {{ user.card_tier }}</div>
+            <div class="card-number">**** **** **** {{ user.card_number_last4 }}</div>
+            <div class="card-holder">{{ user.name }}</div>
+            <div class="card-tier">{{ user.card_tier }}</div>
+            {% if user.card_frozen %}
+            <div class="frozen-badge">FROZEN</div>
+            {% endif %}
+        </div>
 
-        <div class="grid">
-            <div class="card">
+        <!-- KPI Grid -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
                 <div class="label">Current Balance</div>
-                <div class="value">${{ "%.2f"|format(user.current_balance) }}</div>
+                <div class="value red">${{ "%.2f"|format(user.current_balance) }}</div>
             </div>
-            <div class="card">
+            <div class="kpi-card">
                 <div class="label">Available Credit</div>
-                <div class="value">${{ "%.2f"|format(user.available_credit) }}</div>
+                <div class="value green">${{ "%.2f"|format(user.available_credit) }}</div>
             </div>
-            <div class="card">
+            <div class="kpi-card">
                 <div class="label">Credit Limit</div>
                 <div class="value">${{ "%.2f"|format(user.credit_limit) }}</div>
             </div>
-            <div class="card">
+            <div class="kpi-card">
                 <div class="label">Rewards Points</div>
-                <div class="value">{{ "{:,}".format(user.rewards_points) }}</div>
+                <div class="value blue">{{ "{:,}".format(user.rewards_points) }}</div>
             </div>
-            <div class="card">
+            <div class="kpi-card">
                 <div class="label">Minimum Payment Due</div>
                 <div class="value">${{ "%.2f"|format(user.minimum_payment) }}</div>
             </div>
-            <div class="card">
+            <div class="kpi-card">
                 <div class="label">Payment Due Date</div>
-                <div class="value">{{ user.due_date }}</div>
+                <div class="value" style="font-size:1.1rem;">{{ user.due_date }}</div>
             </div>
         </div>
 
+        <!-- Recent Transactions -->
         <div class="section">
             <div class="section-header">
                 <h2>Recent Transactions</h2>
-                <a href="{{ url_for('credit-card.transactions_page') }}">View All Transactions</a>
+                <a href="{{ url_for('credit-card.transactions_page') }}">View All</a>
             </div>
-            <table>
-                <thead>
-                    <tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right;">Amount</th></tr>
-                </thead>
-                <tbody>
-                    {% for t in recent_transactions %}
-                    <tr>
-                        <td>{{ t.date }}</td>
-                        <td>{{ t.merchant }}</td>
-                        <td>{{ t.category }}</td>
-                        <td class="amount">${{ "%.2f"|format(t.amount) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <ul class="txn-list">
+                {% for t in recent_transactions %}
+                <li>
+                    <div class="txn-info">
+                        <div class="txn-merchant">{{ t.merchant }}</div>
+                        <div class="txn-meta">{{ t.date }} &middot; {{ t.category }}</div>
+                    </div>
+                    <div class="txn-amount {{ 'pending' if t.status == 'pending' else '' }}">${{ "%.2f"|format(t.amount) }}{% if t.status == 'pending' %} <small>(pending)</small>{% endif %}</div>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
 
+        <!-- Spending by Category -->
+        <div class="section">
+            <h2>Spending by Category</h2>
+            <div class="spending-bars">
+                {% set max_spend = spending.values()|list|max if spending else 1 %}
+                {% for cat, amt in spending.items() %}
+                <div class="spending-bar">
+                    <span class="cat-name">{{ cat }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ (amt / max_spend * 100)|round(1) }}%"></div>
+                    </div>
+                    <span class="cat-amt">${{ "%.2f"|format(amt) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Payments -->
         {% if recent_payments %}
         <div class="section">
             <div class="section-header">
                 <h2>Recent Payments</h2>
-                <a href="{{ url_for('credit-card.payments_page') }}">View All Payments</a>
+                <a href="{{ url_for('credit-card.payments_page') }}">View All</a>
             </div>
-            <table>
-                <thead>
-                    <tr><th>Date</th><th>Method</th><th style="text-align:right;">Amount</th></tr>
-                </thead>
-                <tbody>
-                    {% for p in recent_payments %}
-                    <tr>
-                        <td>{{ p.date }}</td>
-                        <td>{{ p.method|replace('_', ' ')|title }}</td>
-                        <td class="amount">${{ "%.2f"|format(p.amount) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <ul class="pay-list">
+                {% for p in recent_payments %}
+                <li>
+                    <span>{{ p.date }} &middot; {{ p.method|replace('_', ' ')|title }}</span>
+                    <span class="pay-amt">${{ "%.2f"|format(p.amount) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
         {% endif %}
 
+        <!-- Latest Statement -->
         {% if latest_statement %}
         <div class="section">
             <div class="section-header">
-                <h2>Latest Statement: {{ latest_statement.period }}</h2>
+                <h2>Latest Statement ({{ latest_statement.period }})</h2>
                 <a href="{{ url_for('credit-card.statements_page') }}">All Statements</a>
             </div>
-            <table>
-                <thead>
-                    <tr><th>Opening Balance</th><th>Charges</th><th>Payments</th><th>Interest</th><th>Closing Balance</th></tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${{ "%.2f"|format(latest_statement.opening_balance) }}</td>
-                        <td>${{ "%.2f"|format(latest_statement.charges) }}</td>
-                        <td>${{ "%.2f"|format(latest_statement.payments) }}</td>
-                        <td>${{ "%.2f"|format(latest_statement.interest) }}</td>
-                        <td>${{ "%.2f"|format(latest_statement.closing_balance) }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="kpi-grid" style="margin-bottom:0;">
+                <div class="kpi-card">
+                    <div class="label">Opening Balance</div>
+                    <div class="value" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.opening_balance) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Charges</div>
+                    <div class="value red" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.charges) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Payments</div>
+                    <div class="value green" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.payments) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Closing Balance</div>
+                    <div class="value" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.closing_balance) }}</div>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>

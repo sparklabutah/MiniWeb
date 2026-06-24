@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .content { max-width: 600px; margin: 2rem auto; padding: 0 1.5rem; }
+        .content h2 { font-family: monospace; font-size: 1.3rem; margin-bottom: 1.5rem; }
+        .settings-form { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; color: #a6adc8; margin-bottom: .4rem; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: .6rem .8rem; background: #313244; border: 1px solid #45475a; border-radius: .3rem; font-size: .95rem; color: #cdd6f4; }
+        .form-group input:focus, .form-group select:focus { border-color: #89b4fa; outline: none; }
+        .form-group .help { font-size: .8rem; color: #6c7086; margin-top: .3rem; }
+        .btn-save { width: 100%; padding: .7rem; background: #a6e3a1; color: #1e1e2e; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: .5rem; }
+        .btn-save:hover { background: #94e2d5; }
+        .message { background: rgba(166,227,161,.1); color: #a6e3a1; padding: .6rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-size: .9rem; }
+        .current-values { background: #11111b; border: 1px solid #313244; border-radius: .3rem; padding: .8rem 1rem; margin-bottom: 1.5rem; font-size: .85rem; }
+        .current-values span { color: #89b4fa; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard</a>
+        <span class="spacer"></span>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+    </div>
+
+    <div class="content">
+        <h2>Editor Settings for {{ user.name }}</h2>
+
+        {% if message %}
+        <div class="message">{{ message }}</div>
+        {% endif %}
+
+        <div class="current-values">
+            Current settings:
+            font_size=<span>{{ user.get('settings', {}).get('font_size', '14 (default)') }}</span>,
+            tab_size=<span>{{ user.get('settings', {}).get('tab_size', '4 (default)') }}</span>,
+            theme=<span>{{ user.get('settings', {}).get('theme', 'dark (default)') }}</span>
+        </div>
+
+        <form class="settings-form" method="post" action="{{ url_for('code-editor-execution.settings_page') }}">
+            <div class="form-group">
+                <label for="font_size">Font Size (px)</label>
+                <input type="number" name="font_size" id="font_size" min="8" max="32"
+                       value="{{ user.get('settings', {}).get('font_size', 14) }}">
+                <div class="help">Range: 8 to 32 pixels</div>
+            </div>
+            <div class="form-group">
+                <label for="tab_size">Tab Size (spaces)</label>
+                <select name="tab_size" id="tab_size">
+                    <option value="2" {{ 'selected' if user.get('settings', {}).get('tab_size') == 2 }}>2</option>
+                    <option value="4" {{ 'selected' if user.get('settings', {}).get('tab_size', 4) == 4 }}>4</option>
+                    <option value="8" {{ 'selected' if user.get('settings', {}).get('tab_size') == 8 }}>8</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="theme">Theme</label>
+                <select name="theme" id="theme">
+                    <option value="dark" {{ 'selected' if user.get('settings', {}).get('theme', 'dark') == 'dark' }}>Dark</option>
+                    <option value="light" {{ 'selected' if user.get('settings', {}).get('theme') == 'light' }}>Light</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-save">Save Settings</button>
+        </form>
+    </div>
+</body>
+</html>

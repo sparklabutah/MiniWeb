@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ profile.name }} - HeartLink</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; }
+.navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+.navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+.navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+.navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+.navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+.login-btn { display: inline-block; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff !important; padding: 0.5rem 1.2rem !important; border-radius: 2rem; font-weight: 600; text-decoration: none; font-size: 0.95rem; }
+.main { max-width: 600px; margin: 2rem auto; padding: 0 1.5rem; }
+.profile-card { background: #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+.profile-header { background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; padding: 0; text-align: center; position: relative; overflow: hidden; min-height: 250px; display: flex; flex-direction: column; justify-content: flex-end; }
+.profile-header img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.profile-header .overlay { position: relative; z-index: 1; background: linear-gradient(transparent, rgba(0,0,0,.6)); padding: 3rem 2rem 1.5rem; }
+.profile-header h2 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+.profile-header .age { font-size: 1rem; opacity: 0.9; }
+.profile-body { padding: 1.5rem; }
+.bio { margin-bottom: 1rem; line-height: 1.5; color: #555; }
+.interests { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0; }
+.interests span { background: #f0ebff; color: #667eea; padding: 0.25rem 0.7rem; border-radius: 1rem; font-size: 0.8rem; border: 1px solid #e8deff; }
+.interests span.shared { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+.details { font-size: 0.9rem; color: #666; margin-top: 1rem; }
+.details p { margin: 0.3rem 0; }
+.actions { display: flex; gap: 0.8rem; margin-top: 1.5rem; justify-content: center; }
+.actions form button { padding: 0.7rem 2rem; border: none; border-radius: 2rem; font-size: 0.95rem; cursor: pointer; font-weight: 600; }
+.btn-like { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
+.btn-pass { background: #f1f1f1; color: #888; }
+.matched-badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 0.4rem 1rem; border-radius: 1rem; font-weight: 600; font-size: 0.9rem; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+    <div class="nav-links">
+        <a href="{{ url_for('dating.index') }}">Discover</a>
+        <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        {% if user %}
+        <a href="{{ url_for('dating.matches_page') }}">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('dating.login_page') }}" class="login-btn">Sign In</a>
+        {% endif %}
+    </div>
+</nav>
+<div class="main">
+<div class="profile-card">
+<div class="profile-header">
+    {% if profile.photos %}<img src="{{ profile.photos[0] }}" alt="{{ profile.name }}">{% endif %}
+    <div class="overlay">
+        <h2>{{ profile.name }}</h2>
+        <div class="age">{{ profile.age }} -- {{ profile.location }}</div>
+    </div>
+</div>
+<div class="profile-body">
+<div class="bio">{{ profile.bio }}</div>
+<div class="interests">
+    {% for i in profile.interests %}
+    {% if user and i in user.interests %}
+    <span class="shared" title="Shared interest">{{ i }}</span>
+    {% else %}
+    <span>{{ i }}</span>
+    {% endif %}
+    {% endfor %}
+</div>
+<div class="details">
+<p><strong>Looking for:</strong> {{ profile.looking_for }}</p>
+<p><strong>Gender:</strong> {{ profile.gender }}</p>
+{% if profile.verified %}<p><strong>Verified</strong></p>{% endif %}
+</div>
+{% if is_matched %}
+<div class="matched-badge">You are matched!</div>
+{% endif %}
+{% if user and user.id != profile.id and not is_matched %}
+<div class="actions">
+<form method="post" action="{{ url_for('dating.form_like', profile_id=profile.id) }}">
+    <button type="submit" class="btn-like">Like</button>
+</form>
+<form method="post" action="{{ url_for('dating.form_pass', profile_id=profile.id) }}">
+    <button type="submit" class="btn-pass">Pass</button>
+</form>
+</div>
+{% endif %}
+</div>
+</div>
+</div>
+</body></html>

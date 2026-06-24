@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Reference - CloudPulse Docs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f9fc; color: #3c4257; line-height: 1.6; }
+        .topnav { background: #0a2540; color: #fff; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topnav-brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: .5rem; }
+        .topnav-brand span { color: #80e9ff; }
+        .topnav-links { display: flex; align-items: center; gap: 1.2rem; }
+        .topnav-links a { color: #adbdcc; text-decoration: none; font-size: .875rem; }
+        .topnav-links a:hover { color: #fff; }
+        .topnav-links a.active { color: #80e9ff; }
+        .layout { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: #1a1f36; color: #a3acb9; padding: 1.5rem 0; overflow-y: auto; position: sticky; top: 56px; height: calc(100vh - 56px); flex-shrink: 0; }
+        .sidebar-section { margin-bottom: 1.2rem; }
+        .sidebar-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #697386; padding: .4rem 1.5rem; }
+        .sidebar-link { display: block; padding: .35rem 1.5rem; font-size: .85rem; color: #a3acb9; text-decoration: none; transition: all .15s; border-left: 3px solid transparent; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+        .sidebar-link.active { color: #80e9ff; border-left-color: #80e9ff; background: rgba(128,233,255,.06); }
+
+        .content { flex: 1; max-width: 900px; padding: 2.5rem 3rem; }
+        .content h1 { font-size: 1.8rem; color: #0a2540; margin-bottom: .5rem; }
+        .content .subtitle { font-size: 1rem; color: #697386; margin-bottom: 2rem; }
+
+        .method-badge { display: inline-block; font-size: .7rem; font-weight: 700; padding: .2rem .5rem; border-radius: 3px; font-family: 'SFMono-Regular', Menlo, monospace; letter-spacing: .03em; min-width: 50px; text-align: center; }
+        .method-get { background: #d4f4e2; color: #0d7a3e; }
+        .method-post { background: #d4e4ff; color: #1a56db; }
+        .method-put { background: #fff3cd; color: #856404; }
+        .method-delete { background: #fdd; color: #c0392b; }
+        .method-patch { background: #e8daef; color: #6c3483; }
+
+        .endpoint-card { background: #fff; border: 1px solid #e3e8ee; border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: .75rem; display: flex; align-items: center; gap: 1rem; transition: border-color .15s; }
+        .endpoint-card:hover { border-color: #635bff; }
+        .endpoint-path { font-family: 'SFMono-Regular', Menlo, monospace; font-size: .88rem; color: #0a2540; flex: 1; }
+        .endpoint-title { font-size: .82rem; color: #697386; white-space: nowrap; }
+        .endpoint-card a { text-decoration: none; display: flex; align-items: center; gap: 1rem; flex: 1; }
+
+        .filter-bar { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .filter-btn { padding: .4rem .8rem; border: 1px solid #e3e8ee; border-radius: 6px; background: #fff; font-size: .8rem; cursor: pointer; transition: all .15s; color: #697386; }
+        .filter-btn:hover, .filter-btn.active { border-color: #635bff; color: #635bff; background: #f0f0ff; }
+
+        .api-doc-section { margin-bottom: 2rem; }
+        .api-doc-section h2 { font-size: 1.1rem; color: #0a2540; margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid #e3e8ee; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="{{ url_for('documentation-api-docs.index') }}" class="topnav-brand">CloudPulse <span>Docs</span></a>
+        <div class="topnav-links">
+            <a href="{{ url_for('documentation-api-docs.index') }}">Home</a>
+            <a href="{{ url_for('documentation-api-docs.api_reference') }}" class="active">API Reference</a>
+            <a href="{{ url_for('documentation-api-docs.changelog') }}">Changelog</a>
+            <a href="{{ url_for('documentation-api-docs.search_page') }}">Search</a>
+            {% if user %}
+            <a href="{{ url_for('documentation-api-docs.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('documentation-api-docs.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('documentation-api-docs.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside class="sidebar">
+            {% for section_name, section_docs in ordered_sections %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">{{ section_name }}</div>
+                {% for d in section_docs %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=d.slug) }}" class="sidebar-link">{{ d.title }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </aside>
+
+        <main class="content">
+            <h1>API Reference</h1>
+            <p class="subtitle">Complete reference for all CloudPulse API endpoints</p>
+
+            <div class="filter-bar">
+                <button class="filter-btn active" onclick="filterEndpoints('all')">All</button>
+                <button class="filter-btn" onclick="filterEndpoints('GET')">GET</button>
+                <button class="filter-btn" onclick="filterEndpoints('POST')">POST</button>
+                <button class="filter-btn" onclick="filterEndpoints('PUT')">PUT</button>
+                <button class="filter-btn" onclick="filterEndpoints('DELETE')">DELETE</button>
+            </div>
+
+            <div id="endpoints-list">
+                {% for endpoint in endpoints %}
+                <div class="endpoint-card" data-method="{{ endpoint.method }}">
+                    <span class="method-badge method-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+                    <a href="{{ url_for('documentation-api-docs.page', slug=endpoint.doc_slug) }}">
+                        <span class="endpoint-path">{{ endpoint.path }}</span>
+                        <span class="endpoint-title">{{ endpoint.doc_title }}</span>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h2 style="font-size:1.2rem; color:#0a2540; margin: 2rem 0 1rem; padding-top:1rem; border-top:1px solid #e3e8ee;">Documentation Pages</h2>
+            {% for doc in api_docs %}
+            <div class="api-doc-section">
+                <h2><a href="{{ url_for('documentation-api-docs.page', slug=doc.slug) }}" style="color:#0a2540;text-decoration:none">{{ doc.title }}</a></h2>
+                <p style="font-size:.88rem;color:#697386">{{ doc.content[:150] }}...</p>
+            </div>
+            {% endfor %}
+        </main>
+    </div>
+
+    <script>
+    function filterEndpoints(method) {
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.endpoint-card').forEach(card => {
+            if (method === 'all' || card.dataset.method === method) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    </script>
+</body>
+</html>

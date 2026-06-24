@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ snippet.title }} -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; color: #cdd6f4; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .btn-login-nav { background: #89b4fa; color: #1e1e2e !important; padding: .3rem .8rem !important; border-radius: .3rem; font-weight: 600; }
+        .breadcrumb { padding: .6rem 2rem; font-size: .85rem; color: #6c7086; background: #1e1e2e; }
+        .breadcrumb a { color: #89b4fa; }
+        .content { max-width: 800px; margin: 1rem auto 2rem; padding: 0 1.5rem; }
+        .snippet-header { margin-bottom: 1.5rem; }
+        .snippet-header h2 { font-size: 1.5rem; font-family: monospace; margin-bottom: .5rem; }
+        .snippet-header .desc { color: #a6adc8; font-size: .95rem; line-height: 1.6; margin-bottom: .8rem; }
+        .meta-bar { display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
+        .meta-bar .tag { background: #313244; padding: .2rem .6rem; border-radius: .25rem; font-size: .85rem; }
+        .meta-bar .tag-cat { color: #a6e3a1; }
+        .meta-bar .tag-diff-easy { color: #a6e3a1; }
+        .meta-bar .tag-diff-medium { color: #f9e2af; }
+        .meta-bar .tag-diff-hard { color: #f38ba8; }
+        .code-block { background: #11111b; border: 1px solid #313244; border-radius: .5rem; padding: 1rem; margin: 1.5rem 0; overflow-x: auto; }
+        .code-block pre { font-family: 'Fira Code', 'Consolas', monospace; font-size: .9rem; line-height: 1.6; color: #cdd6f4; white-space: pre-wrap; }
+        .expected-output { background: #11111b; border: 1px solid #313244; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+        .expected-output h3 { font-size: .9rem; color: #a6e3a1; margin-bottom: .5rem; }
+        .expected-output pre { font-family: monospace; font-size: .85rem; color: #a6adc8; white-space: pre-wrap; }
+        .actions { display: flex; gap: .8rem; margin: 1.5rem 0; flex-wrap: wrap; }
+        .actions a, .actions button { padding: .6rem 1.2rem; border-radius: .3rem; font-size: .9rem; font-weight: 600; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-run { background: #a6e3a1; color: #1e1e2e; }
+        .btn-editor { background: #89b4fa; color: #1e1e2e; }
+        .btn-save { background: #cba6f7; color: #1e1e2e; }
+        .btn-share { background: #f9e2af; color: #1e1e2e; }
+        .related-section { margin-top: 2rem; border-top: 1px solid #313244; padding-top: 1.5rem; }
+        .related-section h3 { font-size: 1rem; color: #a6adc8; margin-bottom: .8rem; }
+        .related-list { display: flex; flex-direction: column; gap: .5rem; }
+        .related-item { background: #181825; border: 1px solid #313244; padding: .8rem 1rem; border-radius: .3rem; display: flex; justify-content: space-between; align-items: center; }
+        .related-item:hover { border-color: #89b4fa; }
+        .related-item .diff { font-size: .8rem; }
+        #run-output { background: #11111b; border: 1px solid #313244; border-radius: .5rem; padding: 1rem; margin-top: 1rem; display: none; }
+        #run-output h3 { font-size: .9rem; margin-bottom: .5rem; }
+        #run-output pre { font-family: monospace; font-size: .85rem; white-space: pre-wrap; }
+        .output-stdout { color: #a6e3a1; }
+        .output-stderr { color: #f38ba8; }
+        #share-result { background: #11111b; border: 1px solid #313244; border-radius: .5rem; padding: 1rem; margin-top: .5rem; display: none; font-size: .85rem; color: #a6e3a1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        {% if user %}
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard ({{ user.name }})</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('code-editor-execution.login_page') }}" class="btn-login-nav">Login / Sign In</a>
+        {% endif %}
+    </div>
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a> &rarr; {{ snippet.title }}
+    </div>
+
+    <div class="content">
+        <div class="snippet-header">
+            <h2>{{ snippet.title }}</h2>
+            <div class="desc">{{ snippet.description }}</div>
+            <div class="meta-bar">
+                <span class="tag tag-cat">{{ snippet.category }}</span>
+                <span class="tag tag-diff-{{ snippet.difficulty }}">{{ snippet.difficulty }}</span>
+                <span class="tag">ID: {{ snippet.id }}</span>
+                <span class="tag">{{ snippet.language }}</span>
+            </div>
+        </div>
+
+        <div class="code-block">
+            <pre>{{ snippet.code }}</pre>
+        </div>
+
+        {% if snippet.expected_output %}
+        <div class="expected-output">
+            <h3>Expected Output</h3>
+            <pre>{{ snippet.expected_output }}</pre>
+        </div>
+        {% endif %}
+
+        <div class="actions">
+            <button class="btn-run" onclick="runSnippet({{ snippet.id }})">Run Snippet</button>
+            <a class="btn-editor" href="{{ url_for('code-editor-execution.editor', snippet_id=snippet.id) }}">Open in Editor</a>
+            {% if user %}
+            <form method="post" action="{{ url_for('code-editor-execution.form_save_snippet', snippet_id=snippet.id) }}" style="display:inline">
+                <button type="submit" class="btn-save">
+                    {% if snippet.id in user.get('saved_snippets', []) %}Unsave{% else %}Save to Library{% endif %}
+                </button>
+            </form>
+            {% endif %}
+            <button class="btn-share" onclick="shareSnippet({{ snippet.id }})">Share</button>
+        </div>
+
+        <div id="share-result"></div>
+
+        <div id="run-output">
+            <h3>Execution Result</h3>
+            <pre id="run-result"></pre>
+        </div>
+
+        {% if related %}
+        <div class="related-section">
+            <h3>Related Snippets ({{ snippet.category }})</h3>
+            <div class="related-list">
+                {% for r in related %}
+                <div class="related-item">
+                    <a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=r.id) }}">{{ r.title }}</a>
+                    <span class="diff tag-diff-{{ r.difficulty }}">{{ r.difficulty }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function runSnippet(snippetId) {
+        const outputDiv = document.getElementById('run-output');
+        const resultPre = document.getElementById('run-result');
+        outputDiv.style.display = 'block';
+        resultPre.innerHTML = '<span style="color:#f9e2af">Running...</span>';
+
+        fetch('/sites/code-editor-execution/api/snippets/' + snippetId + '/run', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (data.stdout) html += '<span class="output-stdout">' + escapeHtml(data.stdout) + '</span>';
+            if (data.stderr) html += '<span class="output-stderr">' + escapeHtml(data.stderr) + '</span>';
+            if (data.matches_expected) {
+                html += '\n<span style="color:#a6e3a1;font-weight:bold">Output matches expected!</span>';
+            } else if (data.expected_output) {
+                html += '\n<span style="color:#f9e2af">Expected: ' + escapeHtml(data.expected_output) + '</span>';
+            }
+            resultPre.innerHTML = html || '<span style="color:#6c7086">(no output)</span>';
+        })
+        .catch(err => {
+            resultPre.innerHTML = '<span class="output-stderr">' + escapeHtml(err.toString()) + '</span>';
+        });
+    }
+
+    function shareSnippet(snippetId) {
+        const shareDiv = document.getElementById('share-result');
+        fetch('/sites/code-editor-execution/api/share/' + snippetId)
+        .then(r => r.json())
+        .then(data => {
+            const url = window.location.origin + data.share_url;
+            shareDiv.style.display = 'block';
+            shareDiv.innerHTML = 'Share link: <a href="' + data.share_url + '">' + url + '</a><br>Share token: ' + data.share_token;
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>

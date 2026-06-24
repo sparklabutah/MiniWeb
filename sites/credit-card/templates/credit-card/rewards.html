@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureCard - Rewards</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #2d3748; }
+        .header { background: linear-gradient(135deg, #1a365d, #2a4a7f); color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .88rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .82rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.2rem; color: #1a365d; margin-bottom: 1rem; }
+
+        .rewards-hero { background: linear-gradient(135deg, #744210, #d69e2e); border-radius: 12px; padding: 2rem; color: #fff; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .rewards-hero .points-block h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; opacity: .8; margin-bottom: .3rem; }
+        .rewards-hero .points-block .pts { font-size: 2.5rem; font-weight: 800; }
+        .rewards-hero .cash-value { font-size: .9rem; opacity: .85; }
+        .rewards-hero .cash-value strong { font-size: 1.3rem; }
+
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+        .card { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+        .card h3 { font-size: 1rem; color: #1a365d; margin-bottom: .8rem; }
+
+        .rates-table { width: 100%; border-collapse: collapse; }
+        .rates-table th, .rates-table td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid #edf2f7; font-size: .85rem; }
+        .rates-table th { color: #718096; font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+        .rates-table tr:last-child td { border-bottom: none; }
+        .rate-badge { display: inline-block; padding: .1rem .4rem; border-radius: 4px; font-size: .75rem; font-weight: 700; }
+        .rate-5x { background: #fefcbf; color: #744210; }
+        .rate-3x { background: #c6f6d5; color: #276749; }
+        .rate-2x { background: #bee3f8; color: #2b6cb0; }
+        .rate-1x { background: #edf2f7; color: #4a5568; }
+
+        .earn-bar { display: flex; align-items: center; margin-bottom: .6rem; }
+        .earn-bar .cat { width: 110px; font-size: .82rem; color: #4a5568; flex-shrink: 0; }
+        .earn-bar .bar-track { flex: 1; height: 20px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 0 .6rem; }
+        .earn-bar .bar-fill { height: 100%; background: linear-gradient(90deg, #d69e2e, #f6e05e); border-radius: 4px; min-width: 2px; }
+        .earn-bar .pts { font-size: .82rem; font-weight: 600; color: #744210; width: 80px; text-align: right; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SecureCard</h1>
+        <nav class="header-nav">
+            <a href="{{ url_for('credit-card.index') }}">Overview</a>
+            <a href="{{ url_for('credit-card.transactions_page') }}">Transactions</a>
+            <a href="{{ url_for('credit-card.statements_page') }}">Statements</a>
+            <a href="{{ url_for('credit-card.payments_page') }}">Payments</a>
+            <a href="{{ url_for('credit-card.rewards_page') }}">Rewards</a>
+            <a href="{{ url_for('credit-card.settings_page') }}">Settings</a>
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('credit-card.logout') }}">Logout</a>
+        </nav>
+    </div>
+    <div class="container">
+        <div class="rewards-hero">
+            <div class="points-block">
+                <h3>Available Rewards Points</h3>
+                <div class="pts">{{ "{:,}".format(user.rewards_points) }}</div>
+            </div>
+            <div class="cash-value">
+                Cash value: <strong>${{ "%.2f"|format(user.rewards_points / 100) }}</strong><br>
+                <small>(100 points = $1.00)</small>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <div class="card">
+                <h3>Points Earned by Category</h3>
+                {% if by_category %}
+                {% set max_pts = by_category.values()|list|max %}
+                {% for cat, pts in by_category.items()|sort(attribute='1', reverse=true) %}
+                <div class="earn-bar">
+                    <span class="cat">{{ cat }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ (pts / max_pts * 100)|round(1) }}%"></div>
+                    </div>
+                    <span class="pts">{{ "{:,}".format(pts) }} pts</span>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p style="color:#718096; font-size:.88rem;">No reward activity yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>Rewards Earn Rates</h3>
+                <table class="rates-table">
+                    <thead>
+                        <tr><th>Category</th><th>Rate</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for cat, rate in rewards_rates.items()|sort(attribute='1', reverse=true) %}
+                        <tr>
+                            <td>{{ cat }}</td>
+                            <td>
+                                <span class="rate-badge rate-{{ rate }}x">{{ rate }}x</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

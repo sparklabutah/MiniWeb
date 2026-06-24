@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ paper.title }} -- OpenReview</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
+        .header { border-bottom: 2px solid #7c3aed; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.3rem; color: #7c3aed; }
+        .header h1 a { color: inherit; text-decoration: none; }
+        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
+        .detail { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .back-link { font-size: .9rem; display: inline-block; margin-bottom: 1rem; color: #7c3aed; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .detail h2 { font-size: 1.5rem; color: #1e293b; margin: 0 0 .5rem; line-height: 1.3; }
+        .authors { font-size: 1rem; color: #475569; margin-bottom: .5rem; }
+        .meta-row { display: flex; flex-wrap: wrap; gap: .8rem; font-size: .85rem; color: #64748b; margin-bottom: 1rem; align-items: center; }
+        .badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .8rem; font-weight: 600; }
+        .badge-accept { background: #d1fae5; color: #065f46; }
+        .badge-reject { background: #fee2e2; color: #991b1b; }
+        .score-pill { background: #f1f5f9; padding: .2rem .6rem; border-radius: .25rem; color: #475569; }
+        .abstract-section { margin: 1.5rem 0; background: #fff; padding: 1.2rem; border-radius: .5rem; border: 1px solid #e2e8f0; }
+        .abstract-section h3 { font-size: 1rem; color: #1e293b; margin: 0 0 .5rem; }
+        .abstract-text { font-size: .95rem; line-height: 1.7; color: #334155; }
+        .info-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; background: #fff; border-radius: .5rem; overflow: hidden; border: 1px solid #e2e8f0; }
+        .info-table th { text-align: left; color: #64748b; padding: .5rem .8rem; background: #f8fafc; width: 150px; }
+        .info-table td { padding: .5rem .8rem; color: #334155; }
+        .info-table tr { border-bottom: 1px solid #f1f5f9; }
+        .reviews-section { margin: 2rem 0; }
+        .reviews-section h3 { font-size: 1.1rem; color: #1e293b; margin: 0 0 1rem; }
+        .review-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; }
+        .review-card.meta { border-left: 4px solid #7c3aed; }
+        .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+        .review-title { font-weight: 600; font-size: .95rem; color: #1e293b; }
+        .review-meta { font-size: .8rem; color: #94a3b8; }
+        .review-scores { display: flex; gap: .8rem; flex-wrap: wrap; margin: .5rem 0; }
+        .review-scores span { font-size: .8rem; background: #f1f5f9; padding: .2rem .5rem; border-radius: .2rem; }
+        .review-text { font-size: .9rem; line-height: 1.6; color: #334155; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .actions { display: flex; gap: .5rem; margin: 1rem 0; }
+        .btn { padding: .5rem 1rem; border: 1px solid #cbd5e1; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #475569; }
+        .btn:hover { background: #f1f5f9; }
+        .btn-primary { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+        .btn-primary:hover { background: #6d28d9; }
+        .related { margin-top: 2rem; }
+        .related h3 { font-size: 1rem; color: #1e293b; margin: 0 0 .8rem; }
+        .related-item { border-left: 3px solid #e2e8f0; padding: .5rem .8rem; margin-bottom: .5rem; background: #fff; }
+        .related-item a { font-size: .9rem; color: #1e293b; text-decoration: none; }
+        .related-item a:hover { text-decoration: underline; color: #7c3aed; }
+        .related-meta { font-size: .8rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('conference-review-submission.index') }}">Papers</a>
+            <a href="{{ url_for('conference-review-submission.stats_page') }}">Statistics</a>
+            {% if user %}
+            <a href="{{ url_for('conference-review-submission.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('conference-review-submission.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="detail">
+        <a href="{{ url_for('conference-review-submission.index') }}" class="back-link">&larr; Back to submissions</a>
+
+        <h2>{{ paper.title }}</h2>
+
+        <div class="authors">
+            {% for a in paper.authors %}
+            <a href="{{ url_for('conference-review-submission.index', q=a) }}" style="color:#7c3aed;text-decoration:none">{{ a }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="meta-row">
+            {% if paper.accepted %}
+            <span class="badge badge-accept">Accept</span>
+            {% else %}
+            <span class="badge badge-reject">Reject</span>
+            {% endif %}
+            {% if paper.avg_score is not none %}
+            <span class="score-pill">Avg Score: {{ paper.avg_score }}/10</span>
+            {% endif %}
+            <span>{{ paper.num_reviews }} reviews</span>
+            <span>{{ paper.conference }}</span>
+        </div>
+
+        <div class="actions">
+            {% if user %}
+            <form method="post" action="{{ url_for('conference-review-submission.form_bid', paper_id=paper.id) }}" style="display:inline">
+                <button type="submit" class="btn">
+                    {% if paper.id|string in (user.bids or {}) %}Remove Bid{% else %}Bid to Review{% endif %}
+                </button>
+            </form>
+            {% if user.role in ['reviewer', 'chair', 'admin'] %}
+            <a class="btn btn-primary" href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}">Write Review</a>
+            {% endif %}
+            {% else %}
+            <a class="btn btn-primary" href="{{ url_for('conference-review-submission.login_page') }}">Sign in to review</a>
+            {% endif %}
+        </div>
+
+        <div class="abstract-section">
+            <h3>Abstract</h3>
+            <p class="abstract-text">{{ paper.abstract }}</p>
+        </div>
+
+        <table class="info-table">
+            <tr><th>Paper ID</th><td>{{ paper.id }}</td></tr>
+            <tr><th>Original ID</th><td>{{ paper.original_id }}</td></tr>
+            <tr><th>Decision</th><td>{{ paper.decision }}</td></tr>
+            <tr><th>Conference</th><td>{{ paper.conference }}</td></tr>
+            <tr><th>Authors</th><td>{{ paper.authors | join(', ') }}</td></tr>
+            <tr><th>Avg Score</th><td>{{ paper.avg_score if paper.avg_score is not none else 'N/A' }}</td></tr>
+            <tr><th>Scored Reviews</th><td>{{ paper.scored_review_count }}</td></tr>
+            <tr><th>Total Reviews</th><td>{{ paper.num_reviews }}</td></tr>
+            <tr><th>Meta Reviews</th><td>{{ paper.num_meta_reviews }}</td></tr>
+        </table>
+
+        <div class="reviews-section">
+            <h3>Reviews ({{ paper.reviews|length }})</h3>
+            {% for review in paper.reviews %}
+            <div class="review-card {{ 'meta' if review.is_meta_review }}">
+                <div class="review-header">
+                    <span class="review-title">
+                        {% if review.is_meta_review %}[Meta Review]{% endif %}
+                        {{ review.title or 'Review' }}
+                    </span>
+                    <span class="review-meta">
+                        {{ review.reviewer }} {% if review.date %} &middot; {{ review.date }}{% endif %}
+                    </span>
+                </div>
+                {% if review.recommendation is not none or review.confidence is not none %}
+                <div class="review-scores">
+                    {% if review.recommendation is not none %}
+                    <span>Recommendation: {{ review.recommendation }}/10</span>
+                    {% endif %}
+                    {% if review.confidence is not none %}
+                    <span>Confidence: {{ review.confidence }}</span>
+                    {% endif %}
+                    {% if review.originality is not none %}
+                    <span>Originality: {{ review.originality }}</span>
+                    {% endif %}
+                    {% if review.clarity is not none %}
+                    <span>Clarity: {{ review.clarity }}</span>
+                    {% endif %}
+                    {% if review.soundness is not none %}
+                    <span>Soundness: {{ review.soundness }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="review-text">{{ review.comments }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Submissions (same decision)</h3>
+            {% for r in related %}
+            <div class="related-item">
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=r.id) }}">{{ r.title }}</a>
+                <div class="related-meta">{{ r.authors_str }} &middot; {{ r.decision }} &middot; Score: {{ r.avg_score if r.avg_score is not none else 'N/A' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

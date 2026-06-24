@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ doc.title }} - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+
+        .toolbar { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.4rem 1rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+        .toolbar-left { display: flex; align-items: center; gap: 0.8rem; }
+        .toolbar-left .back { color: #5f6368; text-decoration: none; font-size: 1.2rem; padding: 0.2rem 0.4rem; border-radius: 4px; }
+        .toolbar-left .back:hover { background: #f1f3f4; }
+        .doc-title-display { font-size: 1.1rem; font-weight: 500; color: #202124; }
+
+        .toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .btn { padding: 0.35rem 0.8rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.82rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .btn-star { background: #fff; border: 1px solid #f4b400; color: #f4b400; border-radius: 20px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 500; }
+        .btn-star:hover { background: #fef7e0; }
+        .btn-star.starred { background: #fef7e0; }
+        .btn-trash-action { background: #fff; border: 1px solid #d93025; color: #d93025; border-radius: 20px; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+        .btn-trash-action:hover { background: #fce8e6; }
+        .btn-share { background: #1a73e8; color: #fff; border-radius: 20px; padding: 0.4rem 1rem; font-size: 0.85rem; border: none; }
+        .btn-share:hover { background: #1557b0; }
+        .btn-icon { background: none; color: #5f6368; font-size: 1rem; padding: 0.4rem; border-radius: 50%; border: none; cursor: pointer; }
+        .btn-icon:hover { background: #f1f3f4; }
+        .btn-save { background: #1a73e8; color: #fff; border: none; }
+        .btn-save:hover { background: #1557b0; }
+        .btn-outline { background: #fff; border: 1px solid #dadce0; color: #5f6368; }
+        .btn-outline:hover { background: #f1f3f4; }
+
+        .collaborators { display: flex; align-items: center; gap: -4px; margin-right: 0.5rem; }
+        .avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.7rem; font-weight: 600; border: 2px solid #fff; margin-left: -6px; }
+
+        .editor-container { max-width: 816px; margin: 1.5rem auto; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); min-height: calc(100vh - 200px); border-radius: 2px; }
+
+        /* Form-based edit section */
+        .edit-form { padding: 1.5rem 2rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.85rem; color: #5f6368; margin-bottom: 0.3rem; font-weight: 500; }
+        .form-group input[type="text"] { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #dadce0; border-radius: 4px; font-size: 1rem; color: #202124; }
+        .form-group textarea { width: 100%; padding: 0.8rem; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.95rem; line-height: 1.6; color: #202124; min-height: 400px; resize: vertical; font-family: inherit; }
+        .form-actions { display: flex; gap: 0.5rem; }
+
+        .editor-content { padding: 4rem 5rem; min-height: 600px; outline: none; font-size: 1rem; line-height: 1.7; color: #202124; white-space: pre-wrap; word-wrap: break-word; }
+        .editor-content[contenteditable="false"] { cursor: default; }
+
+        .sidebar-panel { position: fixed; right: 0; top: 52px; bottom: 0; width: 320px; background: #fff; border-left: 1px solid #dadce0; padding: 1rem; overflow-y: auto; display: none; z-index: 20; }
+        .sidebar-panel.open { display: block; }
+        .sidebar-panel h3 { font-size: 0.9rem; font-weight: 500; color: #202124; margin-bottom: 0.8rem; }
+        .sidebar-panel .close-btn { float: right; background: none; border: none; cursor: pointer; color: #5f6368; font-size: 1.1rem; }
+
+        .meta-section { margin-bottom: 1.2rem; }
+        .meta-label { font-size: 0.75rem; color: #80868b; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 0.3rem; }
+        .meta-value { font-size: 0.88rem; color: #202124; }
+
+        .revision-item { border-bottom: 1px solid #f1f3f4; padding: 0.6rem 0; }
+        .revision-item:last-child { border-bottom: none; }
+        .revision-summary { font-size: 0.85rem; color: #202124; }
+        .revision-meta { font-size: 0.75rem; color: #80868b; margin-top: 0.2rem; }
+
+        .collab-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; }
+        .collab-name { font-size: 0.85rem; color: #202124; }
+        .collab-perm { font-size: 0.75rem; color: #80868b; padding: 0.1rem 0.4rem; background: #f1f3f4; border-radius: 3px; }
+
+        .share-form { background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; padding: 0.8rem; margin-top: 0.8rem; }
+        .share-form h4 { font-size: 0.85rem; color: #202124; margin-bottom: 0.5rem; }
+        .share-form select, .share-form input { padding: 0.4rem; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.82rem; }
+        .share-form .share-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
+        .btn-add-share { background: #1a73e8; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.82rem; }
+        .btn-add-share:hover { background: #1557b0; }
+
+        .status-bar { background: #fff; border-top: 1px solid #dadce0; padding: 0.3rem 1rem; display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 0; left: 0; right: 0; font-size: 0.75rem; color: #80868b; }
+        .permission-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 3px; background: #e8f0fe; color: #1a73e8; }
+
+        .nav-links { display: flex; gap: 0.3rem; margin-right: 0.5rem; }
+        .nav-links a { font-size: 0.82rem; color: #5f6368; text-decoration: none; padding: 0.3rem 0.5rem; border-radius: 4px; }
+        .nav-links a:hover { background: #f1f3f4; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('documents.index') }}" class="back" title="Back to documents">&larr;</a>
+            <span class="doc-title-display">{{ doc.title }}</span>
+            {% if doc.is_starred %}<span style="color:#f4b400;font-size:1.1rem;" title="Starred">&#9733;</span>{% endif %}
+        </div>
+        <div class="toolbar-right">
+            <div class="nav-links">
+                <a href="{{ url_for('documents.index') }}">All Docs</a>
+                <a href="{{ url_for('documents.starred') }}">Starred</a>
+                <a href="{{ url_for('documents.trash') }}">Trash</a>
+            </div>
+            <div class="collaborators">
+                {% for c in doc.collaborators %}
+                {% if user_map.get(c.user_id) %}
+                <span class="avatar" style="background:{{ user_map[c.user_id].avatar_color }}" title="{{ user_map[c.user_id].name }} ({{ c.permission }})">{{ user_map[c.user_id].name[0] }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% if user %}
+            <form method="post" action="{{ url_for('documents.form_star_document', doc_id=doc.id) }}" style="display:inline">
+                <input type="hidden" name="redirect_to" value="{{ url_for('documents.editor', doc_id=doc.id) }}">
+                <button type="submit" class="btn btn-star {{ 'starred' if doc.is_starred }}" title="{{ 'Unstar' if doc.is_starred else 'Star' }} this document">
+                    {{ '&#9733; Unstar' if doc.is_starred else '&#9734; Star' }}
+                </button>
+            </form>
+            {% endif %}
+            <button class="btn btn-share" onclick="toggleSidebar()" title="Share and view details">Share / Details</button>
+            <a href="{{ url_for('documents.view_doc', doc_id=doc.id) }}" class="btn btn-outline" title="Read-only view">View</a>
+            {% if not user %}
+            <a href="{{ url_for('documents.login_page') }}" class="btn" style="background:#1a73e8;color:#fff;">Sign In</a>
+            {% else %}
+            <a href="{{ url_for('documents.logout') }}" class="btn btn-outline">Sign Out</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="editor-container">
+        {% if not can_edit %}
+        <div style="background:#fff3cd;color:#856404;padding:.6rem 1rem;font-size:.85rem;border-bottom:1px solid #ffc107;text-align:center">
+            {% if not user %}
+            <a href="{{ url_for('documents.login_page') }}" style="color:#0d6efd;font-weight:600">Sign in</a> to edit this document.
+            {% else %}
+            Read-only -- you have <strong>{{ permission or 'view' }}</strong> access to this document.
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if can_edit %}
+        <!-- Form-based editing (works without JS) -->
+        <form method="post" action="{{ url_for('documents.form_update_document', doc_id=doc.id) }}" class="edit-form">
+            <div class="form-group">
+                <label for="title">Document Title</label>
+                <input type="text" name="title" id="title" value="{{ doc.title }}">
+            </div>
+            <div class="form-group">
+                <label for="content">Content</label>
+                <textarea name="content" id="content">{{ doc.content }}</textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-save">Save Changes</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="editor-content" id="editor" contenteditable="false">{{ doc.content }}</div>
+        {% endif %}
+    </div>
+
+    <div class="sidebar-panel" id="sidebar">
+        <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+
+        <h3>Document Details</h3>
+        <div class="meta-section">
+            <div class="meta-label">Document ID</div>
+            <div class="meta-value">{{ doc.id }}</div>
+        </div>
+        <div class="meta-section">
+            <div class="meta-label">Owner</div>
+            <div class="meta-value">{{ user_map.get(doc.owner_id, {}).get('name', 'Unknown') }} (ID {{ doc.owner_id }})</div>
+        </div>
+        <div class="meta-section">
+            <div class="meta-label">Word Count</div>
+            <div class="meta-value" id="word-count">{{ doc.word_count }}</div>
+        </div>
+        <div class="meta-section">
+            <div class="meta-label">Created</div>
+            <div class="meta-value">{{ doc.created_at[:10] if doc.created_at else 'Unknown' }}</div>
+        </div>
+        <div class="meta-section">
+            <div class="meta-label">Last Modified</div>
+            <div class="meta-value">{{ doc.updated_at[:10] if doc.updated_at else 'Unknown' }}</div>
+        </div>
+        <div class="meta-section">
+            <div class="meta-label">Starred</div>
+            <div class="meta-value">{{ 'Yes' if doc.is_starred else 'No' }}</div>
+        </div>
+        {% if permission %}
+        <div class="meta-section">
+            <div class="meta-label">Your Permission</div>
+            <div class="meta-value"><span class="permission-badge">{{ permission }}</span></div>
+        </div>
+        {% endif %}
+
+        <h3>Collaborators ({{ doc.collaborators|length }})</h3>
+        {% for c in doc.collaborators %}
+        <div class="collab-item">
+            {% if user_map.get(c.user_id) %}
+            <span class="avatar" style="background:{{ user_map[c.user_id].avatar_color }};width:24px;height:24px;font-size:0.65rem;">{{ user_map[c.user_id].name[0] }}</span>
+            <span class="collab-name">{{ user_map[c.user_id].name }} (ID {{ c.user_id }})</span>
+            {% endif %}
+            <span class="collab-perm">{{ c.permission }}</span>
+        </div>
+        {% endfor %}
+
+        {% if user %}
+        <div class="share-form">
+            <h4>Add Collaborator</h4>
+            <form method="post" action="{{ url_for('documents.form_share_document', doc_id=doc.id) }}">
+                <div class="share-row">
+                    <label for="share_user_id" style="font-size:0.82rem;">User:</label>
+                    <select name="user_id" id="share_user_id">
+                        {% for u in users %}
+                        {% if u.id != doc.owner_id %}
+                        <option value="{{ u.id }}">{{ u.name }} (ID {{ u.id }})</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="share-row">
+                    <label for="share_permission" style="font-size:0.82rem;">Permission:</label>
+                    <select name="permission" id="share_permission">
+                        <option value="view">View</option>
+                        <option value="comment">Comment</option>
+                        <option value="edit">Edit</option>
+                    </select>
+                </div>
+                <div class="share-row">
+                    <button type="submit" class="btn-add-share">Share</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <h3 style="margin-top:1rem;">Revision History ({{ revisions|length }})</h3>
+        {% for r in revisions[:10] %}
+        <div class="revision-item">
+            <div class="revision-summary">{{ r.summary }}</div>
+            <div class="revision-meta">
+                {{ user_map.get(r.user_id, {}).get('name', 'Unknown') }} &middot; {{ r.timestamp[:10] }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="status-bar">
+        <span>{{ doc.word_count }} words &middot; Document ID: {{ doc.id }}</span>
+        <span>{% if permission %}<span class="permission-badge">{{ permission }}</span> &middot; {% endif %}Last saved {{ doc.updated_at[:16] if doc.updated_at else '' }}</span>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ assignment.title }} - {{ course.code }} - EduPortal LMS</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; }
+        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem 3rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; }
+        .section h2 { font-size: 1.2rem; margin-bottom: .5rem; }
+        .section h3 { font-size: 1rem; margin-bottom: .8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: .4rem; }
+        .meta-row { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 500; text-transform: uppercase; }
+        .type-homework { background: #eff6ff; color: #3b82f6; }
+        .type-exam { background: #fef2f2; color: #dc2626; }
+        .type-project { background: #f5f3ff; color: #7c3aed; }
+        .type-quiz { background: #fef3c7; color: #d97706; }
+        .description { font-size: .9rem; color: #475569; line-height: 1.6; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th { text-align: left; padding: .6rem .8rem; background: #f8fafc; color: #64748b; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .6rem .8rem; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        .score-good { color: #16a34a; font-weight: 600; }
+        .score-mid { color: #d97706; font-weight: 600; }
+        .score-low { color: #dc2626; font-weight: 600; }
+        .btn { padding: .5rem 1rem; border: 1px solid #cbd5e1; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #475569; }
+        .btn:hover { background: #f1f5f9; }
+        .btn-primary { background: #1a365d; color: #fff; border-color: #1a365d; }
+        .btn-primary:hover { background: #2d4a6f; }
+        .form-row { display: flex; gap: .5rem; align-items: center; margin-top: .5rem; }
+        .form-row input, .form-row textarea { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .85rem; }
+        .form-row textarea { min-height: 60px; resize: vertical; }
+        .empty { color: #94a3b8; font-size: .9rem; padding: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('course-sites-classrooms.index') }}" style="color:inherit;text-decoration:none">EduPortal LMS</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:.85rem;color:#cbd5e1;">{{ user.name }}</span>
+            <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('course-sites-classrooms.index') }}">Courses</a> &raquo;
+            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.code }}</a> &raquo;
+            {{ assignment.title }}
+        </div>
+
+        <div class="section">
+            <h2>{{ assignment.title }}</h2>
+            <div class="meta-row">
+                <span class="badge type-{{ assignment.type }}">{{ assignment.type }}</span>
+                <span>Due: {{ assignment.due_date }}</span>
+                <span>Points: {{ assignment.points }}</span>
+                <span>Course: {{ course.code }}</span>
+            </div>
+            <p class="description">{{ assignment.description }}</p>
+
+            {% if user and user.role == 'student' %}
+            <form method="post" action="{{ url_for('course-sites-classrooms.form_submit_assignment', course_id=course.id, assignment_id=assignment.id) }}">
+                <button type="submit" class="btn btn-primary">Submit Assignment</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Submissions</h3>
+            {% if submissions %}
+            <table>
+                <thead>
+                    <tr>
+                        {% if user and user.role in ('instructor', 'admin') %}
+                        <th>Student</th>
+                        {% endif %}
+                        <th>Submitted</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th>Feedback</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in submissions %}
+                    <tr>
+                        {% if user and user.role in ('instructor', 'admin') %}
+                        <td>{{ sub.student_name|default('--') }}</td>
+                        {% endif %}
+                        <td>{{ sub.submitted_at[:16] }}</td>
+                        <td>
+                            {% if sub.score is not none %}
+                                {% set pct = (sub.score / assignment.points * 100)|round(1) %}
+                                <span class="{% if pct >= 80 %}score-good{% elif pct >= 60 %}score-mid{% else %}score-low{% endif %}">
+                                    {{ sub.score }}/{{ assignment.points }} ({{ pct }}%)
+                                </span>
+                            {% else %}
+                                --
+                            {% endif %}
+                        </td>
+                        <td>{{ sub.status }}</td>
+                        <td>{{ sub.feedback if sub.feedback else '--' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if user and user.role in ('instructor', 'admin') %}
+            <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #e2e8f0;">
+                <h4 style="font-size:.9rem;margin-bottom:.5rem;">Grade a Submission</h4>
+                <form method="post" action="{{ url_for('course-sites-classrooms.form_grade_submission', course_id=course.id, assignment_id=assignment.id) }}">
+                    <div class="form-row">
+                        <label style="font-size:.8rem;">Student ID:</label>
+                        <input type="number" name="student_id" required style="width:80px;">
+                        <label style="font-size:.8rem;">Score:</label>
+                        <input type="number" name="score" required style="width:80px;" step="0.1" max="{{ assignment.points }}">
+                    </div>
+                    <div class="form-row">
+                        <label style="font-size:.8rem;">Feedback:</label>
+                        <textarea name="feedback" style="flex:1;"></textarea>
+                        <button type="submit" class="btn btn-primary">Grade</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <p class="empty">No submissions yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

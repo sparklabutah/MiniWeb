@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starred - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 0.8rem; }
+        .header-left a.back { color: #5f6368; text-decoration: none; font-size: 1.2rem; }
+        .header-left h1 { font-size: 1.2rem; font-weight: 500; color: #202124; }
+        .header-nav { display: flex; align-items: center; gap: 0.5rem; }
+        .header-nav a { font-size: 0.85rem; color: #5f6368; text-decoration: none; padding: 0.4rem 0.7rem; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+        .btn-primary { background: #1a73e8; color: #fff !important; border-radius: 4px; }
+
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+        .count { font-size: 0.85rem; color: #80868b; margin-bottom: 1rem; }
+
+        .doc-item { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center; transition: box-shadow 0.15s; }
+        .doc-item:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .doc-item a { text-decoration: none; color: inherit; flex: 1; }
+        .doc-item-title { font-size: 0.95rem; font-weight: 500; color: #202124; margin-bottom: 0.2rem; }
+        .doc-item-meta { font-size: 0.8rem; color: #80868b; }
+        .star-icon { color: #f4b400; margin-right: 0.3rem; }
+        .avatar-sm { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.6rem; font-weight: 600; vertical-align: middle; }
+
+        .btn-unstar { background: none; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; padding: 0.3rem 0.6rem; font-size: 0.8rem; color: #5f6368; }
+        .btn-unstar:hover { background: #f1f3f4; }
+
+        .empty { text-align: center; padding: 4rem; color: #80868b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="{{ url_for('documents.index') }}" class="back">&larr;</a>
+            <h1>Starred Documents</h1>
+        </div>
+        <div class="header-nav">
+            <a href="{{ url_for('documents.index') }}">All Documents</a>
+            <a href="{{ url_for('documents.starred') }}" style="font-weight:600;color:#1a73e8;">Starred</a>
+            <a href="{{ url_for('documents.trash') }}">Trash</a>
+            {% if not user %}
+            <a href="{{ url_for('documents.login_page') }}" class="btn-primary" style="text-decoration:none;padding:0.4rem 0.8rem;">Sign In</a>
+            {% else %}
+            <a href="{{ url_for('documents.logout') }}">Sign Out</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="count">{{ documents|length }} starred document{{ 's' if documents|length != 1 else '' }} (excluding trashed)</div>
+
+        {% if documents %}
+        {% for doc in documents %}
+        <div class="doc-item" data-doc-id="{{ doc.id }}">
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}">
+                <div class="doc-item-title">
+                    <span class="star-icon">&#9733;</span>{{ doc.title }}
+                </div>
+                <div class="doc-item-meta">
+                    {% if user_map.get(doc.owner_id) %}
+                    <span class="avatar-sm" style="background:{{ user_map[doc.owner_id].avatar_color }}">{{ user_map[doc.owner_id].name[0] }}</span>
+                    {{ user_map[doc.owner_id].name }}
+                    {% endif %}
+                    &middot; {{ doc.word_count }} words &middot; {{ doc.updated_at[:10] if doc.updated_at else '' }}
+                </div>
+            </a>
+            {% if user %}
+            <form method="post" action="{{ url_for('documents.form_star_document', doc_id=doc.id) }}">
+                <input type="hidden" name="redirect_to" value="{{ url_for('documents.starred') }}">
+                <button type="submit" class="btn-unstar" title="Unstar this document">&#9733; Unstar</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty">
+            <p>No starred documents. Star documents to find them quickly.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

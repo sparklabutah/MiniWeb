@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureCard - Settings</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #2d3748; }
+        nav.topnav { background: #1a365d; padding: 0; display: flex; align-items: center; }
+        nav.topnav .brand { color: #fff; font-weight: 700; font-size: 1.2rem; padding: .8rem 1.5rem; }
+        nav.topnav a { color: #bee3f8; text-decoration: none; padding: .8rem 1rem; font-size: .95rem; display: inline-block; }
+        nav.topnav a:hover, nav.topnav a.active { color: #fff; background: rgba(255,255,255,0.1); }
+        nav.topnav .right { margin-left: auto; display: flex; align-items: center; }
+        nav.topnav .right span { color: #90cdf4; padding: 0 .8rem; font-size: .88rem; }
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.1rem; color: #1a365d; margin-bottom: .8rem; }
+        .section { background: #fff; border-radius: 8px; padding: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.2rem; }
+        .section h3 { font-size: 1rem; color: #1a365d; margin-bottom: .8rem; border-bottom: 1px solid #edf2f7; padding-bottom: .4rem; }
+        .info-row { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f7fafc; font-size: .9rem; }
+        .info-row:last-child { border-bottom: none; }
+        .info-row .label { color: #718096; }
+        .info-row .value { font-weight: 600; color: #2d3748; }
+        .form-group { margin-bottom: .8rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        .form-group input, .form-group select { width: 100%; padding: .5rem .6rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: .9rem; }
+        .btn-save { padding: .6rem 1.5rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+        .btn-save:hover { background: #2c5282; }
+        .btn-danger { padding: .6rem 1.5rem; background: #e53e3e; color: #fff; border: none; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+        .btn-danger:hover { background: #c53030; }
+        .btn-success { padding: .6rem 1.5rem; background: #38a169; color: #fff; border: none; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+        .btn-success:hover { background: #276749; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <span class="brand">SecureCard</span>
+        <a href="{{ url_for('credit-card.index') }}">Overview</a>
+        <a href="{{ url_for('credit-card.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('credit-card.statements_page') }}">Statements</a>
+        <a href="{{ url_for('credit-card.payments_page') }}">Payments</a>
+        <a href="{{ url_for('credit-card.rewards_page') }}">Rewards</a>
+        <a href="{{ url_for('credit-card.settings_page') }}" class="active">Settings</a>
+        <div class="right">
+            <span>{{ user.name }}</span>
+            <a href="{{ url_for('credit-card.logout') }}">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Account Settings</h2>
+
+        <div class="section">
+            <h3>Account Information</h3>
+            <div class="info-row">
+                <span class="label">Name</span>
+                <span class="value">{{ user.name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Username</span>
+                <span class="value">{{ user.username }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Email</span>
+                <span class="value">{{ user.email }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Card Number</span>
+                <span class="value">**** **** **** {{ user.card_number_last4 }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Card Tier</span>
+                <span class="value">{{ user.card_tier|title }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">APR</span>
+                <span class="value">{{ user.apr }}%</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Member Since</span>
+                <span class="value">{{ user.member_since }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Auto-Pay</span>
+                <span class="value">{{ 'Enabled' if user.autopay_enabled else 'Disabled' }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Card Status</span>
+                <span class="value">{{ 'FROZEN' if user.card_frozen else 'Active' }}</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Update Email and Auto-Pay</h3>
+            <form method="POST" action="{{ url_for('credit-card.form_update_settings') }}">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" value="{{ user.email }}">
+                </div>
+                <div class="form-group">
+                    <label for="autopay_enabled">Auto-Pay</label>
+                    <select id="autopay_enabled" name="autopay_enabled">
+                        <option value="true" {{ 'selected' if user.autopay_enabled else '' }}>Enabled</option>
+                        <option value="false" {{ 'selected' if not user.autopay_enabled else '' }}>Disabled</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-save">Save Changes</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h3>Card Security</h3>
+            <div class="info-row">
+                <span class="label">Card Status</span>
+                <span class="value">{{ 'FROZEN' if user.card_frozen else 'Active' }}</span>
+            </div>
+            {% if user.card_frozen %}
+            <form method="POST" action="{{ url_for('credit-card.form_update_settings') }}" style="margin-top:.5rem;">
+                <input type="hidden" name="card_frozen" value="false">
+                <button type="submit" class="btn-success">Unfreeze Card</button>
+            </form>
+            {% else %}
+            <form method="POST" action="{{ url_for('credit-card.form_update_settings') }}" style="margin-top:.5rem;">
+                <input type="hidden" name="card_frozen" value="true">
+                <button type="submit" class="btn-danger">Freeze Card</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

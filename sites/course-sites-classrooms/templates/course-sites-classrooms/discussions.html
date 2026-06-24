@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discussions - {{ course.code }} - EduPortal LMS</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; }
+        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem 3rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
+        .tab { padding: .6rem 1.2rem; font-size: .9rem; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab:hover { color: #1e293b; }
+        .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 500; }
+        .new-discussion { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; }
+        .new-discussion h3 { font-size: 1rem; margin-bottom: .8rem; }
+        .form-group { margin-bottom: .8rem; }
+        .form-group label { display: block; font-size: .85rem; color: #475569; margin-bottom: .2rem; }
+        .form-group input, .form-group textarea { width: 100%; padding: .5rem .7rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .9rem; font-family: inherit; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .btn { padding: .5rem 1rem; border: 1px solid #cbd5e1; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; }
+        .btn-primary { background: #1a365d; color: #fff; border-color: #1a365d; }
+        .btn-primary:hover { background: #2d4a6f; }
+        .discussion-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; margin-bottom: .8rem; }
+        .disc-header { padding: 1rem 1.2rem .6rem; }
+        .disc-title { font-size: 1rem; color: #1e293b; margin-bottom: .3rem; }
+        .disc-title .pinned { color: #f59e0b; font-size: .75rem; font-weight: 500; }
+        .disc-meta { font-size: .8rem; color: #94a3b8; }
+        .disc-content { padding: 0 1.2rem .8rem; font-size: .9rem; color: #475569; line-height: 1.6; }
+        .replies { border-top: 1px solid #f1f5f9; padding: .8rem 1.2rem; }
+        .reply { padding: .5rem 0; border-bottom: 1px solid #f8fafc; margin-left: 1rem; }
+        .reply:last-child { border-bottom: none; }
+        .reply-author { font-size: .8rem; font-weight: 600; color: #1e293b; }
+        .reply-content { font-size: .85rem; color: #475569; line-height: 1.5; }
+        .reply-time { font-size: .75rem; color: #94a3b8; }
+        .reply-form { margin-top: .5rem; display: flex; gap: .5rem; }
+        .reply-form input { flex: 1; padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .85rem; }
+        .reply-form button { padding: .4rem .8rem; }
+        .disc-count { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('course-sites-classrooms.index') }}" style="color:inherit;text-decoration:none">EduPortal LMS</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:.85rem;color:#cbd5e1;">{{ user.name }}</span>
+            <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('course-sites-classrooms.index') }}">Courses</a> &raquo;
+            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.code }}</a> &raquo;
+            Discussions
+        </div>
+
+        <div class="tabs">
+            <a class="tab" href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">Overview</a>
+            <a class="tab" href="{{ url_for('course-sites-classrooms.gradebook', course_id=course.id) }}">Gradebook</a>
+            <a class="tab active" href="{{ url_for('course-sites-classrooms.discussions_page', course_id=course.id) }}">Discussions ({{ discussions|length }})</a>
+        </div>
+
+        {% if user %}
+        <div class="new-discussion">
+            <h3>Start a New Discussion</h3>
+            <form method="post" action="{{ url_for('course-sites-classrooms.form_new_discussion', course_id=course.id) }}">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" name="title" id="title" required placeholder="Discussion topic...">
+                </div>
+                <div class="form-group">
+                    <label for="content">Content</label>
+                    <textarea name="content" id="content" required placeholder="Write your post..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Post Discussion</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <p class="disc-count">{{ discussions|length }} discussion threads</p>
+
+        {% for d in discussions %}
+        <div class="discussion-card" data-disc-id="{{ d.id }}">
+            <div class="disc-header">
+                <div class="disc-title">
+                    {% if d.pinned %}<span class="pinned">[PINNED]</span> {% endif %}
+                    {{ d.title }}
+                </div>
+                <div class="disc-meta">{{ d.author_name|default(user_map.get(d.author_id, 'Unknown')) }} &middot; {{ d.created_at[:16] }} &middot; {{ d.replies|length }} replies</div>
+            </div>
+            <div class="disc-content">{{ d.content }}</div>
+            <div class="replies">
+                {% for r in d.replies %}
+                <div class="reply">
+                    <span class="reply-author">{{ r.author_name|default(user_map.get(r.author_id, 'Unknown')) }}</span>
+                    <span class="reply-time">{{ r.created_at[:16] }}</span>
+                    <div class="reply-content">{{ r.content }}</div>
+                </div>
+                {% endfor %}
+                {% if user %}
+                <form class="reply-form" method="post" action="{{ url_for('course-sites-classrooms.form_reply_discussion', course_id=course.id, disc_id=d.id) }}">
+                    <input type="text" name="content" placeholder="Write a reply..." required>
+                    <button type="submit" class="btn btn-primary">Reply</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if discussions|length == 0 %}
+        <p style="text-align:center;color:#94a3b8;padding:2rem;">No discussions yet. Be the first to start one!</p>
+        {% endif %}
+    </div>
+</body>
+</html>

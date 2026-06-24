@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Snippet -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .btn-login-nav { background: #89b4fa; color: #1e1e2e !important; padding: .3rem .8rem !important; border-radius: .3rem; font-weight: 600; }
+        .breadcrumb { padding: .6rem 2rem; font-size: .85rem; color: #6c7086; }
+        .breadcrumb a { color: #89b4fa; }
+        .content { max-width: 700px; margin: 1rem auto 2rem; padding: 0 1.5rem; }
+        .content h2 { font-family: monospace; font-size: 1.3rem; margin-bottom: 1.2rem; }
+        .upload-form { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; color: #a6adc8; margin-bottom: .4rem; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .6rem .8rem; background: #313244; border: 1px solid #45475a; border-radius: .3rem; font-size: .95rem; color: #cdd6f4; font-family: inherit; }
+        .form-group textarea { font-family: 'Fira Code', 'Consolas', monospace; min-height: 150px; resize: vertical; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #89b4fa; outline: none; }
+        .btn-upload { width: 100%; padding: .7rem; background: #a6e3a1; color: #1e1e2e; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; font-weight: 600; }
+        .btn-upload:hover { background: #94e2d5; }
+        .message { padding: .6rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-size: .9rem; }
+        .message-success { background: rgba(166,227,161,.1); color: #a6e3a1; }
+        .message-error { background: rgba(243,139,168,.1); color: #f38ba8; }
+        .new-snippet-info { background: #11111b; border: 1px solid #313244; border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
+        .new-snippet-info a { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        {% if user %}
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('code-editor-execution.login_page') }}" class="btn-login-nav">Login / Sign In</a>
+        {% endif %}
+    </div>
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a> &rarr; Upload Snippet
+    </div>
+
+    <div class="content">
+        <h2>Upload New Snippet</h2>
+
+        {% if message and new_snippet %}
+        <div class="message message-success">{{ message }}</div>
+        <div class="new-snippet-info">
+            <p>Your snippet has been created:</p>
+            <p><a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=new_snippet.id) }}">{{ new_snippet.title }}</a> (ID: {{ new_snippet.id }})</p>
+            <p style="margin-top:.5rem">
+                <a href="{{ url_for('code-editor-execution.editor', snippet_id=new_snippet.id) }}">Open in Editor</a> |
+                <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Another</a>
+            </p>
+        </div>
+        {% elif message %}
+        <div class="message message-error">{{ message }}</div>
+        {% endif %}
+
+        <form class="upload-form" method="post" action="{{ url_for('code-editor-execution.upload_page') }}">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" required placeholder="e.g. Square Numbers">
+            </div>
+            <div class="form-group">
+                <label for="code">Python Code</label>
+                <textarea name="code" id="code" required placeholder="print('Hello, World!')"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <input type="text" name="description" id="description" placeholder="Brief description of what the code does">
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" name="category" id="category" placeholder="e.g. basics, algorithms, sorting" value="custom">
+            </div>
+            <div class="form-group">
+                <label for="difficulty">Difficulty</label>
+                <select name="difficulty" id="difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-upload">Upload Snippet</button>
+        </form>
+    </div>
+</body>
+</html>

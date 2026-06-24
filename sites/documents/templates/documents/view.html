@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ doc.title }} - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .toolbar { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 0.8rem; }
+        .toolbar-left a { color: #5f6368; text-decoration: none; font-size: 1.2rem; }
+        .toolbar-left h1 { font-size: 1.1rem; font-weight: 500; color: #202124; }
+        .toolbar-right { display: flex; align-items: center; gap: 0.5rem; }
+        .btn { padding: 0.35rem 0.8rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; text-decoration: none; color: #5f6368; background: #f1f3f4; }
+        .btn:hover { background: #e8eaed; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .nav-links a { font-size: 0.82rem; color: #5f6368; text-decoration: none; padding: 0.3rem 0.5rem; border-radius: 4px; }
+        .nav-links a:hover { background: #f1f3f4; }
+
+        .document { max-width: 816px; margin: 1.5rem auto; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); border-radius: 2px; padding: 4rem 5rem; min-height: 60vh; }
+        .document h2 { font-size: 1.5rem; font-weight: 600; color: #202124; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8eaed; }
+        .document-content { font-size: 1rem; line-height: 1.7; color: #3c4043; white-space: pre-wrap; word-wrap: break-word; }
+
+        .info-panel { max-width: 816px; margin: 1rem auto; padding: 1rem 1.5rem; background: #fff; border: 1px solid #dadce0; border-radius: 8px; }
+        .info-row { display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.85rem; color: #5f6368; }
+        .info-item { display: flex; align-items: center; gap: 0.3rem; }
+        .info-label { color: #80868b; }
+        .avatar-sm { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.6rem; font-weight: 600; }
+        .permission-badge { font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 3px; background: #e8f0fe; color: #1a73e8; }
+        .star-icon { color: #f4b400; }
+
+        .revisions { max-width: 816px; margin: 1rem auto 3rem; }
+        .revisions h3 { font-size: 0.95rem; color: #202124; margin-bottom: 0.6rem; }
+        .rev-item { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #f1f3f4; font-size: 0.85rem; }
+        .rev-summary { color: #3c4043; }
+        .rev-meta { color: #80868b; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('documents.index') }}" title="Back">&larr;</a>
+            <h1>{{ doc.title }}{% if doc.is_starred %} <span class="star-icon">&#9733;</span>{% endif %}</h1>
+        </div>
+        <div class="toolbar-right">
+            <div class="nav-links">
+                <a href="{{ url_for('documents.index') }}">All Documents</a>
+                <a href="{{ url_for('documents.starred') }}">Starred</a>
+                <a href="{{ url_for('documents.trash') }}">Trash</a>
+            </div>
+            {% if user and (permission == 'owner' or permission == 'edit') %}
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}" class="btn btn-primary">Edit</a>
+            {% endif %}
+            {% if not user %}
+            <a href="{{ url_for('documents.login_page') }}" class="btn btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/" class="btn">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Owner:</span>
+                {% if user_map.get(doc.owner_id) %}
+                <span class="avatar-sm" style="background:{{ user_map[doc.owner_id].avatar_color }}">{{ user_map[doc.owner_id].name[0] }}</span>
+                {{ user_map[doc.owner_id].name }} (ID {{ doc.owner_id }})
+                {% else %}Unknown{% endif %}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Words:</span> {{ doc.word_count }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Created:</span> {{ doc.created_at[:10] if doc.created_at else 'Unknown' }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Modified:</span> {{ doc.updated_at[:10] if doc.updated_at else 'Unknown' }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Collaborators:</span> {{ doc.collaborators|length }}
+            </div>
+            {% if permission %}
+            <div class="info-item">
+                <span class="permission-badge">{{ permission }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="document">
+        <h2>{{ doc.title }}</h2>
+        <div class="document-content">{{ doc.content }}</div>
+    </div>
+
+    {% if revisions %}
+    <div class="revisions">
+        <h3>Revision History ({{ revisions|length }})</h3>
+        {% for r in revisions %}
+        <div class="rev-item">
+            <span class="rev-summary">{{ r.summary }}</span>
+            <span class="rev-meta">{{ user_map.get(r.user_id, {}).get('name', 'Unknown') }} &middot; {{ r.timestamp[:10] }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</body>
+</html>
