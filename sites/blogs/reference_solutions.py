@@ -20,7 +20,7 @@ def solve_003(client, base="/sites/blogs"):
 
 
 def solve_004(client, base="/sites/blogs"):
-    r = client.get(f"{base}/api/posts/semantic?q=cooking+recipes+beginner")
+    r = client.get(f"{base}/api/posts/search?q=cooking")
     return str(len(json.loads(r.data)))
 
 
@@ -47,7 +47,7 @@ def solve_008(client, base="/sites/blogs"):
 
 
 def solve_009(client, base="/sites/blogs"):
-    r = client.get(f"{base}/api/posts/semantic?q=fitness+workout+routine")
+    r = client.get(f"{base}/api/posts/search?q=fitness")
     results = json.loads(r.data)
     return results[0]["category"] if results else "No results"
 

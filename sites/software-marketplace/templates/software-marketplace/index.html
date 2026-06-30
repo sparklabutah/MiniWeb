@@ -3,14 +3,549 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
+    <title>AppVault - Software Marketplace</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --gp-green: #01875f;
+            --gp-green-light: #e6f4ea;
+            --gp-blue: #1a73e8;
+            --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa;
+            --gp-surface: #fff;
+            --gp-text: #202124;
+            --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0;
+            --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            --gp-shadow-hover: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+
+        /* ── Top Nav ── */
+        .topbar {
+            background: var(--gp-surface);
+            border-bottom: 1px solid var(--gp-border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .topbar-inner {
+            max-width: 1280px; margin: 0 auto;
+            display: flex; align-items: center; gap: 1.5rem;
+            padding: .6rem 1.5rem;
+        }
+        .logo {
+            display: flex; align-items: center; gap: .5rem;
+            text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500;
+            white-space: nowrap;
+        }
+        .logo-icon {
+            width: 32px; height: 32px; border-radius: 4px;
+            background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: .9rem;
+        }
+        .search-bar {
+            flex: 1; max-width: 720px; position: relative;
+        }
+        .search-bar form { display: flex; }
+        .search-bar input {
+            width: 100%; padding: .65rem 1rem .65rem 2.75rem;
+            border: 1px solid var(--gp-border); border-radius: 8px;
+            font-size: .95rem; background: var(--gp-bg);
+            outline: none; transition: box-shadow .2s, border-color .2s;
+        }
+        .search-bar input:focus {
+            border-color: var(--gp-blue); background: #fff;
+            box-shadow: 0 0 0 3px rgba(26,115,232,.15);
+        }
+        .search-bar .search-icon {
+            position: absolute; left: .85rem; top: 50%; transform: translateY(-50%);
+            color: var(--gp-text-secondary); font-size: 1.1rem; pointer-events: none;
+        }
+        .nav-links { display: flex; gap: .25rem; align-items: center; }
+        .nav-links a {
+            padding: .45rem .85rem; border-radius: 20px;
+            text-decoration: none; font-size: .85rem; font-weight: 500;
+            color: var(--gp-text-secondary); transition: background .15s;
+            white-space: nowrap;
+        }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+        .nav-links .login-btn {
+            background: var(--gp-blue); color: #fff;
+        }
+        .nav-links .login-btn:hover { background: #1557b0; color: #fff; }
+
+        /* ── Hero Banner ── */
+        .hero {
+            background: linear-gradient(135deg, #174ea6 0%, #1a73e8 50%, #4285f4 100%);
+            color: #fff; padding: 2.5rem 0;
+        }
+        .hero-inner {
+            max-width: 1280px; margin: 0 auto; padding: 0 1.5rem;
+            display: flex; align-items: center; justify-content: space-between; gap: 2rem;
+        }
+        .hero-text h2 { font-size: 2rem; font-weight: 400; margin-bottom: .5rem; }
+        .hero-text p { font-size: 1.1rem; opacity: .9; margin-bottom: 1rem; }
+        .hero-stats { display: flex; gap: 2.5rem; }
+        .hero-stat { text-align: center; }
+        .hero-stat .stat-num { font-size: 1.8rem; font-weight: 500; }
+        .hero-stat .stat-label { font-size: .85rem; opacity: .8; }
+        .hero-cta {
+            display: inline-block; padding: .7rem 1.5rem; border-radius: 8px;
+            background: #fff; color: var(--gp-blue); font-weight: 500;
+            text-decoration: none; font-size: .95rem;
+            transition: box-shadow .2s;
+        }
+        .hero-cta:hover { box-shadow: var(--gp-shadow-hover); }
+
+        /* ── Main Content ── */
+        .main { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+
+        /* ── Category Chips ── */
+        .category-bar {
+            display: flex; gap: .5rem; overflow-x: auto; padding: .5rem 0 1.25rem;
+            scrollbar-width: none;
+        }
+        .category-bar::-webkit-scrollbar { display: none; }
+        .cat-chip {
+            display: inline-flex; align-items: center; gap: .35rem;
+            padding: .45rem 1rem; border-radius: 20px;
+            background: var(--gp-surface); border: 1px solid var(--gp-border);
+            text-decoration: none; color: var(--gp-text);
+            font-size: .82rem; font-weight: 500; white-space: nowrap;
+            transition: background .15s, border-color .15s, box-shadow .15s;
+        }
+        .cat-chip:hover {
+            background: var(--gp-blue-light); border-color: var(--gp-blue);
+            color: var(--gp-blue);
+        }
+        .cat-chip .chip-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+        }
+        .cat-chip .chip-count { color: var(--gp-text-secondary); font-weight: 400; }
+
+        /* ── Section Headers ── */
+        .section {
+            margin-bottom: 2rem;
+        }
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: .75rem; padding-bottom: .25rem;
+        }
+        .section-header h2 {
+            font-size: 1.25rem; font-weight: 500; color: var(--gp-text);
+        }
+        .section-header a {
+            font-size: .85rem; font-weight: 500; color: var(--gp-green);
+            text-decoration: none; padding: .35rem .75rem; border-radius: 4px;
+        }
+        .section-header a:hover { background: var(--gp-green-light); }
+
+        /* ── Editor's Choice ── */
+        .editors-row {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+        }
+        .editor-card {
+            background: var(--gp-surface); border-radius: 12px;
+            overflow: hidden; text-decoration: none; color: inherit;
+            box-shadow: var(--gp-shadow); transition: box-shadow .2s;
+        }
+        .editor-card:hover { box-shadow: var(--gp-shadow-hover); }
+        .editor-banner {
+            height: 120px; display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .editor-banner .ec-badge {
+            position: absolute; top: 8px; left: 8px;
+            background: var(--gp-green); color: #fff;
+            font-size: .65rem; font-weight: 700; text-transform: uppercase;
+            padding: 3px 8px; border-radius: 4px; letter-spacing: .5px;
+        }
+        .editor-banner .ec-icon {
+            width: 56px; height: 56px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; font-weight: 700; color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,.2);
+        }
+        .editor-info {
+            padding: .75rem 1rem;
+        }
+        .editor-info h3 {
+            font-size: .9rem; font-weight: 500; margin-bottom: .2rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .editor-info .ei-meta {
+            font-size: .78rem; color: var(--gp-text-secondary);
+            display: flex; align-items: center; gap: .5rem;
+        }
+        .editor-info .ei-rating { color: var(--gp-star); }
+
+        /* ── Horizontal App Row (like Google Play) ── */
+        .app-row {
+            display: flex; gap: 1rem; overflow-x: auto; padding-bottom: .5rem;
+            scrollbar-width: thin; scrollbar-color: var(--gp-border) transparent;
+        }
+        .app-row::-webkit-scrollbar { height: 4px; }
+        .app-row::-webkit-scrollbar-thumb { background: var(--gp-border); border-radius: 4px; }
+
+        .app-card {
+            flex: 0 0 160px; text-decoration: none; color: inherit;
+            transition: transform .15s;
+        }
+        .app-card:hover { transform: translateY(-2px); }
+        .app-icon {
+            width: 100%; aspect-ratio: 1; border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: 700; color: #fff;
+            margin-bottom: .5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,.12);
+        }
+        .app-card .app-name {
+            font-size: .85rem; font-weight: 500; line-height: 1.3;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; margin-bottom: .2rem;
+        }
+        .app-card .app-dev {
+            font-size: .75rem; color: var(--gp-text-secondary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .app-card .app-bottom {
+            display: flex; align-items: center; gap: .35rem;
+            font-size: .75rem; color: var(--gp-text-secondary); margin-top: .15rem;
+        }
+        .app-card .app-bottom .star { color: var(--gp-star); font-size: .7rem; }
+        .app-card .app-bottom .price-tag {
+            font-weight: 500;
+        }
+        .app-card .app-bottom .price-tag.free { color: var(--gp-green); }
+
+        /* ── Category Grid ── */
+        .cat-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .75rem;
+        }
+        .cat-tile {
+            display: flex; align-items: center; gap: .75rem;
+            padding: 1rem; border-radius: 12px;
+            background: var(--gp-surface); border: 1px solid var(--gp-border);
+            text-decoration: none; color: inherit;
+            transition: box-shadow .15s, border-color .15s;
+        }
+        .cat-tile:hover {
+            box-shadow: var(--gp-shadow); border-color: transparent;
+        }
+        .cat-tile .ct-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: #fff; flex-shrink: 0;
+        }
+        .cat-tile .ct-text h3 { font-size: .9rem; font-weight: 500; }
+        .cat-tile .ct-text span { font-size: .78rem; color: var(--gp-text-secondary); }
+
+        /* ── Footer ── */
+        .footer {
+            border-top: 1px solid var(--gp-border); padding: 1.5rem;
+            text-align: center; color: var(--gp-text-secondary); font-size: .82rem;
+            margin-top: 2rem;
+        }
+        .footer a { color: var(--gp-text-secondary); text-decoration: none; margin: 0 .75rem; }
+        .footer a:hover { color: var(--gp-text); }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .editors-row { grid-template-columns: repeat(2, 1fr); }
+            .hero-inner { flex-direction: column; text-align: center; }
+            .hero-stats { justify-content: center; }
+        }
+        @media (max-width: 600px) {
+            .editors-row { grid-template-columns: 1fr; }
+            .topbar-inner { flex-wrap: wrap; gap: .75rem; }
+            .search-bar { order: 3; flex-basis: 100%; max-width: 100%; }
+            .nav-links { gap: 0; }
+            .hero-text h2 { font-size: 1.5rem; }
+            .hero-stats { gap: 1.5rem; }
+            .app-card { flex: 0 0 130px; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+
+<!-- ── Top Navigation Bar ── -->
+<div class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+            <div class="logo-icon">A</div>
+            AppVault
+        </a>
+        <div class="search-bar">
+            <form action="{{ url_for('software-marketplace.apps_list') }}" method="get">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" name="q" placeholder="Search for apps & games" autocomplete="off">
+            </form>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+            {% if user %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+                <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+                <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="login-btn">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
     </div>
+</div>
+
+<!-- ── Hero Banner ── -->
+<div class="hero">
+    <div class="hero-inner">
+        <div class="hero-text">
+            <h2>Discover the apps you'll love</h2>
+            <p>{{ "{:,}".format(total_apps) }} apps across {{ categories|length }} categories</p>
+            <a class="hero-cta" href="{{ url_for('software-marketplace.apps_list') }}">Explore all apps</a>
+        </div>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="stat-num">{{ "{:,}".format(total_apps) }}</div>
+                <div class="stat-label">Total Apps</div>
+            </div>
+            <div class="hero-stat">
+                <div class="stat-num">{{ categories|length }}</div>
+                <div class="stat-label">Categories</div>
+            </div>
+            <div class="hero-stat">
+                <div class="stat-num">Free</div>
+                <div class="stat-label">Top Apps</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- ── Category Chips ── -->
+    <div class="category-bar">
+        <a class="cat-chip" href="{{ url_for('software-marketplace.apps_list') }}">
+            All apps
+        </a>
+        {% for cat_name, cat_count in categories %}
+        {% if cat_name and cat_name != '1.9' %}
+        <a class="cat-chip" href="{{ url_for('software-marketplace.category_page', cat=cat_name) }}">
+            <span class="chip-dot" style="background: {{ category_icons.get(cat_name, ('', '#888'))[1] }}"></span>
+            {{ cat_name|replace('_', ' ')|title }}
+            <span class="chip-count">({{ cat_count }})</span>
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ── Editor's Choice ── -->
+    {% if editors_choice %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Editor's Choice</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', sort='rating', min_rating=4.5) }}">See more</a>
+        </div>
+        <div class="editors-row">
+            {% set ec_colors = ['#174ea6', '#0d652d', '#8430ce', '#c5221f', '#e37400', '#137333'] %}
+            {% for app in editors_choice %}
+            <a class="editor-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="editor-banner" style="background: linear-gradient(135deg, {{ ec_colors[loop.index0 % 6] }}dd, {{ ec_colors[loop.index0 % 6] }}88);">
+                    <span class="ec-badge">Editor's Choice</span>
+                    <div class="ec-icon" style="background: {{ ec_colors[loop.index0 % 6] }};">{{ app.name[0] }}</div>
+                </div>
+                <div class="editor-info">
+                    <h3>{{ app.name }}</h3>
+                    <div class="ei-meta">
+                        <span>{{ app.category|replace('_', ' ')|title }}</span>
+                        <span class="ei-rating">&#9733; {{ app.rating }}</span>
+                        <span>{{ app.installs }} installs</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Trending Now ── -->
+    {% if trending %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Trending Now</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', sort='reviews') }}">See more</a>
+        </div>
+        <div class="app-row">
+            {% set trend_colors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7b1fa2', '#c2185b', '#00897b', '#5c6bc0', '#f4511e', '#8d6e63'] %}
+            {% for app in trending %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ trend_colors[loop.index0 % 12] }}, {{ trend_colors[(loop.index0 + 3) % 12] }});">
+                    {{ app.name[0] }}
+                </div>
+                <div class="app-name">{{ app.name }}</div>
+                <div class="app-dev">{{ app.developer }}</div>
+                <div class="app-bottom">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    <span>&#183;</span>
+                    <span class="price-tag {% if app.price == 0 %}free{% endif %}">
+                        {% if app.price == 0 %}Free{% else %}${{ "%.2f"|format(app.price) }}{% endif %}
+                    </span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Top Rated ── -->
+    {% if top_rated %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Top Rated</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', sort='rating') }}">See more</a>
+        </div>
+        <div class="app-row">
+            {% set rated_colors = ['#0d652d', '#137333', '#1e8e3e', '#34a853', '#5bb974', '#81c995', '#174ea6', '#1a73e8', '#4285f4', '#669df6', '#8ab4f8', '#aecbfa'] %}
+            {% for app in top_rated %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ rated_colors[loop.index0 % 12] }}, {{ rated_colors[(loop.index0 + 4) % 12] }});">
+                    {{ app.name[0] }}
+                </div>
+                <div class="app-name">{{ app.name }}</div>
+                <div class="app-dev">{{ app.developer }}</div>
+                <div class="app-bottom">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    <span>&#183;</span>
+                    {{ app.installs }}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Top Free Apps ── -->
+    {% if top_free %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Top Free</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', price='free', sort='reviews') }}">See more</a>
+        </div>
+        <div class="app-row">
+            {% set free_colors = ['#1a73e8', '#e8710a', '#d93025', '#188038', '#a142f4', '#f09300', '#1967d2', '#129eaf', '#e52592', '#9334e6', '#e37400', '#5f6368'] %}
+            {% for app in top_free %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ free_colors[loop.index0 % 12] }}, {{ free_colors[(loop.index0 + 5) % 12] }});">
+                    {{ app.name[0] }}
+                </div>
+                <div class="app-name">{{ app.name }}</div>
+                <div class="app-dev">{{ app.developer }}</div>
+                <div class="app-bottom">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    <span>&#183;</span>
+                    <span class="price-tag free">Free</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Top Paid Apps ── -->
+    {% if top_paid %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Top Paid</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', price='paid', sort='reviews') }}">See more</a>
+        </div>
+        <div class="app-row">
+            {% set paid_colors = ['#c5221f', '#b31412', '#e8710a', '#f09300', '#fbbc04', '#f9ab00', '#ea4335', '#d93025', '#e37400', '#a50e0e', '#c61a09', '#b06000'] %}
+            {% for app in top_paid %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ paid_colors[loop.index0 % 12] }}, {{ paid_colors[(loop.index0 + 3) % 12] }});">
+                    {{ app.name[0] }}
+                </div>
+                <div class="app-name">{{ app.name }}</div>
+                <div class="app-dev">{{ app.developer }}</div>
+                <div class="app-bottom">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    <span>&#183;</span>
+                    <span class="price-tag">${{ "%.2f"|format(app.price) }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── New & Updated ── -->
+    {% if new_updated %}
+    <div class="section">
+        <div class="section-header">
+            <h2>New &amp; Updated</h2>
+            <a href="{{ url_for('software-marketplace.apps_list', sort='newest') }}">See more</a>
+        </div>
+        <div class="app-row">
+            {% set new_colors = ['#7b1fa2', '#6a1b9a', '#8e24aa', '#9c27b0', '#ab47bc', '#ba68c8', '#4a148c', '#6a1b9a', '#8e24aa', '#ce93d8', '#e1bee7', '#f3e5f5'] %}
+            {% for app in new_updated %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ new_colors[loop.index0 % 12] }}, {{ new_colors[(loop.index0 + 4) % 12] }});">
+                    {{ app.name[0] }}
+                </div>
+                <div class="app-name">{{ app.name }}</div>
+                <div class="app-dev">{{ app.developer }}</div>
+                <div class="app-bottom">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    <span>&#183;</span>
+                    {{ app.last_updated }}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Browse by Category ── -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Browse by Category</h2>
+        </div>
+        <div class="cat-grid">
+            {% for cat_name, cat_count in categories %}
+            {% if cat_name and cat_name != '1.9' %}
+            <a class="cat-tile" href="{{ url_for('software-marketplace.category_page', cat=cat_name) }}">
+                <div class="ct-icon" style="background: {{ category_icons.get(cat_name, ('', '#5f6368'))[1] }};">
+                    {{ cat_name[0] }}
+                </div>
+                <div class="ct-text">
+                    <h3>{{ cat_name|replace('_', ' ')|title }}</h3>
+                    <span>{{ cat_count }} app{{ 's' if cat_count != 1 }}</span>
+                </div>
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Footer ── -->
+<div class="footer">
+    <p>
+        <a href="{{ url_for('software-marketplace.apps_list') }}">All Apps</a>
+        <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+        {% if user %}
+        <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+        <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+        {% endif %}
+        <a href="/">Back to MiniWeb</a>
+    </p>
+    <p style="margin-top: .5rem;">AppVault Software Marketplace &mdash; {{ "{:,}".format(total_apps) }} apps available</p>
+</div>
+
 </body>
 </html>

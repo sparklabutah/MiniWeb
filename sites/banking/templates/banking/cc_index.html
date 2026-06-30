@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #2d3748; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1200px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-login:hover { background: #1e3a6e; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+        h2 { font-size: 1.15rem; color: #0a2463; margin-bottom: 1rem; }
+
+        .card-preview { background: linear-gradient(135deg, #2b6cb0, #4299e1); border-radius: 16px; padding: 1.8rem; color: #fff; margin-bottom: 1.5rem; max-width: 420px; box-shadow: 0 4px 20px rgba(43,108,176,0.3); position: relative; overflow: hidden; }
+        .card-preview::before { content: ''; position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%; }
+        .card-preview .card-name { font-size: .85rem; letter-spacing: 1px; text-transform: uppercase; opacity: .8; margin-bottom: .8rem; }
+        .card-preview .card-number { font-size: 1.3rem; letter-spacing: 3px; margin-bottom: 1rem; }
+        .card-preview .card-holder { font-size: .9rem; }
+        .card-preview .card-tier { position: absolute; top: 1.2rem; right: 1.5rem; font-size: .75rem; background: rgba(255,255,255,0.2); padding: .2rem .6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .card-preview .frozen-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(229,62,62,0.9); padding: .5rem 1.5rem; border-radius: 6px; font-weight: 700; font-size: 1rem; letter-spacing: 2px; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+        .kpi-card .label { font-size: .78rem; color: #718096; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+        .kpi-card .value { font-size: 1.5rem; font-weight: 700; color: #0a2463; }
+        .kpi-card .value.red { color: #c53030; }
+        .kpi-card .value.green { color: #276749; }
+        .kpi-card .value.blue { color: #2b6cb0; }
+
+        .section { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
+        .section-header h2 { margin-bottom: 0; }
+        .section-header a { font-size: .85rem; color: #3182ce; text-decoration: none; }
+        .section-header a:hover { text-decoration: underline; }
+
+        .txn-list { list-style: none; }
+        .txn-list li { display: flex; justify-content: space-between; align-items: center; padding: .7rem 0; border-bottom: 1px solid #f0f4f8; }
+        .txn-list li:last-child { border-bottom: none; }
+        .txn-list .txn-info { flex: 1; }
+        .txn-list .txn-merchant { font-weight: 600; font-size: .9rem; color: #2d3748; }
+        .txn-list .txn-meta { font-size: .78rem; color: #a0aec0; margin-top: .1rem; }
+        .txn-list .txn-amount { font-weight: 700; font-size: .95rem; color: #2d3748; }
+        .txn-list .txn-amount.pending { color: #d69e2e; }
+
+        .spending-bars { margin-top: .5rem; }
+        .spending-bar { display: flex; align-items: center; margin-bottom: .5rem; }
+        .spending-bar .cat-name { width: 110px; font-size: .82rem; color: #4a5568; flex-shrink: 0; }
+        .spending-bar .bar-track { flex: 1; height: 18px; background: #edf2f7; border-radius: 4px; overflow: hidden; margin: 0 .6rem; }
+        .spending-bar .bar-fill { height: 100%; background: linear-gradient(90deg, #4299e1, #63b3ed); border-radius: 4px; min-width: 2px; }
+        .spending-bar .cat-amt { font-size: .82rem; font-weight: 600; color: #2d3748; width: 80px; text-align: right; flex-shrink: 0; }
+
+        .pay-list { list-style: none; }
+        .pay-list li { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f0f4f8; font-size: .88rem; }
+        .pay-list li:last-child { border-bottom: none; }
+        .pay-list .pay-amt { font-weight: 600; color: #276749; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('banking.index') }}">Dashboard</a>
+        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
+        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
+        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
+        <a href="{{ url_for('banking.pay_bills_page') }}">Pay Bills</a>
+        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
+        <a href="{{ url_for('banking.cc_index') }}" class="active">Credit Card</a>
+        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="card-preview">
+            <div class="card-name">SecureBank {{ cc_user.card_tier }}</div>
+            <div class="card-number">**** **** **** {{ cc_user.card_number_last4 }}</div>
+            <div class="card-holder">{{ cc_user.name }}</div>
+            <div class="card-tier">{{ cc_user.card_tier }}</div>
+            {% if cc_user.card_frozen %}
+            <div class="frozen-badge">FROZEN</div>
+            {% endif %}
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="label">Current Balance</div>
+                <div class="value red">${{ "%.2f"|format(cc_user.current_balance) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Available Credit</div>
+                <div class="value green">${{ "%.2f"|format(cc_user.available_credit) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Credit Limit</div>
+                <div class="value">${{ "%.2f"|format(cc_user.credit_limit) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Rewards Points</div>
+                <div class="value blue">{{ "{:,}".format(cc_user.rewards_points) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Minimum Payment Due</div>
+                <div class="value">${{ "%.2f"|format(cc_user.minimum_payment) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Payment Due Date</div>
+                <div class="value" style="font-size:1.1rem;">{{ cc_user.due_date }}</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>Recent Credit Card Transactions</h2>
+                <a href="{{ url_for('banking.cc_transactions') }}">View All</a>
+            </div>
+            <ul class="txn-list">
+                {% for t in recent_transactions %}
+                <li>
+                    <div class="txn-info">
+                        <div class="txn-merchant">{{ t.merchant }}</div>
+                        <div class="txn-meta">{{ t.date }} &middot; {{ t.category }}</div>
+                    </div>
+                    <div class="txn-amount {{ 'pending' if t.status == 'pending' else '' }}">${{ "%.2f"|format(t.amount) }}{% if t.status == 'pending' %} <small>(pending)</small>{% endif %}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Spending by Category</h2>
+            <div class="spending-bars">
+                {% set max_spend = spending.values()|list|max if spending else 1 %}
+                {% for cat, amt in spending.items() %}
+                <div class="spending-bar">
+                    <span class="cat-name">{{ cat }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ (amt / max_spend * 100)|round(1) }}%"></div>
+                    </div>
+                    <span class="cat-amt">${{ "%.2f"|format(amt) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if recent_payments %}
+        <div class="section">
+            <div class="section-header">
+                <h2>Recent Payments</h2>
+                <a href="{{ url_for('banking.cc_payments') }}">View All</a>
+            </div>
+            <ul class="pay-list">
+                {% for p in recent_payments %}
+                <li>
+                    <span>{{ p.date }} &middot; {{ p.method|replace('_', ' ')|title }}</span>
+                    <span class="pay-amt">${{ "%.2f"|format(p.amount) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if latest_statement %}
+        <div class="section">
+            <div class="section-header">
+                <h2>Latest Statement ({{ latest_statement.period }})</h2>
+                <a href="{{ url_for('banking.cc_statements') }}">All Statements</a>
+            </div>
+            <div class="kpi-grid" style="margin-bottom:0;">
+                <div class="kpi-card">
+                    <div class="label">Opening Balance</div>
+                    <div class="value" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.opening_balance) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Charges</div>
+                    <div class="value red" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.charges) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Payments</div>
+                    <div class="value green" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.payments) }}</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Closing Balance</div>
+                    <div class="value" style="font-size:1.1rem;">${{ "%.2f"|format(latest_statement.closing_balance) }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

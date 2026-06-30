@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="30">
     <title>CloudCore Console</title>
     <link rel="stylesheet" href="/static/style.css">
     <style>
@@ -22,26 +23,55 @@
         .search-bar input::placeholder { color: #8899a6; }
         .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
         .page-title { font-size: 1.4rem; margin-bottom: 1.5rem; color: #16213e; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
         .stat-card { background: #fff; border-radius: 8px; padding: 1.2rem; border-left: 4px solid #ff9900; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .stat-card.critical { border-left-color: #e74c3c; }
         .stat-card.success { border-left-color: #27ae60; }
         .stat-card.info { border-left-color: #3498db; }
+        .stat-card.warn { border-left-color: #f39c12; }
         .stat-label { font-size: .8rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; }
         .stat-value { font-size: 1.8rem; font-weight: 700; color: #1a1a2e; margin: .3rem 0; }
         .stat-detail { font-size: .8rem; color: #94a3b8; }
         .section-title { font-size: 1.1rem; margin: 1.5rem 0 .8rem; color: #16213e; border-bottom: 1px solid #e2e8f0; padding-bottom: .5rem; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+
+        /* Live metrics panel */
+        .metrics-panel { background: #fff; border-radius: 8px; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .metrics-panel h3 { font-size: .95rem; margin-bottom: .8rem; color: #16213e; }
+        .metric-row { display: flex; align-items: center; gap: .8rem; padding: .5rem 0; border-bottom: 1px solid #f0f2f5; }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-label { font-size: .8rem; color: #64748b; width: 110px; flex-shrink: 0; }
+        .metric-bar { flex: 1; height: 18px; background: #e9ecef; border-radius: 3px; overflow: hidden; position: relative; }
+        .metric-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+        .fill-green { background: #27ae60; }
+        .fill-yellow { background: #f39c12; }
+        .fill-red { background: #e74c3c; }
+        .metric-val { font-size: .85rem; font-weight: 600; width: 60px; text-align: right; flex-shrink: 0; }
+        .instance-metric-name { font-size: .8rem; font-weight: 500; color: #37475a; font-family: monospace; }
+
+        /* Service cards with health */
         .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
-        .service-card { background: #fff; border-radius: 6px; padding: 1rem; cursor: pointer; text-decoration: none; color: inherit; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: box-shadow .15s, transform .15s; border: 1px solid #e8ecef; }
+        .service-card { background: #fff; border-radius: 6px; padding: 1rem; cursor: pointer; text-decoration: none; color: inherit; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: box-shadow .15s, transform .15s; border: 1px solid #e8ecef; position: relative; }
         .service-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); transform: translateY(-1px); }
         .service-card .svc-name { font-weight: 600; font-size: .95rem; margin-bottom: .3rem; }
         .service-card .svc-cat { font-size: .75rem; color: #64748b; }
-        .service-card .svc-status { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .7rem; font-weight: 600; margin-top: .4rem; }
+        .service-card .svc-badges { display: flex; gap: .4rem; margin-top: .5rem; flex-wrap: wrap; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .7rem; font-weight: 600; }
         .status-active { background: #d4edda; color: #155724; }
         .status-warning { background: #fff3cd; color: #856404; }
         .status-stopped { background: #f8d7da; color: #721c24; }
         .status-running { background: #d4edda; color: #155724; }
         .status-available { background: #d4edda; color: #155724; }
+        .health-healthy { background: #d4edda; color: #155724; }
+        .health-degraded { background: #fff3cd; color: #856404; }
+        .health-warning { background: #f8d7da; color: #721c24; }
+        .health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: .3rem; vertical-align: middle; }
+        .dot-healthy { background: #27ae60; }
+        .dot-degraded { background: #f39c12; }
+        .dot-warning { background: #e74c3c; }
+
+        /* Alert list */
         .alert-list { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
         .alert-item { display: flex; align-items: center; padding: .8rem 1rem; border-bottom: 1px solid #f0f2f5; gap: .8rem; }
         .alert-item:last-child { border-bottom: none; }
@@ -51,8 +81,23 @@
         .alert-name { font-weight: 500; font-size: .9rem; }
         .alert-resource { font-size: .8rem; color: #64748b; }
         .alert-time { font-size: .75rem; color: #94a3b8; margin-left: auto; }
+
+        /* Log stream */
+        .log-stream { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .log-entry { display: flex; align-items: flex-start; padding: .6rem 1rem; border-bottom: 1px solid #f0f2f5; gap: .6rem; font-size: .82rem; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-level { font-weight: 600; font-size: .75rem; padding: .1rem .4rem; border-radius: 3px; flex-shrink: 0; width: 48px; text-align: center; }
+        .log-level-ERROR { background: #fde8e8; color: #e74c3c; }
+        .log-level-WARN { background: #fef3cd; color: #d68910; }
+        .log-level-INFO { background: #d4edda; color: #1e7e34; }
+        .log-time { font-size: .75rem; color: #94a3b8; flex-shrink: 0; width: 75px; }
+        .log-service { font-size: .75rem; color: #6366f1; font-weight: 500; flex-shrink: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-msg { color: #374151; flex: 1; line-height: 1.3; }
+
         .dropdown-menu { position: relative; display: inline-block; }
         .dropdown-menu select { padding: .4rem .8rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .85rem; background: #fff; cursor: pointer; }
+        .pulse { animation: pulse-anim 2s infinite; }
+        @keyframes pulse-anim { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
     </style>
 </head>
 <body>
@@ -88,11 +133,22 @@
     <div class="container">
         <h1 class="page-title">Console Home</h1>
 
+        <!-- Summary stat cards -->
         <div class="stats-grid">
             <div class="stat-card success">
                 <div class="stat-label">Running Instances</div>
                 <div class="stat-value">{{ running_instances }}</div>
                 <div class="stat-detail">of {{ total_instances }} total</div>
+            </div>
+            <div class="stat-card {% if avg_cpu > 75 %}critical{% elif avg_cpu > 50 %}warn{% else %}info{% endif %}">
+                <div class="stat-label">Avg CPU</div>
+                <div class="stat-value">{{ avg_cpu }}%</div>
+                <div class="stat-detail">across {{ live_metrics|length }} instances</div>
+            </div>
+            <div class="stat-card {% if avg_memory > 75 %}critical{% elif avg_memory > 50 %}warn{% else %}info{% endif %}">
+                <div class="stat-label">Avg Memory</div>
+                <div class="stat-value">{{ avg_memory }}%</div>
+                <div class="stat-detail">{{ total_requests|int }} req/min</div>
             </div>
             <div class="stat-card {% if critical_alerts > 0 %}critical{% endif %}">
                 <div class="stat-label">Active Alerts</div>
@@ -104,13 +160,71 @@
                 <div class="stat-value">${{ "%.2f"|format(total_cost) }}</div>
                 <div class="stat-detail">Budget: ${{ "%.2f"|format(total_budget) }}</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Services</div>
-                <div class="stat-value">{{ services|length }}</div>
-                <div class="stat-detail">across {{ categories|length }} categories</div>
+            <div class="stat-card {% if health_counts.get('warning', 0) > 0 %}critical{% elif health_counts.get('degraded', 0) > 0 %}warn{% else %}success{% endif %}">
+                <div class="stat-label">Service Health</div>
+                <div class="stat-value">{{ health_counts.get('healthy', 0) }}/{{ services|length }}</div>
+                <div class="stat-detail">
+                    {% if health_counts.get('degraded', 0) > 0 %}{{ health_counts['degraded'] }} degraded{% endif %}
+                    {% if health_counts.get('warning', 0) > 0 %} {{ health_counts['warning'] }} warning{% endif %}
+                    {% if health_counts.get('degraded', 0) == 0 and health_counts.get('warning', 0) == 0 %}all healthy{% endif %}
+                </div>
             </div>
         </div>
 
+        <!-- Live Metrics + Recent Logs side by side -->
+        <div class="two-col">
+            <div>
+                <h2 class="section-title">Live Instance Metrics <span class="pulse" style="font-size:.7rem;color:#27ae60;">LIVE</span></h2>
+                <div class="metrics-panel">
+                    {% for m in live_metrics %}
+                    <div style="margin-bottom: .8rem;">
+                        <div class="instance-metric-name">{{ m.instance_id }}</div>
+                        <div class="metric-row">
+                            <div class="metric-label">CPU</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill {% if m.cpu_percent > 80 %}fill-red{% elif m.cpu_percent > 60 %}fill-yellow{% else %}fill-green{% endif %}" style="width:{{ m.cpu_percent }}%"></div>
+                            </div>
+                            <div class="metric-val" style="{% if m.cpu_percent > 80 %}color:#e74c3c{% elif m.cpu_percent > 60 %}color:#f39c12{% else %}color:#27ae60{% endif %}">{{ m.cpu_percent }}%</div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label">Memory</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill {% if m.memory_percent > 80 %}fill-red{% elif m.memory_percent > 60 %}fill-yellow{% else %}fill-green{% endif %}" style="width:{{ m.memory_percent }}%"></div>
+                            </div>
+                            <div class="metric-val">{{ m.memory_percent }}%</div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label">Network I/O</div>
+                            <div style="flex:1;font-size:.8rem;color:#475569;">{{ m.network_in_mbps }} Mbps in / {{ m.network_out_mbps }} Mbps out</div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label">Requests</div>
+                            <div style="flex:1;font-size:.85rem;font-weight:600;color:#1a1a2e;">{{ m.request_count }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <h2 class="section-title">Recent Log Stream</h2>
+                <div class="log-stream">
+                    {% for log in recent_logs %}
+                    <div class="log-entry">
+                        <span class="log-level log-level-{{ log.level }}">{{ log.level }}</span>
+                        <span class="log-time">{{ log.relative_time }}</span>
+                        <span class="log-service" title="{{ log.service }}">{{ log.service }}</span>
+                        <span class="log-msg">{{ log.message[:120] }}{% if log.message|length > 120 %}...{% endif %}</span>
+                    </div>
+                    {% endfor %}
+                    <div style="padding: .6rem 1rem; text-align: center;">
+                        <a href="{{ url_for('cloud-dev-consoles.logs_page') }}" style="color:#0073bb; font-size:.8rem; text-decoration:none;">View all logs</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services by Category with health badges -->
         <h2 class="section-title">Services by Category</h2>
         {% for cat in categories %}
         <h3 style="font-size:.9rem; color:#37475a; margin: 1rem 0 .5rem;">{{ cat }}</h3>
@@ -119,12 +233,16 @@
             <a href="{{ url_for('cloud-dev-consoles.service_detail', service_id=svc.id) }}" class="service-card">
                 <div class="svc-name">{{ svc.name }}</div>
                 <div class="svc-cat">{{ svc.category }}</div>
-                <span class="svc-status status-{{ svc.status }}">{{ svc.status }}</span>
+                <div class="svc-badges">
+                    <span class="badge status-{{ svc.status }}">{{ svc.status }}</span>
+                    <span class="badge health-{{ svc.health }}"><span class="health-dot dot-{{ svc.health }}"></span>{{ svc.health }}</span>
+                </div>
             </a>
             {% endfor %}
         </div>
         {% endfor %}
 
+        <!-- Recent Alerts -->
         <h2 class="section-title">Recent Alerts</h2>
         <div class="alert-list">
             {% for alert in alerts if alert.status == 'active' %}

@@ -1,0 +1,47 @@
+[
+  {
+    "step": 0,
+    "type": "observe",
+    "action": "GET /sites/e-commerce/ (initial observation)",
+    "observation": "== Headings ==\n    [H3] Category\n    [H3] Brand\n    [H3] Price Range\n    [H3] Rating\n\n== Forms ==\n  Form #1: action=/sites/e-commerce/ method=GET\n    <input type=text name=q placeholder=\"Search products...\" value=\"\">\n    <button type=submit>Search</button>\n  Form #2: action=/sites/e-commerce/ method=GET\n    <input type=number name=min_price placeholder=\"0\" value=\"\">\n    <input type=number name=max"
+  },
+  {
+    "action": "GET /sites/e-commerce/login",
+    "observation": "== Headings ==\n[H1] ShopMart\n  [H2] Sign In\n\n== Forms ==\n  Form #1: action=/sites/e-commerce/login method=POST\n    <input type=text name=username placeholder=\"Enter your username\" value=\"\">\n    <input type=password name=password placeholder=\"Enter your password\" value=\"\">\n    <button type=submit>Sign In</button>\n\n== Page Text (excerpt) ==\n  Username\n  Password\n",
+    "step": 1,
+    "macro": "authenticate_by_form"
+  },
+  {
+    "action": "POST /sites/e-commerce/login username=shopper_alice password=pass123",
+    "observation": "== Headings ==\n    [H3] Category\n    [H3] Brand\n    [H3] Price Range\n    [H3] Rating\n\n== Forms ==\n  Form #1: action=/sites/e-commerce/ method=GET\n    <input type=text name=q placeholder=\"Search products...\" value=\"\">\n    <button type=submit>Search</button>\n  Form #2: action=/sites/e-commerce/ method=GET\n    <input type=number name=min_price placeholder=\"0\" value=\"\">\n    <input type=number name=max_price placeholder=\"Any\" value=\"\">\n    <select name=category> options: All Categories(), Automotive(",
+    "status_code": 200,
+    "step": 1,
+    "macro": "authenticate_by_form"
+  },
+  {
+    "action": "POST /sites/e-commerce/review/submit product_id=1 rating=4 title='Great projector'",
+    "observation": "== Headings ==\n[H1] 01 Video Projector, LED Projector Outdoor 1080P HD White Multipurpose with Speaker for Home Theater for Movie for Game(U.S. regulations, Transl)\n    [H3] About this item\n  [H2] Customer Reviews (1)\n    [H3] Write a Review\n  [H2] Related Products\n\n== Forms ==\n  Form #1: action=/sites/e-commerce/cart/add method=POST\n    <input type=hidden name=product_id placeholder=\"\" value=\"1\">\n    <select name=quantity> options: Qty: 1(1), Qty: 2(2), Qty: 3(3), Qty: 4(4), Qty: 5(5), Qty: 6(6",
+    "status_code": 200,
+    "step": 2,
+    "macro": "submit_form"
+  },
+  {
+    "action": "GET /sites/e-commerce/api/reviews/B09D42HCTN (verify)",
+    "observation": "Review found: True, total reviews: 1",
+    "step": 2,
+    "macro": "submit_form"
+  },
+  {
+    "action": "POST_JSON /sites/e-commerce/api/wishlist/1 {product_id: 2}",
+    "observation": "{\"action\": \"added\", \"product_id\": 2, \"wishlist_count\": 1}",
+    "status_code": 200,
+    "step": 3,
+    "macro": "toggle_by_api"
+  },
+  {
+    "action": "GET /sites/e-commerce/api/wishlist/1 (verify)",
+    "observation": "{\"count\": 1, \"items\": [{\"asin\": \"B08NFLLK8P\", \"availability\": \"Only 1 left in stock - order soon.\", \"availability_quantity\": 1, \"brand\": \"1 Factory Radio\", \"categories\": [\"Electronics\", \"Car & Vehicle Electronics\", \"Car Electronics\", \"Car Audio\", \"Car Stereo Receivers\"], \"category_path\": \"Electronics \\u203a Car & Vehicle Electronics \\u203a Car Electronics \\u203a Car Audio \\u203a Car Stereo Receivers\", \"description\": \"1 Factory Radio Audio Equipment Radio Amplifier Compatible with 2001-2005 Chevr",
+    "step": 3,
+    "macro": "toggle_by_api"
+  }
+]

@@ -65,6 +65,9 @@
         }
         .conv-item:hover { background-color: #2a2b32; }
         .conv-item.active { background-color: #343541; }
+        .conv-delete-btn:hover { background-color: #ef4444 !important; color: #fff !important; }
+        .conv-item-row .conv-delete-btn { opacity: 0; transition: opacity 0.15s; }
+        .conv-item-row:hover .conv-delete-btn { opacity: 1; }
         .sidebar-nav {
             border-top: 1px solid #4d4d4f;
             padding-top: 8px;
@@ -453,21 +456,26 @@
         <div class="sidebar-header">
             <h2>AI Chatbots Hub</h2>
         </div>
-        <a href="{{ url_for('ai-chatbots.chat_page') }}" class="new-chat-btn">+ New Chat</a>
+        <form method="post" action="{{ url_for('ai-chatbots.form_new_conversation') }}" style="margin-bottom:8px;">
+            <button type="submit" class="new-chat-btn">+ New Chat</button>
+        </form>
         <div class="conv-list">
             {% if conversations is defined and conversations %}
                 {% for conv in conversations %}
-                <a href="{{ url_for('ai-chatbots.chat_page', conv_id=conv.id) }}" class="conv-item {% if current_conv is defined and current_conv and current_conv.id == conv.id %}active{% endif %}">
-                    {{ conv.title }}
-                </a>
+                <div class="conv-item-row" style="display:flex;align-items:center;gap:2px;">
+                    <a href="{{ url_for('ai-chatbots.chat_page', conv_id=conv.id) }}" class="conv-item {% if current_conv is defined and current_conv and current_conv.id == conv.id %}active{% endif %}" style="flex:1;min-width:0;">
+                        {{ conv.title }}
+                    </a>
+                    <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}" style="flex-shrink:0;" onsubmit="return confirm('Delete this conversation?');">
+                        <button type="submit" class="conv-delete-btn" title="Delete conversation" style="background:none;border:none;color:#8e8ea0;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;">&times;</button>
+                    </form>
+                </div>
                 {% endfor %}
             {% endif %}
         </div>
         <div class="sidebar-nav">
             <a href="{{ url_for('ai-chatbots.index') }}">Home</a>
             <a href="{{ url_for('ai-chatbots.chat_page') }}">Chat</a>
-            <a href="{{ url_for('ai-chatbots.prompts_page') }}">Prompts Library</a>
-            <a href="{{ url_for('ai-chatbots.knowledge_page') }}">Knowledge Base</a>
             <a href="{{ url_for('ai-chatbots.faq_page') }}">FAQ</a>
             <a href="{{ url_for('ai-chatbots.settings_page') }}">Settings</a>
             {% if user %}

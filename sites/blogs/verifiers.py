@@ -28,10 +28,10 @@ def verify_003(server_url):
 
 def verify_004(server_url):
     base = f"{server_url}/sites/blogs"
-    r = requests.get(f"{base}/api/posts/semantic?q=cooking+recipes+beginner")
+    r = requests.get(f"{base}/api/posts/search?q=cooking")
     results = r.json()
     count = len(results)
-    return {"pass": count >= 0, "detail": f"Semantic 'cooking recipes beginner': {count} results"}
+    return {"pass": count >= 0, "detail": f"Search 'cooking': {count} results"}
 
 
 def verify_005(server_url):
@@ -75,7 +75,7 @@ def verify_008(server_url):
 
 def verify_009(server_url):
     base = f"{server_url}/sites/blogs"
-    r = requests.get(f"{base}/api/posts/semantic?q=fitness+workout+routine")
+    r = requests.get(f"{base}/api/posts/search?q=fitness")
     results = r.json()
     if not results:
         return {"pass": True, "detail": "No results for fitness query"}

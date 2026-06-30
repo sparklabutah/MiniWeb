@@ -15,9 +15,6 @@ navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, se
 
 ## Site Description
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+A Zillow/Redfin-style residential real estate platform for Lakeport, WA. Users browse, search, and filter 30 property listings (houses, condos, apartments, townhouses) for sale or rent. Features include saving listings, sending inquiries to agents, viewing market statistics, and an agents directory. 5 registered users, 8 agents across 3 agencies. Modeled after Zillow.com. No temporal simulation required.
+
+See `desc.md` for full details.

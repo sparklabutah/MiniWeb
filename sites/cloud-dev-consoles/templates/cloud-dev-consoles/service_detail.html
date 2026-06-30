@@ -64,7 +64,8 @@
     <div class="container">
         <div class="breadcrumb"><a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a> / {{ service.name }}</div>
         <div class="detail-header">
-            <h1>{{ service.name }} <span class="status-badge status-{{ service.status }}">{{ service.status }}</span></h1>
+            <style>.health-badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600;margin-left:.3rem}.hb-healthy{background:#d4edda;color:#155724}.hb-degraded{background:#fff3cd;color:#856404}.hb-warning{background:#f8d7da;color:#721c24}</style>
+            <h1>{{ service.name }} <span class="status-badge status-{{ service.status }}">{{ service.status }}</span>{% if service.health %}<span class="health-badge hb-{{ service.health }}">{{ service.health }}</span>{% endif %}</h1>
             <p style="color:#64748b; font-size:.9rem;">{{ service.description }}</p>
             <div class="detail-grid">
                 <div class="detail-item"><div class="detail-label">Service ID</div><div class="detail-value">{{ service.id }}</div></div>
@@ -103,7 +104,7 @@
                 <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td style="white-space:nowrap;">{{ log.timestamp }}</td>
+                    <td style="white-space:nowrap;">{{ log.relative_time if log.relative_time else log.timestamp }}</td>
                     <td><span class="log-level level-{{ log.level }}">{{ log.level }}</span></td>
                     <td>{{ log.message }}</td>
                 </tr>

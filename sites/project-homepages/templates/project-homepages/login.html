@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - {{ project.short_title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafbfc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #1e3a5f, #2d5a87); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #7dd3fc; }
+        .header-right a { color: #cbd5e1; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1e3a5f; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        .login-container { max-width: 420px; margin: 4rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .login-container h2 { color: #1e3a5f; margin-bottom: .5rem; font-size: 1.5rem; }
+        .login-container .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .form-group input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        .btn-login { width: 100%; padding: .8rem; background: #1e3a5f; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-login:hover { background: #2d5a87; }
+        .btn-logout { width: 100%; padding: .8rem; background: #dc2626; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: .8rem; }
+        .btn-logout:hover { background: #b91c1c; }
+        .error { background: #fef2f2; color: #dc2626; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #fee2e2; }
+        .success { background: #f0fdf4; color: #16a34a; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #dcfce7; }
+        .user-info { text-align: center; margin-bottom: 1.5rem; }
+        .user-info .avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #1e3a5f, #3b82f6); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 1.4rem; font-weight: 700; margin-bottom: .5rem; }
+        .user-info h3 { color: #1e3a5f; margin-bottom: .2rem; }
+        .user-info p { color: #64748b; font-size: .88rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('project-homepages.index') }}"><span>Flow</span>Net</a></h1>
+        <div class="header-right">
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('project-homepages.index') }}">Home</a>
+        <a href="{{ url_for('project-homepages.paper_page') }}">Paper</a>
+        <a href="{{ url_for('project-homepages.team_page') }}">Team</a>
+        <a href="{{ url_for('project-homepages.resources_page') }}">Resources</a>
+        <a href="{{ url_for('project-homepages.updates_page') }}">Updates</a>
+        <a href="{{ url_for('project-homepages.login_page') }}" class="active">{% if user %}{{ user.username }}{% else %}Sign In{% endif %}</a>
+    </nav>
+
+    {% if user %}
+    <div class="login-container">
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+        <div class="user-info">
+            <div class="avatar">{{ user.full_name.split()[0][0] }}{{ user.full_name.split()[-1][0] }}</div>
+            <h3>{{ user.full_name }}</h3>
+            <p>{{ user.role | capitalize }} &middot; {{ user.department }}</p>
+            <p>{{ user.email }}</p>
+        </div>
+        <form method="post" action="{{ url_for('project-homepages.logout') }}">
+            <button type="submit" class="btn-logout">Sign Out</button>
+        </form>
+    </div>
+    {% else %}
+    <form class="login-container" method="post" action="{{ url_for('project-homepages.login_submit') }}">
+        <h2>Sign In</h2>
+        <p class="subtitle">Sign in to manage the {{ project.short_title }} project</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
+    </form>
+    {% endif %}
+</body>
+</html>

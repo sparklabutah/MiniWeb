@@ -31,9 +31,10 @@ def verify_macro_search_by_query(server_url):
 
 
 def verify_macro_search_by_semantic(server_url):
-    r = requests.get(f"{_base(server_url)}/api/posts/semantic?q=photography+tips")
+    """Semantic search was merged into regular search."""
+    r = requests.get(f"{_base(server_url)}/api/posts/search?q=photography+tips")
     results = r.json()
-    return {"pass": r.status_code == 200, "detail": f"search_by_semantic: {len(results)} results"}
+    return {"pass": r.status_code == 200, "detail": f"search_by_query (was semantic): {len(results)} results"}
 
 
 def verify_macro_filter_by_dropdown(server_url):
@@ -69,11 +70,12 @@ def verify_macro_extract_by_query(server_url):
 
 
 def verify_macro_extract_by_semantic(server_url):
-    r = requests.get(f"{_base(server_url)}/api/posts/semantic?q=learn+something+new")
+    """Semantic search was merged into regular search."""
+    r = requests.get(f"{_base(server_url)}/api/posts/search?q=learn+something+new")
     results = r.json()
     if results:
-        return {"pass": True, "detail": f"extract_by_semantic: {len(results)} results, first cat={results[0]['category']}"}
-    return {"pass": True, "detail": "extract_by_semantic: no results"}
+        return {"pass": True, "detail": f"extract_by_query (was semantic): {len(results)} results, first cat={results[0]['category']}"}
+    return {"pass": True, "detail": "extract_by_query (was semantic): no results"}
 
 
 def verify_macro_extract_by_dropdown(server_url):

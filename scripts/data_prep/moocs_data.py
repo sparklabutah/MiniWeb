@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 random.seed(42)
 
-DATA_DIR = pathlib.Path(__file__).resolve().parents[2] / "sites" / "moocs-language-learning" / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/moocs-language-learning")
 PRISTINE_DIR = DATA_DIR / ".pristine"
 
 # ── Language / Category / Instructor pools ──────────────────────────────────

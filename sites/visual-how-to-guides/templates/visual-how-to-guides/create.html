@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Guide - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+
+        .page-header { padding: 28px 0 20px; border-bottom: 1px solid #e0e0e0; margin-bottom: 24px; }
+        .page-header h1 { font-size: 28px; color: #333; }
+
+        .error-banner { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: #555; margin-bottom: 6px; }
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group textarea,
+        .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76,175,80,0.1); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group .help-text { font-size: 12px; color: #999; margin-top: 4px; }
+
+        .difficulty-options { display: flex; gap: 12px; }
+        .difficulty-options label { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; }
+        .difficulty-options input[type="radio"] { accent-color: #4CAF50; }
+        .difficulty-options label:has(input:checked) { border-color: #4CAF50; background: #e8f5e9; }
+
+        .steps-container { margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 24px; }
+        .steps-container h2 { font-size: 20px; margin-bottom: 16px; color: #333; }
+
+        .step-entry { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 16px; position: relative; }
+        .step-entry .step-label { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .step-entry .step-num { width: 32px; height: 32px; border-radius: 50%; background: #4CAF50; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+        .step-entry .step-label span { font-weight: 600; font-size: 15px; }
+        .step-entry .remove-step { position: absolute; top: 12px; right: 12px; background: none; border: 1px solid #ddd; color: #999; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+        .step-entry .remove-step:hover { border-color: #c62828; color: #c62828; }
+
+        .add-step-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; background: #fff; color: #4CAF50; border: 2px dashed #4CAF50; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; margin-bottom: 24px; }
+        .add-step-btn:hover { background: #e8f5e9; }
+
+        .submit-section { padding: 20px 0 40px; border-top: 1px solid #e0e0e0; margin-top: 8px; display: flex; gap: 12px; }
+        .btn { padding: 12px 28px; border-radius: 6px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; }
+        .btn-primary { background: #4CAF50; color: #fff; }
+        .btn-primary:hover { background: #45a049; }
+        .btn-secondary { background: #fff; color: #666; border: 1px solid #ddd; }
+        .btn-secondary:hover { border-color: #999; text-decoration: none; }
+
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Create a New Guide</h1>
+        </div>
+
+        {% if error %}
+        <div class="error-banner">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('visual-how-to-guides.create_submit') }}" id="create-form">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" placeholder="How to..." required>
+                <div class="help-text">Start with "How to" for best results.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" placeholder="Briefly describe what this guide covers..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select name="category" id="category" required>
+                    <option value="">Select a category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Difficulty</label>
+                <div class="difficulty-options">
+                    <label><input type="radio" name="difficulty" value="easy" checked> Easy</label>
+                    <label><input type="radio" name="difficulty" value="medium"> Medium</label>
+                    <label><input type="radio" name="difficulty" value="hard"> Hard</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="duration">Estimated Duration (minutes)</label>
+                <input type="number" name="duration_minutes" id="duration" value="30" min="1" max="600">
+            </div>
+
+            <div class="steps-container">
+                <h2>Steps</h2>
+                <div id="steps-list">
+                    <div class="step-entry" data-step="1">
+                        <div class="step-label">
+                            <div class="step-num">1</div>
+                            <span>Step 1</span>
+                        </div>
+                        <button type="button" class="remove-step" onclick="removeStep(this)" title="Remove step">&times;</button>
+                        <div class="form-group">
+                            <label>Step Title</label>
+                            <input type="text" name="step_1_title" placeholder="What to do in this step..." required>
+                        </div>
+                        <div class="form-group">
+                            <label>Step Description</label>
+                            <textarea name="step_1_description" placeholder="Detailed instructions for this step..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="add-step-btn" onclick="addStep()">+ Add Step</button>
+            </div>
+
+            <div class="submit-section">
+                <button type="submit" class="btn btn-primary">Publish Guide</button>
+                <a href="{{ url_for('visual-how-to-guides.guides_list') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+
+    <script>
+        var stepCount = 1;
+
+        function addStep() {
+            stepCount++;
+            var html = '<div class="step-entry" data-step="' + stepCount + '">' +
+                '<div class="step-label">' +
+                    '<div class="step-num">' + stepCount + '</div>' +
+                    '<span>Step ' + stepCount + '</span>' +
+                '</div>' +
+                '<button type="button" class="remove-step" onclick="removeStep(this)" title="Remove step">&times;</button>' +
+                '<div class="form-group">' +
+                    '<label>Step Title</label>' +
+                    '<input type="text" name="step_' + stepCount + '_title" placeholder="What to do in this step..." required>' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label>Step Description</label>' +
+                    '<textarea name="step_' + stepCount + '_description" placeholder="Detailed instructions for this step..."></textarea>' +
+                '</div>' +
+            '</div>';
+            document.getElementById('steps-list').insertAdjacentHTML('beforeend', html);
+        }
+
+        function removeStep(btn) {
+            var entries = document.querySelectorAll('.step-entry');
+            if (entries.length <= 1) return;
+            btn.closest('.step-entry').remove();
+            renumberSteps();
+        }
+
+        function renumberSteps() {
+            var entries = document.querySelectorAll('.step-entry');
+            stepCount = entries.length;
+            entries.forEach(function(entry, idx) {
+                var num = idx + 1;
+                entry.setAttribute('data-step', num);
+                entry.querySelector('.step-num').textContent = num;
+                entry.querySelector('.step-label span').textContent = 'Step ' + num;
+                var inputs = entry.querySelectorAll('input[type="text"], textarea');
+                if (inputs[0]) inputs[0].name = 'step_' + num + '_title';
+                if (inputs[1]) inputs[1].name = 'step_' + num + '_description';
+            });
+        }
+    </script>
+</body>
+</html>

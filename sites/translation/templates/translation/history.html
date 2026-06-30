@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Translation History - LinguaBridge</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('translation.index') }}">&larr; Back to Translate</a>
+        <h1>Translation History</h1>
+
+        <form method="GET">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search history...">
+            <select name="lang">
+                <option value="">All languages</option>
+                {% for lang in languages %}
+                <option value="{{ lang.code }}" {% if lang.code == lang %}selected{% endif %}>{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>ID</th><th>From</th><th>To</th><th>Source</th><th>Translation</th><th>Date</th>
+            </tr>
+            {% for h in history %}
+            <tr>
+                <td>{{ h.id }}</td>
+                <td>{{ h.source_lang }}</td>
+                <td>{{ h.target_lang }}</td>
+                <td>{{ h.source_text }}</td>
+                <td>{{ h.translated_text }}</td>
+                <td>{{ h.timestamp }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>

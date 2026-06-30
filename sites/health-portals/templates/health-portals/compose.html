@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compose Message - Lakeport Medical Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: 1rem 2rem; }
+        .header h1 { color: #fff; font-size: 1.3rem; }
+        .header h1 span { color: #7ee8e8; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; }
+        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a.active { font-weight: 700; background: #d0f0f0; }
+        .main { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { display: inline-block; margin-bottom: 1rem; color: #0d6e6e; text-decoration: none; font-size: .85rem; }
+        .form-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .form-card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #0d6e6e; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .3rem; color: #1a202c; }
+        .form-group select, .form-group input, .form-group textarea { width: 100%; padding: .6rem; border: 1px solid #e2e8f0; border-radius: .3rem; font-size: .85rem; }
+        .form-group textarea { min-height: 150px; resize: vertical; }
+        .send-btn { padding: .6rem 1.5rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .9rem; }
+        .send-btn:hover { background: #0a5c5c; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>Lakeport <span>Medical</span> Center</h1></div>
+    <nav>
+        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
+        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
+        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
+        <a href="{{ url_for('health-portals.messages_page') }}" class="active">Messages</a>
+        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </nav>
+    <div class="main">
+        <a href="{{ url_for('health-portals.messages_page') }}" class="back">&larr; Back to Messages</a>
+        <div class="form-card">
+            <h2>{% if reply_to %}Reply{% else %}New Message{% endif %}</h2>
+            <form id="compose-form">
+                <div class="form-group">
+                    <label for="recipient">To (Provider)</label>
+                    <select id="recipient" name="recipient_id">
+                        {% for p in providers %}
+                        <option value="{{ p.id }}" {% if reply_to and p.id|string == reply_to|string %}selected{% endif %}>{{ p.full_name }} ({{ p.get('department', 'General') }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="subject">Subject</label>
+                    <input type="text" id="subject" name="subject" value="{{ subject }}" placeholder="Message subject">
+                </div>
+                <div class="form-group">
+                    <label for="body">Message</label>
+                    <textarea id="body" name="body" placeholder="Type your message here..."></textarea>
+                </div>
+                {% if thread_id %}
+                <input type="hidden" name="thread_id" value="{{ thread_id }}">
+                {% endif %}
+                <button type="submit" class="send-btn">Send Message</button>
+            </form>
+        </div>
+    </div>
+    <div class="footer">Lakeport Medical Center Patient Portal</div>
+    <script>
+    document.getElementById('compose-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var data = {
+            recipient_id: parseInt(document.getElementById('recipient').value),
+            subject: document.getElementById('subject').value,
+            body: document.getElementById('body').value
+        };
+        var threadId = document.querySelector('input[name="thread_id"]');
+        if (threadId) data.thread_id = threadId.value;
+        fetch('{{ url_for("health-portals.api_messages_create") }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function() {
+            window.location.href = '{{ url_for("health-portals.messages_page") }}';
+        });
+    });
+    </script>
+</body>
+</html>

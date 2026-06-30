@@ -3,75 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Write Review -- {{ paper.title }}</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Submit Review | OpenReview</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
-        .header { border-bottom: 2px solid #7c3aed; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
-        .header h1 { font-size: 1.3rem; color: #7c3aed; }
-        .header h1 a { color: inherit; text-decoration: none; }
-        .header-nav a { margin-left: 1rem; font-size: .9rem; color: #475569; text-decoration: none; }
-        .main { max-width: 700px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
-        .back-link { font-size: .9rem; display: inline-block; margin-bottom: 1rem; color: #7c3aed; text-decoration: none; }
-        .paper-title { font-size: 1.2rem; color: #1e293b; margin-bottom: 1.5rem; }
-        .review-form { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.5rem; }
-        .form-group { margin-bottom: 1.2rem; }
-        .form-group label { display: block; font-size: .85rem; color: #475569; margin-bottom: .3rem; font-weight: 600; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .6rem .8rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .95rem; font-family: inherit; }
-        .form-group textarea { min-height: 200px; resize: vertical; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #7c3aed; outline: none; }
-        .btn-submit { padding: .7rem 2rem; background: #7c3aed; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; }
-        .btn-submit:hover { background: #6d28d9; }
-        .help-text { font-size: .8rem; color: #94a3b8; margin-top: .2rem; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
+
+        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
+        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
+        .topbar a:hover { color: #fff; }
+        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
+        .topbar .right a { margin-right: 0; }
+
+        .content { max-width: 720px; margin: 0 auto; padding: 24px 24px 64px; }
+        .breadcrumb { font-size: 12px; color: #999; margin-bottom: 16px; }
+        .breadcrumb a { color: #1a73e8; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .page-title { font-size: 18px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+        .paper-ref {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 15px; color: #555; font-style: italic; margin-bottom: 20px;
+            padding-bottom: 16px; border-bottom: 1px solid #eee;
+        }
+
+        .review-form { margin-top: 0; }
+        .form-section { margin-bottom: 24px; }
+        .form-section label {
+            display: block; font-size: 13px; font-weight: 600; color: #333;
+            margin-bottom: 6px;
+        }
+        .form-section .hint { font-size: 12px; color: #999; margin-bottom: 6px; }
+        .form-section input[type="text"],
+        .form-section select,
+        .form-section textarea {
+            width: 100%; padding: 9px 12px; border: 1px solid #d0d0d0; border-radius: 4px;
+            font-size: 14px; font-family: inherit; background: #fff;
+        }
+        .form-section textarea { min-height: 240px; resize: vertical; line-height: 1.6; }
+        .form-section input:focus, .form-section select:focus, .form-section textarea:focus {
+            border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+        }
+
+        .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .btn-submit {
+            padding: 10px 28px; background: #1a73e8; color: #fff; border: none;
+            border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-submit:hover { background: #1557b0; }
+        .btn-cancel {
+            padding: 10px 20px; background: #fff; color: #555; border: 1px solid #d0d0d0;
+            border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; text-decoration: none;
+        }
+        .btn-cancel:hover { background: #f5f5f5; }
+
+        .form-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid #eee; }
+
+        .notice {
+            background: #e8f0fe; border: 1px solid #c2d7f2; border-radius: 6px; padding: 12px 16px;
+            font-size: 13px; color: #1967d2; margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
-        <div class="header-nav">
-            <a href="{{ url_for('conference-review-submission.index') }}">Papers</a>
-            <a href="{{ url_for('conference-review-submission.stats_page') }}">Statistics</a>
-            <a href="{{ url_for('conference-review-submission.dashboard') }}">Dashboard</a>
+    <div class="topbar">
+        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">OpenReview</a>
+        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+        <div class="right">
+            <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
             <a href="/">MiniWeb</a>
         </div>
     </div>
 
-    <div class="main">
-        <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="back-link">&larr; Back to paper</a>
-        <div class="paper-title">Reviewing: {{ paper.title }}</div>
+    <div class="content">
+        <div class="breadcrumb">
+            <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+            {% if venue %}
+            &rsaquo; <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>
+            {% endif %}
+            &rsaquo; <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">Paper</a>
+            &rsaquo; Submit Review
+        </div>
+
+        <div class="page-title">Official Review</div>
+        <div class="paper-ref">{{ paper.title }}</div>
+
+        <div class="notice">
+            Your review will be posted anonymously. Please provide constructive and detailed feedback on the paper's strengths, weaknesses, clarity, originality, and significance.
+        </div>
 
         <form class="review-form" method="post" action="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}">
-            <div class="form-group">
-                <label for="title">Review Title</label>
-                <input type="text" name="title" id="title" placeholder="e.g., Strong contribution with minor issues" required>
+            <div class="form-section">
+                <label for="title">Review Summary</label>
+                <div class="hint">A one-line summary of your assessment</div>
+                <input type="text" name="title" id="title" placeholder="e.g., Interesting approach but insufficient evaluation" required>
             </div>
-            <div class="form-group">
-                <label for="recommendation">Recommendation (1-10)</label>
-                <select name="recommendation" id="recommendation" required>
-                    <option value="">Select score...</option>
-                    {% for i in range(1, 11) %}
-                    <option value="{{ i }}">{{ i }} {% if i <= 3 %}(Reject){% elif i <= 5 %}(Weak Reject){% elif i <= 7 %}(Weak Accept){% else %}(Accept){% endif %}</option>
-                    {% endfor %}
-                </select>
-                <div class="help-text">1 = strong reject, 10 = strong accept</div>
+
+            <div class="score-grid">
+                <div class="form-section">
+                    <label for="recommendation">Rating</label>
+                    <div class="hint">1 = strong reject, 10 = strong accept</div>
+                    <select name="recommendation" id="recommendation" required>
+                        <option value="">Select...</option>
+                        <option value="10">10: Top 5% of accepted papers, seminal</option>
+                        <option value="9">9: Top 15%, strong accept</option>
+                        <option value="8">8: Top 50%, clear accept</option>
+                        <option value="7">7: Good paper, accept</option>
+                        <option value="6">6: Marginally above threshold</option>
+                        <option value="5">5: Marginally below threshold</option>
+                        <option value="4">4: Ok but not good enough, reject</option>
+                        <option value="3">3: Clear reject</option>
+                        <option value="2">2: Strong reject</option>
+                        <option value="1">1: Trivial or wrong</option>
+                    </select>
+                </div>
+
+                <div class="form-section">
+                    <label for="confidence">Confidence</label>
+                    <div class="hint">How confident are you in your assessment?</div>
+                    <select name="confidence" id="confidence" required>
+                        <option value="">Select...</option>
+                        <option value="5">5: Absolutely certain (expert)</option>
+                        <option value="4">4: Quite confident</option>
+                        <option value="3">3: Fairly confident</option>
+                        <option value="2">2: Willing to defend but not absolutely certain</option>
+                        <option value="1">1: Best guess</option>
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="confidence">Confidence (1-5)</label>
-                <select name="confidence" id="confidence" required>
-                    <option value="">Select confidence...</option>
-                    <option value="1">1 (Not confident)</option>
-                    <option value="2">2 (Somewhat confident)</option>
-                    <option value="3">3 (Fairly confident)</option>
-                    <option value="4">4 (Confident)</option>
-                    <option value="5">5 (Very confident / Expert)</option>
-                </select>
+
+            <div class="form-section">
+                <label for="comments">Review</label>
+                <div class="hint">Provide detailed comments on strengths, weaknesses, clarity, novelty, significance, and questions for the authors</div>
+                <textarea name="comments" id="comments" placeholder="## Summary&#10;Briefly summarize the paper and its contributions.&#10;&#10;## Strengths&#10;- &#10;&#10;## Weaknesses&#10;- &#10;&#10;## Questions&#10;- &#10;&#10;## Minor Comments&#10;- " required></textarea>
             </div>
-            <div class="form-group">
-                <label for="comments">Detailed Comments</label>
-                <textarea name="comments" id="comments" placeholder="Provide detailed feedback on strengths, weaknesses, clarity, novelty, and significance..." required></textarea>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-submit">Submit Review</button>
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn-cancel">Cancel</a>
             </div>
-            <button type="submit" class="btn-submit">Submit Review</button>
         </form>
     </div>
 </body>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backlog - Meridian Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
+        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
+        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
+        .topbar a:hover { color: #fff; }
+        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
+        .topbar-nav a { color: #cbd5e1; }
+        .topbar-nav a.active { color: #fff; font-weight: 600; }
+        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .filters { display: flex; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .filters input, .filters select { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .85rem; background: #fff; }
+        .filters input { min-width: 200px; }
+        .btn { display: inline-block; padding: .4rem .8rem; border-radius: .35rem; font-size: .82rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+        .btn-outline { background: transparent; color: #3b82f6; border: 1px solid #3b82f6; }
+        .btn-outline:hover { background: #eff6ff; }
+        .issue-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; border: 1px solid #e2e8f0; }
+        .issue-table th { background: #f8fafc; text-align: left; padding: .6rem .75rem; font-size: .8rem; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+        .issue-table td { padding: .6rem .75rem; border-bottom: 1px solid #f1f5f9; font-size: .88rem; }
+        .issue-table tr:last-child td { border-bottom: none; }
+        .issue-table tr:hover { background: #f8fafc; }
+        .issue-key { font-family: monospace; font-size: .8rem; color: #3b82f6; text-decoration: none; font-weight: 600; white-space: nowrap; }
+        .issue-key:hover { text-decoration: underline; }
+        .issue-title a { color: #1e293b; text-decoration: none; }
+        .issue-title a:hover { color: #3b82f6; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; text-transform: uppercase; }
+        .badge-bug { background: #fef2f2; color: #dc2626; }
+        .badge-feature { background: #eff6ff; color: #2563eb; }
+        .badge-task { background: #f0fdf4; color: #16a34a; }
+        .badge-story { background: #fefce8; color: #ca8a04; }
+        .badge-critical { background: #fef2f2; color: #dc2626; }
+        .badge-high { background: #fff7ed; color: #ea580c; }
+        .badge-medium { background: #fefce8; color: #ca8a04; }
+        .badge-low { background: #f0fdf4; color: #16a34a; }
+        .avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: .65rem; font-weight: 600; color: #fff; }
+        .empty-state { color: #94a3b8; font-size: .9rem; padding: 1.5rem; text-align: center; }
+        .count-info { font-size: .85rem; color: #64748b; margin-bottom: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Meridian Tracker</h1>
+        <div class="topbar-nav">
+            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Dashboard</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}" class="active">Backlog</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}">+ New Issue</a>
+            {% if user %}
+            <span class="user-badge">{{ user.name }}</span>
+            {% else %}
+            <a href="{{ url_for('project-mgmt-issue-tracking.login_page') }}">Log in</a>
+            {% endif %}
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Backlog</h2>
+
+        <form class="filters" method="GET">
+            <input type="text" name="q" placeholder="Search backlog..." value="{{ q }}" autocomplete="off">
+            <select name="project" onchange="this.form.submit()">
+                <option value="">All Projects</option>
+                {% for p in projects %}
+                <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="type" onchange="this.form.submit()">
+                <option value="">All Types</option>
+                <option value="bug" {% if type_filter == 'bug' %}selected{% endif %}>Bug</option>
+                <option value="feature" {% if type_filter == 'feature' %}selected{% endif %}>Feature</option>
+                <option value="task" {% if type_filter == 'task' %}selected{% endif %}>Task</option>
+                <option value="story" {% if type_filter == 'story' %}selected{% endif %}>Story</option>
+            </select>
+            <select name="priority" onchange="this.form.submit()">
+                <option value="">All Priorities</option>
+                <option value="critical" {% if priority == 'critical' %}selected{% endif %}>Critical</option>
+                <option value="high" {% if priority == 'high' %}selected{% endif %}>High</option>
+                <option value="medium" {% if priority == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="low" {% if priority == 'low' %}selected{% endif %}>Low</option>
+            </select>
+            <button type="submit" class="btn btn-outline">Filter</button>
+        </form>
+
+        <div class="count-info">{{ issues|length }} issue{{ 's' if issues|length != 1 else '' }} in backlog</div>
+
+        {% if issues %}
+        <table class="issue-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Title</th>
+                    <th>Project</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>Assignee</th>
+                    <th>Points</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for issue in issues %}
+            <tr>
+                <td><a class="issue-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a></td>
+                <td class="issue-title"><a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:60] }}{% if issue.title|length > 60 %}...{% endif %}</a></td>
+                <td>
+                    {% if project_lookup.get(issue.project_id) %}
+                    <a href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=issue.project_id) }}" style="color:#3b82f6;text-decoration:none;font-size:.82rem;">{{ project_lookup[issue.project_id].key }}</a>
+                    {% endif %}
+                </td>
+                <td><span class="badge badge-{{ issue.type }}">{{ issue.type }}</span></td>
+                <td><span class="badge badge-{{ issue.priority }}">{{ issue.priority }}</span></td>
+                <td>
+                    {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
+                    <span class="avatar" style="background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
+                    {% else %}
+                    <span style="color:#94a3b8;font-size:.82rem;">--</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:.82rem;color:#475569;">{{ issue.story_points or '-' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">No issues in backlog matching your filters.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

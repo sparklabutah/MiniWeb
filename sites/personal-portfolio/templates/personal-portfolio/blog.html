@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - {{ profile.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #e94560; }
+        .header .user-info { color: #94a3b8; font-size: .85rem; }
+        .header .user-info a { color: #e94560; text-decoration: none; margin-left: .5rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #fce4ec; color: #e94560; }
+
+        .page-title { max-width: 800px; margin: 1.5rem auto .5rem; padding: 0 2rem; }
+        .page-title h2 { font-size: 1.5rem; color: #1a1a2e; }
+        .page-title p { color: #64748b; font-size: .9rem; margin-top: .3rem; }
+
+        .category-filter { max-width: 800px; margin: 1rem auto; padding: 0 2rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .category-filter a { font-size: .85rem; padding: .35rem .8rem; border-radius: 1rem; text-decoration: none; border: 1.5px solid #e2e8f0; color: #334155; }
+        .category-filter a:hover { border-color: #e94560; color: #e94560; }
+        .category-filter a.active { background: #e94560; color: #fff; border-color: #e94560; }
+
+        .blog-list { max-width: 800px; margin: 1rem auto; padding: 0 2rem; }
+        .blog-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1rem; border-left: 4px solid #e94560; transition: box-shadow .2s; }
+        .blog-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+        .blog-card .meta { display: flex; gap: .8rem; align-items: center; margin-bottom: .5rem; font-size: .8rem; }
+        .blog-card .category { background: #eef2ff; color: #4338ca; padding: .15rem .5rem; border-radius: .3rem; font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+        .blog-card .date { color: #94a3b8; }
+        .blog-card h3 { margin-bottom: .4rem; }
+        .blog-card h3 a { color: #1a1a2e; text-decoration: none; font-size: 1.1rem; }
+        .blog-card h3 a:hover { color: #e94560; }
+        .blog-card .excerpt { color: #475569; font-size: .9rem; line-height: 1.5; margin-bottom: .8rem; }
+        .blog-card .tags { display: flex; gap: .3rem; flex-wrap: wrap; }
+        .blog-card .tag { background: #f1f5f9; color: #64748b; font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; }
+        .blog-card .featured-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: .7rem; font-weight: 600; padding: .1rem .4rem; border-radius: .2rem; text-transform: uppercase; }
+        .blog-card .read-link { display: inline-block; margin-top: .5rem; font-size: .85rem; color: #e94560; text-decoration: none; font-weight: 500; }
+        .blog-card .read-link:hover { text-decoration: underline; }
+
+        .no-results { max-width: 800px; margin: 2rem auto; padding: 0 2rem; text-align: center; color: #64748b; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; margin-top: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('personal-portfolio.index') }}">{{ profile.name.split()[0] }}<span>Dev</span></a></h1>
+        <div class="user-info">
+            {% if logged_in %}
+                {{ user.display_name }}
+                <a href="{{ url_for('personal-portfolio.logout') }}">Sign Out</a>
+            {% else %}
+                <a href="{{ url_for('personal-portfolio.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('personal-portfolio.index') }}">Home</a>
+        <a href="{{ url_for('personal-portfolio.projects_page') }}">Projects</a>
+        <a href="{{ url_for('personal-portfolio.resume_page') }}">Resume</a>
+        <a href="{{ url_for('personal-portfolio.blog_page') }}" class="active">Blog</a>
+        <a href="{{ url_for('personal-portfolio.index') }}#contact">Contact</a>
+    </nav>
+
+    <div class="page-title">
+        <h2>Blog</h2>
+        <p>Writings about code, hiking, photography, board games, and everything in between.</p>
+    </div>
+
+    <div class="category-filter">
+        <a href="{{ url_for('personal-portfolio.blog_page') }}" class="{% if not current_category %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="{{ url_for('personal-portfolio.blog_page', category=cat) }}" class="{% if current_category == cat %}active{% endif %}">{{ cat }}</a>
+        {% endfor %}
+    </div>
+
+    {% if blog_links %}
+    <div class="blog-list">
+        {% for post in blog_links|sort(attribute='date', reverse=True) %}
+        <div class="blog-card">
+            <div class="meta">
+                <span class="category">{{ post.category }}</span>
+                <span class="date">{{ post.date }}</span>
+                {% if post.featured %}<span class="featured-badge">Featured</span>{% endif %}
+            </div>
+            <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
+            <p class="excerpt">{{ post.excerpt }}</p>
+            <div class="tags">
+                {% for tag in post.tags %}
+                <span class="tag">#{{ tag }}</span>
+                {% endfor %}
+            </div>
+            <a href="{{ post.url }}" class="read-link">Read on MiniWeb Blogs &rarr;</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-results">
+        <p>No blog posts found in this category.</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        &copy; 2026 {{ profile.name }}. Built with Flask.
+    </div>
+</body>
+</html>

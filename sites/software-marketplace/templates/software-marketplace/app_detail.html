@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app.name }} - AppVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: #1e40af; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.5rem; }
+        .nav { display: flex; gap: 1.5rem; align-items: center; }
+        .nav a { color: #dbeafe; text-decoration: none; font-size: .95rem; }
+        .nav a:hover { color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .breadcrumb { font-size: .9rem; color: #64748b; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .app-header { display: flex; gap: 1.5rem; margin-bottom: 2rem; }
+        .app-icon-lg { width: 80px; height: 80px; background: #dbeafe; border-radius: 1rem; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+        .app-info h2 { font-size: 1.6rem; margin-bottom: .3rem; }
+        .app-info .developer { color: #3b82f6; font-size: .95rem; margin-bottom: .4rem; }
+        .app-info .meta-row { display: flex; gap: 1rem; flex-wrap: wrap; color: #64748b; font-size: .88rem; }
+        .stars { color: #f59e0b; letter-spacing: 1px; }
+        .actions { display: flex; gap: .75rem; margin-bottom: 2rem; }
+        .btn { padding: .7rem 1.5rem; border: none; border-radius: .5rem; font-size: .95rem; cursor: pointer; text-decoration: none; display: inline-block; font-weight: 600; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-outline { background: #fff; color: #2563eb; border: 1px solid #2563eb; }
+        .btn-outline:hover { background: #eff6ff; }
+        .price-badge { display: inline-block; padding: .4rem .8rem; border-radius: .4rem; font-weight: 700; font-size: 1rem; margin-bottom: 1rem; }
+        .price-badge.free { background: #ecfdf5; color: #059669; }
+        .price-badge.paid { background: #fef2f2; color: #dc2626; }
+        .section { margin-bottom: 2rem; }
+        .section h3 { font-size: 1.15rem; margin-bottom: .75rem; padding-bottom: .4rem; border-bottom: 1px solid #e2e8f0; }
+        .description { line-height: 1.7; color: #475569; font-size: .98rem; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+        .info-item { padding: .6rem 0; }
+        .info-item .label { font-size: .82rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+        .info-item .value { font-size: .95rem; margin-top: .2rem; }
+        .review-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem 1.25rem; margin-bottom: .75rem; }
+        .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; }
+        .review-author { font-weight: 600; font-size: .95rem; }
+        .review-date { color: #94a3b8; font-size: .82rem; }
+        .review-text { color: #475569; line-height: 1.6; font-size: .93rem; }
+        .review-helpful { color: #94a3b8; font-size: .82rem; margin-top: .4rem; }
+        .review-form { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.5rem; margin-top: 1rem; }
+        .review-form h4 { margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .88rem; font-weight: 600; color: #475569; margin-bottom: .3rem; }
+        .form-group select, .form-group textarea { width: 100%; padding: .6rem .75rem; border: 1px solid #cbd5e1; border-radius: .4rem; font-size: .9rem; font-family: inherit; outline: none; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
+        .related-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; text-decoration: none; color: inherit; transition: border-color .15s; }
+        .related-card:hover { border-color: #3b82f6; }
+        .related-card h4 { font-size: .9rem; margin-bottom: .25rem; }
+        .related-card .related-meta { font-size: .8rem; color: #64748b; }
+        .no-reviews { text-align: center; padding: 1.5rem; color: #94a3b8; }
+        .delete-btn { background: none; border: none; color: #dc2626; font-size: .8rem; cursor: pointer; padding: 0; }
+        .delete-btn:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AppVault</h1>
+        <div class="nav">
+            <a href="{{ url_for('software-marketplace.index') }}">Home</a>
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            {% if user %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">Logout ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}">Login</a>
+            {% endif %}
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('software-marketplace.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('software-marketplace.category_page', cat=app.category) }}">{{ app.category|replace('_', ' ')|title }}</a> &rsaquo;
+            {{ app.name }}
+        </div>
+
+        <div class="app-header">
+            <div class="app-icon-lg">{{ app.name[0] }}</div>
+            <div class="app-info">
+                <h2>{{ app.name }}</h2>
+                <div class="developer">{{ app.developer }}</div>
+                <div class="meta-row">
+                    <span class="stars">{% for i in range(app.rating|int) %}&#9733;{% endfor %}{% for i in range(5 - app.rating|int) %}&#9734;{% endfor %} {{ app.rating }}</span>
+                    <span>{{ app.reviews_count }} reviews</span>
+                    <span>{{ app.installs }} installs</span>
+                    <span>{{ app.size }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="price-badge {% if app.price == 0 %}free{% else %}paid{% endif %}">
+            {% if app.price == 0 %}Free{% else %}${{ "%.2f"|format(app.price) }}{% endif %}
+        </div>
+
+        <div class="actions">
+            {% if user %}
+                {% if is_installed %}
+                <form method="post" action="{{ url_for('software-marketplace.form_uninstall', app_id=app.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-danger">Uninstall</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('software-marketplace.form_install', app_id=app.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-primary">Install</button>
+                </form>
+                {% endif %}
+
+                {% if app.price > 0 and not in_cart %}
+                <form method="post" action="{{ url_for('software-marketplace.form_add_to_cart', app_id=app.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-outline">Add to Cart</button>
+                </form>
+                {% elif in_cart %}
+                <a href="{{ url_for('software-marketplace.cart_page') }}" class="btn btn-outline" style="background:#eff6ff;">In Cart</a>
+                {% endif %}
+
+                <form method="post" action="{{ url_for('software-marketplace.form_toggle_wishlist', app_id=app.id) }}" style="display:inline;">
+                    <button type="submit" class="btn {% if in_wishlist %}btn-danger{% else %}btn-outline{% endif %}">
+                        {% if in_wishlist %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
+                    </button>
+                </form>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="btn btn-outline">Login to Install</a>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>About this app</h3>
+            <p class="description">{{ app.description }}</p>
+        </div>
+
+        <div class="section">
+            <h3>Details</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="label">Category</div>
+                    <div class="value">{{ app.category|replace('_', ' ')|title }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Genre</div>
+                    <div class="value">{{ app.genre }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Content Rating</div>
+                    <div class="value">{{ app.content_rating }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Size</div>
+                    <div class="value">{{ app.size }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Installs</div>
+                    <div class="value">{{ app.installs }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Last Updated</div>
+                    <div class="value">{{ app.last_updated }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Reviews ({{ reviews|length }})</h3>
+            {% if reviews %}
+                {% for review in reviews %}
+                <div class="review-card">
+                    <div class="review-header">
+                        <div>
+                            <span class="review-author">{{ review.user_name }}</span>
+                            <span class="stars" style="margin-left: .5rem;">{% for i in range(review.rating) %}&#9733;{% endfor %}{% for i in range(5 - review.rating) %}&#9734;{% endfor %}</span>
+                        </div>
+                        <span class="review-date">{{ review.date }}</span>
+                    </div>
+                    <div class="review-text">{{ review.text }}</div>
+                    <div class="review-helpful">
+                        {{ review.helpful_count }} people found this helpful
+                        {% if user and review.user_id == user.id %}
+                        &middot;
+                        <button class="delete-btn" onclick="deleteReview({{ review.id }})">Delete</button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-reviews">No reviews yet. Be the first to review this app!</div>
+            {% endif %}
+
+            {% if user %}
+            <div class="review-form">
+                <h4>Write a Review</h4>
+                <form method="post" action="{{ url_for('software-marketplace.form_submit_review', app_id=app.id) }}">
+                    <div class="form-group">
+                        <label for="rating">Rating</label>
+                        <select id="rating" name="rating" required>
+                            <option value="">Select rating</option>
+                            <option value="5">5 - Excellent</option>
+                            <option value="4">4 - Good</option>
+                            <option value="3">3 - Average</option>
+                            <option value="2">2 - Poor</option>
+                            <option value="1">1 - Terrible</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="text">Your Review</label>
+                        <textarea id="text" name="text" placeholder="Share your experience with this app..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if related %}
+        <div class="section">
+            <h3>Related Apps</h3>
+            <div class="related-grid">
+                {% for rel in related %}
+                <a class="related-card" href="{{ url_for('software-marketplace.app_detail', app_id=rel.id) }}">
+                    <h4>{{ rel.name }}</h4>
+                    <div class="related-meta">
+                        <span class="stars">{% for i in range(rel.rating|int) %}&#9733;{% endfor %}{% for i in range(5 - rel.rating|int) %}&#9734;{% endfor %}</span>
+                        {{ rel.rating }}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if user %}
+    <script>
+    function deleteReview(reviewId) {
+        if (!confirm('Delete this review?')) return;
+        fetch('{{ url_for("software-marketplace.api_delete_review", review_id=0) }}'.replace('/0', '/' + reviewId), {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: {{ user.id }}})
+        }).then(r => {
+            if (r.ok) location.reload();
+            else r.json().then(d => alert(d.error || 'Failed to delete review'));
+        });
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

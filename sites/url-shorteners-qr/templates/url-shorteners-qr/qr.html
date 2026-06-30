@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code - {{ link.title }} - SnapLink</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #c4b5fd; }
+        .header-right a { color: #e0e7ff; text-decoration: none; font-size: .85rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; }
+        nav a { color: #4f46e5; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef2ff; }
+        .container { max-width: 600px; margin: 2rem auto; padding: 0 1.5rem; text-align: center; }
+        .qr-card { background: #fff; border-radius: .6rem; padding: 2.5rem; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+        .qr-card h2 { font-size: 1.2rem; margin-bottom: .5rem; }
+        .qr-card .code { font-family: monospace; font-size: 1.1rem; color: #7c3aed; background: #eef2ff; padding: .3rem .8rem; border-radius: .3rem; font-weight: 700; display: inline-block; margin-bottom: 1rem; }
+        .qr-placeholder { width: 200px; height: 200px; margin: 1.5rem auto; display: flex; align-items: center; justify-content: center; background: #fff; border: 2px solid #e2e8f0; border-radius: .5rem; }
+        .qr-placeholder svg { width: 180px; height: 180px; }
+        .short-url { font-size: 1rem; color: #4f46e5; font-weight: 600; margin: 1rem 0; }
+        .original-url { font-size: .85rem; color: #64748b; word-break: break-all; margin-bottom: 1rem; }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .4rem; font-size: .88rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; margin: .3rem; }
+        .btn-primary { background: #7c3aed; color: #fff; }
+        .btn-outline { background: transparent; border: 1.5px solid #d1d5db; color: #475569; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('url-shorteners-qr.index') }}">Snap<span>Link</span></a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+            <a href="{{ url_for('url-shorteners-qr.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('url-shorteners-qr.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('url-shorteners-qr.index') }}">Create</a>
+        <a href="{{ url_for('url-shorteners-qr.links_page') }}">My Links</a>
+    </nav>
+
+    <div class="container">
+        <div class="qr-card">
+            <h2>{{ link.title }}</h2>
+            <div class="code">{{ link.short_code }}</div>
+
+            <div class="qr-placeholder">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+                    <rect width="200" height="200" fill="white"/>
+                    <!-- Top-left finder -->
+                    <rect x="10" y="10" width="50" height="50" fill="black"/>
+                    <rect x="15" y="15" width="40" height="40" fill="white"/>
+                    <rect x="20" y="20" width="30" height="30" fill="black"/>
+                    <!-- Top-right finder -->
+                    <rect x="140" y="10" width="50" height="50" fill="black"/>
+                    <rect x="145" y="15" width="40" height="40" fill="white"/>
+                    <rect x="150" y="20" width="30" height="30" fill="black"/>
+                    <!-- Bottom-left finder -->
+                    <rect x="10" y="140" width="50" height="50" fill="black"/>
+                    <rect x="15" y="145" width="40" height="40" fill="white"/>
+                    <rect x="20" y="150" width="30" height="30" fill="black"/>
+                    <!-- Data area (decorative) -->
+                    <rect x="70" y="10" width="10" height="10" fill="black"/>
+                    <rect x="90" y="10" width="10" height="10" fill="black"/>
+                    <rect x="110" y="10" width="10" height="10" fill="black"/>
+                    <rect x="70" y="30" width="10" height="10" fill="black"/>
+                    <rect x="90" y="40" width="10" height="10" fill="black"/>
+                    <rect x="70" y="70" width="10" height="10" fill="black"/>
+                    <rect x="80" y="80" width="10" height="10" fill="black"/>
+                    <rect x="90" y="70" width="10" height="10" fill="black"/>
+                    <rect x="100" y="90" width="10" height="10" fill="black"/>
+                    <rect x="110" y="80" width="10" height="10" fill="black"/>
+                    <rect x="120" y="70" width="10" height="10" fill="black"/>
+                    <rect x="130" y="90" width="10" height="10" fill="black"/>
+                    <rect x="70" y="100" width="10" height="10" fill="black"/>
+                    <rect x="90" y="110" width="10" height="10" fill="black"/>
+                    <rect x="110" y="100" width="10" height="10" fill="black"/>
+                    <rect x="130" y="110" width="10" height="10" fill="black"/>
+                    <rect x="150" y="100" width="10" height="10" fill="black"/>
+                    <rect x="80" y="130" width="10" height="10" fill="black"/>
+                    <rect x="100" y="140" width="10" height="10" fill="black"/>
+                    <rect x="120" y="130" width="10" height="10" fill="black"/>
+                    <rect x="140" y="140" width="10" height="10" fill="black"/>
+                    <rect x="160" y="130" width="10" height="10" fill="black"/>
+                    <rect x="80" y="160" width="10" height="10" fill="black"/>
+                    <rect x="100" y="170" width="10" height="10" fill="black"/>
+                    <rect x="130" y="160" width="10" height="10" fill="black"/>
+                    <rect x="150" y="170" width="10" height="10" fill="black"/>
+                    <rect x="170" y="160" width="10" height="10" fill="black"/>
+                </svg>
+            </div>
+
+            <div class="short-url">https://snplnk.io/{{ link.short_code }}</div>
+            <div class="original-url">{{ link.original_url }}</div>
+
+            <div>
+                <a href="{{ url_for('url-shorteners-qr.link_detail', link_id=link.id) }}" class="btn btn-outline">View Stats</a>
+                <a href="{{ url_for('url-shorteners-qr.links_page') }}" class="btn btn-outline">All Links</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

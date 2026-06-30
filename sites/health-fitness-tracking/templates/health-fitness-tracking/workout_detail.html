@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Detail - FitTrack</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
+        .header { background: #0073e6; padding: .7rem 1.5rem; }
+        .header .logo { color: #fff; font-size: 1.25rem; font-weight: 700; text-decoration: none; }
+        .header .logo span { font-weight: 300; opacity: .85; }
+        nav { background: #fff; border-bottom: 1px solid #ddd; }
+        nav .nav-inner { max-width: 960px; margin: 0 auto; display: flex; }
+        nav a { display: block; padding: .75rem 1.2rem; color: #555; text-decoration: none; font-size: .85rem; font-weight: 500; border-bottom: 3px solid transparent; }
+        nav a:hover { color: #0073e6; }
+        nav a.active { color: #0073e6; border-bottom-color: #0073e6; font-weight: 600; }
+        .container { max-width: 800px; margin: 1.5rem auto; padding: 0 1rem; }
+        .back { display: inline-block; margin-bottom: 1rem; color: #0073e6; text-decoration: none; font-size: .85rem; }
+        .back:hover { text-decoration: underline; }
+        .card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .card h2 { font-size: 1.3rem; margin-bottom: .5rem; text-transform: capitalize; }
+        .card .date { color: #888; font-size: .9rem; margin-bottom: 1.5rem; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .detail-item .label { font-size: .75rem; font-weight: 600; color: #888; text-transform: uppercase; }
+        .detail-item .value { font-size: 1.1rem; font-weight: 600; margin-top: .2rem; }
+        .exercises { margin-top: 1rem; }
+        .exercises h3 { font-size: .95rem; margin-bottom: .5rem; color: #0073e6; }
+        .exercises ul { list-style: none; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .exercises li { background: #e8f0fe; padding: .3rem .8rem; border-radius: 1rem; font-size: .8rem; font-weight: 500; color: #0073e6; }
+        .notes { margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: .4rem; font-size: .9rem; color: #666; line-height: 1.5; }
+        .footer { text-align: center; padding: 2rem; color: #aaa; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('health-fitness-tracking.index') }}" class="logo">Fit<span>Track</span></a>
+    </div>
+    <nav>
+        <div class="nav-inner">
+            <a href="{{ url_for('health-fitness-tracking.index') }}">Dashboard</a>
+            <a href="{{ url_for('health-fitness-tracking.nutrition_page') }}">Food Diary</a>
+            <a href="{{ url_for('health-fitness-tracking.workouts_page') }}" class="active">Exercise</a>
+            <a href="{{ url_for('health-fitness-tracking.goals_page') }}">Goals</a>
+            <a href="{{ url_for('health-fitness-tracking.stats_page') }}">Reports</a>
+        </div>
+    </nav>
+    <div class="container">
+        <a href="{{ url_for('health-fitness-tracking.workouts_page') }}" class="back">&larr; Back to Exercise Log</a>
+        <div class="card">
+            <h2>{{ workout.type | replace('_', ' ') }}</h2>
+            <div class="date">{{ workout.date }} {% if workout.start_time %}at {{ workout.start_time }}{% endif %} {% if workout_user %}&mdash; {{ workout_user.display_name }}{% endif %}</div>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="label">Duration</div>
+                    <div class="value">{{ workout.duration_minutes }} min</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Calories Burned</div>
+                    <div class="value">{{ workout.calories_burned }}</div>
+                </div>
+                {% if workout.heart_rate_avg %}
+                <div class="detail-item">
+                    <div class="label">Avg Heart Rate</div>
+                    <div class="value">{{ workout.heart_rate_avg }} bpm</div>
+                </div>
+                {% endif %}
+                {% if workout.heart_rate_max %}
+                <div class="detail-item">
+                    <div class="label">Max Heart Rate</div>
+                    <div class="value">{{ workout.heart_rate_max }} bpm</div>
+                </div>
+                {% endif %}
+                {% if workout.distance_km %}
+                <div class="detail-item">
+                    <div class="label">Distance</div>
+                    <div class="value">{{ workout.distance_km }} km</div>
+                </div>
+                {% endif %}
+                {% if workout.elevation_gain_m %}
+                <div class="detail-item">
+                    <div class="label">Elevation Gain</div>
+                    <div class="value">{{ workout.elevation_gain_m }} m</div>
+                </div>
+                {% endif %}
+                {% if workout.pace_min_per_km %}
+                <div class="detail-item">
+                    <div class="label">Pace</div>
+                    <div class="value">{{ workout.pace_min_per_km }} min/km</div>
+                </div>
+                {% endif %}
+                {% if workout.location %}
+                <div class="detail-item">
+                    <div class="label">Location</div>
+                    <div class="value">{{ workout.location }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% if workout.exercises %}
+            <div class="exercises">
+                <h3>Exercises</h3>
+                <ul>
+                    {% for ex in workout.exercises %}
+                    <li>{{ ex }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if workout.companions %}
+            <div class="exercises">
+                <h3>Companions</h3>
+                <ul>
+                    {% for c in workout.companions %}
+                    <li>{{ c }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if workout.notes %}
+            <div class="notes">{{ workout.notes }}</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="footer">FitTrack &mdash; Your Nutrition & Fitness Dashboard</div>
+</body>
+</html>

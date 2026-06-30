@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category.name }} - LakeportWiki</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; gap: 1rem; align-items: center; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; }
+        .header-nav a:hover { color: #2563eb; }
+        .search-bar { display: flex; gap: .4rem; }
+        .search-bar input { padding: .4rem .7rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .88rem; width: 200px; }
+        .search-bar button { padding: .4rem .8rem; background: #2563eb; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        .main { max-width: 800px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .cat-header { margin-bottom: 1rem; }
+        .cat-header h2 { font-size: 1.3rem; color: #1e3a5f; margin-bottom: .3rem; }
+        .cat-header p { font-size: .9rem; color: #64748b; }
+        .cat-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+        .cat-nav a { font-size: .82rem; padding: .3rem .6rem; background: #f1f5f9; border-radius: .3rem; color: #475569; text-decoration: none; }
+        .cat-nav a:hover, .cat-nav a.active { background: #2563eb; color: #fff; }
+        .page-list { list-style: none; }
+        .page-list li { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .8rem 1rem; margin-bottom: .5rem; display: flex; justify-content: space-between; align-items: center; }
+        .page-list li a { color: #1e3a5f; text-decoration: none; font-weight: 500; }
+        .page-list li a:hover { color: #2563eb; }
+        .page-list li .meta { font-size: .78rem; color: #94a3b8; }
+        .count { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+            <a href="{{ url_for('wikis.recent_changes') }}">Recent Changes</a>
+            <a href="{{ url_for('wikis.create_page') }}">Create Article</a>
+            <form class="search-bar" action="{{ url_for('wikis.search') }}" method="get">
+                <input type="text" name="q" placeholder="Search wiki...">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="cat-header">
+            <h2>Category: {{ category.name }}</h2>
+            <p>{{ category.description }}</p>
+        </div>
+
+        <div class="cat-nav" id="category-dropdown">
+            {% for cat in categories %}
+            <a href="{{ url_for('wikis.category_page', cat_id=cat.id) }}" class="{{ 'active' if cat.id == category.id else '' }}">{{ cat.name }} ({{ cat.page_count }})</a>
+            {% endfor %}
+        </div>
+
+        <div class="count">{{ pages|length }} article{{ 's' if pages|length != 1 else '' }} in this category</div>
+
+        <ul class="page-list">
+            {% for p in pages %}
+            <li>
+                <a href="{{ url_for('wikis.wiki_page', slug=p.slug) }}">{{ p.title }}</a>
+                <span class="meta">{{ p.views }} views &middot; {{ p.updated_at[:10] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

@@ -3,19 +3,15 @@
 Reads JSON data files for documents, users, folders, and revisions.
 Supports full CRUD, sharing/permissions, starring, trash, and folder organization.
 """
-import json
 import pathlib
-import copy
 from datetime import datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
+from app.events import emit
 
+SITE = "documents"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DOCUMENTS_FILE = SITE_DIR / "data" / "documents.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-FOLDERS_FILE = SITE_DIR / "data" / "folders.json"
-REVISIONS_FILE = SITE_DIR / "data" / "revisions.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "documents",
@@ -26,57 +22,39 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-# ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-def _load_json(path):
-    if path.exists():
-        return json.loads(path.read_text())
-    return []
-
-
-def _save_json(path, data):
-    path.write_text(json.dumps(data, indent=2))
-
-
 def _load_documents():
-    return _load_json(DOCUMENTS_FILE)
+    return db.query(SITE, "documents")
 
 
 def _save_documents(docs):
-    _save_json(DOCUMENTS_FILE, docs)
+    db.save_collection(SITE, "documents", docs)
 
 
 def _load_users():
-    return _load_json(USERS_FILE)
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    _save_json(USERS_FILE, users)
+    db.save_collection(SITE, "users", users)
 
 
 def _load_folders():
-    return _load_json(FOLDERS_FILE)
+    return db.query(SITE, "folders")
 
 
 def _save_folders(folders):
-    _save_json(FOLDERS_FILE, folders)
+    db.save_collection(SITE, "folders", folders)
 
 
 def _load_revisions():
-    return _load_json(REVISIONS_FILE)
+    return db.query(SITE, "revisions")
 
 
 def _save_revisions(revisions):
-    _save_json(REVISIONS_FILE, revisions)
+    db.save_collection(SITE, "revisions", revisions)
 
 
 # ---------------------------------------------------------------------------
@@ -84,8 +62,7 @@ def _save_revisions(revisions):
 # ---------------------------------------------------------------------------
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _current_user():
@@ -510,6 +487,8 @@ def form_create_document():
     })
     _save_revisions(revisions)
 
+    emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
+
     return redirect(url_for("documents.editor", doc_id=new_id))
 
 
@@ -561,8 +540,7 @@ def api_documents():
 @blueprint.route("/api/documents/<int:doc_id>")
 def api_document(doc_id):
     """Get a single document by ID."""
-    docs = _load_documents()
-    doc = next((d for d in docs if d["id"] == doc_id), None)
+    doc = db.get_item(SITE, "documents", doc_id)
     if doc is None:
         return jsonify({"error": "Document not found"}), 404
     return jsonify(doc)
@@ -612,6 +590,8 @@ def api_create_document():
         "summary": "Created document",
     })
     _save_revisions(revisions)
+
+    emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
 
     return jsonify(new_doc), 201
 
@@ -792,8 +772,7 @@ def api_document_revisions(doc_id):
     doc = next((d for d in docs if d["id"] == doc_id), None)
     if doc is None:
         return jsonify({"error": "Document not found"}), 404
-    revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
-    revisions.sort(key=lambda r: r["timestamp"], reverse=True)
+    revisions = db.query(SITE, "revisions", where={"document_id": doc_id}, sort="-timestamp")
     return jsonify(revisions)
 
 

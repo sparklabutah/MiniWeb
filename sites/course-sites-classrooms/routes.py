@@ -4,7 +4,6 @@ Serves courses, assignments, submissions, gradebook, and discussion
 boards with role-based access (admin / instructor / student).
 Data is loaded from JSON files in data/.
 """
-import json
 import pathlib
 from datetime import datetime
 
@@ -12,11 +11,10 @@ from flask import (
     Blueprint, Response, abort, jsonify, redirect,
     render_template, request, session, url_for,
 )
+from app import db
 
+SITE = "course-sites-classrooms"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-
 blueprint = Blueprint(
     "course-sites-classrooms",
     __name__,
@@ -31,76 +29,36 @@ BP = "course-sites-classrooms"
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-def _load_json(filename):
-    path = DATA_DIR / filename
-    if path.exists():
-        return json.loads(path.read_text())
-    return []
-
-
-def _save_json(filename, data):
-    path = DATA_DIR / filename
-    path.write_text(json.dumps(data, indent=2))
-
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-
-# Cached data (immutable reference data loaded once)
-_users = None
-_courses = None
-_assignments = None
-_submissions = None
-_discussions = None
-
-
-def _ensure_loaded():
-    global _users, _courses, _assignments, _submissions, _discussions
-    if _users is None:
-        _users = _load_json("users.json")
-        _courses = _load_json("courses.json")
-        _assignments = _load_json("assignments.json")
-        _submissions = _load_json("submissions.json")
-        _discussions = _load_json("discussions.json")
-
-
 def _get_users():
-    _ensure_loaded()
-    return _users
+    return db.query(SITE, "users")
 
 
 def _get_courses():
-    _ensure_loaded()
-    return _courses
+    return db.query(SITE, "courses")
 
 
 def _get_assignments():
-    _ensure_loaded()
-    return _assignments
+    return db.query(SITE, "assignments")
 
 
 def _get_submissions():
-    return _load_json("submissions.json")
+    return db.query(SITE, "submissions")
 
 
 def _get_discussions():
-    return _load_json("discussions.json")
+    return db.query(SITE, "discussions")
 
 
 def _save_submissions(subs):
-    _save_json("submissions.json", subs)
+    db.save_collection(SITE, "submissions", subs)
 
 
 def _save_discussions(discs):
-    _save_json("discussions.json", discs)
+    db.save_collection(SITE, "discussions", discs)
 
 
 def _save_users(users):
-    global _users
-    _save_json("users.json", users)
-    _users = users
+    db.save_collection(SITE, "users", users)
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +84,7 @@ def _current_user():
     uid = session.get("user_id")
     if uid is None:
         return None
-    return _find(_get_users(), id=uid)
+    return db.get_item(SITE, "users", uid)
 
 
 def _user_courses(user):
@@ -155,14 +113,14 @@ def _weighted_average(student_id, course_id):
     Grade weights: homework 30%, exams 40%, projects 20%, quizzes 10%.
     Each category average is the mean of (score/points) for graded submissions.
     """
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         return None
     weights = course.get("grade_weights", {
         "homework": 0.30, "exams": 0.40, "projects": 0.20, "quizzes": 0.10
     })
 
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     submissions = _get_submissions()
 
     category_scores = {}  # type -> list of (score, max_points)
@@ -173,7 +131,7 @@ def _weighted_average(student_id, course_id):
                 sub = s
                 break
         if sub and sub["status"] == "graded":
-            cat = a["type"]
+            cat = a.get("type", a.get("category", ""))
             # Map singular types to weight keys
             weight_key = cat
             if cat == "exam":
@@ -185,7 +143,7 @@ def _weighted_average(student_id, course_id):
             elif cat == "homework":
                 weight_key = "homework"
             category_scores.setdefault(weight_key, []).append(
-                (sub["score"], a["points"])
+                (sub["score"], a.get("points", a.get("points_possible", 100)))
             )
 
     if not category_scores:
@@ -250,10 +208,10 @@ def index():
 @blueprint.route("/course/<int:course_id>")
 def course_detail(course_id):
     user = _current_user()
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     discussions = [d for d in _get_discussions() if d["course_id"] == course_id]
     instructor = _find(_get_users(), id=course["instructor_id"])
     students = [_find(_get_users(), id=sid) for sid in course.get("enrolled_students", [])]
@@ -267,10 +225,10 @@ def course_detail(course_id):
 @blueprint.route("/course/<int:course_id>/assignment/<int:assignment_id>")
 def assignment_detail(course_id, assignment_id):
     user = _current_user()
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignment = _find(_get_assignments(), id=assignment_id, course_id=course_id)
+    assignment = db.get_item(SITE, "assignments", assignment_id)
     if not assignment:
         abort(404)
     submissions = _get_submissions()
@@ -294,10 +252,10 @@ def assignment_detail(course_id, assignment_id):
 @blueprint.route("/course/<int:course_id>/gradebook")
 def gradebook(course_id):
     user = _current_user()
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     submissions = _get_submissions()
     students = [_find(_get_users(), id=sid) for sid in course.get("enrolled_students", [])]
     students = [s for s in students if s is not None]
@@ -321,7 +279,7 @@ def gradebook(course_id):
 @blueprint.route("/course/<int:course_id>/discussions")
 def discussions_page(course_id):
     user = _current_user()
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
     discussions = [d for d in _get_discussions() if d["course_id"] == course_id]
@@ -375,9 +333,10 @@ def form_submit_assignment(course_id, assignment_id):
     user = _current_user()
     if not user or user["role"] != "student":
         return redirect(url_for(f"{BP}.login_page"))
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course or user["id"] not in course.get("enrolled_students", []):
         abort(403)
+    content = request.form.get("content", "").strip()
     submissions = _get_submissions()
     new_id = max((s["id"] for s in submissions), default=0) + 1
     submissions.append({
@@ -386,6 +345,7 @@ def form_submit_assignment(course_id, assignment_id):
         "student_id": user["id"],
         "course_id": course_id,
         "submitted_at": datetime.now().isoformat(),
+        "content": content,
         "score": None,
         "status": "submitted",
         "feedback": ""
@@ -482,7 +442,7 @@ def form_enroll(course_id):
     enrolled = course.setdefault("enrolled_students", [])
     if student_id not in enrolled:
         enrolled.append(student_id)
-        _save_json("courses.json", courses)
+        db.save_collection(SITE, "courses", courses)
     return redirect(url_for(f"{BP}.course_detail", course_id=course_id))
 
 
@@ -502,7 +462,7 @@ def form_unenroll(course_id):
     enrolled = course.get("enrolled_students", [])
     if student_id in enrolled:
         enrolled.remove(student_id)
-        _save_json("courses.json", courses)
+        db.save_collection(SITE, "courses", courses)
     return redirect(url_for(f"{BP}.course_detail", course_id=course_id))
 
 
@@ -527,7 +487,7 @@ def api_courses():
 
 @blueprint.route("/api/courses/<int:course_id>")
 def api_course(course_id):
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
     return jsonify(course)
@@ -535,16 +495,16 @@ def api_course(course_id):
 
 @blueprint.route("/api/courses/<int:course_id>/assignments")
 def api_course_assignments(course_id):
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     atype = request.args.get("type", "").strip()
     if atype:
-        assignments = [a for a in assignments if a["type"] == atype]
+        assignments = [a for a in assignments if a.get("type", a.get("category", "")) == atype]
     return jsonify(assignments)
 
 
 @blueprint.route("/api/assignments/<int:assignment_id>")
 def api_assignment(assignment_id):
-    a = _find(_get_assignments(), id=assignment_id)
+    a = db.get_item(SITE, "assignments", assignment_id)
     if not a:
         abort(404)
     return jsonify(a)
@@ -552,7 +512,7 @@ def api_assignment(assignment_id):
 
 @blueprint.route("/api/courses/<int:course_id>/submissions")
 def api_course_submissions(course_id):
-    subs = [s for s in _get_submissions() if s.get("course_id") == course_id]
+    subs = db.query(SITE, "submissions", where={"course_id": course_id})
     student_id = request.args.get("student_id", type=int)
     if student_id:
         subs = [s for s in subs if s["student_id"] == student_id]
@@ -561,16 +521,16 @@ def api_course_submissions(course_id):
 
 @blueprint.route("/api/assignments/<int:assignment_id>/submissions")
 def api_assignment_submissions(assignment_id):
-    subs = [s for s in _get_submissions() if s["assignment_id"] == assignment_id]
+    subs = db.query(SITE, "submissions", where={"assignment_id": assignment_id})
     return jsonify(subs)
 
 
 @blueprint.route("/api/courses/<int:course_id>/gradebook")
 def api_gradebook(course_id):
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     submissions = _get_submissions()
     students = [_find(_get_users(), id=sid) for sid in course.get("enrolled_students", [])]
     students = [s for s in students if s is not None]
@@ -590,15 +550,15 @@ def api_gradebook(course_id):
             if sub:
                 row["scores"][str(a["id"])] = {
                     "score": sub["score"],
-                    "max_points": a["points"],
-                    "pct": round(sub["score"] / a["points"] * 100, 1) if sub["score"] is not None else None
+                    "max_points": a.get("points", a.get("points_possible", 100)),
+                    "pct": round(sub["score"] / a.get("points", a.get("points_possible", 100)) * 100, 1) if sub["score"] is not None else None
                 }
         rows.append(row)
     return jsonify({
         "course_id": course_id,
         "course_title": course["title"],
         "grade_weights": course.get("grade_weights", {}),
-        "assignments": [{"id": a["id"], "title": a["title"], "type": a["type"], "points": a["points"]}
+        "assignments": [{"id": a["id"], "title": a["title"], "type": a.get("type", a.get("category", "")), "points": a.get("points", a.get("points_possible", 100))}
                         for a in assignments],
         "students": rows
     })
@@ -606,7 +566,7 @@ def api_gradebook(course_id):
 
 @blueprint.route("/api/courses/<int:course_id>/grades/<int:student_id>")
 def api_student_grade(course_id, student_id):
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
     avg = _weighted_average(student_id, course_id)
@@ -620,13 +580,13 @@ def api_student_grade(course_id, student_id):
 
 @blueprint.route("/api/courses/<int:course_id>/discussions")
 def api_course_discussions(course_id):
-    discussions = [d for d in _get_discussions() if d["course_id"] == course_id]
+    discussions = db.query(SITE, "discussions", where={"course_id": course_id})
     return jsonify(discussions)
 
 
 @blueprint.route("/api/discussions/<int:disc_id>")
 def api_discussion(disc_id):
-    disc = _find(_get_discussions(), id=disc_id)
+    disc = db.get_item(SITE, "discussions", disc_id)
     if not disc:
         abort(404)
     return jsonify(disc)
@@ -644,7 +604,7 @@ def api_users():
 
 @blueprint.route("/api/users/<int:user_id>")
 def api_user(user_id):
-    user = _find(_get_users(), id=user_id)
+    user = db.get_item(SITE, "users", user_id)
     if not user:
         abort(404)
     return jsonify({k: v for k, v in user.items() if k != "password"})
@@ -685,7 +645,7 @@ def api_enroll(course_id):
     if student_id in enrolled:
         return jsonify({"action": "already_enrolled", "student_id": student_id})
     enrolled.append(student_id)
-    _save_json("courses.json", courses)
+    db.save_collection(SITE, "courses", courses)
     return jsonify({"action": "enrolled", "student_id": student_id,
                     "total_enrolled": len(enrolled)})
 
@@ -704,7 +664,7 @@ def api_unenroll(course_id):
     if student_id not in enrolled:
         return jsonify({"action": "not_enrolled", "student_id": student_id})
     enrolled.remove(student_id)
-    _save_json("courses.json", courses)
+    db.save_collection(SITE, "courses", courses)
     return jsonify({"action": "unenrolled", "student_id": student_id,
                     "total_enrolled": len(enrolled)})
 
@@ -715,6 +675,7 @@ def api_submit_assignment(course_id, assignment_id):
     student_id = data.get("student_id")
     if student_id is None:
         return jsonify({"error": "student_id required"}), 400
+    content = data.get("content", "")
     submissions = _get_submissions()
     new_id = max((s["id"] for s in submissions), default=0) + 1
     new_sub = {
@@ -723,6 +684,7 @@ def api_submit_assignment(course_id, assignment_id):
         "student_id": student_id,
         "course_id": course_id,
         "submitted_at": datetime.now().isoformat(),
+        "content": content,
         "score": None,
         "status": "submitted",
         "feedback": ""
@@ -803,29 +765,24 @@ def api_reply_discussion(disc_id):
 
 @blueprint.route("/api/stats")
 def api_stats():
-    courses = _get_courses()
-    users = _get_users()
-    assignments = _get_assignments()
-    submissions = _get_submissions()
-    discussions = _get_discussions()
     return jsonify({
-        "total_courses": len(courses),
-        "total_users": len(users),
-        "total_assignments": len(assignments),
-        "total_submissions": len(submissions),
-        "total_discussions": len(discussions),
-        "instructors": len([u for u in users if u["role"] == "instructor"]),
-        "students": len([u for u in users if u["role"] == "student"]),
-        "departments": list(set(c.get("department", "") for c in courses)),
+        "total_courses": db.count(SITE, "courses"),
+        "total_users": db.count(SITE, "users"),
+        "total_assignments": db.count(SITE, "assignments"),
+        "total_submissions": db.count(SITE, "submissions"),
+        "total_discussions": db.count(SITE, "discussions"),
+        "instructors": db.count(SITE, "users", where={"role": "instructor"}),
+        "students": db.count(SITE, "users", where={"role": "student"}),
+        "departments": list(set(c.get("department", "") for c in db.query(SITE, "courses"))),
     })
 
 
 @blueprint.route("/api/courses/<int:course_id>/stats")
 def api_course_stats(course_id):
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     submissions = [s for s in _get_submissions() if s.get("course_id") == course_id]
     graded = [s for s in submissions if s["status"] == "graded" and s["score"] is not None]
     enrolled = len(course.get("enrolled_students", []))
@@ -852,10 +809,10 @@ def api_course_stats(course_id):
 @blueprint.route("/api/export/gradebook/<int:course_id>")
 def api_export_gradebook(course_id):
     """Export gradebook as CSV."""
-    course = _find(_get_courses(), id=course_id)
+    course = db.get_item(SITE, "courses", course_id)
     if not course:
         abort(404)
-    assignments = _filter(_get_assignments(), course_id=course_id)
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
     submissions = _get_submissions()
     students = [_find(_get_users(), id=sid) for sid in course.get("enrolled_students", [])]
     students = [s for s in students if s is not None]
@@ -878,4 +835,4 @@ def api_export_gradebook(course_id):
         lines.append(",".join(row))
 
     return Response("\n".join(lines), mimetype="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename=gradebook_{course['code']}.csv"})
+                    headers={"Content-Disposition": f"attachment; filename=gradebook_{course.get('code', f'course_{course_id}')}.csv"})

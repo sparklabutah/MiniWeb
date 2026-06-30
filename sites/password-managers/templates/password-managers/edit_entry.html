@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit {{ entry.title }} - VaultGuard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #6c8cff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { color: #c9cdd8; background: #1e2235; }
+        nav .spacer { flex: 1; }
+        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
+        nav .btn-logout { color: #f87171; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
+        .breadcrumb a { color: #6c8cff; text-decoration: none; }
+        h2 { color: #e1e4e8; font-size: 1.3rem; margin-bottom: 1.5rem; }
+        .form-card { background: #161822; border: 1px solid #2d3348; border-radius: .6rem; padding: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #c9cdd8; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: .6rem .8rem; background: #1e2235; border: 1.5px solid #2d3348;
+            border-radius: .4rem; font-size: .9rem; color: #e1e4e8;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #6c8cff; outline: none;
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: flex; gap: 1rem; }
+        .form-row .form-group { flex: 1; }
+        .checkbox-group { display: flex; align-items: center; gap: .5rem; }
+        .checkbox-group input[type="checkbox"] { accent-color: #6c8cff; width: 16px; height: 16px; }
+        .btn-submit { width: 100%; padding: .8rem; background: #6c8cff; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
+        .btn-submit:hover { background: #5a7af0; }
+        .hint { font-size: .75rem; color: #6b7280; margin-top: .2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
+        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
+        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
+        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('password-managers.index') }}">Vaults</a> &rsaquo;
+            <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}">{{ entry.title }}</a> &rsaquo; Edit
+        </div>
+
+        <h2>Edit Entry</h2>
+
+        <form class="form-card" method="post" action="{{ url_for('password-managers.edit_entry_submit', entry_id=entry.id) }}">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" value="{{ entry.title }}" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username / Email</label>
+                    <input type="text" name="username" id="username" value="{{ entry.username }}">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="text" name="password" id="password" placeholder="Leave blank to keep current">
+                    <div class="hint">Leave blank to keep the existing password.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="url">Website URL</label>
+                <input type="text" name="url" id="url" value="{{ entry.url }}">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select name="category" id="category">
+                        <option value="login" {% if entry.category == 'login' %}selected{% endif %}>Login</option>
+                        <option value="secure_note" {% if entry.category == 'secure_note' %}selected{% endif %}>Secure Note</option>
+                        <option value="credit_card" {% if entry.category == 'credit_card' %}selected{% endif %}>Credit Card</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="strength">Strength</label>
+                    <select name="strength" id="strength">
+                        <option value="excellent" {% if entry.strength == 'excellent' %}selected{% endif %}>Excellent</option>
+                        <option value="strong" {% if entry.strength == 'strong' %}selected{% endif %}>Strong</option>
+                        <option value="fair" {% if entry.strength == 'fair' %}selected{% endif %}>Fair</option>
+                        <option value="weak" {% if entry.strength == 'weak' %}selected{% endif %}>Weak</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="tags">Tags (comma-separated)</label>
+                <input type="text" name="tags" id="tags" value="{{ entry.tags|join(', ') }}">
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes</label>
+                <textarea name="notes" id="notes">{{ entry.notes }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" name="favorite" id="favorite" {% if entry.favorite %}checked{% endif %}>
+                    <label for="favorite">Mark as favorite</label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">Save Changes</button>
+        </form>
+    </div>
+</body>
+</html>

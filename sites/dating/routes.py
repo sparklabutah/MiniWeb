@@ -3,17 +3,15 @@
 Data interpreter: loads JSON data files, respects config, provides matching
 and messaging logic through Flask routes.
 """
-import json
 import pathlib
 from datetime import datetime
 
 from flask import (Blueprint, abort, jsonify, redirect, render_template,
                    request, session, url_for)
+from app import db
 
+SITE = "dating"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-
 blueprint = Blueprint(
     "dating",
     __name__,
@@ -23,65 +21,43 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-def _load_json(filename):
-    fpath = DATA_DIR / filename
-    if fpath.exists():
-        return json.loads(fpath.read_text())
-    return []
-
-
-def _save_json(filename, data):
-    fpath = DATA_DIR / filename
-    fpath.write_text(json.dumps(data, indent=2))
-
-
 def _load_users():
-    return _load_json("users.json")
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    _save_json("users.json", users)
+    db.save_collection(SITE, "users", users)
 
 
 def _load_matches():
-    return _load_json("matches.json")
+    return db.query(SITE, "matches")
 
 
 def _save_matches(matches):
-    _save_json("matches.json", matches)
+    db.save_collection(SITE, "matches", matches)
 
 
 def _load_messages():
-    return _load_json("messages.json")
+    return db.query(SITE, "messages")
 
 
 def _save_messages(messages):
-    _save_json("messages.json", messages)
+    db.save_collection(SITE, "messages", messages)
 
 
 def _load_likes():
-    return _load_json("likes.json")
+    return db.query(SITE, "likes")
 
 
 def _save_likes(likes):
-    _save_json("likes.json", likes)
+    db.save_collection(SITE, "likes", likes)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _get_current_user():
@@ -167,24 +143,28 @@ def index():
 @blueprint.route("/profiles")
 def profiles_list():
     """Paginated text-based list of all profiles. Supports filtering."""
-    users = _load_users()
     user = _get_current_user()
 
-    # Filtering
+    # Build SQL filter
+    where = {}
     gender = request.args.get("gender")
     if gender:
-        users = [u for u in users if u.get("gender", "").lower() == gender.lower()]
+        where["gender"] = gender
 
     looking_for = request.args.get("looking_for")
     if looking_for:
-        users = [u for u in users if u.get("looking_for", "").lower() == looking_for.lower()]
+        where["looking_for"] = looking_for
 
     interest = request.args.get("interest")
-    if interest:
-        users = [u for u in users if interest.lower() in [i.lower() for i in u.get("interests", [])]]
-
     min_age = request.args.get("min_age", type=int)
     max_age = request.args.get("max_age", type=int)
+
+    # For simple exact-match filters, use db.query; for range/list filters, load filtered set
+    users = db.query(SITE, "users", where=where if where else None)
+
+    # Apply Python-side filters for complex conditions (interest in list, age range)
+    if interest:
+        users = [u for u in users if interest.lower() in [i.lower() for i in u.get("interests", [])]]
     if min_age is not None:
         users = [u for u in users if u.get("age", 0) >= min_age]
     if max_age is not None:
@@ -405,6 +385,8 @@ def form_send_message(match_id):
     if not content:
         return redirect(url_for("dating.conversation", match_id=match_id))
 
+    other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
+
     messages = _load_messages()
     new_id = max((m["id"] for m in messages), default=0) + 1
     messages.append({
@@ -414,6 +396,13 @@ def form_send_message(match_id):
         "read": False
     })
     _save_messages(messages)
+
+    try:
+        from app.bridges import on_message
+        on_message(from_user_id=user["id"], to_user_id=other_id, text=content, source_site="Dating")
+    except Exception:
+        pass
+
     return redirect(url_for("dating.conversation", match_id=match_id))
 
 
@@ -643,6 +632,8 @@ def api_send_message():
     if user["id"] not in (match["user1_id"], match["user2_id"]):
         return jsonify({"error": "Forbidden"}), 403
 
+    other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
+
     messages = _load_messages()
     new_id = max((m["id"] for m in messages), default=0) + 1
     new_msg = {
@@ -653,6 +644,13 @@ def api_send_message():
     }
     messages.append(new_msg)
     _save_messages(messages)
+
+    try:
+        from app.bridges import on_message
+        on_message(from_user_id=user["id"], to_user_id=other_id, text=content, source_site="Dating")
+    except Exception:
+        pass
+
     return jsonify(new_msg)
 
 

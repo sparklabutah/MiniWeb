@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ entry.title }} - VaultGuard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #6c8cff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { color: #c9cdd8; background: #1e2235; }
+        nav .spacer { flex: 1; }
+        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
+        nav .btn-logout { color: #f87171; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
+        .breadcrumb a { color: #6c8cff; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .entry-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+        .entry-header .fav-star { font-size: 1.5rem; color: {% if entry.favorite %}#fbbf24{% else %}#4b5563{% endif %}; }
+        .entry-header .title-area h2 { font-size: 1.4rem; color: #e1e4e8; margin-bottom: .2rem; }
+        .entry-header .title-area .entry-url a { color: #6c8cff; font-size: .9rem; text-decoration: none; }
+        .entry-header .title-area .entry-url a:hover { text-decoration: underline; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        @media (max-width: 700px) { .detail-grid { grid-template-columns: 1fr; } }
+        .detail-card { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1.3rem 1.5rem; }
+        .detail-card h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .05rem; color: #8b92a5; margin-bottom: 1rem; font-weight: 700; }
+        .field { margin-bottom: 1rem; }
+        .field:last-child { margin-bottom: 0; }
+        .field-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04rem; color: #6b7280; margin-bottom: .2rem; font-weight: 600; }
+        .field-value { font-size: .95rem; color: #e1e4e8; word-break: break-all; }
+        .field-value.password { font-family: 'SF Mono', 'Fira Code', monospace; background: #1e2235; padding: .4rem .7rem; border-radius: .3rem; display: inline-block; letter-spacing: .05rem; }
+        .strength-badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+        .strength-excellent { background: #065f46; color: #6ee7b7; }
+        .strength-strong { background: #1e3a5f; color: #93c5fd; }
+        .strength-fair { background: #78350f; color: #fcd34d; }
+        .strength-weak { background: #7f1d1d; color: #fca5a5; }
+        .tags-list { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .tag { background: #1e2235; color: #8b92a5; padding: .2rem .5rem; border-radius: .2rem; font-size: .75rem; }
+        .notes-text { font-size: .9rem; color: #c9cdd8; line-height: 1.5; white-space: pre-wrap; }
+        .card-info { margin-bottom: 1rem; }
+        .card-info .card-brand { font-size: 1rem; font-weight: 600; color: #fbbf24; }
+        .card-info .card-number { font-family: 'SF Mono', monospace; font-size: 1.1rem; color: #e1e4e8; letter-spacing: .1rem; margin: .3rem 0; }
+        .card-info .card-exp { font-size: .85rem; color: #8b92a5; }
+        .audit-section { margin-top: 2rem; }
+        .audit-section h3 { font-size: 1rem; color: #c9cdd8; margin-bottom: .8rem; }
+        .audit-table { width: 100%; border-collapse: collapse; }
+        .audit-table th { text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .04rem; color: #6b7280; padding: .5rem .8rem; border-bottom: 1px solid #2d3348; }
+        .audit-table td { font-size: .85rem; padding: .6rem .8rem; border-bottom: 1px solid #1e2235; color: #c9cdd8; }
+        .audit-table tr:hover td { background: #1a1d29; }
+        .action-badge { padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+        .action-view_password { background: #1e2235; color: #6c8cff; }
+        .action-autofill { background: #0d3028; color: #34d399; }
+        .action-edit_entry { background: #2d1f0f; color: #fbbf24; }
+        .action-login_success { background: #065f46; color: #6ee7b7; }
+        .action-login_failed { background: #7f1d1d; color: #fca5a5; }
+        .action-share_vault { background: #1e1e3f; color: #a78bfa; }
+        .timestamps { font-size: .8rem; color: #6b7280; margin-top: 1rem; }
+        .timestamps span { margin-right: 1.5rem; }
+        .reveal-btn { background: #6c8cff; color: #fff; border: none; padding: .35rem .8rem; border-radius: .3rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+        .reveal-btn:hover { background: #5a7ae6; }
+        .reveal-btn:disabled { background: #3a3f52; color: #6b7280; cursor: default; }
+        .pin-input { width: 120px; padding: .4rem .6rem; font-size: 1.1rem; text-align: center; letter-spacing: 4px; font-family: 'SF Mono', 'Fira Code', monospace; background: #1e2235; color: #e1e4e8; border: 1px solid #3a3f52; border-radius: .3rem; outline: none; }
+        .pin-input:focus { border-color: #6c8cff; }
+        .pw-revealed { font-family: 'SF Mono', 'Fira Code', monospace; background: #0d3028; border: 1px solid #065f46; color: #6ee7b7; padding: .4rem .7rem; border-radius: .3rem; display: inline-block; letter-spacing: .05rem; font-size: .95rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
+        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
+        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
+        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('password-managers.index') }}">Vaults</a> &rsaquo;
+            {% if vault %}
+            <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}">{{ vault.name }}</a> &rsaquo;
+            {% endif %}
+            {{ entry.title }}
+        </div>
+
+        <div class="entry-header">
+            <span class="fav-star">{% if entry.favorite %}&#9733;{% else %}&#9734;{% endif %}</span>
+            <div class="title-area">
+                <h2>{{ entry.title }}</h2>
+                {% if entry.url %}
+                <div class="entry-url"><a href="{{ entry.url }}" target="_blank">{{ entry.url }}</a></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="detail-grid">
+            <div class="detail-card">
+                <h3>Credentials</h3>
+                {% if entry.category == 'credit_card' and entry.card_details %}
+                <div class="card-info">
+                    <div class="card-brand">{{ entry.card_details.brand }}</div>
+                    <div class="card-number">**** **** **** {{ entry.card_details.card_number_last4 }}</div>
+                    <div class="card-exp">{{ entry.card_details.cardholder_name }} &middot; Exp: {{ entry.card_details.expiration }}</div>
+                </div>
+                {% if entry.card_details.billing_address %}
+                <div class="field">
+                    <div class="field-label">Billing Address</div>
+                    <div class="field-value">{{ entry.card_details.billing_address }}</div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="field">
+                    <div class="field-label">Username</div>
+                    <div class="field-value">{{ entry.username or '(none)' }}</div>
+                </div>
+                <div class="field">
+                    <div class="field-label">Password</div>
+                    <div id="pw-display">
+                        <div class="field-value password" id="pw-masked">{{ masked_password or '(none)' }}</div>
+                        <div id="pw-reveal-flow" style="margin-top:.5rem">
+                            <button id="btn-request-pin" class="reveal-btn" onclick="requestRevealPin()">Reveal</button>
+                            <div id="pin-input-area" style="display:none;margin-top:.5rem">
+                                <div style="font-size:.75rem;color:#8b92a5;margin-bottom:.3rem">Enter the PIN sent to your instant messages</div>
+                                <div style="display:flex;gap:.4rem;align-items:center">
+                                    <input type="text" id="pin-code" class="pin-input" maxlength="6" placeholder="000000" autocomplete="off">
+                                    <button class="reveal-btn" onclick="confirmRevealPin()">Verify</button>
+                                </div>
+                                <div id="pin-error" style="color:#f87171;font-size:.75rem;margin-top:.3rem;display:none"></div>
+                                <div id="pin-hint" style="color:#6c8cff;font-size:.7rem;margin-top:.3rem">Check your Instant Messaging inbox for the code.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if entry.strength %}
+                <div class="field">
+                    <div class="field-label">Strength</div>
+                    <span class="strength-badge strength-{{ entry.strength }}">{{ entry.strength }}</span>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="detail-card">
+                <h3>Details</h3>
+                <div class="field">
+                    <div class="field-label">Category</div>
+                    <div class="field-value">{{ entry.category|replace('_', ' ')|title }}</div>
+                </div>
+                {% if vault %}
+                <div class="field">
+                    <div class="field-label">Vault</div>
+                    <div class="field-value">{{ vault.name }}</div>
+                </div>
+                {% endif %}
+                <div class="field">
+                    <div class="field-label">Tags</div>
+                    <div class="tags-list">
+                        {% for tag in entry.tags %}
+                        <span class="tag">{{ tag }}</span>
+                        {% endfor %}
+                        {% if not entry.tags %}
+                        <span class="field-value" style="color: #6b7280;">No tags</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if entry.notes %}
+        <div class="detail-card" style="margin-bottom: 2rem;">
+            <h3>Notes</h3>
+            <div class="notes-text">{{ entry.notes }}</div>
+        </div>
+        {% endif %}
+
+        <div class="timestamps">
+            <span>Created: {{ entry.created_at[:10] if entry.created_at else 'N/A' }}</span>
+            <span>Updated: {{ entry.updated_at[:10] if entry.updated_at else 'N/A' }}</span>
+            <span>Last used: {{ entry.last_used[:10] if entry.last_used else 'N/A' }}</span>
+        </div>
+
+        {% if audit_log %}
+        <div class="audit-section">
+            <h3>Recent Activity for This Entry</h3>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Device</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in audit_log %}
+                    <tr>
+                        <td>{{ event.timestamp[:16]|replace('T', ' ') }}</td>
+                        <td><span class="action-badge action-{{ event.action }}">{{ event.action|replace('_', ' ') }}</span></td>
+                        <td>{{ event.device }}</td>
+                        <td>{{ event.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    var entryId = {{ entry.id | tojson }};
+
+    function requestRevealPin() {
+        var btn = document.getElementById('btn-request-pin');
+        btn.disabled = true;
+        btn.textContent = 'Sending PIN...';
+
+        fetch('{{ url_for("password-managers.api_request_reveal", entry_id=entry.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.textContent = 'PIN Sent';
+            document.getElementById('pin-input-area').style.display = 'block';
+            document.getElementById('pin-code').focus();
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Reveal';
+        });
+    }
+
+    function confirmRevealPin() {
+        var pin = document.getElementById('pin-code').value.trim();
+        if (!pin) return;
+        var errEl = document.getElementById('pin-error');
+        errEl.style.display = 'none';
+
+        fetch('{{ url_for("password-managers.api_confirm_reveal", entry_id=entry.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pin: pin})
+        })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (!res.ok) {
+                errEl.textContent = res.data.error || 'Invalid PIN';
+                errEl.style.display = 'block';
+                return;
+            }
+            // Show the revealed password
+            var masked = document.getElementById('pw-masked');
+            masked.className = 'pw-revealed';
+            masked.textContent = res.data.password;
+            document.getElementById('pw-reveal-flow').style.display = 'none';
+        })
+        .catch(function() {
+            errEl.textContent = 'Request failed';
+            errEl.style.display = 'block';
+        });
+    }
+
+    // Allow Enter key in PIN input
+    var pinInput = document.getElementById('pin-code');
+    if (pinInput) {
+        pinInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmRevealPin(); }
+        });
+    }
+    </script>
+</body>
+</html>

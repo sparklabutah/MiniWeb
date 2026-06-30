@@ -3,14 +3,784 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>FormFlow - My Forms</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --purple-700: #512da8;
+            --purple-600: #5e35b1;
+            --purple-500: #673ab7;
+            --purple-400: #7e57c2;
+            --purple-100: #ede7f6;
+            --purple-50:  #f3e5f5;
+            --gray-900: #202124;
+            --gray-700: #3c4043;
+            --gray-600: #5f6368;
+            --gray-400: #9aa0a6;
+            --gray-200: #dadce0;
+            --gray-100: #f1f3f4;
+            --gray-50:  #f8f9fa;
+            --white: #ffffff;
+            --green-bg: #e6f4ea; --green-text: #137333;
+            --amber-bg: #fef7e0; --amber-text: #b06000;
+            --red-bg: #fce8e6; --red-text: #c5221f;
+            --blue-bg: #e8f0fe; --blue-text: #1967d2;
+            --shadow-sm: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            --shadow-md: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+            --shadow-lg: 0 4px 8px 0 rgba(60,64,67,.3), 0 8px 16px 4px rgba(60,64,67,.15);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            min-height: 100vh;
+        }
+
+        /* ── Top navigation bar ─────────────────────────────────── */
+        .topbar {
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 1rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            text-decoration: none;
+            margin-right: 1.5rem;
+            flex-shrink: 0;
+        }
+        .topbar-brand .brand-icon {
+            width: 40px; height: 40px;
+            background: var(--purple-500);
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .topbar-brand .brand-icon svg { width: 24px; height: 24px; fill: var(--white); }
+        .topbar-brand .brand-text {
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 400;
+            color: var(--gray-700);
+            letter-spacing: -.01em;
+        }
+        .topbar-search {
+            flex: 1;
+            max-width: 720px;
+            position: relative;
+        }
+        .topbar-search input {
+            width: 100%;
+            height: 46px;
+            padding: 0 1rem 0 2.8rem;
+            background: var(--gray-100);
+            border: none;
+            border-radius: 24px;
+            font-size: .95rem;
+            color: var(--gray-900);
+            outline: none;
+            transition: background .2s, box-shadow .2s;
+        }
+        .topbar-search input::placeholder { color: var(--gray-600); }
+        .topbar-search input:focus {
+            background: var(--white);
+            box-shadow: var(--shadow-md);
+        }
+        .topbar-search .search-icon {
+            position: absolute;
+            left: .9rem; top: 50%;
+            transform: translateY(-50%);
+            width: 20px; height: 20px;
+            fill: var(--gray-600);
+            pointer-events: none;
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin-left: auto;
+            padding-left: 1rem;
+            flex-shrink: 0;
+        }
+        .topbar-link {
+            font-size: .875rem;
+            font-weight: 500;
+            color: var(--gray-600);
+            text-decoration: none;
+            padding: .5rem .75rem;
+            border-radius: 20px;
+            transition: background .15s, color .15s;
+            white-space: nowrap;
+        }
+        .topbar-link:hover { background: var(--gray-100); color: var(--gray-900); }
+        .topbar-link.active-link { color: var(--purple-500); }
+        .user-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--purple-400);
+            color: var(--white);
+            display: flex; align-items: center; justify-content: center;
+            font-size: .8rem; font-weight: 500;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .user-avatar:hover { box-shadow: 0 0 0 3px var(--purple-100); }
+
+        /* ── Quick-start banner (Google Forms style) ────────── */
+        .quickstart {
+            background: var(--gray-100);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1.25rem 0 1.5rem;
+        }
+        .quickstart-inner {
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+        .quickstart h2 {
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            font-size: .875rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: .85rem;
+            letter-spacing: .01em;
+        }
+        .quickstart-cards {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding-bottom: .25rem;
+        }
+        .qs-card {
+            flex-shrink: 0;
+            width: 160px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .qs-card-thumb {
+            width: 160px;
+            height: 120px;
+            border-radius: var(--radius);
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color .15s, box-shadow .15s;
+            margin-bottom: .5rem;
+            overflow: hidden;
+        }
+        .qs-card:hover .qs-card-thumb {
+            border-color: var(--purple-400);
+            box-shadow: 0 2px 6px rgba(103,58,183,.15);
+        }
+        .qs-card-thumb.blank {
+            background: var(--white);
+        }
+        .qs-card-thumb.blank svg {
+            width: 56px; height: 56px; fill: var(--purple-400); opacity: .7;
+        }
+        .qs-card-thumb.template {
+            background: linear-gradient(135deg, var(--purple-100) 0%, var(--purple-50) 100%);
+            padding: .75rem;
+        }
+        .qs-card-thumb.template .tmpl-preview {
+            width: 100%;
+            height: 100%;
+            background: var(--white);
+            border-radius: 4px;
+            border-top: 3px solid var(--purple-500);
+            padding: .5rem;
+        }
+        .qs-card-thumb.template .tmpl-line {
+            height: 5px;
+            border-radius: 3px;
+            margin-bottom: 5px;
+        }
+        .qs-card-thumb.template .tmpl-line.title { width: 65%; background: var(--gray-700); }
+        .qs-card-thumb.template .tmpl-line.sub   { width: 90%; background: var(--gray-200); }
+        .qs-card-thumb.template .tmpl-line.field  { width: 100%; background: var(--gray-100); height: 8px; margin-top: 6px; }
+        .qs-card-label {
+            font-size: .8rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            text-align: center;
+        }
+
+        /* ── Main content area ──────────────────────────────── */
+        .main {
+            max-width: 1060px;
+            margin: 0 auto;
+            padding: 1.25rem 1.5rem 3rem;
+        }
+
+        /* ── Toolbar row ────────────────────────────────────── */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            gap: .75rem;
+            flex-wrap: wrap;
+        }
+        .toolbar h2 {
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+        .toolbar-controls {
+            display: flex;
+            gap: .5rem;
+            align-items: center;
+        }
+        .view-toggle {
+            display: flex;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .view-toggle button {
+            background: var(--white);
+            border: none;
+            padding: .45rem .65rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .15s;
+        }
+        .view-toggle button:not(:last-child) { border-right: 1px solid var(--gray-200); }
+        .view-toggle button:hover { background: var(--gray-100); }
+        .view-toggle button.active { background: var(--purple-100); }
+        .view-toggle button svg { width: 18px; height: 18px; fill: var(--gray-600); }
+        .view-toggle button.active svg { fill: var(--purple-500); }
+        .sort-btn {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: .45rem .8rem;
+            font-size: .82rem;
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex; align-items: center; gap: .35rem;
+            transition: background .15s;
+        }
+        .sort-btn:hover { background: var(--gray-100); }
+        .sort-btn svg { width: 16px; height: 16px; fill: var(--gray-600); }
+
+        /* ── Filter tabs ────────────────────────────────────── */
+        .filter-tabs {
+            display: flex;
+            gap: .25rem;
+            margin-bottom: 1.25rem;
+            border-bottom: 2px solid var(--gray-200);
+            padding-bottom: 0;
+        }
+        .filter-tab {
+            background: none;
+            border: none;
+            padding: .65rem 1.1rem;
+            font-size: .875rem;
+            font-weight: 500;
+            color: var(--gray-600);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: color .15s, border-color .15s;
+            border-radius: 4px 4px 0 0;
+        }
+        .filter-tab:hover { color: var(--purple-500); background: var(--purple-50); }
+        .filter-tab.active {
+            color: var(--purple-500);
+            border-bottom-color: var(--purple-500);
+        }
+        .filter-tab .tab-count {
+            display: inline-block;
+            min-width: 18px;
+            height: 18px;
+            line-height: 18px;
+            padding: 0 5px;
+            border-radius: 9px;
+            background: var(--gray-200);
+            color: var(--gray-600);
+            font-size: .7rem;
+            font-weight: 500;
+            text-align: center;
+            margin-left: .35rem;
+            vertical-align: middle;
+        }
+        .filter-tab.active .tab-count {
+            background: var(--purple-100);
+            color: var(--purple-500);
+        }
+
+        /* ── Form cards — grid view ─────────────────────────── */
+        .forms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .form-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+            transition: box-shadow .2s, border-color .2s;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+        .form-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--purple-400);
+        }
+        .form-card-banner {
+            height: 8px;
+            flex-shrink: 0;
+        }
+        .form-card-banner.active  { background: linear-gradient(90deg, #34a853, #4caf50); }
+        .form-card-banner.draft   { background: linear-gradient(90deg, #f9ab00, #fbbc04); }
+        .form-card-banner.closed  { background: linear-gradient(90deg, #ea4335, #e57373); }
+        .form-card-body {
+            padding: 1rem 1.25rem .85rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-card-title {
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--gray-900);
+            line-height: 1.35;
+            margin-bottom: .3rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .form-card-desc {
+            font-size: .82rem;
+            color: var(--gray-600);
+            line-height: 1.45;
+            margin-bottom: .75rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            flex: 1;
+        }
+        .form-card-footer {
+            padding: .65rem 1.25rem;
+            border-top: 1px solid var(--gray-100);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--gray-50);
+        }
+        .form-card-meta {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            font-size: .78rem;
+            color: var(--gray-600);
+        }
+        .form-card-meta .meta-item {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+        }
+        .form-card-meta svg {
+            width: 14px; height: 14px;
+            fill: var(--gray-400);
+        }
+        .form-card-actions {
+            display: flex;
+            gap: .35rem;
+            align-items: center;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: .2rem .6rem;
+            border-radius: 100px;
+            font-size: .7rem;
+            font-weight: 500;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+        }
+        .badge.active  { background: var(--green-bg);  color: var(--green-text); }
+        .badge.draft   { background: var(--amber-bg);  color: var(--amber-text); }
+        .badge.closed  { background: var(--red-bg);    color: var(--red-text); }
+        .icon-btn {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .15s;
+        }
+        .icon-btn:hover { background: var(--gray-100); }
+        .icon-btn svg { width: 18px; height: 18px; fill: var(--gray-600); }
+
+        /* ── Form cards — list view ─────────────────────────── */
+        .forms-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .forms-list .form-card {
+            border-radius: 0;
+            flex-direction: row;
+            align-items: center;
+            border-bottom: none;
+        }
+        .forms-list .form-card:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+        .forms-list .form-card:last-child { border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-bottom: 1px solid var(--gray-200); }
+        .forms-list .form-card:only-child { border-radius: var(--radius-lg); border-bottom: 1px solid var(--gray-200); }
+        .forms-list .form-card-banner {
+            width: 6px; height: auto; align-self: stretch; min-height: 72px;
+        }
+        .forms-list .form-card-body {
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
+            padding: .85rem 1rem;
+            flex: 1;
+        }
+        .forms-list .form-card-title {
+            min-width: 220px;
+            max-width: 300px;
+            margin-bottom: 0;
+            -webkit-line-clamp: 1;
+        }
+        .forms-list .form-card-desc {
+            margin-bottom: 0;
+            -webkit-line-clamp: 1;
+            flex: 1;
+        }
+        .forms-list .form-card-footer {
+            border-top: none;
+            border-left: 1px solid var(--gray-100);
+            background: transparent;
+            padding: .85rem 1rem;
+            flex-shrink: 0;
+        }
+
+        /* ── Action buttons ─────────────────────────────────── */
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .4rem .9rem;
+            border-radius: 20px;
+            font-size: .8rem;
+            font-weight: 500;
+            text-decoration: none;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: background .15s, box-shadow .15s;
+            white-space: nowrap;
+        }
+        .btn-action:hover { background: var(--gray-100); box-shadow: var(--shadow-sm); }
+        .btn-action.primary {
+            background: var(--purple-500);
+            color: var(--white);
+            border-color: var(--purple-500);
+        }
+        .btn-action.primary:hover {
+            background: var(--purple-600);
+            box-shadow: 0 1px 3px rgba(103,58,183,.3);
+        }
+        .btn-action svg { width: 14px; height: 14px; fill: currentColor; }
+
+        /* ── Empty state ────────────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--gray-600);
+        }
+        .empty-state-icon {
+            width: 120px; height: 120px;
+            margin: 0 auto 1.5rem;
+            background: var(--purple-100);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .empty-state-icon svg { width: 56px; height: 56px; fill: var(--purple-400); }
+        .empty-state h3 {
+            font-family: 'Google Sans', 'Roboto', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 400;
+            margin-bottom: .5rem;
+            color: var(--gray-700);
+        }
+        .empty-state p { font-size: .95rem; margin-bottom: 1.25rem; }
+        .empty-state .btn-action { font-size: .9rem; padding: .6rem 1.5rem; }
+
+        /* ── FAB (floating action button) ────────────────────── */
+        .fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px; height: 56px;
+            border-radius: 16px;
+            background: var(--purple-500);
+            color: var(--white);
+            border: none;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            display: flex; align-items: center; justify-content: center;
+            text-decoration: none;
+            transition: background .15s, box-shadow .15s, transform .15s;
+            z-index: 50;
+        }
+        .fab:hover {
+            background: var(--purple-600);
+            box-shadow: 0 6px 20px rgba(103,58,183,.35);
+            transform: scale(1.05);
+        }
+        .fab svg { width: 28px; height: 28px; fill: var(--white); }
+
+        /* ── Responsive ─────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .topbar { padding: 0 .75rem; height: 56px; }
+            .topbar-search { display: none; }
+            .quickstart-inner { padding: 0 1rem; }
+            .qs-card { width: 140px; }
+            .qs-card-thumb { width: 140px; height: 100px; }
+            .main { padding: 1rem; }
+            .forms-grid { grid-template-columns: 1fr; }
+            .filter-tabs { overflow-x: auto; }
+            .forms-list .form-card-body { flex-direction: column; align-items: flex-start; gap: .3rem; }
+            .forms-list .form-card-title { min-width: 0; max-width: none; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
-    </div>
+    <!-- ── Top bar ──────────────────────────────────────── -->
+    <header class="topbar">
+        <a href="{{ url_for('forms-surveys.index') }}" class="topbar-brand">
+            <span class="brand-icon">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM7 17h10v2H7v-2zm0-4h10v2H7v-2zm0-4h7v2H7V9z"/></svg>
+            </span>
+            <span class="brand-text">FormFlow</span>
+        </a>
+
+        <div class="topbar-search">
+            <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" placeholder="Search forms" id="search-input" oninput="searchForms(this.value)">
+        </div>
+
+        <div class="topbar-right">
+            <a href="{{ url_for('forms-surveys.index') }}" class="topbar-link active-link">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}" class="topbar-link">Templates</a>
+            {% if user %}
+            <a href="{{ url_for('forms-surveys.logout') }}" class="user-avatar" title="{{ user.name }} - Sign out">{{ user.name[:1]|upper }}</a>
+            {% else %}
+            <a href="{{ url_for('forms-surveys.login_page') }}" class="topbar-link" style="color: var(--purple-500); font-weight: 500;">Sign in</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ── Quick-start banner ───────────────────────────── -->
+    <section class="quickstart">
+        <div class="quickstart-inner">
+            <h2>Start a new form</h2>
+            <div class="quickstart-cards">
+                <a class="qs-card" href="{{ url_for('forms-surveys.create_form_page') }}">
+                    <div class="qs-card-thumb blank">
+                        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    </div>
+                    <div class="qs-card-label">Blank form</div>
+                </a>
+                <a class="qs-card" href="{{ url_for('forms-surveys.templates_page') }}">
+                    <div class="qs-card-thumb template">
+                        <div class="tmpl-preview">
+                            <div class="tmpl-line title"></div>
+                            <div class="tmpl-line sub"></div>
+                            <div class="tmpl-line field"></div>
+                            <div class="tmpl-line field"></div>
+                        </div>
+                    </div>
+                    <div class="qs-card-label">From template</div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Main content ─────────────────────────────────── -->
+    <main class="main">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <h2>Recent forms</h2>
+            <div class="toolbar-controls">
+                <div class="view-toggle">
+                    <button class="active" onclick="setView('grid', this)" title="Grid view">
+                        <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
+                    </button>
+                    <button onclick="setView('list', this)" title="List view">
+                        <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                    </button>
+                </div>
+                <button class="sort-btn" onclick="toggleSort()">
+                    <svg viewBox="0 0 24 24"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+                    <span id="sort-label">Newest</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="filter-tabs" id="filter-tabs">
+            <button class="filter-tab active" onclick="filterForms('all', this)">
+                All<span class="tab-count" id="count-all">{{ forms|length }}</span>
+            </button>
+            <button class="filter-tab" onclick="filterForms('active', this)">
+                Active<span class="tab-count" id="count-active">{{ forms|selectattr('status','equalto','active')|list|length }}</span>
+            </button>
+            <button class="filter-tab" onclick="filterForms('draft', this)">
+                Drafts<span class="tab-count" id="count-draft">{{ forms|selectattr('status','equalto','draft')|list|length }}</span>
+            </button>
+            <button class="filter-tab" onclick="filterForms('closed', this)">
+                Closed<span class="tab-count" id="count-closed">{{ forms|selectattr('status','equalto','closed')|list|length }}</span>
+            </button>
+        </div>
+
+        <!-- Forms grid -->
+        {% if forms %}
+        <div class="forms-grid" id="forms-container">
+            {% for form in forms %}
+            <a class="form-card" data-status="{{ form.status }}" data-title="{{ form.title|lower }}" data-date="{{ form.created_at }}" href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}">
+                <div class="form-card-banner {{ form.status }}"></div>
+                <div class="form-card-body">
+                    <div class="form-card-title">{{ form.title }}</div>
+                    <div class="form-card-desc">{{ form.description[:120] if form.description else 'No description' }}{% if form.description and form.description|length > 120 %}...{% endif %}</div>
+                </div>
+                <div class="form-card-footer">
+                    <div class="form-card-meta">
+                        <span class="meta-item" title="Responses">
+                            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                            {{ form.responses_count }}
+                        </span>
+                        <span class="meta-item" title="Created {{ form.created_at[:10] }}">
+                            <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+                            {{ form.created_at[:10] }}
+                        </span>
+                    </div>
+                    <div class="form-card-actions" onclick="event.preventDefault(); event.stopPropagation();">
+                        <span class="badge {{ form.status }}">{{ form.status }}</span>
+                        {% if form.status == 'active' %}
+                        <a href="{{ url_for('forms-surveys.respond_form', form_id=form.id) }}" class="btn-action primary" title="Fill out this form">
+                            <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                            Fill Out
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('forms-surveys.form_results', form_id=form.id) }}" class="btn-action" title="View results">
+                            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                            Results
+                        </a>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM7 17h10v2H7v-2zm0-4h10v2H7v-2zm0-4h7v2H7V9z"/></svg>
+            </div>
+            <h3>No forms yet</h3>
+            <p>Create your first form to start collecting responses.</p>
+            <a href="{{ url_for('forms-surveys.create_form_page') }}" class="btn-action primary">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Create a form
+            </a>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- FAB -->
+    <a href="{{ url_for('forms-surveys.create_form_page') }}" class="fab" title="Create new form">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </a>
+
+    <script>
+    /* ── Filter by status ─────────────────────────────── */
+    function filterForms(status, btn) {
+        const cards = document.querySelectorAll('.form-card');
+        const tabs = document.querySelectorAll('.filter-tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        cards.forEach(card => {
+            if (status === 'all' || card.dataset.status === status) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    /* ── Search forms ─────────────────────────────────── */
+    function searchForms(query) {
+        const q = query.toLowerCase().trim();
+        const cards = document.querySelectorAll('.form-card');
+        cards.forEach(card => {
+            const title = card.dataset.title || '';
+            const desc = card.querySelector('.form-card-desc');
+            const descText = desc ? desc.textContent.toLowerCase() : '';
+            if (!q || title.includes(q) || descText.includes(q)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    /* ── Toggle grid/list view ────────────────────────── */
+    function setView(mode, btn) {
+        const container = document.getElementById('forms-container');
+        if (!container) return;
+        const btns = document.querySelectorAll('.view-toggle button');
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (mode === 'list') {
+            container.className = 'forms-list';
+        } else {
+            container.className = 'forms-grid';
+        }
+    }
+
+    /* ── Sort toggle ──────────────────────────────────── */
+    let sortAsc = false;
+    function toggleSort() {
+        sortAsc = !sortAsc;
+        const container = document.getElementById('forms-container');
+        if (!container) return;
+        const cards = Array.from(container.querySelectorAll('.form-card'));
+        cards.sort((a, b) => {
+            const da = a.dataset.date || '';
+            const db = b.dataset.date || '';
+            return sortAsc ? da.localeCompare(db) : db.localeCompare(da);
+        });
+        cards.forEach(card => container.appendChild(card));
+        document.getElementById('sort-label').textContent = sortAsc ? 'Oldest' : 'Newest';
+    }
+    </script>
 </body>
 </html>

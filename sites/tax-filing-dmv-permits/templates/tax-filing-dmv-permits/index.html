@@ -3,14 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Lakeport Government Services</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1b1b1b; font-size: 15px; }
+
+        /* Gov header bar */
+        .gov-bar { background: #1b3a4b; padding: .4rem 0; text-align: center; font-size: .75rem; color: #a0c4b8; letter-spacing: .02rem; }
+        .gov-bar a { color: #fff; text-decoration: none; }
+        .header { background: #fff; border-bottom: 1px solid #dfe1e5; padding: 0 2rem; }
+        .header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: .8rem 0; }
+        .header-brand { display: flex; align-items: center; gap: .8rem; }
+        .header-brand .seal { width: 42px; height: 42px; border-radius: 50%; background: #1b3a4b; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; flex-shrink: 0; }
+        .header-brand h1 { font-size: 1.15rem; color: #1b3a4b; font-weight: 700; line-height: 1.2; }
+        .header-brand h1 a { color: inherit; text-decoration: none; }
+        .header-brand .subtitle { font-size: .75rem; color: #6b7280; font-weight: 400; }
+        .header-right { display: flex; align-items: center; gap: 1rem; font-size: .85rem; }
+        .header-right a { color: #1b3a4b; text-decoration: none; font-weight: 500; }
+        .header-right a:hover { text-decoration: underline; }
+        .header-right .btn-sign { background: #1b3a4b; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        .header-right .btn-sign:hover { background: #274c5b; text-decoration: none; }
+
+        /* Main nav */
+        .main-nav { background: #1b3a4b; }
+        .main-nav-inner { max-width: 1100px; margin: 0 auto; display: flex; gap: 0; }
+        .main-nav a { color: #c5ddd6; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .7rem 1.2rem; border-bottom: 3px solid transparent; transition: all .15s; }
+        .main-nav a:hover { color: #fff; background: rgba(255,255,255,.08); }
+        .main-nav a.active { color: #fff; border-bottom-color: #5db8a3; font-weight: 600; }
+
+        /* Hero / IRS-style banner */
+        .hero { background: linear-gradient(135deg, #1b3a4b 0%, #274c5b 50%, #1b3a4b 100%); padding: 2.5rem 2rem; color: #fff; }
+        .hero-inner { max-width: 1100px; margin: 0 auto; display: flex; gap: 3rem; align-items: center; }
+        .hero-text { flex: 1; }
+        .hero-text h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: .5rem; }
+        .hero-text p { font-size: 1rem; color: #a0c4b8; line-height: 1.5; margin-bottom: 1.2rem; }
+        .hero-cta { display: inline-block; background: #5db8a3; color: #fff; padding: .7rem 2rem; border-radius: .3rem; font-size: 1rem; font-weight: 600; text-decoration: none; }
+        .hero-cta:hover { background: #4ea893; }
+        .hero-tools { display: flex; flex-direction: column; gap: .8rem; min-width: 280px; }
+        .hero-tool { background: rgba(255,255,255,.1); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,.15); border-radius: .4rem; padding: .9rem 1.2rem; text-decoration: none; color: #fff; display: flex; align-items: center; gap: .8rem; transition: background .15s; }
+        .hero-tool:hover { background: rgba(255,255,255,.18); }
+        .hero-tool .tool-icon { font-size: 1.4rem; width: 36px; text-align: center; }
+        .hero-tool .tool-label { font-weight: 600; font-size: .9rem; }
+        .hero-tool .tool-desc { font-size: .75rem; color: #a0c4b8; }
+
+        /* Content */
+        .content { max-width: 1100px; margin: 0 auto; padding: 2rem 2rem 3rem; }
+
+        /* Service cards grid */
+        .services-header { font-size: 1.1rem; font-weight: 700; color: #1b3a4b; margin-bottom: 1rem; border-bottom: 2px solid #1b3a4b; padding-bottom: .5rem; display: flex; align-items: center; gap: .5rem; }
+        .service-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-bottom: 2.5rem; }
+        @media (max-width: 800px) { .service-grid { grid-template-columns: 1fr; } }
+        .service-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: 1.5rem; transition: box-shadow .15s; }
+        .service-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .service-card .card-icon { font-size: 1.8rem; margin-bottom: .6rem; }
+        .service-card h3 { font-size: 1rem; font-weight: 700; color: #1b3a4b; margin-bottom: .3rem; }
+        .service-card p { font-size: .85rem; color: #6b7280; line-height: 1.5; margin-bottom: .8rem; }
+        .service-card .card-links { display: flex; flex-direction: column; gap: .3rem; }
+        .service-card .card-links a { color: #2563eb; text-decoration: none; font-size: .85rem; font-weight: 500; }
+        .service-card .card-links a:hover { text-decoration: underline; }
+
+        /* Alerts / notices */
+        .alert-bar { background: #fef3c7; border: 1px solid #fde68a; border-radius: .4rem; padding: .8rem 1.2rem; margin-bottom: 1.5rem; font-size: .88rem; color: #92400e; display: flex; align-items: center; gap: .6rem; }
+        .alert-bar .alert-icon { font-size: 1.2rem; }
+
+        /* Account summary */
+        .account-section { margin-bottom: 2.5rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .summary-card { background: #fff; border-radius: .4rem; padding: 1rem 1.2rem; border: 1px solid #e2e8f0; border-left: 4px solid #1b3a4b; }
+        .summary-card.tax { border-left-color: #2563eb; }
+        .summary-card.vehicle { border-left-color: #059669; }
+        .summary-card.permit { border-left-color: #d97706; }
+        .summary-card.payment { border-left-color: #7c3aed; }
+        .summary-card .label { font-size: .7rem; text-transform: uppercase; font-weight: 700; letter-spacing: .05rem; color: #6b7280; margin-bottom: .2rem; }
+        .summary-card .value { font-size: 1.5rem; font-weight: 700; color: #1b1b1b; }
+        .summary-card .link { font-size: .8rem; color: #2563eb; text-decoration: none; }
+        .summary-card .link:hover { text-decoration: underline; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .4rem; overflow: hidden; border: 1px solid #e2e8f0; }
+        th { background: #f8fafc; text-align: left; padding: .55rem .8rem; font-size: .75rem; color: #6b7280; text-transform: uppercase; letter-spacing: .03rem; font-weight: 600; }
+        td { padding: .55rem .8rem; border-top: 1px solid #f1f5f9; font-size: .85rem; }
+        td a { color: #2563eb; text-decoration: none; font-weight: 500; }
+        td a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .25rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+        .badge-filed { background: #d1fae5; color: #065f46; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-overdue { background: #fee2e2; color: #991b1b; }
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-approved { background: #dbeafe; color: #1e40af; }
+        .badge-current { background: #d1fae5; color: #065f46; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+        .badge-completed { background: #d1fae5; color: #065f46; }
+
+        .section { margin-bottom: 2rem; }
+        .section h3 { font-size: 1rem; font-weight: 700; color: #334155; margin-bottom: .6rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .3rem; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .78rem; border-top: 1px solid #e2e8f0; background: #fff; line-height: 1.6; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="gov-bar">
+        An official website of the City of Lakeport &mdash; <a href="{{ url_for('tax-filing-dmv-permits.index') }}">lakeport.gov</a>
+    </div>
+
+    <div class="header">
+        <div class="header-inner">
+            <div class="header-brand">
+                <div class="seal">LP</div>
+                <div>
+                    <h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">City of Lakeport</a></h1>
+                    <div class="subtitle">Government Services Portal</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="{{ url_for('tax-filing-dmv-permits.search_page') }}">Search</a>
+                {% if logged_in %}
+                <span style="color:#6b7280">{{ user.display_name }}</span>
+                <a href="{{ url_for('tax-filing-dmv-permits.logout') }}" style="color:#dc2626">Sign Out</a>
+                {% else %}
+                <a href="{{ url_for('tax-filing-dmv-permits.login_page') }}" class="btn-sign">Sign In</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="main-nav">
+        <div class="main-nav-inner">
+            <a href="{{ url_for('tax-filing-dmv-permits.index') }}" class="active">Home</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">File & Pay</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.forms_page') }}">Forms</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">Motor Vehicles</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">Permits</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}">Payments</a>
+            <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}">Appointments</a>
+        </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-inner">
+            <div class="hero-text">
+                <h2>File, Pay, and Manage Your Government Services</h2>
+                <p>Access tax filings, vehicle registrations, building permits, and payments &mdash; all in one secure portal.</p>
+                <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}" class="hero-cta">File Your Taxes</a>
+            </div>
+            <div class="hero-tools">
+                <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page', status='pending') }}" class="hero-tool">
+                    <span class="tool-icon">&#128269;</span>
+                    <div>
+                        <div class="tool-label">Where's My Refund?</div>
+                        <div class="tool-desc">Check the status of your tax refund</div>
+                    </div>
+                </a>
+                <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}" class="hero-tool">
+                    <span class="tool-icon">&#128179;</span>
+                    <div>
+                        <div class="tool-label">Make a Payment</div>
+                        <div class="tool-desc">Pay taxes, fees, or fines online</div>
+                    </div>
+                </a>
+                <a href="{{ url_for('tax-filing-dmv-permits.forms_page') }}" class="hero-tool">
+                    <span class="tool-icon">&#128196;</span>
+                    <div>
+                        <div class="tool-label">Forms & Instructions</div>
+                        <div class="tool-desc">Download tax forms and DMV documents</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Alerts -->
+        {% set overdue = filings | selectattr('status', 'equalto', 'overdue') | list %}
+        {% set expired_vehicles = vehicles | selectattr('renewal_status', 'equalto', 'expired') | list %}
+        {% if overdue %}
+        <div class="alert-bar">
+            <span class="alert-icon">&#9888;</span>
+            You have {{ overdue | length }} overdue tax filing{{ 's' if overdue | length != 1 }}. <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page', status='overdue') }}" style="color:#92400e;font-weight:600;text-decoration:underline">View now</a>
+        </div>
+        {% endif %}
+        {% if expired_vehicles %}
+        <div class="alert-bar">
+            <span class="alert-icon">&#9888;</span>
+            {{ expired_vehicles | length }} vehicle registration{{ 's' if expired_vehicles | length != 1 }} expired. <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}" style="color:#92400e;font-weight:600;text-decoration:underline">Renew now</a>
+        </div>
+        {% endif %}
+
+        <!-- Services grid -->
+        <div class="services-header">Services</div>
+        <div class="service-grid">
+            <div class="service-card">
+                <div class="card-icon">&#128176;</div>
+                <h3>Tax Services</h3>
+                <p>File income, property, and business taxes. Check filing status and make payments.</p>
+                <div class="card-links">
+                    <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">View My Tax Filings</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.forms_page', category='tax') }}">Tax Forms & Instructions</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}">Make a Tax Payment</a>
+                </div>
+            </div>
+            <div class="service-card">
+                <div class="card-icon">&#128663;</div>
+                <h3>Motor Vehicles</h3>
+                <p>Register vehicles, renew registrations, and manage your plates and titles.</p>
+                <div class="card-links">
+                    <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">My Vehicles</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.register_vehicle_page') }}">Register a Vehicle</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.forms_page', category='dmv') }}">DMV Forms</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}">Schedule DMV Appointment</a>
+                </div>
+            </div>
+            <div class="service-card">
+                <div class="card-icon">&#128221;</div>
+                <h3>Permits & Licenses</h3>
+                <p>Apply for building, renovation, parking, and event permits.</p>
+                <div class="card-links">
+                    <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">My Permits</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.apply_permit_page') }}">Apply for a Permit</a>
+                    <a href="{{ url_for('tax-filing-dmv-permits.forms_page', category='permits') }}">Permit Applications</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account summary -->
+        <div class="account-section">
+            <div class="services-header">Your Account Summary</div>
+            <div class="summary-grid">
+                <div class="summary-card tax">
+                    <div class="label">Tax Filings</div>
+                    <div class="value">{{ filings | length }}</div>
+                    <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}" class="link">View All &rarr;</a>
+                </div>
+                <div class="summary-card vehicle">
+                    <div class="label">Vehicles</div>
+                    <div class="value">{{ vehicles | length }}</div>
+                    <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}" class="link">View All &rarr;</a>
+                </div>
+                <div class="summary-card permit">
+                    <div class="label">Permits</div>
+                    <div class="value">{{ permits | length }}</div>
+                    <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}" class="link">View All &rarr;</a>
+                </div>
+                <div class="summary-card payment">
+                    <div class="label">Total Paid</div>
+                    <div class="value">${{ "%.0f" | format(payments | sum(attribute='amount')) }}</div>
+                    <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}" class="link">Payment History &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent filings -->
+        {% if filings %}
+        <div class="section">
+            <h3>Recent Tax Filings</h3>
+            <table>
+                <thead><tr><th>Filing ID</th><th>Type</th><th>Tax Year</th><th>Tax Owed</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for f in filings[:5] %}
+                <tr>
+                    <td><a href="{{ url_for('tax-filing-dmv-permits.tax_filing_detail', filing_id=f.id) }}">{{ f.filing_id }}</a></td>
+                    <td>{{ f.type | replace("_", " ") | title }}</td>
+                    <td>{{ f.tax_year }}</td>
+                    <td>${{ "%.2f" | format(f.tax_owed) }}</td>
+                    <td><span class="badge badge-{{ f.status }}">{{ f.status | title }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if vehicles %}
+        <div class="section">
+            <h3>Registered Vehicles</h3>
+            <table>
+                <thead><tr><th>Vehicle</th><th>Plate</th><th>Expires</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for v in vehicles %}
+                <tr>
+                    <td><a href="{{ url_for('tax-filing-dmv-permits.vehicle_detail', vehicle_id=v.id) }}">{{ v.vehicle.year }} {{ v.vehicle.make }} {{ v.vehicle.model }}</a></td>
+                    <td>{{ v.plate_number }}</td>
+                    <td>{{ v.expiration_date }}</td>
+                    <td><span class="badge badge-{{ v.renewal_status }}">{{ v.renewal_status | title }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        City of Lakeport &mdash; Government Services Portal<br>
+        Revenue Department &bull; Department of Motor Vehicles &bull; Permits & Inspections<br>
+        &copy; 2026 Lakeport Municipal Government. All rights reserved.
     </div>
 </body>
 </html>

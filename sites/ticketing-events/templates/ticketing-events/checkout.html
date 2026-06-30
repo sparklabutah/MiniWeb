@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - {{ event.name }} - Lakeport Events</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .header-actions a { color: #fff; text-decoration: none; font-size: .9rem; margin-left: 1rem; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #666; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #d63031; text-decoration: none; }
+        h2 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .checkout-card { background: #fff; border-radius: .6rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .event-summary { padding-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
+        .event-summary h3 { font-size: 1.2rem; margin-bottom: .3rem; }
+        .event-summary p { font-size: .9rem; color: #666; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group select, .form-group input { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; background: #fff; }
+        .form-group select:focus, .form-group input:focus { border-color: #d63031; outline: none; }
+        .ticket-option { padding: .5rem 0; font-size: .85rem; color: #333; }
+        .btn-checkout { width: 100%; padding: .8rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        .btn-checkout:hover { background: #c0392b; }
+        .promo-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+        <div class="header-actions">
+            {% if logged_in %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.logout') }}">Sign Out</a>
+            {% else %}
+                <a href="{{ url_for('ticketing-events.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('ticketing-events.index') }}">Events</a> &gt;
+            <a href="{{ url_for('ticketing-events.event_detail', event_id=event.id) }}">{{ event.name }}</a> &gt;
+            Checkout
+        </div>
+        <h2>Checkout</h2>
+        <div class="checkout-card">
+            <div class="event-summary">
+                <h3>{{ event.name }}</h3>
+                <p>{{ event.date }} &middot; {{ event.time }} &middot; {{ event.venue }}</p>
+            </div>
+            <form method="POST" action="{{ url_for('ticketing-events.checkout_submit', event_id=event.id) }}">
+                <div class="form-group">
+                    <label for="ticket_type">Ticket Type</label>
+                    <select id="ticket_type" name="ticket_type" required>
+                        {% for tt in event.ticket_types %}
+                        {% set remaining = tt.available - tt.sold %}
+                        {% if tt.available == 0 or remaining > 0 %}
+                        <option value="{{ tt.type }}">{{ tt.type }} - ${{ '%.2f'|format(tt.price) }}{% if tt.available > 0 %} ({{ remaining }} left){% endif %}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantity</label>
+                    <select id="quantity" name="quantity">
+                        {% for i in range(1, 11) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="promo-section">
+                    <div class="form-group">
+                        <label for="promo_code">Promo Code (optional)</label>
+                        <input type="text" id="promo_code" name="promo_code" placeholder="Enter promo code">
+                    </div>
+                </div>
+                <button type="submit" class="btn-checkout">Complete Purchase</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

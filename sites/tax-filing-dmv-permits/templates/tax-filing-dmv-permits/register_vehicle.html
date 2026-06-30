@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Vehicle - Lakeport Government Services</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1b3a4b, #274c5b); padding: .8rem 2rem; } .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; } .header h1 a span { color: #5db8a3; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+        nav a { color: #1b3a4b; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; }
+        .container { max-width: 700px; margin: 2rem auto; padding: 0 2rem; }
+        .form-card { background: #fff; padding: 2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .form-card h2 { color: #1b3a4b; margin-bottom: 1.5rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; color: #334155; margin-bottom: .3rem; }
+        .form-group input, .form-group select { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .submit-btn { width: 100%; padding: .8rem; background: #1b3a4b; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
+        .success-msg { background: #d1fae5; color: #065f46; padding: .8rem; border-radius: .3rem; margin-bottom: 1rem; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Lakeport <span>Gov</span>Services</a></h1></div>
+    <nav><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Dashboard</a><a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">Vehicles</a></nav>
+    <div class="container">
+        <div class="form-card">
+            <h2>Register a New Vehicle</h2>
+            <div id="success-msg" class="success-msg"></div>
+            <form id="reg-form" onsubmit="return submitVehicle(event)">
+                <div class="form-group"><label>Owner Name</label><input type="text" id="owner_name" value="{{ user.display_name }}" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Year</label><input type="number" id="year" required placeholder="2024"></div>
+                    <div class="form-group"><label>Make</label><input type="text" id="make" required placeholder="Toyota"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Model</label><input type="text" id="model" required placeholder="Camry"></div>
+                    <div class="form-group"><label>Trim</label><input type="text" id="trim" placeholder="SE"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Color</label><input type="text" id="color" required placeholder="Silver"></div>
+                    <div class="form-group"><label>Body Type</label>
+                        <select id="body_type"><option value="sedan">Sedan</option><option value="suv">SUV</option><option value="pickup truck">Pickup Truck</option><option value="coupe">Coupe</option><option value="van">Van</option></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>VIN</label><input type="text" id="vin" required placeholder="1HGCM82633A004352"></div>
+                    <div class="form-group"><label>Fuel Type</label>
+                        <select id="fuel_type"><option value="gasoline">Gasoline</option><option value="diesel">Diesel</option><option value="electric">Electric</option><option value="hybrid">Hybrid</option></select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Plate Number</label><input type="text" id="plate_number" placeholder="ABC-1234"></div>
+                <button type="submit" class="submit-btn">Register Vehicle</button>
+            </form>
+        </div>
+    </div>
+    <script>
+    function submitVehicle(e) {
+        e.preventDefault();
+        var data = {
+            user_id: {{ user.id }}, owner_name: document.getElementById('owner_name').value,
+            year: parseInt(document.getElementById('year').value), make: document.getElementById('make').value,
+            model: document.getElementById('model').value, trim: document.getElementById('trim').value,
+            color: document.getElementById('color').value, body_type: document.getElementById('body_type').value,
+            vin: document.getElementById('vin').value, fuel_type: document.getElementById('fuel_type').value,
+            plate_number: document.getElementById('plate_number').value,
+        };
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/vehicles', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var msg = document.getElementById('success-msg');
+            msg.style.display = 'block';
+            msg.textContent = 'Vehicle registered! Registration ID: ' + d.registration_id;
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

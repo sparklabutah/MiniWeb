@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle {{ vehicle.registration_id }} - Lakeport Government Services</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b3a4b, #274c5b); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8a3; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+        nav a { color: #1b3a4b; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { display: inline-block; margin-bottom: 1rem; color: #5db8a3; text-decoration: none; font-size: .9rem; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .detail-card h2 { margin-bottom: 1rem; color: #1b3a4b; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem 2rem; }
+        .field-label { font-size: .8rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .field-value { font-size: .95rem; color: #1a1a2e; margin-bottom: .5rem; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+        .badge-current { background: #d1fae5; color: #065f46; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 1rem; }
+        th { background: #f8fafc; text-align: left; padding: .6rem .8rem; font-size: .8rem; color: #64748b; text-transform: uppercase; }
+        td { padding: .6rem .8rem; border-top: 1px solid #f1f5f9; font-size: .88rem; }
+        .toggle-btn { padding: .3rem .8rem; border: 1px solid #d1d5db; border-radius: .3rem; cursor: pointer; font-size: .85rem; background: #fff; }
+        .toggle-btn.active { background: #d1fae5; border-color: #059669; color: #065f46; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Lakeport <span>Gov</span>Services</a></h1></div>
+    <nav>
+        <a href="{{ url_for('tax-filing-dmv-permits.index') }}">Dashboard</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">Tax Filings</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">Vehicles</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">Permits</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}">Payments</a>
+    </nav>
+    <div class="container">
+        <a class="back" href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">&larr; Back to Vehicles</a>
+        <div class="detail-card">
+            <h2>{{ vehicle.vehicle.year }} {{ vehicle.vehicle.make }} {{ vehicle.vehicle.model }}</h2>
+            <div class="detail-grid">
+                <div><div class="field-label">Registration ID</div><div class="field-value">{{ vehicle.registration_id }}</div></div>
+                <div><div class="field-label">Owner</div><div class="field-value">{{ vehicle.owner_name }}</div></div>
+                <div><div class="field-label">Plate</div><div class="field-value">{{ vehicle.plate_number }} ({{ vehicle.plate_state }})</div></div>
+                <div><div class="field-label">VIN</div><div class="field-value">{{ vehicle.vehicle.vin }}</div></div>
+                <div><div class="field-label">Color</div><div class="field-value">{{ vehicle.vehicle.color }}</div></div>
+                <div><div class="field-label">Body Type</div><div class="field-value">{{ vehicle.vehicle.body_type|title }}</div></div>
+                <div><div class="field-label">Engine</div><div class="field-value">{{ vehicle.vehicle.engine }}</div></div>
+                <div><div class="field-label">Fuel Type</div><div class="field-value">{{ vehicle.vehicle.fuel_type|title }}</div></div>
+                <div><div class="field-label">Registration Date</div><div class="field-value">{{ vehicle.registration_date }}</div></div>
+                <div><div class="field-label">Expiration</div><div class="field-value">{{ vehicle.expiration_date }}</div></div>
+                <div><div class="field-label">Renewal Status</div><div class="field-value"><span class="badge badge-{{ vehicle.renewal_status }}">{{ vehicle.renewal_status|title }}</span></div></div>
+                <div><div class="field-label">Renewal Fee</div><div class="field-value">${{ "%.2f"|format(vehicle.renewal_fee) }}{% if vehicle.late_penalty > 0 %} + ${{ "%.2f"|format(vehicle.late_penalty) }} late{% endif %}</div></div>
+                <div>
+                    <div class="field-label">Insurance Verified</div>
+                    <div class="field-value">
+                        <button class="toggle-btn {% if vehicle.insurance_verified %}active{% endif %}" id="insurance-toggle" onclick="toggleInsurance({{ vehicle.id }})">
+                            {{ 'Verified' if vehicle.insurance_verified else 'Not Verified' }}
+                        </button>
+                    </div>
+                </div>
+                {% if vehicle.lien_holder %}<div><div class="field-label">Lien Holder</div><div class="field-value">{{ vehicle.lien_holder }}</div></div>{% endif %}
+            </div>
+        </div>
+        {% if payments %}
+        <div style="margin-top:2rem">
+            <h3 style="color:#334155;margin-bottom:.8rem;">Related Payments</h3>
+            <table>
+                <thead><tr><th>Payment ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr><td>{{ p.payment_id }}</td><td>${{ "%.2f"|format(p.amount) }}</td><td>{{ p.method|replace("_"," ")|title }}</td><td>{{ p.payment_date }}</td><td>{{ p.status|title }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    <script>
+    function toggleInsurance(vehicleId) {
+        var btn = document.getElementById('insurance-toggle');
+        var current = btn.classList.contains('active');
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/vehicles/' + vehicleId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({insurance_verified: !current})
+        }).then(function() { location.reload(); });
+    }
+    </script>
+</body>
+</html>

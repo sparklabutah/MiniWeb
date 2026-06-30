@@ -3,14 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>SnapLink - URL Shortener &amp; QR Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #c4b5fd; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #e0e7ff; text-decoration: none; font-size: .85rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+        nav a { color: #4f46e5; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef2ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+        .create-box { background: #fff; border-radius: .6rem; padding: 2rem; box-shadow: 0 1px 6px rgba(0,0,0,.06); margin-bottom: 2rem; }
+        .create-box h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #4f46e5; }
+        .form-row { display: flex; gap: .8rem; margin-bottom: .8rem; flex-wrap: wrap; }
+        .form-row input { flex: 1; min-width: 200px; padding: .65rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .form-row input:focus { border-color: #7c3aed; outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
+        .btn { padding: .65rem 1.2rem; border: none; border-radius: .4rem; font-size: .9rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #7c3aed; color: #fff; }
+        .btn-primary:hover { background: #6d28d9; }
+        .btn-sm { padding: .4rem .8rem; font-size: .8rem; }
+        .btn-outline { background: transparent; border: 1.5px solid #d1d5db; color: #475569; }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .error { background: #fef2f2; color: #dc2626; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #fee2e2; }
+        .section-title { font-size: 1.1rem; margin-bottom: 1rem; color: #1e293b; }
+        .link-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: .6rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+        .link-card:hover { border-color: #7c3aed; }
+        .link-info h3 { font-size: .95rem; margin-bottom: .2rem; }
+        .link-info h3 a { color: #4f46e5; text-decoration: none; }
+        .link-info .meta { font-size: .8rem; color: #64748b; }
+        .link-info .meta .code { font-family: monospace; background: #f1f5f9; padding: .1rem .4rem; border-radius: .2rem; color: #7c3aed; font-weight: 600; }
+        .link-stats { text-align: right; }
+        .link-stats .clicks { font-size: 1.2rem; font-weight: 700; color: #7c3aed; }
+        .link-stats .label { font-size: .75rem; color: #94a3b8; }
+        .badge { font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+        .empty { text-align: center; color: #94a3b8; padding: 2rem; }
+    </style>
 </head>
 <body>
+    <div class="header">
+        <h1><a href="{{ url_for('url-shorteners-qr.index') }}">Snap<span>Link</span></a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+            <span style="color:#e0e7ff; font-size:.85rem;">{{ user.name }}</span>
+            <a href="{{ url_for('url-shorteners-qr.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('url-shorteners-qr.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('url-shorteners-qr.index') }}" class="active">Create</a>
+        <a href="{{ url_for('url-shorteners-qr.links_page') }}">My Links</a>
+    </nav>
+
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <div class="create-box">
+            <h2>Shorten a URL</h2>
+            <form method="post" action="{{ url_for('url-shorteners-qr.create_link_form') }}">
+                <div class="form-row">
+                    <input type="url" name="original_url" placeholder="Paste your long URL here..." required>
+                </div>
+                <div class="form-row">
+                    <input type="text" name="title" placeholder="Title (optional)">
+                    <input type="text" name="short_code" placeholder="Custom short code (optional)" pattern="[a-zA-Z0-9_-]+" maxlength="20">
+                </div>
+                <div class="form-row">
+                    <input type="datetime-local" name="expires_at" placeholder="Expiry (optional)">
+                    <input type="text" name="tags" placeholder="Tags (comma-separated, optional)">
+                </div>
+                <div class="form-row" style="align-items: center;">
+                    <select name="redirect_type" style="padding: .65rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem;">
+                        <option value="301">301 - Permanent Redirect</option>
+                        <option value="302">302 - Temporary Redirect</option>
+                        <option value="307">307 - Temporary (Strict)</option>
+                    </select>
+                    <label style="display: flex; align-items: center; gap: .4rem; font-size: .9rem; color: #475569; cursor: pointer;">
+                        <input type="checkbox" name="qr_enabled" checked style="width: 18px; height: 18px; accent-color: #7c3aed;">
+                        Generate QR Code
+                    </label>
+                    <button type="submit" class="btn btn-primary">Shorten URL</button>
+                </div>
+            </form>
+        </div>
+
+        <h2 class="section-title">Recent Links</h2>
+        {% if links %}
+        {% for link in links %}
+        <div class="link-card">
+            <div class="link-info">
+                <h3><a href="{{ url_for('url-shorteners-qr.link_detail', link_id=link.id) }}">{{ link.title }}</a></h3>
+                <div class="meta">
+                    <span class="code">{{ link.short_code }}</span>
+                    &rarr; {{ link.original_url[:60] }}{% if link.original_url|length > 60 %}...{% endif %}
+                    &middot; {{ link.created_at[:10] }}
+                    <span class="badge {{ 'badge-active' if link.is_active else 'badge-inactive' }}">
+                        {{ 'Active' if link.is_active else 'Inactive' }}
+                    </span>
+                </div>
+            </div>
+            <div class="link-stats">
+                <div class="clicks">{{ link.clicks }}</div>
+                <div class="label">clicks</div>
+            </div>
+        </div>
+        {% endfor %}
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="{{ url_for('url-shorteners-qr.links_page') }}" class="btn btn-outline">View All Links</a>
+        </div>
+        {% else %}
+        <div class="empty">No links yet. Create your first short link above.</div>
+        {% endif %}
     </div>
 </body>
 </html>

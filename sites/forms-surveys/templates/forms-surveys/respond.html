@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlow - {{ form.title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
+        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .container { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+        .form-header { background: #fff; border-radius: 8px; border: 1px solid #dadce0; border-top: 4px solid #673ab7; padding: 1.5rem; margin-bottom: 1rem; }
+        .form-header h2 { font-size: 1.4rem; margin-bottom: .3rem; }
+        .form-header .desc { color: #5f6368; font-size: .9rem; }
+        .form-header .required-note { font-size: .8rem; color: #d32f2f; margin-top: .5rem; }
+        .field-card { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1.2rem 1.5rem; margin-bottom: .75rem; }
+        .field-card .field-label { font-size: .95rem; font-weight: 500; margin-bottom: .8rem; }
+        .field-card .field-label .required { color: #d32f2f; }
+        input[type="text"], textarea { width: 100%; padding: .6rem .8rem; border: none; border-bottom: 1.5px solid #dadce0; font-size: .95rem; font-family: inherit; outline: none; transition: border-color .15s; }
+        input[type="text"]:focus, textarea:focus { border-color: #673ab7; }
+        textarea { min-height: 80px; resize: vertical; }
+        select { width: 100%; padding: .6rem .8rem; border: 1.5px solid #dadce0; border-radius: 4px; font-size: .95rem; background: #fff; outline: none; }
+        select:focus { border-color: #673ab7; }
+        .radio-group, .checkbox-group { display: flex; flex-direction: column; gap: .5rem; }
+        .radio-group label, .checkbox-group label { display: flex; align-items: center; gap: .5rem; font-size: .9rem; cursor: pointer; padding: .3rem 0; }
+        .radio-group input, .checkbox-group input { accent-color: #673ab7; width: 18px; height: 18px; }
+        .rating-group { display: flex; gap: .8rem; }
+        .rating-group label { display: flex; flex-direction: column; align-items: center; gap: .3rem; cursor: pointer; }
+        .rating-group input { accent-color: #673ab7; width: 20px; height: 20px; }
+        .rating-group .rating-num { font-size: .85rem; color: #5f6368; }
+        .submit-section { margin-top: 1rem; display: flex; gap: .5rem; }
+        .btn-submit { background: #673ab7; color: #fff; border: none; padding: .7rem 2rem; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { background: #5e35b1; }
+        .btn-cancel { background: #fff; color: #5f6368; border: 1px solid #dadce0; padding: .7rem 1.5rem; border-radius: 6px; font-size: 1rem; cursor: pointer; text-decoration: none; }
+        .btn-cancel:hover { background: #f1f3f4; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FormFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
+            {% if user %}
+            <span style="color: #ce93d8; font-size: .85rem;">{{ user.name }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="form-header">
+            <h2>{{ form.title }}</h2>
+            <p class="desc">{{ form.description }}</p>
+            <p class="required-note">* Required</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('forms-surveys.submit_response_form', form_id=form.id) }}">
+            {% for field in form.fields %}
+            <div class="field-card">
+                <div class="field-label">
+                    {{ field.label }}
+                    {% if field.required %}<span class="required">*</span>{% endif %}
+                </div>
+
+                {% if field.type == 'text' %}
+                <input type="text" name="{{ field.id }}" placeholder="Your answer" {% if field.required %}required{% endif %}>
+
+                {% elif field.type == 'textarea' %}
+                <textarea name="{{ field.id }}" placeholder="Your answer" {% if field.required %}required{% endif %}></textarea>
+
+                {% elif field.type == 'radio' %}
+                <div class="radio-group">
+                    {% for opt in field.options %}
+                    <label>
+                        <input type="radio" name="{{ field.id }}" value="{{ opt }}" {% if field.required %}required{% endif %}>
+                        {{ opt }}
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {% elif field.type == 'checkbox' %}
+                <div class="checkbox-group">
+                    {% for opt in field.options %}
+                    <label>
+                        <input type="checkbox" name="{{ field.id }}" value="{{ opt }}">
+                        {{ opt }}
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {% elif field.type == 'dropdown' %}
+                <select name="{{ field.id }}" {% if field.required %}required{% endif %}>
+                    <option value="">Select an option</option>
+                    {% for opt in field.options %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+
+                {% elif field.type == 'rating' %}
+                <div class="rating-group">
+                    {% for opt in field.options %}
+                    <label>
+                        <input type="radio" name="{{ field.id }}" value="{{ opt }}" {% if field.required %}required{% endif %}>
+                        <span class="rating-num">{{ opt }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="submit-section">
+                <button type="submit" class="btn-submit">Submit</button>
+                <a href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}" class="btn-cancel">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

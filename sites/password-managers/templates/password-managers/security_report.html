@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Report - VaultGuard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #6c8cff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { color: #c9cdd8; background: #1e2235; }
+        nav a.active { color: #6c8cff; background: #1e2235; font-weight: 600; }
+        nav .spacer { flex: 1; }
+        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
+        nav .btn-logout { color: #f87171; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
+        .breadcrumb a { color: #6c8cff; text-decoration: none; }
+        h2 { color: #e1e4e8; font-size: 1.3rem; margin-bottom: 1rem; }
+        .report-meta { font-size: .8rem; color: #6b7280; margin-bottom: 1.5rem; }
+        .score-section { background: linear-gradient(135deg, #1e2235, #252a3a); border: 1px solid #2d3348; border-radius: .6rem; padding: 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+        .score-big { width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: 800; flex-shrink: 0; }
+        .score-good { background: linear-gradient(135deg, #065f46, #047857); color: #6ee7b7; border: 4px solid #34d399; }
+        .score-fair { background: linear-gradient(135deg, #78350f, #92400e); color: #fcd34d; border: 4px solid #fbbf24; }
+        .score-poor { background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #fca5a5; border: 4px solid #f87171; }
+        .score-details h3 { font-size: 1.1rem; color: #e1e4e8; margin-bottom: .3rem; }
+        .score-details p { font-size: .9rem; color: #8b92a5; }
+        .score-stats { display: flex; gap: 1.5rem; margin-top: .8rem; flex-wrap: wrap; }
+        .score-stat { text-align: center; }
+        .score-stat .num { font-size: 1.3rem; font-weight: 700; }
+        .score-stat .label { font-size: .75rem; color: #8b92a5; }
+        .section { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.2rem; }
+        .section h3 { font-size: 1rem; color: #c9cdd8; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+        .section-icon { font-size: 1.1rem; }
+        .issue-list { list-style: none; }
+        .issue-item { display: flex; align-items: flex-start; gap: .8rem; padding: .8rem; border-radius: .4rem; margin-bottom: .5rem; }
+        .issue-item:hover { background: #1a1d29; }
+        .issue-item .priority { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: .4rem; }
+        .priority-critical { background: #ef4444; }
+        .priority-high { background: #f59e0b; }
+        .priority-medium { background: #3b82f6; }
+        .priority-low { background: #8b92a5; }
+        .issue-item .issue-text { flex: 1; font-size: .9rem; color: #c9cdd8; }
+        .issue-item .issue-link { color: #6c8cff; text-decoration: none; font-size: .8rem; flex-shrink: 0; }
+        .issue-item .issue-link:hover { text-decoration: underline; }
+        .breach-alert { background: #1f1215; border: 1px solid #7f1d1d; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: 1rem; }
+        .breach-alert .breach-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
+        .breach-alert .breach-severity { font-size: .7rem; font-weight: 700; text-transform: uppercase; padding: .15rem .5rem; border-radius: .2rem; background: #7f1d1d; color: #fca5a5; }
+        .breach-alert .breach-title { font-weight: 600; color: #fca5a5; }
+        .breach-alert .breach-details { font-size: .85rem; color: #d1a3a3; margin-bottom: .5rem; }
+        .breach-alert .breach-recommendation { font-size: .85rem; color: #e1e4e8; background: #1a1d29; padding: .6rem .8rem; border-radius: .3rem; line-height: 1.4; }
+        .strength-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+        .strength-card { text-align: center; padding: 1rem; border-radius: .4rem; background: #1e2235; }
+        .strength-card .count { font-size: 1.5rem; font-weight: 700; }
+        .strength-card .label { font-size: .75rem; text-transform: uppercase; color: #8b92a5; }
+        .strength-card.excellent .count { color: #34d399; }
+        .strength-card.strong .count { color: #60a5fa; }
+        .strength-card.fair .count { color: #fbbf24; }
+        .strength-card.weak .count { color: #f87171; }
+        .pw-item { display: flex; align-items: center; gap: .8rem; padding: .6rem .8rem; margin-bottom: .3rem; border-radius: .3rem; }
+        .pw-item:hover { background: #1a1d29; }
+        .pw-item .pw-title { flex: 1; font-size: .9rem; color: #c9cdd8; }
+        .pw-item .pw-title a { color: #6c8cff; text-decoration: none; }
+        .pw-item .pw-title a:hover { text-decoration: underline; }
+        .pw-item .pw-reason { font-size: .8rem; color: #8b92a5; flex: 2; }
+        .pw-item .pw-strength { font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+        .twofa-bar { display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+        .twofa-track { flex: 1; height: 8px; background: #1e2235; border-radius: 4px; overflow: hidden; }
+        .twofa-fill { height: 100%; background: linear-gradient(90deg, #34d399, #6ee7b7); border-radius: 4px; }
+        .twofa-pct { font-size: .9rem; font-weight: 700; color: #34d399; flex-shrink: 0; }
+        .missing-2fa-item { display: flex; align-items: center; gap: .6rem; padding: .4rem .6rem; margin-bottom: .3rem; }
+        .missing-2fa-item .risk { font-size: .7rem; font-weight: 600; text-transform: uppercase; padding: .1rem .4rem; border-radius: .2rem; }
+        .risk-medium { background: #78350f; color: #fcd34d; }
+        .risk-low { background: #1e2235; color: #8b92a5; }
+        .risk-high { background: #7f1d1d; color: #fca5a5; }
+        .missing-2fa-item .title { font-size: .85rem; color: #c9cdd8; }
+        .vault-health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+        .vault-health-card { background: #1e2235; border-radius: .4rem; padding: 1rem 1.2rem; }
+        .vault-health-card h4 { font-size: .95rem; color: #e1e4e8; margin-bottom: .4rem; }
+        .vault-health-card .vh-meta { font-size: .8rem; color: #8b92a5; margin-bottom: .4rem; }
+        .vault-health-card .vh-issues { list-style: none; }
+        .vault-health-card .vh-issues li { font-size: .8rem; color: #c9cdd8; padding: .2rem 0; }
+        .vault-health-card .vh-issues li::before { content: "\2022 "; color: #6b7280; }
+        .age-item { display: flex; align-items: center; gap: .8rem; padding: .5rem .6rem; margin-bottom: .3rem; }
+        .age-item .age-title { flex: 1; font-size: .85rem; color: #c9cdd8; }
+        .age-item .age-days { font-size: .85rem; font-weight: 600; color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
+        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
+        <a href="{{ url_for('password-managers.security_report_page') }}" class="active">Security</a>
+        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('password-managers.index') }}">Home</a> &rsaquo; Security Report
+        </div>
+
+        <h2>Security Report</h2>
+        {% if report.report_generated_at %}
+        <div class="report-meta">Report generated: {{ report.report_generated_at[:16]|replace('T', ' ') }} UTC &middot; {{ report.user_name }}</div>
+        {% endif %}
+
+        <!-- Overall Score -->
+        <div class="score-section">
+            <div class="score-big {% if report.overall_score >= 80 %}score-good{% elif report.overall_score >= 60 %}score-fair{% else %}score-poor{% endif %}">
+                {{ report.overall_score }}
+            </div>
+            <div class="score-details">
+                <h3>Overall: {{ report.overall_rating }}</h3>
+                <p>Your password security posture across all vaults.</p>
+                {% if report.summary %}
+                <div class="score-stats">
+                    <div class="score-stat"><div class="num">{{ report.summary.total_entries }}</div><div class="label">Items</div></div>
+                    <div class="score-stat"><div class="num">{{ report.summary.login_entries }}</div><div class="label">Logins</div></div>
+                    <div class="score-stat"><div class="num">{{ report.summary.secure_note_entries }}</div><div class="label">Secure Notes</div></div>
+                    <div class="score-stat"><div class="num">{{ report.summary.total_vaults }}</div><div class="label">Vaults</div></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Breach Alerts -->
+        {% if report.breach_alerts %}
+        <div class="section">
+            <h3><span class="section-icon">&#x26a0;</span> Breach Alerts</h3>
+            {% for alert in report.breach_alerts %}
+            <div class="breach-alert">
+                <div class="breach-header">
+                    <span class="breach-severity">{{ alert.severity }}</span>
+                    <span class="breach-title">{{ alert.entry_title }} &mdash; {{ alert.breach_source }}</span>
+                </div>
+                <div class="breach-details">
+                    Detected: {{ alert.detected_at[:10] }} &middot; Breach date: {{ alert.breach_date }} &middot;
+                    Email exposed: {{ alert.email_exposed }} &middot;
+                    Data: {{ alert.data_exposed|join(', ') }}
+                </div>
+                <div class="breach-recommendation">{{ alert.recommendation }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Password Strength -->
+        {% if report.password_strength %}
+        <div class="section">
+            <h3><span class="section-icon">&#x1f512;</span> Password Strength</h3>
+            <div class="strength-grid">
+                <div class="strength-card excellent">
+                    <div class="count">{{ report.password_strength.excellent }}</div>
+                    <div class="label">Excellent</div>
+                </div>
+                <div class="strength-card strong">
+                    <div class="count">{{ report.password_strength.strong }}</div>
+                    <div class="label">Strong</div>
+                </div>
+                <div class="strength-card fair">
+                    <div class="count">{{ report.password_strength.fair }}</div>
+                    <div class="label">Fair</div>
+                </div>
+                <div class="strength-card weak">
+                    <div class="count">{{ report.password_strength.weak }}</div>
+                    <div class="label">Weak</div>
+                </div>
+            </div>
+
+            {% if report.password_strength.breakdown %}
+            <h4 style="font-size: .85rem; color: #8b92a5; margin: 1rem 0 .5rem;">Passwords Needing Attention</h4>
+            {% for pw in report.password_strength.breakdown %}
+            <div class="pw-item">
+                <span class="pw-strength" style="color: {% if pw.strength == 'weak' %}#f87171{% elif pw.strength == 'fair' %}#fbbf24{% else %}#8b92a5{% endif %};">{{ pw.strength }}</span>
+                <span class="pw-title"><a href="{{ url_for('password-managers.entry_detail', entry_id=pw.entry_id) }}">{{ pw.title }}</a></span>
+                <span class="pw-reason">{{ pw.reason }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Two-Factor Coverage -->
+        {% if report.two_factor_coverage %}
+        <div class="section">
+            <h3><span class="section-icon">&#x1f6e1;</span> Two-Factor Authentication</h3>
+            <div class="twofa-bar">
+                <div class="twofa-track">
+                    <div class="twofa-fill" style="width: {{ report.two_factor_coverage.coverage_percentage }}%;"></div>
+                </div>
+                <span class="twofa-pct">{{ report.two_factor_coverage.coverage_percentage }}%</span>
+            </div>
+            <p style="font-size: .85rem; color: #8b92a5; margin-bottom: 1rem;">
+                {{ report.two_factor_coverage.entries_with_2fa_enabled }} of {{ report.two_factor_coverage.entries_with_2fa_available }} eligible entries have 2FA enabled.
+            </p>
+
+            {% if report.two_factor_coverage.missing_2fa %}
+            <h4 style="font-size: .85rem; color: #8b92a5; margin-bottom: .5rem;">Missing 2FA</h4>
+            {% for item in report.two_factor_coverage.missing_2fa %}
+            <div class="missing-2fa-item">
+                <span class="risk risk-{{ item.risk }}">{{ item.risk }}</span>
+                <span class="title"><a href="{{ url_for('password-managers.entry_detail', entry_id=item.entry_id) }}" style="color: #6c8cff; text-decoration: none;">{{ item.title }}</a></span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Password Age -->
+        {% if report.password_age and report.password_age.older_than_1_year %}
+        <div class="section">
+            <h3><span class="section-icon">&#x23f0;</span> Aging Passwords</h3>
+            <p style="font-size: .85rem; color: #8b92a5; margin-bottom: 1rem;">{{ report.password_age.recommendation }}</p>
+            {% for item in report.password_age.older_than_1_year %}
+            <div class="age-item">
+                <span class="age-title"><a href="{{ url_for('password-managers.entry_detail', entry_id=item.entry_id) }}" style="color: #6c8cff; text-decoration: none;">{{ item.title }}</a></span>
+                <span class="age-days">{{ item.age_days }} days old</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Vault Health -->
+        {% if report.vault_health %}
+        <div class="section">
+            <h3><span class="section-icon">&#x1f4ca;</span> Vault Health</h3>
+            <div class="vault-health-grid">
+                {% for vh in report.vault_health %}
+                <div class="vault-health-card">
+                    <h4>{{ vh.vault_name }}</h4>
+                    <div class="vh-meta">{{ vh.entries }} entries &middot; Avg strength: {{ vh.avg_strength_score }}/5</div>
+                    <ul class="vh-issues">
+                        {% for issue in vh.issues %}
+                        <li>{{ issue }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recommendations -->
+        {% if report.recommendations %}
+        <div class="section">
+            <h3><span class="section-icon">&#x2705;</span> Recommendations</h3>
+            <ul class="issue-list">
+                {% for rec in report.recommendations %}
+                <li class="issue-item">
+                    <div class="priority priority-{{ rec.priority }}"></div>
+                    <div class="issue-text">{{ rec.action }}</div>
+                    {% if rec.entry_id %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=rec.entry_id) }}" class="issue-link">View entry &rarr;</a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

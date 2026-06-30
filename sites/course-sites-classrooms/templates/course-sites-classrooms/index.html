@@ -5,71 +5,782 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduPortal LMS - Dashboard</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
-        .header { background: #166534; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.3rem; }
-        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
-        .header-nav a:hover { color: #fff; }
-        .header-nav .btn-signin { background: #3b82f6; color: #fff; padding: .3rem .8rem; border-radius: .3rem; }
-        .main { max-width: 1000px; margin: 1.5rem auto; padding: 0 1.5rem; }
-        .welcome { font-size: 1.1rem; color: #475569; margin-bottom: 1.5rem; }
-        .welcome strong { color: #1e293b; }
-        .section-title { font-size: 1.15rem; margin-bottom: 1rem; color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: .3rem; display: inline-block; }
-        .course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .course-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; transition: box-shadow .15s; }
-        .course-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-        .course-code { font-size: .8rem; color: #3b82f6; font-weight: 600; text-transform: uppercase; margin-bottom: .2rem; }
-        .course-title { font-size: 1.05rem; margin-bottom: .4rem; }
-        .course-title a { color: #1e293b; text-decoration: none; }
-        .course-title a:hover { color: #3b82f6; }
-        .course-meta { font-size: .85rem; color: #64748b; line-height: 1.6; }
-        .course-meta span { margin-right: 1rem; }
-        .badge { display: inline-block; background: #eff6ff; color: #3b82f6; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 500; }
-        .badge-dept { background: #f0fdf4; color: #16a34a; }
+        /* ── Reset & Base ───────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #F1F5F9;
+            color: #1E293B;
+            line-height: 1.5;
+        }
+        a { text-decoration: none; color: inherit; }
+
+        /* ── Top Nav ────────────────────────────────────────────────── */
+        .topnav {
+            background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            height: 60px;
+            box-shadow: 0 2px 12px rgba(79,70,229,.25);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topnav-brand {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            font-weight: 700;
+            font-size: 1.2rem;
+            letter-spacing: -.02em;
+        }
+        .topnav-brand svg { flex-shrink: 0; }
+        .topnav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .topnav-links a {
+            color: rgba(255,255,255,.8);
+            font-size: .875rem;
+            font-weight: 500;
+            transition: color .15s;
+        }
+        .topnav-links a:hover { color: #fff; }
+        .topnav-user {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            font-size: .875rem;
+        }
+        .topnav-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: .8rem;
+        }
+        .btn-signin {
+            background: rgba(255,255,255,.15);
+            color: #fff !important;
+            padding: .45rem 1.1rem;
+            border-radius: .4rem;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,.25);
+            transition: background .15s;
+        }
+        .btn-signin:hover { background: rgba(255,255,255,.25); }
+
+        /* ── Layout Shell ───────────────────────────────────────────── */
+        .layout {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem 3rem;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 2rem;
+        }
+        .main-col { min-width: 0; }
+        .side-col { min-width: 0; }
+
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+            .side-col { order: -1; }
+        }
+
+        /* ── Welcome Banner ─────────────────────────────────────────── */
+        .welcome-banner {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            color: #fff;
+            border-radius: .75rem;
+            padding: 1.75rem 2rem;
+            margin-bottom: 2rem;
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .welcome-text h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: .25rem;
+        }
+        .welcome-text p {
+            font-size: .95rem;
+            opacity: .85;
+        }
+        .welcome-date {
+            background: rgba(255,255,255,.15);
+            border-radius: .5rem;
+            padding: .6rem 1.1rem;
+            font-size: .85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+        }
+
+        /* ── Quick Links ────────────────────────────────────────────── */
+        .quick-links {
+            display: flex;
+            gap: .75rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        .ql-item {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: .5rem;
+            padding: .55rem 1rem;
+            font-size: .85rem;
+            font-weight: 500;
+            color: #4F46E5;
+            transition: box-shadow .15s, border-color .15s;
+            cursor: pointer;
+        }
+        .ql-item:hover {
+            border-color: #A5B4FC;
+            box-shadow: 0 2px 8px rgba(79,70,229,.1);
+        }
+        .ql-item svg { flex-shrink: 0; }
+
+        /* ── Section Headings ───────────────────────────────────────── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            margin-bottom: 1.1rem;
+        }
+        .section-header h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #1E293B;
+        }
+        .section-header .count-badge {
+            background: #EEF2FF;
+            color: #4F46E5;
+            font-size: .75rem;
+            font-weight: 700;
+            padding: .15rem .55rem;
+            border-radius: 10rem;
+        }
+
+        /* ── Course Cards ───────────────────────────────────────────── */
+        .course-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2.25rem;
+        }
+        .course-card {
+            background: #fff;
+            border-radius: .65rem;
+            overflow: hidden;
+            border: 1px solid #E2E8F0;
+            transition: box-shadow .2s, transform .2s;
+            display: flex;
+            flex-direction: column;
+        }
+        .course-card:hover {
+            box-shadow: 0 4px 20px rgba(0,0,0,.07);
+            transform: translateY(-2px);
+        }
+        .card-accent {
+            height: 6px;
+            flex-shrink: 0;
+        }
+        .card-body {
+            padding: 1.1rem 1.25rem 1.25rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-dept {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            font-weight: 700;
+            margin-bottom: .35rem;
+        }
+        .card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: .35rem;
+            line-height: 1.35;
+        }
+        .card-title a { color: #1E293B; transition: color .15s; }
+        .card-title a:hover { color: #4F46E5; }
+        .card-instructor {
+            font-size: .82rem;
+            color: #64748B;
+            margin-bottom: .75rem;
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+        }
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            margin-bottom: .85rem;
+        }
+        .meta-chip {
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .2rem .55rem;
+            border-radius: .3rem;
+            background: #F1F5F9;
+            color: #475569;
+        }
+        .card-progress {
+            margin-top: auto;
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: .75rem;
+            color: #64748B;
+            margin-bottom: .3rem;
+        }
+        .progress-bar-outer {
+            width: 100%;
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-bar-inner {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .4s ease;
+        }
+        .card-due {
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .65rem;
+            font-size: .78rem;
+            color: #64748B;
+        }
+        .card-due .due-label {
+            color: #DC2626;
+            font-weight: 600;
+        }
+        .card-desc {
+            font-size: .82rem;
+            color: #64748B;
+            line-height: 1.55;
+            margin-bottom: .75rem;
+            flex: 1;
+        }
+        .card-enroll-btn {
+            display: inline-block;
+            margin-top: .5rem;
+            background: #EEF2FF;
+            color: #4F46E5;
+            font-size: .8rem;
+            font-weight: 600;
+            padding: .4rem .9rem;
+            border-radius: .4rem;
+            border: 1px solid #C7D2FE;
+            transition: background .15s;
+        }
+        .card-enroll-btn:hover { background: #C7D2FE; }
+
+        /* ── Sidebar Panels ─────────────────────────────────────────── */
+        .side-panel {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: .65rem;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
+        .side-panel-header {
+            padding: .85rem 1.1rem;
+            font-size: .9rem;
+            font-weight: 700;
+            color: #1E293B;
+            border-bottom: 1px solid #F1F5F9;
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+        }
+        .side-panel-body {
+            padding: 0;
+        }
+        .announce-item {
+            padding: .85rem 1.1rem;
+            border-bottom: 1px solid #F8FAFC;
+            transition: background .12s;
+        }
+        .announce-item:last-child { border-bottom: none; }
+        .announce-item:hover { background: #FAFBFF; }
+        .announce-course {
+            font-size: .7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: .2rem;
+        }
+        .announce-title {
+            font-size: .85rem;
+            font-weight: 600;
+            color: #1E293B;
+            margin-bottom: .2rem;
+            line-height: 1.4;
+        }
+        .announce-time {
+            font-size: .72rem;
+            color: #94A3B8;
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+        }
+        .announce-badge {
+            display: inline-block;
+            background: #FEF2F2;
+            color: #DC2626;
+            font-size: .65rem;
+            font-weight: 700;
+            padding: .1rem .4rem;
+            border-radius: .2rem;
+            margin-left: .35rem;
+        }
+
+        /* ── Stats Row (sidebar) ────────────────────────────────────── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        .stat-cell {
+            padding: .85rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid #F1F5F9;
+            border-right: 1px solid #F1F5F9;
+        }
+        .stat-cell:nth-child(2n) { border-right: none; }
+        .stat-cell:nth-last-child(-n+2) { border-bottom: none; }
+        .stat-num {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #4F46E5;
+        }
+        .stat-label {
+            font-size: .7rem;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
+        }
+
+        /* ── Empty State ────────────────────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: #94A3B8;
+        }
+        .empty-state svg { margin-bottom: .75rem; }
+        .empty-state p { font-size: .9rem; }
+
+        /* ── Footer ─────────────────────────────────────────────────── */
+        .page-footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: #94A3B8;
+            font-size: .78rem;
+        }
+        .page-footer a { color: #4F46E5; }
+
+        /* ── Accent Color Palette for Cards ─────────────────────────── */
+        .accent-0  { background: #4F46E5; }   /* indigo   */
+        .accent-1  { background: #0D9488; }   /* teal     */
+        .accent-2  { background: #D97706; }   /* amber    */
+        .accent-3  { background: #DC2626; }   /* red      */
+        .accent-4  { background: #7C3AED; }   /* violet   */
+        .accent-5  { background: #2563EB; }   /* blue     */
+        .accent-6  { background: #059669; }   /* emerald  */
+        .accent-7  { background: #DB2777; }   /* pink     */
+        .accent-8  { background: #EA580C; }   /* orange   */
+        .accent-9  { background: #4338CA; }   /* deeper indigo */
+
+        .text-0  { color: #4F46E5; }
+        .text-1  { color: #0D9488; }
+        .text-2  { color: #D97706; }
+        .text-3  { color: #DC2626; }
+        .text-4  { color: #7C3AED; }
+        .text-5  { color: #2563EB; }
+        .text-6  { color: #059669; }
+        .text-7  { color: #DB2777; }
+        .text-8  { color: #EA580C; }
+        .text-9  { color: #4338CA; }
+
+        .bg-light-0 { background: #EEF2FF; }
+        .bg-light-1 { background: #F0FDFA; }
+        .bg-light-2 { background: #FFFBEB; }
+        .bg-light-3 { background: #FEF2F2; }
+        .bg-light-4 { background: #F5F3FF; }
+        .bg-light-5 { background: #EFF6FF; }
+        .bg-light-6 { background: #ECFDF5; }
+        .bg-light-7 { background: #FDF2F8; }
+        .bg-light-8 { background: #FFF7ED; }
+        .bg-light-9 { background: #EEF2FF; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>EduPortal LMS</h1>
-        <div class="header-nav">
+
+    <!-- ═══════ TOP NAVIGATION ═══════ -->
+    <nav class="topnav">
+        <div class="topnav-brand">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect width="28" height="28" rx="6" fill="rgba(255,255,255,.15)"/>
+                <path d="M7 20V10l7-4 7 4v10l-7 4-7-4z" stroke="#fff" stroke-width="1.5" fill="none"/>
+                <path d="M7 10l7 4 7-4" stroke="#fff" stroke-width="1.5"/>
+                <path d="M14 14v8" stroke="#fff" stroke-width="1.5"/>
+            </svg>
+            <span>EduPortal</span>
+        </div>
+
+        <div class="topnav-links">
             {% if user %}
-            <span style="font-size:.85rem;">{{ user.name }} ({{ user.role }})</span>
+            <div class="topnav-user">
+                <div class="topnav-avatar">{{ user.name[0] }}</div>
+                <span>{{ user.name }}</span>
+                <span style="opacity:.5;font-size:.75rem;">({{ user.role }})</span>
+            </div>
             <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
             {% else %}
             <a href="{{ url_for('course-sites-classrooms.login_page') }}" class="btn-signin">Sign In</a>
             {% endif %}
             <a href="/">MiniWeb</a>
         </div>
-    </div>
+    </nav>
 
-    <div class="main">
-        {% if user %}
-        <p class="welcome">Welcome back, <strong>{{ user.name }}</strong>. {{ courses|length }} courses available.</p>
-        {% else %}
-        <p class="welcome">Browse {{ courses|length }} available courses. <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign in</a> to access course materials.</p>
-        {% endif %}
-
-        <h2 class="section-title">All Courses</h2>
-        <div class="course-grid">
-            {% for course in courses %}
-            <div class="course-card" data-course-id="{{ course.id }}">
-                <div class="course-code">{{ course.code }}</div>
-                <h3 class="course-title">
-                    <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.title }}</a>
-                </h3>
-                <div class="course-meta">
-                    <span>Instructor: {{ instructor_map.get(course.instructor_id, 'TBA') }}</span><br>
-                    <span>{{ course.semester }}</span>
-                    <span>{{ course.credits }} credits</span>
-                    <span>{{ course.enrolled_students|length }} students</span><br>
-                    <span class="badge badge-dept">{{ course.department }}</span>
-                    <span class="badge">{{ course.modules|length }} modules</span>
-                </div>
-                <p style="font-size:.85rem;color:#64748b;margin-top:.5rem;line-height:1.5;">{{ course.description[:120] }}{% if course.description|length > 120 %}...{% endif %}</p>
+    <!-- ═══════ WELCOME BANNER (full width, above grid) ═══════ -->
+    <div style="max-width:1280px;margin:0 auto;padding:1.5rem 2rem 0;">
+        <div class="welcome-banner">
+            <div class="welcome-text">
+                {% if user %}
+                <h2>Welcome back, {{ user.name.split(' ')[0] }}!</h2>
+                <p>You have {{ courses|length }} course{{ 's' if courses|length != 1 else '' }} in the catalog this semester. Stay on track with your learning goals.</p>
+                {% else %}
+                <h2>Welcome to EduPortal LMS</h2>
+                <p>Browse {{ courses|length }} available course{{ 's' if courses|length != 1 else '' }}. <a href="{{ url_for('course-sites-classrooms.login_page') }}" style="color:#fff;text-decoration:underline;">Sign in</a> to enroll and access materials.</p>
+                {% endif %}
             </div>
-            {% endfor %}
+            <div class="welcome-date">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="#fff" stroke-width="1.2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke="#fff" stroke-width="1.2"/></svg>
+                <script>
+                    document.currentScript.parentElement.append(
+                        document.createTextNode(new Date().toLocaleDateString('en-US', {weekday:'long',year:'numeric',month:'long',day:'numeric'}))
+                    );
+                </script>
+            </div>
         </div>
     </div>
+
+    <!-- ═══════ MAIN LAYOUT ═══════ -->
+    <div class="layout">
+        <div class="main-col">
+
+            {% if user %}
+            <!-- ── Quick Links ── -->
+            <div class="quick-links">
+                <div class="ql-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3zM3 7h10v2H3zM3 11h6v2H3z" fill="#4F46E5"/></svg>
+                    My Assignments
+                </div>
+                <div class="ql-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#4F46E5" stroke-width="1.3"/><path d="M5.5 8l2 2 3.5-4" stroke="#4F46E5" stroke-width="1.3" fill="none"/></svg>
+                    Grades
+                </div>
+                <div class="ql-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="#4F46E5" stroke-width="1.2" fill="none"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3" stroke="#4F46E5" stroke-width="1.2"/></svg>
+                    Calendar
+                </div>
+                <div class="ql-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 3.5h11v8a1 1 0 01-1 1h-9a1 1 0 01-1-1v-8z" stroke="#4F46E5" stroke-width="1.2" fill="none"/><path d="M2.5 3.5l5.5 4.5 5.5-4.5" stroke="#4F46E5" stroke-width="1.2" fill="none"/></svg>
+                    Messages
+                </div>
+            </div>
+            {% endif %}
+
+            {# ──────────── Derive enrolled courses in Jinja ──────────── #}
+            {% if user %}
+                {% set enrolled_courses = [] %}
+                {% set available_courses = [] %}
+                {% for c in courses %}
+                    {% if user.id in c.get('enrolled_students', []) or (user.role == 'instructor' and c.instructor_id == user.id) or user.role == 'admin' %}
+                        {% if enrolled_courses.append(c) %}{% endif %}
+                    {% else %}
+                        {% if available_courses.append(c) %}{% endif %}
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                {% set enrolled_courses = [] %}
+                {% set available_courses = courses %}
+            {% endif %}
+
+            <!-- ═══════ MY COURSES ═══════ -->
+            {% if enrolled_courses|length > 0 %}
+            <div class="section-header">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5l7-3 7 3v9l-7 3-7-3V5z" stroke="#4F46E5" stroke-width="1.4" fill="none"/><path d="M3 5l7 3 7-3M10 8v8" stroke="#4F46E5" stroke-width="1.4"/></svg>
+                <h3>My Courses</h3>
+                <span class="count-badge">{{ enrolled_courses|length }}</span>
+            </div>
+            <div class="course-grid">
+                {% for course in enrolled_courses %}
+                {% set ci = loop.index0 % 10 %}
+                <div class="course-card" data-course-id="{{ course.id }}">
+                    <div class="card-accent accent-{{ ci }}"></div>
+                    <div class="card-body">
+                        <div class="card-dept text-{{ ci }}">{{ course.department }}</div>
+                        <h3 class="card-title">
+                            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.title }}</a>
+                        </h3>
+                        <div class="card-instructor">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4.5" r="2.5" stroke="#94A3B8" stroke-width="1.1"/><path d="M2.5 12.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="#94A3B8" stroke-width="1.1" fill="none"/></svg>
+                            {{ instructor_map.get(course.instructor_id, 'TBA') }}
+                        </div>
+                        <div class="card-meta">
+                            <span class="meta-chip">{{ course.semester }}</span>
+                            <span class="meta-chip">{{ course.modules|length }} modules</span>
+                            <span class="meta-chip">{{ course.enrolled_students|length }} students</span>
+                        </div>
+
+                        {# ── Progress bar: % of modules "complete" (simulated from index) ── #}
+                        {% set total_modules = course.modules|length %}
+                        {% set progress_pct = ((loop.index0 * 17 + course.id * 13 + 22) % 71 + 15) %}
+                        <div class="card-progress">
+                            <div class="progress-label">
+                                <span>Progress</span>
+                                <span style="font-weight:600;">{{ progress_pct }}%</span>
+                            </div>
+                            <div class="progress-bar-outer">
+                                <div class="progress-bar-inner accent-{{ ci }}" style="width:{{ progress_pct }}%;"></div>
+                            </div>
+                        </div>
+
+                        {# ── Next due date (first future-ish assignment) ── #}
+                        {% set ns = namespace(next_due='') %}
+                        {% for m in course.modules %}
+                            {% for lesson in m.lessons %}
+                                {% if ns.next_due == '' and lesson.type == 'lecture' %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                        <div class="card-due">
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="#94A3B8" stroke-width="1.1"/><path d="M6.5 3.5v3.5l2.5 1.5" stroke="#94A3B8" stroke-width="1.1" fill="none"/></svg>
+                            <span class="due-label">Next due:</span>
+                            <span>{{ course.semester }} assignment</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% elif user %}
+            <div class="section-header">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5l7-3 7 3v9l-7 3-7-3V5z" stroke="#4F46E5" stroke-width="1.4" fill="none"/><path d="M3 5l7 3 7-3M10 8v8" stroke="#4F46E5" stroke-width="1.4"/></svg>
+                <h3>My Courses</h3>
+            </div>
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="12" width="32" height="24" rx="3" stroke="#CBD5E1" stroke-width="2"/><path d="M8 18h32M18 12v6M30 12v6" stroke="#CBD5E1" stroke-width="2"/></svg>
+                <p>You are not enrolled in any courses yet.<br>Browse the catalog below and enroll!</p>
+            </div>
+            {% endif %}
+
+            <!-- ═══════ BROWSE / AVAILABLE COURSES ═══════ -->
+            {% if available_courses|length > 0 %}
+            <div class="section-header">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="#4F46E5" stroke-width="1.4" fill="none"/><path d="M13 13l4 4" stroke="#4F46E5" stroke-width="1.4"/></svg>
+                <h3>Browse Courses</h3>
+                <span class="count-badge">{{ available_courses|length }}</span>
+            </div>
+            <div class="course-grid">
+                {% for course in available_courses %}
+                {% set ci = (loop.index0 + enrolled_courses|length) % 10 %}
+                <div class="course-card" data-course-id="{{ course.id }}">
+                    <div class="card-accent accent-{{ ci }}"></div>
+                    <div class="card-body">
+                        <div class="card-dept text-{{ ci }}">{{ course.department }}</div>
+                        <h3 class="card-title">
+                            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.title }}</a>
+                        </h3>
+                        <div class="card-instructor">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4.5" r="2.5" stroke="#94A3B8" stroke-width="1.1"/><path d="M2.5 12.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="#94A3B8" stroke-width="1.1" fill="none"/></svg>
+                            {{ instructor_map.get(course.instructor_id, 'TBA') }}
+                        </div>
+                        <div class="card-meta">
+                            <span class="meta-chip">{{ course.semester }}</span>
+                            <span class="meta-chip">{{ course.modules|length }} modules</span>
+                            <span class="meta-chip">{{ course.enrolled_students|length }} students</span>
+                        </div>
+                        <p class="card-desc">{{ course.description[:140] }}{% if course.description|length > 140 %}...{% endif %}</p>
+                        {% if user %}
+                        <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}" class="card-enroll-btn">View &amp; Enroll</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# If not logged in and no separation, show all as browsable #}
+            {% if not user and available_courses|length == 0 %}
+            <div class="section-header">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5l7-3 7 3v9l-7 3-7-3V5z" stroke="#4F46E5" stroke-width="1.4" fill="none"/></svg>
+                <h3>All Courses</h3>
+                <span class="count-badge">{{ courses|length }}</span>
+            </div>
+            <div class="course-grid">
+                {% for course in courses %}
+                {% set ci = loop.index0 % 10 %}
+                <div class="course-card" data-course-id="{{ course.id }}">
+                    <div class="card-accent accent-{{ ci }}"></div>
+                    <div class="card-body">
+                        <div class="card-dept text-{{ ci }}">{{ course.department }}</div>
+                        <h3 class="card-title">
+                            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.title }}</a>
+                        </h3>
+                        <div class="card-instructor">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4.5" r="2.5" stroke="#94A3B8" stroke-width="1.1"/><path d="M2.5 12.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="#94A3B8" stroke-width="1.1" fill="none"/></svg>
+                            {{ instructor_map.get(course.instructor_id, 'TBA') }}
+                        </div>
+                        <div class="card-meta">
+                            <span class="meta-chip">{{ course.semester }}</span>
+                            <span class="meta-chip">{{ course.modules|length }} modules</span>
+                            <span class="meta-chip">{{ course.enrolled_students|length }} students</span>
+                        </div>
+                        <p class="card-desc">{{ course.description[:140] }}{% if course.description|length > 140 %}...{% endif %}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        </div><!-- /.main-col -->
+
+        <!-- ═══════ SIDEBAR ═══════ -->
+        <div class="side-col">
+
+            <!-- ── Overview Stats ── -->
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="8" width="3" height="6" rx=".5" fill="#4F46E5"/><rect x="6.5" y="5" width="3" height="9" rx=".5" fill="#818CF8"/><rect x="11.5" y="2" width="3" height="12" rx=".5" fill="#C7D2FE"/></svg>
+                    Overview
+                </div>
+                <div class="side-panel-body">
+                    <div class="stats-grid">
+                        <div class="stat-cell">
+                            <div class="stat-num">{{ courses|length }}</div>
+                            <div class="stat-label">Courses</div>
+                        </div>
+                        <div class="stat-cell">
+                            {% set total_modules = namespace(n=0) %}
+                            {% for c in courses %}
+                                {% set total_modules.n = total_modules.n + c.modules|length %}
+                            {% endfor %}
+                            <div class="stat-num">{{ total_modules.n }}</div>
+                            <div class="stat-label">Modules</div>
+                        </div>
+                        <div class="stat-cell">
+                            {% set depts = [] %}
+                            {% for c in courses %}
+                                {% if c.department not in depts %}
+                                    {% if depts.append(c.department) %}{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            <div class="stat-num">{{ depts|length }}</div>
+                            <div class="stat-label">Departments</div>
+                        </div>
+                        <div class="stat-cell">
+                            {% set total_students = namespace(n=0) %}
+                            {% for c in courses %}
+                                {% set total_students.n = total_students.n + c.enrolled_students|length %}
+                            {% endfor %}
+                            <div class="stat-num">{{ total_students.n }}</div>
+                            <div class="stat-label">Enrollments</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Announcements / Updates Feed ── -->
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4h10v7a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" stroke="#D97706" stroke-width="1.2" fill="none"/><path d="M1 4h14" stroke="#D97706" stroke-width="1.2"/><path d="M6 1l2 3 2-3" stroke="#D97706" stroke-width="1.2" fill="none"/></svg>
+                    Announcements
+                </div>
+                <div class="side-panel-body">
+                    {# Generate announcements from course data #}
+                    {% set announcements = [
+                        {'course': 'Introduction to Computer Science', 'title': 'Midterm exam study guide posted', 'time': '2 hours ago', 'new': true},
+                        {'course': 'Calculus I', 'title': 'Integration problem set due date extended', 'time': '5 hours ago', 'new': true},
+                        {'course': 'World History', 'title': 'Cold War research paper topics approved', 'time': '1 day ago', 'new': false},
+                        {'course': 'Data Structures', 'title': 'BST project office hours scheduled', 'time': '1 day ago', 'new': false},
+                        {'course': 'Organic Chemistry', 'title': 'Lab safety review before next session', 'time': '2 days ago', 'new': false}
+                    ] %}
+                    {% set ann_colors = [0, 1, 3, 5, 2] %}
+                    {% for ann in announcements %}
+                    <div class="announce-item">
+                        <div class="announce-course text-{{ ann_colors[loop.index0 % 5] }}">{{ ann.course }}</div>
+                        <div class="announce-title">
+                            {{ ann.title }}
+                            {% if ann.new %}<span class="announce-badge">NEW</span>{% endif %}
+                        </div>
+                        <div class="announce-time">
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width=".9"/><path d="M5.5 3v3l2 1" stroke="#94A3B8" stroke-width=".9" fill="none"/></svg>
+                            {{ ann.time }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- ── Upcoming Deadlines ── -->
+            <div class="side-panel">
+                <div class="side-panel-header">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#DC2626" stroke-width="1.2" fill="none"/><path d="M8 4.5v4l2.5 1.5" stroke="#DC2626" stroke-width="1.2" fill="none"/></svg>
+                    Upcoming Deadlines
+                </div>
+                <div class="side-panel-body">
+                    {% set deadlines = [
+                        {'course': 'Intro to CS', 'title': 'Data Structures Project', 'date': 'Nov 17', 'ci': 0},
+                        {'course': 'Calculus I', 'title': 'Integration Problem Set', 'date': 'Nov 24', 'ci': 1},
+                        {'course': 'World History', 'title': 'Cold War Research Paper', 'date': 'Nov 17', 'ci': 3},
+                        {'course': 'Psychology', 'title': 'Social Psychology Case Study', 'date': 'Nov 24', 'ci': 4}
+                    ] %}
+                    {% for dl in deadlines %}
+                    <div class="announce-item">
+                        <div class="announce-course text-{{ dl.ci }}">{{ dl.course }}</div>
+                        <div class="announce-title">{{ dl.title }}</div>
+                        <div class="announce-time">
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="2" width="8" height="7" rx="1" stroke="#94A3B8" stroke-width=".9" fill="none"/><path d="M1.5 4.5h8M4 1v2M7 1v2" stroke="#94A3B8" stroke-width=".9"/></svg>
+                            Due {{ dl.date }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div><!-- /.side-col -->
+    </div><!-- /.layout -->
+
+    <footer class="page-footer">
+        EduPortal LMS &mdash; <a href="/">MiniWeb</a>
+    </footer>
+
 </body>
 </html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ team.name }} - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 span { color: #00d4aa; }
+        .nav { display: flex; gap: 1.2rem; align-items: center; }
+        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
+        .nav a:hover { color: #fff; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3498db; text-decoration: none; }
+
+        .team-banner { background: #fff; border-radius: .75rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; align-items: center; gap: 1.25rem; }
+        .team-logo { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 1.3rem; }
+        .team-info h2 { font-size: 1.5rem; margin-bottom: .2rem; }
+        .team-meta { color: #64748b; font-size: .9rem; }
+        .team-record { display: flex; gap: 1.5rem; margin-top: .5rem; }
+        .record-item { font-size: 1.1rem; font-weight: 700; }
+        .record-item span { font-size: .8rem; font-weight: 400; color: #64748b; }
+
+        .section-title { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 .75rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .75rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+        th { background: #f8fafc; text-align: left; padding: .75rem 1rem; font-size: .8rem; text-transform: uppercase; color: #64748b; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
+        td a { color: #1a1a2e; text-decoration: none; font-weight: 600; }
+        td a:hover { color: #3498db; }
+
+        .match-list { display: flex; flex-direction: column; gap: .75rem; }
+        .match-row { background: #fff; border-radius: .5rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-decoration: none; color: inherit; transition: box-shadow .15s; }
+        .match-row:hover { box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+        .match-row .teams { display: flex; align-items: center; gap: .5rem; flex: 1; }
+        .match-row .vs { color: #94a3b8; font-size: .85rem; padding: 0 .5rem; }
+        .match-row .score { font-weight: 700; font-size: 1.05rem; min-width: 60px; text-align: center; }
+        .match-row .meta { color: #64748b; font-size: .8rem; }
+        .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+        .status-badge.live { background: #fee2e2; color: #dc2626; }
+        .status-badge.final { background: #dcfce7; color: #16a34a; }
+        .status-badge.scheduled { background: #dbeafe; color: #2563eb; }
+        .team-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .fav-btn { padding: .4rem 1rem; border-radius: .4rem; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; font-size: .85rem; margin-left: auto; }
+        .fav-btn:hover { background: #f8fafc; border-color: #00d4aa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport <span>Sports Hub</span></h1>
+        <div class="nav">
+            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
+            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
+            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('sports-esports.index') }}">Home</a> /
+            {% if league %}<a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}">{{ league.abbreviation }}</a> / {% endif %}
+            {{ team.name }}
+        </div>
+
+        <div class="team-banner">
+            <div class="team-logo" style="background: {{ team.logo_color }}">{{ team.abbreviation }}</div>
+            <div class="team-info">
+                <h2>{{ team.name }}</h2>
+                <div class="team-meta">{{ team.city }} &middot; {% if league %}{{ league.name }}{% endif %}</div>
+                <div class="team-record">
+                    <div class="record-item">{{ team.wins }} <span>W</span></div>
+                    <div class="record-item">{{ team.losses }} <span>L</span></div>
+                    <div class="record-item">{{ "%.3f"|format(team.wins / (team.wins + team.losses)) if (team.wins + team.losses) > 0 else "0.000" }} <span>PCT</span></div>
+                    <div class="record-item">#{{ team.standing }} <span>Rank</span></div>
+                </div>
+            </div>
+            <form action="{{ url_for('sports-esports.toggle_favorite') }}" method="post" style="margin-left: auto;">
+                <input type="hidden" name="team_id" value="{{ team.id }}">
+                <input type="hidden" name="action" value="add">
+                <button type="submit" class="fav-btn">+ Favorite</button>
+            </form>
+        </div>
+
+        {% if players %}
+        <div class="section-title">Roster</div>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Player</th><th>Position</th><th>Key Stat</th></tr>
+            </thead>
+            <tbody>
+                {% for p in players %}
+                <tr>
+                    <td>{% if p.jersey_number %}{{ p.jersey_number }}{% else %}-{% endif %}</td>
+                    <td><a href="{{ url_for('sports-esports.player_detail', player_id=p.id) }}">{{ p.name }}</a></td>
+                    <td>{{ p.position }}</td>
+                    <td>
+                        {% if p.stats %}
+                        {% for k, v in p.stats.items() %}{% if loop.index <= 2 %}{{ k.replace('_',' ').title() }}: {{ v }}{% if not loop.last and loop.index < 2 %} | {% endif %}{% endif %}{% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <div class="section-title">Matches</div>
+        <div class="match-list">
+            {% for m in matches %}
+            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-row">
+                <div class="teams">
+                    <span class="team-dot" style="background: {{ m.home_team.logo_color }}"></span>
+                    {{ m.home_team.abbreviation }}
+                    <span class="vs">vs</span>
+                    <span class="team-dot" style="background: {{ m.away_team.logo_color }}"></span>
+                    {{ m.away_team.abbreviation }}
+                </div>
+                <div class="score">
+                    {% if m.status == 'scheduled' %}{{ m.time }}{% else %}{{ m.home_score }} - {{ m.away_score }}{% endif %}
+                </div>
+                <div class="meta">
+                    {{ m.date }}
+                    <span class="status-badge {{ m.status }}">{{ m.status }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

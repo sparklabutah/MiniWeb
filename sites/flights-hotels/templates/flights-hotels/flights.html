@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flights - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .page-title { font-size: 1.4rem; color: #1a365d; margin-bottom: .3rem; }
+        .result-count { color: #718096; font-size: .9rem; margin-bottom: 1.5rem; }
+        .filters { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .filters form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; }
+        .filters .form-group { flex: 1; min-width: 130px; }
+        .filters label { display: block; font-size: .78rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        .filters select, .filters input { width: 100%; padding: .45rem .6rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .88rem; }
+        .filters select:focus, .filters input:focus { outline: none; border-color: #4299e1; }
+        .filter-btn { background: #2b6cb0; color: #fff; border: none; padding: .5rem 1.2rem; border-radius: .3rem; cursor: pointer; font-size: .88rem; font-weight: 600; white-space: nowrap; }
+        .filter-btn:hover { background: #1a365d; }
+        .clear-link { font-size: .82rem; color: #e53e3e; text-decoration: none; white-space: nowrap; }
+        .flight-card { background: #fff; border-radius: .5rem; padding: 1.2rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; gap: 1.2rem; text-decoration: none; color: inherit; transition: box-shadow .15s, border-color .15s; border: 1px solid transparent; }
+        .flight-card:hover { border-color: #4299e1; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .flight-airline { min-width: 120px; }
+        .flight-airline .airline-name { font-weight: 600; font-size: .95rem; color: #1a365d; }
+        .flight-airline .flight-num { font-size: .82rem; color: #718096; }
+        .flight-route { flex: 1; display: flex; align-items: center; gap: .8rem; }
+        .flight-endpoint { text-align: center; }
+        .flight-endpoint .code { font-size: 1.2rem; font-weight: 700; color: #2d3748; }
+        .flight-endpoint .time { font-size: .85rem; color: #4a5568; }
+        .flight-endpoint .city { font-size: .75rem; color: #a0aec0; }
+        .flight-arrow { color: #a0aec0; font-size: .85rem; text-align: center; flex: 1; }
+        .flight-arrow .duration { font-size: .78rem; display: block; }
+        .flight-arrow .stops { font-size: .72rem; color: #718096; }
+        .flight-meta { text-align: right; min-width: 100px; }
+        .flight-price { font-size: 1.3rem; font-weight: 700; color: #2b6cb0; }
+        .flight-class { font-size: .75rem; text-transform: uppercase; font-weight: 600; padding: .15rem .5rem; border-radius: .2rem; display: inline-block; margin-top: .2rem; }
+        .flight-class.economy { background: #e6fffa; color: #234e52; }
+        .flight-class.business { background: #ebf4ff; color: #1a365d; }
+        .flight-class.first { background: #fefcbf; color: #744210; }
+        .flight-date { font-size: .78rem; color: #718096; margin-top: .2rem; }
+        .no-results { text-align: center; color: #a0aec0; padding: 3rem; background: #fff; border-radius: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}" class="active">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2 class="page-title">Flight Results</h2>
+        <p class="result-count">{{ total }} flight{{ 's' if total != 1 else '' }} found</p>
+
+        <div class="filters">
+            <form method="get" action="{{ url_for('flights-hotels.flights_page') }}">
+                <div class="form-group">
+                    <label>From</label>
+                    <select name="origin">
+                        <option value="">Any</option>
+                        {% for ap in airports %}
+                        <option value="{{ ap }}" {{ 'selected' if origin == ap else '' }}>{{ ap }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>To</label>
+                    <select name="destination">
+                        <option value="">Any</option>
+                        {% for ap in airports %}
+                        <option value="{{ ap }}" {{ 'selected' if destination == ap else '' }}>{{ ap }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="date" value="{{ date }}">
+                </div>
+                <div class="form-group">
+                    <label>Airline</label>
+                    <select name="airline">
+                        <option value="">Any</option>
+                        {% for a in airlines %}
+                        <option value="{{ a }}" {{ 'selected' if airline == a else '' }}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Class</label>
+                    <select name="class">
+                        <option value="">Any</option>
+                        <option value="economy" {{ 'selected' if flight_class == 'economy' else '' }}>Economy</option>
+                        <option value="business" {{ 'selected' if flight_class == 'business' else '' }}>Business</option>
+                        <option value="first" {{ 'selected' if flight_class == 'first' else '' }}>First</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Max Price</label>
+                    <input type="number" name="max_price" value="{{ max_price }}" placeholder="$">
+                </div>
+                <div class="form-group">
+                    <label>Sort</label>
+                    <select name="sort">
+                        <option value="price" {{ 'selected' if sort == 'price' else '' }}>Price</option>
+                        <option value="duration" {{ 'selected' if sort == 'duration' else '' }}>Duration</option>
+                        <option value="departure" {{ 'selected' if sort == 'departure' else '' }}>Departure</option>
+                        <option value="date" {{ 'selected' if sort == 'date' else '' }}>Date</option>
+                    </select>
+                </div>
+                <button type="submit" class="filter-btn">Filter</button>
+                <a href="{{ url_for('flights-hotels.flights_page') }}" class="clear-link">Clear</a>
+            </form>
+        </div>
+
+        {% if flights %}
+        {% for f in flights %}
+        <a class="flight-card" href="{{ url_for('flights-hotels.flight_detail', flight_id=f.id) }}">
+            <div class="flight-airline">
+                <div class="airline-name">{{ f.eff_airline or f.airline or f.carrier_lg or '' }}</div>
+                <div class="flight-num">{{ f.flight_number or '' }}</div>
+            </div>
+            <div class="flight-route">
+                <div class="flight-endpoint">
+                    <div class="code">{{ f.eff_origin or f.origin or f.airport_1 or '' }}</div>
+                    <div class="time">{{ f.departure_time or '' }}</div>
+                    <div class="city">{{ f.eff_origin_city or f.origin_city or f.city1 or '' }}</div>
+                </div>
+                <div class="flight-arrow">
+                    &#8594;
+                    {% if f.duration_minutes %}<span class="duration">{{ f.duration_minutes // 60 }}h {{ f.duration_minutes % 60 }}m</span>{% elif f.nsmiles %}<span class="duration">{{ f.nsmiles }} mi</span>{% endif %}
+                    <span class="stops">{{ 'Nonstop' if f.stops == 0 else ('%d stop' % f.stops + ('s' if f.stops > 1 else '')) if f.stops else 'Nonstop' }}</span>
+                </div>
+                <div class="flight-endpoint">
+                    <div class="code">{{ f.eff_dest or f.destination or f.airport_2 or '' }}</div>
+                    <div class="time">{{ f.arrival_time or '' }}</div>
+                    <div class="city">{{ f.eff_dest_city or f.dest_city or f.city2 or '' }}</div>
+                </div>
+            </div>
+            <div class="flight-meta">
+                <div class="flight-price">${{ "%.2f"|format(f.eff_price or f.price or f.fare or 0) }}</div>
+                <span class="flight-class {{ f.class or 'economy' }}">{{ f.class or 'economy' }}</span>
+                <div class="flight-date">{{ f.date or '' }}</div>
+            </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="no-results">No flights match your search criteria. Try adjusting the filters.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

@@ -1,0 +1,110 @@
+[
+  {
+    "type": "observation",
+    "step": 0,
+    "url": "/sites/business-company/",
+    "title": "Apex Dynamics Corp - Homepage",
+    "ax_tree_summary": "Homepage for Apex Dynamics Corp. H1: Empowering Businesses Through Technology. Navigation: Products, Team, Services, Blog, Careers, Contact, Newsletter. Featured Products: Real-time Security Gateway, Streamlined API Management Layer, Cloud-native Data Pipeline. Services section with 6 services. Team section with 6 members. Blog section with 3 latest articles. Newsletter subscribe form. Export CSV links for products, services, team, posts."
+  },
+  {
+    "type": "action",
+    "step": 1,
+    "macro": "export_by_dropdown",
+    "action": "GET /sites/business-company/api/export?resource=products&format=csv",
+    "description": "Clicked the 'Export CSV' link on the Products section to export all products as CSV."
+  },
+  {
+    "type": "observation",
+    "step": 1,
+    "url": "/sites/business-company/api/export?resource=products&format=csv",
+    "title": "Products CSV Export",
+    "ax_tree_summary": "CSV file downloaded with header row (id,name,category,description,price_monthly,features,is_featured) and 12 data rows, one for each product.",
+    "extracted_value": {
+      "format": "csv",
+      "resource": "products",
+      "header_columns": 7,
+      "data_rows": 12
+    }
+  },
+  {
+    "type": "action",
+    "step": 2,
+    "macro": "extract_from_table",
+    "action": "GET /sites/business-company/api/compare?resource=products&ids=1,2",
+    "description": "Used the compare API to compare products with ID 1 and ID 2, extracting their categories."
+  },
+  {
+    "type": "observation",
+    "step": 2,
+    "url": "/sites/business-company/api/compare?resource=products&ids=1,2",
+    "title": "Product Comparison",
+    "ax_tree_summary": "API returned comparison of 2 products: Product 1 (Real-time Security Gateway, category Automation, no price) and Product 2 (Streamlined API Management Layer, category Enterprise Software, $18900/mo).",
+    "extracted_value": {
+      "product_1": {
+        "id": 1,
+        "name": "Real-time Security Gateway",
+        "category": "Automation"
+      },
+      "product_2": {
+        "id": 2,
+        "name": "Streamlined API Management Layer",
+        "category": "Enterprise Software"
+      }
+    }
+  },
+  {
+    "type": "action",
+    "step": 3,
+    "macro": "navigate_by_semantic",
+    "action": "GET /sites/business-company/about",
+    "description": "Navigated to the Team/About page by clicking the 'Team' link in the navigation bar, which semantically corresponds to the company's team/about section."
+  },
+  {
+    "type": "observation",
+    "step": 3,
+    "url": "/sites/business-company/about",
+    "title": "About Apex Dynamics",
+    "ax_tree_summary": "About page showing 20 team members listed with name, title, department. Members include Jason Harris (Engineering Manager), William Young (Marketing Director), Robert Baker (Content Strategist), Carol Mitchell (General Counsel), and 16 more. Filter by Department dropdown available."
+  },
+  {
+    "type": "action",
+    "step": 4,
+    "macro": "search_by_query",
+    "action": "GET /sites/business-company/api/products/search?q=analytics",
+    "description": "Used the product search API to search for products containing the word 'analytics'."
+  },
+  {
+    "type": "observation",
+    "step": 4,
+    "url": "/sites/business-company/api/products/search?q=analytics",
+    "title": "Product Search Results",
+    "ax_tree_summary": "Search returned 2 products matching 'analytics': 1) Integrated CRM Suite (Data Analytics, id=4), 2) Advanced Analytics Platform (Cybersecurity, id=11).",
+    "extracted_value": {
+      "query": "analytics",
+      "result_count": 2,
+      "results": [
+        "Integrated CRM Suite",
+        "Advanced Analytics Platform"
+      ]
+    }
+  },
+  {
+    "type": "action",
+    "step": 5,
+    "macro": "search_by_semantic",
+    "action": "GET /sites/business-company/api/products/semantic?q=security+and+protection",
+    "description": "Used the semantic search API to find products related to 'security and protection'."
+  },
+  {
+    "type": "observation",
+    "step": 5,
+    "url": "/sites/business-company/api/products/semantic?q=security+and+protection",
+    "title": "Semantic Search Results",
+    "ax_tree_summary": "API returned 3 products matching 'security and protection': 1) Real-time Security Gateway (Automation), 2) Automated Integration Framework (Cybersecurity), 3) Advanced Analytics Platform (Cybersecurity).",
+    "extracted_value": {
+      "query": "security and protection",
+      "result_count": 3,
+      "first_result": "Real-time Security Gateway"
+    }
+  }
+]

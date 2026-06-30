@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FundSpark - Dashboard</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fafafa; color: #282828; line-height: 1.5; }
+        a { text-decoration: none; color: inherit; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e6e6e6; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+        .navbar-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #282828; }
+        .navbar-brand em { font-style: normal; color: #2bde73; }
+        .navbar-links { display: flex; align-items: center; gap: 1.5rem; }
+        .navbar-links a { font-size: .875rem; font-weight: 500; color: #656969; transition: color .15s; }
+        .navbar-links a:hover { color: #282828; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .dash-header { margin-bottom: 2rem; }
+        .dash-header h1 { font-size: 1.6rem; font-weight: 800; }
+        .dash-header p { font-size: .9rem; color: #888; margin-top: .2rem; }
+
+        .section-title { font-size: 1rem; font-weight: 700; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+        .section-count { font-size: .75rem; background: #f0f0f0; color: #666; padding: .15rem .5rem; border-radius: 10px; font-weight: 600; }
+
+        .campaign-card { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 1.25rem; margin-bottom: .75rem; transition: box-shadow .15s; }
+        .campaign-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+        .campaign-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: .4rem; }
+        .campaign-card h3 a { color: #282828; }
+        .campaign-card h3 a:hover { color: #2bde73; }
+        .card-stats { display: flex; gap: 1.2rem; font-size: .82rem; color: #777; margin-bottom: .5rem; align-items: center; }
+        .card-stats .raised { font-weight: 700; color: #282828; }
+        .status-pill { display: inline-flex; align-items: center; padding: .15rem .5rem; border-radius: 12px; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+        .status-pill.funded { background: #d1fae5; color: #065f46; }
+        .status-pill.active { background: #e8faf0; color: #0d9f52; }
+        .status-pill.expired { background: #f1f5f9; color: #64748b; }
+        .status-pill.cancelled { background: #fee2e2; color: #991b1b; }
+        .progress-track { background: #ececec; border-radius: 4px; height: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; background: #2bde73; }
+
+        .backed-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #eee; }
+        .backed-table th { text-align: left; padding: .7rem 1rem; font-size: .75rem; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: .04em; background: #fafafa; border-bottom: 1px solid #eee; }
+        .backed-table td { padding: .7rem 1rem; font-size: .85rem; border-bottom: 1px solid #f5f5f5; }
+        .backed-table tr:last-child td { border-bottom: none; }
+        .backed-table td a { color: #282828; font-weight: 600; }
+        .backed-table td a:hover { color: #2bde73; }
+        .pct-badge { font-size: .78rem; font-weight: 600; color: #2bde73; }
+
+        .empty { text-align: center; color: #bbb; padding: 2rem; font-size: .9rem; }
+
+        .footer { text-align: center; padding: 2rem; font-size: .78rem; color: #bbb; border-top: 1px solid #eee; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{{ url_for('crowdfunding-donations.index') }}" class="navbar-brand"><em>Fund</em>Spark</a>
+    <div class="navbar-links">
+        <a href="{{ url_for('crowdfunding-donations.index') }}">Explore</a>
+        <a href="{{ url_for('crowdfunding-donations.create_page') }}">Start a Project</a>
+        <a href="{{ url_for('crowdfunding-donations.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('crowdfunding-donations.logout') }}">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="dash-header">
+        <h1>Dashboard</h1>
+        <p>Welcome back, {{ user.username }}</p>
+    </div>
+
+    <div class="section-title">Your Campaigns <span class="section-count">{{ created_campaigns|length }}</span></div>
+    {% if created_campaigns %}
+        {% for c in created_campaigns %}
+        <div class="campaign-card">
+            <h3><a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=c.id) }}">{{ c.title }}</a></h3>
+            <div class="card-stats">
+                <span class="raised">${{ '{:,.0f}'.format(c.raised_amount) }}</span>
+                <span>of ${{ '{:,.0f}'.format(c.goal_amount) }}</span>
+                <span>{{ c.backer_count }} backers</span>
+                <span class="status-pill {{ c.status }}">{{ c.status }}</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width: {{ [c.funding_pct, 100]|min }}%"></div></div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty">You haven't created any campaigns yet.</div>
+    {% endif %}
+
+    <div class="section-title" style="margin-top:2rem">Backed Campaigns <span class="section-count">{{ backed_campaigns|length }}</span></div>
+    {% if backed_campaigns %}
+    <table class="backed-table">
+        <thead><tr><th>Campaign</th><th>Pledged</th><th>Funding</th></tr></thead>
+        <tbody>
+        {% for b in backed_campaigns %}
+        <tr>
+            <td><a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=b.campaign.id) }}">{{ b.campaign.title }}</a></td>
+            <td>${{ '{:,.0f}'.format(b.amount) }}</td>
+            <td><span class="pct-badge">{{ b.funding_pct }}%</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty">You haven't backed any campaigns yet.</div>
+    {% endif %}
+</div>
+
+<div class="footer">FundSpark &middot; <a href="/" style="color:#2bde73">MiniWeb Home</a></div>
+
+</body>
+</html>

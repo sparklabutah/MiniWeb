@@ -3,45 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In -- OpenReview</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Login | OpenReview</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
-        .header { border-bottom: 2px solid #7c3aed; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
-        .header h1 { font-size: 1.3rem; color: #7c3aed; }
-        .header h1 a { color: inherit; text-decoration: none; }
-        .login-form { max-width: 400px; margin: 4rem auto; padding: 2rem; border: 1px solid #e2e8f0; border-radius: .5rem; background: #fff; }
-        .login-form h2 { margin: 0 0 1.5rem; font-size: 1.3rem; color: #1e293b; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: .85rem; color: #475569; margin-bottom: .3rem; }
-        .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .95rem; }
-        .form-group input:focus { border-color: #7c3aed; outline: none; }
-        .btn-login { width: 100%; padding: .7rem; background: #7c3aed; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; }
-        .btn-login:hover { background: #6d28d9; }
-        .error { color: #dc2626; font-size: .85rem; margin-bottom: 1rem; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #f7f7f7; color: #333; line-height: 1.5; font-size: 14px; }
+
+        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
+        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
+        .topbar a:hover { color: #fff; }
+        .topbar .right { margin-left: auto; }
+
+        .login-container {
+            max-width: 380px; margin: 60px auto; padding: 32px;
+            background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+        }
+        .login-logo { text-align: center; margin-bottom: 24px; }
+        .login-logo h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: #1a1a1a; }
+        .login-logo p { font-size: 13px; color: #888; margin-top: 4px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; font-weight: 500; }
+        .form-group input {
+            width: 100%; padding: 9px 12px; border: 1px solid #d0d0d0; border-radius: 4px;
+            font-size: 14px; font-family: inherit;
+        }
+        .form-group input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+        .btn-login {
+            width: 100%; padding: 10px; background: #1a73e8; color: #fff; border: none;
+            border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+            margin-top: 4px;
+        }
+        .btn-login:hover { background: #1557b0; }
+        .error-msg { background: #fce8e6; color: #c5221f; padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+        .back-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: #1a73e8; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
-        <a href="/" style="font-size:.9rem;color:#475569;text-decoration:none">&larr; MiniWeb</a>
+    <div class="topbar">
+        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">OpenReview</a>
+        <div class="right">
+            <a href="/">MiniWeb</a>
+        </div>
     </div>
 
-    <form class="login-form" method="post" action="{{ url_for('conference-review-submission.login_submit') }}">
-        <h2>Sign In</h2>
+    <form class="login-container" method="post" action="{{ url_for('conference-review-submission.login_submit') }}">
+        <div class="login-logo">
+            <h1>OpenReview</h1>
+            <p>Sign in to access your review tasks and submissions</p>
+        </div>
+
         {% if error %}
-        <div class="error">{{ error }}</div>
+        <div class="error-msg">{{ error }}</div>
         {% endif %}
+
         <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" name="username" id="username" required autocomplete="off">
+            <label for="username">Email or Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
         </div>
         <div class="form-group">
             <label for="password">Password</label>
-            <input type="password" name="password" id="password" required>
+            <input type="password" name="password" id="password" required placeholder="Enter your password">
         </div>
         <button type="submit" class="btn-login">Sign In</button>
+        <a href="{{ url_for('conference-review-submission.index') }}" class="back-link">Back to venues</a>
     </form>
 </body>
 </html>

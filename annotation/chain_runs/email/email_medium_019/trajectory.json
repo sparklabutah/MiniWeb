@@ -1,0 +1,53 @@
+[
+  {
+    "step": 0,
+    "type": "observe",
+    "action": "GET /sites/email/ (initial observation)",
+    "observation": "== Headings ==\n[H1] WebMail\n  [H2] Sign In\n\n== Forms ==\n  Form #1: action=/sites/email/login method=POST\n    <input type=text name=username placeholder=\"Enter your username\" value=\"\">\n    <input type=password name=password placeholder=\"Enter your password\" value=\"\">\n    <button type=submit>Sign In</button>\n\n== Links ==\n  [Sign In] -> #login-form\n\n== Page Text (excerpt) ==\n  Use your WebMail accoun"
+  },
+  {
+    "action": "GET /sites/email/login",
+    "observation": "== Headings ==\n[H1] WebMail\n  [H2] Sign In\n\n== Forms ==\n  Form #1: action=/sites/email/login method=POST\n    <input type=text name=username placeholder=\"Enter your username\" value=\"\">\n    <input type=password name=password placeholder=\"Enter your password\" value=\"\">\n    <button type=submit>Sign In</button>\n\n== Links ==\n  [Sign In] -> #login-form\n\n== Page Text (excerpt) ==\n  Use your WebMail account\n  Username\n  Password\n",
+    "step": 1,
+    "macro": "authenticate_by_form"
+  },
+  {
+    "action": "POST /sites/email/login username=lynn_blair password=pass123",
+    "observation": "== Headings ==\n[H1] WebMail\n\n== Forms ==\n  Form #1: action=/sites/email/search method=GET\n    <input type=text name=q placeholder=\"Search mail...\" value=\"\">\n    <button type=submit>Search</button>\n\n== Links ==\n  [Sign out] -> /sites/email/logout\n  [Compose] -> /sites/email/compose\n  [Inbox 211 (211)] -> /sites/email/?folder=inbox\n  [Sent 23 (23)] -> /sites/email/?folder=sent\n  [Drafts (0)] -> /sites/email/?folder=drafts\n  [Trash (0)] -> /sites/email/?folder=trash\n  [Spam (0)] -> /sites/email/?fo",
+    "status_code": 200,
+    "step": 1,
+    "macro": "authenticate_by_form"
+  },
+  {
+    "action": "GET /sites/email/?folder=sent",
+    "observation": "== Headings ==\n[H1] WebMail\n\n== Forms ==\n  Form #1: action=/sites/email/search method=GET\n    <input type=text name=q placeholder=\"Search mail...\" value=\"\">\n    <button type=submit>Search</button>\n\n== Links ==\n  [Sign out] -> /sites/email/logout\n  [Compose] -> /sites/email/compose\n  [Inbox 211 (211)] -> /sites/email/?folder=inbox\n  [Sent 23 (23)] -> /sites/email/?folder=sent\n  [Drafts (0)] -> /sites/email/?folder=drafts\n  [Trash (0)] -> /sites/email/?folder=trash\n  [Spam (0)] -> /sites/email/?folder=spam\n  [Contacts] -> /sites/email/contacts\n  [\u2605 lynn.blair@enron.com UCU - SBA - Peaking at Carlton for 20] -> /sites/email/message/4\n  [\u2605 lynn.blair@enron.com FW: File Restore Request \u2014 Please res] -> /sites/email/message/7\n  [\u2605 lynn.blair@enron.com Weekly Report for Gas Logistics \u2014 Sta] -> /s",
+    "status_code": 200,
+    "step": 2,
+    "macro": "filter_by_dropdown"
+  },
+  {
+    "action": "GET /sites/email/api/messages?user_id=1&folder=sent (verify)",
+    "observation": "Sent folder total: 23",
+    "step": 2,
+    "macro": "filter_by_dropdown"
+  },
+  {
+    "action": "GET /sites/email/compose",
+    "observation": "== Headings ==\n[H1] WebMail\n\n== Forms ==\n  Form #1: action=/sites/email/compose method=POST\n    <input type=text name=to placeholder=\"Recipients (e.g. user@example.com)\" value=\"\">\n    <input type=text name=cc placeholder=\"Cc recipients\" value=\"\">\n    <input type=text name=subject placeholder=\"Subject\" value=\"\">\n    <textarea name=body>\n    <button type=submit>Send</button>\n    <button type=button></button>\n\n== Links ==\n  [Sign out] -> /sites/email/logout\n  [Compose] -> /sites/email/compose\n  [In",
+    "step": 3,
+    "macro": "submit_form"
+  },
+  {
+    "action": "POST /sites/email/compose to=michael.bodnar@enron.com subject='Weekly Status Update'",
+    "observation": "== Headings ==\n[H1] WebMail\n\n== Forms ==\n  Form #1: action=/sites/email/search method=GET\n    <input type=text name=q placeholder=\"Search mail...\" value=\"\">\n    <button type=submit>Search</button>\n\n== Links ==\n  [Sign out] -> /sites/email/logout\n  [Compose] -> /sites/email/compose\n  [Inbox 211 (211)] -> /sites/email/?folder=inbox\n  [Sent 23 (24)] -> /sites/email/?folder=sent\n  [Drafts (0)] -> /sites/email/?folder=drafts\n  [Trash (0)] -> /sites/email/?folder=trash\n  [Spam (0)] -> /sites/email/?fo",
+    "status_code": 200,
+    "step": 3,
+    "macro": "submit_form"
+  },
+  {
+    "action": "GET /sites/email/api/messages?user_id=1&folder=sent (verify)",
+    "observation": "Sent folder total: 24",
+    "step": 3,
+    "macro": "submit_form"
+  }
+]

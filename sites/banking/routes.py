@@ -1,30 +1,20 @@
 """SecureBank Online — digital banking portal (Chase / TD / Amex style).
 
-Synthesises realistic banking data (users, accounts, transactions, payees,
-bills, loans) and serves through Flask routes.  Data files live under data/
-and are reset from data/.pristine/ between evaluation runs.
+Data is stored in per-site SQLite tables (banking_users, banking_transactions,
+etc.) and queried through app.db.  Session mutations are isolated per user.
 """
-import json
 import pathlib
 import random
-import re
 from datetime import datetime, timedelta
-from collections import Counter
 
 from flask import (
     Blueprint, Response, abort, jsonify, redirect, render_template, request,
     session, url_for,
 )
+from app import db
 
+SITE = "banking"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-DATA_DIR = SITE_DIR / "data"
-USERS_FILE = DATA_DIR / "users.json"
-ACCOUNTS_FILE = DATA_DIR / "accounts.json"
-TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
-PAYEES_FILE = DATA_DIR / "payees.json"
-BILLS_FILE = DATA_DIR / "bills.json"
-LOANS_FILE = DATA_DIR / "loans.json"
 
 blueprint = Blueprint(
     "banking",
@@ -34,291 +24,70 @@ blueprint = Blueprint(
     static_url_path="/static",
 )
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-# ---------------------------------------------------------------------------
-# Synthesised data generation (runs once, writes JSON to data/)
-# ---------------------------------------------------------------------------
-
-_FIRST_NAMES = [
-    "James", "Maria", "Robert", "Linda", "Michael", "Patricia",
-    "David", "Jennifer", "William", "Elizabeth", "Richard", "Susan",
-    "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen",
-    "Daniel", "Nancy",
-]
-_LAST_NAMES = [
-    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia",
-    "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez",
-    "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore",
-    "Jackson", "Martin",
-]
-_MERCHANTS = [
-    "Amazon", "Walmart", "Target", "Costco", "Whole Foods", "Shell Gas",
-    "Chevron", "Starbucks", "McDonald's", "Uber", "Lyft", "Netflix",
-    "Spotify", "Apple", "AT&T", "Verizon", "Home Depot", "Lowe's",
-    "CVS Pharmacy", "Walgreens", "Best Buy", "Trader Joe's",
-    "Safeway", "Kroger", "Publix", "Chick-fil-A", "Chipotle",
-    "DoorDash", "Grubhub", "Delta Airlines",
-]
-_BILL_COMPANIES = [
-    "City Power & Light", "Metro Water Authority", "National Gas Co",
-    "Comcast Internet", "AT&T Wireless", "State Farm Insurance",
-    "Blue Cross Health", "Capital One Credit", "Student Loan Corp",
-    "HOA Management LLC", "City Parking Authority", "Green Energy Solar",
-]
 _ACCOUNT_TYPES = ["checking", "savings", "credit", "loan"]
-_TX_CATEGORIES = [
-    "Groceries", "Dining", "Transportation", "Entertainment", "Shopping",
-    "Utilities", "Healthcare", "Education", "Travel", "Subscriptions",
-    "Gas", "Insurance", "Rent", "Transfer", "Deposit", "ATM Withdrawal",
-]
-_LOAN_TYPES = ["mortgage", "auto", "personal", "student"]
-
-
-def _synthesize_data():
-    """Generate all banking data deterministically from config seed."""
-    config = _load_config()
-    seed = config.get("random_seed", 42)
-    n = config.get("num_data_points", 200)
-    rng = random.Random(seed)
-
-    # --- Users (5 bank customers) ---
-    users = []
-    for i in range(1, 6):
-        first = _FIRST_NAMES[(i - 1) % len(_FIRST_NAMES)]
-        last = _LAST_NAMES[(i - 1) % len(_LAST_NAMES)]
-        users.append({
-            "id": i,
-            "username": f"{first.lower()}_{last.lower()}",
-            "password": f"secure{i * 111}",
-            "name": f"{first} {last}",
-            "email": f"{first.lower()}.{last.lower()}@email.com",
-            "phone": f"({rng.randint(200,999)}) {rng.randint(200,999)}-{rng.randint(1000,9999)}",
-            "address": f"{rng.randint(100,9999)} {rng.choice(['Oak','Maple','Cedar','Pine','Elm'])} {rng.choice(['St','Ave','Blvd','Dr','Ln'])}, {rng.choice(['Springfield','Portland','Austin','Denver','Seattle'])}, {rng.choice(['IL','OR','TX','CO','WA'])} {rng.randint(10000,99999)}",
-            "mfa_code": f"{rng.randint(100000, 999999)}",
-            "notifications": [],
-        })
-
-    # --- Accounts (2-3 per user) ---
-    accounts = []
-    acct_id = 1
-    for user in users:
-        n_accts = rng.randint(2, 3)
-        types_for_user = rng.sample(_ACCOUNT_TYPES, n_accts)
-        for atype in types_for_user:
-            if atype == "checking":
-                balance = round(rng.uniform(500, 25000), 2)
-                acct_num = f"CHK-{rng.randint(100000,999999)}"
-            elif atype == "savings":
-                balance = round(rng.uniform(1000, 100000), 2)
-                acct_num = f"SAV-{rng.randint(100000,999999)}"
-            elif atype == "credit":
-                balance = round(rng.uniform(-5000, 0), 2)  # negative = owed
-                acct_num = f"CC-{rng.randint(1000,9999)}-{rng.randint(1000,9999)}"
-            else:  # loan
-                balance = round(rng.uniform(-200000, -5000), 2)
-                acct_num = f"LN-{rng.randint(100000,999999)}"
-
-            accounts.append({
-                "id": acct_id,
-                "user_id": user["id"],
-                "account_number": acct_num,
-                "type": atype,
-                "balance": balance,
-                "currency": "USD",
-                "opened_date": f"{rng.randint(2015,2023)}-{rng.randint(1,12):02d}-{rng.randint(1,28):02d}",
-                "status": "active",
-                "interest_rate": round(rng.uniform(0.01, 0.05), 4) if atype == "savings" else (round(rng.uniform(0.15, 0.25), 4) if atype == "credit" else (round(rng.uniform(0.03, 0.08), 4) if atype == "loan" else 0.0)),
-            })
-            acct_id += 1
-
-    # --- Transactions (n total, spread across accounts) ---
-    transactions = []
-    base_date = datetime(2026, 6, 1)
-    for tx_id in range(1, n + 1):
-        acct = rng.choice(accounts)
-        days_ago = rng.randint(0, 180)
-        tx_date = base_date - timedelta(days=days_ago)
-        is_credit_acct = acct["type"] == "credit"
-        is_deposit = rng.random() < 0.25
-
-        if is_deposit and not is_credit_acct:
-            amount = round(rng.uniform(50, 5000), 2)
-            merchant = rng.choice(["Direct Deposit", "Payroll", "Refund", "Cash Deposit", "ACH Transfer"])
-            tx_type = "credit"
-            category = rng.choice(["Deposit", "Transfer"])
-        else:
-            amount = round(rng.uniform(2, 500), 2)
-            merchant = rng.choice(_MERCHANTS)
-            tx_type = "debit"
-            category = rng.choice(_TX_CATEGORIES[:13])
-
-        transactions.append({
-            "id": tx_id,
-            "account_id": acct["id"],
-            "user_id": acct["user_id"],
-            "date": tx_date.strftime("%Y-%m-%d"),
-            "description": merchant,
-            "amount": amount,
-            "type": tx_type,
-            "category": category,
-            "status": rng.choice(["posted", "posted", "posted", "pending"]),
-            "reference": f"TXN{tx_id:06d}",
-        })
-
-    transactions.sort(key=lambda t: t["date"], reverse=True)
-    for i, t in enumerate(transactions, 1):
-        t["id"] = i
-
-    # --- Payees ---
-    payees = []
-    payee_id = 1
-    for user in users:
-        n_payees = rng.randint(3, 6)
-        chosen = rng.sample(_BILL_COMPANIES + _MERCHANTS[:10], n_payees)
-        for name in chosen:
-            payees.append({
-                "id": payee_id,
-                "user_id": user["id"],
-                "name": name,
-                "account_number": f"PAY-{rng.randint(10000,99999)}",
-                "category": rng.choice(["Utility", "Insurance", "Credit Card", "Subscription", "Rent", "Other"]),
-                "nickname": name.split()[0] if len(name.split()) > 1 else name[:8],
-            })
-            payee_id += 1
-
-    # --- Bills ---
-    bills = []
-    bill_id = 1
-    for user in users:
-        user_payees = [p for p in payees if p["user_id"] == user["id"]]
-        for payee in user_payees[:4]:
-            due_day = rng.randint(1, 28)
-            amount = round(rng.uniform(25, 500), 2)
-            for month_offset in range(3):
-                due_date = datetime(2026, 6 - month_offset, due_day)
-                bills.append({
-                    "id": bill_id,
-                    "user_id": user["id"],
-                    "payee_id": payee["id"],
-                    "payee_name": payee["name"],
-                    "amount": amount + round(rng.uniform(-20, 20), 2),
-                    "due_date": due_date.strftime("%Y-%m-%d"),
-                    "status": "paid" if month_offset > 0 else rng.choice(["due", "due", "overdue"]),
-                    "category": payee["category"],
-                    "auto_pay": rng.choice([True, False]),
-                })
-                bill_id += 1
-
-    # --- Loans ---
-    loans = []
-    loan_id = 1
-    for user in users:
-        n_loans = rng.randint(0, 2)
-        for _ in range(n_loans):
-            ltype = rng.choice(_LOAN_TYPES)
-            principal = round(rng.uniform(5000, 350000), 2) if ltype == "mortgage" else round(rng.uniform(2000, 50000), 2)
-            rate = round(rng.uniform(0.03, 0.09), 4)
-            term_months = rng.choice([36, 48, 60, 120, 180, 360])
-            remaining = round(principal * rng.uniform(0.2, 0.95), 2)
-            monthly = round(principal * (rate / 12) / (1 - (1 + rate / 12) ** -term_months), 2)
-            loans.append({
-                "id": loan_id,
-                "user_id": user["id"],
-                "type": ltype,
-                "original_amount": principal,
-                "remaining_balance": remaining,
-                "interest_rate": rate,
-                "term_months": term_months,
-                "monthly_payment": monthly,
-                "next_payment_date": f"2026-07-{rng.randint(1,28):02d}",
-                "status": "active",
-                "start_date": f"{rng.randint(2018,2024)}-{rng.randint(1,12):02d}-01",
-            })
-            loan_id += 1
-
-    return users, accounts, transactions, payees, bills, loans
-
-
-def _write_data(users, accounts, transactions, payees, bills, loans):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    pristine = DATA_DIR / ".pristine"
-    pristine.mkdir(parents=True, exist_ok=True)
-
-    for fname, data in [
-        ("users.json", users),
-        ("accounts.json", accounts),
-        ("transactions.json", transactions),
-        ("payees.json", payees),
-        ("bills.json", bills),
-        ("loans.json", loans),
-    ]:
-        content = json.dumps(data, indent=2)
-        (DATA_DIR / fname).write_text(content)
-        (pristine / fname).write_text(content)
-
-
-def _maybe_generate():
-    """Generate data if not already present."""
-    if not USERS_FILE.exists():
-        users, accounts, transactions, payees, bills, loans = _synthesize_data()
-        _write_data(users, accounts, transactions, payees, bills, loans)
-
 
 # ---------------------------------------------------------------------------
-# Data loading helpers
+# Data loading helpers — thin wrappers around db.query / db.get_item
 # ---------------------------------------------------------------------------
-
-def _load_json(path):
-    _maybe_generate()
-    return json.loads(path.read_text())
-
-def _save_json(path, data):
-    path.write_text(json.dumps(data, indent=2))
 
 def _load_users():
-    return _load_json(USERS_FILE)
+    return db.query(SITE, "users")
 
 def _save_users(users):
-    _save_json(USERS_FILE, users)
+    db.save_collection(SITE, "users", users)
 
-def _load_accounts():
-    return _load_json(ACCOUNTS_FILE)
+def _load_accounts(user_id=None, account_type=None):
+    where = {}
+    if user_id is not None:
+        where["user_id"] = user_id
+    if account_type:
+        where["type"] = account_type
+    return db.query(SITE, "accounts", where=where if where else None)
 
 def _save_accounts(accounts):
-    _save_json(ACCOUNTS_FILE, accounts)
+    db.save_collection(SITE, "accounts", accounts)
 
-def _load_transactions():
-    return _load_json(TRANSACTIONS_FILE)
+def _load_transactions(user_id=None, account_id=None, limit=None, offset=0):
+    where = {}
+    if user_id is not None:
+        where["user_id"] = user_id
+    if account_id is not None:
+        where["account_id"] = account_id
+    return db.query(SITE, "transactions", where=where if where else None,
+                    sort="-date", limit=limit, offset=offset)
+
+def _count_transactions(user_id=None, account_id=None):
+    where = {}
+    if user_id is not None:
+        where["user_id"] = user_id
+    if account_id is not None:
+        where["account_id"] = account_id
+    return db.count(SITE, "transactions", where=where if where else None)
 
 def _save_transactions(txns):
-    _save_json(TRANSACTIONS_FILE, txns)
+    db.save_collection(SITE, "transactions", txns)
 
-def _load_payees():
-    return _load_json(PAYEES_FILE)
+def _load_payees(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "payees", where=where)
 
 def _save_payees(payees):
-    _save_json(PAYEES_FILE, payees)
+    db.save_collection(SITE, "payees", payees)
 
-def _load_bills():
-    return _load_json(BILLS_FILE)
+def _load_bills(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "bills", where=where)
 
 def _save_bills(bills):
-    _save_json(BILLS_FILE, bills)
+    db.save_collection(SITE, "bills", bills)
 
-def _load_loans():
-    return _load_json(LOANS_FILE)
+def _load_loans(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "loans", where=where)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _get_current_user():
@@ -332,7 +101,6 @@ def _get_browsing_user():
     user = _get_current_user()
     if user:
         return user, True
-    # Default to user 1 for unauthenticated browsing
     return _get_user(1), False
 
 
@@ -348,16 +116,17 @@ def _keyword_score(query, text):
 
 @blueprint.route("/")
 def index():
-    _maybe_generate()
+
     user, logged_in = _get_browsing_user()
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"]]
+    accounts = _load_accounts(user_id=user["id"])
+    cc_user = _cc_get_user_for_banking(user)
     return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=logged_in)
+                           logged_in=logged_in, cc_user=cc_user)
 
 
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    _maybe_generate()
+
     return render_template("banking/login.html", error=None)
 
 
@@ -371,9 +140,10 @@ def login_submit():
         return render_template("banking/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"]]
+    accounts = _load_accounts(user_id=user["id"])
+    cc_user = _cc_get_user_for_banking(user)
     return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=True)
+                           logged_in=True, cc_user=cc_user)
 
 
 @blueprint.route("/logout")
@@ -382,9 +152,10 @@ def logout():
     session.pop("identity_verified", None)
     # Redirect to dashboard (browse-only mode)
     user = _get_user(1)
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"]]
+    accounts = _load_accounts(user_id=user["id"])
+    cc_user = _cc_get_user_for_banking(user)
     return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=False)
+                           logged_in=False, cc_user=cc_user)
 
 
 @blueprint.route("/verify-identity", methods=["GET"])
@@ -411,10 +182,8 @@ def verify_identity_submit():
 @blueprint.route("/accounts")
 def accounts_page():
     user, logged_in = _get_browsing_user()
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"]]
     account_type = request.args.get("type", "").strip()
-    if account_type:
-        accounts = [a for a in accounts if a["type"] == account_type]
+    accounts = _load_accounts(user_id=user["id"], account_type=account_type or None)
     return render_template("banking/accounts.html", user=user, accounts=accounts,
                            account_types=_ACCOUNT_TYPES, selected_type=account_type,
                            logged_in=logged_in)
@@ -423,15 +192,10 @@ def accounts_page():
 @blueprint.route("/account/<int:account_id>")
 def account_detail(account_id):
     user, logged_in = _get_browsing_user()
-    accounts = _load_accounts()
-    account = next((a for a in accounts if a["id"] == account_id and a["user_id"] == user["id"]), None)
-    if not account:
-        # Also try finding the account without user restriction for browse mode
-        account = next((a for a in accounts if a["id"] == account_id), None)
+    account = db.get_item(SITE, "accounts", account_id)
     if not account:
         abort(404)
-    transactions = [t for t in _load_transactions() if t["account_id"] == account_id]
-    transactions = transactions[:30]  # Paginate: first 30
+    transactions = _load_transactions(account_id=account_id, limit=30)
     return render_template("banking/account_detail.html", user=user,
                            account=account, transactions=transactions,
                            logged_in=logged_in)
@@ -440,7 +204,7 @@ def account_detail(account_id):
 @blueprint.route("/transactions")
 def transactions_page():
     user, logged_in = _get_browsing_user()
-    txns = [t for t in _load_transactions() if t["user_id"] == user["id"]]
+    uid = user["id"]
 
     q = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
@@ -451,49 +215,72 @@ def transactions_page():
     min_amount = request.args.get("min_amount", "").strip()
     max_amount = request.args.get("max_amount", "").strip()
     page = request.args.get("page", 1, type=int)
+    per_page = 30
+
+    # Build SQL query with all filters
+    clauses = ["[user_id] = ?"]
+    params = [uid]
 
     if q:
-        txns = [t for t in txns if q.lower() in t["description"].lower() or
-                q.lower() in t["category"].lower() or
-                q.lower() in t["reference"].lower()]
+        ql = f"%{q}%"
+        clauses.append("([description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ?)")
+        params.extend([ql, ql, ql])
     if category:
-        txns = [t for t in txns if t["category"] == category]
+        clauses.append("[category] = ?")
+        params.append(category)
     if tx_type:
-        txns = [t for t in txns if t["type"] == tx_type]
+        clauses.append("[type] = ?")
+        params.append(tx_type)
     if date_from:
-        txns = [t for t in txns if t["date"] >= date_from]
+        clauses.append("[date] >= ?")
+        params.append(date_from)
     if date_to:
-        txns = [t for t in txns if t["date"] <= date_to]
+        clauses.append("[date] <= ?")
+        params.append(date_to)
     if min_amount:
         try:
             mn = float(min_amount)
-            txns = [t for t in txns if t["amount"] >= mn]
+            clauses.append("[amount] >= ?")
+            params.append(mn)
         except ValueError:
             pass
     if max_amount:
         try:
             mx = float(max_amount)
-            txns = [t for t in txns if t["amount"] <= mx]
+            clauses.append("[amount] <= ?")
+            params.append(mx)
         except ValueError:
             pass
 
-    if sort == "date":
-        txns.sort(key=lambda t: t["date"], reverse=True)
-    elif sort == "amount_asc":
-        txns.sort(key=lambda t: t["amount"])
-    elif sort == "amount_desc":
-        txns.sort(key=lambda t: t["amount"], reverse=True)
-    elif sort == "description":
-        txns.sort(key=lambda t: t["description"].lower())
+    where_sql = " AND ".join(clauses)
 
-    categories = sorted(set(t["category"] for t in _load_transactions() if t["user_id"] == user["id"]))
+    # Sort
+    sort_map = {
+        "date": "[date] DESC",
+        "amount_asc": "[amount] ASC",
+        "amount_desc": "[amount] DESC",
+        "description": "[description] ASC",
+    }
+    order_sql = sort_map.get(sort, "[date] DESC")
 
-    # Pagination: 30 per page
-    total_count = len(txns)
-    per_page = 30
+    # Count
+    total_count = db.execute(
+        f"SELECT COUNT(*) FROM [banking_transactions] WHERE {where_sql}",
+        tuple(params), fetch="val") or 0
     total_pages = max(1, (total_count + per_page - 1) // per_page)
     page = max(1, min(page, total_pages))
-    txns_page = txns[(page - 1) * per_page : page * per_page]
+    offset = (page - 1) * per_page
+
+    # Fetch page
+    txns_page = db.execute(
+        f"SELECT * FROM [banking_transactions] WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",
+        tuple(params) + (per_page, offset))
+
+    # Categories for filter dropdown (small query)
+    cat_rows = db.execute(
+        "SELECT DISTINCT [category] FROM [banking_transactions] WHERE [user_id] = ? ORDER BY [category]",
+        (uid,))
+    categories = [r["category"] for r in cat_rows]
 
     return render_template("banking/transactions.html", user=user,
                            transactions=txns_page, categories=categories,
@@ -507,7 +294,7 @@ def transactions_page():
 @blueprint.route("/transfer", methods=["GET"])
 def transfer_page():
     user, logged_in = _get_browsing_user()
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"]]
+    accounts = _load_accounts(user_id=user["id"])
     return render_template("banking/transfer.html", user=user, accounts=accounts,
                            result=None, logged_in=logged_in)
 
@@ -523,11 +310,9 @@ def transfer_submit():
     amount = request.form.get("amount", type=float)
     memo = request.form.get("memo", "").strip()
 
-    accounts = _load_accounts()
-    from_acct = next((a for a in accounts if a["id"] == from_id and a["user_id"] == user["id"]), None)
-    to_acct = next((a for a in accounts if a["id"] == to_id and a["user_id"] == user["id"]), None)
-
-    user_accounts = [a for a in accounts if a["user_id"] == user["id"]]
+    user_accounts = _load_accounts(user_id=user["id"])
+    from_acct = next((a for a in user_accounts if a["id"] == from_id), None)
+    to_acct = next((a for a in user_accounts if a["id"] == to_id), None)
 
     if not from_acct or not to_acct or from_id == to_id:
         return render_template("banking/transfer.html", user=user,
@@ -541,7 +326,7 @@ def transfer_submit():
 
     from_acct["balance"] = round(from_acct["balance"] - amount, 2)
     to_acct["balance"] = round(to_acct["balance"] + amount, 2)
-    _save_accounts(accounts)
+    _save_accounts(user_accounts)
 
     txns = _load_transactions()
     new_id = max(t["id"] for t in txns) + 1 if txns else 1
@@ -573,15 +358,16 @@ def transfer_submit():
     _save_transactions(txns)
 
     return render_template("banking/transfer.html", user=user,
-                           accounts=[a for a in _load_accounts() if a["user_id"] == user["id"]],
+                           accounts=_load_accounts(user_id=user["id"]),
                            result="success", logged_in=True)
 
 
 @blueprint.route("/pay-bills")
 def pay_bills_page():
     user, logged_in = _get_browsing_user()
-    bills = [b for b in _load_bills() if b["user_id"] == user["id"]]
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"] and a["type"] in ("checking", "savings")]
+    bills = _load_bills(user_id=user["id"])
+    all_accounts = _load_accounts(user_id=user["id"])
+    accounts = [a for a in all_accounts if a["type"] in ("checking", "savings")]
     return render_template("banking/pay_bills.html", user=user, bills=bills,
                            accounts=accounts, result=None, logged_in=logged_in)
 
@@ -595,10 +381,10 @@ def pay_bill_submit():
     bill_id = request.form.get("bill_id", type=int)
     account_id = request.form.get("account_id", type=int)
 
-    bills = _load_bills()
-    bill = next((b for b in bills if b["id"] == bill_id), None)
-    user_bills = [b for b in bills if b["user_id"] == user["id"]]
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"] and a["type"] in ("checking", "savings")]
+    bill = db.get_item(SITE, "bills", bill_id)
+    user_bills = _load_bills(user_id=user["id"])
+    all_accounts = _load_accounts(user_id=user["id"])
+    accounts = [a for a in all_accounts if a["type"] in ("checking", "savings")]
 
     if not bill:
         return render_template("banking/pay_bills.html", user=user, bills=user_bills,
@@ -607,23 +393,37 @@ def pay_bill_submit():
         return render_template("banking/pay_bills.html", user=user, bills=user_bills,
                                accounts=accounts, result="Bill already paid.", logged_in=True)
 
+    # If no account_id provided, find the user's primary checking account
+    if not account_id:
+        checking_accounts = [a for a in accounts if a["type"] == "checking"]
+        if checking_accounts:
+            account_id = checking_accounts[0]["id"]
+
+    # Debit the paying account
     if account_id:
-        accts = _load_accounts()
-        acct = next((a for a in accts if a["id"] == account_id), None)
+        acct = db.get_item(SITE, "accounts", account_id)
         if acct:
+            if acct["balance"] < bill["amount"]:
+                return render_template("banking/pay_bills.html", user=user, bills=user_bills,
+                                       accounts=accounts,
+                                       result="Insufficient funds in account.", logged_in=True)
             acct["balance"] = round(acct["balance"] - bill["amount"], 2)
-            _save_accounts(accts)
+            db.save_item(SITE, "accounts", account_id, acct)
 
+    # Mark bill as paid
     bill["status"] = "paid"
-    _save_bills(bills)
+    db.save_item(SITE, "bills", bill_id, bill)
 
-    txns = _load_transactions()
-    new_id = max(t["id"] for t in txns) + 1 if txns else 1
-    txns.insert(0, {
+    # Create a transaction record for the debit
+    today = datetime.now().strftime("%Y-%m-%d")
+    max_id = db.execute(
+        "SELECT COALESCE(MAX([id]), 0) FROM [banking_transactions]", (), fetch="val")
+    new_id = max_id + 1
+    db.save_item(SITE, "transactions", new_id, {
         "id": new_id,
         "account_id": account_id or 0,
         "user_id": bill["user_id"],
-        "date": datetime.now().strftime("%Y-%m-%d"),
+        "date": today,
         "description": f"Bill payment - {bill['payee_name']}",
         "amount": bill["amount"],
         "type": "debit",
@@ -631,9 +431,8 @@ def pay_bill_submit():
         "status": "posted",
         "reference": f"BILL{bill_id:06d}",
     })
-    _save_transactions(txns)
 
-    user_bills = [b for b in _load_bills() if b["user_id"] == user["id"]]
+    user_bills = _load_bills(user_id=user["id"])
     return render_template("banking/pay_bills.html", user=user, bills=user_bills,
                            accounts=accounts,
                            result=f"Bill to {bill['payee_name']} paid successfully (${bill['amount']:.2f}).",
@@ -643,7 +442,7 @@ def pay_bill_submit():
 @blueprint.route("/payees")
 def payees_page():
     user, logged_in = _get_browsing_user()
-    payees = [p for p in _load_payees() if p["user_id"] == user["id"]]
+    payees = _load_payees(user_id=user["id"])
     return render_template("banking/payees.html", user=user, payees=payees,
                            result=None, logged_in=logged_in)
 
@@ -660,7 +459,7 @@ def add_payee_submit():
     nickname = request.form.get("nickname", "").strip()
 
     if not name:
-        payees = [p for p in _load_payees() if p["user_id"] == user["id"]]
+        payees = _load_payees(user_id=user["id"])
         return render_template("banking/payees.html", user=user, payees=payees,
                                result="error", logged_in=True)
 
@@ -703,9 +502,10 @@ def delete_payee_submit():
 @blueprint.route("/loans")
 def loans_page():
     user, logged_in = _get_browsing_user()
-    loans = [l for l in _load_loans() if l["user_id"] == user["id"]]
+    loans = _load_loans(user_id=user["id"])
+    accounts = _load_accounts(user_id=user["id"])
     return render_template("banking/loans.html", user=user, loans=loans,
-                           result=None, logged_in=logged_in)
+                           accounts=accounts, result=None, logged_in=logged_in)
 
 
 @blueprint.route("/loans/pay", methods=["POST"])
@@ -718,31 +518,63 @@ def pay_loan_submit():
     amount = request.form.get("amount", type=float)
     account_id = request.form.get("account_id", type=int)
 
-    loans = _load_loans()
-    loan = next((l for l in loans if l["id"] == loan_id), None)
+    loan = db.get_item(SITE, "loans", loan_id)
     if not loan:
-        user_loans = [l for l in loans if l["user_id"] == user["id"]]
+        user_loans = _load_loans(user_id=user["id"])
         return render_template("banking/loans.html", user=user, loans=user_loans,
                                result="Loan not found.", logged_in=True)
 
     if not amount or amount <= 0:
         amount = loan["monthly_payment"]
 
+    # If no account_id provided, find the user's primary checking account
+    if not account_id:
+        checking_accounts = _load_accounts(user_id=user["id"], account_type="checking")
+        if checking_accounts:
+            account_id = checking_accounts[0]["id"]
+
+    # Debit the paying account
+    if account_id:
+        acct = db.get_item(SITE, "accounts", account_id)
+        if acct:
+            if acct["balance"] < amount:
+                user_loans = _load_loans(user_id=user["id"])
+                accounts = _load_accounts(user_id=user["id"])
+                return render_template("banking/loans.html", user=user, loans=user_loans,
+                                       accounts=accounts,
+                                       result="Insufficient funds in account.", logged_in=True)
+            acct["balance"] = round(acct["balance"] - amount, 2)
+            db.save_item(SITE, "accounts", account_id, acct)
+
+    # Reduce loan balance
     loan["remaining_balance"] = round(loan["remaining_balance"] - amount, 2)
     if loan["remaining_balance"] <= 0:
         loan["remaining_balance"] = 0
         loan["status"] = "paid_off"
-    _save_json(LOANS_FILE, loans)
+    db.save_item(SITE, "loans", loan_id, loan)
 
-    if account_id:
-        accounts = _load_accounts()
-        acct = next((a for a in accounts if a["id"] == account_id), None)
-        if acct:
-            acct["balance"] = round(acct["balance"] - amount, 2)
-            _save_accounts(accounts)
+    # Create a transaction record for the debit
+    today = datetime.now().strftime("%Y-%m-%d")
+    max_id = db.execute(
+        "SELECT COALESCE(MAX([id]), 0) FROM [banking_transactions]", (), fetch="val")
+    new_id = max_id + 1
+    db.save_item(SITE, "transactions", new_id, {
+        "id": new_id,
+        "account_id": account_id or 0,
+        "user_id": user["id"],
+        "date": today,
+        "description": f"Loan payment - {loan.get('type', 'Loan')} loan #{loan_id}",
+        "amount": amount,
+        "type": "debit",
+        "category": "Loan Payment",
+        "status": "posted",
+        "reference": f"LOAN{loan_id:06d}",
+    })
 
-    user_loans = [l for l in _load_loans() if l["user_id"] == user["id"]]
+    user_loans = _load_loans(user_id=user["id"])
+    accounts = _load_accounts(user_id=user["id"])
     return render_template("banking/loans.html", user=user, loans=user_loans,
+                           accounts=accounts,
                            result=f"Payment of ${amount:.2f} applied. Remaining balance: ${loan['remaining_balance']:.2f}.",
                            logged_in=True)
 
@@ -818,8 +650,9 @@ def configure_bill_submit():
         if auto_pay:
             bill["auto_pay"] = auto_pay.lower() in ("true", "yes", "on", "1")
         _save_bills(bills)
-    user_bills = [b for b in _load_bills() if b["user_id"] == user["id"]]
-    accounts = [a for a in _load_accounts() if a["user_id"] == user["id"] and a["type"] in ("checking", "savings")]
+    user_bills = _load_bills(user_id=user["id"])
+    all_accounts = _load_accounts(user_id=user["id"])
+    accounts = [a for a in all_accounts if a["type"] in ("checking", "savings")]
     return render_template("banking/pay_bills.html", user=user, bills=user_bills,
                            accounts=accounts,
                            result=f"Bill #{bill_id} configured successfully." if bill else "Bill not found.",
@@ -859,7 +692,7 @@ def api_verify_identity():
 
 @blueprint.route("/api/users/<int:user_id>")
 def api_user(user_id):
-    _maybe_generate()
+
     user = _get_user(user_id)
     if not user:
         abort(404)
@@ -869,22 +702,15 @@ def api_user(user_id):
 
 @blueprint.route("/api/accounts")
 def api_accounts():
-    _maybe_generate()
-    accounts = _load_accounts()
     user_id = request.args.get("user_id", type=int)
     atype = request.args.get("type", "").strip()
-    if user_id:
-        accounts = [a for a in accounts if a["user_id"] == user_id]
-    if atype:
-        accounts = [a for a in accounts if a["type"] == atype]
+    accounts = _load_accounts(user_id=user_id, account_type=atype or None)
     return jsonify(accounts)
 
 
 @blueprint.route("/api/accounts/<int:account_id>")
 def api_account(account_id):
-    _maybe_generate()
-    accounts = _load_accounts()
-    account = next((a for a in accounts if a["id"] == account_id), None)
+    account = db.get_item(SITE, "accounts", account_id)
     if not account:
         abort(404)
     return jsonify(account)
@@ -892,8 +718,6 @@ def api_account(account_id):
 
 @blueprint.route("/api/transactions")
 def api_transactions():
-    _maybe_generate()
-    txns = _load_transactions()
     user_id = request.args.get("user_id", type=int)
     account_id = request.args.get("account_id", type=int)
     q = request.args.get("q", "").strip()
@@ -906,64 +730,77 @@ def api_transactions():
     max_amount = request.args.get("max_amount", "").strip()
     limit = request.args.get("limit", type=int)
 
+    clauses = []
+    params = []
     if user_id:
-        txns = [t for t in txns if t["user_id"] == user_id]
+        clauses.append("[user_id] = ?")
+        params.append(user_id)
     if account_id:
-        txns = [t for t in txns if t["account_id"] == account_id]
+        clauses.append("[account_id] = ?")
+        params.append(account_id)
     if q:
-        txns = [t for t in txns if q.lower() in t["description"].lower() or
-                q.lower() in t["category"].lower() or
-                q.lower() in t["reference"].lower()]
+        ql = f"%{q}%"
+        clauses.append("([description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ?)")
+        params.extend([ql, ql, ql])
     if category:
-        txns = [t for t in txns if t["category"] == category]
+        clauses.append("[category] = ?")
+        params.append(category)
     if tx_type:
-        txns = [t for t in txns if t["type"] == tx_type]
+        clauses.append("[type] = ?")
+        params.append(tx_type)
     if date_from:
-        txns = [t for t in txns if t["date"] >= date_from]
+        clauses.append("[date] >= ?")
+        params.append(date_from)
     if date_to:
-        txns = [t for t in txns if t["date"] <= date_to]
+        clauses.append("[date] <= ?")
+        params.append(date_to)
     if min_amount:
         try:
             mn = float(min_amount)
-            txns = [t for t in txns if t["amount"] >= mn]
+            clauses.append("[amount] >= ?")
+            params.append(mn)
         except ValueError:
             pass
     if max_amount:
         try:
             mx = float(max_amount)
-            txns = [t for t in txns if t["amount"] <= mx]
+            clauses.append("[amount] <= ?")
+            params.append(mx)
         except ValueError:
             pass
 
-    if sort == "date":
-        txns.sort(key=lambda t: t["date"], reverse=True)
-    elif sort == "amount_asc":
-        txns.sort(key=lambda t: t["amount"])
-    elif sort == "amount_desc":
-        txns.sort(key=lambda t: t["amount"], reverse=True)
-    elif sort == "description":
-        txns.sort(key=lambda t: t["description"].lower())
+    sort_map = {
+        "date": "[date] DESC",
+        "amount_asc": "[amount] ASC",
+        "amount_desc": "[amount] DESC",
+        "description": "[description] ASC",
+    }
+    order_sql = sort_map.get(sort, "[date] DESC")
 
-    if limit:
-        txns = txns[:limit]
+    where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
+    limit_sql = f" LIMIT {limit}" if limit else ""
+    txns = db.execute(
+        f"SELECT * FROM [banking_transactions]{where_sql} ORDER BY {order_sql}{limit_sql}",
+        tuple(params))
     return jsonify(txns)
 
 
 @blueprint.route("/api/transactions/search")
 def api_transactions_search():
-    _maybe_generate()
     q = request.args.get("q", "").strip()
-    txns = _load_transactions()
     if q:
-        txns = [t for t in txns if q.lower() in t["description"].lower() or
-                q.lower() in t["category"].lower() or
-                q.lower() in t.get("reference", "").lower()]
+        ql = f"%{q}%"
+        txns = db.execute(
+            "SELECT * FROM [banking_transactions] WHERE [description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ? ORDER BY [date] DESC",
+            (ql, ql, ql))
+    else:
+        txns = _load_transactions(limit=50)
     return jsonify(txns)
 
 
 @blueprint.route("/api/transactions/semantic")
 def api_transactions_semantic():
-    _maybe_generate()
+
     q = request.args.get("q", "").strip()
     txns = _load_transactions()
     if q:
@@ -980,11 +817,8 @@ def api_transactions_semantic():
 
 @blueprint.route("/api/payees")
 def api_payees():
-    _maybe_generate()
-    payees = _load_payees()
     user_id = request.args.get("user_id", type=int)
-    if user_id:
-        payees = [p for p in payees if p["user_id"] == user_id]
+    payees = _load_payees(user_id=user_id)
     return jsonify(payees)
 
 
@@ -1023,20 +857,28 @@ def api_delete_payee(payee_id):
 
 @blueprint.route("/api/bills")
 def api_bills():
-    _maybe_generate()
-    bills = _load_bills()
     user_id = request.args.get("user_id", type=int)
     status = request.args.get("status", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
+
+    clauses = []
+    params = []
     if user_id:
-        bills = [b for b in bills if b["user_id"] == user_id]
+        clauses.append("[user_id] = ?")
+        params.append(user_id)
     if status:
-        bills = [b for b in bills if b["status"] == status]
+        clauses.append("[status] = ?")
+        params.append(status)
     if date_from:
-        bills = [b for b in bills if b["due_date"] >= date_from]
+        clauses.append("[due_date] >= ?")
+        params.append(date_from)
     if date_to:
-        bills = [b for b in bills if b["due_date"] <= date_to]
+        clauses.append("[due_date] <= ?")
+        params.append(date_to)
+
+    where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
+    bills = db.execute(f"SELECT * FROM [banking_bills]{where_sql}", tuple(params))
     return jsonify(bills)
 
 
@@ -1045,30 +887,41 @@ def api_pay_bill(bill_id):
     data = request.get_json(silent=True) or {}
     account_id = data.get("account_id")
 
-    bills = _load_bills()
-    bill = next((b for b in bills if b["id"] == bill_id), None)
+    bill = db.get_item(SITE, "bills", bill_id)
     if not bill:
         abort(404)
     if bill["status"] == "paid":
         return jsonify({"error": "Bill already paid"}), 400
 
+    # If no account_id provided, find the bill owner's primary checking account
+    if not account_id:
+        checking_accounts = _load_accounts(user_id=bill["user_id"], account_type="checking")
+        if checking_accounts:
+            account_id = checking_accounts[0]["id"]
+
+    # Debit the paying account
     if account_id:
-        accounts = _load_accounts()
-        acct = next((a for a in accounts if a["id"] == account_id), None)
+        acct = db.get_item(SITE, "accounts", account_id)
         if acct:
+            if acct["balance"] < bill["amount"]:
+                return jsonify({"error": "Insufficient funds"}), 400
             acct["balance"] = round(acct["balance"] - bill["amount"], 2)
-            _save_accounts(accounts)
+            db.save_item(SITE, "accounts", account_id, acct)
 
+    # Mark bill as paid
     bill["status"] = "paid"
-    _save_bills(bills)
+    db.save_item(SITE, "bills", bill_id, bill)
 
-    txns = _load_transactions()
-    new_id = max(t["id"] for t in txns) + 1 if txns else 1
-    txns.insert(0, {
+    # Create a transaction record for the debit
+    today = datetime.now().strftime("%Y-%m-%d")
+    max_id = db.execute(
+        "SELECT COALESCE(MAX([id]), 0) FROM [banking_transactions]", (), fetch="val")
+    new_id = max_id + 1
+    db.save_item(SITE, "transactions", new_id, {
         "id": new_id,
         "account_id": account_id or 0,
         "user_id": bill["user_id"],
-        "date": datetime.now().strftime("%Y-%m-%d"),
+        "date": today,
         "description": f"Bill payment - {bill['payee_name']}",
         "amount": bill["amount"],
         "type": "debit",
@@ -1076,8 +929,8 @@ def api_pay_bill(bill_id):
         "status": "posted",
         "reference": f"BILL{bill_id:06d}",
     })
-    _save_transactions(txns)
-    return jsonify({"status": "paid", "bill_id": bill_id, "amount": bill["amount"]})
+    return jsonify({"status": "paid", "bill_id": bill_id, "amount": bill["amount"],
+                    "account_id": account_id})
 
 
 @blueprint.route("/api/transfer", methods=["POST"])
@@ -1142,14 +995,14 @@ def api_transfer():
 
 @blueprint.route("/api/loans")
 def api_loans():
-    _maybe_generate()
-    loans = _load_loans()
     user_id = request.args.get("user_id", type=int)
     ltype = request.args.get("type", "").strip()
+    where = {}
     if user_id:
-        loans = [l for l in loans if l["user_id"] == user_id]
+        where["user_id"] = user_id
     if ltype:
-        loans = [l for l in loans if l["type"] == ltype]
+        where["type"] = ltype
+    loans = db.query(SITE, "loans", where=where if where else None)
     return jsonify(loans)
 
 
@@ -1159,29 +1012,55 @@ def api_pay_loan(loan_id):
     amount = data.get("amount")
     account_id = data.get("account_id")
 
-    loans = _load_loans()
-    loan = next((l for l in loans if l["id"] == loan_id), None)
+    loan = db.get_item(SITE, "loans", loan_id)
     if not loan:
         abort(404)
 
     if not amount or amount <= 0:
         amount = loan["monthly_payment"]
 
+    # If no account_id provided, find the loan owner's primary checking account
+    if not account_id:
+        checking_accounts = _load_accounts(user_id=loan["user_id"], account_type="checking")
+        if checking_accounts:
+            account_id = checking_accounts[0]["id"]
+
+    # Debit the paying account
+    if account_id:
+        acct = db.get_item(SITE, "accounts", account_id)
+        if acct:
+            if acct["balance"] < amount:
+                return jsonify({"error": "Insufficient funds"}), 400
+            acct["balance"] = round(acct["balance"] - amount, 2)
+            db.save_item(SITE, "accounts", account_id, acct)
+
+    # Reduce loan balance
     loan["remaining_balance"] = round(loan["remaining_balance"] - amount, 2)
     if loan["remaining_balance"] <= 0:
         loan["remaining_balance"] = 0
         loan["status"] = "paid_off"
-    _save_json(LOANS_FILE, loans)
+    db.save_item(SITE, "loans", loan_id, loan)
 
-    if account_id:
-        accounts = _load_accounts()
-        acct = next((a for a in accounts if a["id"] == account_id), None)
-        if acct:
-            acct["balance"] = round(acct["balance"] - amount, 2)
-            _save_accounts(accounts)
+    # Create a transaction record for the debit
+    today = datetime.now().strftime("%Y-%m-%d")
+    max_id = db.execute(
+        "SELECT COALESCE(MAX([id]), 0) FROM [banking_transactions]", (), fetch="val")
+    new_id = max_id + 1
+    db.save_item(SITE, "transactions", new_id, {
+        "id": new_id,
+        "account_id": account_id or 0,
+        "user_id": loan["user_id"],
+        "date": today,
+        "description": f"Loan payment - {loan.get('type', 'Loan')} loan #{loan_id}",
+        "amount": amount,
+        "type": "debit",
+        "category": "Loan Payment",
+        "status": "posted",
+        "reference": f"LOAN{loan_id:06d}",
+    })
 
     return jsonify({"status": loan["status"], "remaining_balance": loan["remaining_balance"],
-                    "payment_amount": amount})
+                    "payment_amount": amount, "account_id": account_id})
 
 
 @blueprint.route("/api/users/<int:user_id>/settings", methods=["PUT"])
@@ -1217,13 +1096,8 @@ def api_add_notification(user_id):
 
 @blueprint.route("/api/stats")
 def api_stats():
-    _maybe_generate()
-    accounts = _load_accounts()
-    txns = _load_transactions()
     user_id = request.args.get("user_id", type=int)
-    if user_id:
-        accounts = [a for a in accounts if a["user_id"] == user_id]
-        txns = [t for t in txns if t["user_id"] == user_id]
+    accounts = _load_accounts(user_id=user_id)
 
     total_balance = sum(a["balance"] for a in accounts)
     by_type = {}
@@ -1231,32 +1105,42 @@ def api_stats():
         by_type.setdefault(a["type"], []).append(a["balance"])
     type_totals = {k: round(sum(v), 2) for k, v in by_type.items()}
 
-    cat_spending = Counter()
-    for t in txns:
-        if t["type"] == "debit":
-            cat_spending[t["category"]] += t["amount"]
-    top_categories = dict(Counter({k: round(v, 2) for k, v in cat_spending.items()}).most_common(10))
+    # Use SQL aggregation for spending categories
+    uid_clause = " AND [user_id] = ?" if user_id else ""
+    uid_params = (user_id,) if user_id else ()
+    cat_rows = db.execute(
+        f"SELECT [category], SUM([amount]) as total FROM [banking_transactions] WHERE [type] = 'debit'{uid_clause} GROUP BY [category] ORDER BY total DESC LIMIT 10",
+        ("debit" and uid_params) if not user_id else uid_params)
+    # Requery correctly
+    if user_id:
+        cat_rows = db.execute(
+            "SELECT [category], SUM([amount]) as total FROM [banking_transactions] WHERE [type] = 'debit' AND [user_id] = ? GROUP BY [category] ORDER BY total DESC LIMIT 10",
+            (user_id,))
+    else:
+        cat_rows = db.execute(
+            "SELECT [category], SUM([amount]) as total FROM [banking_transactions] WHERE [type] = 'debit' GROUP BY [category] ORDER BY total DESC LIMIT 10",
+            ())
+    top_categories = {r["category"]: round(r["total"], 2) for r in cat_rows}
+
+    total_txns = db.count(SITE, "transactions", where={"user_id": user_id} if user_id else None)
 
     return jsonify({
         "total_accounts": len(accounts),
         "total_balance": round(total_balance, 2),
         "balance_by_type": type_totals,
-        "total_transactions": len(txns),
+        "total_transactions": total_txns,
         "top_spending_categories": top_categories,
     })
 
 
 @blueprint.route("/api/export")
 def api_export():
-    _maybe_generate()
     fmt = request.args.get("format", "json").lower()
     data_type = request.args.get("type", "transactions").lower()
     user_id = request.args.get("user_id", type=int)
 
     if data_type == "transactions":
-        data = _load_transactions()
-        if user_id:
-            data = [d for d in data if d["user_id"] == user_id]
+        data = _load_transactions(user_id=user_id)
         if fmt == "csv":
             lines = ["id,account_id,user_id,date,description,amount,type,category,status,reference"]
             for t in data:
@@ -1267,9 +1151,7 @@ def api_export():
         return jsonify(data)
 
     elif data_type == "accounts":
-        data = _load_accounts()
-        if user_id:
-            data = [d for d in data if d["user_id"] == user_id]
+        data = _load_accounts(user_id=user_id)
         if fmt == "csv":
             lines = ["id,user_id,account_number,type,balance,currency,opened_date,status,interest_rate"]
             for a in data:
@@ -1318,3 +1200,528 @@ def api_select_transaction(tx_id):
     tx["flagged"] = not tx.get("flagged", False)
     _save_transactions(txns)
     return jsonify({"id": tx_id, "flagged": tx["flagged"]})
+
+
+# ===========================================================================
+# Credit Card section — merged from credit-card site
+# ===========================================================================
+
+CC_REWARDS_RATES = {
+    "Dining": 3,
+    "Travel": 5,
+    "Gas": 2,
+    "Groceries": 3,
+    "Entertainment": 2,
+    "Shopping": 1,
+    "Electronics": 1,
+    "Healthcare": 1,
+    "Transportation": 1,
+    "Home": 1,
+    "Utilities": 1,
+    "Auto": 1,
+}
+
+# ---------------------------------------------------------------------------
+# Credit card data helpers
+# ---------------------------------------------------------------------------
+
+def _cc_load_users():
+    return db.query(SITE, "cc_users")
+
+def _cc_load_transactions(user_id=None, limit=None, sort="-date"):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "cc_transactions", where=where, sort=sort, limit=limit)
+
+def _cc_load_statements(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "cc_statements", where=where)
+
+def _cc_load_payments(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "cc_payments", where=where)
+
+def _cc_get_user_for_banking(banking_user):
+    """Find a credit card user that corresponds to the banking user."""
+    cc_user = db.get_item(SITE, "cc_users", banking_user["id"])
+    if cc_user:
+        return cc_user
+    cc_users = db.query(SITE, "cc_users", limit=1)
+    return cc_users[0] if cc_users else None
+
+def _cc_calculate_rewards_earned(transactions, user_id):
+    """Calculate total rewards points earned from CC transactions for a user."""
+    user_txns = [t for t in transactions if t["user_id"] == user_id and t["status"] == "posted"]
+    total = 0
+    by_category = {}
+    for t in user_txns:
+        rate = CC_REWARDS_RATES.get(t["category"], 1)
+        pts = int(t["amount"] * rate)
+        total += pts
+        by_category[t["category"]] = by_category.get(t["category"], 0) + pts
+    return total, by_category
+
+def _cc_spending_by_category(transactions, user_id):
+    """Aggregate spending by category for a CC user."""
+    user_txns = [t for t in transactions if t["user_id"] == user_id]
+    cats = {}
+    for t in user_txns:
+        cats[t["category"]] = cats.get(t["category"], 0) + t["amount"]
+    return dict(sorted(cats.items(), key=lambda x: -x[1]))
+
+
+# ---------------------------------------------------------------------------
+# Credit card HTML routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/credit-card")
+def cc_index():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    user_txns = _cc_load_transactions(user_id=cc_user["id"], limit=5, sort="-date")
+    statements = _cc_load_statements(user_id=cc_user["id"])
+    statements.sort(key=lambda s: s.get("period", ""), reverse=True)
+    latest_stmt = statements[0] if statements else None
+    recent_payments = _cc_load_payments(user_id=cc_user["id"])
+    recent_payments.sort(key=lambda p: p.get("date", ""), reverse=True)
+    recent_payments = recent_payments[:3]
+    cc_txns_for_spending = _cc_load_transactions(user_id=cc_user["id"])
+    spending = _cc_spending_by_category(cc_txns_for_spending, cc_user["id"])
+    return render_template("banking/cc_index.html", user=user, cc_user=cc_user,
+                           recent_transactions=user_txns,
+                           latest_statement=latest_stmt,
+                           recent_payments=recent_payments,
+                           spending=spending, logged_in=logged_in)
+
+
+@blueprint.route("/credit-card/transactions")
+def cc_transactions():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    uid = cc_user["id"]
+
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    search = request.args.get("q", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+
+    clauses = ["[user_id] = ?"]
+    params = [uid]
+    if category:
+        clauses.append("[category] = ?")
+        params.append(category)
+    if status:
+        clauses.append("[status] = ?")
+        params.append(status)
+    if date_from:
+        clauses.append("[date] >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("[date] <= ?")
+        params.append(date_to)
+    if search:
+        sl = f"%{search}%"
+        clauses.append("([merchant] LIKE ? OR [category] LIKE ?)")
+        params.extend([sl, sl])
+
+    where_sql = " AND ".join(clauses)
+    total_count = db.execute(
+        f"SELECT COUNT(*) FROM [banking_cc_transactions] WHERE {where_sql}",
+        tuple(params), fetch="val") or 0
+    total_amount_val = db.execute(
+        f"SELECT COALESCE(SUM([amount]), 0) FROM [banking_cc_transactions] WHERE {where_sql}",
+        tuple(params), fetch="val") or 0
+    total_amount = total_amount_val
+
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * per_page
+    page_txns = db.execute(
+        f"SELECT * FROM [banking_cc_transactions] WHERE {where_sql} ORDER BY [date] DESC LIMIT ? OFFSET ?",
+        tuple(params) + (per_page, offset))
+
+    cat_rows = db.execute(
+        "SELECT DISTINCT [category] FROM [banking_cc_transactions] WHERE [user_id] = ? ORDER BY [category]",
+        (uid,))
+    categories = [r["category"] for r in cat_rows]
+    return render_template("banking/cc_transactions.html", user=user, cc_user=cc_user,
+                           transactions=page_txns, categories=categories,
+                           category=category, status=status,
+                           date_from=date_from, date_to=date_to, q=search,
+                           page=page, total_pages=total_pages,
+                           total_count=total_count, total_amount=total_amount,
+                           logged_in=logged_in)
+
+
+@blueprint.route("/credit-card/statements")
+def cc_statements():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    user_stmts = _cc_load_statements(user_id=cc_user["id"])
+    user_stmts.sort(key=lambda s: s.get("period", ""), reverse=True)
+    return render_template("banking/cc_statements.html", user=user, cc_user=cc_user,
+                           statements=user_stmts, logged_in=logged_in)
+
+
+@blueprint.route("/credit-card/payments")
+def cc_payments():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    user_payments = _cc_load_payments(user_id=cc_user["id"])
+    user_payments.sort(key=lambda p: p.get("date", ""), reverse=True)
+    return render_template("banking/cc_payments.html", user=user, cc_user=cc_user,
+                           payments=user_payments, logged_in=logged_in)
+
+
+@blueprint.route("/credit-card/rewards")
+def cc_rewards():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    user_cc_txns = _cc_load_transactions(user_id=cc_user["id"])
+    total_earned, by_category = _cc_calculate_rewards_earned(user_cc_txns, cc_user["id"])
+    return render_template("banking/cc_rewards.html", user=user, cc_user=cc_user,
+                           total_earned=total_earned, by_category=by_category,
+                           rewards_rates=CC_REWARDS_RATES, logged_in=logged_in)
+
+
+@blueprint.route("/credit-card/settings")
+def cc_settings():
+    user, logged_in = _get_browsing_user()
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+    return render_template("banking/cc_settings.html", user=user, cc_user=cc_user,
+                           logged_in=logged_in)
+
+
+# ---------------------------------------------------------------------------
+# Credit card form mutation routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/credit-card/payment/make", methods=["POST"])
+def cc_form_make_payment():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+
+    payments = _cc_load_payments()
+    new_id = max((p["id"] for p in payments), default=0) + 1
+    amount = float(request.form.get("amount", 0))
+    payment = {
+        "id": new_id,
+        "user_id": cc_user["id"],
+        "date": request.form.get("date", datetime.now().strftime("%Y-%m-%d")),
+        "amount": amount,
+        "method": request.form.get("method", "bank_transfer"),
+        "bank_name": request.form.get("bank_name", ""),
+        "status": "completed",
+        "confirmation": f"PMT-{datetime.now().strftime('%Y%m%d')}-{new_id:03d}",
+    }
+    payments.append(payment)
+    db.save_collection(SITE, "cc_payments", payments)
+
+    # Update CC user balance
+    cc_users = _cc_load_users()
+    u = next((u for u in cc_users if u["id"] == cc_user["id"]), None)
+    if u:
+        u["current_balance"] = round(u["current_balance"] - amount, 2)
+        u["available_credit"] = round(u["credit_limit"] - u["current_balance"], 2)
+        db.save_collection(SITE, "cc_users", cc_users)
+
+    return redirect(url_for("banking.cc_payments"))
+
+
+@blueprint.route("/credit-card/transaction/<int:txn_id>/dispute", methods=["POST"])
+def cc_form_dispute_transaction(txn_id):
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+
+    transactions = _cc_load_transactions()
+    txn = next((t for t in transactions if t["id"] == txn_id), None)
+    if not txn:
+        abort(404)
+    txn["disputed"] = not txn.get("disputed", False)
+    db.save_collection(SITE, "cc_transactions", transactions)
+    return redirect(url_for("banking.cc_transactions"))
+
+
+@blueprint.route("/credit-card/settings/update", methods=["POST"])
+def cc_form_update_settings():
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    cc_user = _cc_get_user_for_banking(user)
+    if not cc_user:
+        abort(404)
+
+    cc_users = _cc_load_users()
+    u = next((u for u in cc_users if u["id"] == cc_user["id"]), None)
+    if not u:
+        abort(404)
+    if "email" in request.form:
+        u["email"] = request.form["email"].strip()
+    if "autopay_enabled" in request.form:
+        u["autopay_enabled"] = request.form["autopay_enabled"] == "true"
+    if "card_frozen" in request.form:
+        u["card_frozen"] = request.form["card_frozen"] == "true"
+    db.save_collection(SITE, "cc_users", cc_users)
+    return redirect(url_for("banking.cc_settings"))
+
+
+# ---------------------------------------------------------------------------
+# Credit card API routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/credit-card/transactions")
+def api_cc_transactions():
+    uid = request.args.get("user_id", type=int)
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    merchant = request.args.get("merchant", "").strip()
+    disputed = request.args.get("disputed", "").strip()
+    sort = request.args.get("sort", "date_desc").strip()
+
+    clauses = []
+    params = []
+    if uid:
+        clauses.append("[user_id] = ?")
+        params.append(uid)
+    if category:
+        clauses.append("[category] = ?")
+        params.append(category)
+    if status:
+        clauses.append("[status] = ?")
+        params.append(status)
+    if date_from:
+        clauses.append("[date] >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("[date] <= ?")
+        params.append(date_to)
+    if merchant:
+        clauses.append("[merchant] LIKE ?")
+        params.append(f"%{merchant}%")
+
+    sort_map = {
+        "date_asc": "[date] ASC",
+        "date_desc": "[date] DESC",
+        "amount_asc": "[amount] ASC",
+        "amount_desc": "[amount] DESC",
+        "merchant": "[merchant] ASC",
+    }
+    order_sql = sort_map.get(sort, "[date] DESC")
+
+    where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
+    results = db.execute(
+        f"SELECT * FROM [banking_cc_transactions]{where_sql} ORDER BY {order_sql}",
+        tuple(params))
+    return jsonify(results)
+
+
+@blueprint.route("/api/credit-card/transactions/<int:txn_id>/dispute", methods=["POST"])
+def api_cc_dispute_transaction(txn_id):
+    transactions = _cc_load_transactions()
+    txn = next((t for t in transactions if t["id"] == txn_id), None)
+    if not txn:
+        return jsonify({"error": "Transaction not found"}), 404
+    txn["disputed"] = not txn.get("disputed", False)
+    db.save_collection(SITE, "cc_transactions", transactions)
+    action = "disputed" if txn["disputed"] else "undisputed"
+    return jsonify({"action": action, "transaction_id": txn_id, "disputed": txn["disputed"]})
+
+
+@blueprint.route("/api/credit-card/statements")
+def api_cc_statements():
+    uid = request.args.get("user_id", type=int)
+    period = request.args.get("period", "").strip()
+    where = {}
+    if uid:
+        where["user_id"] = uid
+    if period:
+        where["period"] = period
+    results = db.query(SITE, "cc_statements", where=where if where else None, sort="-period")
+    return jsonify(results)
+
+
+@blueprint.route("/api/credit-card/payments", methods=["GET"])
+def api_cc_payments_list():
+    uid = request.args.get("user_id", type=int)
+    status = request.args.get("status", "").strip()
+    where = {}
+    if uid:
+        where["user_id"] = uid
+    if status:
+        where["status"] = status
+    results = db.query(SITE, "cc_payments", where=where if where else None, sort="-date")
+    return jsonify(results)
+
+
+@blueprint.route("/api/credit-card/payments", methods=["POST"])
+def api_cc_make_payment():
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    amount = data.get("amount")
+    if not uid or not amount:
+        return jsonify({"error": "user_id and amount required"}), 400
+    amount = float(amount)
+    payments = _cc_load_payments()
+    new_id = max((p["id"] for p in payments), default=0) + 1
+    payment = {
+        "id": new_id,
+        "user_id": uid,
+        "date": data.get("date", datetime.now().strftime("%Y-%m-%d")),
+        "amount": amount,
+        "method": data.get("method", "bank_transfer"),
+        "bank_name": data.get("bank_name", ""),
+        "status": "completed",
+        "confirmation": f"PMT-{datetime.now().strftime('%Y%m%d')}-{new_id:03d}",
+    }
+    payments.append(payment)
+    db.save_collection(SITE, "cc_payments", payments)
+
+    # Update user balance
+    cc_users = _cc_load_users()
+    user = next((u for u in cc_users if u["id"] == uid), None)
+    if user:
+        user["current_balance"] = round(user["current_balance"] - amount, 2)
+        user["available_credit"] = round(user["credit_limit"] - user["current_balance"], 2)
+        db.save_collection(SITE, "cc_users", cc_users)
+    return jsonify(payment), 201
+
+
+@blueprint.route("/api/credit-card/rewards")
+def api_cc_rewards():
+    uid = request.args.get("user_id", type=int)
+    if not uid:
+        return jsonify({"error": "user_id required"}), 400
+    cc_user = db.get_item(SITE, "cc_users", uid)
+    if not cc_user:
+        return jsonify({"error": "User not found"}), 404
+    user_txns = _cc_load_transactions(user_id=uid)
+    total_earned, by_category = _cc_calculate_rewards_earned(user_txns, uid)
+    return jsonify({
+        "user_id": uid,
+        "current_points": cc_user.get("rewards_points", 0),
+        "total_earned_from_transactions": total_earned,
+        "by_category": by_category,
+        "rates": CC_REWARDS_RATES,
+    })
+
+
+@blueprint.route("/api/credit-card/rewards/redeem", methods=["POST"])
+def api_cc_redeem_rewards():
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    points = data.get("points")
+    if not uid or not points:
+        return jsonify({"error": "user_id and points required"}), 400
+    points = int(points)
+    cc_users = _cc_load_users()
+    cc_user = next((u for u in cc_users if u["id"] == uid), None)
+    if not cc_user:
+        return jsonify({"error": "User not found"}), 404
+    if points > cc_user.get("rewards_points", 0):
+        return jsonify({"error": "Insufficient points"}), 400
+    cc_user["rewards_points"] -= points
+    credit_amount = round(points / 100, 2)  # 100 points = $1
+    cc_user["current_balance"] = round(cc_user["current_balance"] - credit_amount, 2)
+    cc_user["available_credit"] = round(cc_user["credit_limit"] - cc_user["current_balance"], 2)
+    db.save_collection(SITE, "cc_users", cc_users)
+    return jsonify({
+        "action": "redeemed",
+        "points_redeemed": points,
+        "credit_amount": credit_amount,
+        "remaining_points": cc_user["rewards_points"],
+    })
+
+
+@blueprint.route("/api/credit-card/spending")
+def api_cc_spending():
+    uid = request.args.get("user_id", type=int)
+    if not uid:
+        return jsonify({"error": "user_id required"}), 400
+    user_txns = _cc_load_transactions(user_id=uid)
+    spending = _cc_spending_by_category(user_txns, uid)
+    total = sum(spending.values())
+    return jsonify({
+        "user_id": uid,
+        "total": round(total, 2),
+        "by_category": spending,
+    })
+
+
+@blueprint.route("/api/credit-card/stats")
+def api_cc_stats():
+    total_txns = db.count(SITE, "cc_transactions")
+    total_spend = db.execute(
+        "SELECT COALESCE(SUM([amount]), 0) FROM [banking_cc_transactions]", (), fetch="val") or 0
+    total_users = db.count(SITE, "cc_users")
+    cat_rows = db.execute(
+        "SELECT [category], SUM([amount]) as total FROM [banking_cc_transactions] GROUP BY [category] ORDER BY total DESC",
+        ())
+    categories = {r["category"]: round(r["total"], 2) for r in cat_rows}
+    return jsonify({
+        "total_transactions": total_txns,
+        "total_spend": round(total_spend, 2),
+        "total_users": total_users,
+        "disputed_transactions": 0,
+        "spending_by_category": categories,
+    })
+
+
+@blueprint.route("/api/credit-card/settings", methods=["GET"])
+def api_cc_get_settings():
+    uid = request.args.get("user_id", type=int)
+    if not uid:
+        return jsonify({"error": "user_id required"}), 400
+    cc_user = db.get_item(SITE, "cc_users", uid)
+    if not cc_user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "user_id": uid,
+        "email": cc_user.get("email", ""),
+        "autopay_enabled": cc_user.get("autopay_enabled", False),
+        "card_frozen": cc_user.get("card_frozen", False),
+    })
+
+
+@blueprint.route("/api/credit-card/settings", methods=["POST"])
+def api_cc_update_settings():
+    data = request.get_json(silent=True) or {}
+    uid = data.get("user_id")
+    if not uid:
+        return jsonify({"error": "user_id required"}), 400
+    cc_users = _cc_load_users()
+    cc_user = next((u for u in cc_users if u["id"] == uid), None)
+    if not cc_user:
+        return jsonify({"error": "User not found"}), 404
+    changed = []
+    if "email" in data:
+        cc_user["email"] = data["email"].strip()
+        changed.append("email")
+    if "autopay_enabled" in data:
+        cc_user["autopay_enabled"] = bool(data["autopay_enabled"])
+        changed.append("autopay_enabled")
+    if "card_frozen" in data:
+        cc_user["card_frozen"] = bool(data["card_frozen"])
+        changed.append("card_frozen")
+    db.save_collection(SITE, "cc_users", cc_users)
+    return jsonify({"action": "updated", "fields": changed, "user_id": uid})

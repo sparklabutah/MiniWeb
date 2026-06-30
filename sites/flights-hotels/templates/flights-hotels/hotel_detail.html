@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ hotel.name }} - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { font-size: .9rem; color: #4299e1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { text-decoration: underline; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .hotel-header { margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+        .hotel-header h2 { font-size: 1.5rem; color: #1a365d; margin-bottom: .3rem; }
+        .hotel-header .city { font-size: .95rem; color: #718096; }
+        .hotel-header .stars { color: #d69e2e; font-size: 1.1rem; margin-top: .3rem; }
+        .price-rating { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding: 1rem 1.2rem; background: #f7fafc; border-radius: .4rem; }
+        .price-rating .price { font-size: 2rem; font-weight: 700; color: #2b6cb0; }
+        .price-rating .price-label { font-size: .82rem; color: #a0aec0; }
+        .price-rating .rating-box { text-align: center; }
+        .price-rating .rating-value { font-size: 1.5rem; font-weight: 700; color: #2d3748; }
+        .price-rating .rating-label { font-size: .78rem; color: #718096; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .info-item label { font-size: .78rem; font-weight: 600; color: #a0aec0; text-transform: uppercase; }
+        .info-item .value { font-size: .95rem; color: #2d3748; margin-top: .15rem; }
+        .description { font-size: .95rem; line-height: 1.6; color: #4a5568; margin-bottom: 1.5rem; }
+        .amenities-section h3 { font-size: 1rem; color: #1a365d; margin-bottom: .6rem; }
+        .amenities-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; }
+        .amenity-tag { background: #ebf4ff; color: #2b6cb0; font-size: .82rem; padding: .3rem .7rem; border-radius: .25rem; font-weight: 500; }
+        .book-form { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+        .book-form h3 { font-size: 1rem; color: #1a365d; margin-bottom: .8rem; }
+        .book-form .form-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .book-form label { display: block; font-size: .82rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        .book-form select, .book-form input { padding: .5rem .7rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .9rem; }
+        .book-btn { background: #38a169; color: #fff; border: none; padding: .6rem 1.5rem; border-radius: .3rem; cursor: pointer; font-size: .95rem; font-weight: 600; }
+        .book-btn:hover { background: #2f855a; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}" class="active">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <a href="{{ url_for('flights-hotels.hotels_page') }}" class="back">&larr; Back to hotels</a>
+
+        <div class="detail-card">
+            <div class="hotel-header">
+                <h2>{{ hotel.name }}</h2>
+                <div class="city">{{ hotel.city }} &middot; {{ hotel.address }}</div>
+                <div class="stars">
+                    {% for _ in range(hotel.stars) %}&#9733;{% endfor %}{% for _ in range(5 - hotel.stars) %}&#9734;{% endfor %}
+                    ({{ hotel.stars }}-star)
+                </div>
+            </div>
+
+            <div class="price-rating">
+                <div>
+                    <div class="price">${{ "%.0f"|format(hotel.price_per_night) }}</div>
+                    <div class="price-label">per night</div>
+                </div>
+                <div class="rating-box">
+                    <div class="rating-value">{{ hotel.rating }}</div>
+                    <div class="rating-label">out of 5</div>
+                </div>
+            </div>
+
+            <p class="description">{{ hotel.description }}</p>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Check-in</label>
+                    <div class="value">{{ hotel.check_in }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Check-out</label>
+                    <div class="value">{{ hotel.check_out }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Rooms Available</label>
+                    <div class="value">{{ hotel.rooms_available }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Address</label>
+                    <div class="value">{{ hotel.address }}</div>
+                </div>
+            </div>
+
+            <div class="amenities-section">
+                <h3>Amenities</h3>
+                <div class="amenities-list">
+                    {% for a in hotel.amenities %}
+                    <span class="amenity-tag">{{ a }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="book-form">
+                <h3>Book This Hotel</h3>
+                <form method="post" action="{{ url_for('flights-hotels.book_hotel', hotel_id=hotel.id) }}">
+                    <div class="form-row">
+                        <div>
+                            <label for="nights">Nights</label>
+                            <select name="nights" id="nights">
+                                {% for n in range(1, 15) %}
+                                <option value="{{ n }}">{{ n }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="travelers">Guests</label>
+                            <select name="travelers" id="travelers">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="account_type">Pay with:</label>
+                            <select name="account_type" id="account_type">
+                                <option value="checking">Checking Account</option>
+                                <option value="credit">Credit Card</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="book-btn">Book Now</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

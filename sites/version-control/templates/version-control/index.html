@@ -3,14 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
+    <title>MeridianGit</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Top nav */
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-logo svg { fill: #f0f6fc; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-links a.active { font-weight: 600; }
+        .nav-search { margin: 0 16px; }
+        .nav-search input { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 5px 12px; font-size: 14px; width: 280px; }
+        .nav-search input::placeholder { color: #484f58; }
+        .nav-search input:focus { outline: none; border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,0.3); }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-user .user-name { color: #e6edf3; font-weight: 500; font-size: 14px; }
+        .nav-user .btn-signin { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        .nav-user .btn-signin:hover { background: #30363d; border-color: #8b949e; }
+        .nav-user .btn-logout { color: #8b949e; font-size: 13px; }
+
+        /* Main layout */
+        .main-container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; display: flex; gap: 24px; }
+        .feed-col { flex: 1; min-width: 0; }
+        .sidebar-col { width: 350px; flex-shrink: 0; }
+
+        /* Dashboard header */
+        .dash-header { margin-bottom: 20px; }
+        .dash-header h1 { font-size: 24px; font-weight: 600; color: #e6edf3; }
+        .dash-header p { color: #8b949e; font-size: 14px; margin-top: 4px; }
+
+        /* Activity feed */
+        .feed-section h2 { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+        .activity-list { list-style: none; }
+        .activity-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #21262d; }
+        .activity-avatar { width: 32px; height: 32px; border-radius: 50%; background: #30363d; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #8b949e; flex-shrink: 0; }
+        .activity-content { flex: 1; min-width: 0; }
+        .activity-header { font-size: 14px; color: #e6edf3; }
+        .activity-header .author { font-weight: 600; color: #58a6ff; }
+        .activity-type { display: inline-block; font-size: 12px; font-weight: 500; padding: 1px 6px; border-radius: 12px; margin-left: 4px; }
+        .type-push { background: #1f6feb22; color: #58a6ff; }
+        .type-merge { background: #238636aa; color: #3fb950; }
+        .type-merge_request_review { background: #8957e5aa; color: #bc8cff; }
+        .type-issue { background: #da3633aa; color: #f85149; }
+        .type-comment { background: #30363d; color: #8b949e; }
+        .activity-detail { font-size: 13px; color: #8b949e; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .activity-detail .repo-link { color: #58a6ff; font-weight: 500; }
+        .activity-meta { font-size: 12px; color: #484f58; margin-top: 4px; }
+
+        /* Sidebar */
+        .sidebar-section { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .sidebar-section h3 { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .sidebar-section h3 a { font-size: 12px; font-weight: 400; color: #58a6ff; }
+        .repo-list-sidebar { list-style: none; }
+        .repo-list-sidebar li { padding: 8px 0; border-bottom: 1px solid #21262d; }
+        .repo-list-sidebar li:last-child { border-bottom: none; }
+        .repo-sidebar-name { font-size: 14px; font-weight: 600; }
+        .repo-sidebar-name a { color: #58a6ff; }
+        .repo-sidebar-desc { font-size: 12px; color: #8b949e; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .repo-sidebar-meta { display: flex; gap: 12px; margin-top: 4px; font-size: 12px; color: #8b949e; }
+        .repo-sidebar-meta .lang-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 2px; vertical-align: middle; }
+        .stat-item { display: flex; align-items: center; gap: 3px; }
+        .stat-item svg { fill: #8b949e; }
+
+        .btn-new-repo { display: inline-flex; align-items: center; gap: 6px; background: #238636; color: #fff; padding: 5px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; border: 1px solid rgba(240,246,252,0.1); }
+        .btn-new-repo:hover { background: #2ea043; text-decoration: none; }
+
+        /* Language colors */
+        .lang-python { background: #3572A5; }
+        .lang-go { background: #00ADD8; }
+        .lang-typescript { background: #3178c6; }
+        .lang-javascript { background: #f1e05a; }
+        .lang-terraform { background: #5c4ee5; }
+        .lang-hcl { background: #5c4ee5; }
+        .lang-rust { background: #dea584; }
+        .lang-default { background: #8b949e; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+<nav class="top-nav">
+    <a href="{{ url_for('version-control.index') }}" class="nav-logo">
+        <svg height="28" width="28" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        MeridianGit
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('version-control.index') }}" class="active">Dashboard</a>
+        <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+        <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+        <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+        <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+        <a href="{{ url_for('version-control.members_page') }}">Members</a>
     </div>
+    <div class="nav-search">
+        <input type="text" placeholder="Search or jump to...">
+    </div>
+    <div class="nav-user">
+        {% if session.get('vc_username') %}
+        <span class="user-name">{{ session.vc_name }}</span>
+        <a href="{{ url_for('version-control.logout') }}" class="btn-logout">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('version-control.login_page') }}" class="btn-signin" style="text-decoration:none;">Sign in</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="main-container">
+    <div class="feed-col">
+        <div class="dash-header">
+            <h1>Dashboard</h1>
+            <p>All the latest activity from your organization</p>
+        </div>
+
+        <section class="feed-section">
+            <h2>Recent Activity</h2>
+            <ul class="activity-list">
+            {% for a in activities %}
+                <li class="activity-item">
+                    <div class="activity-avatar">{{ a.author_name[0] }}</div>
+                    <div class="activity-content">
+                        <div class="activity-header">
+                            <a href="#" class="author">{{ a.author_name }}</a>
+                            <span class="activity-type type-{{ a.type }}">{{ a.type | replace('_', ' ') }}</span>
+                        </div>
+                        <div class="activity-detail">
+                            <span class="repo-link">{{ a.repo }}</span>
+                            {% if a.commit_message %} &mdash; {{ a.commit_message }}{% endif %}
+                            {% if a.merge_request_title %} &mdash; {{ a.merge_request_title }}{% endif %}
+                            {% if a.review_comment %} &mdash; {{ a.review_comment[:100] }}{% endif %}
+                        </div>
+                        <div class="activity-meta">{{ a.created_at[:10] }} {{ a.created_at[11:16] if a.created_at|length > 16 else '' }}</div>
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+        </section>
+    </div>
+
+    <div class="sidebar-col">
+        <div class="sidebar-section">
+            <h3>
+                Repositories
+                <a href="{{ url_for('version-control.repos_page') }}">View all</a>
+            </h3>
+            <ul class="repo-list-sidebar">
+            {% for r in repos %}
+                <li>
+                    <div class="repo-sidebar-name">
+                        <a href="{{ url_for('version-control.repo_detail', repo_id=r.id) }}">{{ r.owner_username }}/{{ r.name }}</a>
+                    </div>
+                    <div class="repo-sidebar-desc">{{ r.description[:70] if r.description else '' }}{% if r.description and r.description|length > 70 %}...{% endif %}</div>
+                    <div class="repo-sidebar-meta">
+                        {% if r.tech_stack %}
+                        <span class="stat-item">
+                            <span class="lang-dot lang-{{ r.tech_stack[0]|lower|replace(' ', '-') if r.tech_stack else 'default' }}"></span>
+                            {{ r.tech_stack[0] if r.tech_stack else '' }}
+                        </span>
+                        {% endif %}
+                        <span class="stat-item">
+                            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
+                            {{ r.stars }}
+                        </span>
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>Quick Actions</h3>
+            <a href="{{ url_for('version-control.new_repo_page') }}" class="btn-new-repo">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"></path></svg>
+                New repository
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>Platform Stats</h3>
+            <ul style="list-style:none; font-size:14px; color:#c9d1d9;">
+                <li style="padding:4px 0; display:flex; justify-content:space-between;">
+                    <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+                    <span style="color:#8b949e;">{{ project_count }}</span>
+                </li>
+                <li style="padding:4px 0; display:flex; justify-content:space-between;">
+                    <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+                    <span style="color:#8b949e;">{{ issue_count }}</span>
+                </li>
+                <li style="padding:4px 0; display:flex; justify-content:space-between;">
+                    <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+                    <span style="color:#8b949e;">{{ mr_count }}</span>
+                </li>
+                <li style="padding:4px 0; display:flex; justify-content:space-between;">
+                    <a href="{{ url_for('version-control.members_page') }}">Members</a>
+                    <span style="color:#8b949e;">{{ member_count }}</span>
+                </li>
+            </ul>
+        </div>
+
+        {% if recent_issues %}
+        <div class="sidebar-section">
+            <h3>
+                Recent Issues
+                <a href="{{ url_for('version-control.issues_page') }}">View all</a>
+            </h3>
+            <ul style="list-style:none;">
+                {% for issue in recent_issues %}
+                <li style="padding:6px 0; border-bottom:1px solid #21262d; font-size:13px;">
+                    <a href="{{ url_for('version-control.issue_detail', issue_id=issue.id) }}" style="color:#e6edf3;">{{ issue.title[:60] }}{% if issue.title|length > 60 %}...{% endif %}</a>
+                    <div style="font-size:11px; color:#484f58;">{{ issue.project_name }} &middot; {{ issue.updated_at[:10] if issue.updated_at else '' }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
 </body>
 </html>

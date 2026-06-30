@@ -1,128 +1,234 @@
 # MiniWeb
 
-A lightweight, self-contained web platform for agentic benchmarking. One Flask process serves a search portal and any number of mini-sites, each with its own pages, JSON data, and verifiable tasks.
+A web platform for benchmarking browser-agent AI systems. One Flask process serves 66 realistic websites — banking, forums, e-commerce, email, and more — each backed by real-world data (arxiv, reddit, StackExchange, Wikipedia) totaling 11M+ records in SQLite. Agents receive natural-language instructions and interact with rendered HTML; verifiers check backend state to score success.
 
-**163 macros** from 4 web-agent datasets
+## Quick Start (CHPC)
 
-## Quick Start
-
-### Option A: Python (no Docker)
+### 1. Clone and set up environment
 
 ```bash
+cd /scratch/general/vast/$USER/projects
+git clone <repo-url> MiniWeb
+cd MiniWeb
+
+# Create conda environment
+module load miniforge3
+conda create -n miniweb-eval python=3.11 -y
+conda activate miniweb-eval
 pip install -r requirements.txt
+```
+
+### 2. Set up the database
+
+The database (`miniweb.db`, ~18GB) lives in `data_sources/` with a symlink in the project root.
+If you're on the same CHPC allocation, the symlink already points to the shared DB:
+
+```bash
+# Verify the DB exists
+ls -lh miniweb.db  # should be a symlink to data_sources/miniweb.db
+
+# If not, create the symlink
+ln -s /scratch/general/vast/u1653932/data_sources/miniweb.db miniweb.db
+```
+
+To rebuild from scratch (requires raw data in `data_sources/`):
+```bash
+# On a compute node (large datasets need RAM + I/O):
+srun --ntasks=1 --mem=32G --time=2:00:00 --account=kmarino --partition=notchpeak \
+    python scripts/build_db.py --force
+
+# Build FTS5 search indexes (can run separately):
+python scripts/build_fts.py
+```
+
+### 3. Set up API keys (optional)
+
+For AI-powered features (chatbot, translation):
+```bash
+echo 'OPENAI_API_KEY=sk-your-key-here' > .env
+```
+
+### 4. Run the app
+
+```bash
+python run.py
+# Open http://localhost:8080
+```
+
+For running on a CHPC interactive node with port forwarding:
+```bash
+# On your local machine:
+ssh -L 8080:localhost:8080 <username>@notchpeak.chpc.utah.edu
+
+# On CHPC:
+cd /scratch/general/vast/$USER/projects/MiniWeb
+conda activate miniweb-eval
 python run.py
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
-
-### Option B: Docker
+### 5. Compute node scripts (optional)
 
 ```bash
-docker build -t miniweb .
-docker run -p 8080:8080 miniweb
+# Extract 1M Wikipedia articles from the 95GB ZIM file
+srun --ntasks=1 --mem=16G --time=2:00:00 --account=kmarino --partition=notchpeak \
+    python scripts/extract_wiki_sample.py
+
+# Pre-compute all routes between map locations (walking/driving/transit)
+srun --ntasks=1 --mem=8G --time=8:00:00 --account=kmarino --partition=notchpeak \
+    python scripts/precompute_all_routes.py --skip-existing
 ```
 
 ## Project Structure
 
 ```
 MiniWeb/
-├── run.py                      # Entry point
-├── requirements.txt            # Flask
-├── Dockerfile                  # Optional container
+├── run.py                          # Entry point
+├── CLAUDE.md                       # Development rules (read before contributing)
+├── miniweb.db                      # SQLite database (all site data, ~12GB)
+│
 ├── app/
-│   ├── __init__.py             # Auto-discovers sites and mounts blueprints
-│   ├── portal/                 # Search homepage
-│   └── static/                 # Shared CSS
-├── sites/
-│   ├── _template/              # Copy to create a new site
-│   ├── academic-paper-db/      # Full reference site (20 tasks, 21 macros)
-│   ├── bookstore/              # Minimal template (no tasks)
-│   └── <site-id>/              # Each site contains:
-│       ├── site.json           #   Metadata
-│       ├── doc/                #   User-written site description
-│       ├── config/config.json  #   Site config (num_data_points, etc.)
-│       ├── routes.py           #   Flask blueprint (with data interpreter)
-│       ├── data/               #   Raw data (original format, never rewritten)
-│       ├── data/.pristine/     #   Immutable reset baseline
-│       ├── templates/<id>/     #   Jinja2 templates
-│       ├── tasks.json          #   20 benchmark tasks
-│       ├── verifiers.py        #   Per-task verification
-│       ├── macro_verifiers.py  #   Per-macro verification
-│       └── reference_solutions.py  # Per-task solutions
-├── specs/                      # Site generation specs (JSON)
-├── scripts/                    # Generation & validation tools
-├── evaluation/                 # Browser-agent evaluation harness
-├── macros/                     # Macro research pipeline
-└── docs/                       # Documentation
+│   ├── __init__.py                 # Flask app factory, blueprint registration, admin API
+│   ├── db.py                       # Database access layer (query, get_item, save_item, search)
+│   ├── events.py                   # Cross-site event bus (emit/on pattern)
+│   ├── bridges.py                  # Backward-compatible event wrappers
+│   ├── handlers/                   # Event handlers (banking, email, calendar, IM, cloud, passwords)
+│   ├── portal/                     # Browser chrome + new tab page with search
+│   └── static/                     # Shared CSS, generated tiles
+│
+├── sites/<site-id>/                # 65 self-contained sites
+│   ├── site.json                   # Metadata (name, description, category)
+│   ├── schema.py                   # SQLite table definitions
+│   ├── routes.py                   # Flask blueprint (routes + SQL queries)
+│   ├── templates/<site-id>/        # Jinja2 HTML templates
+│   ├── tasks.json                  # 20 benchmark tasks
+│   ├── verifiers.py                # Task success verification
+│   ├── macro_verifiers.py          # Per-macro verification
+│   └── reference_solutions.py      # Known-good solutions
+│
+├── scripts/
+│   ├── build_db.py                 # Build miniweb.db from raw data (special ingestors)
+│   ├── build_fts.py                # Build FTS5 full-text search indexes
+│   ├── generate_schemas.py         # Auto-generate schema.py from data files
+│   ├── extract_wiki_sample.py      # Extract Wikipedia articles from ZIM (compute node)
+│   ├── extract_osm_portland.py     # Extract POIs from OpenStreetMap
+│   ├── precompute_all_routes.py    # Pre-compute OSRM routes (compute node)
+│   └── data_prep/                  # Per-site data preparation
+│
+├── annotation/                     # Human annotation + evaluation interface
+├── miniweb.db -> data_sources/     # Symlink to SQLite database (~18GB)
+└── docs/
+    └── ARCHITECTURE.md             # Full architecture documentation
 ```
 
 ## How It Works
 
-At startup, `app/__init__.py` scans `sites/*/site.json` and auto-registers each site as a Flask Blueprint mounted at `/sites/<id>/`. The portal at `/` reads all `site.json` files to build a searchable index.
+### Data Flow
 
-No config files to edit. No routing to update. Just drop a folder and restart.
-
-## Adding a New Site
-
-### 1. Scaffold + prepare data and docs
-
-```bash
-./scripts/add_site.sh my-site "My Site Name" "A short description"
+```
+Synthetic JSON + Raw data (CSV/JSONL/XML)
+              |
+         build_db.py (merged into same tables)
+              |
+         miniweb.db (per-site tables, NOT NULL defaults, no NULLs)
+              |
+         Flask routes.py — db.query() with SQL WHERE/ORDER BY/LIMIT
+              |
+         Jinja2 templates → HTML → Browser Agent
 ```
 
-Then:
-- Place raw data files in `sites/my-site/data/` (keep original format — never rewrite)
-- Write site description in `sites/my-site/doc/` (what the site is, how it uses the data, what real-world site to model after, temporal dynamics if any)
+1. **Build**: `build_db.py` reads synthetic JSON + raw CSV/JSONL/XML and inserts both into the same per-site tables. All columns have NOT NULL defaults — no NULLs anywhere.
+2. **Serve**: Each site's `routes.py` queries its tables through `app/db.py` — all filtering, sorting, and pagination happens in SQL. Only the ~50 rows visible on the page are fetched.
+3. **Mutate**: Agent actions (transfers, posts, edits) are stored in a per-session overlay, never modifying base data.
+4. **Verify**: After the agent finishes, verifiers check backend state through the admin API.
 
-### 2. Generate and validate
+### Database
 
-```bash
-python scripts/generate_site.py specs/my-site.json
-python scripts/validate_site.py my-site
+All data lives in `miniweb.db` (~18GB) with 350+ per-site tables + FTS5 indexes. Examples:
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `forums_posts` | 127K | reddit CSV |
+| `forums_comments` | 1M | reddit CSV |
+| `academic_paper_db_papers` | 1M | arxiv JSONL |
+| `qa_knowledge_questions` | 1M | StackExchange XML |
+| `flights_hotels_hotels` | 1M | kaggle CSV |
+| `banking_transactions` | 220 | synthetic |
+
+Sites query data through `app/db.py`:
+
+```python
+from app import db
+
+# SQL-level filtering, sorting, pagination
+txns = db.query("banking", "transactions",
+                where={"user_id": 1}, sort="-date", limit=30)
+
+# Single item
+user = db.get_item("banking", "users", 1)
+
+# Raw SQL for complex queries
+rows = db.execute(
+    "SELECT * FROM forums_posts WHERE subreddit=? ORDER BY score DESC LIMIT 30",
+    ("science",)
+)
 ```
 
-### 3. Browser-eval loop (×N)
+### Session Isolation
 
-```bash
-python evaluation/run_eval.py --site my-site --model gemini-flash
-```
+Each browser session gets isolated mutations. When an agent transfers money or posts a comment, the change goes to `session_overlay`, not the base table. Multiple agents can run in parallel without interference. `POST /_reset_data` reverts to pristine state.
 
-Run N times (currently 3), fixing issues between rounds.
+## Sites
 
-See [docs/miniweb_webgen_pipeline.md](docs/miniweb_webgen_pipeline.md) for the full pipeline.
+65 sites across 14 categories:
 
-## Key Design Principles
+| Category | Sites |
+|----------|-------|
+| Financial | banking, brokerage, insurance-loans, crowdfunding |
+| Communication | email, instant-messaging, remote-calls, team-chat, dating |
+| Social Media | forums, multimedia-posting, rating-review |
+| Shopping | e-commerce, auctions, flights-hotels, ticketing-events, real-estate |
+| Productivity | calendar-todo, documents, spreadsheets, project-mgmt, CRM, cloud-storage |
+| Dynamic Info | news, blogs, weather, sports-esports |
+| Streaming & Media | music, video, live, podcasts-audiobooks, books-comics |
+| Government | agency-portals, tax-filing, petitions-voting |
+| Health | health-portals, health-fitness-tracking |
+| Education | course-sites, conference-review, visual-how-to-guides |
+| Maps & Navigation | map-services, transit-directions |
+| Utilities | password-managers, converters, translation, url-shorteners |
+| Technology | ai-chatbots, code-editor, software-marketplace |
+| Other | design-creative, personal-portfolio, handwritten-notes, and more |
 
-- **Original data format preserved**: Raw data in `data/` is never rewritten. `routes.py` contains a data interpreter that reads the raw format at runtime.
-- **Temporal simulation**: Sites with time-varying domains (stocks, weather, news) must simulate data changes over time.
-- **Macro-driven**: Every site implements a set of target macros, each with a dedicated verifier.
-- **Realistic tasks**: Tasks represent things a real user would actually do on the site.
-- **Self-contained sites**: Each site directory is fully isolated with all code, data, and templates.
+### Cross-Site Integration
+
+Sites are connected via a centralized event bus (`app/events.py`):
+- **Purchases** → banking debit + confirmation email + 2FA verification
+- **Bookings** → calendar event + email
+- **Signups** → welcome email + password manager entry
+- **File creation** → cloud storage sync
+- **Messages** → instant messaging
+
+All financial transactions support account selection (checking/credit) with email-based 2FA.
 
 ## Evaluation
 
-Run browser agents against benchmark tasks:
-
 ```bash
-pip install -r evaluation/requirements.txt
-python evaluation/run_eval.py --site my-site --model gemini-flash
+python evaluation/run_eval.py --site banking --model gemini-flash
 ```
 
-The agent receives only the natural-language instruction and interacts with the rendered UI through a real browser. Verifiers check backend state after each task.
+The agent receives a natural-language instruction, interacts with the site through a real browser, and verifiers check whether the task was completed correctly.
 
-See [AGENTS.md](AGENTS.md) for supported models, CLI flags, and how to add new agents.
+See [AGENTS.md](AGENTS.md) for supported models and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details.
 
-## API
+## Admin API
 
-### Portal
+For verification and debugging:
 
-- `GET /` — search homepage
-- `GET /api/sites` — list all sites (optional `?q=` filter)
-
-### Per-site
-
-Each site defines its own routes under `/sites/<id>/`. See the site's `routes.py` for available endpoints.
+- `GET /_admin/data/<site>/<collection>` — query data (supports `?user_id=1&_count=1`)
+- `GET /_admin/files/<site>` — list collections
+- `GET /_admin/user/<site>/<user_id>` — all data for a user
+- `POST /_reset_data` — reset session to pristine
+- `GET /_admin/log` — request log
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding sites, submitting PRs, and code style.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and read [CLAUDE.md](CLAUDE.md) before writing code.

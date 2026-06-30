@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cart - AppVault</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: #1e40af; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.5rem; }
+        .nav { display: flex; gap: 1.5rem; align-items: center; }
+        .nav a { color: #dbeafe; text-decoration: none; font-size: .95rem; }
+        .nav a:hover { color: #fff; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: 1.5rem; }
+        .cart-item { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin-bottom: .75rem; display: flex; align-items: center; gap: 1rem; }
+        .app-icon { width: 48px; height: 48px; background: #dbeafe; border-radius: .75rem; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+        .item-info { flex: 1; }
+        .item-info h3 { font-size: 1rem; margin-bottom: .2rem; }
+        .item-info h3 a { text-decoration: none; color: inherit; }
+        .item-info h3 a:hover { color: #2563eb; }
+        .item-info .meta { color: #64748b; font-size: .85rem; }
+        .item-price { font-weight: 700; font-size: 1rem; color: #dc2626; flex-shrink: 0; }
+        .item-price.free { color: #059669; }
+        .remove-btn { background: none; border: none; color: #dc2626; font-size: .85rem; cursor: pointer; padding: .3rem .5rem; }
+        .remove-btn:hover { text-decoration: underline; }
+        .cart-summary { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.5rem; margin-top: 1.5rem; }
+        .summary-row { display: flex; justify-content: space-between; padding: .4rem 0; font-size: .95rem; }
+        .summary-total { font-weight: 700; font-size: 1.15rem; border-top: 2px solid #e2e8f0; padding-top: .75rem; margin-top: .5rem; }
+        .btn { display: inline-block; padding: .7rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: .5rem; font-size: .95rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
+        .btn:hover { background: #1d4ed8; }
+        .btn-block { display: block; width: 100%; margin-top: 1rem; }
+        .empty { text-align: center; padding: 3rem; color: #94a3b8; }
+        .empty a { color: #3b82f6; text-decoration: none; }
+        .empty a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AppVault</h1>
+        <div class="nav">
+            <a href="{{ url_for('software-marketplace.index') }}">Home</a>
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+            <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+            <a href="{{ url_for('software-marketplace.logout') }}">Logout ({{ user.display_name }})</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">Shopping Cart</h2>
+
+        {% if cart_items %}
+            {% for item in cart_items %}
+            <div class="cart-item">
+                <div class="app-icon">{{ item.app.name[0] }}</div>
+                <div class="item-info">
+                    <h3><a href="{{ url_for('software-marketplace.app_detail', app_id=item.app.id) }}">{{ item.app.name }}</a></h3>
+                    <div class="meta">{{ item.app.genre }} &middot; {{ item.app.developer }}</div>
+                </div>
+                <div class="item-price {% if item.app.price == 0 %}free{% endif %}">
+                    {% if item.app.price == 0 %}Free{% else %}${{ "%.2f"|format(item.app.price) }}{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('software-marketplace.form_remove_from_cart', app_id=item.app.id) }}" style="display:inline;">
+                    <button type="submit" class="remove-btn">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Items</span>
+                    <span>{{ cart_items|length }}</span>
+                </div>
+                <div class="summary-row summary-total">
+                    <span>Total</span>
+                    <span>${{ "%.2f"|format(total) }}</span>
+                </div>
+                <a href="{{ url_for('software-marketplace.checkout_page') }}" class="btn btn-block">Proceed to Checkout</a>
+            </div>
+        {% else %}
+            <div class="empty">
+                <p>Your cart is empty.</p>
+                <p><a href="{{ url_for('software-marketplace.apps_list') }}">Browse apps</a></p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

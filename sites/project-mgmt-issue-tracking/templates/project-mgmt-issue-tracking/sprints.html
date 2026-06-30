@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprints - Meridian Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
+        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
+        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
+        .topbar a:hover { color: #fff; }
+        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
+        .topbar-nav a { color: #cbd5e1; }
+        .topbar-nav a.active { color: #fff; font-weight: 600; }
+        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .sprint-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.25rem; margin-bottom: 1rem; transition: box-shadow .15s; }
+        .sprint-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .sprint-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+        .sprint-header h3 { font-size: 1.05rem; }
+        .sprint-header h3 a { color: #1e293b; text-decoration: none; }
+        .sprint-header h3 a:hover { color: #3b82f6; }
+        .sprint-status { display: inline-block; padding: .2rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+        .sprint-status.active { background: #d1fae5; color: #059669; }
+        .sprint-status.closed { background: #f1f5f9; color: #64748b; }
+        .sprint-status.planned { background: #dbeafe; color: #1d4ed8; }
+        .sprint-meta { font-size: .85rem; color: #64748b; margin-bottom: .5rem; }
+        .sprint-goal { font-size: .9rem; color: #475569; margin-bottom: .75rem; line-height: 1.4; }
+        .sprint-stats { display: flex; gap: 1.5rem; font-size: .85rem; }
+        .sprint-stat { display: flex; flex-direction: column; }
+        .sprint-stat .num { font-weight: 700; font-size: 1.1rem; color: #1e293b; }
+        .sprint-stat .lbl { color: #94a3b8; font-size: .78rem; }
+        .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: .5rem; max-width: 200px; }
+        .progress-bar .fill { height: 100%; background: #10b981; border-radius: 3px; transition: width .3s; }
+        .project-tag { display: inline-block; background: #f1f5f9; color: #475569; font-size: .75rem; padding: .15rem .4rem; border-radius: .2rem; margin-left: .5rem; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Meridian Tracker</h1>
+        <div class="topbar-nav">
+            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Dashboard</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}" class="active">Sprints</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}">Backlog</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}">+ New Issue</a>
+            {% if user %}
+            <span class="user-badge">{{ user.name }}</span>
+            {% endif %}
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>All Sprints</h2>
+
+        {% for sd in sprint_data %}
+        <div class="sprint-card">
+            <div class="sprint-header">
+                <h3>
+                    <a href="{{ url_for('project-mgmt-issue-tracking.sprint_detail', sprint_id=sd.sprint.id) }}">{{ sd.sprint.name }}</a>
+                    {% if sd.project %}
+                    <span class="project-tag">{{ sd.project.name }}</span>
+                    {% endif %}
+                </h3>
+                <span class="sprint-status {{ sd.sprint.status }}">{{ sd.sprint.status }}</span>
+            </div>
+            <div class="sprint-meta">{{ sd.sprint.start_date }} to {{ sd.sprint.end_date }}</div>
+            <div class="sprint-goal">{{ sd.sprint.goal }}</div>
+            <div class="sprint-stats">
+                <div class="sprint-stat">
+                    <span class="num">{{ sd.done_issues }}/{{ sd.total_issues }}</span>
+                    <span class="lbl">Issues Done</span>
+                </div>
+                <div class="sprint-stat">
+                    <span class="num">{{ sd.done_points }}/{{ sd.total_points }}</span>
+                    <span class="lbl">Story Points</span>
+                </div>
+                <div>
+                    {% if sd.total_points > 0 %}
+                    <div class="progress-bar" title="{{ ((sd.done_points / sd.total_points) * 100)|int }}% complete">
+                        <div class="fill" style="width: {{ ((sd.done_points / sd.total_points) * 100)|int }}%"></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Locations - Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+        .content { max-width: 1060px; margin: 1.5rem auto; padding: 0 2rem; }
+        .section-title { font-size: 1.4rem; font-weight: 600; margin-bottom: .5rem; color: #1565c0; }
+        .section-subtitle { font-size: .9rem; color: #64748b; margin-bottom: 1.2rem; }
+
+        .locations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .loc-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; justify-content: space-between; }
+        .loc-card .loc-info h3 { font-size: 1rem; color: #1565c0; margin-bottom: .2rem; }
+        .loc-card .loc-info p { font-size: .8rem; color: #64748b; }
+        .loc-card .loc-default { font-size: .7rem; background: #bbdefb; color: #1565c0; padding: .15rem .5rem; border-radius: 1rem; font-weight: 600; }
+        .loc-card .loc-actions { display: flex; gap: .5rem; }
+        .btn-remove { background: none; border: 1px solid #ef5350; color: #ef5350; padding: .3rem .7rem; border-radius: .3rem; font-size: .78rem; cursor: pointer; }
+        .btn-remove:hover { background: #ffebee; }
+
+        /* Add location form */
+        .add-location { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 2rem; }
+        .add-location h3 { font-size: 1rem; color: #1565c0; margin-bottom: 1rem; }
+        .add-form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; }
+        .add-form .form-group { flex: 1; min-width: 150px; }
+        .add-form label { display: block; font-size: .78rem; color: #475569; font-weight: 600; margin-bottom: .3rem; }
+        .add-form input { width: 100%; padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .add-form input:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .btn-add { background: #1565c0; color: #fff; border: none; padding: .55rem 1.2rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; align-self: flex-end; }
+        .btn-add:hover { background: #0d47a1; }
+        .msg-success { background: #e8f5e9; color: #2e7d32; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
+        .msg-error { background: #fce4ec; color: #c62828; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
+
+        /* All locations list */
+        .all-locs-title { font-size: 1.1rem; font-weight: 600; color: #1565c0; margin-bottom: .8rem; margin-top: 1rem; }
+        .all-locs-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 2rem; }
+        .all-locs-list .loc-tag { background: #e3f2fd; color: #1565c0; font-size: .8rem; padding: .3rem .7rem; border-radius: .3rem; }
+        .all-locs-list .loc-tag.saved { background: #bbdefb; font-weight: 600; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            {% if user %}
+                <a href="{{ url_for('weather.locations_page') }}">My Locations</a>
+                <a href="{{ url_for('weather.logout') }}">Sign Out ({{ user.username }})</a>
+            {% else %}
+                <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}">Alerts</a>
+        <a href="{{ url_for('weather.locations_page') }}" class="active">Locations</a>
+    </nav>
+
+    <div class="content">
+        <h2 class="section-title">My Saved Locations</h2>
+        <p class="section-subtitle">Manage your saved weather locations, {{ user.name }}.</p>
+
+        <div id="message-area"></div>
+
+        <div class="locations-grid">
+            {% for loc in saved %}
+            <div class="loc-card" id="loc-{{ loc.id }}">
+                <div class="loc-info">
+                    <h3>{{ loc.name }}</h3>
+                    <p>{{ loc.lat }}, {{ loc.lng }}</p>
+                </div>
+                <div class="loc-actions">
+                    {% if loc.is_default %}
+                    <span class="loc-default">Default</span>
+                    {% endif %}
+                    <button class="btn-remove" onclick="removeLocation({{ loc.id }})">Remove</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="add-location">
+            <h3>Add a Location</h3>
+            <form class="add-form" id="add-form" onsubmit="addLocation(event)">
+                <div class="form-group">
+                    <label for="loc-name">Location Name</label>
+                    <input type="text" id="loc-name" name="name" placeholder="e.g., Yakima, WA" required>
+                </div>
+                <div class="form-group">
+                    <label for="loc-lat">Latitude</label>
+                    <input type="number" id="loc-lat" name="lat" step="0.01" placeholder="47.00">
+                </div>
+                <div class="form-group">
+                    <label for="loc-lng">Longitude</label>
+                    <input type="number" id="loc-lng" name="lng" step="0.01" placeholder="-120.50">
+                </div>
+                <button type="submit" class="btn-add">Add Location</button>
+            </form>
+        </div>
+
+        <h3 class="all-locs-title">All Available Locations</h3>
+        <div class="all-locs-list">
+            {% set saved_ids = saved | map(attribute='id') | list %}
+            {% for loc in all_locations %}
+            <span class="loc-tag {% if loc.id in saved_ids %}saved{% endif %}">{{ loc.name }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">
+        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+    </div>
+
+    <script>
+        function showMessage(type, text) {
+            var area = document.getElementById('message-area');
+            area.innerHTML = '<div class="msg-' + type + '">' + text + '</div>';
+            setTimeout(function() { area.innerHTML = ''; }, 4000);
+        }
+
+        function removeLocation(locId) {
+            fetch('{{ url_for("weather.api_locations_delete") }}', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({location_id: locId})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    showMessage('error', data.error);
+                } else {
+                    var card = document.getElementById('loc-' + locId);
+                    if (card) card.remove();
+                    showMessage('success', data.message);
+                }
+            })
+            .catch(function() { showMessage('error', 'Network error'); });
+        }
+
+        function addLocation(e) {
+            e.preventDefault();
+            var name = document.getElementById('loc-name').value;
+            var lat = parseFloat(document.getElementById('loc-lat').value) || 0;
+            var lng = parseFloat(document.getElementById('loc-lng').value) || 0;
+            fetch('{{ url_for("weather.api_locations_post") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: name, lat: lat, lng: lng})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    showMessage('error', data.error);
+                } else {
+                    showMessage('success', data.message);
+                    setTimeout(function() { location.reload(); }, 1000);
+                }
+            })
+            .catch(function() { showMessage('error', 'Network error'); });
+        }
+    </script>
+</body>
+</html>

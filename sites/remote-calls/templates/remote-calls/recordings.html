@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordings - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .search-bar { background: #fff; padding: 1rem 1.2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.2rem; }
+        .search-bar form { display: flex; gap: .8rem; align-items: center; }
+        .search-bar input { flex: 1; padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .search-bar input:focus { border-color: #4fc3f7; outline: none; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .results-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        .recording-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+        .recording-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; transition: box-shadow .2s; }
+        .recording-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+        .recording-thumb { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 1.5rem 1.2rem; color: #fff; position: relative; }
+        .recording-thumb .play-icon { font-size: 2rem; margin-bottom: .5rem; }
+        .recording-thumb .title { font-size: .95rem; font-weight: 600; }
+        .recording-thumb .date { font-size: .8rem; color: #b0bec5; margin-top: .3rem; }
+        .recording-thumb .badge { position: absolute; top: .8rem; right: .8rem; background: rgba(255,255,255,.15); padding: .2rem .5rem; border-radius: .2rem; font-size: .7rem; color: #fff; }
+        .recording-body { padding: 1rem 1.2rem; }
+        .recording-meta { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
+        .recording-meta .meta-item { font-size: .8rem; color: #64748b; }
+        .recording-meta .meta-item strong { color: #1a1a2e; }
+        .recording-tags { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .tag { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; }
+        .tag.transcript { background: #e8f5e9; color: #2e7d32; }
+        .tag.access { background: #e3f2fd; color: #1565c0; }
+        .recording-card a { text-decoration: none; color: inherit; }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}" class="active">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>Recordings</h2>
+
+        <div class="search-bar">
+            <form method="get" action="{{ url_for('remote-calls.recordings_page') }}">
+                <input type="text" name="q" value="{{ search }}" placeholder="Search recordings...">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </form>
+        </div>
+
+        <div class="results-count">{{ recordings|length }} recording{{ 's' if recordings|length != 1 }}</div>
+
+        {% if recordings %}
+        <div class="recording-grid">
+            {% for r in recordings %}
+            <div class="recording-card">
+                <a href="{{ url_for('remote-calls.recording_detail', recording_id=r.id) }}">
+                    <div class="recording-thumb">
+                        <div class="play-icon">&#9654;</div>
+                        <div class="title">{{ r.title }}</div>
+                        <div class="date">{{ parse_dt(r.date).strftime('%b %d, %Y at %I:%M %p') if parse_dt(r.date) else r.date }}</div>
+                        <div class="badge">{{ r.format|upper }}</div>
+                    </div>
+                </a>
+                <div class="recording-body">
+                    <div class="recording-meta">
+                        <div class="meta-item"><strong>{{ format_duration_minutes(r.duration_minutes) }}</strong></div>
+                        <div class="meta-item">&middot; {{ r.file_size_mb }} MB</div>
+                        <div class="meta-item">&middot; {{ r.views }} views</div>
+                        <div class="meta-item">&middot; By {{ user_map.get(r.recorded_by, 'Unknown') }}</div>
+                    </div>
+                    <div class="recording-tags">
+                        {% if r.transcript_available %}<span class="tag transcript">Transcript</span>{% endif %}
+                        <span class="tag access">{{ r.access|capitalize }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No recordings found.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

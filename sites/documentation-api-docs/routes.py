@@ -4,16 +4,13 @@ Serves structured documentation pages with sidebar navigation, search,
 API reference with method badges, changelog, and user bookmarks.
 Data is loaded from JSON files in the data/ directory.
 """
-import json
 import pathlib
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
 
+SITE = "documentation-api-docs"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DOCS_FILE = SITE_DIR / "data" / "docs.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-SEARCH_INDEX_FILE = SITE_DIR / "data" / "search_index.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "documentation-api-docs",
@@ -24,39 +21,28 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
 _docs = None
 _search_index = None
 _sections = None
-_section_order = ["Getting Started", "Concepts", "API Reference", "Changelog", "Tools"]
+_section_order = ["Getting Started", "Workflows", "Tasks", "Webhooks", "SDKs", "Changelog"]
 
 
 def _load_docs():
-    with open(DOCS_FILE) as f:
-        return json.load(f)
+    return db.query(SITE, "docs")
 
 
 def _load_search_index():
-    with open(SEARCH_INDEX_FILE) as f:
-        return json.load(f)
+    return db.query(SITE, "search_index")
 
 
 def _ensure_loaded():
     global _docs, _search_index, _sections
     if _docs is None:
         _docs = _load_docs()
-        _docs.sort(key=lambda d: d["order"])
+        _docs.sort(key=lambda d: d.get("order_", 0))
         _search_index = _load_search_index()
         _sections = {}
         for doc in _docs:
@@ -81,7 +67,7 @@ def _get_search_index():
 
 def _get_ordered_sections():
     """Return sections in canonical order."""
-    sections = _get_sections()
+    sections = _get_sections() or {}
     ordered = []
     for name in _section_order:
         if name in sections:
@@ -98,18 +84,15 @@ def _get_ordered_sections():
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -161,9 +144,8 @@ def _search_docs(query):
 def _extract_endpoints():
     """Extract API endpoint info from API Reference docs."""
     docs = _get_docs()
-    api_docs = [d for d in docs if d["section"] == "API Reference"]
     endpoints = []
-    for doc in api_docs:
+    for doc in docs:
         content = doc["content"]
         # Extract method and path from code blocks like "GET /api/v1/namespaces/..."
         import re
@@ -216,7 +198,8 @@ def page(slug):
 @blueprint.route("/api-reference")
 def api_reference():
     docs = _get_docs()
-    api_docs = [d for d in docs if d["section"] == "API Reference"]
+    api_sections = {"Workflows", "Tasks", "Webhooks"}
+    api_docs = [d for d in docs if d["section"] in api_sections]
     endpoints = _extract_endpoints()
     ordered_sections = _get_ordered_sections()
     user = None

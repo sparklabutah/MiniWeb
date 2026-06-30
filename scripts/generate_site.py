@@ -68,7 +68,7 @@ def build_generation_prompt(spec):
 
 Study these files as the gold-standard pattern:
 - sites/moocs-language-learning/routes.py — Flask blueprint with HTML + JSON API routes
-- sites/moocs-language-learning/data/*.json — structured seed data
+- data_sources/moocs-language-learning/*.json — structured seed data
 - sites/moocs-language-learning/tasks.json — 20 benchmark tasks (easy/medium/hard)
 - sites/moocs-language-learning/verifiers.py — per-task HTTP verification functions
 - sites/moocs-language-learning/reference_solutions.py — per-task solutions via test client
@@ -114,16 +114,16 @@ Generate the following files in `sites/{site_id}/`:
 ### 1. `site.json`
 Update with the correct id, name, description, and tags.
 
-### 2. `data/*.json`
-Create realistic seed data JSON files for each entity. Aim for 25-40 items for the
-primary entity and 5+ users. Data should be internally consistent and rich enough to
-support the tasks (e.g., varied prices/ratings for filtering, specific items for lookup).
+### 2. Data files (`data_sources/{site_id}/*.json`)
+Create realistic seed data JSON files for each entity in the shared data_sources directory.
+Aim for 25-40 items for the primary entity and 5+ users. Data should be internally
+consistent and rich enough to support the tasks.
 
 ### 3. `routes.py`
 Flask blueprint with:
 - HTML routes: index (list/search), detail page, user dashboard, comparison page
 - JSON API routes: CRUD for all entities, filtering/sorting/search, aggregation/stats
-- Write endpoints: create, update, delete operations that mutate data/*.json
+- Write endpoints: create, update, delete operations that mutate data_sources/{site_id}/*.json
 - Follow the pattern in the moocs-language-learning reference site exactly.
 
 ### 4. `templates/{site_id}/*.html`
@@ -166,7 +166,7 @@ For write tasks: make POST/PUT/DELETE calls, then verify.
 2. Write tasks must test that mutations persist (verify after writing).
 3. Task expected_answers must be deterministic and match what the verifier checks.
 4. Data must be rich enough that filter/sort/search tasks have non-trivial answers.
-5. The `data/.pristine/` directory is NOT your concern — the snapshot step handles it.
+5. The `data_sources/{site_id}/.pristine/` directory is NOT your concern — the snapshot step handles it.
 {mooc_ref}
 """
     return prompt

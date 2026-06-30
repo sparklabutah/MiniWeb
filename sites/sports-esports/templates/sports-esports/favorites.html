@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Favorites - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 span { color: #00d4aa; }
+        .nav { display: flex; gap: 1.2rem; align-items: center; }
+        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
+        .nav a:hover { color: #fff; }
+        .nav a.active { color: #00d4aa; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        .page-title { font-size: 1.4rem; font-weight: 700; margin-bottom: .25rem; }
+        .page-subtitle { font-size: .9rem; color: #64748b; margin-bottom: 1.5rem; }
+
+        .section-title { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 .75rem; }
+        .fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+
+        .fav-card { background: #fff; border-radius: .75rem; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; align-items: center; gap: 1rem; transition: box-shadow .15s; }
+        .fav-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+        .fav-card .icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .85rem; flex-shrink: 0; }
+        .fav-card .info { flex: 1; }
+        .fav-card .info a { color: #1a1a2e; text-decoration: none; font-weight: 600; font-size: .95rem; }
+        .fav-card .info a:hover { color: #3498db; }
+        .fav-card .meta { font-size: .8rem; color: #64748b; }
+        .remove-btn { padding: .3rem .7rem; border-radius: .3rem; border: 1px solid #fecaca; background: #fff; color: #dc2626; cursor: pointer; font-size: .75rem; }
+        .remove-btn:hover { background: #fee2e2; }
+
+        .match-list { display: flex; flex-direction: column; gap: .75rem; }
+        .match-row { background: #fff; border-radius: .5rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-decoration: none; color: inherit; transition: box-shadow .15s; }
+        .match-row:hover { box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+        .match-row .teams { display: flex; align-items: center; gap: .5rem; flex: 1; }
+        .match-row .vs { color: #94a3b8; font-size: .85rem; padding: 0 .5rem; }
+        .match-row .score { font-weight: 700; min-width: 60px; text-align: center; }
+        .match-row .meta { color: #64748b; font-size: .8rem; }
+        .team-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+        .status-badge.live { background: #fee2e2; color: #dc2626; }
+        .status-badge.final { background: #dcfce7; color: #16a34a; }
+        .status-badge.scheduled { background: #dbeafe; color: #2563eb; }
+
+        .empty-state { text-align: center; color: #94a3b8; padding: 2rem; background: #fff; border-radius: .75rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+        .add-section { background: #fff; border-radius: .75rem; padding: 1.25rem; margin-top: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .add-section h3 { font-size: .95rem; margin-bottom: .75rem; }
+        .add-form { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+        .add-form select { padding: .5rem .75rem; border: 1px solid #e2e8f0; border-radius: .4rem; font-size: .9rem; }
+        .add-btn { padding: .5rem 1rem; background: #00d4aa; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
+        .add-btn:hover { background: #00b894; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport <span>Sports Hub</span></h1>
+        <div class="nav">
+            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
+            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
+            <a href="{{ url_for('sports-esports.favorites_page') }}" class="active">Favorites</a>
+            {% if logged_in %}
+            <a href="{{ url_for('sports-esports.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('sports-esports.login_page') }}">Login</a>
+            {% endif %}
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="page-title">My Favorites</div>
+        <div class="page-subtitle">{{ user.name }}'s followed teams and players</div>
+
+        <div class="section-title">Favorite Teams</div>
+        {% if fav_teams %}
+        <div class="fav-grid">
+            {% for team in fav_teams %}
+            <div class="fav-card">
+                <div class="icon" style="background: {{ team.logo_color }}">{{ team.abbreviation }}</div>
+                <div class="info">
+                    <a href="{{ url_for('sports-esports.team_detail', team_id=team.id) }}">{{ team.name }}</a>
+                    <div class="meta">{{ team.city }} &middot; {{ team.wins }}W-{{ team.losses }}L</div>
+                </div>
+                <form action="{{ url_for('sports-esports.toggle_favorite') }}" method="post">
+                    <input type="hidden" name="team_id" value="{{ team.id }}">
+                    <input type="hidden" name="action" value="remove">
+                    <button type="submit" class="remove-btn">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No favorite teams yet. Browse teams and add them to your favorites.</div>
+        {% endif %}
+
+        <div class="section-title">Favorite Players</div>
+        {% if fav_players %}
+        <div class="fav-grid">
+            {% for p in fav_players %}
+            <div class="fav-card">
+                <div class="icon" style="background: {{ p.team.logo_color|default('#999') }}">{{ p.jersey_number if p.jersey_number else '?' }}</div>
+                <div class="info">
+                    <a href="{{ url_for('sports-esports.player_detail', player_id=p.id) }}">{{ p.name }}</a>
+                    <div class="meta">{{ p.team.name }} &middot; {{ p.position }}</div>
+                </div>
+                <form action="{{ url_for('sports-esports.toggle_favorite') }}" method="post">
+                    <input type="hidden" name="player_id" value="{{ p.id }}">
+                    <input type="hidden" name="action" value="remove">
+                    <button type="submit" class="remove-btn">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No favorite players yet. Browse players and add them to your favorites.</div>
+        {% endif %}
+
+        {% if fav_matches %}
+        <div class="section-title">Your Teams' Matches</div>
+        <div class="match-list">
+            {% for m in fav_matches %}
+            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-row">
+                <div class="teams">
+                    <span class="team-dot" style="background: {{ m.home_team.logo_color }}"></span>
+                    {{ m.home_team.abbreviation }}
+                    <span class="vs">vs</span>
+                    <span class="team-dot" style="background: {{ m.away_team.logo_color }}"></span>
+                    {{ m.away_team.abbreviation }}
+                </div>
+                <div class="score">
+                    {% if m.status == 'scheduled' %}{{ m.time }}{% else %}{{ m.home_score }} - {{ m.away_score }}{% endif %}
+                </div>
+                <div class="meta">
+                    {{ m.date }}
+                    <span class="status-badge {{ m.status }}">{{ m.status }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="add-section">
+            <h3>Add a Team to Favorites</h3>
+            <form class="add-form" action="{{ url_for('sports-esports.toggle_favorite') }}" method="post">
+                <input type="hidden" name="action" value="add">
+                <select name="team_id" required>
+                    <option value="">Select a team...</option>
+                    {% for t in all_teams %}
+                    <option value="{{ t.id }}">{{ t.name }} ({{ t.city }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="add-btn">Add Team</button>
+            </form>
+        </div>
+
+        <div class="add-section" style="margin-top: 1rem;">
+            <h3>Add a Player to Favorites</h3>
+            <form class="add-form" action="{{ url_for('sports-esports.toggle_favorite') }}" method="post">
+                <input type="hidden" name="action" value="add">
+                <select name="player_id" required>
+                    <option value="">Select a player...</option>
+                    {% for p in all_players %}
+                    <option value="{{ p.id }}">{{ p.name }} ({{ p.position }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="add-btn">Add Player</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

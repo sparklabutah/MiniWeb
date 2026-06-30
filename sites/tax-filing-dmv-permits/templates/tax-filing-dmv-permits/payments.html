@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments - Lakeport Government Services</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b3a4b, #274c5b); padding: .8rem 2rem; } .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; } .header h1 a span { color: #5db8a3; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1b3a4b; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; } nav a.active { font-weight: 700; background: #d4edda; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; } h2 { color: #1b3a4b; margin-bottom: 1rem; }
+        .filters { display: flex; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: end; }
+        .filters label { font-size: .8rem; color: #64748b; font-weight: 600; display: block; margin-bottom: .2rem; }
+        .filters select, .filters input { padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .88rem; }
+        .filters button { padding: .45rem 1rem; background: #1b3a4b; color: #fff; border: none; border-radius: .3rem; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .6rem .8rem; font-size: .8rem; color: #64748b; text-transform: uppercase; }
+        td { padding: .6rem .8rem; border-top: 1px solid #f1f5f9; font-size: .88rem; }
+        .badge-completed { background: #d1fae5; color: #065f46; display: inline-block; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+        .action-btn { display: inline-block; margin-bottom: 1rem; padding: .5rem 1.2rem; background: #059669; color: #fff; text-decoration: none; border-radius: .3rem; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Lakeport <span>Gov</span>Services</a></h1></div>
+    <nav>
+        <a href="{{ url_for('tax-filing-dmv-permits.index') }}">Dashboard</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">Tax Filings</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">Vehicles</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">Permits</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}" class="active">Payments</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.search_page') }}">Search</a>
+    </nav>
+    <div class="container">
+        <h2>Payment History</h2>
+        <a class="action-btn" href="{{ url_for('tax-filing-dmv-permits.make_payment_page') }}">+ Make Payment</a>
+        <form class="filters" method="get">
+            <div><label for="type">Type</label>
+                <select name="type" id="type"><option value="">All Types</option>
+                    {% for t in payment_types %}<option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t|replace("_"," ")|title }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label for="date_from">From</label><input type="date" name="date_from" id="date_from" value="{{ date_from or '' }}"></div>
+            <div><label for="date_to">To</label><input type="date" name="date_to" id="date_to" value="{{ date_to or '' }}"></div>
+            <button type="submit">Filter</button>
+        </form>
+        <table>
+            <thead><tr><th>Payment ID</th><th>Type</th><th>Amount</th><th>Method</th><th>Date</th><th>Confirmation</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.payment_id }}</td>
+                    <td>{{ p.type|replace("_"," ")|title }}</td>
+                    <td>${{ "%.2f"|format(p.amount) }}</td>
+                    <td>{{ p.method|replace("_"," ")|title }}</td>
+                    <td>{{ p.payment_date }}</td>
+                    <td>{{ p.confirmation_number }}</td>
+                    <td><span class="badge-completed">{{ p.status|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

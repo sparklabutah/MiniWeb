@@ -3,14 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
+    <title>Lakeport Sports Hub</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 span { color: #00d4aa; }
+        .nav { display: flex; gap: 1.2rem; align-items: center; }
+        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; transition: color .15s; }
+        .nav a:hover { color: #fff; }
+        .nav a.active { color: #00d4aa; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+        .section-title { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .75rem; display: flex; align-items: center; gap: .5rem; }
+        .section-title .badge { background: #e74c3c; color: #fff; font-size: .7rem; padding: .15rem .5rem; border-radius: 1rem; font-weight: 600; }
+
+        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+        .match-card { background: #fff; border-radius: .75rem; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .1s; display: block; }
+        .match-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); transform: translateY(-2px); }
+        .match-card.live { border-left: 4px solid #e74c3c; }
+        .match-card.final { border-left: 4px solid #27ae60; }
+        .match-card.scheduled { border-left: 4px solid #3498db; }
+        .match-league { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: .5rem; }
+        .match-teams { display: flex; justify-content: space-between; align-items: center; }
+        .match-team { display: flex; align-items: center; gap: .6rem; flex: 1; }
+        .team-color { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; }
+        .team-name { font-weight: 600; font-size: .95rem; }
+        .match-score { text-align: center; min-width: 80px; }
+        .match-score .score { font-size: 1.3rem; font-weight: 800; }
+        .match-score .status { font-size: .7rem; text-transform: uppercase; margin-top: .15rem; }
+        .match-score .status.live { color: #e74c3c; font-weight: 700; }
+        .match-score .status.final { color: #27ae60; }
+        .match-score .status.scheduled { color: #3498db; }
+        .match-meta { font-size: .78rem; color: #94a3b8; margin-top: .6rem; }
+
+        .league-pills { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .league-pill { display: inline-block; padding: .4rem .9rem; border-radius: 2rem; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; color: #334155; font-size: .85rem; font-weight: 500; transition: all .15s; }
+        .league-pill:hover { border-color: #00d4aa; color: #1a1a2e; background: #e6fff9; }
+    </style>
 </head>
 <body>
+    <div class="header">
+        <h1>Lakeport <span>Sports Hub</span></h1>
+        <div class="nav">
+            <a href="{{ url_for('sports-esports.index') }}" class="active">Scoreboard</a>
+            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
+            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
+            <a href="{{ url_for('sports-esports.compare_page') }}">Compare</a>
+            <a href="{{ url_for('sports-esports.login_page') }}">Login</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+        <div class="league-pills">
+            {% for league in leagues %}
+            <a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}" class="league-pill">{{ league.abbreviation }}</a>
+            {% endfor %}
+        </div>
+
+        {% if live_matches %}
+        <div class="section-title">Live Now <span class="badge">LIVE</span></div>
+        <div class="match-grid">
+            {% for m in live_matches %}
+            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card live">
+                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.league.sport }}</div>
+                <div class="match-teams">
+                    <div class="match-team">
+                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
+                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
+                    </div>
+                    <div class="match-score">
+                        <div class="score">{{ m.home_score }} - {{ m.away_score }}</div>
+                        <div class="status live">{{ m.quarter }}{% if m.clock %} {{ m.clock }}{% endif %}</div>
+                    </div>
+                    <div class="match-team" style="justify-content: flex-end;">
+                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
+                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
+                    </div>
+                </div>
+                <div class="match-meta">{{ m.venue }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if recent_matches %}
+        <div class="section-title">Recent Results</div>
+        <div class="match-grid">
+            {% for m in recent_matches %}
+            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card final">
+                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.date }}</div>
+                <div class="match-teams">
+                    <div class="match-team">
+                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
+                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
+                    </div>
+                    <div class="match-score">
+                        <div class="score">{{ m.home_score }} - {{ m.away_score }}</div>
+                        <div class="status final">Final</div>
+                    </div>
+                    <div class="match-team" style="justify-content: flex-end;">
+                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
+                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
+                    </div>
+                </div>
+                <div class="match-meta">{{ m.venue }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if upcoming_matches %}
+        <div class="section-title">Upcoming</div>
+        <div class="match-grid">
+            {% for m in upcoming_matches %}
+            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card scheduled">
+                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.date }}</div>
+                <div class="match-teams">
+                    <div class="match-team">
+                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
+                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
+                    </div>
+                    <div class="match-score">
+                        <div class="score">vs</div>
+                        <div class="status scheduled">{{ m.time }}</div>
+                    </div>
+                    <div class="match-team" style="justify-content: flex-end;">
+                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
+                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
+                    </div>
+                </div>
+                <div class="match-meta">{{ m.venue }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

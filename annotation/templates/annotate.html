@@ -3,117 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Annotate — {{ site_id or 'select site' }}</title>
+<title>Annotate</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-.topbar { background: #1e293b; border-bottom: 1px solid #334155; padding: .4rem 1rem; display: flex; align-items: center; gap: .8rem; flex-shrink: 0; }
-.topbar h1 { font-size: .95rem; color: #38bdf8; }
-.topbar select, .topbar input { background: #334155; border: 1px solid #475569; color: #e2e8f0; padding: .25rem .4rem; border-radius: .3rem; font-size: .8rem; }
-.topbar a { color: #94a3b8; text-decoration: none; font-size: .8rem; }
+.topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: .8rem; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.topbar h1 { font-size: .95rem; color: #0f172a; font-weight: 700; }
+.topbar select, .topbar input { background: #fff; border: 1px solid #cbd5e1; color: #1e293b; padding: .3rem .5rem; border-radius: .3rem; font-size: .8rem; }
+.topbar a { color: #2563eb; text-decoration: none; font-size: .8rem; }
 
-.draft-nav { background: #1e293b; border-bottom: 1px solid #334155; padding: .3rem 1rem; display: flex; align-items: center; gap: .5rem; flex-shrink: 0; font-size: .8rem; }
-.draft-nav .progress { color: #94a3b8; flex: 1; }
-.draft-nav .chain { color: #38bdf8; font-family: monospace; font-size: .72rem; }
+.site-pill { display: inline-block; padding: .2rem .5rem; border-radius: 1rem; font-size: .75rem; font-weight: 600; cursor: pointer; border: 2px solid transparent; transition: all .15s; }
+.site-pill.active { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.2); }
 
 .split { display: flex; flex: 1; overflow: hidden; }
 .left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .left-panel iframe { flex: 1; border: none; background: #fff; }
-.right-panel { width: 440px; background: #1e293b; border-left: 1px solid #334155; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.right-panel { width: 480px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
 
-.steps-bar { display: flex; border-bottom: 1px solid #334155; flex-shrink: 0; }
-.steps-bar .step { flex: 1; padding: .45rem .2rem; text-align: center; font-size: .65rem; color: #475569; cursor: pointer; border-bottom: 2px solid transparent; }
-.steps-bar .step.active { color: #38bdf8; border-bottom-color: #38bdf8; }
-.steps-bar .step.done { color: #22c55e; }
-.steps-bar .step .num { display: inline-block; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; border: 1px solid currentColor; font-size: .6rem; margin-right: .15rem; }
-.steps-bar .step.done .num { background: #22c55e; border-color: #22c55e; color: #0f172a; }
-.steps-bar .step.active .num { background: #38bdf8; border-color: #38bdf8; color: #0f172a; }
+.steps-bar { display: flex; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
+.steps-bar .step { flex: 1; padding: .5rem .2rem; text-align: center; font-size: .7rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+.steps-bar .step.active { color: #2563eb; border-bottom-color: #2563eb; }
+.steps-bar .step.done { color: #16a34a; }
+.steps-bar .step .num { display: inline-block; width: 18px; height: 18px; line-height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-size: .65rem; margin-right: .2rem; }
+.steps-bar .step.done .num { background: #16a34a; border-color: #16a34a; color: #fff; }
+.steps-bar .step.active .num { background: #2563eb; border-color: #2563eb; color: #fff; }
 
-.step-content { flex: 1; overflow-y: auto; padding: .8rem; }
+.step-content { flex: 1; overflow-y: auto; padding: 1rem; }
 .step-panel { display: none; }
 .step-panel.active { display: block; }
-.step-panel h3 { font-size: .85rem; margin-bottom: .3rem; color: #f1f5f9; }
-.step-panel .hint { font-size: .72rem; color: #64748b; margin-bottom: .5rem; }
+.step-panel h3 { font-size: .95rem; margin-bottom: .4rem; color: #0f172a; font-weight: 700; }
+.step-panel .hint { font-size: .8rem; color: #64748b; margin-bottom: .6rem; line-height: 1.4; }
 
-label { display: block; font-size: .72rem; color: #94a3b8; margin: .5rem 0 .15rem; font-weight: 500; }
-textarea, input[type="text"], input[type="number"], select { width: 100%; padding: .35rem; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: .3rem; font-size: .8rem; font-family: inherit; }
-textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap: break-word; }
+label { display: block; font-size: .78rem; color: #475569; margin: .6rem 0 .2rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+textarea, input[type="text"], input[type="number"], select { width: 100%; padding: .45rem .5rem; background: #fff; border: 1px solid #cbd5e1; color: #0f172a; border-radius: .4rem; font-size: .85rem; font-family: inherit; }
+textarea:focus, input:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.15); }
+textarea { min-height: 60px; resize: vertical; white-space: pre-wrap; word-wrap: break-word; }
 
-.btn { padding: .3rem .6rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .78rem; font-weight: 600; }
-.btn-primary { background: #38bdf8; color: #0f172a; }
-.btn-secondary { background: #334155; color: #e2e8f0; }
+/* Instruction textarea — extra prominent */
+textarea#instruction {
+    font-size: 1rem;
+    line-height: 1.5;
+    min-height: 100px;
+    border: 2px solid #2563eb;
+    background: #eff6ff;
+    color: #0f172a;
+    padding: .6rem .7rem;
+    font-weight: 500;
+}
+textarea#instruction:focus {
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.2);
+}
+
+.btn { padding: .35rem .7rem; border: none; border-radius: .4rem; cursor: pointer; font-size: .8rem; font-weight: 600; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.btn-secondary:hover { background: #e2e8f0; }
 .btn-danger { background: #ef4444; color: #fff; }
-.btn-success { background: #22c55e; color: #0f172a; }
-.btn-sm { padding: .2rem .35rem; font-size: .68rem; }
-.btn-lg { padding: .45rem 1rem; font-size: .88rem; }
-.btn-recording { background: #ef4444; animation: pulse 1s infinite; }
+.btn-danger:hover { background: #dc2626; }
+.btn-success { background: #16a34a; color: #fff; }
+.btn-success:hover { background: #15803d; }
+.btn-sm { padding: .25rem .4rem; font-size: .72rem; }
+.btn-lg { padding: .5rem 1.2rem; font-size: .9rem; }
+.btn-recording { background: #ef4444; color: #fff; animation: pulse 1s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .7; } }
 
 /* Trajectory entries */
-.traj-entry { background: #0f172a; border: 1px solid #334155; border-radius: .3rem; margin-bottom: .3rem; overflow: hidden; }
-.traj-action { padding: .3rem .5rem; font-size: .72rem; display: flex; gap: .3rem; align-items: center; border-bottom: 1px solid #1e293b; }
-.traj-action .badge { padding: .1rem .3rem; border-radius: .2rem; font-weight: 600; font-size: .62rem; background: #1e3a5f; color: #38bdf8; }
-.traj-action .url { color: #94a3b8; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: .68rem; }
-.traj-action .ts { color: #475569; font-size: .62rem; font-family: monospace; }
-.traj-obs { padding: .3rem .5rem; font-size: .68rem; color: #64748b; max-height: 60px; overflow: hidden; cursor: pointer; }
-.traj-obs:hover { max-height: none; color: #94a3b8; }
-.traj-obs .obs-label { color: #22c55e; font-weight: 600; font-size: .62rem; }
+.traj-entry { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; margin-bottom: .3rem; overflow: hidden; }
+.traj-action { padding: .35rem .5rem; font-size: .75rem; display: flex; gap: .3rem; align-items: center; border-bottom: 1px solid #f1f5f9; }
+.traj-action .badge { padding: .1rem .35rem; border-radius: .2rem; font-weight: 700; font-size: .65rem; background: #dbeafe; color: #1e40af; }
+.traj-action .url { color: #475569; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: .72rem; }
+.traj-action .ts { color: #94a3b8; font-size: .65rem; font-family: monospace; }
+.traj-obs { padding: .35rem .5rem; font-size: .72rem; color: #64748b; max-height: 60px; overflow: hidden; cursor: pointer; }
+.traj-obs:hover { max-height: none; color: #475569; }
+.traj-obs .obs-label { color: #16a34a; font-weight: 700; font-size: .65rem; }
 
 /* Verifier options */
-.verifier-option { background: #0f172a; border: 1px solid #334155; border-radius: .4rem; padding: .4rem .5rem; margin-bottom: .3rem; display: flex; gap: .4rem; align-items: flex-start; cursor: pointer; }
-.verifier-option:hover { border-color: #475569; }
-.verifier-option.selected { border-color: #38bdf8; background: #0f1729; }
-.verifier-option input[type="checkbox"] { margin-top: .1rem; accent-color: #38bdf8; }
+.verifier-option { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .5rem .6rem; margin-bottom: .3rem; display: flex; gap: .5rem; align-items: flex-start; cursor: pointer; }
+.verifier-option:hover { border-color: #cbd5e1; background: #f1f5f9; }
+.verifier-option.selected { border-color: #2563eb; background: #eff6ff; }
+.verifier-option input[type="checkbox"] { margin-top: .15rem; accent-color: #2563eb; }
 .verifier-option .v-info { flex: 1; }
-.verifier-option .v-label { font-size: .78rem; color: #e2e8f0; }
-.verifier-option .v-desc { font-size: .68rem; color: #64748b; margin-top: .1rem; }
-.indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.indicator.pass { background: #22c55e; }
+.verifier-option .v-label { font-size: .82rem; color: #0f172a; font-weight: 500; }
+.verifier-option .v-desc { font-size: .72rem; color: #64748b; margin-top: .1rem; }
+.indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; margin-top: .2rem; }
+.indicator.pass { background: #16a34a; }
 .indicator.fail { background: #ef4444; }
-.indicator.pending { background: #475569; }
+.indicator.pending { background: #cbd5e1; }
 
-.macro-chips { display: flex; flex-wrap: wrap; gap: .2rem; }
-.macro-chip { background: #334155; color: #94a3b8; padding: .12rem .35rem; border-radius: 1rem; font-size: .68rem; cursor: pointer; border: 1px solid transparent; }
-.macro-chip.selected { background: #1e3a5f; color: #38bdf8; border-color: #38bdf8; }
+.macro-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+.macro-chip { background: #f1f5f9; color: #475569; padding: .15rem .4rem; border-radius: 1rem; font-size: .72rem; cursor: pointer; border: 1px solid transparent; }
+.macro-chip.selected { background: #dbeafe; color: #1e40af; border-color: #2563eb; }
 
-.diff-selector { display: flex; gap: .3rem; }
-.diff-btn { padding: .2rem .5rem; border-radius: .3rem; border: 1px solid #334155; background: none; color: #94a3b8; cursor: pointer; font-size: .72rem; }
-.diff-btn.active.easy { border-color: #22c55e; color: #22c55e; }
-.diff-btn.active.medium { border-color: #f59e0b; color: #f59e0b; }
-.diff-btn.active.hard { border-color: #ef4444; color: #ef4444; }
+.bottom-bar { border-top: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; gap: .3rem; align-items: center; flex-shrink: 0; background: #f8fafc; }
+.bottom-bar .status { flex: 1; font-size: .78rem; color: #64748b; }
+.nav-btns { display: flex; gap: .4rem; margin-top: .8rem; justify-content: flex-end; }
 
-.bottom-bar { border-top: 1px solid #334155; padding: .4rem .8rem; display: flex; gap: .3rem; align-items: center; flex-shrink: 0; }
-.bottom-bar .status { flex: 1; font-size: .72rem; color: #94a3b8; }
-.nav-btns { display: flex; gap: .3rem; margin-top: .6rem; justify-content: flex-end; }
+/* API Reference panel */
+.api-ref { border-top: 1px solid #e2e8f0; flex-shrink: 0; max-height: 220px; display: flex; flex-direction: column; }
+.api-ref-header { padding: .4rem .8rem; background: #f1f5f9; cursor: pointer; display: flex; align-items: center; gap: .4rem; user-select: none; }
+.api-ref-header:hover { background: #e2e8f0; }
+.api-ref-header h4 { font-size: .78rem; color: #475569; font-weight: 600; flex: 1; }
+.api-ref-header .toggle { font-size: .7rem; color: #94a3b8; }
+.api-ref-body { overflow-y: auto; flex: 1; }
+.api-ref.collapsed .api-ref-body { display: none; }
+.api-ref.collapsed { max-height: none; }
+.api-route { padding: .35rem .8rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+.api-route:hover { background: #eff6ff; }
+.api-route-top { display: flex; align-items: baseline; gap: .4rem; font-family: 'SF Mono', Menlo, monospace; font-size: .72rem; }
+.api-route .method { font-weight: 700; width: 42px; flex-shrink: 0; }
+.api-route .method.get { color: #16a34a; }
+.api-route .method.post { color: #2563eb; }
+.api-route .method.put { color: #d97706; }
+.api-route .method.delete { color: #ef4444; }
+.api-route .path { color: #0f172a; }
+.api-route .params { color: #94a3b8; font-size: .68rem; }
+.api-route .desc { font-size: .7rem; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin-top: .1rem; padding-left: 46px; }
+.api-route .returns { font-size: .65rem; color: #94a3b8; font-family: 'SF Mono', Menlo, monospace; padding-left: 46px; }
+
+/* Macro items with tooltips */
+.macro-item { position: relative; display: flex; align-items: center; gap: .4rem; padding: .3rem .4rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .25rem; font-size: .8rem; }
+.macro-item:hover { background: #f1f5f9; }
+.macro-item .macro-name { flex: 1; font-weight: 500; color: #1e293b; }
+.macro-item .macro-verb { font-size: .65rem; color: #64748b; text-transform: uppercase; letter-spacing: .03em; }
+.macro-item .reorder-btns { display: flex; flex-direction: column; gap: 0; }
+.macro-item .reorder-btns button { background: none; border: none; cursor: pointer; font-size: .6rem; color: #94a3b8; padding: 0 .15rem; line-height: 1; }
+.macro-item .reorder-btns button:hover { color: #2563eb; }
+.macro-tooltip {
+    display: none; position: absolute; left: 100%; top: -5px; margin-left: 8px;
+    background: #1e293b; color: #fff; padding: .5rem .7rem; border-radius: .4rem;
+    font-size: .75rem; width: 280px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    line-height: 1.4; pointer-events: none;
+}
+.macro-item:hover .macro-tooltip { display: block; }
+.macro-tooltip .tt-desc { margin-bottom: .3rem; }
+.macro-tooltip .tt-example { color: #94a3b8; font-style: italic; }
+
+/* Chain display */
+.chain-display { font-family: monospace; font-size: .75rem; color: #2563eb; background: #eff6ff; padding: .3rem .5rem; border-radius: .3rem; margin-top: .4rem; min-height: 1.4em; }
+
+/* Site tabs for switching iframe */
+.site-tabs { display: flex; gap: .3rem; margin-bottom: .5rem; }
+.site-tab { padding: .25rem .6rem; border-radius: .3rem; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; font-size: .78rem; font-weight: 500; }
+.site-tab.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+/* Skip modal */
+.skip-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.skip-modal { background: #fff; padding: 1.5rem; border-radius: .6rem; width: 400px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.15); }
+.skip-modal h3 { font-size: .95rem; margin-bottom: .6rem; color: #0f172a; }
+.skip-modal select { width: 100%; padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .85rem; margin-bottom: .5rem; }
+.skip-modal textarea { width: 100%; padding: .35rem .5rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .82rem; min-height: 60px; resize: vertical; }
 </style>
 </head>
 <body>
 
 <div class="topbar">
     <h1>Annotator</h1>
-    <select id="site-select" onchange="changeSite()">
-        <option value="">— site —</option>
-        {% for s in sites %}<option value="{{ s.id }}" {{ 'selected' if s.id == site_id }}>{{ s.id }} ({{ s.draft_count }}d/{{ s.annotated_count }}a)</option>{% endfor %}
-    </select>
-    <input type="text" id="annotator-name" placeholder="your name" style="width:100px">
+    {% if prompt and prompt.sites %}
+    {% for s in prompt.sites %}
+    <span class="site-pill active" style="background:{{ ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'][loop.index0 % 5] }};color:{{ ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'][loop.index0 % 5] }}" onclick="switchToSite('{{ s.id }}', this)">{{ s.name }}</span>
+    {% endfor %}
+    {% endif %}
+    <input type="text" id="annotator-name" placeholder="your name" style="width:110px;margin-left:auto">
     <a href="{{ url_for('annotation.index') }}">Home</a>
     <a href="{{ url_for('annotation.dashboard') }}">Dashboard</a>
 </div>
 
-{% if mode in ('queue', 'full') and total_drafts > 0 %}
-<div class="draft-nav">
-    <a href="{{ url_for('annotation.annotate', mode=mode, site=site_id, idx=[0, draft_idx-1]|max) }}" class="btn btn-secondary btn-sm">←</a>
-    <span class="progress">{{ draft_idx + 1 }}/{{ total_drafts }}</span>
-    <a href="{{ url_for('annotation.annotate', mode=mode, site=site_id, idx=[total_drafts-1, draft_idx+1]|min) }}" class="btn btn-secondary btn-sm">→</a>
-    <a href="{{ url_for('annotation.annotate', mode=mode, site=site_id, idx=[total_drafts-1, draft_idx+1]|min) }}" class="btn btn-danger btn-sm" title="Skip this draft and move to next">Skip</a>
-    {% if draft %}<span class="chain">{{ draft.macros | join(' → ') }}</span>{% endif %}
-</div>
-{% endif %}
-
 <div class="split">
     <div class="left-panel">
-        <iframe id="site-iframe" src="/sites/{{ site_id }}/" allow="clipboard-write"></iframe>
+        <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/sites/{{ prompt.sites[0].id }}/{% else %}/{% endif %}" allow="clipboard-write"></iframe>
     </div>
 
     <div class="right-panel">
@@ -126,75 +186,55 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
 
         <div class="step-content">
 
-            <!-- STEP 1: Read/Write task -->
+            <!-- STEP 1: Design a Task -->
             <div class="step-panel active" id="step-1">
-                {% if mode == 'prompt' %}
                 <h3>Step 1: Design a Task From This Prompt</h3>
-                {% if macro_prompt %}
-                <div style="background:#1e3a5f;border:1px solid #38bdf8;border-radius:.4rem;padding:.6rem;margin-bottom:.5rem">
-                    <div style="font-size:.72rem;color:#94a3b8;margin-bottom:.3rem">YOUR ASSIGNMENT</div>
-                    <div style="font-size:.85rem;color:#e2e8f0;margin-bottom:.3rem">
-                        Site: <strong style="color:#38bdf8">{{ macro_prompt.site_name }}</strong>
-                        · Difficulty: <strong style="color:{% if macro_prompt.difficulty == 'easy' %}#22c55e{% elif macro_prompt.difficulty == 'medium' %}#f59e0b{% else %}#ef4444{% endif %}">{{ macro_prompt.difficulty }}</strong>
-                    </div>
-                    <div style="font-size:.8rem;color:#e2e8f0">
-                        Macros to exercise:
-                        {% for m in macro_prompt.macros %}
-                        <span style="background:#334155;padding:.1rem .3rem;border-radius:.2rem;font-size:.7rem;margin-right:.2rem">{{ m }}</span>
-                        {% endfor %}
-                    </div>
+
+                <!-- Sites section -->
+                <label>Sites</label>
+                <div class="site-tabs" id="site-tabs"></div>
+
+                <!-- Macros section -->
+                <label>Macros <span style="font-weight:400;text-transform:none;color:#94a3b8">(uncheck to disable, arrows to reorder)</span></label>
+                <div id="macro-list"></div>
+                <div class="chain-display" id="chain-display"></div>
+
+                <!-- Controls -->
+                <div style="display:flex;gap:.4rem;margin-top:.6rem">
+                    <button class="btn btn-secondary btn-sm" onclick="reshufflePrompt()">Reshuffle</button>
+                    <button class="btn btn-danger btn-sm" onclick="openSkipModal()">Skip</button>
                 </div>
-                <p class="hint">Explore the <strong>{{ macro_prompt.site_name }}</strong> site on the left. Write a task instruction that exercises the macros above. The instruction should tell a browser agent exactly where to navigate, what to do, and what to report.</p>
-                <a href="{{ url_for('annotation.annotate', mode='prompt') }}" class="btn btn-secondary btn-sm" style="margin-bottom:.5rem">🎲 Reshuffle (new prompt)</a>
-                {% else %}
-                <p class="hint">Select a site to get a macro prompt.</p>
-                {% endif %}
-                {% elif mode == 'queue' %}
-                <h3>Step 1: Review Draft Task</h3>
-                <p class="hint">Read the draft below. Try it on the site — if it's impossible or unclear, edit it or click Skip.</p>
-                {% else %}
-                <h3>Step 1: Design Your Task</h3>
-                <p class="hint">Explore the site, then write a task instruction.</p>
-                {% endif %}
+
                 <label>Instruction</label>
-                <textarea id="instruction" rows="4" placeholder="{% if mode == 'blank' %}Write your task here. Example: Navigate to the Transactions page, filter by category 'Groceries', and report how many transactions match.{% endif %}">{{ draft.instruction if draft else '' }}</textarea>
-                <label>Difficulty</label>
-                <div class="diff-selector">
-                    {% set d = draft.difficulty if draft else 'medium' %}
-                    <button class="diff-btn easy {{ 'active' if d == 'easy' }}" onclick="setDiff('easy',this)">Easy</button>
-                    <button class="diff-btn medium {{ 'active' if d == 'medium' }}" onclick="setDiff('medium',this)">Medium</button>
-                    <button class="diff-btn hard {{ 'active' if d == 'hard' }}" onclick="setDiff('hard',this)">Hard</button>
-                </div>
-                <input type="hidden" id="difficulty" value="{{ d }}">
+                <textarea id="instruction" rows="4" placeholder="Write your task here. Example: Navigate to the Transactions page, filter by category 'Groceries', and report how many transactions match."></textarea>
+
                 <div class="nav-btns">
-                    <button class="btn btn-primary" onclick="startRecording()">Start Recording →</button>
+                    <button class="btn btn-primary" onclick="startRecording()">Start Recording &rarr;</button>
                 </div>
             </div>
 
-            <!-- STEP 2: Record trajectory (start/stop) -->
+            <!-- STEP 2: Record trajectory -->
             <div class="step-panel" id="step-2">
                 <h3>Step 2: Solve the Task</h3>
                 <p class="hint">Navigate the site on the left. Recording captures every page you visit.</p>
 
                 <div style="display:flex;gap:.3rem;margin-bottom:.5rem;align-items:center">
-                    <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">⏺ Recording...</button>
-                    <span id="rec-status" style="font-size:.72rem;color:#ef4444">● REC</span>
-                    <span id="rec-count" style="font-size:.72rem;color:#94a3b8;margin-left:auto">0 entries</span>
+                    <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">Recording...</button>
+                    <span id="rec-status" style="font-size:.78rem;color:#ef4444;font-weight:600">REC</span>
+                    <span id="rec-count" style="font-size:.78rem;color:#64748b;margin-left:auto">0 entries</span>
                 </div>
 
                 <div id="trajectory-list" style="max-height:350px;overflow-y:auto"></div>
 
                 <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
-                    <button class="btn btn-primary" onclick="stopAndNext()">Stop Recording →</button>
+                    <button class="btn btn-secondary" onclick="goStep(1)">&larr; Back</button>
+                    <button class="btn btn-primary" onclick="stopAndNext()">Stop Recording &rarr;</button>
                 </div>
             </div>
 
             <!-- STEP 3: Type answer -->
             <div class="step-panel" id="step-3">
                 <h3>Step 3: What's the Answer?</h3>
-                <!-- Macros are NOT labeled by annotators (avoids selection bias).
-                     They get auto-inferred from trajectories post-hoc. -->
                 <p class="hint">Based on your walkthrough, what is the correct answer?</p>
                 <label>Answer</label>
                 <textarea id="final-answer" rows="2" placeholder="The answer you found..."></textarea>
@@ -208,50 +248,94 @@ textarea { min-height: 55px; resize: vertical; white-space: pre-wrap; word-wrap:
                 <label>Alternatives (one per line)</label>
                 <textarea id="alternatives" rows="2" placeholder="other valid answers..."></textarea>
                 <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
-                    <button class="btn btn-primary" onclick="goToVerifiers()">Select Verifiers →</button>
+                    <button class="btn btn-secondary" onclick="goStep(2)">&larr; Back</button>
+                    <button class="btn btn-primary" onclick="goToVerifiers()">Select Verifiers &rarr;</button>
                 </div>
             </div>
 
             <!-- STEP 4: Select verifiers -->
             <div class="step-panel" id="step-4">
                 <h3>Step 4: Select Verifiers</h3>
-                <p class="hint">Check which verifications should pass. Green = currently passing.</p>
+                <p class="hint">Check what should be verified after the agent completes this task.</p>
+
                 <div id="verifier-checklist"></div>
-                <div style="display:flex;gap:.3rem;margin-top:.4rem">
-                    <button class="btn btn-secondary btn-sm" onclick="addCustomVerifier()">+ Custom Check</button>
+
+                <div id="user-state-section" style="margin-top:.6rem">
+                    <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:.3rem">User State After Task</div>
+                    <div id="user-state-list" style="font-size:.75rem;color:#64748b">Loading...</div>
+                </div>
+
+                <div id="interaction-log-section" style="margin-top:.6rem">
+                    <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:.3rem">Agent Actions (mutations)</div>
+                    <div id="interaction-log-list" style="font-size:.75rem;color:#64748b">No mutations recorded yet</div>
+                </div>
+
+                <div style="display:flex;gap:.3rem;margin-top:.6rem">
                     <button class="btn btn-primary btn-sm" onclick="testAllVerifiers()">Test All</button>
                 </div>
-                <div id="test-result" style="margin-top:.3rem;font-size:.72rem"></div>
+                <div id="test-result" style="margin-top:.4rem;font-size:.78rem"></div>
                 <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(4)">← Back</button>
-                    <button class="btn btn-success btn-lg" onclick="submitTask()">✓ Submit</button>
+                    <button class="btn btn-secondary" onclick="goStep(3)">&larr; Back</button>
+                    <button class="btn btn-success btn-lg" onclick="submitTask()">Submit</button>
                 </div>
             </div>
         </div>
 
+        <div id="api-ref-panel" class="api-ref collapsed">
+            <div class="api-ref-header" onclick="toggleApiRef()">
+                <h4 id="api-ref-title">API Reference</h4>
+                <span class="toggle" id="api-ref-toggle">Show</span>
+            </div>
+            <div class="api-ref-body" id="api-ref-body"></div>
+        </div>
+
         <div class="bottom-bar">
-            <span class="status" id="status">{% if draft %}Draft loaded{% else %}Select a site{% endif %}</span>
+            <span class="status" id="status">Ready</span>
+        </div>
+    </div>
+</div>
+
+<!-- Skip Modal -->
+<div id="skip-modal" class="skip-overlay" style="display:none">
+    <div class="skip-modal">
+        <h3>Why skip this prompt?</h3>
+        <select id="skip-reason">
+            <option value="ambiguous">Ambiguous -- macros don't combine well</option>
+            <option value="broken">Broken -- site has bugs</option>
+            <option value="impossible">Impossible -- can't design a valid task</option>
+            <option value="other">Other</option>
+        </select>
+        <textarea id="skip-details" placeholder="Details..."></textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.8rem;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeSkipModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="confirmSkip()">Skip &amp; Get New Prompt</button>
         </div>
     </div>
 </div>
 
 <script>
+const macroDescriptions = {{ macro_descriptions | tojson }};
+let currentPrompt = {{ prompt | tojson }};
 let currentStep = 1;
-let selectedMacros = {{ (draft.macros if draft else []) | tojson }};
+let selectedMacros = currentPrompt ? currentPrompt.macros.slice() : [];
 let trajectory = [];
 let recording = false;
 let recordInterval = null;
 let lastUrl = '';
 let selectedVerifiers = [];
 let verifierCounter = 0;
+let activeSiteIdx = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
-    renderMacros();
-    selectedMacros.forEach(m => {
-        const chip = [...document.querySelectorAll('.macro-chip')].find(c => c.textContent.trim() === m);
-        if (chip) chip.classList.add('selected');
-    });
+    if (currentPrompt) {
+        renderSiteTabs();
+        renderMacroList();
+        updateChainDisplay();
+        // Load API reference for first site
+        if (currentPrompt.sites.length > 0) {
+            loadApiRef(currentPrompt.sites[0].id);
+        }
+    }
 });
 
 // --- Steps ---
@@ -266,18 +350,283 @@ function goStep(n) {
     document.querySelectorAll('.steps-bar .step')[n - 1].classList.add('active');
 }
 
-function changeSite() {
-    const site = document.getElementById('site-select').value;
-    if (site) window.location.href = '/annotate/task/{{ mode }}?site=' + site;
+// --- Site tabs ---
+function renderSiteTabs() {
+    if (!currentPrompt || !currentPrompt.sites) return;
+    const container = document.getElementById('site-tabs');
+    const colors = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
+    const textColors = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
+    container.innerHTML = currentPrompt.sites.map((s, i) =>
+        `<button class="site-tab${i === activeSiteIdx ? ' active' : ''}" onclick="switchToSiteIdx(${i})" style="background:${i === activeSiteIdx ? colors[i % 5] : '#fff'};color:${textColors[i % 5]}">${s.name}</button>`
+    ).join('');
 }
 
-function setDiff(d, btn) {
-    document.getElementById('difficulty').value = d;
-    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+function switchToSite(siteId, el) {
+    const idx = currentPrompt.sites.findIndex(s => s.id === siteId);
+    if (idx >= 0) switchToSiteIdx(idx);
 }
 
-// --- Recording (start/stop, auto-captures navigation) ---
+function switchToSiteIdx(idx) {
+    if (!currentPrompt || idx < 0 || idx >= currentPrompt.sites.length) return;
+    activeSiteIdx = idx;
+    const siteId = currentPrompt.sites[idx].id;
+    document.getElementById('site-iframe').src = '/sites/' + siteId + '/';
+    renderSiteTabs();
+    loadApiRef(siteId);
+    // Update topbar pills
+    document.querySelectorAll('.topbar .site-pill').forEach((pill, i) => {
+        pill.classList.toggle('active', i === idx);
+    });
+}
+
+// --- Macro list with checkboxes, tooltips, reorder ---
+function renderMacroList() {
+    const container = document.getElementById('macro-list');
+    if (!container) return;
+    container.innerHTML = selectedMacros.map((m, i) => {
+        const desc = macroDescriptions[m] || {};
+        return `<div class="macro-item" data-macro="${m}">
+            <input type="checkbox" checked onchange="toggleMacroCheck('${m}', this.checked)">
+            <span class="macro-name">${m}</span>
+            <span class="macro-verb">${desc.verb || ''}</span>
+            <div class="reorder-btns">
+                <button onclick="moveMacro(${i}, -1)" title="Move up"${i === 0 ? ' disabled' : ''}>&uarr;</button>
+                <button onclick="moveMacro(${i}, 1)" title="Move down"${i === selectedMacros.length - 1 ? ' disabled' : ''}>&darr;</button>
+            </div>
+            <div class="macro-tooltip">
+                <div class="tt-desc">${desc.description || 'No description'}</div>
+                <div class="tt-example">${desc.example || ''}</div>
+            </div>
+        </div>`;
+    }).join('');
+    updateChainDisplay();
+}
+
+function toggleMacroCheck(name, checked) {
+    if (!checked) {
+        // Uncheck: visually disable but keep in list for reorder context
+        const item = document.querySelector(`.macro-item[data-macro="${name}"]`);
+        if (item) {
+            item.style.opacity = '0.4';
+            item.dataset.disabled = 'true';
+        }
+    } else {
+        const item = document.querySelector(`.macro-item[data-macro="${name}"]`);
+        if (item) {
+            item.style.opacity = '1';
+            item.dataset.disabled = '';
+        }
+    }
+    updateChainDisplay();
+}
+
+function getEnabledMacros() {
+    const items = document.querySelectorAll('.macro-item');
+    const enabled = [];
+    items.forEach(item => {
+        const cb = item.querySelector('input[type="checkbox"]');
+        if (cb && cb.checked) {
+            enabled.push(item.dataset.macro);
+        }
+    });
+    return enabled;
+}
+
+function moveMacro(idx, direction) {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= selectedMacros.length) return;
+    const temp = selectedMacros[idx];
+    selectedMacros[idx] = selectedMacros[newIdx];
+    selectedMacros[newIdx] = temp;
+    renderMacroList();
+}
+
+function updateChainDisplay() {
+    const display = document.getElementById('chain-display');
+    if (!display) return;
+    const enabled = getEnabledMacros();
+    display.textContent = enabled.length > 0
+        ? enabled.join(' \u2192 ')
+        : '(no macros selected)';
+}
+
+// --- Reshuffle ---
+function reshufflePrompt() {
+    document.getElementById('status').textContent = 'Loading new prompt...';
+    fetch('/annotate/api/prompt')
+        .then(r => r.json())
+        .then(prompt => {
+            if (!prompt || !prompt.sites || !prompt.macros) {
+                document.getElementById('status').textContent = 'No prompt available';
+                return;
+            }
+            currentPrompt = prompt;
+            selectedMacros = prompt.macros.slice();
+            activeSiteIdx = 0;
+
+            // Update topbar pills
+            const topbar = document.querySelector('.topbar');
+            topbar.querySelectorAll('.site-pill').forEach(p => p.remove());
+            const nameInput = document.getElementById('annotator-name');
+            const colors = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
+            const textColors = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
+            prompt.sites.forEach((s, i) => {
+                const pill = document.createElement('span');
+                pill.className = 'site-pill active';
+                pill.style.background = colors[i % 5];
+                pill.style.color = textColors[i % 5];
+                pill.textContent = s.name;
+                pill.onclick = () => switchToSite(s.id, pill);
+                topbar.insertBefore(pill, nameInput);
+            });
+
+            // Update iframe
+            if (prompt.sites.length > 0) {
+                document.getElementById('site-iframe').src = '/sites/' + prompt.sites[0].id + '/';
+                loadApiRef(prompt.sites[0].id);
+            }
+
+            renderSiteTabs();
+            renderMacroList();
+            updateChainDisplay();
+            document.getElementById('instruction').value = '';
+            document.getElementById('status').textContent = 'New prompt loaded';
+        })
+        .catch(e => {
+            document.getElementById('status').textContent = 'Error: ' + e.message;
+        });
+}
+
+// --- Skip modal ---
+function openSkipModal() {
+    document.getElementById('skip-modal').style.display = 'flex';
+}
+
+function closeSkipModal() {
+    document.getElementById('skip-modal').style.display = 'none';
+}
+
+async function confirmSkip() {
+    const reason = document.getElementById('skip-reason').value;
+    const details = document.getElementById('skip-details').value.trim();
+    if (!details) { alert('Please provide details'); return; }
+    const annotator = document.getElementById('annotator-name').value || 'anonymous';
+    const sites = currentPrompt ? currentPrompt.sites.map(s => s.id) : [];
+    const macros = getEnabledMacros();
+    try {
+        await fetch('/annotate/api/report', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                sites, macros, reason, details, annotator,
+                instruction: document.getElementById('instruction').value,
+            })
+        });
+    } catch(e) {}
+    closeSkipModal();
+    // Get a new prompt
+    reshufflePrompt();
+}
+
+// --- API Reference ---
+function toggleApiRef() {
+    const panel = document.getElementById('api-ref-panel');
+    const toggle = document.getElementById('api-ref-toggle');
+    panel.classList.toggle('collapsed');
+    toggle.textContent = panel.classList.contains('collapsed') ? 'Show' : 'Hide';
+}
+
+let siteDataFiles = [];
+
+function loadApiRef(siteId) {
+    // Load admin data files and site API routes in parallel
+    Promise.all([
+        fetch('/_admin/files/' + siteId).then(r => r.json()),
+        fetch('/annotate/api/routes/' + siteId).then(r => r.json()),
+    ]).then(([files, routes]) => {
+        siteDataFiles = files;
+        const title = document.getElementById('api-ref-title');
+        const body = document.getElementById('api-ref-body');
+        let html = '';
+
+        // Section 1: Verification endpoints (admin)
+        html += `<div style="padding:.35rem .8rem;font-size:.7rem;font-weight:700;color:#15803d;background:#f0fdf4;border-bottom:1px solid #bbf7d0;text-transform:uppercase;letter-spacing:.04em">Verification Endpoints</div>`;
+
+        // User state
+        html += `<div class="api-route" onclick="copyRoute('/_admin/user/${siteId}/1')" title="Click to copy">
+            <div class="api-route-top">
+                <span class="method get">GET</span>
+                <span class="path">/_admin/user/${siteId}/{user_id}</span>
+            </div>
+            <div class="desc">All data for a user: profile, cart, saved items, orders, transactions, etc.</div>
+        </div>`;
+
+        // Interaction log
+        html += `<div class="api-route" onclick="copyRoute('/_admin/log')" title="Click to copy">
+            <div class="api-route-top">
+                <span class="method get">GET</span>
+                <span class="path">/_admin/log</span>
+                <span class="params">?method=POST &middot; ?path=transfer &middot; ?last=10</span>
+            </div>
+            <div class="desc">Request history: every API call the agent made this session (method, path, body, response)</div>
+        </div>`;
+
+        // Session state
+        html += `<div class="api-route" onclick="copyRoute('/_admin/session')" title="Click to copy">
+            <div class="api-route-top">
+                <span class="method get">GET</span>
+                <span class="path">/_admin/session</span>
+            </div>
+            <div class="desc">Current session state (logged-in user, verified status, settings)</div>
+        </div>`;
+
+        // Data files
+        if (files.length) {
+            html += files.map(f => {
+                const name = f.replace('.json', '');
+                const path = `/_admin/data/${siteId}/${name}`;
+                return `<div class="api-route" onclick="copyRoute('${path}')" title="Click to copy">
+                    <div class="api-route-top">
+                        <span class="method get">GET</span>
+                        <span class="path">/_admin/data/${siteId}/${name}</span>
+                        <span class="params">?key=val &middot; ?_id=N &middot; ?_count=1</span>
+                    </div>
+                    <div class="desc">Raw ${name} data with filtering</div>
+                </div>`;
+            }).join('');
+        }
+
+        // Section 2: Site API endpoints
+        if (routes.length) {
+            html += `<div style="padding:.35rem .8rem;font-size:.7rem;font-weight:700;color:#1e40af;background:#eff6ff;border-bottom:1px solid #bfdbfe;text-transform:uppercase;letter-spacing:.04em">Site API (${routes.length} endpoints)</div>`;
+            html += routes.map(r => {
+                const extra = r.params.length ? '?' + r.params.join(', ?') :
+                              r.body_fields.length ? '{' + r.body_fields.join(', ') + '}' : '';
+                const returns = r.returns && r.returns.length ? 'Returns: ' + r.returns.join(', ') : '';
+                const fullPath = '/sites/' + siteId + r.path;
+                return `<div class="api-route" onclick="copyRoute('${fullPath}')" title="Click to copy">
+                    <div class="api-route-top">
+                        <span class="method ${r.method.toLowerCase()}">${r.method}</span>
+                        <span class="path">${r.path}</span>
+                        <span class="params">${extra}</span>
+                    </div>
+                    <div class="desc">${r.description}</div>
+                    ${returns ? '<div class="returns">' + returns + '</div>' : ''}
+                </div>`;
+            }).join('');
+        }
+
+        title.textContent = `API Reference for ${siteId}`;
+        body.innerHTML = html;
+    }).catch(() => {});
+}
+
+function copyRoute(path) {
+    navigator.clipboard.writeText(path).then(() => {
+        document.getElementById('status').textContent = 'Copied: ' + path;
+    }).catch(() => {});
+}
+
+// --- Recording ---
 function startRecording() {
     trajectory = [];
     renderTrajectory();
@@ -285,9 +634,7 @@ function startRecording() {
     lastUrl = '';
     goStep(2);
     updateRecUI();
-    // Poll iframe URL every 500ms
     recordInterval = setInterval(pollIframe, 500);
-    // Capture initial page
     pollIframe();
 }
 
@@ -305,7 +652,7 @@ function stopAndNext() {
     recording = false;
     clearInterval(recordInterval);
     updateRecUI();
-    goStep(3); // Go to Answer step (macros are auto-inferred post-hoc)
+    goStep(3);
 }
 
 function updateRecUI() {
@@ -313,14 +660,14 @@ function updateRecUI() {
     const status = document.getElementById('rec-status');
     if (recording) {
         btn.className = 'btn btn-recording';
-        btn.textContent = '⏺ Recording...';
+        btn.textContent = 'Recording...';
         status.style.color = '#ef4444';
-        status.textContent = '● REC';
+        status.textContent = 'REC';
     } else {
         btn.className = 'btn btn-secondary';
-        btn.textContent = '▶ Resume';
+        btn.textContent = 'Resume';
         status.style.color = '#94a3b8';
-        status.textContent = '⏸ Paused';
+        status.textContent = 'Paused';
     }
 }
 
@@ -336,92 +683,50 @@ function pollIframe() {
             const ts = new Date().toISOString();
             const title = doc.title || '';
 
-            // --- Capture 3 observation types ---
-
-            // 1. Raw HTML (truncated to 5000 chars to keep trajectory manageable)
             let rawHtml = '';
-            try {
-                rawHtml = doc.documentElement.outerHTML.substring(0, 5000);
-            } catch(e) {}
+            try { rawHtml = doc.documentElement.outerHTML.substring(0, 5000); } catch(e) {}
 
-            // 2. Accessibility tree: structured extraction of interactive + semantic elements
             let axTree = '';
             try {
                 const parts = [];
-                // Headings
                 const headings = [...doc.querySelectorAll('h1,h2,h3,h4')].map(h =>
                     `[${h.tagName}] ${h.textContent.trim()}`).filter(Boolean).slice(0, 10);
                 if (headings.length) parts.push('HEADINGS:\n  ' + headings.join('\n  '));
-                // Forms & inputs
                 const inputs = [...doc.querySelectorAll('input,textarea,select')].map(el => {
                     const label = el.labels?.[0]?.textContent?.trim() || el.placeholder || el.name || el.id || '';
                     return `[${el.tagName}:${el.type||'text'}] ${label}${el.value ? ' = "'+el.value.substring(0,30)+'"' : ''}`;
                 }).slice(0, 15);
                 if (inputs.length) parts.push('INPUTS:\n  ' + inputs.join('\n  '));
-                // Buttons
                 const buttons = [...doc.querySelectorAll('button,input[type=submit],[role=button],.btn')].map(b =>
                     `[button] ${b.textContent.trim().substring(0, 40)}`).filter(s => s.length > 10).slice(0, 10);
                 if (buttons.length) parts.push('BUTTONS:\n  ' + buttons.join('\n  '));
-                // Links
                 const links = [...doc.querySelectorAll('a[href]')].map(a => {
                     const text = a.textContent.trim().substring(0, 40);
                     const href = a.getAttribute('href') || '';
-                    return text.length > 1 ? `[link] ${text} → ${href}` : null;
+                    return text.length > 1 ? `[link] ${text} -> ${href}` : null;
                 }).filter(Boolean).slice(0, 15);
                 if (links.length) parts.push('LINKS:\n  ' + links.join('\n  '));
-                // Tables
                 const tables = [...doc.querySelectorAll('table')];
                 if (tables.length) {
                     const t = tables[0];
                     const rows = t.querySelectorAll('tr').length;
                     const cols = t.querySelector('tr')?.querySelectorAll('th,td').length || 0;
-                    parts.push(`TABLES: ${tables.length} table(s), first is ${rows}×${cols}`);
+                    parts.push(`TABLES: ${tables.length} table(s), first is ${rows}x${cols}`);
                 }
-                // Text content summary
                 const bodyText = doc.body?.innerText?.substring(0, 300).replace(/\s+/g, ' ').trim() || '';
                 if (bodyText) parts.push('TEXT: ' + bodyText);
-
                 axTree = parts.join('\n\n');
             } catch(e) {}
 
-            // 3. Screenshot (canvas capture of iframe)
-            let screenshot = '';
-            try {
-                // Use iframe's own rendering — capture via canvas drawImage
-                const canvas = document.createElement('canvas');
-                const rect = iframe.getBoundingClientRect();
-                canvas.width = Math.min(rect.width, 1280);
-                canvas.height = Math.min(rect.height, 800);
-                // Note: drawImage from iframe only works same-origin
-                // Fallback: we store a placeholder and note that screenshot capture
-                // requires the html2canvas library for full support
-                screenshot = '[screenshot:pending]'; // placeholder — see note below
-            } catch(e) {
-                screenshot = '[screenshot:error]';
-            }
+            let screenshot = '[screenshot:pending]';
 
-            // Record action + observation
-            trajectory.push({
-                type: 'action',
-                url: url,
-                timestamp: ts,
-            });
-            trajectory.push({
-                type: 'observation',
-                title: title,
-                url: url,
-                raw_html: rawHtml,
-                ax_tree: axTree,
-                screenshot: screenshot,
-                timestamp: ts,
-            });
+            trajectory.push({ type: 'action', url: url, timestamp: ts });
+            trajectory.push({ type: 'observation', title: title, url: url, raw_html: rawHtml, ax_tree: axTree, screenshot: screenshot, timestamp: ts });
 
             lastUrl = url;
             renderTrajectory();
         }
-    } catch(e) {
-        // Cross-origin or other error — skip
-    }
+    } catch(e) {}
 }
 
 function renderTrajectory() {
@@ -434,29 +739,24 @@ function renderTrajectory() {
             stepNum++;
             const obs = (i + 1 < trajectory.length && trajectory[i+1].type === 'observation') ? trajectory[i+1] : null;
             const obsId = 'obs-' + stepNum;
-
             html += `<div class="traj-entry">
                 <div class="traj-action">
                     <span class="badge">ACT ${stepNum}</span>
                     <span class="url">${t.url}</span>
                     <span class="ts">${t.timestamp.split('T')[1]?.slice(0,8) || ''}</span>
                 </div>`;
-
             if (obs) {
-                // Observation with 3 view tabs
                 html += `<div class="traj-obs">
                     <div style="display:flex;gap:.2rem;margin-bottom:.2rem">
                         <span class="obs-label" style="margin-right:.3rem">OBS</span>
-                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','ax')" style="padding:.1rem .3rem;font-size:.6rem">AX Tree</button>
-                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','html')" style="padding:.1rem .3rem;font-size:.6rem">HTML</button>
-                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','screen')" style="padding:.1rem .3rem;font-size:.6rem">Screenshot</button>
-                        <b style="margin-left:.3rem;font-size:.68rem">${obs.title}</b>
+                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','ax')" style="padding:.1rem .3rem;font-size:.62rem">AX Tree</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','html')" style="padding:.1rem .3rem;font-size:.62rem">HTML</button>
+                        <b style="margin-left:.3rem;font-size:.72rem;color:#0f172a">${obs.title}</b>
                     </div>
-                    <div id="${obsId}-ax" style="font-size:.65rem;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml(obs.ax_tree || '(empty)')}</div>
-                    <div id="${obsId}-html" style="display:none;font-size:.6rem;color:#64748b;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml((obs.raw_html || '').substring(0, 2000))}</div>
-                    <div id="${obsId}-screen" style="display:none;font-size:.65rem;color:#64748b">${obs.screenshot === '[screenshot:pending]' ? '<span style="color:#f59e0b">Screenshot capture requires html2canvas (not loaded)</span>' : obs.screenshot || '(no screenshot)'}</div>
+                    <div id="${obsId}-ax" style="font-size:.68rem;color:#475569;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml(obs.ax_tree || '(empty)')}</div>
+                    <div id="${obsId}-html" style="display:none;font-size:.65rem;color:#64748b;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml((obs.raw_html || '').substring(0, 2000))}</div>
                 </div>`;
-                i++; // skip observation entry
+                i++;
             }
             html += '</div>';
         }
@@ -467,7 +767,7 @@ function renderTrajectory() {
 }
 
 function showObsTab(obsId, tab) {
-    ['ax','html','screen'].forEach(t => {
+    ['ax','html'].forEach(t => {
         const el = document.getElementById(obsId + '-' + t);
         if (el) el.style.display = (t === tab) ? 'block' : 'none';
     });
@@ -475,31 +775,6 @@ function showObsTab(obsId, tab) {
 
 function escHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// --- Macros ---
-function toggleMacro(name, el) {
-    const idx = selectedMacros.indexOf(name);
-    if (idx >= 0) { selectedMacros.splice(idx, 1); el.classList.remove('selected'); }
-    else { selectedMacros.push(name); el.classList.add('selected'); }
-    renderMacros();
-}
-function clearMacros() {
-    selectedMacros = [];
-    document.querySelectorAll('.macro-chip').forEach(c => c.classList.remove('selected'));
-    renderMacros();
-}
-function renderMacros() {
-    const div = document.getElementById('selected-macros');
-    div.innerHTML = selectedMacros.length
-        ? selectedMacros.map((m,i) => `<span class="macro-chip selected" onclick="selectedMacros.splice(${i},1);renderMacros()">${i+1}. ${m} ×</span>`).join(' ')
-        : '<span style="color:#475569">none</span>';
-}
-function filterMacros() {
-    const q = document.getElementById('macro-filter').value.toLowerCase();
-    document.querySelectorAll('#macro-list .macro-chip').forEach(c => {
-        c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
 }
 
 // --- Verifiers ---
@@ -513,102 +788,224 @@ function populateVerifiers() {
     const answerType = document.getElementById('answer-type').value;
     const alts = document.getElementById('alternatives').value.split('\n').map(s => s.trim()).filter(Boolean);
     const urls = [...new Set(trajectory.filter(t => t.type === 'action' && t.url).map(t => t.url))];
-    const siteId = document.getElementById('site-select').value;
+    const siteId = currentPrompt && currentPrompt.sites.length > 0 ? currentPrompt.sites[0].id : '';
 
     const cl = document.getElementById('verifier-checklist');
     cl.innerHTML = '';
     selectedVerifiers = [];
 
-    // Answer match
+    // 1. Answer match (auto-checked)
     if (answer) {
-        addVOption({id: 'v_ans', checked: true,
-            label: `Answer: "${answer.length > 50 ? answer.slice(0,50)+'...' : answer}"`,
-            desc: `Type: ${answerType}${alts.length ? ', alternatives: ' + alts.join(', ') : ''}`,
+        addVerifier({id: 'v_ans', checked: true,
+            label: `Answer matches: "${answer.length > 60 ? answer.slice(0,60)+'...' : answer}"`,
+            desc: `Type: ${answerType}`,
             config: {evaluator: 'AgentResponseEvaluator', type: answerType, expected: answer, alternatives: alts}
         });
     }
 
-    // Grounding
+    // 2. Grounding (auto-checked)
     if (urls.length > 0) {
-        addVOption({id: 'v_ground', checked: true,
-            label: `Grounding: agent visited ${urls.length} pages`,
+        addVerifier({id: 'v_ground', checked: true,
+            label: `Agent visited ${urls.length} page(s)`,
             desc: urls.slice(0, 3).join(', ') + (urls.length > 3 ? ` +${urls.length-3} more` : ''),
             config: {evaluator: 'GroundingEvaluator', required_urls: urls}
         });
     }
 
-    // Backend suggestions
+    // 3. Fetch user state and interaction log
     if (siteId) {
-        addVOption({id: 'v_count', checked: false, editable: true,
-            label: 'Backend: check count/value via API',
-            desc: 'Fill in the API endpoint and expected value',
-            config: {evaluator: 'BackendStateEvaluator', method: 'GET', endpoint: `/sites/${siteId}/api/`, field: 'length', comparison: 'equals', expected: ''}
-        });
-        addVOption({id: 'v_exists', checked: false, editable: true,
-            label: 'Backend: verify item exists (mutation check)',
-            desc: 'Check that a created/saved item is present',
-            config: {evaluator: 'BackendStateEvaluator', method: 'GET', endpoint: `/sites/${siteId}/api/`, field: '', comparison: 'exists', expected: ''}
-        });
-        addVOption({id: 'v_gone', checked: false, editable: true,
-            label: 'Backend: verify item deleted (negative check)',
-            desc: 'Check that a deleted item is no longer present',
-            config: {evaluator: 'BackendStateEvaluator', method: 'GET', endpoint: `/sites/${siteId}/api/`, field: '', comparison: 'not_exists', expected: ''}
-        });
+        fetchUserState(siteId);
+        fetchInteractionLog();
     }
 }
 
-function addVOption(opts) {
+function addVerifier(opts) {
     const div = document.createElement('div');
     div.className = 'verifier-option' + (opts.checked ? ' selected' : '');
     div.dataset.vid = opts.id;
-    div.dataset.config = JSON.stringify(opts.config);
-
-    let editFields = '';
-    if (opts.editable) {
-        editFields = `<div style="margin-top:.2rem">
-            <input type="text" data-f="endpoint" placeholder="endpoint" value="${opts.config.endpoint||''}" style="font-size:.68rem;padding:.2rem;margin-bottom:.15rem">
-            <input type="text" data-f="field" placeholder="field (.count, length)" value="${opts.config.field||''}" style="font-size:.68rem;padding:.2rem;margin-bottom:.15rem">
-            <input type="text" data-f="expected" placeholder="expected value" value="${opts.config.expected||''}" style="font-size:.68rem;padding:.2rem">
-        </div>`;
-    }
-
+    const configStr = JSON.stringify(opts.config);
     div.innerHTML = `
-        <input type="checkbox" ${opts.checked ? 'checked' : ''} onchange="toggleV('${opts.id}',this.checked,this.closest('.verifier-option'))">
-        <div class="v-info"><div class="v-label">${opts.label}</div><div class="v-desc">${opts.desc}</div>${editFields}</div>
+        <input type="checkbox" ${opts.checked ? 'checked' : ''} onchange="toggleVerifier('${opts.id}', this.checked)">
+        <div class="v-info"><div class="v-label">${opts.label}</div><div class="v-desc">${opts.desc}</div></div>
         <span class="indicator pending" id="ind-${opts.id}"></span>`;
+    div.dataset.config = configStr;
     document.getElementById('verifier-checklist').appendChild(div);
     if (opts.checked) selectedVerifiers.push({id: opts.id, config: opts.config});
 }
 
-function toggleV(id, checked, el) {
+function toggleVerifier(id, checked) {
+    const el = document.querySelector(`[data-vid="${id}"]`);
+    if (!el) return;
     el.classList.toggle('selected', checked);
     const config = JSON.parse(el.dataset.config);
-    el.querySelectorAll('[data-f]').forEach(inp => { config[inp.dataset.f] = inp.value; });
-    if (checked) {
-        selectedVerifiers = selectedVerifiers.filter(v => v.id !== id);
-        selectedVerifiers.push({id, config});
-    } else {
-        selectedVerifiers = selectedVerifiers.filter(v => v.id !== id);
-    }
+    // Read any editable expected value
+    const expInput = el.querySelector('[data-expected]');
+    if (expInput) config.expected = expInput.value;
+    selectedVerifiers = selectedVerifiers.filter(v => v.id !== id);
+    if (checked) selectedVerifiers.push({id, config});
 }
 
-function addCustomVerifier() {
-    const siteId = document.getElementById('site-select').value;
-    addVOption({id: 'v_custom_' + (verifierCounter++), checked: false, editable: true,
-        label: 'Custom backend check',
-        desc: 'Fill in endpoint and expected value',
-        config: {evaluator: 'BackendStateEvaluator', method: 'GET', endpoint: `/sites/${siteId}/api/`, field: '', comparison: 'equals', expected: ''}
-    });
+function fetchUserState(siteId) {
+    // Get the actual logged-in user from the session
+    fetch('/_admin/session').then(r => r.json()).then(sess => {
+        const userId = sess.user_id || 1;
+        _fetchUserStateForId(siteId, userId);
+    }).catch(() => _fetchUserStateForId(siteId, 1));
+}
+
+function _fetchUserStateForId(siteId, userId) {
+    // Use /_admin/user which correctly aggregates across all ref fields
+    // (user_id, author_id, seller_id, etc.)
+    fetch(`/_admin/user/${siteId}/${userId}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('user-state-list');
+            let html = '';
+
+            // Profile fields (embedded data like cart, wishlist, saved_posts)
+            const profile = data.profile || {};
+            const interesting = Object.entries(profile).filter(([k,v]) =>
+                Array.isArray(v) || (typeof v === 'object' && v !== null)
+            );
+            if (interesting.length) {
+                html += '<div style="margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Profile data:</div>';
+                interesting.forEach(([key, val]) => {
+                    const vid = 'v_profile_' + key;
+                    const isArray = Array.isArray(val);
+                    const valStr = isArray
+                        ? (val.length ? JSON.stringify(val).slice(0,60) : '[]')
+                        : JSON.stringify(val).slice(0,60);
+                    const cmp = isArray ? 'contains' : 'equals';
+                    const placeholder = isArray ? 'expected item ID (e.g. 5)' : 'expected value after task';
+                    html += makeStateVerifier(vid,
+                        `${key}: <span style="color:#64748b;font-weight:400">${valStr}</span>`,
+                        {evaluator: 'BackendStateEvaluator', method: 'GET',
+                         endpoint: `/_admin/user/${siteId}/${userId}`,
+                         field: `profile.${key}`, comparison: cmp, expected: ''},
+                        placeholder
+                    );
+                });
+            }
+
+            // Collection counts — use the aggregated data from /_admin/user
+            const collections = Object.entries(data).filter(([k,v]) =>
+                k.endsWith('_count') && typeof v === 'number'
+            );
+            if (collections.length) {
+                html += '<div style="margin-top:.4rem;margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Data counts:</div>';
+                collections.forEach(([key, val]) => {
+                    const collection = key.replace('_count', '');
+                    const vid = 'v_count_' + collection;
+                    html += makeStateVerifier(vid,
+                        `${collection}: <span style="color:#64748b;font-weight:400">${val} items</span>`,
+                        {evaluator: 'BackendStateEvaluator', method: 'GET',
+                         endpoint: `/_admin/user/${siteId}/${userId}`,
+                         field: `${key}`, comparison: 'equals', expected: ''},
+                        'expected count after task'
+                    );
+                });
+            }
+
+            // Also show total counts (not user-scoped) for each data file
+            fetch(`/_admin/files/${siteId}`).then(r => r.json()).then(files => {
+                const dataFiles = files.filter(f => f !== 'users.json');
+                if (dataFiles.length) {
+                    html += '<div style="margin-top:.4rem;margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Total site data:</div>';
+                    const promises = dataFiles.map(f =>
+                        fetch(`/_admin/data/${siteId}/${f.replace('.json','')}?_count=1`)
+                            .then(r => r.json()).then(d => ({file: f, count: d.count}))
+                            .catch(() => ({file: f, count: '?'}))
+                    );
+                    Promise.all(promises).then(results => {
+                        results.forEach(({file, count}) => {
+                            const name = file.replace('.json', '');
+                            const vid = 'v_total_' + name;
+                            html += makeStateVerifier(vid,
+                                `ALL ${name}: <span style="color:#64748b;font-weight:400">${count} total</span>`,
+                                {evaluator: 'BackendStateEvaluator', method: 'GET',
+                                 endpoint: `/_admin/data/${siteId}/${name}?_count=1`,
+                                 field: 'count', comparison: 'equals', expected: ''},
+                                'expected total count'
+                            );
+                        });
+                        container.innerHTML = html || '<span style="color:#94a3b8">No user state data</span>';
+                    });
+                } else {
+                    container.innerHTML = html || '<span style="color:#94a3b8">No user state data</span>';
+                }
+            });
+        })
+        .catch(() => {
+            document.getElementById('user-state-list').innerHTML = '<span style="color:#94a3b8">Could not load user state</span>';
+        });
+}
+
+function makeStateVerifier(vid, label, config, placeholder) {
+    return `<div class="verifier-option" data-vid="${vid}" data-config='${JSON.stringify(config).replace(/'/g, "&#39;")}'>
+        <input type="checkbox" onchange="toggleVerifier('${vid}', this.checked)">
+        <div class="v-info">
+            <div class="v-label">${label}</div>
+            <div style="margin-top:.15rem"><input type="text" data-expected placeholder="${placeholder}" style="font-size:.72rem;padding:.2rem;width:100%" oninput="updateVerifierExpected('${vid}',this.value)"></div>
+        </div>
+    </div>`;
+}
+
+function fetchInteractionLog() {
+    // Fetch all mutation requests (POST, PUT, DELETE) from server-side log
+    fetch('/_admin/log')
+        .then(r => r.json())
+        .then(data => {
+            const mutations = (data.entries || []).filter(e =>
+                ['POST', 'PUT', 'DELETE'].includes(e.method) &&
+                !e.path.includes('/login') && !e.path.includes('/api/login')
+            );
+            const container = document.getElementById('interaction-log-list');
+            if (!mutations.length) {
+                container.innerHTML = '<span style="color:#94a3b8">No mutations recorded. Record a trajectory first.</span>';
+                return;
+            }
+            // Use BackendStateEvaluator to check /_admin/log for these actions
+            container.innerHTML = mutations.map((e, i) => {
+                const vid = 'v_action_' + i;
+                const bodyStr = e.body ? JSON.stringify(e.body).slice(0,80) : '';
+                const pathForCheck = e.path.replace(/^\/sites\/[^/]+/, '');
+                return `<div class="verifier-option" data-vid="${vid}" data-config='${JSON.stringify({
+                    evaluator: 'BackendStateEvaluator', method: 'GET',
+                    endpoint: `/_admin/log?method=${e.method}&path=${encodeURIComponent(pathForCheck)}`,
+                    field: 'count', comparison: 'greater_than', expected: '0'
+                }).replace(/'/g, "&#39;")}'>
+                    <input type="checkbox" onchange="toggleVerifier('${vid}', this.checked)">
+                    <div class="v-info">
+                        <div class="v-label"><span style="color:${e.method==='DELETE'?'#ef4444':e.method==='PUT'?'#d97706':'#2563eb'};font-weight:700">${e.method}</span> ${e.path}</div>
+                        ${bodyStr ? `<div class="v-desc">${bodyStr}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => {});
+}
+
+function updateVerifierExpected(vid, value) {
+    const el = document.querySelector(`[data-vid="${vid}"]`);
+    if (!el) return;
+    const config = JSON.parse(el.dataset.config);
+    config.expected = value;
+    el.dataset.config = JSON.stringify(config);
+    // Update in selectedVerifiers if already checked
+    const sv = selectedVerifiers.find(v => v.id === vid);
+    if (sv) sv.config.expected = value;
 }
 
 async function testAllVerifiers() {
-    // Re-read editable fields
+    // Re-read expected values from inputs
     selectedVerifiers.forEach(v => {
         const el = document.querySelector(`[data-vid="${v.id}"]`);
-        if (el) el.querySelectorAll('[data-f]').forEach(inp => { v.config[inp.dataset.f] = inp.value; });
+        if (!el) return;
+        const expInput = el.querySelector('[data-expected]');
+        if (expInput) v.config.expected = expInput.value;
     });
     const res = document.getElementById('test-result');
-    res.innerHTML = '<span style="color:#f59e0b">Testing...</span>';
+    res.innerHTML = '<span style="color:#d97706">Testing...</span>';
     try {
         const r = await fetch('/annotate/api/validate_eval', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -620,50 +1017,47 @@ async function testAllVerifiers() {
             const ind = document.getElementById('ind-' + v.id);
             if (ind && d.results[i]) ind.className = 'indicator ' + (d.results[i].passed ? 'pass' : 'fail');
         });
-        res.innerHTML = (d.passed ? '🟢 ALL PASS' : '🔴 FAILED') + '<br>' +
-            d.results.map(r => `${r.passed?'✓':'✗'} ${r.detail}`).join('<br>');
+        res.innerHTML = (d.passed ? '<span style="color:#16a34a;font-weight:600">ALL PASS</span>' : '<span style="color:#ef4444;font-weight:600">FAILED</span>') + '<br>' +
+            d.results.map(r => `${r.passed?'<span style="color:#16a34a">&#10003;</span>':'<span style="color:#ef4444">&#10007;</span>'} ${r.detail}`).join('<br>');
     } catch(e) { res.innerHTML = `<span style="color:#ef4444">${e.message}</span>`; }
 }
 
 // --- Submit ---
 async function submitTask() {
-    const site = document.getElementById('site-select').value;
     const instruction = document.getElementById('instruction').value;
     const annotator = document.getElementById('annotator-name').value;
-    if (!site || !instruction || !annotator) { alert('Fill in site, instruction, and your name'); return; }
+    if (!currentPrompt || !currentPrompt.sites.length || !instruction || !annotator) {
+        alert('Fill in instruction and your name');
+        return;
+    }
     if (trajectory.length === 0) { alert('Record a trajectory first (Step 2)'); return; }
 
-    // Re-read editable verifier fields
     selectedVerifiers.forEach(v => {
         const el = document.querySelector(`[data-vid="${v.id}"]`);
         if (el) el.querySelectorAll('[data-f]').forEach(inp => { v.config[inp.dataset.f] = inp.value; });
     });
 
+    const enabledMacros = getEnabledMacros();
+
     try {
         const r = await fetch('/annotate/api/tasks', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                site, instruction,
+                sites: currentPrompt.sites,
+                site: currentPrompt.sites[0].id,
+                instruction,
                 expected_answer: document.getElementById('final-answer').value,
-                difficulty: document.getElementById('difficulty').value,
-                macros: [],  // macros auto-inferred post-hoc from trajectory, not annotator-selected
+                macros: enabledMacros,
                 eval: selectedVerifiers.map(v => v.config),
                 eval_logic: 'all',
                 trajectory,
                 annotator,
-                mode: '{{ mode }}',
-                draft_source: {{ draft_idx if draft else 'null' }},
             })
         });
         const d = await r.json();
         document.getElementById('status').innerHTML = d.task_id
-            ? `<span style="color:#22c55e">✓ ${d.task_id}</span>`
+            ? `<span style="color:#16a34a;font-weight:600">Saved: ${d.task_id}</span>`
             : `<span style="color:#ef4444">${d.error}</span>`;
-        {% if mode in ('queue', 'full') and total_drafts > 0 %}
-        if (d.task_id) setTimeout(() => {
-            window.location.href = '/annotate/task/{{ mode }}?site={{ site_id }}&idx={{ [total_drafts-1, draft_idx+1]|min }}';
-        }, 600);
-        {% endif %}
     } catch(e) { document.getElementById('status').innerHTML = `<span style="color:#ef4444">${e.message}</span>`; }
 }
 </script>

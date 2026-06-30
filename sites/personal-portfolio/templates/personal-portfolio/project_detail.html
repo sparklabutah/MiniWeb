@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project.title }} - {{ profile.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #e94560; }
+        .header .user-info { color: #94a3b8; font-size: .85rem; }
+        .header .user-info a { color: #e94560; text-decoration: none; margin-left: .5rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #fce4ec; color: #e94560; }
+
+        .breadcrumb { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; font-size: .85rem; color: #94a3b8; }
+        .breadcrumb a { color: #e94560; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .project-header { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; }
+        .project-header h2 { font-size: 1.8rem; color: #1a1a2e; margin-bottom: .3rem; }
+        .project-header .tagline { font-size: 1.1rem; color: #e94560; font-weight: 500; margin-bottom: 1rem; }
+        .meta-badges { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .meta-badges .badge { font-size: .75rem; text-transform: uppercase; font-weight: 600; padding: .2rem .5rem; border-radius: .3rem; }
+        .badge-type { background: #eef2ff; color: #4338ca; }
+        .badge-status { background: #dcfce7; color: #166534; }
+        .badge-featured { background: #fef3c7; color: #92400e; }
+
+        .project-body { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+        .project-main { }
+        .project-main .description { color: #475569; line-height: 1.7; font-size: .95rem; margin-bottom: 1.5rem; }
+
+        .project-sidebar { }
+        .sidebar-card { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .sidebar-card h4 { font-size: .9rem; color: #1a1a2e; margin-bottom: .8rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .4rem; }
+        .sidebar-card .info-row { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: .5rem; }
+        .sidebar-card .info-row .label { color: #94a3b8; }
+        .sidebar-card .info-row .value { color: #1a1a2e; font-weight: 500; }
+        .sidebar-card .link-btn { display: block; text-align: center; padding: .6rem; border-radius: .4rem; text-decoration: none; font-size: .85rem; font-weight: 600; margin-bottom: .5rem; }
+        .sidebar-card .link-btn.github { background: #1a1a2e; color: #fff; }
+        .sidebar-card .link-btn.github:hover { background: #16213e; }
+        .sidebar-card .link-btn.live { background: #e94560; color: #fff; }
+        .sidebar-card .link-btn.live:hover { background: #d63851; }
+
+        .tech-tags { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .tech-tag { background: #f1f5f9; color: #334155; font-size: .8rem; padding: .3rem .6rem; border-radius: .3rem; }
+
+        .collaborators { margin-top: .5rem; }
+        .collaborator { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; font-size: .85rem; }
+        .collaborator .role { color: #94a3b8; font-size: .75rem; }
+
+        .stats-row { display: flex; gap: 1rem; margin-bottom: .5rem; }
+        .stat-item { font-size: .85rem; }
+        .stat-item .stat-val { font-weight: 700; color: #e94560; }
+        .stat-item .stat-label { color: #94a3b8; font-size: .75rem; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; margin-top: 3rem; }
+
+        @media (max-width: 700px) {
+            .project-body { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('personal-portfolio.index') }}">{{ profile.name.split()[0] }}<span>Dev</span></a></h1>
+        <div class="user-info">
+            {% if logged_in %}
+                {{ user.display_name }}
+                <a href="{{ url_for('personal-portfolio.logout') }}">Sign Out</a>
+            {% else %}
+                <a href="{{ url_for('personal-portfolio.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('personal-portfolio.index') }}">Home</a>
+        <a href="{{ url_for('personal-portfolio.projects_page') }}" class="active">Projects</a>
+        <a href="{{ url_for('personal-portfolio.resume_page') }}">Resume</a>
+        <a href="{{ url_for('personal-portfolio.blog_page') }}">Blog</a>
+        <a href="{{ url_for('personal-portfolio.index') }}#contact">Contact</a>
+    </nav>
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('personal-portfolio.projects_page') }}">Projects</a> / {{ project.title }}
+    </div>
+
+    <div class="project-header">
+        <h2>{{ project.title }}</h2>
+        <div class="tagline">{{ project.tagline }}</div>
+        <div class="meta-badges">
+            <span class="badge badge-type">{{ project.type }}</span>
+            <span class="badge badge-status">{{ project.status }}</span>
+            {% if project.featured %}<span class="badge badge-featured">Featured</span>{% endif %}
+        </div>
+    </div>
+
+    <div class="project-body">
+        <div class="project-main">
+            <p class="description">{{ project.description }}</p>
+
+            <h4 style="margin-bottom: .6rem; font-size: .95rem;">Technologies</h4>
+            <div class="tech-tags" style="margin-bottom: 1.5rem;">
+                {% for tech in project.technologies %}
+                <span class="tech-tag">{{ tech }}</span>
+                {% endfor %}
+            </div>
+
+            {% if project.collaborators %}
+            <h4 style="margin-bottom: .6rem; font-size: .95rem;">Collaborators</h4>
+            <div class="collaborators">
+                {% for collab in project.collaborators %}
+                <div class="collaborator">
+                    <span>{{ collab.name }}</span>
+                    <span class="role">{{ collab.role }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="project-sidebar">
+            <div class="sidebar-card">
+                <h4>Links</h4>
+                {% if project.github_url %}
+                <a href="{{ project.github_url }}" class="link-btn github">View Source Code</a>
+                {% endif %}
+                {% if project.live_url %}
+                <a href="{{ project.live_url }}" class="link-btn live">View Live Site</a>
+                {% endif %}
+            </div>
+
+            <div class="sidebar-card">
+                <h4>Details</h4>
+                <div class="info-row">
+                    <span class="label">Started</span>
+                    <span class="value">{{ project.started }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Last Updated</span>
+                    <span class="value">{{ project.last_updated }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Status</span>
+                    <span class="value">{{ project.status }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Type</span>
+                    <span class="value">{{ project.type }}</span>
+                </div>
+                {% if project.github_stars is defined and project.github_stars %}
+                <div class="info-row">
+                    <span class="label">Stars</span>
+                    <span class="value">{{ project.github_stars }}</span>
+                </div>
+                {% endif %}
+                {% if project.downloads is defined and project.downloads %}
+                <div class="info-row">
+                    <span class="label">Downloads</span>
+                    <span class="value">{{ "{:,}".format(project.downloads) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        &copy; 2026 {{ profile.name }}. Built with Flask.
+    </div>
+</body>
+</html>

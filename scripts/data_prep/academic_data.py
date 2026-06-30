@@ -16,7 +16,7 @@ import time
 import urllib.request
 import xml.etree.ElementTree as ET
 
-SITE_DATA_DIR = pathlib.Path(__file__).resolve().parents[2] / "sites" / "academic-paper-db" / "data"
+SITE_DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/academic-paper-db")
 PRISTINE_DIR = SITE_DATA_DIR / ".pristine"
 
 ARXIV_BASE = "http://export.arxiv.org/api/query"

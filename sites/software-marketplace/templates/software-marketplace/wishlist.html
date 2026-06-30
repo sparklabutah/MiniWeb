@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wishlist - AppVault</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: #1e40af; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.5rem; }
+        .nav { display: flex; gap: 1.5rem; align-items: center; }
+        .nav a { color: #dbeafe; text-decoration: none; font-size: .95rem; }
+        .nav a:hover { color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: .5rem; }
+        .subtitle { color: #64748b; font-size: .95rem; margin-bottom: 1.5rem; }
+        .wishlist-item { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin-bottom: .75rem; display: flex; align-items: center; gap: 1rem; }
+        .app-icon { width: 52px; height: 52px; background: #dbeafe; border-radius: .75rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+        .item-info { flex: 1; }
+        .item-info h3 { font-size: 1rem; margin-bottom: .2rem; }
+        .item-info h3 a { text-decoration: none; color: inherit; }
+        .item-info h3 a:hover { color: #2563eb; }
+        .item-info .meta { color: #64748b; font-size: .85rem; }
+        .stars { color: #f59e0b; letter-spacing: 1px; }
+        .item-actions { flex-shrink: 0; display: flex; gap: .5rem; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .4rem; font-size: .88rem; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-outline { background: #fff; color: #3b82f6; border: 1px solid #3b82f6; }
+        .btn-outline:hover { background: #eff6ff; }
+        .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .empty { text-align: center; padding: 3rem; color: #94a3b8; }
+        .empty a { color: #3b82f6; text-decoration: none; }
+        .empty a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AppVault</h1>
+        <div class="nav">
+            <a href="{{ url_for('software-marketplace.index') }}">Home</a>
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+            <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+            <a href="{{ url_for('software-marketplace.logout') }}">Logout ({{ user.display_name }})</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">My Wishlist</h2>
+        <p class="subtitle">{{ wishlist_apps|length }} app{{ 's' if wishlist_apps|length != 1 }} saved</p>
+
+        {% if wishlist_apps %}
+            {% for item in wishlist_apps %}
+            <div class="wishlist-item">
+                <div class="app-icon">{{ item.app.name[0] }}</div>
+                <div class="item-info">
+                    <h3><a href="{{ url_for('software-marketplace.app_detail', app_id=item.app.id) }}">{{ item.app.name }}</a></h3>
+                    <div class="meta">
+                        {{ item.app.genre }} &middot;
+                        <span class="stars">{% for i in range(item.app.rating|int) %}&#9733;{% endfor %}{% for i in range(5 - item.app.rating|int) %}&#9734;{% endfor %}</span>
+                        {{ item.app.rating }} &middot;
+                        {% if item.app.price == 0 %}Free{% else %}${{ "%.2f"|format(item.app.price) }}{% endif %} &middot;
+                        Added {{ item.added_date }}
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <a href="{{ url_for('software-marketplace.app_detail', app_id=item.app.id) }}" class="btn btn-outline">View</a>
+                    <form method="post" action="{{ url_for('software-marketplace.form_toggle_wishlist', app_id=item.app.id) }}" style="display:inline;">
+                        <input type="hidden" name="redirect_to" value="{{ url_for('software-marketplace.wishlist_page') }}">
+                        <button type="submit" class="btn btn-danger">Remove</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">
+                <p>Your wishlist is empty.</p>
+                <p><a href="{{ url_for('software-marketplace.apps_list') }}">Browse apps to add to your wishlist</a></p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

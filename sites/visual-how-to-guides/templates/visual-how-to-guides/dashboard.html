@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        .dashboard-header { padding: 32px 0 24px; border-bottom: 1px solid #e0e0e0; margin-bottom: 32px; display: flex; align-items: center; gap: 20px; }
+        .user-avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #4CAF50, #388E3C); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; flex-shrink: 0; }
+        .dashboard-header h1 { font-size: 28px; color: #333; }
+        .dashboard-header p { font-size: 14px; color: #999; margin-top: 4px; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 36px; }
+        .stat-card { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; text-align: center; }
+        .stat-card .stat-value { font-size: 32px; font-weight: 700; color: #4CAF50; }
+        .stat-card .stat-label { font-size: 13px; color: #999; text-transform: uppercase; margin-top: 4px; }
+
+        .section { margin-bottom: 36px; }
+        .section h2 { font-size: 20px; margin-bottom: 20px; color: #333; border-left: 4px solid #4CAF50; padding-left: 12px; }
+
+        .guide-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .guide-card-sm { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; transition: box-shadow 0.2s; background: #fff; }
+        .guide-card-sm:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .guide-card-sm h3 { font-size: 15px; margin-bottom: 8px; }
+        .guide-card-sm h3 a { color: #333; }
+        .guide-card-sm h3 a:hover { color: #4CAF50; }
+        .guide-card-sm .meta { font-size: 13px; color: #777; display: flex; gap: 10px; flex-wrap: wrap; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+
+        .followed-list { display: flex; flex-wrap: wrap; gap: 12px; }
+        .followed-tag { display: inline-block; padding: 8px 16px; background: #e8f5e9; color: #2e7d32; border-radius: 20px; font-size: 14px; font-weight: 500; }
+
+        .empty-note { color: #999; font-size: 14px; padding: 16px 0; }
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+            <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="user-avatar">{{ user.display_name[0] }}</div>
+            <div>
+                <h1>Welcome, {{ user.display_name }}</h1>
+                <p>@{{ user.username }}</p>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value">{{ bookmarked_guides|length }}</div>
+                <div class="stat-label">Bookmarks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ followed_authors|length }}</div>
+                <div class="stat-label">Following</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Bookmarked Guides</h2>
+            {% if bookmarked_guides %}
+            <div class="guide-list">
+                {% for guide in bookmarked_guides %}
+                <div class="guide-card-sm">
+                    <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                    <div class="meta">
+                        <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                        <span>{{ guide.time_estimate }}</span>
+                        <span>{{ guide.rating }}/5</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-note">You haven't bookmarked any guides yet. <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse guides</a> to find something interesting.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h2>Authors You Follow</h2>
+            {% if followed_authors %}
+            <div class="followed-list">
+                {% for name in followed_authors %}
+                <span class="followed-tag">{{ name }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-note">You're not following any authors yet. Visit an author's profile to follow them.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+</body>
+</html>

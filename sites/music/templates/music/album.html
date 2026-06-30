@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ album.title }} - SoundWave</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+        a { color: #1db954; text-decoration: none; }
+        a:hover { color: #1ed760; }
+
+        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+
+        .album-header { padding: 2.5rem 1.5rem; background: linear-gradient(180deg, {{ album.cover_color }}44 0%, #0a0a0a 100%); }
+        .album-header-inner { max-width: 1200px; margin: 0 auto; display: flex; gap: 2rem; align-items: flex-end; }
+        .album-cover { width: 230px; height: 230px; border-radius: .5rem; display: flex; align-items: center; justify-content: center; font-size: 4rem; font-weight: 700; color: rgba(255,255,255,.7); box-shadow: 0 8px 24px rgba(0,0,0,.5); flex-shrink: 0; }
+        .album-info { flex: 1; }
+        .album-type { font-size: .8rem; color: #ccc; text-transform: uppercase; letter-spacing: 1px; }
+        .album-info h1 { font-size: 2.5rem; color: #fff; margin: .3rem 0; }
+        .album-meta { font-size: .95rem; color: #ccc; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+        .album-meta a { color: #fff; font-weight: 600; }
+        .album-meta a:hover { color: #1db954; }
+        .album-stats { font-size: .85rem; color: #888; margin-top: .5rem; }
+        .album-actions { margin-top: 1rem; display: flex; gap: .8rem; align-items: center; }
+        .btn-like { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1.2rem; border-radius: 1.5rem; font-weight: 600; font-size: .85rem; border: 1px solid #888; color: #fff; background: transparent; cursor: pointer; transition: all .15s; }
+        .btn-like:hover { border-color: #1db954; }
+        .btn-like.liked { border-color: #1db954; color: #1db954; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem 2rem; }
+
+        .track-list { list-style: none; margin-top: 1rem; }
+        .track-row { display: flex; align-items: center; padding: .7rem .8rem; border-radius: .3rem; gap: .8rem; transition: background .15s; border-bottom: 1px solid #1a1a1a; }
+        .track-row:hover { background: #1a1a1a; }
+        .track-num { width: 2rem; text-align: right; color: #888; font-size: .9rem; flex-shrink: 0; }
+        .track-info { flex: 1; min-width: 0; }
+        .track-title { font-size: .95rem; color: #fff; }
+        .track-title a { color: #fff; }
+        .track-title a:hover { color: #1db954; }
+        .track-plays { color: #888; font-size: .85rem; min-width: 60px; text-align: right; }
+        .track-duration { color: #888; font-size: .85rem; min-width: 45px; text-align: right; }
+        .track-like-btn { background: none; border: none; color: #888; cursor: pointer; font-size: 1rem; padding: .2rem .4rem; }
+        .track-like-btn:hover { color: #1db954; }
+        .track-like-btn.liked { color: #1db954; }
+
+        @media (max-width: 768px) {
+            .album-header-inner { flex-direction: column; align-items: center; text-align: center; }
+            .album-cover { width: 180px; height: 180px; font-size: 3rem; }
+            .album-info h1 { font-size: 1.8rem; }
+            .album-meta { justify-content: center; }
+            .album-actions { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
+        <div class="nav-links">
+            <a href="{{ url_for('music.browse') }}">Browse</a>
+            <a href="{{ url_for('music.playlists_page') }}">Playlists</a>
+            <a href="{{ url_for('music.library_page') }}">Library</a>
+            {% if user %}
+                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
+                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
+            {% else %}
+                <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="album-header">
+        <div class="album-header-inner">
+            <div class="album-cover" style="background: {{ album.cover_color }};">{{ album.title[0] }}</div>
+            <div class="album-info">
+                <div class="album-type">Album</div>
+                <h1>{{ album.title }}</h1>
+                <div class="album-meta">
+                    <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}">{{ album.artist_name }}</a>
+                    <span>&middot; {{ album.release_date }}</span>
+                    <span>&middot; {{ tracks|length }} songs, {{ total_duration }}</span>
+                </div>
+                <div class="album-stats">{{ album.genre }}</div>
+                <div class="album-actions">
+                    <button class="btn-like {% if is_liked %}liked{% endif %}" onclick="toggleLikeAlbum({{ album.id }})" id="like-album-btn">
+                        {% if is_liked %}Saved{% else %}Save to Library{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <ul class="track-list">
+            {% for track in tracks %}
+            <li class="track-row">
+                <span class="track-num">{{ track.track_number }}</span>
+                <div class="track-info">
+                    <div class="track-title"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                </div>
+                <span class="track-plays">{{ track.plays_formatted }}</span>
+                <span class="track-duration">{{ track.duration_formatted }}</span>
+                <button class="track-like-btn" onclick="toggleLikeTrack({{ track.id }}, this)" title="Like track">&#9825;</button>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+    function toggleLikeAlbum(albumId) {
+        fetch("{{ url_for('music.api_like_album') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({album_id: albumId})
+        }).then(r => r.json()).then(data => {
+            const btn = document.getElementById("like-album-btn");
+            if (data.action === "liked") {
+                btn.textContent = "Saved";
+                btn.classList.add("liked");
+            } else {
+                btn.textContent = "Save to Library";
+                btn.classList.remove("liked");
+            }
+        });
+    }
+    function toggleLikeTrack(trackId, btn) {
+        fetch("/sites/music/api/tracks/" + trackId + "/like", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"}
+        }).then(r => r.json()).then(data => {
+            if (data.action === "liked") {
+                btn.classList.add("liked");
+                btn.innerHTML = "&#9829;";
+            } else {
+                btn.classList.remove("liked");
+                btn.innerHTML = "&#9825;";
+            }
+        });
+    }
+    </script>
+</body>
+</html>

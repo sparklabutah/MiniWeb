@@ -4,20 +4,15 @@ Data interpreter: loads synthesized JSON data files, respects config.
 Templates are read-only; projects are mutable copies.
 The editor is simplified — positioned HTML divs, not a real canvas.
 """
-import json
 import pathlib
 import copy
 from datetime import datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
 
+SITE = "design-creative"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-TEMPLATES_FILE = SITE_DIR / "data" / "templates.json"
-PROJECTS_FILE = SITE_DIR / "data" / "projects.json"
-ASSETS_FILE = SITE_DIR / "data" / "assets.json"
-
 blueprint = Blueprint(
     "design-creative",
     __name__,
@@ -27,60 +22,36 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-# ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
-_templates_cache = None
-_assets_cache = None
-
-
-def _load_json(path):
-    if path.exists():
-        return json.loads(path.read_text())
-    return []
-
-
 def _load_templates():
-    global _templates_cache
-    if _templates_cache is None:
-        _templates_cache = _load_json(TEMPLATES_FILE)
-    return _templates_cache
+    return db.query(SITE, "templates")
 
 
 def _load_assets():
-    global _assets_cache
-    if _assets_cache is None:
-        _assets_cache = _load_json(ASSETS_FILE)
-    return _assets_cache
+    # Assets have no DB schema; return empty list
+    return []
 
 
 def _load_users():
-    return _load_json(USERS_FILE)
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _load_projects():
-    return _load_json(PROJECTS_FILE)
+    return db.query(SITE, "projects")
 
 
 def _save_projects(projects):
-    PROJECTS_FILE.write_text(json.dumps(projects, indent=2))
+    db.save_collection(SITE, "projects", projects)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _get_current_user():
@@ -156,11 +127,11 @@ def index():
 
 @blueprint.route("/template/<int:template_id>")
 def template_detail(template_id):
-    templates = _load_templates()
-    tmpl = next((t for t in templates if t["id"] == template_id), None)
+    tmpl = db.get_item(SITE, "templates", template_id)
     if tmpl is None:
         abort(404)
-    related = [t for t in templates if t["category"] == tmpl["category"] and t["id"] != template_id][:4]
+    related = db.query(SITE, "templates", where={"category": tmpl["category"]}, limit=5)
+    related = [t for t in related if t["id"] != template_id][:4]
     user = _get_current_user()
     return render_template("design-creative/template.html", template=tmpl,
                            related=related, user=user)
@@ -234,8 +205,9 @@ def assets_page():
         results = [a for a in results if a["type"] == asset_type]
 
     user = _get_current_user()
+    asset_types = ["icon", "photo", "illustration", "shape", "font", "texture", "video"]
     return render_template("design-creative/assets.html", assets=results,
-                           q=q, asset_type=asset_type, user=user)
+                           q=q, asset_type=asset_type, asset_types=asset_types, user=user)
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -407,8 +379,7 @@ def api_templates():
 
 @blueprint.route("/api/templates/<int:template_id>")
 def api_template(template_id):
-    templates = _load_templates()
-    tmpl = next((t for t in templates if t["id"] == template_id), None)
+    tmpl = db.get_item(SITE, "templates", template_id)
     if tmpl is None:
         abort(404)
     return jsonify(tmpl)
@@ -443,8 +414,7 @@ def api_projects():
 
 @blueprint.route("/api/projects/<int:project_id>")
 def api_project(project_id):
-    projects = _load_projects()
-    project = next((p for p in projects if p["id"] == project_id), None)
+    project = db.get_item(SITE, "projects", project_id)
     if project is None:
         abort(404)
     return jsonify(project)

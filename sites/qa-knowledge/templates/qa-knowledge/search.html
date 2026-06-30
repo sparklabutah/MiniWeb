@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - KnowledgeHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; } a:hover { color: #0a95ff; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .search-form { flex: 1; display: flex; }
+        .header .search-form input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; }
+        .header .search-form button { padding: 6px 12px; background: #e3701a; color: #fff; border: none; border-radius: 3px; cursor: pointer; margin-left: 4px; }
+        .header .user-area { color: #fff; font-size: 13px; margin-left: auto; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+        h2 { margin-bottom: 12px; }
+        .q-list-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e3e6e8; }
+        .q-stats { text-align: center; min-width: 60px; }
+        .q-stats .num { font-size: 17px; font-weight: 600; } .q-stats .lbl { font-size: 11px; color: #6a737c; }
+        .q-content h3 { font-size: 15px; margin-bottom: 4px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .meta { font-size: 12px; color: #6a737c; margin-top: 4px; }
+        .no-results { color: #6a737c; font-size: 14px; padding: 24px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('qa-knowledge.index') }}" class="logo">KnowledgeHub</a>
+        <nav>
+            <a href="{{ url_for('qa-knowledge.index') }}">Questions</a>
+            <a href="{{ url_for('qa-knowledge.tags_page') }}">Tags</a>
+            <a href="{{ url_for('qa-knowledge.users_page') }}">Users</a>
+        </nav>
+        <form class="search-form" action="{{ url_for('qa-knowledge.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search questions..." value="{{ query }}">
+            <button type="submit">Search</button>
+        </form>
+        <div class="user-area">
+            {% if current_user %}
+                <a href="{{ url_for('qa-knowledge.dashboard') }}">{{ current_user.se_display_name }}</a> |
+                <a href="{{ url_for('qa-knowledge.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('qa-knowledge.login_page') }}">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Search Results{% if query %} for "{{ query }}"{% endif %}</h2>
+        <p style="font-size:13px; color:#6a737c; margin-bottom:16px;">{{ results|length }} result{{ 's' if results|length != 1 }} found</p>
+
+        {% if results %}
+            {% for q in results %}
+            <div class="q-list-item">
+                <div class="q-stats">
+                    <div class="num">{{ q.score }}</div><div class="lbl">votes</div>
+                </div>
+                <div class="q-stats">
+                    <div class="num">{{ q.answer_count }}</div><div class="lbl">answers</div>
+                </div>
+                <div class="q-content">
+                    <h3><a href="{{ url_for('qa-knowledge.question_detail', qid=q.id) }}">{{ q.title }}</a></h3>
+                    <div class="tags">
+                        {% for t in q.tags %}
+                        <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="meta">asked {{ q.creation_date }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% elif query %}
+            <div class="no-results">No questions matched your search.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

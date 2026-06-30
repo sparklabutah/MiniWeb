@@ -1,22 +1,19 @@
 """Email -- Webmail client modeled after Gmail/Outlook.
 
-Data interpreter: reads enron_sample.jsonl line by line. Maps emails to users
-based on from/to fields. The raw data file is never modified.
+Data is stored in SQLite: enron emails in the email_emails table, users and
+sent messages in per-site typed tables.  Queried through app.db.
 """
-import json
 import pathlib
-import random
 import re
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
+from app.db import _deserialize_row
 
+SITE = "email"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_FILE = SITE_DIR / "data" / "enron_sample.jsonl"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-SENT_FILE = SITE_DIR / "data" / "sent_messages.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "email",
@@ -27,14 +24,6 @@ blueprint = Blueprint(
 )
 
 EMAILS_PER_PAGE = 25
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
 
 # ---------------------------------------------------------------------------
 # Data interpreter -- reads raw JSONL, maps to users
@@ -97,13 +86,13 @@ def _match_user_id(to_addrs, from_addr):
 
 def _interpret_record(raw, idx):
     """Convert a raw JSONL record into a normalized email object."""
-    from_addr = raw.get("from", "").strip()
-    to_addrs = _parse_addr_list(raw.get("to", ""))
-    cc_addrs = _parse_addr_list(raw.get("cc", ""))
-    subject = raw.get("subject", "(no subject)").strip()
-    date_obj = _parse_email_date(raw.get("date", ""))
-    body = raw.get("body", "")
-    message_id = raw.get("message_id", "")
+    from_addr = (raw.get("from") or raw.get("from_") or "").strip()
+    to_addrs = _parse_addr_list(raw.get("to") or "")
+    cc_addrs = _parse_addr_list(raw.get("cc") or "")
+    subject = (raw.get("subject") or "(no subject)").strip()
+    date_obj = _parse_email_date(raw.get("date") or "")
+    body = raw.get("body") or ""
+    message_id = raw.get("message_id") or ""
 
     return {
         "id": idx,
@@ -125,27 +114,8 @@ def _interpret_record(raw, idx):
     }
 
 
-def _load_emails():
-    """Read JSONL dataset and map emails to users."""
-    config = _load_config()
-    n = config.get("num_data_points", -1)
-    seed = config.get("random_seed", 42)
-    rng = random.Random(seed)
-
-    raw_records = []
-    with open(DATA_FILE) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                raw_records.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    if n > 0 and n < len(raw_records):
-        raw_records = rng.sample(raw_records, n)
-
+def _assign_emails_to_users(raw_records):
+    """Interpret raw records and assign them to users."""
     emails = []
     robin_counter = 0
     for idx, raw in enumerate(raw_records, 1):
@@ -184,56 +154,89 @@ def _load_emails():
 
 
 # ---------------------------------------------------------------------------
-# Caching
+# DB-backed data access  (email_emails table)
 # ---------------------------------------------------------------------------
 
-_emails = None
-_contacts = None
+
+def _db_conn():
+    return db.get_conn()
 
 
-def _ensure_loaded():
-    global _emails, _contacts
-    if _emails is None:
-        _emails = _load_emails()
-        # Extract contacts from all emails
+def _db_load_all_raw():
+    """Load all raw email records from DB."""
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT * FROM email_emails ORDER BY date"
+    ).fetchall()
+    results = []
+    for row in rows:
+        raw = _deserialize_row(row)
+        # The per-site table uses 'from_' to avoid SQL keyword;
+        # _interpret_record expects 'from'
+        if "from_" in raw and "from" not in raw:
+            raw["from"] = raw.pop("from_")
+        results.append(raw)
+    return results
+
+
+# DB emails cache -- loaded and assigned once
+_db_emails = None
+_db_contacts = None
+
+
+def _db_ensure_loaded():
+    global _db_emails, _db_contacts
+    if _db_emails is None:
+        raw_records = _db_load_all_raw()
+        _db_emails = _assign_emails_to_users(raw_records)
+        # Extract contacts
         addr_set = set()
-        for e in _emails:
+        for e in _db_emails:
             if e["from_addr"]:
                 addr_set.add(e["from_addr"])
             for a in e["to_addrs"]:
                 addr_set.add(a)
             for a in e["cc_addrs"]:
                 addr_set.add(a)
-        _contacts = sorted(addr_set)
+        _db_contacts = sorted(addr_set)
 
+
+def _db_get_emails():
+    _db_ensure_loaded()
+    return _db_emails
+
+
+def _db_get_contacts():
+    _db_ensure_loaded()
+    return _db_contacts
+
+
+# ---------------------------------------------------------------------------
+# Unified accessors -- always use DB
+# ---------------------------------------------------------------------------
 
 def _get_emails():
-    _ensure_loaded()
-    return _emails
+    return _db_get_emails()
 
 
 def _get_contacts():
-    _ensure_loaded()
-    return _contacts
+    return _db_get_contacts()
 
 
 # ---------------------------------------------------------------------------
-# Users (mutable state)
+# Users (mutable state -- stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _current_user():
@@ -248,20 +251,124 @@ def _session_user_id():
 
 
 # ---------------------------------------------------------------------------
-# Sent messages (mutable state for composed emails)
+# Sent messages (mutable state -- stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_sent():
-    if SENT_FILE.exists():
-        try:
-            return json.loads(SENT_FILE.read_text())
-        except (json.JSONDecodeError, ValueError):
-            return []
-    return []
+    return db.query(SITE, "sent_messages")
 
 
 def _save_sent(messages):
-    SENT_FILE.write_text(json.dumps(messages, indent=2))
+    db.save_collection(SITE, "sent_messages", messages)
+
+
+# ---------------------------------------------------------------------------
+# Synthetic overlay emails -- Alex Rivera's Meridian emails
+# ---------------------------------------------------------------------------
+# The sent_messages.json file contains pre-authored Alex Rivera emails in
+# raw format (from/to fields).  We interpret them once into the normalized
+# email format and assign user_ids based on @meridiansystems.com addresses.
+# These take priority over Enron background data.
+
+_overlay_emails = None
+
+
+def _build_user_addr_map():
+    """Build email_address -> user_id mapping from users.json."""
+    users = _load_users()
+    return {u["email_address"]: u["id"] for u in users if u.get("email_address")}
+
+
+def _load_overlay_emails():
+    """Interpret sent_messages.json into normalized email objects."""
+    global _overlay_emails
+    if _overlay_emails is not None:
+        return _overlay_emails
+
+    raw_msgs = _load_sent()
+    if not raw_msgs:
+        _overlay_emails = []
+        return _overlay_emails
+
+    addr_map = _build_user_addr_map()
+    emails = []
+
+    for idx, raw in enumerate(raw_msgs):
+        from_addr = (raw.get("from") or raw.get("from_") or "").strip()
+        to_addrs = raw.get("to") or []
+        if isinstance(to_addrs, str):
+            to_addrs = _parse_addr_list(to_addrs)
+        cc_addrs = raw.get("cc") or []
+        if isinstance(cc_addrs, str):
+            cc_addrs = _parse_addr_list(cc_addrs)
+
+        subject = (raw.get("subject") or "(no subject)").strip()
+        date_str = raw.get("date", "")
+        try:
+            date_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            date_obj = _parse_email_date(date_str)
+
+        body = raw.get("body", "")
+        folder = raw.get("folder", "inbox")
+        is_read = raw.get("is_read", False)
+        is_starred = raw.get("is_starred", False)
+        labels = raw.get("labels", [])
+
+        # Determine which user this belongs to
+        user_id = None
+        # If sender is a known user, assign to them (sent folder)
+        sender_uid = addr_map.get(from_addr)
+        # If any recipient is a known user, assign to them (inbox)
+        recipient_uids = [addr_map[a] for a in to_addrs if a in addr_map]
+
+        if folder == "sent" and sender_uid:
+            user_id = sender_uid
+        elif recipient_uids:
+            user_id = recipient_uids[0]
+        elif sender_uid:
+            user_id = sender_uid
+        else:
+            # Default to user 1 (Alex Rivera)
+            user_id = 1
+
+        # Use IDs starting at 20000 to avoid collision with Enron (1-N)
+        # and composed messages (10000+)
+        email_id = 20000 + idx + 1
+
+        email = {
+            "id": email_id,
+            "from_addr": from_addr,
+            "to_addrs": to_addrs,
+            "cc_addrs": cc_addrs,
+            "subject": subject,
+            "date": date_obj.isoformat(),
+            "date_display": date_obj.strftime("%b %d, %Y %I:%M %p"),
+            "date_sort": date_obj.timestamp(),
+            "body": body,
+            "body_preview": (body[:120].replace('\n', ' ').replace('\r', ' ').strip() + '...') if len(body) > 120 else body.replace('\n', ' ').replace('\r', ' ').strip(),
+            "message_id": raw.get("message_id", f"<overlay-{email_id}@meridiansystems.com>"),
+            "folder": folder,
+            "is_read": is_read,
+            "is_starred": is_starred,
+            "labels": labels,
+            "user_id": user_id,
+        }
+        emails.append(email)
+
+        # If this message is TO a known user (inbox), also create a copy
+        # in the sender's sent folder (if sender is a known user)
+        if folder == "inbox" and sender_uid and sender_uid != user_id:
+            sent_copy = dict(email)
+            sent_copy["id"] = 20000 + len(raw_msgs) + len(emails) + 1
+            sent_copy["folder"] = "sent"
+            sent_copy["is_read"] = True
+            sent_copy["user_id"] = sender_uid
+            emails.append(sent_copy)
+
+    emails.sort(key=lambda e: e.get("date_sort", 0), reverse=True)
+    _overlay_emails = emails
+    return _overlay_emails
 
 
 # ---------------------------------------------------------------------------
@@ -269,13 +376,31 @@ def _save_sent(messages):
 # ---------------------------------------------------------------------------
 
 def _user_emails(user_id, folder=None):
-    """Get emails for a user, optionally filtered by folder. Includes composed messages."""
-    emails = [e for e in _get_emails() if e["user_id"] == user_id]
-    # Add composed/sent messages from mutable storage
+    """Get emails for a user, optionally filtered by folder.
+
+    Priority order:
+    1. Overlay emails (synthetic Alex Rivera / Meridian emails from sent_messages.json)
+    2. Composed emails (runtime-composed messages stored back to sent_messages.json
+       with id >= 10000, which are NOT in the overlay set)
+    3. Enron background emails (supplementary)
+    """
+    # Start with overlay (Alex Rivera) emails
+    overlay = _load_overlay_emails()
+    overlay_ids = {e["id"] for e in overlay}
+    emails = [e for e in overlay if e["user_id"] == user_id]
+
+    # Add runtime-composed messages (id >= 10000 and < 20000, not in overlay)
     sent_msgs = _load_sent()
     for sm in sent_msgs:
-        if sm.get("user_id") == user_id:
+        sm_id = sm.get("id")
+        if sm_id is not None and sm_id not in overlay_ids and sm.get("user_id") == user_id:
             emails.append(sm)
+
+    # Add Enron background emails
+    for e in _get_emails():
+        if e["user_id"] == user_id:
+            emails.append(e)
+
     if folder:
         emails = [e for e in emails if e.get("folder") == folder]
     emails.sort(key=lambda e: e.get("date_sort", 0), reverse=True)
@@ -297,16 +422,22 @@ def _folder_counts(user_id):
 
 
 def _find_email(email_id, user_id=None):
-    """Find an email by ID across both static and sent stores."""
-    # Check static emails
+    """Find an email by ID across overlay, static, and sent stores."""
+    # Check overlay emails first
+    for e in _load_overlay_emails():
+        if e["id"] == email_id:
+            if user_id is None or e["user_id"] == user_id:
+                return e, "overlay"
+    # Check static (Enron) emails
     for e in _get_emails():
         if e["id"] == email_id:
             if user_id is None or e["user_id"] == user_id:
                 return e, "static"
-    # Check sent messages
+    # Check runtime-composed sent messages
     sent_msgs = _load_sent()
+    overlay_ids = {e["id"] for e in _load_overlay_emails()}
     for e in sent_msgs:
-        if e["id"] == email_id:
+        if e["id"] == email_id and e["id"] not in overlay_ids:
             if user_id is None or e["user_id"] == user_id:
                 return e, "sent"
     return None, None
@@ -570,6 +701,50 @@ def form_delete(email_id):
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
+@blueprint.route("/bulk", methods=["POST"])
+def form_bulk_action():
+    """Handle bulk actions on selected emails (delete, mark read/unread)."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("email.login_page"))
+    action = request.form.get("action", "")
+    selected_ids = request.form.getlist("selected")
+    folder = request.form.get("folder", "inbox")
+    for eid_str in selected_ids:
+        try:
+            eid = int(eid_str)
+        except (ValueError, TypeError):
+            continue
+        email, source = _find_email(eid, user["id"])
+        if not email:
+            continue
+        if action == "delete":
+            email["folder"] = "trash"
+            if source == "sent":
+                sent = _load_sent()
+                for s in sent:
+                    if s["id"] == eid:
+                        s["folder"] = "trash"
+                _save_sent(sent)
+        elif action == "mark_read":
+            email["is_read"] = True
+            if source == "sent":
+                sent = _load_sent()
+                for s in sent:
+                    if s["id"] == eid:
+                        s["is_read"] = True
+                _save_sent(sent)
+        elif action == "mark_unread":
+            email["is_read"] = False
+            if source == "sent":
+                sent = _load_sent()
+                for s in sent:
+                    if s["id"] == eid:
+                        s["is_read"] = False
+                _save_sent(sent)
+    return redirect(url_for("email.index", folder=folder))
+
+
 @blueprint.route("/message/<int:email_id>/read", methods=["POST"])
 def form_mark_read(email_id):
     user = _current_user()
@@ -628,9 +803,15 @@ def api_messages():
     if user_id:
         emails = _user_emails(user_id, folder=folder if folder else None)
     else:
-        emails = list(_get_emails())
-        sent = _load_sent()
-        emails.extend(sent)
+        # No user_id: return all emails (overlay + Enron + composed)
+        overlay = _load_overlay_emails()
+        overlay_ids = {e["id"] for e in overlay}
+        emails = list(overlay)
+        emails.extend(_get_emails())
+        # Add runtime-composed messages not already in overlay
+        for sm in _load_sent():
+            if sm.get("id") not in overlay_ids:
+                emails.append(sm)
         if folder:
             emails = [e for e in emails if e.get("folder") == folder]
 
@@ -852,7 +1033,10 @@ def api_folder_count(name):
     user_id = _resolve_user_id(request.args.get("user_id", type=int))
     if not user_id:
         # Count across all users
-        all_emails = list(_get_emails()) + _load_sent()
+        overlay = _load_overlay_emails()
+        overlay_ids = {e["id"] for e in overlay}
+        all_emails = list(overlay) + list(_get_emails())
+        all_emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
         emails_in_folder = [e for e in all_emails if e.get("folder") == name]
         return jsonify({"folder": name, "total": len(emails_in_folder),
                         "unread": sum(1 for e in emails_in_folder if not e.get("is_read"))})
@@ -880,7 +1064,10 @@ def api_search():
     if user_id:
         emails = _user_emails(user_id)
     else:
-        emails = list(_get_emails()) + _load_sent()
+        overlay = _load_overlay_emails()
+        overlay_ids = {e["id"] for e in overlay}
+        emails = list(overlay) + list(_get_emails())
+        emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
     results = _search_emails(emails, q)
     return jsonify(results)
 
@@ -908,10 +1095,13 @@ def api_login():
 
 @blueprint.route("/api/stats")
 def api_stats():
-    emails = list(_get_emails()) + _load_sent()
+    overlay = _load_overlay_emails()
+    overlay_ids = {e["id"] for e in overlay}
+    emails = list(overlay) + list(_get_emails())
+    emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
     user_id = _resolve_user_id(request.args.get("user_id", type=int))
     if user_id:
-        emails = [e for e in emails if e["user_id"] == user_id]
+        emails = [e for e in emails if e.get("user_id") == user_id]
     total = len(emails)
     unread = sum(1 for e in emails if not e.get("is_read"))
     starred = sum(1 for e in emails if e.get("is_starred"))

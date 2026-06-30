@@ -38,10 +38,10 @@ def verify_004(server_url):
 
 def verify_005(server_url):
     base = f"{server_url}/sites/calendar-todo"
-    r = requests.get(f"{base}/api/events/semantic?q=fitness+exercise+workout")
+    r = requests.get(f"{base}/api/events/search?q=fitness+exercise+workout")
     results = r.json()
     if not results:
-        return {"pass": False, "detail": "No semantic results for fitness"}
+        return {"pass": False, "detail": "No search results for fitness"}
     return {"pass": True, "detail": f"Top result: {results[0]['title']}"}
 
 
@@ -75,12 +75,12 @@ def verify_008(server_url):
 
 def verify_009(server_url):
     base = f"{server_url}/sites/calendar-todo"
-    r = requests.get(f"{base}/api/events/semantic?q=career+development+mentoring")
+    r = requests.get(f"{base}/api/events/search?q=career+development+mentoring")
     results = r.json()
     if not results:
-        return {"pass": False, "detail": "No semantic results"}
+        return {"pass": False, "detail": "No search results"}
     titles = [e["title"] for e in results]
-    return {"pass": True, "detail": f"Semantic results: {titles[:3]}"}
+    return {"pass": True, "detail": f"Search results: {titles[:3]}"}
 
 
 def verify_010(server_url):

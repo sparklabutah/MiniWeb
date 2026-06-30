@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+
+        /* Settings page */
+        .settings-container { max-width: 700px; margin: 0 auto; padding: 40px 24px; }
+        .settings-container h1 { font-size: 24px; font-weight: 600; margin-bottom: 32px; }
+
+        /* Profile section */
+        .settings-section { background: #1a1a1a; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+        .settings-section h2 { font-size: 18px; font-weight: 500; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #272727; }
+
+        .profile-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; background: #7c4dff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; flex-shrink: 0; }
+        .profile-info .profile-name { font-size: 18px; font-weight: 500; }
+        .profile-info .profile-handle { font-size: 14px; color: #aaa; }
+        .profile-info .profile-email { font-size: 13px; color: #666; }
+
+        /* Toggle rows */
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #222; }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-label { flex: 1; }
+        .setting-label .label-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+        .setting-label .label-desc { font-size: 12px; color: #aaa; }
+
+        /* Toggle switch */
+        .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch input { display: none; }
+        .toggle-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #555; border-radius: 12px; cursor: pointer; transition: background 0.2s; }
+        .toggle-slider::before { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+        .toggle-switch input:checked + .toggle-slider { background: #3ea6ff; }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+        /* Select / dropdown */
+        .setting-select { background: #272727; border: 1px solid #303030; color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; outline: none; cursor: pointer; }
+        .setting-select:focus { border-color: #3ea6ff; }
+
+        /* Save button */
+        .save-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+        .save-btn { background: #3ea6ff; color: #0f0f0f; border: none; padding: 10px 32px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .save-btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="/search" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="settings-container">
+        <h1>Settings</h1>
+
+        <!-- Profile -->
+        <div class="settings-section">
+            <h2>Account</h2>
+            <div class="profile-row">
+                <div class="profile-avatar">{{ (user.display_name or user.username)[0] }}</div>
+                <div class="profile-info">
+                    <div class="profile-name">{{ user.display_name }}</div>
+                    <div class="profile-handle">@{{ user.username }}</div>
+                    {% if user.email %}
+                    <div class="profile-email">{{ user.email }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="/settings/update">
+            <!-- Playback preferences -->
+            <div class="settings-section">
+                <h2>Playback</h2>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Autoplay</div>
+                        <div class="label-desc">Automatically play the next video when a video finishes.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="autoplay" value="true"
+                            {{ 'checked' if user.get('preferences', {}).get('autoplay', True) }}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Default quality</div>
+                        <div class="label-desc">Choose the default video playback quality.</div>
+                    </div>
+                    <select name="default_quality" class="setting-select">
+                        {% set current_quality = user.get('preferences', {}).get('default_quality', 'auto') %}
+                        <option value="auto" {{ 'selected' if current_quality == 'auto' }}>Auto</option>
+                        <option value="2160p" {{ 'selected' if current_quality == '2160p' }}>2160p (4K)</option>
+                        <option value="1440p" {{ 'selected' if current_quality == '1440p' }}>1440p</option>
+                        <option value="1080p" {{ 'selected' if current_quality == '1080p' }}>1080p</option>
+                        <option value="720p" {{ 'selected' if current_quality == '720p' }}>720p</option>
+                        <option value="480p" {{ 'selected' if current_quality == '480p' }}>480p</option>
+                        <option value="360p" {{ 'selected' if current_quality == '360p' }}>360p</option>
+                        <option value="240p" {{ 'selected' if current_quality == '240p' }}>240p</option>
+                        <option value="144p" {{ 'selected' if current_quality == '144p' }}>144p</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Playback speed</div>
+                        <div class="label-desc">Default playback speed for videos.</div>
+                    </div>
+                    <select name="playback_speed" class="setting-select">
+                        {% set current_speed = user.get('preferences', {}).get('playback_speed', 1.0) %}
+                        <option value="0.25" {{ 'selected' if current_speed == 0.25 }}>0.25x</option>
+                        <option value="0.5" {{ 'selected' if current_speed == 0.5 }}>0.5x</option>
+                        <option value="0.75" {{ 'selected' if current_speed == 0.75 }}>0.75x</option>
+                        <option value="1.0" {{ 'selected' if current_speed == 1.0 }}>Normal</option>
+                        <option value="1.25" {{ 'selected' if current_speed == 1.25 }}>1.25x</option>
+                        <option value="1.5" {{ 'selected' if current_speed == 1.5 }}>1.5x</option>
+                        <option value="1.75" {{ 'selected' if current_speed == 1.75 }}>1.75x</option>
+                        <option value="2.0" {{ 'selected' if current_speed == 2.0 }}>2x</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Captions</div>
+                        <div class="label-desc">Always show captions when available.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="captions" value="true"
+                            {{ 'checked' if user.get('preferences', {}).get('captions', False) }}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="settings-section">
+                <h2>Notifications</h2>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Notifications</div>
+                        <div class="label-desc">Receive notifications about new videos from subscribed channels.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="notifications" value="true"
+                            {{ 'checked' if user.get('preferences', {}).get('notifications', True) }}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Appearance -->
+            <div class="settings-section">
+                <h2>Appearance</h2>
+
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <div class="label-title">Dark mode</div>
+                        <div class="label-desc">Use dark theme throughout the site.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="dark_mode" value="true"
+                            {{ 'checked' if user.get('preferences', {}).get('dark_mode', True) }}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="save-section">
+                <button type="submit" class="save-btn">Save changes</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

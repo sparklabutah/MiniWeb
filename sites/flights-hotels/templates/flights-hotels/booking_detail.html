@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking #{{ booking.id }} - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { font-size: .9rem; color: #4299e1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { text-decoration: underline; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .booking-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .booking-header h2 { font-size: 1.3rem; color: #1a365d; }
+        .status-badge { display: inline-block; font-size: .82rem; text-transform: uppercase; font-weight: 700; padding: .3rem .8rem; border-radius: .25rem; }
+        .status-badge.confirmed { background: #c6f6d5; color: #22543d; }
+        .status-badge.pending { background: #fefcbf; color: #744210; }
+        .status-badge.cancelled { background: #fed7d7; color: #9b2c2c; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .info-item label { font-size: .78rem; font-weight: 600; color: #a0aec0; text-transform: uppercase; }
+        .info-item .value { font-size: 1rem; color: #2d3748; margin-top: .15rem; }
+        .price-box { background: #f7fafc; padding: 1rem 1.2rem; border-radius: .4rem; text-align: center; margin-bottom: 1.5rem; }
+        .price-box .amount { font-size: 2rem; font-weight: 700; color: #2b6cb0; }
+        .price-box .label { font-size: .85rem; color: #718096; }
+        .ref-section { border-top: 1px solid #e2e8f0; padding-top: 1.5rem; margin-top: .5rem; }
+        .ref-section h3 { font-size: 1rem; color: #1a365d; margin-bottom: .8rem; }
+        .ref-detail { background: #f7fafc; padding: 1rem; border-radius: .4rem; font-size: .9rem; color: #4a5568; line-height: 1.6; }
+        .ref-detail strong { color: #2d3748; }
+        .cancel-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+        .cancel-btn { background: #e53e3e; color: #fff; border: none; padding: .6rem 1.5rem; border-radius: .3rem; cursor: pointer; font-size: .9rem; font-weight: 600; }
+        .cancel-btn:hover { background: #c53030; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}" class="active">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <a href="{{ url_for('flights-hotels.bookings_page') }}" class="back">&larr; Back to bookings</a>
+
+        <div class="detail-card">
+            <div class="booking-header">
+                <h2>Booking #{{ booking.id }} &middot; {{ booking.type|capitalize }}</h2>
+                <span class="status-badge {{ booking.status }}">{{ booking.status }}</span>
+            </div>
+
+            <div class="price-box">
+                <div class="amount">${{ "%.2f"|format(booking.total_price) }}</div>
+                <div class="label">Total Price</div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Booking Date</label>
+                    <div class="value">{{ booking.booking_date }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Travelers</label>
+                    <div class="value">{{ booking.travelers }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Type</label>
+                    <div class="value">{{ booking.type|capitalize }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Status</label>
+                    <div class="value">{{ booking.status|capitalize }}</div>
+                </div>
+            </div>
+
+            {% if ref_detail %}
+            <div class="ref-section">
+                {% if booking.type == 'flight' %}
+                <h3>Flight Details</h3>
+                <div class="ref-detail">
+                    <strong>{{ ref_detail.airline }}</strong> {{ ref_detail.flight_number }}<br>
+                    {{ ref_detail.origin_city }} ({{ ref_detail.origin }}) &rarr; {{ ref_detail.dest_city }} ({{ ref_detail.destination }})<br>
+                    Date: {{ ref_detail.date }} &middot; Departs {{ ref_detail.departure_time }} &middot; Arrives {{ ref_detail.arrival_time }}<br>
+                    Duration: {{ ref_detail.duration_minutes }} min &middot; Class: {{ ref_detail.class|capitalize }} &middot; {{ 'Nonstop' if ref_detail.stops == 0 else '%d stop(s)' % ref_detail.stops }}<br>
+                    Aircraft: {{ ref_detail.aircraft }}
+                </div>
+                {% elif booking.type == 'hotel' %}
+                <h3>Hotel Details</h3>
+                <div class="ref-detail">
+                    <strong>{{ ref_detail.name }}</strong><br>
+                    {{ ref_detail.address }}<br>
+                    {{ ref_detail.city }} &middot;
+                    {% for _ in range(ref_detail.stars) %}&#9733;{% endfor %} &middot;
+                    Rating: {{ ref_detail.rating }}/5<br>
+                    ${{ "%.0f"|format(ref_detail.price_per_night) }}/night &middot;
+                    Check-in: {{ ref_detail.check_in }} &middot; Check-out: {{ ref_detail.check_out }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if booking.status != 'cancelled' %}
+            <div class="cancel-section">
+                <form method="post" action="{{ url_for('flights-hotels.cancel_booking', booking_id=booking.id) }}">
+                    <button type="submit" class="cancel-btn" onclick="return confirm('Cancel this booking?')">Cancel Booking</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

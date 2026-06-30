@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask a Question - KnowledgeHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .user-area { color: #fff; font-size: 13px; margin-left: auto; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+        .card { background: #fff; border: 1px solid #d6d9dc; border-radius: 4px; padding: 24px; }
+        h1 { font-size: 22px; margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+        .hint { font-size: 12px; color: #6a737c; margin-bottom: 6px; }
+        input[type="text"], textarea { width: 100%; padding: 8px; border: 1px solid #babfc4; border-radius: 3px; font-family: inherit; font-size: 14px; margin-bottom: 16px; }
+        textarea { min-height: 200px; }
+        .btn { display: inline-block; padding: 10px 20px; background: #0a95ff; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #0074cc; }
+        .error { color: #d1383d; margin-bottom: 12px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('qa-knowledge.index') }}" class="logo">KnowledgeHub</a>
+        <nav>
+            <a href="{{ url_for('qa-knowledge.index') }}">Questions</a>
+            <a href="{{ url_for('qa-knowledge.tags_page') }}">Tags</a>
+            <a href="{{ url_for('qa-knowledge.users_page') }}">Users</a>
+        </nav>
+        <div class="user-area">
+            {% if current_user %}
+                {{ current_user.se_display_name }} |
+                <a href="{{ url_for('qa-knowledge.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('qa-knowledge.login_page') }}">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Ask a Question</h1>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="card">
+            <form method="post" action="{{ url_for('qa-knowledge.ask_submit') }}">
+                <label for="title">Title</label>
+                <div class="hint">Be specific and concise about your problem.</div>
+                <input type="text" id="title" name="title" placeholder="e.g., How to chain asyncio.gather with error handling?" required>
+
+                <label for="body">Body</label>
+                <div class="hint">Include all the information someone would need to answer your question.</div>
+                <textarea id="body" name="body" placeholder="Describe your problem in detail..."></textarea>
+
+                <label for="tags">Tags</label>
+                <div class="hint">Add up to 5 tags separated by commas to describe what your question is about.</div>
+                <input type="text" id="tags" name="tags" placeholder="e.g., python, asyncio, error-handling">
+
+                <button type="submit" class="btn">Post Your Question</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

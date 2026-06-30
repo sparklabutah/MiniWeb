@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 span { color: #00d4aa; }
+        .nav { display: flex; gap: 1.2rem; align-items: center; }
+        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
+        .nav a:hover { color: #fff; }
+        .nav a.active { color: #00d4aa; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+
+        .filters { background: #fff; border-radius: .75rem; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; }
+        .filter-group { display: flex; flex-direction: column; gap: .3rem; }
+        .filter-group label { font-size: .75rem; text-transform: uppercase; color: #64748b; letter-spacing: .5px; font-weight: 600; }
+        .filter-group input, .filter-group select { padding: .5rem .75rem; border: 1px solid #e2e8f0; border-radius: .4rem; font-size: .9rem; outline: none; }
+        .filter-group input:focus, .filter-group select:focus { border-color: #00d4aa; }
+        .filter-btn { padding: .5rem 1.25rem; background: #1a1a2e; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; }
+        .filter-btn:hover { background: #2a2a4e; }
+
+        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .75rem; }
+        .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .player-card { background: #fff; border-radius: .75rem; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .1s; display: block; }
+        .player-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); transform: translateY(-2px); }
+        .player-card .player-name { font-size: 1.05rem; font-weight: 700; margin-bottom: .2rem; }
+        .player-card .player-meta { font-size: .85rem; color: #64748b; margin-bottom: .5rem; }
+        .player-card .player-stats { font-size: .8rem; color: #475569; display: flex; flex-wrap: wrap; gap: .5rem; }
+        .player-card .stat-chip { background: #f1f5f9; padding: .2rem .5rem; border-radius: .3rem; }
+        .no-results { text-align: center; color: #94a3b8; padding: 3rem; font-size: 1rem; }
+        .team-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: .3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport <span>Sports Hub</span></h1>
+        <div class="nav">
+            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
+            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+            <a href="{{ url_for('sports-esports.players_page') }}" class="active">Players</a>
+            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="section-title">Players Directory</div>
+
+        <form class="filters" method="get" action="{{ url_for('sports-esports.players_page') }}">
+            <div class="filter-group">
+                <label>Search</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Name, position, team...">
+            </div>
+            <div class="filter-group">
+                <label>League</label>
+                <select name="league_id">
+                    <option value="">All Leagues</option>
+                    {% for l in leagues %}
+                    <option value="{{ l.id }}" {% if league_id == l.id %}selected{% endif %}>{{ l.abbreviation }} - {{ l.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Team</label>
+                <select name="team_id">
+                    <option value="">All Teams</option>
+                    {% for t in teams %}
+                    <option value="{{ t.id }}" {% if team_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="filter-btn">Filter</button>
+        </form>
+
+        {% if players %}
+        <div class="player-grid">
+            {% for p in players %}
+            <a href="{{ url_for('sports-esports.player_detail', player_id=p.id) }}" class="player-card">
+                <div class="player-name">{% if p.jersey_number %}#{{ p.jersey_number }} {% endif %}{{ p.name }}</div>
+                <div class="player-meta">
+                    <span class="team-dot" style="background: {{ p.team.logo_color|default('#999') }}"></span>
+                    {{ p.team.name }} &middot; {{ p.position }}
+                </div>
+                <div class="player-stats">
+                    {% if p.stats %}
+                    {% for k, v in p.stats.items() %}{% if loop.index <= 3 %}
+                    <span class="stat-chip">{{ k.replace('_',' ').title() }}: {{ v }}</span>
+                    {% endif %}{% endfor %}
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-results">No players found matching your criteria.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay Bill - Lakeport Medical Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: 1rem 2rem; }
+        .header h1 { color: #fff; font-size: 1.3rem; }
+        .header h1 span { color: #7ee8e8; }
+        .main { max-width: 600px; margin: 2rem auto; padding: 0 2rem; }
+        .back { display: inline-block; margin-bottom: 1rem; color: #0d6e6e; text-decoration: none; font-size: .85rem; }
+        .card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .card h2 { font-size: 1.1rem; color: #0d6e6e; margin-bottom: .5rem; }
+        .bill-info { font-size: .85rem; color: #64748b; margin-bottom: 1.5rem; }
+        .bill-info div { margin-top: .3rem; }
+        .amount { font-size: 1.8rem; font-weight: 700; color: #0d6e6e; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .6rem; border: 1px solid #e2e8f0; border-radius: .3rem; font-size: .85rem; }
+        .btn { padding: .7rem 1.5rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .9rem; }
+        .error { color: #dc2626; margin-bottom: 1rem; font-size: .85rem; }
+        .success { background: #dcfce7; color: #16a34a; padding: 1rem; border-radius: .4rem; font-weight: 600; text-align: center; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>Lakeport <span>Medical</span> Center</h1></div>
+    <div class="main">
+        <a href="{{ url_for('health-portals.billing_page') }}" class="back">&larr; Back to Billing</a>
+        <div class="card">
+            {% if success %}
+            <div class="success">Payment processed successfully. Thank you!</div>
+            {% else %}
+            <h2>Pay Bill</h2>
+            <div class="bill-info">
+                <div><strong>Service:</strong> {{ bill.description }}</div>
+                <div><strong>Date:</strong> {{ bill.date_of_service }}</div>
+                <div><strong>Provider:</strong> {{ bill.provider_name }}</div>
+            </div>
+            <div class="amount">${{ "%.2f"|format(amount) }}</div>
+            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+            <form method="POST" action="{{ url_for('health-portals.pay_bill_submit', bill_id=bill.id) }}">
+                <div class="form-group">
+                    <label for="card_name">Name on Card</label>
+                    <input type="text" id="card_name" name="card_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="card_number">Card Number</label>
+                    <input type="text" id="card_number" name="card_number" required placeholder="4111111111111111">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label for="expiry">Expiry</label>
+                        <input type="text" id="expiry" name="expiry" placeholder="MM/YY">
+                    </div>
+                    <div class="form-group">
+                        <label for="cvv">CVV</label>
+                        <input type="text" id="cvv" name="cvv" placeholder="123">
+                    </div>
+                </div>
+                <button type="submit" class="btn">Submit Payment</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="footer">Lakeport Medical Center Patient Portal</div>
+</body>
+</html>

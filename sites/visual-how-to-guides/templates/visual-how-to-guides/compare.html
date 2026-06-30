@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Guides - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        .page-header { padding: 28px 0 20px; border-bottom: 1px solid #e0e0e0; margin-bottom: 24px; }
+        .page-header h1 { font-size: 28px; color: #333; }
+        .page-header p { font-size: 15px; color: #777; margin-top: 6px; }
+
+        .selector-form { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 32px; padding: 20px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .selector-group { flex: 1; min-width: 200px; }
+        .selector-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+        .selector-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
+        .selector-group select:focus { outline: none; border-color: #4CAF50; }
+        .compare-btn { padding: 10px 24px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; height: 42px; }
+        .compare-btn:hover { background: #45a049; }
+
+        .comparison-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+        .comparison-table th { background: #4CAF50; color: #fff; padding: 14px 16px; text-align: left; font-size: 14px; font-weight: 600; }
+        .comparison-table th:first-child { width: 160px; background: #388E3C; }
+        .comparison-table td { padding: 12px 16px; border-bottom: 1px solid #e0e0e0; font-size: 14px; vertical-align: top; }
+        .comparison-table tr:nth-child(even) { background: #fafafa; }
+        .comparison-table tr:hover { background: #f0f7f0; }
+        .comparison-table .attr-label { font-weight: 600; color: #555; background: #f5f5f5; }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state h3 { margin-bottom: 10px; font-size: 18px; color: #666; }
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Compare Guides</h1>
+            <p>Select two or more guides to compare them side by side.</p>
+        </div>
+
+        <form class="selector-form" method="get" action="{{ url_for('visual-how-to-guides.compare_page') }}">
+            <div class="selector-group">
+                <label for="guide1">First Guide</label>
+                <select name="guide1" id="guide1">
+                    <option value="">Select a guide</option>
+                    {% for g in guides %}
+                    <option value="{{ g.id }}" {% if selected|length > 0 and selected[0].id == g.id %}selected{% endif %}>{{ g.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="selector-group">
+                <label for="guide2">Second Guide</label>
+                <select name="guide2" id="guide2">
+                    <option value="">Select a guide</option>
+                    {% for g in guides %}
+                    <option value="{{ g.id }}" {% if selected|length > 1 and selected[1].id == g.id %}selected{% endif %}>{{ g.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="compare-btn" onclick="buildCompareUrl(event)">Compare</button>
+        </form>
+
+        {% if selected|length >= 2 %}
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Attribute</th>
+                    {% for g in selected %}
+                    <th><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=g.id) }}" style="color:#fff;">{{ g.title }}</a></th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="attr-label">Category</td>
+                    {% for g in selected %}
+                    <td>{{ g.category }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Difficulty</td>
+                    {% for g in selected %}
+                    <td><span class="badge badge-{{ g.difficulty }}">{{ g.difficulty }}</span></td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Duration</td>
+                    {% for g in selected %}
+                    <td>{{ g.time_estimate }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Steps</td>
+                    {% for g in selected %}
+                    <td>{{ g.steps|length }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Rating</td>
+                    {% for g in selected %}
+                    <td>{{ g.rating }}/5</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Views</td>
+                    {% for g in selected %}
+                    <td>{{ g.views }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Created</td>
+                    {% for g in selected %}
+                    <td>{{ g.created_at }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Updated</td>
+                    {% for g in selected %}
+                    <td>{{ g.date_published }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="attr-label">Description</td>
+                    {% for g in selected %}
+                    <td>{{ g.description }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+        {% elif selected|length == 1 %}
+        <div class="empty-state">
+            <h3>Select a second guide to compare</h3>
+            <p>You need at least two guides to make a comparison.</p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>Select guides to compare</h3>
+            <p>Use the dropdowns above to pick two guides and see them side by side.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+
+    <script>
+        function buildCompareUrl(e) {
+            e.preventDefault();
+            var g1 = document.getElementById('guide1').value;
+            var g2 = document.getElementById('guide2').value;
+            var ids = [g1, g2].filter(function(v) { return v; });
+            if (ids.length < 2) {
+                alert('Please select two guides to compare.');
+                return;
+            }
+            window.location.href = '{{ url_for("visual-how-to-guides.compare_page") }}?ids=' + ids.join(',');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} - ForumHub</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #dae0e6; color: #1c1c1c; }
+        a { color: #0079d3; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #fff; border-bottom: 1px solid #edeff1; padding: 8px 20px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { font-weight: 700; font-size: 20px; color: #ff4500; }
+        .header .nav-links { margin-left: auto; display: flex; gap: 12px; font-size: 14px; }
+        .container { max-width: 780px; margin: 16px auto; padding: 0 16px; }
+        .post-full { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 12px 16px; margin-bottom: 16px; }
+        .post-meta { font-size: 12px; color: #787c7e; margin-bottom: 8px; }
+        .post-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+        .post-body { font-size: 14px; line-height: 1.5; margin-bottom: 12px; white-space: pre-wrap; }
+        .post-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .post-actions button, .post-actions a { font-size: 12px; font-weight: 700; color: #878a8c; padding: 4px 8px; border-radius: 2px; background: none; border: none; cursor: pointer; }
+        .post-actions button:hover, .post-actions a:hover { background: #f6f7f8; text-decoration: none; }
+        .vote-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .vote-row button { background: none; border: none; cursor: pointer; font-size: 18px; color: #878a8c; }
+        .vote-row button:hover { color: #ff4500; }
+        .vote-row .score { font-weight: 700; font-size: 14px; }
+        .flair { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; background: #edeff1; margin-left: 6px; }
+        .share-dropdown { position: relative; display: inline-block; }
+        .share-menu { display: none; position: absolute; left: 0; top: 100%; background: #fff; border: 1px solid #ccc; border-radius: 4px; min-width: 160px; z-index: 50; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .share-menu.open { display: block; }
+        .share-menu button { display: block; width: 100%; text-align: left; padding: 8px 12px; border: none; background: none; cursor: pointer; font-size: 13px; color: #1c1c1c; }
+        .share-menu button:hover { background: #f6f7f8; }
+        .comment-form { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 12px 16px; margin-bottom: 16px; }
+        .comment-form textarea { width: 100%; height: 80px; padding: 8px; border: 1px solid #edeff1; border-radius: 4px; font-size: 14px; resize: vertical; font-family: inherit; }
+        .comment-form button { margin-top: 8px; padding: 6px 16px; background: #0079d3; color: #fff; border: none; border-radius: 20px; font-weight: 700; cursor: pointer; }
+        .comments-section h3 { font-size: 14px; color: #787c7e; margin-bottom: 12px; }
+        .comment { background: #fff; border-left: 2px solid #edeff1; padding: 8px 12px; margin-bottom: 4px; margin-left: 0; }
+        .comment .comment-meta { font-size: 12px; color: #787c7e; margin-bottom: 4px; }
+        .comment .comment-body { font-size: 14px; line-height: 1.4; margin-bottom: 6px; }
+        .comment .comment-actions { display: flex; gap: 6px; }
+        .comment .comment-actions button { font-size: 11px; color: #878a8c; background: none; border: none; cursor: pointer; font-weight: 700; }
+        .comment .children { margin-left: 20px; border-left: 2px solid #edeff1; }
+        .edit-form { margin-top: 8px; }
+        .edit-form textarea { width: 100%; height: 60px; padding: 6px; border: 1px solid #edeff1; border-radius: 4px; font-size: 14px; font-family: inherit; }
+        .edit-form button { margin-top: 4px; padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .edit-form .save-btn { background: #0079d3; color: #fff; }
+        .edit-form .cancel-btn { background: #edeff1; color: #1c1c1c; margin-left: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('forums.index') }}" class="logo">ForumHub</a>
+        <div class="nav-links">
+            {% if current_user %}
+                <a href="{{ url_for('forums.user_profile', username=current_user.username) }}">u/{{ current_user.username }}</a>
+                <a href="{{ url_for('forums.logout') }}">Log Out</a>
+            {% else %}
+                <a href="{{ url_for('forums.login_page') }}">Log In</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="post-full">
+            <div class="post-meta">
+                <a href="{{ url_for('forums.subreddit_view', subreddit_name=post.subreddit) }}">r/{{ post.subreddit }}</a>
+                &middot; Posted by
+                <a href="{{ url_for('forums.user_profile', username=post.author) }}">u/{{ post.author }}</a>
+                &middot; {{ format_time_ago(post.created_utc) }}
+                {% if post.flair %}<span class="flair">{{ post.flair }}</span>{% endif %}
+            </div>
+            <h1 class="post-title">{{ post.title }}</h1>
+            <div class="post-body">{{ post.body }}</div>
+            <div class="vote-row">
+                <button onclick="votePost('up')">&#9650;</button>
+                <span class="score" id="post-score">{{ post.score }}</span>
+                <button onclick="votePost('down')">&#9660;</button>
+                <span style="color:#787c7e;font-size:12px;margin-left:8px;">{{ post._comment_count }} comments</span>
+            </div>
+            <div class="post-actions">
+                <div class="share-dropdown">
+                    <button onclick="toggleShareMenu()">Share</button>
+                    <div class="share-menu" id="share-menu">
+                        <button onclick="sharePost('copy_link')">Copy Link</button>
+                        <button onclick="sharePost('crosspost')">Crosspost</button>
+                        <button onclick="sharePost('dm')">Send as Message</button>
+                    </div>
+                </div>
+                <button onclick="savePost()">Save</button>
+                {% if current_user and current_user.root_user_id == post.author_root_user_id %}
+                <button onclick="showEditPost()">Edit</button>
+                <button onclick="deletePost()">Delete</button>
+                {% endif %}
+                <button onclick="showReport()">Report</button>
+            </div>
+            <div id="edit-post-form" style="display:none;" class="edit-form">
+                <textarea id="edit-post-body">{{ post.body }}</textarea>
+                <button class="save-btn" onclick="saveEditPost()">Save</button>
+                <button class="cancel-btn" onclick="document.getElementById('edit-post-form').style.display='none'">Cancel</button>
+            </div>
+        </div>
+
+        <div class="comment-form">
+            <textarea id="comment-body" placeholder="What are your thoughts?"></textarea>
+            <button onclick="addComment()">Comment</button>
+        </div>
+
+        <div class="comments-section">
+            <h3>{{ post._comment_count }} Comments</h3>
+            {% macro render_comments(nodes) %}
+            {% for c in nodes %}
+            <div class="comment" data-comment-id="{{ c.id }}">
+                <div class="comment-meta">
+                    <a href="{{ url_for('forums.user_profile', username=c.author) }}">u/{{ c.author }}</a>
+                    &middot; {{ c.score }} points &middot; {{ format_time_ago(c.created_utc) }}
+                </div>
+                <div class="comment-body">{{ c.body }}</div>
+                <div class="comment-actions">
+                    <button onclick="voteComment('{{ c.id }}', 'up')">&#9650;</button>
+                    <button onclick="voteComment('{{ c.id }}', 'down')">&#9660;</button>
+                    <button onclick="showReply('{{ c.id }}')">Reply</button>
+                    {% if current_user and current_user.root_user_id == c.author_root_user_id %}
+                    <button onclick="deleteComment('{{ c.id }}')">Delete</button>
+                    {% endif %}
+                </div>
+                <div id="reply-{{ c.id }}" style="display:none;" class="edit-form">
+                    <textarea id="reply-body-{{ c.id }}" placeholder="Write a reply..."></textarea>
+                    <button class="save-btn" onclick="submitReply('{{ c.id }}')">Reply</button>
+                    <button class="cancel-btn" onclick="document.getElementById('reply-{{ c.id }}').style.display='none'">Cancel</button>
+                </div>
+                {% if c.children %}
+                <div class="children">
+                    {{ render_comments(c.children) }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endmacro %}
+            {{ render_comments(comment_tree) }}
+        </div>
+    </div>
+    <script>
+        const BASE = '{{ url_for("forums.index") }}';
+        const POST_ID = '{{ post.id }}';
+        function votePost(dir) {
+            fetch(`${BASE}api/posts/${POST_ID}/vote`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).then(r => r.json()).then(d => { if(d.score !== undefined) document.getElementById('post-score').textContent = d.score; });
+        }
+        function voteComment(cid, dir) {
+            fetch(`${BASE}api/comments/${cid}/vote`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function addComment() {
+            const body = document.getElementById('comment-body').value.trim();
+            if (!body) return;
+            fetch(`${BASE}api/posts/${POST_ID}/comments`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function showReply(cid) { document.getElementById('reply-' + cid).style.display = 'block'; }
+        function submitReply(parentId) {
+            const body = document.getElementById('reply-body-' + parentId).value.trim();
+            if (!body) return;
+            fetch(`${BASE}api/posts/${POST_ID}/comments`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body, parent_comment_id: parentId})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function deleteComment(cid) {
+            if (!confirm('Delete this comment?')) return;
+            fetch(`${BASE}api/comments/${cid}`, {method: 'DELETE'}).then(() => location.reload());
+        }
+        function savePost() {
+            fetch(`${BASE}api/posts/${POST_ID}/save`, {method: 'POST'})
+                .then(r => r.json()).then(d => alert(d.action || d.error));
+        }
+        function toggleShareMenu() {
+            document.getElementById('share-menu').classList.toggle('open');
+        }
+        function sharePost(method) {
+            document.getElementById('share-menu').classList.remove('open');
+            fetch(`${BASE}api/posts/${POST_ID}/share`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({method: method})
+            }).then(r => r.json()).then(d => alert('Shared via ' + method));
+        }
+        function deletePost() {
+            if (!confirm('Delete this post?')) return;
+            fetch(`${BASE}api/posts/${POST_ID}`, {method: 'DELETE'})
+                .then(() => window.location.href = '{{ url_for("forums.index") }}');
+        }
+        function showEditPost() { document.getElementById('edit-post-form').style.display = 'block'; }
+        function saveEditPost() {
+            const body = document.getElementById('edit-post-body').value.trim();
+            fetch(`${BASE}api/posts/${POST_ID}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body})
+            }).then(() => location.reload());
+        }
+        function showReport() {
+            const reason = prompt('Reason for report (spam, harassment, misinformation, other):');
+            if (!reason) return;
+            const desc = prompt('Additional details (optional):') || '';
+            fetch(`${BASE}api/report`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target_type: 'post', target_id: POST_ID, reason: reason, description: desc})
+            }).then(r => r.json()).then(d => alert(d.id ? 'Report submitted' : d.error));
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.share-dropdown')) document.getElementById('share-menu').classList.remove('open');
+        });
+    </script>
+</body>
+</html>

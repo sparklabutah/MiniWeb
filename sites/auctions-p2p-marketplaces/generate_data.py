@@ -19,7 +19,7 @@ import shutil
 from datetime import datetime, timedelta
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/auctions-p2p-marketplaces")
 PRISTINE_DIR = DATA_DIR / ".pristine"
 CONFIG_PATH = SITE_DIR / "config" / "config.json"
 

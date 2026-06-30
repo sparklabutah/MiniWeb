@@ -9,10 +9,10 @@ def _base(server_url):
     return f"{server_url}/sites/calendar-todo"
 
 
-def verify_macro_navigate_by_semantic(server_url):
-    r = requests.get(f"{_base(server_url)}/api/events/semantic?q=exercise+fitness")
+def verify_macro_navigate_by_search(server_url):
+    r = requests.get(f"{_base(server_url)}/api/events/search?q=exercise+fitness")
     results = r.json()
-    return {"pass": r.status_code == 200, "detail": f"navigate_by_semantic: {len(results)} results"}
+    return {"pass": r.status_code == 200, "detail": f"navigate_by_search: {len(results)} results"}
 
 
 def verify_macro_navigate_by_route(server_url):
@@ -62,10 +62,10 @@ def verify_macro_extract_by_query(server_url):
     return {"pass": True, "detail": "extract_by_query: no results (ok)"}
 
 
-def verify_macro_extract_by_semantic(server_url):
-    r = requests.get(f"{_base(server_url)}/api/events/semantic?q=learning+education")
+def verify_macro_extract_by_search(server_url):
+    r = requests.get(f"{_base(server_url)}/api/events/search?q=learning+education")
     results = r.json()
-    return {"pass": r.status_code == 200, "detail": f"extract_by_semantic: {len(results)} results"}
+    return {"pass": r.status_code == 200, "detail": f"extract_by_search: {len(results)} results"}
 
 
 def verify_macro_extract_by_dropdown(server_url):

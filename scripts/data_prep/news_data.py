@@ -24,7 +24,7 @@ from pathlib import Path
 
 WIKINEWS_API = "https://en.wikinews.org/w/api.php"
 TARGET_ARTICLES = 200
-OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "sites" / "news" / "data"
+OUTPUT_DIR = Path("/scratch/general/vast/u1653932/data_sources/news")
 
 # ── Category mapping ────────────────────────────────────────────────────────
 # Map WikiNews categories to our 8 site categories

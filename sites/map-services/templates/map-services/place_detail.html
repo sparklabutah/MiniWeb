@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ place.name }} - CascadiaMaps</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202124; font-size: 14px; }
+
+        .app { display: flex; height: 100vh; flex-direction: column; }
+        .top-bar { background:#fff;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e8eaed;flex-shrink:0; }
+        .top-bar .brand { font-size:16px;font-weight:500;color:#5f6368;text-decoration:none; }
+        .top-bar .brand b { color:#4285f4; }
+        .top-bar .nav-link { font-size:12px;color:#5f6368;text-decoration:none;padding:4px 8px;border-radius:16px; }
+        .top-bar .nav-link:hover { background:#f1f3f4; }
+        .top-bar .spacer { flex:1; }
+
+        .main-area { display: flex; flex: 1; overflow: hidden; }
+
+        /* Left panel */
+        .panel { width: 400px; height: 100%; display: flex; flex-direction: column; background: #fff; box-shadow: 2px 0 6px rgba(0,0,0,.1); z-index: 10; flex-shrink: 0; overflow: hidden; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 0; }
+
+        .breadcrumb { font-size: 12px; color: #5f6368; padding: 10px 16px; border-bottom: 1px solid #f1f3f4; }
+        .breadcrumb a { color: #1a73e8; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .place-header { padding: 16px; }
+        .place-header h2 { font-size: 18px; color: #202124; margin-bottom: 4px; font-weight: 500; }
+        .place-cat { display: inline-block; background: #e8f0fe; color: #1967d2; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+        .place-rating { color: #fbbc04; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+        .place-rating span { color: #5f6368; font-weight: 400; font-size: 12px; }
+
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .info-item .label { font-size: 11px; color: #5f6368; text-transform: uppercase; font-weight: 600; letter-spacing: .03em; margin-bottom: 2px; }
+        .info-item .value { font-size: 13px; color: #202124; }
+        .info-item .value a { color: #1a73e8; text-decoration: none; }
+
+        .action-bar { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; padding: 0 16px 12px; }
+        .btn { padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; text-decoration: none; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-primary { background: #4285f4; color: #fff; }
+        .btn-primary:hover { background: #3367d6; }
+        .btn-outline { background: #fff; color: #1a73e8; border: 1px solid #dadce0; }
+        .btn-outline:hover { background: #f1f3f4; }
+        .btn-save { background: #34a853; color: #fff; }
+        .btn-save:hover { background: #2d9249; }
+        .btn-saved { background: #e8f5e9; color: #2d9249; border: 1px solid #a5d6a7; }
+
+        .nearby-section { padding: 0 16px 16px; }
+        .nearby-section h3 { font-size: 14px; color: #202124; margin-bottom: 8px; font-weight: 500; padding-top: 12px; border-top: 1px solid #e8eaed; }
+        .nearby-list { display: grid; gap: 4px; }
+        .nearby-card { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; transition: background .1s; }
+        .nearby-card:hover { background: #f8f9fa; }
+        .nearby-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .nearby-info h4 { font-size: 13px; margin-bottom: 1px; }
+        .nearby-info h4 a { color: #202124; text-decoration: none; }
+        .nearby-info h4 a:hover { color: #1a73e8; }
+        .nearby-info .meta { font-size: 11px; color: #70757a; }
+
+        /* User section */
+        .user-section { padding: 10px 16px; border-top: 1px solid #e8eaed; font-size: 12px; color: #5f6368; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .user-section a { color: #1a73e8; text-decoration: none; }
+
+        /* Map */
+        #place-map { flex: 1; z-index: 0; }
+
+        /* Map pins */
+        .map-pin { background: none !important; border: none !important; }
+
+        @media (max-width: 768px) {
+            .panel { width: 100%; height: 50vh; }
+            .main-area { flex-direction: column; }
+            #place-map { height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="top-bar">
+        <a href="{{ url_for('map-services.index') }}" class="brand"><b>Cascadia</b>Maps</a>
+        <a href="{{ url_for('map-services.directions') }}" class="nav-link">Directions</a>
+        <a href="{{ url_for('map-services.saved_places') }}" class="nav-link">Saved</a>
+        <span class="spacer"></span>
+        <a href="/" class="nav-link">MiniWeb</a>
+    </div>
+    <div class="main-area">
+        <div class="panel">
+            <div class="panel-content">
+                <div class="breadcrumb">
+                    <a href="{{ url_for('map-services.index') }}">Explore</a> &rsaquo;
+                    <a href="{{ url_for('map-services.index', category=place.category) }}">{{ place.category | replace('_', ' ') | title }}</a> &rsaquo;
+                    {{ place.name }}
+                </div>
+
+                <div class="place-header">
+                    <h2>{{ place.name }}</h2>
+                    <span class="place-cat">{{ place.category | replace('_', ' ') | title }}</span>
+                    <div class="place-rating"><span style="color:#fbbc04;">&#9733;</span> {{ place.rating }} <span>/ 5.0</span></div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="label">Address</div>
+                            <div class="value">{{ place.address }}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Phone</div>
+                            <div class="value">
+                                {% if place.phone %}
+                                <a href="tel:{{ place.phone }}">{{ place.phone }}</a>
+                                {% else %}
+                                Not available
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Hours</div>
+                            <div class="value">{{ place.hours or 'Not available' }}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">Coordinates</div>
+                            <div class="value" style="font-size:11px;color:#70757a;">{{ place.lat }}, {{ place.lng }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <a href="{{ url_for('map-services.directions') }}" class="btn btn-primary">Directions</a>
+                    {% if user %}
+                        {% if is_saved %}
+                        <span class="btn btn-saved">Saved</span>
+                        {% else %}
+                        <form method="post" action="{{ url_for('map-services.api_saved_place_create') }}" style="display:inline;">
+                            <input type="hidden" name="location_id" value="{{ place.id }}">
+                            <button type="button" class="btn btn-save" onclick="savePlaceAPI({{ place.id }})">Save Place</button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                    {% if place.phone %}
+                    <a href="tel:{{ place.phone }}" class="btn btn-outline">Call</a>
+                    {% endif %}
+                </div>
+
+                <!-- Reviews Section (Google Maps style) -->
+                <div style="margin-top:20px;">
+                    <h3 style="font-size:15px;font-weight:500;color:#202124;margin-bottom:12px;">
+                        Reviews{% if reviews %} ({{ reviews|length }}){% endif %}
+                    </h3>
+
+                    {% if reviews %}
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:36px;font-weight:400;color:#202124;">{{ "%.1f"|format(place.rating) }}</div>
+                        <div>
+                            <div style="color:#fbbc04;font-size:16px;">
+                                {% for i in range(5) %}{% if place.rating >= i + 0.5 %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
+                            </div>
+                            <div style="font-size:12px;color:#70757a;">{{ reviews|length }} reviews</div>
+                        </div>
+                    </div>
+
+                    {% for rev in reviews[:10] %}
+                    <div style="padding:12px 0;border-bottom:1px solid #f1f3f4;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#4285f4;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">{{ rev.username[0] }}</div>
+                            <span style="font-size:13px;font-weight:500;color:#202124;">{{ rev.username }}</span>
+                            <span style="font-size:11px;color:#70757a;">{{ rev.timestamp[:10] }}</span>
+                        </div>
+                        <div style="color:#fbbc04;font-size:12px;margin-bottom:4px;">
+                            {% for i in range(5) %}{% if rev.rating >= i + 0.5 %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
+                        </div>
+                        <div style="font-size:13px;color:#3c4043;line-height:1.5;">{{ rev.text }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div style="color:#70757a;font-size:13px;padding:12px 0;">No reviews yet.</div>
+                    {% endif %}
+
+                    {% if user %}
+                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e8eaed;">
+                        <h4 style="font-size:13px;font-weight:500;margin-bottom:8px;">Write a review</h4>
+                        <form method="post" action="{{ url_for('map-services.form_post_review', place_id=place.id) }}">
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:12px;color:#5f6368;">Rating</label>
+                                <select name="rating" style="padding:4px 8px;border:1px solid #dadce0;border-radius:4px;font-size:13px;">
+                                    <option value="5">5 &#9733;</option>
+                                    <option value="4">4 &#9733;</option>
+                                    <option value="3">3 &#9733;</option>
+                                    <option value="2">2 &#9733;</option>
+                                    <option value="1">1 &#9733;</option>
+                                </select>
+                            </div>
+                            <textarea name="text" rows="3" placeholder="Share your experience..." style="width:100%;padding:8px;border:1px solid #dadce0;border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;" required></textarea>
+                            <button type="submit" style="margin-top:8px;padding:8px 20px;background:#4285f4;color:#fff;border:none;border-radius:20px;font-size:13px;cursor:pointer;">Post review</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if nearby %}
+                <div class="nearby-section">
+                    <h3>Nearby Places</h3>
+                    <div class="nearby-list">
+                        {% for n in nearby %}
+                        <div class="nearby-card">
+                            <div class="nearby-dot" style="background:{{ {'restaurant':'#ea4335','cafe':'#795548','hospital':'#f44336','park':'#4caf50','bank':'#3f51b5','hotel':'#673ab7','school':'#2196f3','gas_station':'#607d8b','grocery':'#8bc34a','government':'#3f51b5','library':'#ff5722','gym':'#e91e63','pharmacy':'#00bcd4','bakery':'#ff7043','brewery':'#ffc107','bar':'#9c27b0','fast_food':'#ff9800','fire_station':'#d32f2f','police':'#1565c0','entertainment':'#9c27b0','transportation':'#009688','office':'#607d8b','community_center':'#ff9800','post_office':'#78909c','bookstore':'#5d4037'}.get(n.category, '#9e9e9e') }}">{{ n.name[0] }}</div>
+                            <div class="nearby-info">
+                                <h4><a href="{{ url_for('map-services.place_detail', place_id=n.id) }}">{{ n.name }}</a></h4>
+                                <div class="meta"><span style="color:#fbbc04;">&#9733;</span> {{ n.rating }} &middot; {{ n.category | replace('_', ' ') | title }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="user-section">
+                {% if user %}
+                <span>{{ user.full_name }}</span>
+                <a href="{{ url_for('map-services.logout') }}">Sign out</a>
+                {% else %}
+                <a href="{{ url_for('map-services.login_page') }}">Sign in</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="place-map"></div>
+    </div>
+</div>
+
+<script>
+var catColors = {{ {'restaurant':'#ea4335','cafe':'#795548','hospital':'#f44336','park':'#4caf50','bank':'#3f51b5','hotel':'#673ab7','school':'#2196f3','gas_station':'#607d8b','grocery':'#8bc34a','government':'#3f51b5','library':'#ff5722','gym':'#e91e63','pharmacy':'#00bcd4','bakery':'#ff7043','brewery':'#ffc107','bar':'#9c27b0','fast_food':'#ff9800','fire_station':'#d32f2f','police':'#1565c0','entertainment':'#9c27b0','transportation':'#009688','office':'#607d8b','community_center':'#ff9800','post_office':'#78909c','bookstore':'#5d4037'} | tojson }};
+
+var placeLat = {{ place.lat }};
+var placeLng = {{ place.lng }};
+var map = L.map('place-map', {zoomControl: false}).setView([placeLat, placeLng], 16);
+L.control.zoom({position: 'topright'}).addTo(map);
+
+L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap &amp; CartoDB',
+    maxZoom: 19,
+    
+}).addTo(map);
+
+// Main place marker (drop-pin style)
+var mainColor = catColors['{{ place.category }}'] || '#ea4335';
+var mainIcon = L.divIcon({
+    className: 'map-pin',
+    html: '<div style="background:'+mainColor+';width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:15px;">{{ place.name[0] }}</span></div>',
+    iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36]
+});
+L.marker([placeLat, placeLng], {icon: mainIcon}).addTo(map)
+    .bindPopup('<b>{{ place.name | e }}</b><br>{{ place.address | e }}')
+    .openPopup();
+
+// Nearby place markers (smaller drop-pins)
+var nearby = {{ nearby | tojson }};
+nearby.forEach(function(n) {
+    if (n.lat && n.lng) {
+        var color = catColors[n.category] || '#9e9e9e';
+        var icon = L.divIcon({
+            className: 'map-pin',
+            html: '<div style="background:'+color+';width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:10px;">'+n.name[0]+'</span></div>',
+            iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24]
+        });
+        L.marker([n.lat, n.lng], {icon: icon}).addTo(map).bindPopup(
+            '<b>' + n.name + '</b><br>' + (n.address || '') +
+            '<br><a href="/sites/map-services/place/' + n.id + '" style="font-size:12px">View</a>'
+        );
+    }
+});
+
+function savePlaceAPI(locationId) {
+    fetch('{{ url_for("map-services.api_saved_place_create") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({location_id: locationId})
+    }).then(r => r.json()).then(() => location.reload());
+}
+</script>
+</body>
+</html>

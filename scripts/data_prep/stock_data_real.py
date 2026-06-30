@@ -26,8 +26,7 @@ sys.stdout.reconfigure(line_buffering=True)
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-SITE_DIR = Path(__file__).resolve().parents[2] / "sites" / "stock-crypto"
-DATA_DIR = SITE_DIR / "data"
+DATA_DIR = Path("/scratch/general/vast/u1653932/data_sources/stock-crypto-prices")
 PRISTINE_DIR = DATA_DIR / ".pristine"
 
 ASSETS_FILE = DATA_DIR / "assets.json"

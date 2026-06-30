@@ -1,0 +1,141 @@
+[
+  {
+    "type": "observation",
+    "step": 0,
+    "url": "/sites/business-company/",
+    "title": "Apex Dynamics Corp - Homepage",
+    "ax_tree_summary": "Homepage for Apex Dynamics Corp. H1: Empowering Businesses Through Technology. Navigation: Products, Team, Services, Blog, Careers, Contact, Newsletter. Featured Products: Real-time Security Gateway, Streamlined API Management Layer, Cloud-native Data Pipeline. Services section with 6 services. Team section with 6 members. Blog section with 3 latest articles. Newsletter subscribe form. Export CSV links for products, services, team, posts."
+  },
+  {
+    "type": "action",
+    "step": 1,
+    "macro": "extract_from_table",
+    "action": "GET /sites/business-company/api/compare?resource=products&ids=1,2",
+    "description": "Used the compare API to compare products with ID 1 and ID 2, extracting their categories."
+  },
+  {
+    "type": "observation",
+    "step": 1,
+    "url": "/sites/business-company/api/compare?resource=products&ids=1,2",
+    "title": "Product Comparison",
+    "ax_tree_summary": "API returned comparison of 2 products: Product 1 (Real-time Security Gateway, category Automation, no price) and Product 2 (Streamlined API Management Layer, category Enterprise Software, $18900/mo).",
+    "extracted_value": {
+      "product_1": {
+        "id": 1,
+        "name": "Real-time Security Gateway",
+        "category": "Automation"
+      },
+      "product_2": {
+        "id": 2,
+        "name": "Streamlined API Management Layer",
+        "category": "Enterprise Software"
+      }
+    }
+  },
+  {
+    "type": "action",
+    "step": 2,
+    "macro": "navigate_by_dropdown",
+    "action": "GET /sites/business-company/careers",
+    "description": "Navigated to the Careers page to find the department dropdown filter."
+  },
+  {
+    "type": "observation",
+    "step": 2,
+    "url": "/sites/business-company/careers",
+    "title": "Careers Page",
+    "ax_tree_summary": "Careers page showing 10 open positions. Filter form with department dropdown and location dropdown. Departments include: Customer Success, Finance, Legal, Marketing, Product Management, Research & Development, Sales."
+  },
+  {
+    "type": "action",
+    "step": 3,
+    "macro": "navigate_by_dropdown",
+    "action": "GET /sites/business-company/careers?department=Marketing",
+    "description": "Selected 'Marketing' from the department dropdown to filter job openings by Marketing department.",
+    "form_data": {
+      "department": "Marketing"
+    },
+    "method": "GET"
+  },
+  {
+    "type": "observation",
+    "step": 3,
+    "url": "/sites/business-company/careers?department=Marketing",
+    "title": "Careers - Marketing",
+    "ax_tree_summary": "Careers page filtered by Marketing department showing 2 open positions: Content Strategist (Boston, MA, Full-time) and Brand Manager (Chicago, IL, Full-time)."
+  },
+  {
+    "type": "action",
+    "step": 4,
+    "macro": "navigate_by_route",
+    "action": "GET /sites/business-company/team/1",
+    "description": "Navigated directly to the team member detail page for member ID 1 using the URL route /team/1."
+  },
+  {
+    "type": "observation",
+    "step": 4,
+    "url": "/sites/business-company/team/1",
+    "title": "Team Member - Jason Harris",
+    "ax_tree_summary": "Team member detail page for Jason Harris. Title: Engineering Manager. Department: Engineering. Email: jason.harris@apexdynamics.com. Phone: +1-555-350-4657. Started: 2016. Bio mentions joined as Engineering Manager with expertise in engineering. Colleagues from same department shown.",
+    "extracted_value": {
+      "member_id": 1,
+      "name": "Jason Harris",
+      "title": "Engineering Manager",
+      "department": "Engineering"
+    }
+  },
+  {
+    "type": "action",
+    "step": 5,
+    "macro": "search_by_semantic",
+    "action": "GET /sites/business-company/api/products/semantic?q=security+and+protection",
+    "description": "Used the semantic search API to find products related to 'security and protection'."
+  },
+  {
+    "type": "observation",
+    "step": 5,
+    "url": "/sites/business-company/api/products/semantic?q=security+and+protection",
+    "title": "Semantic Search Results",
+    "ax_tree_summary": "API returned 3 products matching 'security and protection': 1) Real-time Security Gateway (Automation), 2) Automated Integration Framework (Cybersecurity), 3) Advanced Analytics Platform (Cybersecurity).",
+    "extracted_value": {
+      "query": "security and protection",
+      "result_count": 3,
+      "first_result": "Real-time Security Gateway"
+    }
+  },
+  {
+    "type": "action",
+    "step": 6,
+    "macro": "submit_by_query",
+    "action": "GET /sites/business-company/contact",
+    "description": "Navigated to the Contact page to find the contact form."
+  },
+  {
+    "type": "observation",
+    "step": 6,
+    "url": "/sites/business-company/contact",
+    "title": "Contact Us",
+    "ax_tree_summary": "Contact page with a form containing fields: name (text), email (email), subject (text), message (textarea), and a Submit button. Form action is POST /sites/business-company/contact."
+  },
+  {
+    "type": "action",
+    "step": 7,
+    "macro": "submit_by_query",
+    "action": "POST /sites/business-company/contact",
+    "description": "Submitted the contact form with name='John Test', email='john@test.com', subject='Product Demo', message='I would like a demo of your analytics platform.'",
+    "form_data": {
+      "name": "John Test",
+      "email": "john@test.com",
+      "subject": "Product Demo",
+      "message": "I would like a demo of your analytics platform."
+    },
+    "method": "POST"
+  },
+  {
+    "type": "observation",
+    "step": 7,
+    "url": "/sites/business-company/contact",
+    "title": "Contact - Submission Successful",
+    "ax_tree_summary": "Contact page showing success message confirming the message was sent successfully. Form fields are reset."
+  }
+]

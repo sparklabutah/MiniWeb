@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ note.title }} - NoteCanvas</title>
+    <style>
+        :root {
+            --amber: #f59e0b;
+            --amber-dark: #d97706;
+            --amber-light: #fef3c7;
+            --amber-50: #fffbeb;
+            --text-primary: #1c1917;
+            --text-secondary: #57534e;
+            --text-muted: #a8a29e;
+            --bg-page: #fafaf9;
+            --bg-card: #ffffff;
+            --border: #e7e5e4;
+            --border-light: #f5f5f4;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,.07);
+            --radius: .5rem;
+            --radius-lg: .75rem;
+            --danger: #ef4444;
+            --danger-light: #fef2f2;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-page); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; line-height: 1.5; }
+        a { color: var(--amber-dark); text-decoration: none; }
+        a:hover { color: var(--amber); }
+
+        /* ---- Top bar ---- */
+        .top-bar {
+            background: var(--bg-card);
+            padding: .5rem 1rem;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 200;
+        }
+        .top-bar .left { display: flex; align-items: center; gap: .75rem; }
+        .back-btn { display: inline-flex; align-items: center; gap: .3rem; font-size: .85rem; font-weight: 500; color: var(--text-secondary); padding: .3rem .6rem; border-radius: var(--radius); transition: background .12s; }
+        .back-btn:hover { background: var(--border-light); color: var(--text-primary); }
+        .back-btn svg { width: 16px; height: 16px; }
+        .top-bar .right { display: flex; align-items: center; gap: .5rem; }
+
+        /* ---- Toolbar ---- */
+        .toolbar {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: .4rem 1rem;
+            display: flex; align-items: center; gap: .25rem;
+            flex-wrap: wrap;
+            position: sticky; top: 43px; z-index: 190;
+        }
+        .toolbar .tool-group { display: flex; align-items: center; gap: .2rem; }
+        .toolbar .tool-divider { width: 1px; height: 22px; background: var(--border); margin: 0 .4rem; }
+        .tool-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: .3rem;
+            padding: .35rem .6rem; border: 1px solid transparent;
+            border-radius: var(--radius); background: none;
+            font-size: .8rem; font-weight: 500; color: var(--text-secondary);
+            cursor: pointer; transition: all .12s; white-space: nowrap;
+        }
+        .tool-btn:hover { background: var(--border-light); color: var(--text-primary); }
+        .tool-btn.active { background: var(--amber-light); color: var(--amber-dark); border-color: var(--amber); }
+        .tool-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .tool-btn.danger { color: var(--danger); }
+        .tool-btn.danger:hover { background: var(--danger-light); }
+        .tool-btn.save-btn { background: var(--amber); color: #fff; border-color: var(--amber); font-weight: 600; }
+        .tool-btn.save-btn:hover { background: var(--amber-dark); }
+
+        .color-picker-group { display: flex; align-items: center; gap: .2rem; }
+        .pen-color {
+            width: 22px; height: 22px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer;
+            transition: border-color .12s; padding: 0;
+        }
+        .pen-color:hover { border-color: var(--text-muted); }
+        .pen-color.active { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3px var(--text-primary); }
+
+        .brush-size-slider { width: 70px; height: 4px; accent-color: var(--amber); cursor: pointer; }
+
+        .save-indicator { font-size: .75rem; color: var(--text-muted); font-weight: 500; margin-left: .3rem; }
+
+        /* ---- Editor container ---- */
+        .editor-container { display: flex; flex-direction: column; height: calc(100vh - 87px); }
+
+        /* ---- Title input ---- */
+        .title-input {
+            border: none; background: none; width: 100%;
+            font-size: 1.6rem; font-weight: 800; color: var(--text-primary);
+            padding: 1rem 1.5rem .3rem; outline: none;
+            font-family: inherit; letter-spacing: -.02em;
+        }
+        .title-input::placeholder { color: var(--text-muted); }
+
+        /* ---- Meta bar ---- */
+        .meta-bar {
+            display: flex; align-items: center; gap: .6rem; padding: .3rem 1.5rem .6rem;
+            flex-wrap: wrap;
+        }
+        .meta-bar .meta-item { font-size: .75rem; color: var(--text-muted); display: flex; align-items: center; gap: .25rem; }
+        .meta-bar .meta-item svg { width: 12px; height: 12px; }
+
+        .tag-input-wrap { display: flex; align-items: center; gap: .3rem; }
+        .tag-input-wrap label { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+        .tag-input {
+            border: none; border-bottom: 1px dashed var(--border);
+            background: none; font-size: .75rem; color: var(--text-secondary);
+            padding: .15rem .3rem; outline: none; width: 180px;
+            font-family: inherit;
+        }
+        .tag-input:focus { border-color: var(--amber); }
+
+        .note-color-select { display: flex; align-items: center; gap: .3rem; }
+        .note-color-select label { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+        .note-color-dot {
+            width: 18px; height: 18px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer; padding: 0;
+            transition: border-color .12s;
+        }
+        .note-color-dot:hover { border-color: var(--text-muted); }
+        .note-color-dot.active { border-color: var(--text-primary); }
+
+        .pin-toggle { display: flex; align-items: center; gap: .25rem; font-size: .75rem; color: var(--text-muted); cursor: pointer; }
+        .pin-toggle input { accent-color: var(--amber); cursor: pointer; }
+
+        /* ---- Content area (text + canvas) ---- */
+        .content-area { flex: 1; position: relative; overflow: hidden; }
+
+        .text-editor {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            padding: .8rem 1.5rem 1rem;
+            font-size: .95rem; font-family: inherit; color: var(--text-primary);
+            line-height: 1.8; resize: none; border: none; outline: none;
+            background: transparent; overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .text-editor::placeholder { color: var(--text-muted); }
+
+        .draw-canvas {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            cursor: crosshair; z-index: 10;
+            touch-action: none;
+        }
+        .draw-canvas.hidden { display: none; pointer-events: none; }
+
+        /* View mode indicators */
+        .mode-text .draw-canvas { display: none; pointer-events: none; }
+        .mode-draw .text-editor { pointer-events: none; opacity: .3; }
+        .mode-draw .draw-canvas { display: block; }
+        .mode-both .draw-canvas { display: block; }
+        .mode-both .text-editor { pointer-events: auto; opacity: 1; }
+
+        /* ---- Drawing preview overlay ---- */
+        .drawing-preview {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none; z-index: 5;
+        }
+        .drawing-preview img { width: 100%; height: 100%; object-fit: contain; }
+
+        /* ---- Not logged in overlay ---- */
+        .readonly-notice {
+            background: var(--amber-50); border: 1px solid var(--amber-light);
+            border-radius: var(--radius); padding: .5rem 1rem;
+            margin: .75rem 1.5rem; font-size: .85rem; color: var(--amber-dark);
+            display: flex; align-items: center; gap: .5rem;
+        }
+        .readonly-notice a { font-weight: 600; }
+
+        @media (max-width: 600px) {
+            .title-input { font-size: 1.3rem; padding: .75rem 1rem .2rem; }
+            .meta-bar { padding: .3rem 1rem .6rem; }
+            .text-editor { padding: .8rem 1rem; }
+            .toolbar { padding: .3rem .5rem; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top bar -->
+    <div class="top-bar">
+        <div class="left">
+            <a href="{{ url_for('handwritten-notes-whiteboards.index') }}" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                Notes
+            </a>
+        </div>
+        <div class="right">
+            {% if user %}
+            <span style="font-size:.8rem;color:var(--text-muted);">{{ user.display_name }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="tool-group">
+            <button class="tool-btn" id="btn-mode-text" onclick="setMode('text')" title="Text mode">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4v3h5.5v12h3V7H19V4z"/></svg>
+                Text
+            </button>
+            <button class="tool-btn" id="btn-mode-draw" onclick="setMode('draw')" title="Draw mode">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                Draw
+            </button>
+            <button class="tool-btn active" id="btn-mode-both" onclick="setMode('both')" title="Text + Draw combined">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+                Both
+            </button>
+        </div>
+
+        <div class="tool-divider"></div>
+
+        <!-- Drawing tools (shown when draw mode active) -->
+        <div class="tool-group" id="draw-tools">
+            <button class="tool-btn active" id="btn-pen" onclick="setTool('pen')" title="Pen">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
+                Pen
+            </button>
+            <button class="tool-btn" id="btn-eraser" onclick="setTool('eraser')" title="Eraser">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.78-.78 2.05 0 2.83l3.85 3.85c.39.39.9.59 1.41.59H20v-2h-8.73l9.14-9.14c.78-.78.78-2.05 0-2.83l-3.85-3.85c-.39-.39-.9-.59-1.42-.59zM5.1 16.97L5.03 16.9l6.37-6.37 3.07 3.07-6.37 6.37-.93-.93-2.07-2.07z"/></svg>
+                Eraser
+            </button>
+
+            <div class="tool-divider"></div>
+
+            <div class="color-picker-group">
+                <button class="pen-color active" style="background:#1c1917;" data-color="#1c1917" onclick="setPenColor(this)" title="Black"></button>
+                <button class="pen-color" style="background:#2563eb;" data-color="#2563eb" onclick="setPenColor(this)" title="Blue"></button>
+                <button class="pen-color" style="background:#dc2626;" data-color="#dc2626" onclick="setPenColor(this)" title="Red"></button>
+                <button class="pen-color" style="background:#16a34a;" data-color="#16a34a" onclick="setPenColor(this)" title="Green"></button>
+                <button class="pen-color" style="background:#9333ea;" data-color="#9333ea" onclick="setPenColor(this)" title="Purple"></button>
+            </div>
+
+            <div class="tool-divider"></div>
+
+            <input type="range" class="brush-size-slider" id="brush-size" min="1" max="10" value="2" title="Brush size">
+
+            <div class="tool-divider"></div>
+
+            <button class="tool-btn" onclick="clearDrawing()" title="Clear all drawing">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                Clear
+            </button>
+        </div>
+
+        <div style="flex:1;"></div>
+
+        <span class="save-indicator" id="save-indicator"></span>
+
+        {% if user %}
+        <button class="tool-btn save-btn" onclick="saveNote()" title="Save note">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6z"/></svg>
+            Save
+        </button>
+
+        <form method="post" action="{{ url_for('handwritten-notes-whiteboards.note_delete_submit', note_id=note.id) }}" style="display:inline;" onsubmit="return confirm('Delete this note permanently?');">
+            <button type="submit" class="tool-btn danger" title="Delete note">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-container">
+        {% if not user %}
+        <div class="readonly-notice">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;flex-shrink:0;color:var(--amber);"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            You are viewing this note in read-only mode.
+            <a href="{{ url_for('handwritten-notes-whiteboards.login_page') }}">Sign in</a> to edit.
+        </div>
+        {% endif %}
+
+        <input type="text" class="title-input" id="note-title" value="{{ note.title }}" placeholder="Untitled Note" {% if not user %}readonly{% endif %}>
+
+        <div class="meta-bar">
+            <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                {{ note.updated_at[:16] | replace('T', ' ') }}
+            </div>
+
+            {% if user %}
+            <div class="tag-input-wrap">
+                <label>Tags:</label>
+                <input type="text" class="tag-input" id="note-tags" value="{{ note.tags | join(', ') if note.tags is iterable and note.tags is not string else note.tags }}" placeholder="e.g. work, ideas">
+            </div>
+
+            <div class="note-color-select">
+                <label>Color:</label>
+                {% for c in ['#FFFACD', '#E8F5E9', '#E3F2FD', '#FFF3E0', '#F3E5F5', '#FFE0E0', '#FFFFFF'] %}
+                <button class="note-color-dot {{ 'active' if note.color == c }}" style="background:{{ c }};" data-color="{{ c }}" onclick="setNoteColor(this)"></button>
+                {% endfor %}
+            </div>
+
+            <label class="pin-toggle">
+                <input type="checkbox" id="note-pinned" {{ 'checked' if note.is_pinned }}>
+                Pin
+            </label>
+            {% else %}
+            <div class="card-tags" style="display:flex;gap:.25rem;">
+                {% for t in note.tags %}
+                <span style="background:var(--border-light);padding:.1rem .35rem;border-radius:99px;font-size:.7rem;color:var(--text-muted);">{{ t }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="content-area mode-both" id="content-area">
+            <textarea class="text-editor" id="note-content" placeholder="Start typing your note..." {% if not user %}readonly{% endif %}>{{ note.content }}</textarea>
+
+            {% if note.drawing_data %}
+            <div class="drawing-preview" id="drawing-preview">
+                <img src="{{ note.drawing_data }}" alt="Drawing">
+            </div>
+            {% else %}
+            <div class="drawing-preview" id="drawing-preview" style="display:none;"></div>
+            {% endif %}
+
+            <canvas class="draw-canvas" id="draw-canvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        // ---- State ----
+        var mode = 'both';       // 'text', 'draw', 'both'
+        var tool = 'pen';        // 'pen' or 'eraser'
+        var penColor = '#1c1917';
+        var brushSize = 2;
+        var drawing = false;
+        var noteId = {{ note.id }};
+        var isLoggedIn = {{ 'true' if user else 'false' }};
+        var hasUnsaved = false;
+
+        // ---- Elements ----
+        var canvas = document.getElementById('draw-canvas');
+        var ctx = canvas.getContext('2d');
+        var contentArea = document.getElementById('content-area');
+        var drawTools = document.getElementById('draw-tools');
+        var titleInput = document.getElementById('note-title');
+        var contentInput = document.getElementById('note-content');
+        var saveIndicator = document.getElementById('save-indicator');
+        var drawingPreview = document.getElementById('drawing-preview');
+
+        // ---- Canvas setup ----
+        function resizeCanvas() {
+            var rect = contentArea.getBoundingClientRect();
+            var oldData = null;
+            if (canvas.width > 0 && canvas.height > 0) {
+                try { oldData = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch(e) {}
+            }
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (oldData) {
+                try { ctx.putImageData(oldData, 0, 0); } catch(e) {}
+            }
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Load existing drawing data onto canvas
+        var existingDrawing = {{ note.drawing_data|tojson }};
+        if (existingDrawing && existingDrawing.indexOf('data:') === 0) {
+            var img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // Hide the preview img since we loaded onto canvas
+                if (drawingPreview) drawingPreview.style.display = 'none';
+            };
+            img.src = existingDrawing;
+        }
+
+        // ---- Mode switching ----
+        window.setMode = function(m) {
+            mode = m;
+            contentArea.className = 'content-area mode-' + m;
+
+            document.getElementById('btn-mode-text').classList.toggle('active', m === 'text');
+            document.getElementById('btn-mode-draw').classList.toggle('active', m === 'draw');
+            document.getElementById('btn-mode-both').classList.toggle('active', m === 'both');
+
+            if (m === 'draw' || m === 'both') {
+                drawTools.style.opacity = '1';
+                drawTools.style.pointerEvents = 'auto';
+                canvas.classList.remove('hidden');
+                if (drawingPreview) drawingPreview.style.display = 'none';
+            } else {
+                drawTools.style.opacity = '.4';
+                drawTools.style.pointerEvents = 'none';
+                canvas.classList.add('hidden');
+                // Show drawing preview in text mode if there is drawing data
+                updateDrawingPreview();
+            }
+            resizeCanvas();
+        };
+
+        function updateDrawingPreview() {
+            if (!drawingPreview) return;
+            var dataUrl = canvas.toDataURL('image/png');
+            // Check if canvas is blank
+            var blank = isCanvasBlank();
+            if (!blank) {
+                drawingPreview.innerHTML = '<img src="' + dataUrl + '" alt="Drawing">';
+                drawingPreview.style.display = 'block';
+            } else if (!existingDrawing) {
+                drawingPreview.style.display = 'none';
+            }
+        }
+
+        function isCanvasBlank() {
+            var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (var i = 3; i < pixels.length; i += 4) {
+                if (pixels[i] !== 0) return false;
+            }
+            return true;
+        }
+
+        // ---- Tool switching ----
+        window.setTool = function(t) {
+            tool = t;
+            document.getElementById('btn-pen').classList.toggle('active', t === 'pen');
+            document.getElementById('btn-eraser').classList.toggle('active', t === 'eraser');
+            canvas.style.cursor = t === 'eraser' ? 'cell' : 'crosshair';
+        };
+
+        // ---- Pen color ----
+        window.setPenColor = function(el) {
+            penColor = el.getAttribute('data-color');
+            document.querySelectorAll('.pen-color').forEach(function(b) { b.classList.remove('active'); });
+            el.classList.add('active');
+        };
+
+        // ---- Note color ----
+        window.setNoteColor = function(el) {
+            document.querySelectorAll('.note-color-dot').forEach(function(b) { b.classList.remove('active'); });
+            el.classList.add('active');
+            markUnsaved();
+        };
+
+        // ---- Brush size ----
+        document.getElementById('brush-size').addEventListener('input', function() {
+            brushSize = parseInt(this.value);
+        });
+
+        // ---- Drawing events ----
+        function getPos(e) {
+            var rect = canvas.getBoundingClientRect();
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+            }
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function startDraw(e) {
+            if (!isLoggedIn) return;
+            e.preventDefault();
+            drawing = true;
+            var pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function moveDraw(e) {
+            if (!drawing || !isLoggedIn) return;
+            e.preventDefault();
+            var pos = getPos(e);
+            if (tool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = brushSize * 4;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = penColor;
+                ctx.lineWidth = brushSize;
+            }
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function endDraw(e) {
+            if (drawing) {
+                drawing = false;
+                markUnsaved();
+            }
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', moveDraw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', endDraw);
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', moveDraw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+        canvas.addEventListener('touchcancel', endDraw);
+
+        // ---- Clear drawing ----
+        window.clearDrawing = function() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            existingDrawing = '';
+            markUnsaved();
+        };
+
+        // ---- Track changes ----
+        function markUnsaved() {
+            hasUnsaved = true;
+            saveIndicator.textContent = 'Unsaved changes';
+            saveIndicator.style.color = 'var(--amber-dark)';
+        }
+
+        if (isLoggedIn) {
+            titleInput.addEventListener('input', markUnsaved);
+            contentInput.addEventListener('input', markUnsaved);
+            var tagsInput = document.getElementById('note-tags');
+            if (tagsInput) tagsInput.addEventListener('input', markUnsaved);
+            var pinnedInput = document.getElementById('note-pinned');
+            if (pinnedInput) pinnedInput.addEventListener('change', markUnsaved);
+        }
+
+        // ---- Save note ----
+        window.saveNote = function() {
+            if (!isLoggedIn) return;
+            saveIndicator.textContent = 'Saving...';
+            saveIndicator.style.color = 'var(--text-muted)';
+
+            var drawingData = '';
+            if (!isCanvasBlank()) {
+                drawingData = canvas.toDataURL('image/png');
+            }
+
+            var colorEl = document.querySelector('.note-color-dot.active');
+            var color = colorEl ? colorEl.getAttribute('data-color') : '#FFFACD';
+
+            var tagsInput = document.getElementById('note-tags');
+            var tags = tagsInput ? tagsInput.value : '';
+
+            var pinnedInput = document.getElementById('note-pinned');
+            var isPinned = pinnedInput ? pinnedInput.checked : false;
+
+            var body = {
+                title: titleInput.value || 'Untitled Note',
+                content: contentInput.value,
+                tags: tags,
+                color: color,
+                is_pinned: isPinned,
+                drawing_data: drawingData
+            };
+
+            fetch('{{ url_for("handwritten-notes-whiteboards.note_save_ajax", note_id=note.id) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                hasUnsaved = false;
+                saveIndicator.textContent = 'Saved';
+                saveIndicator.style.color = '#16a34a';
+                setTimeout(function() {
+                    if (!hasUnsaved) saveIndicator.textContent = '';
+                }, 2000);
+            })
+            .catch(function(err) {
+                saveIndicator.textContent = 'Save failed';
+                saveIndicator.style.color = 'var(--danger)';
+            });
+        };
+
+        // ---- Keyboard shortcut: Ctrl+S to save ----
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                window.saveNote();
+            }
+        });
+
+        // ---- Warn on leave with unsaved changes ----
+        window.addEventListener('beforeunload', function(e) {
+            if (hasUnsaved) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

@@ -1,27 +1,16 @@
 """Auctions & P2P Marketplaces — eBay-style auction platform.
 
-Data interpreter: reads generated JSON data files (products, users, bids,
-messages, etc.) and serves through Flask routes. Products are adapted from
-WebShop data format into auction listings. Config controls sampling.
+Products populated from webshop data at build time into the products table.
 """
-import json
 import pathlib
-import random
-import re
-from collections import Counter
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
+from app.events import emit
 
+SITE = "auctions-p2p-marketplaces"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-DATA_DIR = SITE_DIR / "data"
-PRODUCTS_FILE = DATA_DIR / "products.json"
-USERS_FILE = DATA_DIR / "users.json"
-BIDS_FILE = DATA_DIR / "bids.json"
-MESSAGES_FILE = DATA_DIR / "messages.json"
-REPORTS_FILE = DATA_DIR / "reports.json"
-RATINGS_FILE = DATA_DIR / "ratings.json"
-WATCHLIST_FILE = DATA_DIR / "watchlist.json"
+_PRODUCTS_TABLE = "auctions_p2p_marketplaces_products"
 
 blueprint = Blueprint(
     "auctions-p2p-marketplaces",
@@ -32,140 +21,36 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
+# Data helpers
 # ---------------------------------------------------------------------------
 
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
+def _get_product(product_id):
+    return db.get_item(SITE, "products", product_id)
 
 
-# ---------------------------------------------------------------------------
-# Data loading
-# ---------------------------------------------------------------------------
-
-_products = None
-_categories = None
+def _get_categories_from_db():
+    rows = db.execute(
+        f"SELECT DISTINCT category FROM [{_PRODUCTS_TABLE}] WHERE category != '' ORDER BY category")
+    return [r["category"] for r in rows]
 
 
-def _load_json(path):
-    if path.exists():
-        return json.loads(path.read_text())
-    return []
-
-
-def _save_json(path, data):
-    path.write_text(json.dumps(data, indent=2))
-
-
-def _load_products():
-    config = _load_config()
-    n = config.get("num_data_points", -1)
-    seed = config.get("random_seed", 42)
-    products = _load_json(PRODUCTS_FILE)
-
-    if n > 0 and n < len(products):
-        rng = random.Random(seed)
-        products = rng.sample(products, n)
-        # Re-assign IDs
-        for i, p in enumerate(products, 1):
-            p["id"] = i
-
-    return products
-
-
-def _ensure_loaded():
-    global _products, _categories
-    if _products is None:
-        _products = _load_products()
-        _categories = sorted(set(p["category"] for p in _products))
-
-
-def _get_products():
-    _ensure_loaded()
-    return _products
-
-
-def _get_categories():
-    _ensure_loaded()
-    return _categories
-
-
-# ---------------------------------------------------------------------------
-# Users (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_users():
-    return _load_json(USERS_FILE)
-
-
-def _save_users(users):
-    _save_json(USERS_FILE, users)
+def _get_conditions_from_db():
+    rows = db.execute(
+        f"SELECT DISTINCT [condition] FROM [{_PRODUCTS_TABLE}] ORDER BY [condition]")
+    return [r["condition"] for r in rows]
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    """Get a single user by ID."""
+    return db.get_item(SITE, "users", user_id)
 
 
-# ---------------------------------------------------------------------------
-# Bids (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_bids():
-    return _load_json(BIDS_FILE)
-
-
-def _save_bids(bids):
-    _save_json(BIDS_FILE, bids)
-
-
-# ---------------------------------------------------------------------------
-# Messages (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_messages():
-    return _load_json(MESSAGES_FILE)
-
-
-def _save_messages(messages):
-    _save_json(MESSAGES_FILE, messages)
-
-
-# ---------------------------------------------------------------------------
-# Reports (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_reports():
-    return _load_json(REPORTS_FILE)
-
-
-def _save_reports(reports):
-    _save_json(REPORTS_FILE, reports)
-
-
-# ---------------------------------------------------------------------------
-# Ratings (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_ratings():
-    return _load_json(RATINGS_FILE)
-
-
-def _save_ratings(ratings):
-    _save_json(RATINGS_FILE, ratings)
-
-
-# ---------------------------------------------------------------------------
-# Watchlist (mutable)
-# ---------------------------------------------------------------------------
-
-def _load_watchlist():
-    return _load_json(WATCHLIST_FILE)
-
-
-def _save_watchlist(watchlist):
-    _save_json(WATCHLIST_FILE, watchlist)
+def _max_id(collection, id_col="id"):
+    """Get the max id from a collection via SQL."""
+    table = db.get_table_name(SITE, collection)
+    if not table:
+        return 0
+    return db.execute(f"SELECT MAX([{id_col}]) as m FROM [{table}]", fetch="val") or 0
 
 
 # ---------------------------------------------------------------------------
@@ -195,14 +80,53 @@ def _search_products(products, query, semantic=False):
                 q in p.get("brand", "").lower()]
 
 
+def _build_product_query(q="", cat="", status="", condition="",
+                         min_price=None, max_price=None, sort="ending_soon", limit=50):
+    """Query products with filters pushed to SQL."""
+    clauses = []
+    params = []
+    if cat:
+        clauses.append("[category] = ?")
+        params.append(cat)
+    if status:
+        clauses.append("[status] = ?")
+        params.append(status)
+    if condition:
+        clauses.append("[condition] = ?")
+        params.append(condition)
+    if min_price is not None:
+        clauses.append("[current_price] >= ?")
+        params.append(min_price)
+    if max_price is not None:
+        clauses.append("[current_price] <= ?")
+        params.append(max_price)
+    if q:
+        ql = f"%{q.lower()}%"
+        clauses.append(
+            "(LOWER([name]) LIKE ? OR LOWER([description]) LIKE ? "
+            "OR LOWER([category]) LIKE ? OR LOWER([brand]) LIKE ?)")
+        params.extend([ql, ql, ql, ql])
+
+    sort_map = {
+        "ending_soon": "[auction_end] ASC",
+        "price_low": "[current_price] ASC",
+        "price_high": "[current_price] DESC",
+        "most_bids": "[num_bids] DESC",
+        "newest": "[auction_start] DESC",
+    }
+    order = sort_map.get(sort, "[auction_end] ASC")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    sql = f"SELECT * FROM [{_PRODUCTS_TABLE}]{where} ORDER BY {order} LIMIT ?"
+    params.append(limit)
+    return db.execute(sql, tuple(params))
+
+
 # ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
 @blueprint.route("/")
 def index():
-    products = _get_products()
-    categories = _get_categories()
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
     status = request.args.get("status", "").strip()
@@ -211,47 +135,30 @@ def index():
     min_price = request.args.get("min_price", "").strip()
     max_price = request.args.get("max_price", "").strip()
 
-    results = list(products)
-
-    if q:
-        results = _search_products(results, q)
-    if cat:
-        results = [p for p in results if p["category"] == cat]
-    if status:
-        results = [p for p in results if p["status"] == status]
-    if condition:
-        results = [p for p in results if p["condition"] == condition]
+    min_p = None
+    max_p = None
     if min_price:
         try:
             min_p = float(min_price)
-            results = [p for p in results if p["current_price"] >= min_p]
         except ValueError:
             pass
     if max_price:
         try:
             max_p = float(max_price)
-            results = [p for p in results if p["current_price"] <= max_p]
         except ValueError:
             pass
 
-    if sort == "ending_soon":
-        results.sort(key=lambda p: p["auction_end"])
-    elif sort == "price_low":
-        results.sort(key=lambda p: p["current_price"])
-    elif sort == "price_high":
-        results.sort(key=lambda p: -p["current_price"])
-    elif sort == "most_bids":
-        results.sort(key=lambda p: -p["num_bids"])
-    elif sort == "newest":
-        results.sort(key=lambda p: p["auction_start"], reverse=True)
-    elif sort == "relevance" and q:
+    results = _build_product_query(q=q, cat=cat, condition=condition,
+                                    min_price=min_p, max_price=max_p, sort=sort)
+    if sort == "relevance" and q:
         results.sort(key=lambda p: -_keyword_score(q, p))
+
+    categories = _get_categories_from_db()
+    conditions = _get_conditions_from_db()
 
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
-
-    conditions = sorted(set(p["condition"] for p in _get_products()))
 
     return render_template("auctions-p2p-marketplaces/index.html",
                            products=results, categories=categories,
@@ -263,21 +170,20 @@ def index():
 
 @blueprint.route("/listing/<int:listing_id>")
 def listing_detail(listing_id):
-    products = _get_products()
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if product is None:
         abort(404)
-    bids = _load_bids()
-    listing_bids = [b for b in bids if b["listing_id"] == listing_id]
-    listing_bids.sort(key=lambda b: b["amount"], reverse=True)
-    related = [p for p in products if p["category"] == product["category"]
-               and p["id"] != listing_id][:6]
+    listing_bids = db.query(SITE, "bids",
+                            where={"listing_id": listing_id},
+                            sort="-amount")
+    related = _build_product_query(cat=product["category"], limit=7)
+    related = [p for p in related if p["id"] != listing_id][:6]
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
     seller = _get_user(product["seller_id"])
-    ratings = _load_ratings()
-    seller_ratings = [r for r in ratings if r["rated_user_id"] == product["seller_id"]]
+    seller_ratings = db.query(SITE, "ratings",
+                              where={"rated_user_id": product["seller_id"]})
     return render_template("auctions-p2p-marketplaces/listing.html",
                            product=product, bids=listing_bids, related=related,
                            user=user, seller=seller, seller_ratings=seller_ratings)
@@ -285,20 +191,12 @@ def listing_detail(listing_id):
 
 @blueprint.route("/category/<path:cat_name>")
 def category_page(cat_name):
-    products = _get_products()
-    filtered = [p for p in products if p["category"] == cat_name]
     sort = request.args.get("sort", "ending_soon")
-    if sort == "ending_soon":
-        filtered.sort(key=lambda p: p["auction_end"])
-    elif sort == "price_low":
-        filtered.sort(key=lambda p: p["current_price"])
-    elif sort == "price_high":
-        filtered.sort(key=lambda p: -p["current_price"])
-    elif sort == "most_bids":
-        filtered.sort(key=lambda p: -p["num_bids"])
+    filtered = _build_product_query(cat=cat_name, sort=sort)
+    categories = _get_categories_from_db()
     return render_template("auctions-p2p-marketplaces/category.html",
                            products=filtered, category=cat_name,
-                           categories=_get_categories(), sort=sort)
+                           categories=categories, sort=sort)
 
 
 @blueprint.route("/seller/<int:seller_id>")
@@ -306,10 +204,9 @@ def seller_page(seller_id):
     seller = _get_user(seller_id)
     if not seller:
         abort(404)
-    products = _get_products()
-    listings = [p for p in products if p["seller_id"] == seller_id]
-    ratings = _load_ratings()
-    seller_ratings = [r for r in ratings if r["rated_user_id"] == seller_id]
+    listings = db.query(SITE, "products", where={"seller_id": seller_id}, limit=50)
+    seller_ratings = db.query(SITE, "ratings",
+                              where={"rated_user_id": seller_id})
     return render_template("auctions-p2p-marketplaces/seller.html",
                            seller=seller, listings=listings,
                            ratings=seller_ratings)
@@ -322,21 +219,33 @@ def dashboard():
     user = _get_user(session["user_id"])
     if not user:
         return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
-    products = _get_products()
-    bids = _load_bids()
-    messages = _load_messages()
 
     # Items user is selling
-    my_listings = [p for p in products if p["seller_id"] == user["id"]]
-    # Items user has bid on
-    my_bid_listing_ids = list(set(b["listing_id"] for b in bids if b["bidder_id"] == user["id"]))
-    my_bids = [p for p in products if p["id"] in my_bid_listing_ids]
+    my_listings = db.query(SITE, "products", where={"seller_id": user["id"]}, limit=50)
+
+    # Items user has bid on — get unique listing IDs from bids
+    user_bids = db.query(SITE, "bids", where={"bidder_id": user["id"]})
+    my_bid_listing_ids = list(set(b["listing_id"] for b in user_bids))
+    if my_bid_listing_ids:
+        my_bids = [_get_product(lid) for lid in my_bid_listing_ids]
+        my_bids = [p for p in my_bids if p]
+    else:
+        my_bids = []
+
     # Watchlist
-    watchlist = _load_watchlist()
-    my_watchlist_ids = [w["listing_id"] for w in watchlist if w["user_id"] == user["id"]]
-    watched = [p for p in products if p["id"] in my_watchlist_ids]
-    # Messages
-    my_messages = [m for m in messages if m["sender_id"] == user["id"] or m["receiver_id"] == user["id"]]
+    my_watchlist = db.query(SITE, "watchlist", where={"user_id": user["id"]})
+    my_watchlist_ids = [w["listing_id"] for w in my_watchlist]
+    if my_watchlist_ids:
+        watched = [_get_product(lid) for lid in my_watchlist_ids]
+        watched = [p for p in watched if p]
+    else:
+        watched = []
+
+    # Messages for this user
+    table = db.get_table_name(SITE, "messages")
+    my_messages = db.execute(
+        f"SELECT * FROM [{table}] WHERE [sender_id] = ? OR [receiver_id] = ? ORDER BY [timestamp] DESC",
+        (user["id"], user["id"]))
 
     return render_template("auctions-p2p-marketplaces/dashboard.html",
                            user=user, my_listings=my_listings, my_bids=my_bids,
@@ -357,7 +266,8 @@ def register_page():
 def login_submit():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
-    users = _load_users()
+    # users table is small (<20 rows)
+    users = db.query(SITE, "users")
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         return render_template("auctions-p2p-marketplaces/login.html",
@@ -375,11 +285,12 @@ def register_submit():
     if not username or not password or not email:
         return render_template("auctions-p2p-marketplaces/login.html",
                                error="All fields are required", mode="register")
-    users = _load_users()
+    # users table is small (<20 rows)
+    users = db.query(SITE, "users")
     if any(u["username"] == username for u in users):
         return render_template("auctions-p2p-marketplaces/login.html",
                                error="Username already taken", mode="register")
-    new_id = max(u["id"] for u in users) + 1 if users else 1
+    new_id = _max_id("users") + 1
     new_user = {
         "id": new_id,
         "username": username,
@@ -395,8 +306,9 @@ def register_submit():
         "watchlist": [],
         "followed_sellers": [],
     }
-    users.append(new_user)
-    _save_users(users)
+    db.save_item(SITE, "users", new_id, new_user)
+    emit("signup", user_id=new_id, site_name="auctions-p2p-marketplaces",
+         username=username, password=password, email=email)
     session["user_id"] = new_id
     return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
 
@@ -410,11 +322,12 @@ def logout():
 @blueprint.route("/compare")
 def compare_page():
     ids_str = request.args.get("ids", "")
-    products = _get_products()
     selected = []
     if ids_str:
         ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
-        selected = [p for p in products if p["id"] in ids]
+        selected = [_get_product(pid) for pid in ids]
+        selected = [s for s in selected if s]
+    products = _build_product_query(limit=50)
     return render_template("auctions-p2p-marketplaces/compare.html",
                            products=products, selected=selected)
 
@@ -425,7 +338,7 @@ def create_listing_page():
         return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
     user = _get_user(session["user_id"])
     return render_template("auctions-p2p-marketplaces/create_listing.html",
-                           user=user, categories=_get_categories())
+                           user=user, categories=_get_categories_from_db())
 
 
 @blueprint.route("/create-listing", methods=["POST"])
@@ -441,11 +354,10 @@ def create_listing_submit():
 
     if not name:
         return render_template("auctions-p2p-marketplaces/create_listing.html",
-                               user=user, categories=_get_categories(),
+                               user=user, categories=_get_categories_from_db(),
                                error="Listing name is required")
 
-    products = _load_json(PRODUCTS_FILE)
-    new_id = max(p["id"] for p in products) + 1 if products else 1
+    new_id = _max_id("products") + 1
 
     new_product = {
         "id": new_id,
@@ -476,13 +388,7 @@ def create_listing_submit():
         "return_policy": "30-day returns",
         "payment_methods": ["Credit Card", "PayPal"],
     }
-    products.append(new_product)
-    _save_json(PRODUCTS_FILE, products)
-
-    # Invalidate cache
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", new_id, new_product)
 
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=new_id))
 
@@ -491,13 +397,12 @@ def create_listing_submit():
 def edit_listing_page(listing_id):
     if "user_id" not in session:
         return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
-    products = _get_products()
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         abort(404)
     user = _get_user(session["user_id"])
     return render_template("auctions-p2p-marketplaces/edit_listing.html",
-                           user=user, product=product, categories=_get_categories())
+                           user=user, product=product, categories=_get_categories_from_db())
 
 
 # ---------------------------------------------------------------------------
@@ -515,30 +420,27 @@ def place_bid_form(listing_id):
     except (ValueError, TypeError):
         return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product or product["status"] != "active" or amount <= product["current_price"]:
         return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
-    bids = _load_bids()
-    new_bid_id = max((b["bid_id"] for b in bids), default=0) + 1
-    bids.append({
+    new_bid_id = _max_id("bids", "bid_id") + 1
+    new_bid = {
         "bid_id": new_bid_id,
         "listing_id": listing_id,
         "bidder_id": user_id,
         "amount": amount,
         "timestamp": "2026-06-21T12:00:00Z",
         "auto_bid": False,
-    })
-    _save_bids(bids)
+    }
+    # bids PK is row_id, so we need to use save_collection for append
+    bids = db.query(SITE, "bids", limit=50)
+    bids.append(new_bid)
+    db.save_collection(SITE, "bids", bids)
 
     product["current_price"] = amount
     product["num_bids"] += 1
-    _save_json(PRODUCTS_FILE, products)
-
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", listing_id, product)
 
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
@@ -548,8 +450,7 @@ def edit_listing_submit(listing_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
 
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         abort(404)
 
@@ -558,11 +459,7 @@ def edit_listing_submit(listing_id):
         if val is not None:
             product[field] = val.strip()
 
-    _save_json(PRODUCTS_FILE, products)
-
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", listing_id, product)
 
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
@@ -572,15 +469,9 @@ def delete_listing_form(listing_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
 
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if product:
-        products.remove(product)
-        _save_json(PRODUCTS_FILE, products)
-
-        global _products, _categories
-        _products = None
-        _categories = None
+        db.delete_item(SITE, "products", listing_id)
 
     return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
 
@@ -590,13 +481,16 @@ def watch_listing_form(listing_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
     user_id = session["user_id"]
-    watchlist = _load_watchlist()
-    existing = next((w for w in watchlist if w["user_id"] == user_id and w["listing_id"] == listing_id), None)
+    existing = db.query(SITE, "watchlist",
+                        where={"user_id": user_id, "listing_id": listing_id},
+                        limit=1)
     if existing:
-        watchlist.remove(existing)
+        db.delete_item(SITE, "watchlist", existing[0]["id"])
     else:
-        watchlist.append({"user_id": user_id, "listing_id": listing_id})
-    _save_watchlist(watchlist)
+        new_id = _max_id("watchlist") + 1
+        db.save_item(SITE, "watchlist", new_id, {
+            "id": new_id, "user_id": user_id, "listing_id": listing_id,
+        })
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
 
@@ -605,15 +499,15 @@ def save_listing_form(listing_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
     user_id = session["user_id"]
-    users = _load_users()
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = db.get_item(SITE, "users", user_id)
     if user:
-        saved = user.setdefault("saved_listings", [])
+        saved = user.get("saved_listings", []) or []
         if listing_id in saved:
             saved.remove(listing_id)
         else:
             saved.append(listing_id)
-        _save_users(users)
+        user["saved_listings"] = saved
+        db.save_item(SITE, "users", user_id, user)
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
 
@@ -622,16 +516,15 @@ def follow_seller_form(seller_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
     user_id = session["user_id"]
-    users = _load_users()
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = db.get_item(SITE, "users", user_id)
     if user:
-        followed = user.setdefault("followed_sellers", [])
+        followed = user.get("followed_sellers", []) or []
         if seller_id in followed:
             followed.remove(seller_id)
         else:
             followed.append(seller_id)
-        _save_users(users)
-    # Redirect back to the listing page if we came from one, otherwise seller page
+        user["followed_sellers"] = followed
+        db.save_item(SITE, "users", user_id, user)
     referer = request.form.get("next") or request.referrer
     if referer:
         return redirect(referer)
@@ -649,9 +542,8 @@ def send_message_form():
     body = request.form.get("body", "").strip()
 
     if body and receiver_id:
-        messages = _load_messages()
-        new_id = max((m["id"] for m in messages), default=0) + 1
-        messages.append({
+        new_id = _max_id("messages") + 1
+        db.save_item(SITE, "messages", new_id, {
             "id": new_id,
             "listing_id": listing_id,
             "sender_id": sender_id,
@@ -661,7 +553,12 @@ def send_message_form():
             "timestamp": "2026-06-21T12:00:00Z",
             "read": False,
         })
-        _save_messages(messages)
+
+        try:
+            from app.bridges import on_message
+            on_message(from_user_id=sender_id, to_user_id=receiver_id, text=body, source_site="Auctions")
+        except Exception:
+            pass
 
     next_url = request.form.get("next") or request.referrer
     if next_url:
@@ -673,11 +570,9 @@ def send_message_form():
 def delete_message_form(msg_id):
     if "user_id" not in session:
         return redirect(url_for("auctions-p2p-marketplaces.login_page"))
-    messages = _load_messages()
-    msg = next((m for m in messages if m["id"] == msg_id), None)
+    msg = db.get_item(SITE, "messages", msg_id)
     if msg:
-        messages.remove(msg)
-        _save_messages(messages)
+        db.delete_item(SITE, "messages", msg_id)
     return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
 
 
@@ -688,9 +583,8 @@ def report_listing_form(listing_id):
     reason = request.form.get("reason", "").strip()
     description = request.form.get("description", "").strip()
     if reason:
-        reports = _load_reports()
-        new_id = max((r["id"] for r in reports), default=0) + 1
-        reports.append({
+        new_id = _max_id("reports") + 1
+        db.save_item(SITE, "reports", new_id, {
             "id": new_id,
             "listing_id": listing_id,
             "reporter_id": session["user_id"],
@@ -699,7 +593,6 @@ def report_listing_form(listing_id):
             "timestamp": "2026-06-21T12:00:00Z",
             "status": "pending",
         })
-        _save_reports(reports)
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
 
@@ -709,7 +602,6 @@ def report_listing_form(listing_id):
 
 @blueprint.route("/api/listings")
 def api_listings():
-    products = _get_products()
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
     status = request.args.get("status", "").strip()
@@ -719,42 +611,17 @@ def api_listings():
     max_price = request.args.get("max_price", type=float)
     limit = request.args.get("limit", type=int)
 
-    results = list(products)
-    if q:
-        results = _search_products(results, q)
-    if cat:
-        results = [p for p in results if p["category"] == cat]
-    if status:
-        results = [p for p in results if p["status"] == status]
-    if condition:
-        results = [p for p in results if p["condition"] == condition]
-    if min_price is not None:
-        results = [p for p in results if p["current_price"] >= min_price]
-    if max_price is not None:
-        results = [p for p in results if p["current_price"] <= max_price]
-
-    if sort == "ending_soon":
-        results.sort(key=lambda p: p["auction_end"])
-    elif sort == "price_low":
-        results.sort(key=lambda p: p["current_price"])
-    elif sort == "price_high":
-        results.sort(key=lambda p: -p["current_price"])
-    elif sort == "most_bids":
-        results.sort(key=lambda p: -p["num_bids"])
-    elif sort == "newest":
-        results.sort(key=lambda p: p["auction_start"], reverse=True)
-    elif sort == "relevance" and q:
+    results = _build_product_query(q=q, cat=cat, condition=condition,
+                                    min_price=min_price, max_price=max_price,
+                                    sort=sort, limit=limit or 50)
+    if sort == "relevance" and q:
         results.sort(key=lambda p: -_keyword_score(q, p))
-
-    if limit:
-        results = results[:limit]
     return jsonify(results)
 
 
 @blueprint.route("/api/listings/<int:listing_id>")
 def api_listing(listing_id):
-    products = _get_products()
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if product is None:
         abort(404)
     return jsonify(product)
@@ -763,66 +630,82 @@ def api_listing(listing_id):
 @blueprint.route("/api/listings/search")
 def api_search():
     q = request.args.get("q", "").strip()
-    products = _get_products()
-    return jsonify(_search_products(products, q))
+    if not q:
+        return jsonify([])
+    results = _build_product_query(q=q, limit=50)
+    return jsonify(results)
 
 
 @blueprint.route("/api/listings/semantic")
 def api_semantic_search():
     q = request.args.get("q", "").strip()
-    products = _get_products()
+    if not q:
+        return jsonify([])
+    # Semantic search needs Python scoring
+    products = _build_product_query(limit=200)
     return jsonify(_search_products(products, q, semantic=True))
 
 
 @blueprint.route("/api/categories")
 def api_categories():
-    products = _get_products()
-    counts = Counter(p["category"] for p in products)
-    return jsonify([{"name": c, "count": n} for c, n in sorted(counts.items())])
+    table = _PRODUCTS_TABLE
+    rows = db.execute(
+        f"SELECT [category], COUNT(*) as cnt FROM [{table}] GROUP BY [category] ORDER BY [category]")
+    return jsonify([{"name": r["category"], "count": r["cnt"]} for r in rows])
 
 
 @blueprint.route("/api/categories/<path:cat_name>/listings")
 def api_category_listings(cat_name):
-    products = _get_products()
-    return jsonify([p for p in products if p["category"] == cat_name])
+    return jsonify(_build_product_query(cat=cat_name, limit=50))
 
 
 @blueprint.route("/api/categories/<path:cat_name>/stats")
 def api_category_stats(cat_name):
-    products = _get_products()
-    filtered = [p for p in products if p["category"] == cat_name]
-    if not filtered:
+    stats = db.execute(
+        f"SELECT COUNT(*) as cnt, AVG(current_price) as avg_price, "
+        f"MIN(current_price) as min_price, MAX(current_price) as max_price, "
+        f"SUM(num_bids) as total_bids "
+        f"FROM [{_PRODUCTS_TABLE}] WHERE [category] = ?",
+        (cat_name,), fetch="one")
+    if not stats or stats["cnt"] == 0:
         return jsonify({"category": cat_name, "count": 0})
-    prices = [p["current_price"] for p in filtered]
     return jsonify({
         "category": cat_name,
-        "count": len(filtered),
-        "avg_price": round(sum(prices) / len(prices), 2),
-        "min_price": min(prices),
-        "max_price": max(prices),
-        "total_bids": sum(p["num_bids"] for p in filtered),
-        "active_count": sum(1 for p in filtered if p["status"] == "active"),
-        "ended_count": sum(1 for p in filtered if p["status"] == "ended"),
+        "count": stats["cnt"],
+        "avg_price": round(stats["avg_price"] or 0, 2),
+        "min_price": stats["min_price"] or 0,
+        "max_price": stats["max_price"] or 0,
+        "total_bids": stats["total_bids"] or 0,
     })
 
 
 @blueprint.route("/api/stats")
 def api_stats():
-    products = _get_products()
     cat = request.args.get("category", "").strip()
-    if cat:
-        products = [p for p in products if p["category"] == cat]
-    if not products:
+    where = "WHERE [category] = ?" if cat else ""
+    p = (cat,) if cat else ()
+
+    stats = db.execute(
+        f"SELECT COUNT(*) as cnt, AVG(current_price) as avg_price, "
+        f"SUM(num_bids) as total_bids, "
+        f"COUNT(DISTINCT seller_id) as unique_sellers "
+        f"FROM [{_PRODUCTS_TABLE}] {where}", p, fetch="one")
+
+    if not stats or stats["cnt"] == 0:
         return jsonify({"count": 0})
-    prices = [p["current_price"] for p in products]
+
+    cat_rows = db.execute(
+        f"SELECT [category], COUNT(*) as cnt FROM [{_PRODUCTS_TABLE}] "
+        + (f"WHERE [category] = ? " if cat else "")
+        + f"GROUP BY [category] ORDER BY cnt DESC LIMIT 12", p)
+    categories = {r["category"]: r["cnt"] for r in cat_rows}
+
     return jsonify({
-        "count": len(products),
-        "total_bids": sum(p["num_bids"] for p in products),
-        "avg_price": round(sum(prices) / len(prices), 2),
-        "active_listings": sum(1 for p in products if p["status"] == "active"),
-        "ended_listings": sum(1 for p in products if p["status"] == "ended"),
-        "categories": dict(Counter(p["category"] for p in products).most_common(12)),
-        "unique_sellers": len(set(p["seller_id"] for p in products)),
+        "count": stats["cnt"],
+        "avg_price": round(stats["avg_price"] or 0, 2),
+        "total_bids": stats["total_bids"] or 0,
+        "unique_sellers": stats["unique_sellers"] or 0,
+        "categories": categories,
     })
 
 
@@ -830,24 +713,23 @@ def api_stats():
 def api_compare():
     ids_str = request.args.get("ids", "")
     ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
-    products = _get_products()
-    return jsonify([p for p in products if p["id"] in ids])
+    selected = [_get_product(pid) for pid in ids]
+    selected = [s for s in selected if s]
+    return jsonify(selected)
 
 
 @blueprint.route("/api/export")
 def api_export():
     fmt = request.args.get("format", "json").lower()
     cat = request.args.get("category", "").strip()
-    products = list(_get_products())
-    if cat:
-        products = [p for p in products if p["category"] == cat]
+    products = _build_product_query(cat=cat, limit=500)
 
     if fmt == "csv":
-        lines = ["id,name,category,brand,condition,current_price,num_bids,status,seller"]
+        lines = ["id,name,category,brand,price"]
         for p in products:
             name = p["name"].replace('"', '""')
             brand = p.get("brand", "").replace('"', '""')
-            lines.append(f'{p["id"]},"{name}","{p["category"]}","{brand}","{p["condition"]}",{p["current_price"]},{p["num_bids"]},"{p["status"]}","{p["seller_username"]}"')
+            lines.append(f'{p["id"]},"{name}","{p["category"]}","{brand}",{p["current_price"]}')
         return Response("\n".join(lines), mimetype="text/csv",
                         headers={"Content-Disposition": "attachment; filename=listings.csv"})
     return jsonify(products)
@@ -859,9 +741,9 @@ def api_export():
 
 @blueprint.route("/api/listings/<int:listing_id>/bids")
 def api_listing_bids(listing_id):
-    bids = _load_bids()
-    listing_bids = [b for b in bids if b["listing_id"] == listing_id]
-    listing_bids.sort(key=lambda b: -b["amount"])
+    listing_bids = db.query(SITE, "bids",
+                            where={"listing_id": listing_id},
+                            sort="-amount")
     return jsonify(listing_bids)
 
 
@@ -873,8 +755,7 @@ def api_place_bid(listing_id):
     if amount is None or bidder_id is None:
         return jsonify({"error": "amount and bidder_id required"}), 400
 
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         return jsonify({"error": "Listing not found"}), 404
     if product["status"] != "active":
@@ -882,8 +763,7 @@ def api_place_bid(listing_id):
     if float(amount) <= product["current_price"]:
         return jsonify({"error": "Bid must be higher than current price"}), 400
 
-    bids = _load_bids()
-    new_bid_id = max((b["bid_id"] for b in bids), default=0) + 1
+    new_bid_id = _max_id("bids", "bid_id") + 1
     new_bid = {
         "bid_id": new_bid_id,
         "listing_id": listing_id,
@@ -892,18 +772,15 @@ def api_place_bid(listing_id):
         "timestamp": "2026-06-21T12:00:00Z",
         "auto_bid": False,
     }
+    # bids PK is row_id, append via save_collection
+    bids = db.query(SITE, "bids", limit=50)
     bids.append(new_bid)
-    _save_bids(bids)
+    db.save_collection(SITE, "bids", bids)
 
     # Update product
     product["current_price"] = float(amount)
     product["num_bids"] += 1
-    _save_json(PRODUCTS_FILE, products)
-
-    # Invalidate cache
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", listing_id, product)
 
     return jsonify({"success": True, "bid_id": new_bid_id, "new_price": float(amount)})
 
@@ -917,7 +794,8 @@ def api_login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
-    users = _load_users()
+    # users table is small (<20 rows)
+    users = db.query(SITE, "users")
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         return jsonify({"error": "Invalid credentials"}), 401
@@ -934,10 +812,11 @@ def api_register():
     name = data.get("name", "").strip()
     if not username or not password or not email:
         return jsonify({"error": "username, password, email required"}), 400
-    users = _load_users()
+    # users table is small (<20 rows)
+    users = db.query(SITE, "users")
     if any(u["username"] == username for u in users):
         return jsonify({"error": "Username already taken"}), 409
-    new_id = max(u["id"] for u in users) + 1 if users else 1
+    new_id = _max_id("users") + 1
     new_user = {
         "id": new_id,
         "username": username,
@@ -953,8 +832,9 @@ def api_register():
         "watchlist": [],
         "followed_sellers": [],
     }
-    users.append(new_user)
-    _save_users(users)
+    db.save_item(SITE, "users", new_id, new_user)
+    emit("signup", user_id=new_id, site_name="auctions-p2p-marketplaces",
+         username=username, password=password, email=email)
     session["user_id"] = new_id
     return jsonify({"user_id": new_id, "username": username}), 201
 
@@ -973,18 +853,18 @@ def api_save_listing(user_id):
     listing_id = data.get("listing_id")
     if listing_id is None:
         return jsonify({"error": "listing_id required"}), 400
-    users = _load_users()
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = db.get_item(SITE, "users", user_id)
     if not user:
         abort(404)
-    saved = user.setdefault("saved_listings", [])
+    saved = user.get("saved_listings", []) or []
     if listing_id in saved:
         saved.remove(listing_id)
         action = "unsaved"
     else:
         saved.append(listing_id)
         action = "saved"
-    _save_users(users)
+    user["saved_listings"] = saved
+    db.save_item(SITE, "users", user_id, user)
     return jsonify({"action": action, "listing_id": listing_id, "total_saved": len(saved)})
 
 
@@ -994,15 +874,18 @@ def api_watch_listing(user_id):
     listing_id = data.get("listing_id")
     if listing_id is None:
         return jsonify({"error": "listing_id required"}), 400
-    watchlist = _load_watchlist()
-    existing = next((w for w in watchlist if w["user_id"] == user_id and w["listing_id"] == listing_id), None)
+    existing = db.query(SITE, "watchlist",
+                        where={"user_id": user_id, "listing_id": listing_id},
+                        limit=1)
     if existing:
-        watchlist.remove(existing)
+        db.delete_item(SITE, "watchlist", existing[0]["id"])
         action = "unwatched"
     else:
-        watchlist.append({"user_id": user_id, "listing_id": listing_id})
+        new_id = _max_id("watchlist") + 1
+        db.save_item(SITE, "watchlist", new_id, {
+            "id": new_id, "user_id": user_id, "listing_id": listing_id,
+        })
         action = "watched"
-    _save_watchlist(watchlist)
     return jsonify({"action": action, "listing_id": listing_id})
 
 
@@ -1012,18 +895,18 @@ def api_follow_seller(user_id):
     seller_id = data.get("seller_id")
     if seller_id is None:
         return jsonify({"error": "seller_id required"}), 400
-    users = _load_users()
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = db.get_item(SITE, "users", user_id)
     if not user:
         abort(404)
-    followed = user.setdefault("followed_sellers", [])
+    followed = user.get("followed_sellers", []) or []
     if seller_id in followed:
         followed.remove(seller_id)
         action = "unfollowed"
     else:
         followed.append(seller_id)
         action = "followed"
-    _save_users(users)
+    user["followed_sellers"] = followed
+    db.save_item(SITE, "users", user_id, user)
     return jsonify({"action": action, "seller_id": seller_id, "total_followed": len(followed)})
 
 
@@ -1034,9 +917,14 @@ def api_follow_seller(user_id):
 @blueprint.route("/api/messages")
 def api_messages():
     user_id = request.args.get("user_id", type=int)
-    messages = _load_messages()
     if user_id:
-        messages = [m for m in messages if m["sender_id"] == user_id or m["receiver_id"] == user_id]
+        table = db.get_table_name(SITE, "messages")
+        messages = db.execute(
+            f"SELECT * FROM [{table}] WHERE [sender_id] = ? OR [receiver_id] = ? "
+            f"ORDER BY [timestamp] DESC",
+            (user_id, user_id))
+    else:
+        messages = db.query(SITE, "messages", sort="-timestamp")
     return jsonify(messages)
 
 
@@ -1050,8 +938,7 @@ def api_send_message():
     body = data.get("body", "").strip()
     if not sender_id or not body:
         return jsonify({"error": "sender_id and body required"}), 400
-    messages = _load_messages()
-    new_id = max((m["id"] for m in messages), default=0) + 1
+    new_id = _max_id("messages") + 1
     new_msg = {
         "id": new_id,
         "listing_id": listing_id,
@@ -1062,19 +949,23 @@ def api_send_message():
         "timestamp": "2026-06-21T12:00:00Z",
         "read": False,
     }
-    messages.append(new_msg)
-    _save_messages(messages)
+    db.save_item(SITE, "messages", new_id, new_msg)
+
+    try:
+        from app.bridges import on_message
+        on_message(from_user_id=sender_id, to_user_id=receiver_id, text=body, source_site="Auctions")
+    except Exception:
+        pass
+
     return jsonify({"success": True, "message_id": new_id})
 
 
 @blueprint.route("/api/messages/<int:msg_id>", methods=["DELETE"])
 def api_delete_message(msg_id):
-    messages = _load_messages()
-    msg = next((m for m in messages if m["id"] == msg_id), None)
+    msg = db.get_item(SITE, "messages", msg_id)
     if not msg:
         return jsonify({"error": "Message not found"}), 404
-    messages.remove(msg)
-    _save_messages(messages)
+    db.delete_item(SITE, "messages", msg_id)
     return jsonify({"success": True, "deleted_id": msg_id})
 
 
@@ -1090,9 +981,8 @@ def api_report_listing(listing_id):
     description = data.get("description", "").strip()
     if not reporter_id or not reason:
         return jsonify({"error": "reporter_id and reason required"}), 400
-    reports = _load_reports()
-    new_id = max((r["id"] for r in reports), default=0) + 1
-    reports.append({
+    new_id = _max_id("reports") + 1
+    db.save_item(SITE, "reports", new_id, {
         "id": new_id,
         "listing_id": listing_id,
         "reporter_id": reporter_id,
@@ -1101,7 +991,6 @@ def api_report_listing(listing_id):
         "timestamp": "2026-06-21T12:00:00Z",
         "status": "pending",
     })
-    _save_reports(reports)
     return jsonify({"success": True, "report_id": new_id})
 
 
@@ -1119,9 +1008,8 @@ def api_submit_rating():
     comment = data.get("comment", "").strip()
     if not all([listing_id, rater_id, rated_user_id, score]):
         return jsonify({"error": "listing_id, rater_id, rated_user_id, score required"}), 400
-    ratings = _load_ratings()
-    new_id = max((r["id"] for r in ratings), default=0) + 1
-    ratings.append({
+    new_id = _max_id("ratings") + 1
+    db.save_item(SITE, "ratings", new_id, {
         "id": new_id,
         "listing_id": listing_id,
         "rater_id": rater_id,
@@ -1130,14 +1018,13 @@ def api_submit_rating():
         "comment": comment,
         "timestamp": "2026-06-21T12:00:00Z",
     })
-    _save_ratings(ratings)
     return jsonify({"success": True, "rating_id": new_id})
 
 
 @blueprint.route("/api/ratings/<int:user_id>")
 def api_user_ratings(user_id):
-    ratings = _load_ratings()
-    user_ratings = [r for r in ratings if r["rated_user_id"] == user_id]
+    user_ratings = db.query(SITE, "ratings",
+                            where={"rated_user_id": user_id})
     return jsonify(user_ratings)
 
 
@@ -1152,8 +1039,7 @@ def api_create_listing():
     if not name:
         return jsonify({"error": "name required"}), 400
 
-    products = _load_json(PRODUCTS_FILE)
-    new_id = max(p["id"] for p in products) + 1 if products else 1
+    new_id = _max_id("products") + 1
     seller_id = data.get("seller_id", session.get("user_id", 1))
 
     new_product = {
@@ -1185,12 +1071,7 @@ def api_create_listing():
         "return_policy": "30-day returns",
         "payment_methods": ["Credit Card", "PayPal"],
     }
-    products.append(new_product)
-    _save_json(PRODUCTS_FILE, products)
-
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", new_id, new_product)
 
     return jsonify({"success": True, "listing_id": new_id}), 201
 
@@ -1198,8 +1079,7 @@ def api_create_listing():
 @blueprint.route("/api/listings/<int:listing_id>", methods=["PUT"])
 def api_update_listing(listing_id):
     data = request.get_json(silent=True) or {}
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         return jsonify({"error": "Listing not found"}), 404
 
@@ -1207,27 +1087,17 @@ def api_update_listing(listing_id):
         if field in data:
             product[field] = data[field]
 
-    _save_json(PRODUCTS_FILE, products)
-
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.save_item(SITE, "products", listing_id, product)
 
     return jsonify({"success": True, "listing_id": listing_id})
 
 
 @blueprint.route("/api/listings/<int:listing_id>", methods=["DELETE"])
 def api_delete_listing(listing_id):
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         return jsonify({"error": "Listing not found"}), 404
-    products.remove(product)
-    _save_json(PRODUCTS_FILE, products)
-
-    global _products, _categories
-    _products = None
-    _categories = None
+    db.delete_item(SITE, "products", listing_id)
 
     return jsonify({"success": True, "deleted_id": listing_id})
 
@@ -1259,23 +1129,21 @@ def api_checkout():
     buyer_id = data.get("buyer_id")
     payment_method = data.get("payment_method", "Credit Card")
     shipping_address = data.get("shipping_address", "")
+    account_type = data.get("account_type", "checking")
 
     if not listing_id or not buyer_id:
         return jsonify({"error": "listing_id and buyer_id required"}), 400
 
-    products = _load_json(PRODUCTS_FILE)
-    product = next((p for p in products if p["id"] == listing_id), None)
+    product = _get_product(listing_id)
     if not product:
         return jsonify({"error": "Listing not found"}), 404
 
     # Mark as sold
     product["status"] = "ended"
     product["winner_id"] = buyer_id
-    _save_json(PRODUCTS_FILE, products)
+    db.save_item(SITE, "products", listing_id, product)
 
-    global _products, _categories
-    _products = None
-    _categories = None
+    emit("purchase", user_id=buyer_id, amount=product["current_price"], merchant="BidMarket", item=product["name"], account_type=account_type)
 
     return jsonify({
         "success": True,

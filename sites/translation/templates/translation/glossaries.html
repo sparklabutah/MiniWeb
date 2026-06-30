@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Glossaries - LinguaBridge</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('translation.index') }}">&larr; Back to Translate</a>
+        <h1>Custom Glossaries</h1>
+
+        {% if logged_in %}
+        <h3>Create New Glossary</h3>
+        <form method="POST" action="{{ url_for('translation.create_glossary_form') }}">
+            <input type="text" name="name" placeholder="Glossary name" required>
+            <select name="source_lang">
+                {% for lang in languages %}
+                <option value="{{ lang.code }}">{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="target_lang">
+                {% for lang in languages %}
+                <option value="{{ lang.code }}" {% if loop.index == 2 %}selected{% endif %}>{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Create</button>
+        </form>
+        {% endif %}
+
+        <h3>Your Glossaries</h3>
+        <ul>
+            {% for g in glossaries %}
+            <li>
+                <a href="{{ url_for('translation.glossary_detail', glossary_id=g.id) }}">{{ g.name }}</a>
+                ({{ g.source_lang }} &rarr; {{ g.target_lang }}, {{ g.entries|length }} entries)
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

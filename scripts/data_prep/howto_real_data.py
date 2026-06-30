@@ -17,7 +17,7 @@ SEED = 42
 random.seed(SEED)
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "visual-howto-guides"
-DATA_DIR = SITE_DIR / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/visual-how-to-guides")
 
 # ── Category mapping: wikiHow top-level -> site categories ──────────────────
 

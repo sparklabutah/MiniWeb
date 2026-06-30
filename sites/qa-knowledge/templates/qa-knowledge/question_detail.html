@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ question.title }} - KnowledgeHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; } a:hover { color: #0a95ff; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .user-area { color: #fff; font-size: 13px; margin-left: auto; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+        .card { background: #fff; border: 1px solid #d6d9dc; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+        .q-header { margin-bottom: 16px; }
+        .q-header h1 { font-size: 22px; margin-bottom: 8px; }
+        .vote-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 50px; }
+        .vote-btn { background: none; border: 1px solid #babfc4; border-radius: 3px; cursor: pointer; padding: 4px 10px; font-size: 18px; }
+        .vote-btn:hover { background: #e3e6e8; }
+        .score { font-size: 20px; font-weight: 600; }
+        .post-body { display: flex; gap: 16px; }
+        .post-content { flex: 1; }
+        .post-content .body-text { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .meta { font-size: 12px; color: #6a737c; }
+        .actions { display: flex; gap: 8px; margin-top: 8px; font-size: 13px; }
+        .actions form { display: inline; }
+        .btn { display: inline-block; padding: 8px 16px; background: #0a95ff; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .btn:hover { background: #0074cc; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-outline { background: #fff; color: #0074cc; border: 1px solid #0074cc; }
+        .btn-outline:hover { background: #e1ecf4; }
+        .btn-danger { background: #d1383d; } .btn-danger:hover { background: #c02227; }
+        .answer-section { margin-top: 24px; }
+        .answer-section h2 { font-size: 18px; margin-bottom: 12px; }
+        .answer { border-bottom: 1px solid #e3e6e8; padding: 16px 0; }
+        .answer.accepted { border-left: 3px solid #2f6f44; padding-left: 12px; }
+        .accepted-badge { color: #2f6f44; font-weight: 600; font-size: 13px; }
+        .answer-form { margin-top: 24px; }
+        .answer-form textarea { width: 100%; min-height: 120px; padding: 8px; border: 1px solid #babfc4; border-radius: 3px; font-family: inherit; font-size: 14px; }
+        select { padding: 4px 8px; font-size: 13px; border: 1px solid #babfc4; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('qa-knowledge.index') }}" class="logo">KnowledgeHub</a>
+        <nav>
+            <a href="{{ url_for('qa-knowledge.index') }}">Questions</a>
+            <a href="{{ url_for('qa-knowledge.tags_page') }}">Tags</a>
+            <a href="{{ url_for('qa-knowledge.users_page') }}">Users</a>
+        </nav>
+        <div class="user-area">
+            {% if current_user %}
+                <a href="{{ url_for('qa-knowledge.dashboard') }}">{{ current_user.se_display_name }}</a> |
+                <a href="{{ url_for('qa-knowledge.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('qa-knowledge.login_page') }}">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="q-header">
+            <h1>{{ question.title }}</h1>
+            <div class="meta">
+                Asked {{ question.creation_date }}
+                {% if question.author %}
+                by <a href="{{ url_for('qa-knowledge.user_profile', uid=question.author.root_user_id) }}">{{ question.author.se_display_name }}</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="post-body">
+                <div class="vote-cell">
+                    <form method="post" action="{{ url_for('qa-knowledge.form_question_vote', qid=question.id) }}">
+                        <input type="hidden" name="direction" value="up">
+                        <button class="vote-btn" title="Upvote">&#9650;</button>
+                    </form>
+                    <div class="score">{{ question.score }}</div>
+                    <form method="post" action="{{ url_for('qa-knowledge.form_question_vote', qid=question.id) }}">
+                        <input type="hidden" name="direction" value="down">
+                        <button class="vote-btn" title="Downvote">&#9660;</button>
+                    </form>
+                </div>
+                <div class="post-content">
+                    <div class="body-text">{{ question.body_excerpt }}</div>
+                    <div class="tags">
+                        {% for t in question.tags %}
+                        <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="actions">
+                        <!-- share_by_dropdown -->
+                        <form method="post" action="{{ url_for('qa-knowledge.form_share_question', qid=question.id) }}">
+                            <select name="platform">
+                                <option value="link">Copy Link</option>
+                                <option value="twitter">Twitter</option>
+                                <option value="facebook">Facebook</option>
+                                <option value="linkedin">LinkedIn</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline">Share</button>
+                        </form>
+                        <a href="{{ url_for('qa-knowledge.edit_question_page', qid=question.id) }}" class="btn btn-sm btn-outline">Edit</a>
+                        <!-- save_by_toggle -->
+                        {% if current_user %}
+                        <form method="post" action="{{ url_for('qa-knowledge.form_save_question', qid=question.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline">
+                                {% if question.id in saved_ids %}Unsave{% else %}Save{% endif %}
+                            </button>
+                        </form>
+                        {% endif %}
+                        <a href="{{ url_for('qa-knowledge.report_question_page', qid=question.id) }}" class="btn btn-sm btn-outline" style="color:#d1383d; border-color:#d1383d;">Report</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="answer-section">
+            <h2>{{ question.answer_count }} Answer{{ 's' if question.answer_count != 1 }}</h2>
+            {% for a in question.answers %}
+            <div class="card answer {% if a.is_accepted %}accepted{% endif %}">
+                <div class="post-body">
+                    <div class="vote-cell">
+                        <form method="post" action="{{ url_for('qa-knowledge.form_answer_vote', aid=a.id) }}">
+                            <input type="hidden" name="direction" value="up">
+                            <button class="vote-btn" title="Upvote">&#9650;</button>
+                        </form>
+                        <div class="score">{{ a.score }}</div>
+                        <form method="post" action="{{ url_for('qa-knowledge.form_answer_vote', aid=a.id) }}">
+                            <input type="hidden" name="direction" value="down">
+                            <button class="vote-btn" title="Downvote">&#9660;</button>
+                        </form>
+                        {% if a.is_accepted %}
+                        <div class="accepted-badge">&#10004; Accepted</div>
+                        {% endif %}
+                    </div>
+                    <div class="post-content">
+                        <div class="body-text">{{ a.body_excerpt }}</div>
+                        <div class="meta">
+                            answered {{ a.creation_date }}
+                            {% if a.author %}
+                            by <a href="{{ url_for('qa-knowledge.user_profile', uid=a.author.root_user_id) }}">{{ a.author.se_display_name }}</a>
+                            {% endif %}
+                        </div>
+                        <div class="actions" style="margin-top:6px;">
+                            <form method="post" action="{{ url_for('qa-knowledge.report_answer_submit', aid=a.id) }}">
+                                <input type="hidden" name="reason" value="not-an-answer">
+                                <button type="submit" class="btn btn-sm btn-outline" style="color:#d1383d; border-color:#d1383d; font-size:11px;">Report</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- post_from_free_text: answer form -->
+        <div class="answer-form card">
+            <h3>Your Answer</h3>
+            <form method="post" action="{{ url_for('qa-knowledge.form_answer_submit', qid=question.id) }}">
+                <textarea name="body" placeholder="Write your answer here..." required></textarea>
+                <button type="submit" class="btn" style="margin-top:8px;">Post Your Answer</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

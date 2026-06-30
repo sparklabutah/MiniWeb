@@ -31,21 +31,21 @@ def verify_macro_count_by_section(server_url):
     r = requests.get(f"{_base(server_url)}/api/sections")
     sections = r.json()
     for s in sections:
-        if s["name"] == "API Reference":
-            return {"pass": s["count"] > 0, "detail": f"API Reference has {s['count']} pages"}
-    return {"pass": False, "detail": "API Reference section not found"}
+        if s["name"] == "Workflows":
+            return {"pass": s["count"] > 0, "detail": f"Workflows has {s['count']} pages"}
+    return {"pass": False, "detail": "Workflows section not found"}
 
 
 def verify_macro_count_by_api(server_url):
     r = requests.get(f"{_base(server_url)}/api/docs")
     docs = r.json()
-    return {"pass": len(docs) == 25, "detail": f"Total docs: {len(docs)}"}
+    return {"pass": len(docs) == 18, "detail": f"Total docs: {len(docs)}"}
 
 
 def verify_macro_search_by_query(server_url):
-    r = requests.get(f"{_base(server_url)}/api/docs/search?q=instances")
+    r = requests.get(f"{_base(server_url)}/api/docs/search?q=workflow")
     results = r.json()
-    return {"pass": len(results) > 0, "detail": f"Search 'instances': {len(results)} results"}
+    return {"pass": len(results) > 0, "detail": f"Search 'workflow': {len(results)} results"}
 
 
 def verify_macro_list_by_api(server_url):
@@ -65,11 +65,11 @@ def verify_macro_filter_by_method(server_url):
 
 
 def verify_macro_filter_by_tag(server_url):
-    r = requests.get(f"{_base(server_url)}/api/docs?tag=instances")
+    r = requests.get(f"{_base(server_url)}/api/docs?tag=workflows")
     docs = r.json()
-    ok = all("instances" in d.get("tags", []) for d in docs)
+    ok = all("workflows" in d.get("tags", []) for d in docs)
     return {"pass": ok and len(docs) > 0,
-            "detail": f"Tag 'instances': {len(docs)} docs, all_tagged={ok}"}
+            "detail": f"Tag 'workflows': {len(docs)} docs, all_tagged={ok}"}
 
 
 def verify_macro_extract_from_changelog(server_url):
@@ -96,27 +96,27 @@ def verify_macro_extract_by_api(server_url):
 
 
 def verify_macro_extract_from_results(server_url):
-    r = requests.get(f"{_base(server_url)}/api/docs/search?q=monitoring")
+    r = requests.get(f"{_base(server_url)}/api/docs/search?q=task")
     results = r.json()
     titles = [d["title"] for d in results]
-    return {"pass": len(titles) > 0, "detail": f"Search 'monitoring' returned: {titles}"}
+    return {"pass": len(titles) > 0, "detail": f"Search 'task' returned: {titles}"}
 
 
 def verify_macro_extract_from_dashboard(server_url):
     base = _base(server_url)
     r = requests.get(f"{base}/api/users/2")
     user = r.json()
-    return {"pass": "api_key" in user and user["api_key"].startswith("cpk_"),
+    return {"pass": "api_key" in user and user["api_key"].startswith("mf_"),
             "detail": f"User 2 API key: {user.get('api_key', 'N/A')}"}
 
 
 def verify_macro_authenticate_by_form(server_url):
     base = _base(server_url)
     r = requests.post(f"{base}/api/login",
-                      json={"username": "qa_elena", "password": "elena321"})
+                      json={"username": "dev_natalie", "password": "mflow_docs5"})
     data = r.json()
     ok = data.get("user_id") == 5
-    return {"pass": ok, "detail": f"Authenticate qa_elena: user_id={data.get('user_id')}"}
+    return {"pass": ok, "detail": f"Authenticate dev_natalie: user_id={data.get('user_id')}"}
 
 
 def verify_macro_bookmark_by_toggle(server_url):

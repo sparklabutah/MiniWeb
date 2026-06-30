@@ -11,8 +11,7 @@ import pathlib
 import shutil
 from datetime import datetime, timedelta
 
-SITE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "blog"
-DATA_DIR = SITE_DIR / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/blogs")
 PRISTINE_DIR = DATA_DIR / ".pristine"
 
 random.seed(42)

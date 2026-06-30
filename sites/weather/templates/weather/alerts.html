@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Alerts - Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+        .content { max-width: 1060px; margin: 1.5rem auto; padding: 0 2rem; }
+        .section-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.2rem; color: #1565c0; }
+
+        .alert-card { background: #fff; border-radius: .5rem; margin-bottom: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+        .alert-card .alert-header { padding: 1rem 1.2rem; display: flex; align-items: center; gap: .8rem; }
+        .alert-card .alert-header .alert-icon { font-size: 1.3rem; }
+        .alert-card .alert-header .alert-title { font-weight: 600; font-size: 1rem; }
+        .alert-card .alert-header .alert-severity { font-size: .75rem; padding: .2rem .6rem; border-radius: 1rem; font-weight: 600; margin-left: auto; }
+        .severity-severe { background: #fce4ec; color: #c62828; }
+        .severity-moderate { background: #fff3e0; color: #e65100; }
+        .severity-minor { background: #e8f5e9; color: #2e7d32; }
+        .alert-severe .alert-header { border-left: 4px solid #c62828; }
+        .alert-moderate .alert-header { border-left: 4px solid #e65100; }
+        .alert-minor .alert-header { border-left: 4px solid #2e7d32; }
+        .alert-card .alert-body { padding: 0 1.2rem 1.2rem; }
+        .alert-card .alert-body p { font-size: .9rem; color: #475569; line-height: 1.6; margin-bottom: .8rem; }
+        .alert-meta { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .8rem; color: #64748b; }
+        .alert-meta .meta-item { display: flex; align-items: center; gap: .3rem; }
+        .alert-areas { margin-top: .6rem; }
+        .alert-areas span { display: inline-block; background: #e3f2fd; color: #1565c0; font-size: .75rem; padding: .2rem .5rem; border-radius: .3rem; margin-right: .3rem; margin-bottom: .3rem; }
+
+        .no-alerts { background: #e8f5e9; border-radius: .5rem; padding: 2rem; text-align: center; color: #2e7d32; }
+        .no-alerts .no-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            {% if user %}
+                <a href="{{ url_for('weather.locations_page') }}">My Locations</a>
+                <a href="{{ url_for('weather.logout') }}">Sign Out ({{ user.username }})</a>
+            {% else %}
+                <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}" class="active">Alerts</a>
+        <a href="{{ url_for('weather.locations_page') }}">Locations</a>
+    </nav>
+
+    <div class="content">
+        <h2 class="section-title">Active Weather Alerts &mdash; Lakeport, WA</h2>
+
+        {% if alerts %}
+            {% for alert in alerts %}
+            <div class="alert-card alert-{{ alert.severity|lower }}">
+                <div class="alert-header">
+                    <span class="alert-icon">&#9888;&#65039;</span>
+                    <span class="alert-title">{{ alert.title }}</span>
+                    <span class="alert-severity severity-{{ alert.severity|lower }}">{{ alert.severity }}</span>
+                </div>
+                <div class="alert-body">
+                    <p>{{ alert.description }}</p>
+                    <div class="alert-meta">
+                        <div class="meta-item">
+                            <strong>Type:</strong> {{ alert.type }}
+                        </div>
+                        <div class="meta-item">
+                            <strong>Start:</strong> {{ alert.start }}
+                        </div>
+                        <div class="meta-item">
+                            <strong>End:</strong> {{ alert.end }}
+                        </div>
+                    </div>
+                    <div class="alert-areas">
+                        <strong style="font-size: .8rem; color: #64748b;">Affected areas:</strong><br>
+                        {% for area in alert.areas %}
+                        <span>{{ area }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-alerts">
+                <div class="no-icon">&#9989;</div>
+                <p><strong>No active weather alerts.</strong></p>
+                <p>There are currently no weather advisories, watches, or warnings for the Lakeport area.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+    </div>
+</body>
+</html>

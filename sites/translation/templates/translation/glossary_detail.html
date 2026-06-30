@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ glossary.name }} - LinguaBridge</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('translation.glossaries_page') }}">&larr; Back to Glossaries</a>
+        <h1>{{ glossary.name }}</h1>
+        <p>{{ glossary.source_lang }} &rarr; {{ glossary.target_lang }}</p>
+
+        {% if logged_in %}
+        <h3>Add Entry</h3>
+        <form method="POST" action="{{ url_for('translation.add_glossary_entry_form', glossary_id=glossary.id) }}">
+            <input type="text" name="source" placeholder="Source word" required>
+            <input type="text" name="target" placeholder="Target word" required>
+            <button type="submit">Add</button>
+        </form>
+        {% endif %}
+
+        <h3>Entries ({{ glossary.entries|length }})</h3>
+        <table border="1" cellpadding="5">
+            <tr><th>Source</th><th>Target</th></tr>
+            {% for e in glossary.entries %}
+            <tr><td>{{ e.source }}</td><td>{{ e.target }}</td></tr>
+            {% endfor %}
+        </table>
+
+        {% if logged_in %}
+        <form method="POST" action="{{ url_for('translation.delete_glossary_form', glossary_id=glossary.id) }}">
+            <button type="submit" style="color:red">Delete Glossary</button>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>

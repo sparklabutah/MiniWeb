@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
-SITE_DATA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "qa-knowledge" / "data"
+SITE_DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/qa-knowledge")
 PRISTINE_DIR = SITE_DATA_DIR / ".pristine"
 
 BASE_URL = "https://api.stackexchange.com/2.3"

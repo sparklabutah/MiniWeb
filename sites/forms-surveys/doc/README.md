@@ -14,9 +14,27 @@ navigate_by_semantic, navigate_by_route, extract_by_query, extract_by_semantic, 
 
 ## Site Description
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+FormFlow is a Google Forms / SurveyMonkey-inspired form builder and survey platform. Users create forms with various field types, distribute them, collect responses, view analytics, and export data.
+
+### Data Files
+- `users.json` -- 5 users at Meridian Systems company
+- `forms.json` -- 12 forms/surveys (retrospectives, feedback, prioritization, satisfaction)
+- `responses.json` -- 45 responses across the forms
+- `templates_forms.json` -- 6 reusable form templates (CSAT, NPS, etc.)
+
+### Key Features
+- Form builder with 8 field types: text, textarea, rating, radio, checkbox, dropdown, slider, ranking
+- Response collection with required-field validation
+- Results analytics with per-field statistics (averages, distributions, rankings)
+- CSV and JSON export of responses
+- File attachments on forms
+- Form sharing via email or link
+- Form templates gallery for quick creation
+- Search/filter forms by status and keyword
+- Semantic search across form titles, descriptions, and field labels
+
+### Real-World Model
+Modeled after Google Forms with additional features from SurveyMonkey (templates, analytics, sharing).
+
+### No Temporal Dynamics
+Forms have status (draft/active/closed) that changes via user actions. No continuous time simulation needed.

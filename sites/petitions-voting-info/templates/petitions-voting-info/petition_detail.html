@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ petition.title }} - Lakeport Civic Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b4332, #2d6a4f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.4rem; font-weight: 700; }
+        .header h1 span { color: #95d5b2; }
+        .header-nav a { color: #b7e4c7; text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-login { background: #40916c; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #40916c; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .petition-header { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .petition-header h2 { font-size: 1.5rem; color: #1b4332; margin-bottom: .6rem; }
+        .petition-header .meta { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 600; }
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-won { background: #fef3c7; color: #92400e; }
+        .badge-closed { background: #e5e7eb; color: #374151; }
+        .petition-header .description { font-size: .95rem; color: #334155; line-height: 1.7; margin-bottom: 1.2rem; }
+        .progress-section { margin-bottom: 1.2rem; }
+        .progress-label { font-size: .85rem; color: #475569; margin-bottom: .3rem; display: flex; justify-content: space-between; }
+        .progress-bar { background: #e5e7eb; border-radius: .4rem; height: 12px; overflow: hidden; }
+        .progress-bar-fill { background: linear-gradient(90deg, #2d6a4f, #52b788); height: 100%; border-radius: .4rem; transition: width .5s; }
+        .tag { display: inline-block; background: #f0fdf4; color: #166534; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; margin-right: .3rem; margin-bottom: .3rem; }
+        .sign-section { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .sign-section h3 { color: #1b4332; margin-bottom: .8rem; }
+        .sign-section textarea { width: 100%; padding: .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-family: inherit; font-size: .9rem; resize: vertical; min-height: 80px; }
+        .sign-section .btn-sign { background: #40916c; color: #fff; border: none; padding: .7rem 2rem; border-radius: .4rem; cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: .6rem; }
+        .sign-section .btn-sign:hover { background: #2d6a4f; }
+        .sign-section .btn-sign:disabled { background: #94a3b8; cursor: not-allowed; }
+        .signed-msg { color: #065f46; font-weight: 600; }
+        .signatures-section { background: #fff; border-radius: .5rem; padding: 1.5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .signatures-section h3 { color: #1b4332; margin-bottom: 1rem; font-size: 1.1rem; }
+        .sig-item { border-bottom: 1px solid #f1f5f9; padding: .8rem 0; }
+        .sig-item:last-child { border-bottom: none; }
+        .sig-item .sig-name { font-weight: 600; color: #1b4332; }
+        .sig-item .sig-date { font-size: .8rem; color: #94a3b8; }
+        .sig-item .sig-comment { font-size: .9rem; color: #475569; margin-top: .2rem; font-style: italic; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('petitions-voting-info.index') }}" style="color:#fff;text-decoration:none;">Lakeport <span>Civic Hub</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a>
+            <a href="{{ url_for('petitions-voting-info.elections_list') }}">Elections</a>
+            <a href="{{ url_for('petitions-voting-info.voter_info_page') }}">Voter Info</a>
+            {% if logged_in %}
+                <a href="{{ url_for('petitions-voting-info.logout') }}" class="btn-login">Logout ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('petitions-voting-info.login_page') }}" class="btn-login">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('petitions-voting-info.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a> &rsaquo;
+            {{ petition.title }}
+        </div>
+
+        <div class="petition-header">
+            <h2>{{ petition.title }}</h2>
+            <div class="meta">
+                <span class="badge badge-{{ petition.status }}">{{ petition.status }}</span>
+                {{ petition.category | replace('_', ' ') | title }} &middot;
+                Started by {{ petition.creator_name }} &middot;
+                Created {{ petition.created_at[:10] }}
+                {% if petition.deadline %} &middot; Deadline: {{ petition.deadline[:10] }}{% endif %}
+            </div>
+            <div class="description">{{ petition.description }}</div>
+
+            <div class="progress-section">
+                <div class="progress-label">
+                    <span>{{ petition.signatures_current }} of {{ petition.signatures_required }} signatures</span>
+                    <span>{{ progress_pct }}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" style="width: {{ progress_pct }}%"></div>
+                </div>
+            </div>
+
+            {% if petition.tags %}
+            <div>
+                {% for tag in petition.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+            </div>
+            {% endif %}
+
+            {% if logged_in %}
+            <div style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;">
+                <button id="btn-save" onclick="toggleSave()" style="padding:.45rem 1rem;border-radius:.3rem;border:1px solid #d1d5db;background:{% if is_saved %}#d1fae5{% else %}#fff{% endif %};cursor:pointer;font-size:.85rem;font-weight:600;color:#1b4332;">
+                    {% if is_saved %}Saved{% else %}Save{% endif %}
+                </button>
+                <button id="btn-subscribe" onclick="toggleSubscribe()" style="padding:.45rem 1rem;border-radius:.3rem;border:1px solid #d1d5db;background:{% if is_subscribed %}#dbeafe{% else %}#fff{% endif %};cursor:pointer;font-size:.85rem;font-weight:600;color:#1b4332;">
+                    {% if is_subscribed %}Subscribed{% else %}Subscribe{% endif %}
+                </button>
+                <div style="position:relative;display:inline-block;">
+                    <select id="share-method" style="padding:.45rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;background:#fff;">
+                        <option value="">Share...</option>
+                        <option value="email">Email</option>
+                        <option value="twitter">Twitter</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="link">Copy Link</option>
+                    </select>
+                </div>
+                <span id="action-result" style="font-size:.85rem;"></span>
+            </div>
+            <script>
+            function toggleSave() {
+                fetch('{{ url_for("petitions-voting-info.api_petition_save", petition_id=petition.id) }}', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+                }).then(function(r){return r.json();}).then(function(d){
+                    var btn = document.getElementById('btn-save');
+                    btn.textContent = d.action === 'saved' ? 'Saved' : 'Save';
+                    btn.style.background = d.action === 'saved' ? '#d1fae5' : '#fff';
+                    document.getElementById('action-result').textContent = d.action === 'saved' ? 'Petition saved!' : 'Petition removed from saved.';
+                    document.getElementById('action-result').style.color = '#065f46';
+                });
+            }
+            function toggleSubscribe() {
+                fetch('{{ url_for("petitions-voting-info.api_petition_subscribe", petition_id=petition.id) }}', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+                }).then(function(r){return r.json();}).then(function(d){
+                    var btn = document.getElementById('btn-subscribe');
+                    btn.textContent = d.action === 'subscribed' ? 'Subscribed' : 'Subscribe';
+                    btn.style.background = d.action === 'subscribed' ? '#dbeafe' : '#fff';
+                    document.getElementById('action-result').textContent = d.action === 'subscribed' ? 'Subscribed to updates!' : 'Unsubscribed.';
+                    document.getElementById('action-result').style.color = '#065f46';
+                });
+            }
+            document.getElementById('share-method').addEventListener('change', function() {
+                var method = this.value;
+                if (!method) return;
+                fetch('{{ url_for("petitions-voting-info.api_petition_share", petition_id=petition.id) }}', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({method: method})
+                }).then(function(r){return r.json();}).then(function(d){
+                    var el = document.getElementById('action-result');
+                    if (d.share_url) {
+                        el.innerHTML = 'Shared via ' + d.method + '!';
+                        el.style.color = '#065f46';
+                        if (d.method === 'link') { navigator.clipboard && navigator.clipboard.writeText(window.location.href); }
+                    }
+                });
+                this.value = '';
+            });
+            </script>
+            {% endif %}
+        </div>
+
+        {% if petition.status == 'active' %}
+        <div class="sign-section">
+            {% if not logged_in %}
+                <h3>Sign This Petition</h3>
+                <p>You must <a href="{{ url_for('petitions-voting-info.login_page') }}">sign in</a> to add your signature.</p>
+            {% elif already_signed %}
+                <p class="signed-msg">You have already signed this petition. Thank you for your support!</p>
+            {% else %}
+                <h3>Add Your Signature</h3>
+                <form id="sign-form">
+                    <div style="margin-bottom:.8rem;">
+                        <label for="signature" style="font-size:.85rem;color:#475569;font-weight:600;">Type your full legal name to sign:</label>
+                        <input type="text" id="signature" name="signature" required placeholder="e.g., {{ user.display_name }}" style="width:100%;padding:.5rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.95rem;font-family:'Brush Script MT',cursive,sans-serif;margin-top:.3rem;">
+                    </div>
+                    <label for="comment" style="font-size:.85rem;color:#475569;">Leave a comment (optional):</label>
+                    <textarea id="comment" name="comment" placeholder="Why do you support this petition?"></textarea>
+                    <button type="submit" class="btn-sign" id="btn-sign">Sign Petition</button>
+                    <span id="sign-result" style="margin-left:1rem;font-size:.9rem;"></span>
+                </form>
+                <script>
+                document.getElementById('sign-form').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var sig = document.getElementById('signature').value.trim();
+                    if (!sig) { document.getElementById('sign-result').textContent = 'Please type your name to sign.'; return; }
+                    var btn = document.getElementById('btn-sign');
+                    btn.disabled = true;
+                    btn.textContent = 'Signing...';
+                    fetch('{{ url_for("petitions-voting-info.api_petition_sign", petition_id=petition.id) }}', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({signature: sig, comment: document.getElementById('comment').value})
+                    }).then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+                    .then(function(res) {
+                        var el = document.getElementById('sign-result');
+                        if (res.ok) {
+                            el.style.color = '#065f46';
+                            el.textContent = 'Signed successfully! Thank you.';
+                            btn.textContent = 'Signed';
+                            setTimeout(function(){ location.reload(); }, 1200);
+                        } else {
+                            el.style.color = '#b91c1c';
+                            el.textContent = res.data.error || 'Error signing petition.';
+                            btn.disabled = false;
+                            btn.textContent = 'Sign Petition';
+                        }
+                    });
+                });
+                </script>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="signatures-section">
+            <h3>Signatures ({{ signatures|length }})</h3>
+            {% for sig in signatures %}
+            <div class="sig-item">
+                <span class="sig-name">{{ sig.user_name }}</span>
+                <span class="sig-date">&middot; {{ sig.signed_at[:10] }}</span>
+                {% if sig.comment %}
+                <div class="sig-comment">"{{ sig.comment }}"</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% if not signatures %}
+            <p style="color:#94a3b8;">No signatures yet. Be the first to sign!</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">Lakeport Civic Hub</div>
+</body>
+</html>

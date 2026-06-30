@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeridianCloud - Recent</title>
+    <style>
+        /* -- Reset & Base -- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Google Sans', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8f9fa; color: #202124; font-size: 14px; line-height: 1.4;
+        }
+        a { text-decoration: none; color: inherit; }
+        button { font-family: inherit; cursor: pointer; }
+
+        /* -- Header -- */
+        .header {
+            background: #fff; height: 64px; display: flex; align-items: center;
+            padding: 0 16px 0 8px; border-bottom: 1px solid #e0e0e0;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+        }
+        .header-logo {
+            display: flex; align-items: center; gap: 4px;
+            min-width: 238px; padding: 0 8px;
+        }
+        .header-logo svg { width: 40px; height: 40px; }
+        .header-logo .logo-text {
+            font-size: 22px; font-weight: 400; color: #5f6368;
+            letter-spacing: -0.5px;
+        }
+        .header-logo .logo-text b { color: #202124; font-weight: 500; }
+
+        .search-wrapper { flex: 1; max-width: 720px; margin: 0 auto; }
+        .search-bar {
+            display: flex; align-items: center;
+            background: #f1f3f4; border-radius: 28px;
+            padding: 0 16px; height: 48px;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .search-bar:focus-within {
+            background: #fff; box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+        }
+        .search-bar .search-icon {
+            color: #5f6368; margin-right: 12px; display: flex; flex-shrink: 0;
+        }
+        .search-bar input {
+            border: none; background: none; outline: none;
+            font-size: 16px; width: 100%; color: #202124;
+        }
+        .search-bar input::placeholder { color: #5f6368; }
+
+        .header-actions {
+            display: flex; align-items: center; gap: 8px; margin-left: 16px;
+        }
+        .icon-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: none; background: none; display: flex;
+            align-items: center; justify-content: center;
+            color: #5f6368; transition: background 0.15s;
+        }
+        .icon-btn:hover { background: #e8eaed; }
+        .avatar-circle {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 14px; font-weight: 500; cursor: pointer;
+        }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .user-name { font-size: 13px; color: #5f6368; }
+
+        /* -- Sidebar -- */
+        .sidebar {
+            position: fixed; left: 0; top: 64px; bottom: 0;
+            width: 256px; background: #fff; overflow-y: auto;
+            padding: 8px 0 16px; z-index: 100; border-right: none;
+        }
+        .new-btn-wrapper { padding: 8px 12px 12px; }
+        .new-btn {
+            display: inline-flex; align-items: center; gap: 10px;
+            background: #fff; color: #3c4043;
+            border: none; border-radius: 24px;
+            padding: 0 24px 0 12px; height: 56px;
+            font-size: 14px; font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+            cursor: pointer; transition: box-shadow 0.2s, background 0.15s;
+        }
+        .new-btn:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.16), 0 1px 3px rgba(0,0,0,0.1);
+            background: #f6fafe;
+        }
+        .new-btn .plus-icon {
+            width: 36px; height: 36px; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .new-btn .plus-icon svg { width: 24px; height: 24px; }
+
+        .nav-section { padding: 0 12px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 0 24px; height: 32px;
+            border-radius: 0 16px 16px 0;
+            font-size: 14px; color: #5f6368;
+            transition: background 0.15s; cursor: pointer;
+            margin-right: 12px;
+        }
+        .nav-item:hover { background: #e8eaed; }
+        .nav-item.active {
+            background: #c2e7ff; color: #001d35; font-weight: 500;
+        }
+        .nav-item .nav-icon {
+            width: 20px; height: 20px; display: flex;
+            align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .nav-item .nav-icon svg { width: 20px; height: 20px; fill: currentColor; }
+
+        .nav-divider { height: 1px; background: #e0e0e0; margin: 8px 12px; }
+
+        .storage-meter { padding: 16px 24px; }
+        .storage-bar-bg {
+            height: 4px; background: #e0e0e0; border-radius: 2px;
+            overflow: hidden; margin-bottom: 8px;
+        }
+        .storage-bar-fill {
+            height: 100%; background: #1a73e8; border-radius: 2px;
+            transition: width 0.3s;
+        }
+        .storage-text { font-size: 12px; color: #5f6368; }
+        .storage-link {
+            display: inline-block; margin-top: 4px;
+            font-size: 13px; color: #1a73e8; font-weight: 500;
+        }
+        .storage-link:hover { text-decoration: underline; }
+
+        /* -- Main content area -- */
+        .main {
+            margin-left: 256px; margin-top: 64px;
+            padding: 16px 24px 32px;
+            min-height: calc(100vh - 64px);
+        }
+
+        .toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+        }
+        .breadcrumb {
+            display: flex; align-items: center; gap: 4px; font-size: 14px;
+        }
+        .breadcrumb .bc-current { color: #202124; font-weight: 500; }
+
+        .toolbar-actions {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .view-toggle {
+            display: inline-flex; border: 1px solid #dadce0; border-radius: 8px;
+            overflow: hidden;
+        }
+        .view-toggle button {
+            background: #fff; border: none; padding: 6px 12px;
+            color: #5f6368; display: flex; align-items: center;
+            justify-content: center; cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .view-toggle button:first-child { border-right: 1px solid #dadce0; }
+        .view-toggle button.active { background: #e8f0fe; color: #1a73e8; }
+        .view-toggle button:hover:not(.active) { background: #f1f3f4; }
+
+        .section-label {
+            font-size: 14px; font-weight: 500; color: #202124;
+            margin: 16px 0 8px; padding: 0 4px;
+        }
+
+        /* -- File Grid View -- */
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .file-card {
+            background: #fff; border: 1px solid #dadce0;
+            border-radius: 12px; overflow: hidden;
+            transition: box-shadow 0.15s, border-color 0.15s;
+            cursor: pointer; position: relative;
+        }
+        .file-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #bdc1c6;
+        }
+        .file-card-thumb {
+            height: 160px; display: flex; align-items: center;
+            justify-content: center; border-bottom: 1px solid #f1f3f4;
+            position: relative;
+        }
+        .file-card-thumb .type-glyph { font-size: 56px; opacity: 0.85; }
+        .file-card-thumb .open-in-badge {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(255,255,255,0.92); border-radius: 6px;
+            padding: 3px 8px; font-size: 11px; font-weight: 500;
+            color: #1a73e8; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            display: flex; align-items: center; gap: 4px;
+            transition: background 0.15s;
+        }
+        .file-card-thumb .open-in-badge:hover { background: #e8f0fe; }
+        .file-card-info {
+            padding: 10px 14px; display: flex;
+            align-items: center; gap: 8px;
+        }
+        .file-card-info .fc-file-icon { font-size: 18px; flex-shrink: 0; }
+        .file-card-info .fc-file-name {
+            font-size: 13px; font-weight: 500; color: #3c4043;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            flex: 1;
+        }
+        .file-card-info .fc-actions {
+            display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+        }
+        .fc-star-btn {
+            background: none; border: none; font-size: 16px;
+            color: #dadce0; cursor: pointer; padding: 2px;
+            line-height: 1; display: flex; align-items: center;
+        }
+        .fc-star-btn.starred { color: #f4b400; }
+        .fc-star-btn:hover { color: #f4b400; }
+
+        .thumb-document { background: #e8f0fe; }
+        .thumb-spreadsheet { background: #e6f4ea; }
+        .thumb-presentation { background: #fef7e0; }
+        .thumb-code { background: #f3e8fd; }
+        .thumb-note { background: #f1f3f4; }
+        .thumb-image, .thumb-whiteboard { background: #fce8e6; }
+        .thumb-archive { background: #f1f3f4; }
+        .thumb-default { background: #f1f3f4; }
+
+        /* -- File List View -- */
+        .file-list {
+            width: 100%; border-collapse: collapse;
+            background: #fff; border-radius: 0;
+        }
+        .file-list th {
+            text-align: left; padding: 8px 16px;
+            font-size: 12px; color: #5f6368; font-weight: 500;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky; top: 0; background: #fff; z-index: 5;
+            user-select: none; cursor: pointer;
+        }
+        .file-list th:hover { color: #202124; }
+        .file-list td {
+            padding: 6px 16px; font-size: 13px;
+            border-bottom: 1px solid #f1f3f4; color: #3c4043;
+        }
+        .file-list tr { transition: background 0.1s; }
+        .file-list tbody tr:hover { background: #f8f9fa; }
+        .file-list tr:last-child td { border-bottom: none; }
+        .file-list .fl-name-cell {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .fl-file-icon {
+            font-size: 20px; width: 24px; text-align: center; flex-shrink: 0;
+        }
+        .fl-file-name {
+            font-weight: 500; color: #202124;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .fl-file-name:hover { color: #1a73e8; }
+        .fl-open-in {
+            font-size: 11px; color: #1a73e8; font-weight: 500;
+            background: #e8f0fe; border-radius: 4px;
+            padding: 1px 6px; margin-left: 6px; flex-shrink: 0;
+        }
+        .fl-open-in:hover { background: #d2e3fc; }
+        .fl-star {
+            background: none; border: none; font-size: 16px;
+            color: #dadce0; cursor: pointer; padding: 2px 4px;
+        }
+        .fl-star.starred { color: #f4b400; }
+        .fl-star:hover { color: #f4b400; }
+        .fl-owner { display: flex; align-items: center; gap: 6px; }
+        .fl-avatar-xs {
+            width: 24px; height: 24px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 11px; font-weight: 500;
+        }
+        .fl-meta { color: #5f6368; font-size: 12px; }
+
+        .ctx-menu-btn {
+            background: none; border: none; color: #5f6368;
+            font-size: 18px; cursor: pointer; padding: 4px;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; width: 28px; height: 28px;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        .file-list tbody tr:hover .ctx-menu-btn,
+        .file-card:hover .ctx-menu-btn { opacity: 1; }
+        .ctx-menu-btn:hover { background: #e8eaed; }
+
+        .dropdown-menu {
+            position: absolute; top: 100%; right: 0;
+            background: #fff; border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            min-width: 200px; z-index: 300;
+            padding: 8px 0; display: none;
+        }
+        .dropdown-menu.open { display: block; }
+        .dropdown-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 8px 16px; font-size: 13px; color: #3c4043;
+            cursor: pointer; transition: background 0.1s;
+            border: none; background: none; width: 100%; text-align: left;
+        }
+        .dropdown-item:hover { background: #f1f3f4; }
+        .dropdown-item .di-icon { width: 20px; text-align: center; color: #5f6368; }
+        .dropdown-divider { height: 1px; background: #e0e0e0; margin: 4px 0; }
+
+        .empty-state {
+            text-align: center; padding: 80px 24px; color: #5f6368;
+        }
+        .empty-state .empty-icon {
+            font-size: 80px; margin-bottom: 16px; opacity: 0.4;
+        }
+        .empty-state h3 {
+            font-size: 16px; font-weight: 500;
+            color: #202124; margin-bottom: 8px;
+        }
+        .empty-state p { font-size: 14px; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .header-logo { min-width: auto; }
+            .header-logo .logo-text { display: none; }
+            .file-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+            .file-card-thumb { height: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="header-logo">
+        <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6.6 66.85L0 53.9 29.1 0h13.2z" fill="#0066DA"/>
+            <path d="M29.1 78L15.5 53.9l29.1-53.9h13.2L29.1 78z" fill="#00AC47"/>
+            <path d="M87.3 53.9L73.7 78H13.4l6.6-12.1 29.1-53.9z" fill="#EA4335"/>
+            <path d="M57.7 0L44.6 0 15.5 53.9l6.6 12.1L87.3 53.9z" fill="#00832D"/>
+            <path d="M29.1 0L0 53.9l6.6 12.95L73.7 78l13.6-24.1z" fill="#2684FC" opacity="0"/>
+            <path d="M87.3 53.9H22.1l6.6 12.15H73.7z" fill="#FFBA00"/>
+        </svg>
+        <span class="logo-text"><b>Meridian</b>Cloud</span>
+    </a>
+
+    <div class="search-wrapper">
+        <form class="search-bar" method="get" action="{{ url_for('cloud-storage-file-transfer.index') }}">
+            <span class="search-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#5f6368"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </span>
+            <input type="text" name="q" placeholder="Search in Drive" autocomplete="off">
+        </form>
+    </div>
+
+    <div class="header-actions">
+        {% if user %}
+        <div class="user-info">
+            <span class="user-name">{{ user.name }}</span>
+            <a href="{{ url_for('cloud-storage-file-transfer.logout') }}" class="icon-btn" title="Sign out">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#5f6368"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            </a>
+            <div class="avatar-circle" style="background:{{ user.avatar_color }};" title="{{ user.name }}">{{ user.name[0] }}</div>
+        </div>
+        {% else %}
+        <a href="{{ url_for('cloud-storage-file-transfer.login_page') }}" style="background:#1a73e8;color:#fff;padding:8px 20px;border-radius:20px;font-size:14px;font-weight:500;">Sign in</a>
+        {% endif %}
+    </div>
+</header>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="new-btn-wrapper">
+        <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="new-btn">
+            <span class="plus-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </span>
+            New
+        </a>
+    </div>
+
+    <div class="nav-section">
+        <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="nav-item">
+            <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 2H5C3.9 2 3 2.9 3 4v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H5V4h14v16z"/><path d="M13.5 7H10v2h3.5c.83 0 1.5.67 1.5 1.5S14.33 12 13.5 12H10v2h3.5c1.93 0 3.5-1.57 3.5-3.5S15.43 7 13.5 7z"/></svg>
+            </span>
+            My Drive
+        </a>
+        <a href="{{ url_for('cloud-storage-file-transfer.shared') }}" class="nav-item">
+            <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </span>
+            Shared with me
+        </a>
+        <a href="{{ url_for('cloud-storage-file-transfer.recent') }}" class="nav-item active">
+            <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            </span>
+            Recent
+        </a>
+        <a href="{{ url_for('cloud-storage-file-transfer.starred') }}" class="nav-item">
+            <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></svg>
+            </span>
+            Starred
+        </a>
+        <a href="{{ url_for('cloud-storage-file-transfer.trash') }}" class="nav-item">
+            <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </span>
+            Trash
+        </a>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div class="storage-meter">
+        <div class="storage-bar-bg">
+            <div class="storage-bar-fill" style="width: 34%;" id="storageBar"></div>
+        </div>
+        <div class="storage-text" id="storageText">Loading...</div>
+        <a href="#" class="storage-link" onclick="return false;">Buy storage</a>
+    </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+    <div class="toolbar">
+        <div class="breadcrumb">
+            <span class="bc-current">Recent</span>
+        </div>
+        <div class="toolbar-actions">
+            <div class="view-toggle">
+                <button id="viewGridBtn" class="active" onclick="setView('grid')" title="Grid view">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z"/></svg>
+                </button>
+                <button id="viewListBtn" onclick="setView('list')" title="List view">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if files %}
+    <div class="section-label">Recently modified</div>
+
+    <!-- Grid View -->
+    <div class="file-grid" id="fileGridView">
+        {% for file in files %}
+        <div class="file-card" data-file-id="{{ file.id }}">
+            <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}">
+                <div class="file-card-thumb
+                    {% if file.type == 'document' %}thumb-document
+                    {% elif file.type == 'spreadsheet' %}thumb-spreadsheet
+                    {% elif file.type == 'presentation' %}thumb-presentation
+                    {% elif file.type == 'code' %}thumb-code
+                    {% elif file.type == 'note' %}thumb-note
+                    {% elif file.type in ('image', 'whiteboard') %}thumb-image
+                    {% elif file.type == 'archive' %}thumb-archive
+                    {% else %}thumb-default{% endif %}">
+                    <span class="type-glyph">
+                        {% if file.type == 'document' %}&#128196;
+                        {% elif file.type == 'spreadsheet' %}&#128202;
+                        {% elif file.type == 'presentation' %}&#128209;
+                        {% elif file.type == 'code' %}&#128187;
+                        {% elif file.type == 'note' %}&#128221;
+                        {% elif file.type in ('image', 'whiteboard') %}&#128444;
+                        {% else %}&#128193;{% endif %}
+                    </span>
+                </div>
+            </a>
+            {% if file.source_site and file.source_site in open_in_urls %}
+            <a class="open-in-badge"
+               href="{% if file.type == 'presentation' %}{{ open_in_presentation_url.replace('{source_id}', file.source_id|string) }}{% else %}{{ open_in_urls[file.source_site].replace('{source_id}', file.source_id|string) }}{% endif %}"
+               title="Open in {{ open_in_labels.get(file.source_site, file.source_site) }}"
+               style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.92);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:500;color:#1a73e8;box-shadow:0 1px 3px rgba(0,0,0,0.12);z-index:2;">
+                &#8599; Open in {{ open_in_labels.get(file.source_site, file.source_site) }}
+            </a>
+            {% endif %}
+            <div class="file-card-info">
+                <span class="fc-file-icon">
+                    {% if file.type == 'document' %}<span style="color:#4285f4;">&#128196;</span>
+                    {% elif file.type == 'spreadsheet' %}<span style="color:#0f9d58;">&#128202;</span>
+                    {% elif file.type == 'presentation' %}<span style="color:#f4b400;">&#128209;</span>
+                    {% elif file.type == 'code' %}<span style="color:#7b1fa2;">&#128187;</span>
+                    {% elif file.type == 'note' %}<span style="color:#5f6368;">&#128221;</span>
+                    {% elif file.type in ('image', 'whiteboard') %}<span style="color:#e91e63;">&#128444;</span>
+                    {% else %}<span style="color:#5f6368;">&#128193;</span>{% endif %}
+                </span>
+                <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}" class="fc-file-name" title="{{ file.name }}">{{ file.name }}</a>
+                <div class="fc-actions">
+                    <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_star_toggle', file_id=file.id) }}" style="display:inline;">
+                        <button type="submit" class="fc-star-btn {% if file.starred %}starred{% endif %}" title="{% if file.starred %}Unstar{% else %}Star{% endif %}">
+                            {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- List View -->
+    <table class="file-list" id="fileListView" style="display:none;">
+        <thead>
+            <tr>
+                <th style="width:40px;"></th>
+                <th>Name</th>
+                <th>Owner</th>
+                <th>Last modified</th>
+                <th>File size</th>
+                <th style="width:40px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in files %}
+            <tr data-file-id="{{ file.id }}">
+                <td>
+                    <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_star_toggle', file_id=file.id) }}" style="display:inline;">
+                        <button type="submit" class="fl-star {% if file.starred %}starred{% endif %}" title="{% if file.starred %}Unstar{% else %}Star{% endif %}">
+                            {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
+                        </button>
+                    </form>
+                </td>
+                <td>
+                    <div class="fl-name-cell">
+                        <span class="fl-file-icon">
+                            {% if file.type == 'document' %}<span style="color:#4285f4;">&#128196;</span>
+                            {% elif file.type == 'spreadsheet' %}<span style="color:#0f9d58;">&#128202;</span>
+                            {% elif file.type == 'presentation' %}<span style="color:#f4b400;">&#128209;</span>
+                            {% elif file.type == 'code' %}<span style="color:#7b1fa2;">&#128187;</span>
+                            {% elif file.type == 'note' %}<span style="color:#5f6368;">&#128221;</span>
+                            {% elif file.type in ('image', 'whiteboard') %}<span style="color:#e91e63;">&#128444;</span>
+                            {% else %}<span style="color:#5f6368;">&#128193;</span>{% endif %}
+                        </span>
+                        <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}" class="fl-file-name">{{ file.name }}</a>
+                        {% if file.source_site and file.source_site in open_in_urls %}
+                        <a class="fl-open-in"
+                           href="{% if file.type == 'presentation' %}{{ open_in_presentation_url.replace('{source_id}', file.source_id|string) }}{% else %}{{ open_in_urls[file.source_site].replace('{source_id}', file.source_id|string) }}{% endif %}"
+                           title="Open in {{ open_in_labels.get(file.source_site, file.source_site) }}">
+                            Open in {{ open_in_labels.get(file.source_site, file.source_site) }}
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    {% if file.owner_id in user_map %}
+                    <span class="fl-owner">
+                        <span class="fl-avatar-xs" style="background:{{ user_map[file.owner_id].avatar_color }};">{{ user_map[file.owner_id].name[0] }}</span>
+                        {{ user_map[file.owner_id].name.split()[0] }}
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="fl-meta">{{ file.modified_at[:10] }}</td>
+                <td class="fl-meta">{{ format_size(file.size_bytes) }}</td>
+                <td style="position:relative;">
+                    <button class="ctx-menu-btn" onclick="toggleCtxMenu(event, {{ file.id }})" title="More actions">&#8942;</button>
+                    <div class="dropdown-menu" id="ctxMenu{{ file.id }}">
+                        <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}" class="dropdown-item">
+                            <span class="di-icon">&#128065;</span> Preview
+                        </a>
+                        {% if file.source_site and file.source_site in open_in_urls %}
+                        <a href="{% if file.type == 'presentation' %}{{ open_in_presentation_url.replace('{source_id}', file.source_id|string) }}{% else %}{{ open_in_urls[file.source_site].replace('{source_id}', file.source_id|string) }}{% endif %}" class="dropdown-item">
+                            <span class="di-icon">&#8599;</span> Open in {{ open_in_labels.get(file.source_site, file.source_site) }}
+                        </a>
+                        {% endif %}
+                        <div class="dropdown-divider"></div>
+                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_star_toggle', file_id=file.id) }}" style="display:contents;">
+                            <button type="submit" class="dropdown-item">
+                                <span class="di-icon">{% if file.starred %}&#9733;{% else %}&#9734;{% endif %}</span>
+                                {% if file.starred %}Remove from Starred{% else %}Add to Starred{% endif %}
+                            </button>
+                        </form>
+                        <div class="dropdown-divider"></div>
+                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;">
+                            <button type="submit" class="dropdown-item" style="color:#c5221f;">
+                                <span class="di-icon">&#128465;</span> Move to trash
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">&#128336;</div>
+        <h3>No recent files</h3>
+        <p>Files you have recently opened or modified will appear here.</p>
+    </div>
+    {% endif %}
+</main>
+
+<script>
+    function setView(mode) {
+        var grid = document.getElementById('fileGridView');
+        var list = document.getElementById('fileListView');
+        var gridBtn = document.getElementById('viewGridBtn');
+        var listBtn = document.getElementById('viewListBtn');
+        if (!grid || !list) return;
+        if (mode === 'list') {
+            grid.style.display = 'none'; list.style.display = '';
+            gridBtn.classList.remove('active'); listBtn.classList.add('active');
+            localStorage.setItem('driveViewMode', 'list');
+        } else {
+            grid.style.display = ''; list.style.display = 'none';
+            gridBtn.classList.add('active'); listBtn.classList.remove('active');
+            localStorage.setItem('driveViewMode', 'grid');
+        }
+    }
+    (function() { var s = localStorage.getItem('driveViewMode'); if (s === 'list') setView('list'); })();
+
+    function toggleCtxMenu(e, fileId) {
+        e.stopPropagation();
+        document.querySelectorAll('.dropdown-menu.open').forEach(function(m) {
+            if (m.id !== 'ctxMenu' + fileId) m.classList.remove('open');
+        });
+        document.getElementById('ctxMenu' + fileId).classList.toggle('open');
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.ctx-menu-btn') && !e.target.closest('.dropdown-menu')) {
+            document.querySelectorAll('.dropdown-menu.open').forEach(function(m) { m.classList.remove('open'); });
+        }
+    });
+
+    (function() {
+        fetch("{{ url_for('cloud-storage-file-transfer.api_storage_usage') }}")
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var totalGB = 15;
+                var usedBytes = d.total_bytes || 0;
+                var usedGB = usedBytes / (1024*1024*1024);
+                var pct = Math.min(Math.round((usedGB / totalGB) * 100), 100);
+                var bar = document.getElementById('storageBar');
+                var txt = document.getElementById('storageText');
+                if (bar) bar.style.width = pct + '%';
+                if (txt) txt.textContent = d.total_human + ' of ' + totalGB + ' GB used';
+            })
+            .catch(function() {
+                var txt = document.getElementById('storageText');
+                if (txt) txt.textContent = 'Storage info unavailable';
+            });
+    })();
+</script>
+
+</body>
+</html>

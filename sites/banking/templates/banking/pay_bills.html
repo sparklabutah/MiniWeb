@@ -78,8 +78,15 @@
                     <td>{{ 'Yes' if bill.auto_pay else 'No' }}</td>
                     <td>
                         {% if bill.status != 'paid' %}
-                        <form method="post" action="{{ url_for('banking.pay_bill_submit') }}" style="display:inline">
+                        <form method="post" action="{{ url_for('banking.pay_bill_submit') }}" style="display:inline-flex;align-items:center;gap:.3rem;">
                             <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                            {% if accounts %}
+                            <select name="account_id" style="padding:.3rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.75rem;max-width:140px;">
+                                {% for acct in accounts %}
+                                <option value="{{ acct.id }}">{{ acct.account_number|truncate(12, True, '..') }} (${{ "%.2f"|format(acct.balance) }})</option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
                             <button type="submit" class="btn-pay">Pay Now</button>
                         </form>
                         {% else %}

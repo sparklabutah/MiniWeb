@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-DATA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "stock-crypto" / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/stock-crypto-prices")
 
 # ---------------------------------------------------------------------------
 # 1. STOCK DEFINITIONS  (150 major US stocks with realistic data)

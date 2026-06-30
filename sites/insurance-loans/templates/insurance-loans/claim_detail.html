@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claim {{ claim.claim_number }} - Cascadia Insurance &amp; Lending</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1a3c5e, #2b5f8a); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8fe; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a3c5e; text-decoration: none; font-size: .88rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef4fb; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #1a3c5e; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .container { max-width: 800px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { font-size: .88rem; color: #2563eb; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { text-decoration: underline; }
+        .card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .card-header h2 { color: #1a3c5e; font-size: 1.2rem; }
+        .badge { display: inline-block; padding: .2rem .7rem; border-radius: .25rem; font-size: .8rem; font-weight: 600; }
+        .badge-open { background: #fef3c7; color: #92400e; }
+        .badge-in_review { background: #dbeafe; color: #1e40af; }
+        .badge-closed { background: #f1f5f9; color: #475569; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .item label { font-size: .75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
+        .item .val { font-size: .95rem; color: #1e293b; margin-top: .15rem; }
+        .desc { background: #f8fafc; padding: 1rem; border-radius: .4rem; margin-bottom: 1.5rem; line-height: 1.6; color: #334155; font-size: .92rem; }
+        .notes { background: #fffbeb; padding: 1rem; border-radius: .4rem; color: #92400e; font-size: .88rem; line-height: 1.5; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('insurance-loans.index') }}">Cascadia <span>Insurance &amp; Lending</span></a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('insurance-loans.index') }}">Dashboard</a>
+        <a href="{{ url_for('insurance-loans.policies_page') }}">Policies</a>
+        <a href="{{ url_for('insurance-loans.claims_page') }}" class="active">Claims</a>
+        <a href="{{ url_for('insurance-loans.loans_page') }}">Loans</a>
+        <a href="{{ url_for('insurance-loans.payments_page') }}">Payments</a>
+        {% if logged_in %}
+        <a href="{{ url_for('insurance-loans.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('insurance-loans.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+    <div class="container">
+        <a href="{{ url_for('insurance-loans.claims_page') }}" class="back">Back to Claims</a>
+        <div class="card">
+            <div class="card-header">
+                <h2>{{ claim.claim_number }}</h2>
+                <span class="badge badge-{{ claim.status }}">{{ claim.status|replace('_', ' ')|title }}</span>
+            </div>
+            <div class="grid">
+                <div class="item"><label>Claimant</label><div class="val">{{ claim.claimant_name }}</div></div>
+                <div class="item"><label>Policy Number</label><div class="val">{{ claim.policy_number }}</div></div>
+                <div class="item"><label>Type</label><div class="val">{{ claim.type|replace('_', ' ')|title }}</div></div>
+                <div class="item"><label>Date of Incident</label><div class="val">{{ claim.date_of_incident }}</div></div>
+                <div class="item"><label>Date Filed</label><div class="val">{{ claim.date_filed }}</div></div>
+                <div class="item"><label>Date Resolved</label><div class="val">{{ claim.date_resolved or '--' }}</div></div>
+                <div class="item"><label>Location</label><div class="val">{{ claim.incident_location or '--' }}</div></div>
+                <div class="item"><label>Police Report</label><div class="val">{{ claim.police_report_number or '--' }}</div></div>
+                <div class="item"><label>Damage Estimate</label><div class="val">{% if claim.damage_estimate is not none %}${{ "%.2f"|format(claim.damage_estimate) }}{% else %}--{% endif %}</div></div>
+                <div class="item"><label>Deductible Applied</label><div class="val">{% if claim.deductible_applied is not none %}${{ "%.2f"|format(claim.deductible_applied) }}{% else %}--{% endif %}</div></div>
+                <div class="item"><label>Payout Amount</label><div class="val">{% if claim.payout_amount is not none %}${{ "%.2f"|format(claim.payout_amount) }}{% else %}--{% endif %}</div></div>
+                <div class="item"><label>Adjuster</label><div class="val">{{ claim.adjuster or '--' }} {{ claim.adjuster_phone or '' }}</div></div>
+            </div>
+            <h3 style="font-size:.95rem;color:#1a3c5e;margin-bottom:.5rem;">Description</h3>
+            <div class="desc">{{ claim.description }}</div>
+            {% if claim.notes %}
+            <h3 style="font-size:.95rem;color:#1a3c5e;margin-bottom:.5rem;">Notes</h3>
+            <div class="notes">{{ claim.notes }}</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="footer">Cascadia Insurance &amp; Lending</div>
+</body>
+</html>

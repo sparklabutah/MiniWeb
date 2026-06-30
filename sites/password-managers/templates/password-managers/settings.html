@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - VaultGuard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #6c8cff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { color: #c9cdd8; background: #1e2235; }
+        nav a.active { color: #6c8cff; background: #1e2235; font-weight: 600; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #f87171; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
+        .breadcrumb a { color: #6c8cff; text-decoration: none; }
+        h2 { color: #e1e4e8; font-size: 1.3rem; margin-bottom: 1.5rem; }
+        .settings-card { background: #161822; border: 1px solid #2d3348; border-radius: .6rem; padding: 2rem; margin-bottom: 1.5rem; }
+        .settings-card h3 { font-size: 1rem; color: #c9cdd8; margin-bottom: 1rem; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: .8rem 0; border-bottom: 1px solid #1e2235; }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-label { font-size: .9rem; color: #c9cdd8; }
+        .setting-label .hint { font-size: .75rem; color: #6b7280; margin-top: .2rem; }
+        .setting-value select { background: #1e2235; border: 1px solid #2d3348; color: #e1e4e8; padding: .4rem .6rem; border-radius: .3rem; font-size: .85rem; }
+        .user-info-card { background: #161822; border: 1px solid #2d3348; border-radius: .6rem; padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+        .user-info-card .field { margin-bottom: .8rem; }
+        .user-info-card .field-label { font-size: .75rem; text-transform: uppercase; color: #6b7280; font-weight: 600; }
+        .user-info-card .field-value { font-size: .95rem; color: #e1e4e8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
+        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
+        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
+        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
+        <span class="spacer"></span>
+        <a href="{{ url_for('password-managers.settings_page') }}" class="active">Settings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('password-managers.index') }}">Home</a> &rsaquo; Settings
+        </div>
+
+        <h2>Settings</h2>
+
+        {% if user %}
+        <div class="user-info-card">
+            <div class="field">
+                <div class="field-label">Display Name</div>
+                <div class="field-value">{{ user.display_name }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Email</div>
+                <div class="field-value">{{ user.email }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Plan</div>
+                <div class="field-value">{{ user.plan|title }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Two-Factor Authentication</div>
+                <div class="field-value">{{ "Enabled" if user.two_factor_enabled else "Disabled" }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="settings-card">
+            <h3>Security Settings</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    Auto-Lock Timeout
+                    <div class="hint">Lock vault after period of inactivity</div>
+                </div>
+                <div class="setting-value">
+                    <select id="autoLock">
+                        <option value="1">1 minute</option>
+                        <option value="5" selected>5 minutes</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">1 hour</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    Clipboard Clear
+                    <div class="hint">Clear clipboard after copying a password</div>
+                </div>
+                <div class="setting-value">
+                    <select id="clipboardClear">
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="0">Never</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    Default Password Length
+                    <div class="hint">Default length for generated passwords</div>
+                </div>
+                <div class="setting-value">
+                    <select id="pwLength">
+                        <option value="12">12 characters</option>
+                        <option value="16">16 characters</option>
+                        <option value="20" selected>20 characters</option>
+                        <option value="32">32 characters</option>
+                        <option value="64">64 characters</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-card">
+            <h3>Display Settings</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    Theme
+                    <div class="hint">Appearance theme for the vault</div>
+                </div>
+                <div class="setting-value">
+                    <select id="theme">
+                        <option value="dark" selected>Dark</option>
+                        <option value="light">Light</option>
+                        <option value="midnight">Midnight Blue</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

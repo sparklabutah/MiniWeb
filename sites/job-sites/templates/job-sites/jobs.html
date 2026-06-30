@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if query %}{{ query }} - {% endif %}Job Search - JobQuest</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; color: #4338ca; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #dc2626; }
+        .login-banner { max-width: 1100px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
+        .login-banner a { color: #4338ca; font-weight: 600; }
+        .search-bar { max-width: 1100px; margin: 1rem auto; padding: 0 2rem; }
+        .search-bar form { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .search-bar input, .search-bar select { padding: .6rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; }
+        .search-bar input:focus, .search-bar select:focus { border-color: #6366f1; outline: none; }
+        .search-bar input[name="q"] { flex: 2; min-width: 200px; }
+        .search-bar input[name="location"] { flex: 1; min-width: 150px; }
+        .search-bar button { background: #6366f1; color: #fff; border: none; padding: .6rem 1.2rem; border-radius: .4rem; font-weight: 600; cursor: pointer; }
+        .search-bar button:hover { background: #4f46e5; }
+        .content-wrapper { max-width: 1100px; margin: 1rem auto; padding: 0 2rem; display: flex; gap: 1.5rem; }
+        .sidebar { width: 260px; flex-shrink: 0; }
+        .sidebar-section { background: #fff; border-radius: .5rem; padding: 1rem 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .sidebar-section h4 { font-size: .85rem; color: #374151; margin-bottom: .6rem; border-bottom: 1px solid #f3f4f6; padding-bottom: .4rem; }
+        .sidebar-section label { display: block; font-size: .85rem; color: #4b5563; padding: .25rem 0; cursor: pointer; }
+        .sidebar-section input[type="radio"] { margin-right: .4rem; }
+        .sidebar-section select { width: 100%; padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .85rem; }
+        .sidebar-section select:focus { border-color: #6366f1; outline: none; }
+        .slider-group { margin-top: .4rem; }
+        .slider-group label.slider-label { font-size: .8rem; color: #6b7280; margin-bottom: .2rem; }
+        .slider-group input[type="range"] { width: 100%; margin: .3rem 0; accent-color: #6366f1; }
+        .slider-group .slider-value { font-size: .8rem; color: #4338ca; font-weight: 600; text-align: center; }
+        .date-inputs { display: flex; gap: .4rem; margin-top: .3rem; }
+        .date-inputs input[type="date"] { flex: 1; padding: .4rem .5rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .8rem; }
+        .date-inputs input[type="date"]:focus { border-color: #6366f1; outline: none; }
+        .btn-filter { width: 100%; padding: .5rem; background: #6366f1; color: #fff; border: none; border-radius: .4rem; font-size: .85rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
+        .btn-filter:hover { background: #4f46e5; }
+        .main { flex: 1; min-width: 0; }
+        .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+        .results-header h2 { font-size: 1.1rem; color: #374151; }
+        .results-header .count { color: #6b7280; font-size: .9rem; }
+        .sort-bar { display: flex; align-items: center; gap: .5rem; }
+        .sort-bar label { font-size: .85rem; color: #6b7280; }
+        .sort-bar select { padding: .4rem .7rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .85rem; }
+        .sort-bar select:focus { border-color: #6366f1; outline: none; }
+        .job-list { display: flex; flex-direction: column; gap: .8rem; }
+        .job-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid #6366f1; transition: box-shadow .15s; }
+        .job-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.1); }
+        .job-card h3 { margin-bottom: .3rem; }
+        .job-card h3 a { color: #1e1b4b; text-decoration: none; font-size: 1.05rem; }
+        .job-card h3 a:hover { color: #6366f1; text-decoration: underline; }
+        .job-card .company { color: #374151; font-weight: 500; font-size: .9rem; }
+        .job-card .meta { display: flex; gap: 1rem; flex-wrap: wrap; margin: .5rem 0; font-size: .8rem; color: #6b7280; }
+        .job-card .meta .tag { background: #f3f4f6; padding: .15rem .5rem; border-radius: .25rem; }
+        .job-card .snippet { font-size: .85rem; color: #4b5563; line-height: 1.5; margin-top: .5rem; }
+        .job-card .rating { color: #f59e0b; font-size: .85rem; }
+        .no-results { text-align: center; padding: 3rem; color: #6b7280; }
+        .footer { text-align: center; padding: 2rem; color: #9ca3af; font-size: .8rem; border-top: 1px solid #e5e7eb; margin-top: 3rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}" class="active">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('job-sites.profile_page') }}">Profile</a>
+        <a href="{{ url_for('job-sites.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('job-sites.login_page') }}">Sign In</a>
+        {% endif %}
+    </nav>
+
+    {% if not logged_in %}
+    <div class="login-banner">
+        Browsing as {{ user.display_name }} (demo mode). <a href="{{ url_for('job-sites.login_page') }}">Sign in</a> to manage your own job search.
+    </div>
+    {% endif %}
+
+    <div class="search-bar">
+        <form action="{{ url_for('job-sites.jobs_page') }}" method="get" id="search-form">
+            <input type="text" name="q" placeholder="Job title, keywords, or company" value="{{ query }}">
+            <input type="text" name="location" placeholder="City, state, or remote" value="{{ location }}">
+            <input type="hidden" name="job_type" id="hidden-job-type" value="{{ job_type }}">
+            <input type="hidden" name="salary_min" id="hidden-salary-min" value="{{ salary_min if salary_min is not none else '' }}">
+            <input type="hidden" name="salary_max" id="hidden-salary-max" value="{{ salary_max if salary_max is not none else '' }}">
+            <input type="hidden" name="date_from" id="hidden-date-from" value="{{ date_from }}">
+            <input type="hidden" name="date_to" id="hidden-date-to" value="{{ date_to }}">
+            <input type="hidden" name="sort" id="hidden-sort" value="{{ sort }}">
+            <input type="hidden" name="company" id="hidden-company" value="{{ company }}">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="content-wrapper">
+        <aside class="sidebar">
+            <!-- filter_by_dropdown: Company -->
+            <div class="sidebar-section">
+                <h4>Company</h4>
+                <select id="company-filter" onchange="applyFilters()">
+                    <option value="">All Companies</option>
+                    {% for c in companies %}
+                    <option value="{{ c }}" {% if company == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- filter_by_radio: Job Type -->
+            <div class="sidebar-section">
+                <h4>Job Type</h4>
+                <label><input type="radio" name="job_type_radio" value="" {% if not job_type %}checked{% endif %} onchange="applyFilters()"> All Types</label>
+                <label><input type="radio" name="job_type_radio" value="full-time" {% if job_type == 'full-time' %}checked{% endif %} onchange="applyFilters()"> Full-time</label>
+                <label><input type="radio" name="job_type_radio" value="part-time" {% if job_type == 'part-time' %}checked{% endif %} onchange="applyFilters()"> Part-time</label>
+                <label><input type="radio" name="job_type_radio" value="contract" {% if job_type == 'contract' %}checked{% endif %} onchange="applyFilters()"> Contract</label>
+                <label><input type="radio" name="job_type_radio" value="internship" {% if job_type == 'internship' %}checked{% endif %} onchange="applyFilters()"> Internship</label>
+            </div>
+
+            <!-- filter_by_slider: Salary Range -->
+            <div class="sidebar-section">
+                <h4>Salary Range</h4>
+                <div class="slider-group">
+                    <label class="slider-label">Minimum Salary</label>
+                    <input type="range" id="salary-min-slider" min="0" max="300000" step="10000" value="{{ salary_min if salary_min is not none else 0 }}" oninput="updateSalaryLabel()">
+                    <div class="slider-value" id="salary-min-label">${{ "{:,}".format(salary_min) if salary_min is not none and salary_min else '0' }}+</div>
+                </div>
+                <div class="slider-group">
+                    <label class="slider-label">Maximum Salary</label>
+                    <input type="range" id="salary-max-slider" min="0" max="300000" step="10000" value="{{ salary_max if salary_max is not none else 300000 }}" oninput="updateSalaryLabel()">
+                    <div class="slider-value" id="salary-max-label">${{ "{:,}".format(salary_max) if salary_max is not none and salary_max else '300,000' }}</div>
+                </div>
+            </div>
+
+            <!-- filter_by_date_range: Posted Date -->
+            <div class="sidebar-section">
+                <h4>Date Posted</h4>
+                <div class="date-inputs">
+                    <input type="date" id="date-from" value="{{ date_from }}" placeholder="From">
+                    <input type="date" id="date-to" value="{{ date_to }}" placeholder="To">
+                </div>
+            </div>
+
+            <button class="btn-filter" onclick="applyFilters()">Apply Filters</button>
+        </aside>
+
+        <div class="main">
+            <div class="results-header">
+                <div>
+                    <h2>{% if query %}Results for "{{ query }}"{% else %}All Jobs{% endif %}</h2>
+                    <span class="count">{{ jobs|length }} job{{ 's' if jobs|length != 1 else '' }} found</span>
+                </div>
+                <!-- sort_by_ranking -->
+                <div class="sort-bar">
+                    <label for="sort-select">Sort by:</label>
+                    <select id="sort-select" onchange="applyFilters()">
+                        <option value="date" {% if sort == 'date' %}selected{% endif %}>Date (Newest)</option>
+                        <option value="salary_desc" {% if sort == 'salary_desc' %}selected{% endif %}>Salary (High to Low)</option>
+                        <option value="salary_asc" {% if sort == 'salary_asc' %}selected{% endif %}>Salary (Low to High)</option>
+                        <option value="company" {% if sort == 'company' %}selected{% endif %}>Company (A-Z)</option>
+                        <option value="title" {% if sort == 'title' %}selected{% endif %}>Title (A-Z)</option>
+                        {% if query %}
+                        <option value="relevance" {% if sort == 'relevance' %}selected{% endif %}>Relevance</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+
+            {% if jobs %}
+            <div class="job-list">
+                {% for job in jobs %}
+                <div class="job-card">
+                    <h3><a href="{{ url_for('job-sites.job_detail', job_id=job.row_id) }}">{{ job.job_title }}</a></h3>
+                    <div class="company">
+                        <a href="{{ url_for('job-sites.company_page', company_name=job.company) }}" style="color:#374151;text-decoration:none;">{{ job.company }}</a>
+                        {% if job.company_rating %}<span class="rating">&#9733; {{ job.company_rating }}</span>{% endif %}
+                    </div>
+                    <div class="meta">
+                        <span>{{ job.location }}</span>
+                        <span class="tag">{{ job.salary_range }}</span>
+                        <span class="tag">{{ job.job_type }}</span>
+                        <span>Posted {{ job.posted_date }}</span>
+                    </div>
+                    <div class="snippet">{{ job.job_description[:200] }}{% if job.job_description|length > 200 %}...{% endif %}</div>
+                    {% if job.tags %}
+                    <div class="meta" style="margin-top:.5rem;">
+                        {% for tag in job.tags %}
+                        <span class="tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="no-results">
+                <p>No jobs found matching your search criteria.</p>
+                <p style="margin-top:.5rem;"><a href="{{ url_for('job-sites.jobs_page') }}" style="color:#6366f1;">Browse all jobs</a></p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">
+        JobQuest &mdash; Your job search, simplified. &copy; 2026
+    </div>
+
+    <script>
+    function updateSalaryLabel() {
+        var minVal = parseInt(document.getElementById("salary-min-slider").value);
+        var maxVal = parseInt(document.getElementById("salary-max-slider").value);
+        document.getElementById("salary-min-label").textContent = "$" + minVal.toLocaleString() + "+";
+        document.getElementById("salary-max-label").textContent = "$" + maxVal.toLocaleString();
+    }
+
+    function applyFilters() {
+        var form = document.getElementById("search-form");
+        var radioChecked = document.querySelector('input[name="job_type_radio"]:checked');
+        document.getElementById("hidden-job-type").value = radioChecked ? radioChecked.value : "";
+
+        var salaryMin = parseInt(document.getElementById("salary-min-slider").value);
+        document.getElementById("hidden-salary-min").value = salaryMin > 0 ? salaryMin : "";
+
+        var salaryMax = parseInt(document.getElementById("salary-max-slider").value);
+        document.getElementById("hidden-salary-max").value = salaryMax < 300000 ? salaryMax : "";
+
+        document.getElementById("hidden-date-from").value = document.getElementById("date-from").value;
+        document.getElementById("hidden-date-to").value = document.getElementById("date-to").value;
+        document.getElementById("hidden-sort").value = document.getElementById("sort-select").value;
+        document.getElementById("hidden-company").value = document.getElementById("company-filter").value;
+
+        form.submit();
+    }
+    </script>
+</body>
+</html>

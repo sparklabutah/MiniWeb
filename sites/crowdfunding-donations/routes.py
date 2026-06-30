@@ -4,20 +4,16 @@ Data interpreter: reads synthesized JSON files, respects config/config.json,
 and serves through Flask routes.  Raw data files are never modified except for
 mutable user/pledge state.
 """
-import json
 import pathlib
 from collections import Counter
 from datetime import datetime
 
 from flask import (Blueprint, Response, abort, jsonify, redirect,
                    render_template, request, session, url_for)
+from app import db
 
+SITE = "crowdfunding-donations"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-CAMPAIGNS_FILE = SITE_DIR / "data" / "campaigns.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-PLEDGES_FILE = SITE_DIR / "data" / "pledges.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
-
 blueprint = Blueprint(
     "crowdfunding-donations",
     __name__,
@@ -27,61 +23,42 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-# ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
 _categories_list = ["technology", "art", "games", "film", "music", "community", "design", "food"]
 
 
-def _load_campaigns():
-    with open(CAMPAIGNS_FILE) as f:
-        return json.load(f)
-
-
 def _get_campaigns():
-    return _load_campaigns()
+    return db.query(SITE, "campaigns")
 
 
 def _get_campaign(campaign_id):
-    campaigns = _get_campaigns()
-    return next((c for c in campaigns if c["id"] == campaign_id), None)
+    return db.get_item(SITE, "campaigns", campaign_id)
 
 
 def _save_campaigns(campaigns):
-    CAMPAIGNS_FILE.write_text(json.dumps(campaigns, indent=2))
+    db.save_collection(SITE, "campaigns", campaigns)
 
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _load_pledges():
-    if PLEDGES_FILE.exists():
-        return json.loads(PLEDGES_FILE.read_text())
-    return []
+    return db.query(SITE, "pledges")
 
 
 def _save_pledges(pledges):
-    PLEDGES_FILE.write_text(json.dumps(pledges, indent=2))
+    db.save_collection(SITE, "pledges", pledges)
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +209,7 @@ def login_submit():
     else:
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-    users = _load_users()
+    users = _load_users()  # small table
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         if request.is_json:
@@ -271,6 +248,7 @@ def form_pledge(campaign_id):
         data = request.get_json(silent=True) or {}
         tier_id = data.get("tier_id")
         amount = data.get("amount")
+        account_type = data.get("account_type", "checking")
         if tier_id is not None:
             tier_id = int(tier_id)
         if amount is not None:
@@ -278,6 +256,7 @@ def form_pledge(campaign_id):
     else:
         tier_id = request.form.get("tier_id", type=int)
         amount = request.form.get("amount", type=float)
+        account_type = request.form.get("account_type", "checking")
 
     campaigns = _get_campaigns()
     campaign = next((c for c in campaigns if c["id"] == campaign_id), None)
@@ -338,10 +317,29 @@ def form_pledge(campaign_id):
         _save_users(users)
 
     if is_json:
+        # API path: direct payment bridge call (no 2FA)
+        try:
+            from app.bridges import on_payment
+            on_payment(user_id=user_id, recipient=campaign["title"],
+                       amount=amount, category="Donations",
+                       account_type=account_type)
+        except Exception:
+            pass  # bridge failure should never block the main flow
         return jsonify({"pledge_id": new_id, "new_raised": campaign["raised_amount"],
                         "backer_count": campaign["backer_count"],
                         "new_status": campaign["status"]})
-    return redirect(url_for("crowdfunding-donations.campaign_detail", campaign_id=campaign_id))
+
+    # Form path: 2FA verification before completing the payment
+    from app.events import request_2fa
+    verify_url = request_2fa("payment",
+                             return_url=url_for("crowdfunding-donations.campaign_detail",
+                                                campaign_id=campaign_id),
+                             user_id=user_id,
+                             recipient=campaign["title"],
+                             amount=amount,
+                             category="Donations",
+                             account_type=account_type)
+    return redirect(verify_url)
 
 
 @blueprint.route("/campaign/create", methods=["POST"])
@@ -501,6 +499,7 @@ def api_pledge(campaign_id):
     user_id = data.get("user_id") or session.get("user_id")
     tier_id = data.get("tier_id")
     amount = data.get("amount")
+    account_type = data.get("account_type", "checking")
 
     if not user_id:
         return jsonify({"error": "Authentication required"}), 401
@@ -554,6 +553,15 @@ def api_pledge(campaign_id):
             "tier_id": tier_id
         })
         _save_users(users)
+
+    # Bridge: notify banking of donation payment
+    try:
+        from app.bridges import on_payment
+        on_payment(user_id=user_id, recipient=campaign["title"],
+                   amount=amount, category="Donations",
+                   account_type=account_type)
+    except Exception:
+        pass  # bridge failure should never block the main flow
 
     return jsonify({"pledge_id": new_id, "new_raised": campaign["raised_amount"],
                     "new_status": campaign["status"],

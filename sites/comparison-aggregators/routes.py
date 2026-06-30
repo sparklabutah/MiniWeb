@@ -1,23 +1,19 @@
 """Comparison / Aggregators — Phone specs comparison site (GSMArena-style).
 
-Data interpreter: reads the original phones.csv snapshot, samples based on
-config/config.json, and serves through Flask routes.  The raw data file is
-never modified.
+Data is stored in SQLite: phones in the comparison_aggregators_phones table,
+users in a per-site typed table.  Queried through app.db.
 """
-import csv
-import json
 import pathlib
-import random
 import re
 from collections import Counter
 
 from flask import (Blueprint, Response, abort, jsonify, redirect,
                    render_template, request, session, url_for)
+from app import db
+from app.db import _deserialize_row
 
+SITE = "comparison-aggregators"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_FILE = SITE_DIR / "data" / "phones.csv"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "comparison-aggregators",
@@ -28,15 +24,15 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
+# DB-backed data access (comparison_aggregators_phones table)
 # ---------------------------------------------------------------------------
 
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
+
+def _db_conn():
+    return db.get_conn()
 
 # ---------------------------------------------------------------------------
-# Data interpreter — reads raw CSV, samples, cleans
+# Data interpreter — reads raw CSV row dict, cleans into phone record
 # ---------------------------------------------------------------------------
 
 def _parse_price_eur(raw_price):
@@ -88,18 +84,28 @@ def _extract_year(released_at):
 
 
 def _interpret_record(raw, idx):
-    """Convert a raw CSV row dict into a cleaned phone record."""
-    price_eur = _parse_price_eur(raw.get("Price", ""))
-    price_usd = _parse_price_usd(raw.get("Price", ""))
+    """Convert a raw DB row dict into a cleaned phone record."""
+    # Per-site table uses lowercase column names; fall back to legacy
+    # capitalized keys for backwards compatibility.
+    def _g(key):
+        """Get field by lowercase key, falling back to original case."""
+        val = raw.get(key)
+        if val is None:
+            val = raw.get(key.capitalize(), "")
+        return str(val or "")
+
+    price_raw = _g("price")
+    price_eur = _parse_price_eur(price_raw)
+    price_usd = _parse_price_usd(price_raw)
     price = price_usd or price_eur  # prefer USD if available
-    battery_mah = _parse_numeric(raw.get("battery_size", ""), "mAh")
-    display_num = _parse_numeric(raw.get("display_size", ""))
-    camera_num = _parse_numeric(raw.get("camera_pixels", ""), "MP")
-    ram_num = _parse_numeric(raw.get("ram", ""), "GB RAM")
-    year = _extract_year(raw.get("released_at", ""))
+    battery_mah = _parse_numeric(_g("battery_size"), "mAh")
+    display_num = _parse_numeric(_g("display_size"))
+    camera_num = _parse_numeric(_g("camera_pixels"), "MP")
+    ram_num = _parse_numeric(_g("ram"), "GB RAM")
+    year = _extract_year(_g("released_at"))
 
     # Normalise OS to a top-level category
-    os_raw = raw.get("os", "").strip()
+    os_raw = _g("os").strip()
     if "Android" in os_raw:
         os_family = "Android"
     elif "iOS" in os_raw or os_raw.startswith("Apple"):
@@ -118,121 +124,219 @@ def _interpret_record(raw, idx):
     return {
         "id": idx,
         "original_id": int(raw.get("id", 0) or 0),
-        "brand": raw.get("brand", "").strip(),
-        "name": raw.get("name", "").strip(),
-        "released_at": raw.get("released_at", "").strip(),
+        "brand": _g("brand").strip(),
+        "name": _g("name").strip(),
+        "released_at": _g("released_at").strip(),
         "year": year,
         "os": os_raw,
         "os_family": os_family,
-        "storage": raw.get("storage", "").strip(),
-        "display_size": raw.get("display_size", "").strip(),
+        "storage": _g("storage").strip(),
+        "display_size": _g("display_size").strip(),
         "display_size_num": display_num,
-        "display_resolution": raw.get("display_resolution", "").strip(),
-        "camera_pixels": raw.get("camera_pixels", "").strip(),
+        "display_resolution": _g("display_resolution").strip(),
+        "camera_pixels": _g("camera_pixels").strip(),
         "camera_num": camera_num,
-        "ram": raw.get("ram", "").strip(),
+        "ram": _g("ram").strip(),
         "ram_num": ram_num,
-        "battery_size": raw.get("battery_size", "").strip(),
+        "battery_size": _g("battery_size").strip(),
         "battery_mah": battery_mah,
-        "battery_type": raw.get("battery_type", "").strip(),
-        "chipset": raw.get("chipset", "").strip(),
-        "price_raw": raw.get("Price", "").strip(),
+        "battery_type": _g("battery_type").strip(),
+        "chipset": _g("chipset").strip(),
+        "price_raw": price_raw.strip(),
         "price": price,
-        "body": raw.get("body", "").strip(),
-        "weight": raw.get("Weight", "").strip(),
-        "sim": raw.get("SIM", "").strip(),
-        "wlan": raw.get("WLAN", "").strip(),
-        "bluetooth": raw.get("Bluetooth", "").strip(),
-        "gps": raw.get("GPS", "").strip(),
-        "usb": raw.get("USB", "").strip(),
-        "sensors": raw.get("Sensors", "").strip(),
-        "colors": raw.get("Colors", "").strip(),
-        "nfc": raw.get("NFC", "").strip(),
+        "body": _g("body").strip(),
+        "weight": _g("weight").strip(),
+        "sim": _g("sim").strip(),
+        "wlan": _g("wlan").strip(),
+        "bluetooth": _g("bluetooth").strip(),
+        "gps": _g("gps").strip(),
+        "usb": _g("usb").strip(),
+        "sensors": _g("sensors").strip(),
+        "colors": _g("colors").strip(),
+        "nfc": _g("nfc").strip(),
     }
 
 
-def _load_phones():
-    """Read CSV dataset.  num_data_points=-1 loads all records; positive N
-    uses reservoir sampling to pick N records uniformly at random."""
-    config = _load_config()
-    n = config.get("num_data_points", -1)
-    seed = config.get("random_seed", 42)
-    rng = random.Random(seed)
+# ---------------------------------------------------------------------------
+# DB query helpers
+# ---------------------------------------------------------------------------
 
-    rows = []
-    with open(DATA_FILE, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows.append(row)
+def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
+                     price_max=None, battery_min=None, year_from=None,
+                     year_to=None, sort="newest", limit=5000, offset=0):
+    """Query phones from comparison_aggregators_phones with filters.
 
-    if n > 0 and n < len(rows):
-        rows = rng.sample(rows, n)
+    Returns interpreted phone dicts.  Because _interpret_record computes
+    derived fields (year, os_family, price, battery_mah) from raw strings,
+    we do text-level filtering where feasible and post-filter the rest.
+    """
+    conn = _db_conn()
+    clauses = []
+    params = []
 
+    # Text search — search brand, name, os, chipset
+    if q:
+        clauses.append(
+            "(name LIKE ? OR brand LIKE ? OR os LIKE ? OR chipset LIKE ?)"
+        )
+        params.extend([f"%{q}%"] * 4)
+
+    # Brand filter — exact match
+    if brand:
+        clauses.append("brand = ?")
+        params.append(brand)
+
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    sql = f"SELECT * FROM comparison_aggregators_phones {where} LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = conn.execute(sql, params).fetchall()
+
+    # Interpret all rows, then apply post-filters that need computed fields
     phones = []
-    for idx, raw in enumerate(rows, 1):
-        phones.append(_interpret_record(raw, idx))
+    for i, row in enumerate(rows):
+        raw = _deserialize_row(row)
+        phone = _interpret_record(raw, offset + i + 1)
+        phones.append(phone)
 
-    # Sort by year descending (newest first), then name
-    phones.sort(key=lambda p: (-(p["year"] or 0), p["name"]))
+    # Post-filter on computed fields
+    if os_family:
+        phones = [p for p in phones if p["os_family"] == os_family]
+    if price_min is not None:
+        phones = [p for p in phones if p["price"] is not None and p["price"] >= price_min]
+    if price_max is not None:
+        phones = [p for p in phones if p["price"] is not None and p["price"] <= price_max]
+    if battery_min is not None:
+        phones = [p for p in phones if p["battery_mah"] is not None and p["battery_mah"] >= battery_min]
+    if year_from is not None:
+        phones = [p for p in phones if p["year"] is not None and p["year"] >= year_from]
+    if year_to is not None:
+        phones = [p for p in phones if p["year"] is not None and p["year"] <= year_to]
+
+    # Sort
+    phones = _sort_phones(phones, sort)
+
+    # Re-assign sequential IDs after filtering/sorting
     for i, p in enumerate(phones, 1):
         p["id"] = i
 
     return phones
 
 
+def _db_get_phone_by_item_id(item_id):
+    """Look up a single phone by its id in comparison_aggregators_phones."""
+    conn = _db_conn()
+    row = conn.execute(
+        "SELECT * FROM comparison_aggregators_phones WHERE id = ?",
+        (item_id,),
+    ).fetchone()
+    if not row:
+        return None
+    raw = _deserialize_row(row)
+    return _interpret_record(raw, raw.get("id", 0))
+
+
+def _db_count_phones():
+    conn = _db_conn()
+    return conn.execute(
+        "SELECT COUNT(*) FROM comparison_aggregators_phones"
+    ).fetchone()[0]
+
+
+# Brand and OS family caches (computed once from DB)
+_db_brands_cache = None
+_db_os_cache = None
+
+
+def _db_get_brands():
+    global _db_brands_cache
+    if _db_brands_cache is not None:
+        return _db_brands_cache
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT DISTINCT brand FROM comparison_aggregators_phones"
+    ).fetchall()
+    _db_brands_cache = sorted(b[0] for b in rows if b[0] and b[0].strip())
+    return _db_brands_cache
+
+
+def _db_get_os_families():
+    """Compute unique OS families from the DB.
+
+    Because os_family is a computed field (not stored in raw data), we sample
+    a batch and extract unique values.
+    """
+    global _db_os_cache
+    if _db_os_cache is not None:
+        return _db_os_cache
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT os FROM comparison_aggregators_phones LIMIT 20000"
+    ).fetchall()
+    families = set()
+    for row in rows:
+        os_raw = (row[0] or "").strip()
+        if "Android" in os_raw:
+            families.add("Android")
+        elif "iOS" in os_raw or os_raw.startswith("Apple"):
+            families.add("iOS")
+        elif "Windows" in os_raw:
+            families.add("Windows")
+        elif "Symbian" in os_raw:
+            families.add("Symbian")
+        elif "BlackBerry" in os_raw:
+            families.add("BlackBerry")
+        elif os_raw == "Feature phone" or os_raw == "":
+            families.add("Feature phone")
+        else:
+            families.add("Other")
+    _db_os_cache = sorted(families)
+    return _db_os_cache
+
+
+def _db_related_phones(phone, limit=6):
+    """Find phones with the same brand from DB."""
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT * FROM comparison_aggregators_phones "
+        "WHERE brand = ? AND id != ? LIMIT ?",
+        (phone["brand"], phone["original_id"], limit),
+    ).fetchall()
+    return [_interpret_record(_deserialize_row(r), _deserialize_row(r).get("id", i))
+            for i, r in enumerate(rows)]
+
+
 # ---------------------------------------------------------------------------
-# Caching
+# Unified accessors — always use DB
 # ---------------------------------------------------------------------------
-
-_phones = None
-_brands = None
-_os_families = None
-
-
-def _ensure_loaded():
-    global _phones, _brands, _os_families
-    if _phones is None:
-        _phones = _load_phones()
-        _brands = sorted(set(p["brand"] for p in _phones if p["brand"]))
-        _os_families = sorted(set(p["os_family"] for p in _phones))
-
-
-def _get_phones():
-    _ensure_loaded()
-    return _phones
 
 
 def _get_brands():
-    _ensure_loaded()
-    return _brands
+    return _db_get_brands()
 
 
 def _get_os_families():
-    _ensure_loaded()
-    return _os_families
+    return _db_get_os_families()
 
 
 # ---------------------------------------------------------------------------
-# Users (mutable state)
+# Users (mutable state — stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
-# Search / filter helpers
+# Search / filter helpers (used for file-based fallback)
 # ---------------------------------------------------------------------------
 
 def _search_phones(phones, query):
@@ -304,7 +408,6 @@ def _sort_phones(phones, sort_key):
 
 @blueprint.route("/")
 def index():
-    phones = _get_phones()
     brands = _get_brands()
     os_families = _get_os_families()
 
@@ -316,14 +419,11 @@ def index():
     price_max = request.args.get("price_max", type=float)
     battery_min = request.args.get("battery_min", type=float)
 
-    results = list(phones)
-    if q:
-        results = _search_phones(results, q)
-    results = _filter_phones(results, brand=brand or None,
-                             os_family=os_fam or None,
-                             price_min=price_min, price_max=price_max,
-                             battery_min=battery_min)
-    results = _sort_phones(results, sort)
+    results = _db_query_phones(
+        q=q, brand=brand or None, os_family=os_fam or None,
+        sort=sort, price_min=price_min, price_max=price_max,
+        battery_min=battery_min,
+    )
 
     user = None
     if "user_id" in session:
@@ -339,13 +439,12 @@ def index():
 
 @blueprint.route("/phone/<int:phone_id>")
 def phone_detail(phone_id):
-    phones = _get_phones()
-    phone = next((p for p in phones if p["id"] == phone_id), None)
+    phone = _db_get_phone_by_item_id(phone_id)
     if phone is None:
         abort(404)
-    # Find related phones from same brand
-    related = [p for p in phones if p["brand"] == phone["brand"]
-               and p["id"] != phone_id][:6]
+    phone["id"] = phone_id
+    related = _db_related_phones(phone)
+
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -355,10 +454,10 @@ def phone_detail(phone_id):
 
 @blueprint.route("/brand/<path:brand_name>")
 def brand_page(brand_name):
-    phones = _get_phones()
-    filtered = [p for p in phones if p["brand"] == brand_name]
     sort = request.args.get("sort", "newest").strip()
-    filtered = _sort_phones(filtered, sort)
+
+    filtered = _db_query_phones(brand=brand_name, sort=sort)
+
     return render_template("comparison-aggregators/brand.html",
                            phones=filtered, brand_name=brand_name,
                            brands=_get_brands(), sort=sort)
@@ -367,14 +466,17 @@ def brand_page(brand_name):
 @blueprint.route("/compare")
 def compare_page():
     ids_str = request.args.get("ids", "")
-    phones = _get_phones()
     selected = []
     if ids_str:
         ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
-        selected = [p for p in phones if p["id"] in ids]
-        # Preserve the order requested
-        id_order = {pid: i for i, pid in enumerate(ids)}
-        selected.sort(key=lambda p: id_order.get(p["id"], 999))
+        for pid in ids:
+            phone = _db_get_phone_by_item_id(pid)
+            if phone:
+                phone["id"] = pid
+                selected.append(phone)
+
+    phones = _db_query_phones(limit=500)
+
     return render_template("comparison-aggregators/compare.html",
                            phones=phones, selected=selected)
 
@@ -410,9 +512,20 @@ def dashboard():
     user = _get_user(session["user_id"])
     if not user:
         return redirect(url_for("comparison-aggregators.login_page"))
-    phones = _get_phones()
-    fav_phones = [p for p in phones if p["id"] in user.get("favorites", [])]
-    compare_phones = [p for p in phones if p["id"] in user.get("compare_lists", [])]
+
+    fav_phones = []
+    for pid in user.get("favorites", []):
+        phone = _db_get_phone_by_item_id(pid)
+        if phone:
+            phone["id"] = pid
+            fav_phones.append(phone)
+    compare_phones = []
+    for pid in user.get("compare_lists", []):
+        phone = _db_get_phone_by_item_id(pid)
+        if phone:
+            phone["id"] = pid
+            compare_phones.append(phone)
+
     return render_template("comparison-aggregators/dashboard.html",
                            user=user, fav_phones=fav_phones,
                            compare_phones=compare_phones)
@@ -492,7 +605,6 @@ def form_remove_compare(phone_id):
 
 @blueprint.route("/api/phones")
 def api_phones():
-    phones = _get_phones()
     q = request.args.get("q", "").strip()
     brand = request.args.get("brand", "").strip()
     os_fam = request.args.get("os", "").strip()
@@ -504,42 +616,39 @@ def api_phones():
     year_to = request.args.get("year_to", type=int)
     limit = request.args.get("limit", type=int)
 
-    results = list(phones)
-    if q:
-        results = _search_phones(results, q)
-    results = _filter_phones(results, brand=brand or None,
-                             os_family=os_fam or None,
-                             price_min=price_min, price_max=price_max,
-                             battery_min=battery_min,
-                             year_from=year_from, year_to=year_to)
-    results = _sort_phones(results, sort)
-    if limit:
-        results = results[:limit]
+    results = _db_query_phones(
+        q=q, brand=brand or None, os_family=os_fam or None,
+        sort=sort, price_min=price_min, price_max=price_max,
+        battery_min=battery_min, year_from=year_from, year_to=year_to,
+        limit=limit or 5000,
+    )
+
     return jsonify(results)
 
 
 @blueprint.route("/api/phones/<int:phone_id>")
 def api_phone(phone_id):
-    phones = _get_phones()
-    phone = next((p for p in phones if p["id"] == phone_id), None)
+    phone = _db_get_phone_by_item_id(phone_id)
     if phone is None:
         abort(404)
+    phone["id"] = phone_id
     return jsonify(phone)
 
 
 @blueprint.route("/api/brands")
 def api_brands():
-    phones = _get_phones()
-    counts = Counter(p["brand"] for p in phones)
-    return jsonify([{"name": b, "count": c} for b, c in sorted(counts.items())])
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT brand, COUNT(*) FROM comparison_aggregators_phones "
+        "GROUP BY brand ORDER BY brand"
+    ).fetchall()
+    return jsonify([{"name": r[0], "count": r[1]} for r in rows if r[0] and r[0].strip()])
 
 
 @blueprint.route("/api/brands/<path:brand_name>/phones")
 def api_brand_phones(brand_name):
-    phones = _get_phones()
     sort = request.args.get("sort", "newest").strip()
-    filtered = [p for p in phones if p["brand"] == brand_name]
-    filtered = _sort_phones(filtered, sort)
+    filtered = _db_query_phones(brand=brand_name, sort=sort)
     return jsonify(filtered)
 
 
@@ -547,19 +656,21 @@ def api_brand_phones(brand_name):
 def api_compare():
     ids_str = request.args.get("ids", "")
     ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
-    phones = _get_phones()
-    selected = [p for p in phones if p["id"] in ids]
-    id_order = {pid: i for i, pid in enumerate(ids)}
-    selected.sort(key=lambda p: id_order.get(p["id"], 999))
+    selected = []
+    for pid in ids:
+        phone = _db_get_phone_by_item_id(pid)
+        if phone:
+            phone["id"] = pid
+            selected.append(phone)
     return jsonify(selected)
 
 
 @blueprint.route("/api/stats")
 def api_stats():
-    phones = _get_phones()
-    brand = request.args.get("brand", "").strip()
-    if brand:
-        phones = [p for p in phones if p["brand"] == brand]
+    brand_filter = request.args.get("brand", "").strip()
+
+    phones = _db_query_phones(brand=brand_filter or None, limit=20000)
+
     if not phones:
         return jsonify({"count": 0})
 

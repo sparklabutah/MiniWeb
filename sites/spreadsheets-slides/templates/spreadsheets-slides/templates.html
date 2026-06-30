@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Templates - SheetDeck</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .header a { color: #0f9d58; text-decoration: none; font-size: 1.2rem; font-weight: 500; }
+        .header h1 { font-size: 1rem; font-weight: 400; color: #5f6368; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+        .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .template-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1.2rem; }
+        .template-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .template-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 0.3rem; }
+        .template-desc { font-size: 0.82rem; color: #5f6368; margin-bottom: 0.5rem; line-height: 1.4; }
+        .template-meta { display: flex; align-items: center; gap: 0.5rem; }
+        .template-type { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; font-weight: 500; }
+        .template-type.spreadsheet { background: #e6f4ea; color: #0f9d58; }
+        .template-type.presentation { background: #fef7e0; color: #f9ab00; }
+        .template-cat { font-size: 0.75rem; color: #80868b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('spreadsheets-slides.index') }}">SheetDeck</a>
+        <h1>Templates</h1>
+    </div>
+
+    <div class="container">
+        <div class="template-grid">
+            {% for t in templates %}
+            <div class="template-card">
+                <div class="template-name">{{ t.name }}</div>
+                <div class="template-desc">{{ t.description }}</div>
+                <div class="template-meta">
+                    <span class="template-type {{ t.type }}">{{ t.type|capitalize }}</span>
+                    <span class="template-cat">{{ t.category }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

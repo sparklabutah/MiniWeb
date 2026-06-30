@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meetings - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .filters { background: #fff; padding: 1rem 1.2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.2rem; }
+        .filters form { display: flex; flex-wrap: wrap; gap: .8rem; align-items: flex-end; }
+        .filters .field { display: flex; flex-direction: column; gap: .3rem; }
+        .filters label { font-size: .75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .filters input, .filters select { padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .filters input:focus, .filters select:focus { border-color: #4fc3f7; outline: none; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .results-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        thead { background: #f8fafc; }
+        th { padding: .7rem 1rem; text-align: left; font-size: .8rem; color: #64748b; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f0f0f0; }
+        tr:hover { background: #f8fafc; }
+        .tag { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; }
+        .tag.scheduled { background: #e3f2fd; color: #1565c0; }
+        .tag.completed { background: #e8f5e9; color: #2e7d32; }
+        .tag.cancelled { background: #fce4ec; color: #c62828; }
+        .tag.work { background: #e3f2fd; color: #1565c0; }
+        .tag.personal { background: #fce4ec; color: #c62828; }
+        td a { color: #1976d2; text-decoration: none; font-weight: 500; }
+        td a:hover { text-decoration: underline; }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}" class="active">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>Meetings</h2>
+
+        <div class="filters">
+            <form method="get" action="{{ url_for('remote-calls.meetings_page') }}">
+                <div class="field">
+                    <label for="q">Search</label>
+                    <input type="text" name="q" id="q" value="{{ search }}" placeholder="Meeting title...">
+                </div>
+                <div class="field">
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="">All</option>
+                        <option value="scheduled" {{ 'selected' if status == 'scheduled' }}>Scheduled</option>
+                        <option value="completed" {{ 'selected' if status == 'completed' }}>Completed</option>
+                        <option value="cancelled" {{ 'selected' if status == 'cancelled' }}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="type">Type</label>
+                    <select name="type" id="type">
+                        <option value="">All</option>
+                        <option value="work" {{ 'selected' if meeting_type == 'work' }}>Work</option>
+                        <option value="personal" {{ 'selected' if meeting_type == 'personal' }}>Personal</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="participant">Participant</label>
+                    <select name="participant" id="participant">
+                        <option value="">All</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {{ 'selected' if participant == u.id }}>{{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="date_from">From</label>
+                    <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+                </div>
+                <div class="field">
+                    <label for="date_to">To</label>
+                    <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+                </div>
+                <div class="field" style="justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                </div>
+                <div class="field" style="justify-content:flex-end;">
+                    <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Reset</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="results-count">{{ meetings|length }} meeting{{ 's' if meetings|length != 1 }} found</div>
+
+        {% if meetings %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Date &amp; Time</th>
+                    <th>Duration</th>
+                    <th>Host</th>
+                    <th>Participants</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Recording</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in meetings %}
+                <tr>
+                    <td><a href="{{ url_for('remote-calls.meeting_detail', meeting_id=m.id) }}">{{ m.title }}</a></td>
+                    <td>{{ parse_dt(m.date).strftime('%b %d, %Y %I:%M %p') if parse_dt(m.date) else m.date }}</td>
+                    <td>{{ format_duration_minutes(m.duration_minutes) }}</td>
+                    <td>{{ user_map.get(m.host_id, 'Unknown') }}</td>
+                    <td>{{ m.participants|length }}</td>
+                    <td><span class="tag {{ m.type }}">{{ m.type|capitalize }}</span></td>
+                    <td><span class="tag {{ m.status }}">{{ m.status|capitalize }}</span></td>
+                    <td>{% if m.recording_available %}&#127909; Yes{% else %}--{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">No meetings match your filters.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

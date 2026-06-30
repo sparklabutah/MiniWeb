@@ -19,7 +19,7 @@ from pathlib import Path
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "sites" / "wiki" / "data"
+OUTPUT_DIR = Path("/scratch/general/vast/u1653932/data_sources/wikis")
 
 # Topic seeds for varied coverage
 TOPIC_SEEDS = {

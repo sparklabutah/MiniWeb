@@ -1,69 +1,149 @@
 {% extends "brokerage/base.html" %}
-{% block title %}Watchlist — TradeCore{% endblock %}
+{% block title %}Lists | TradeVista{% endblock %}
 {% block content %}
-<div class="card">
-    <h2>Watchlist ({{ watched|length }})</h2>
-    <div id="wl-msg" class="msg msg-success"></div>
-    <table>
-        <thead>
-            <tr>
-                <th>Symbol</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Price</th>
-                <th>Change</th>
-                <th>Change %</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in watched %}
-            <tr id="wl-{{ t.symbol }}">
-                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}"><strong>{{ t.symbol }}</strong></a></td>
-                <td>{{ t.name }}</td>
-                <td><span class="tag tag-{{ t.type }}">{{ t.type }}</span></td>
-                <td>${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</td>
-                <td class="{% if t.change >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change) }}</td>
-                <td class="{% if t.change_pct >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.change_pct >= 0 }}{{ t.change_pct }}%</td>
-                <td><span class="market-status {% if t.market_open %}status-open{% else %}status-closed{% endif %}">{% if t.market_open %}Open{% else %}Closed{% endif %}</span></td>
-                <td>
-                    <form method="post" action="{{ url_for('brokerage.form_watchlist_toggle') }}" style="display:inline">
-                        <input type="hidden" name="symbol" value="{{ t.symbol }}">
-                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if not watched %}
-    <p style="color:#8b949e;padding:1rem;">Your watchlist is empty.</p>
-    {% endif %}
-</div>
+<div class="rh-main">
+    <div class="rh-content">
+        <div style="margin-bottom:24px;">
+            <h1 class="rh-section-title" style="font-size:28px;">Lists</h1>
+        </div>
 
-<div class="card">
-    <h2>Price Alerts ({{ alerts|length }})</h2>
-    <table>
-        <thead>
-            <tr><th>Symbol</th><th>Condition</th><th>Target Price</th></tr>
-        </thead>
-        <tbody>
-            {% for a in alerts %}
-            <tr>
-                <td><strong>{{ a.symbol }}</strong></td>
-                <td>{{ a.condition|title }}</td>
-                <td>${{ "%.2f"|format(a.price) if a.price >= 1 else "%.4f"|format(a.price) }}</td>
-            </tr>
+        <!-- Watchlist -->
+        <div class="rh-card">
+            <div class="rh-card-header">
+                <h2>My List</h2>
+                <span class="rh-label">{{ watched|length }} item{{ 's' if watched|length != 1 }}</span>
+            </div>
+            {% if watched %}
+            {% for t in watched %}
+            <div class="wl-item" style="padding:16px 20px;">
+                <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" style="display:flex;align-items:center;flex:1;text-decoration:none;gap:16px;">
+                    <div style="min-width:80px;">
+                        <div class="wl-sym" style="font-size:15px;">{{ t.symbol }}</div>
+                        <div class="wl-name" style="max-width:140px;">{{ t.name }}</div>
+                    </div>
+
+                    <!-- Sparkline -->
+                    {% if t.sparkline_prices and t.sparkline_prices|length > 1 %}
+                    <div style="flex:1;max-width:200px;">
+                        {% set sp_min = t.sparkline_prices|min %}
+                        {% set sp_max = t.sparkline_prices|max %}
+                        {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                        <svg class="sparkline-svg" width="120" height="32" viewBox="0 0 120 32" style="width:100%;">
+                            <polyline fill="none" stroke="{% if t.change >= 0 %}#00C805{% else %}#FF5000{% endif %}" stroke-width="1.5"
+                                points="{% for sp in t.sparkline_prices %}{{ (loop.index0 / (t.sparkline_prices|length - 1) * 118 + 1)|round(1) }},{{ (31 - (sp - sp_min) / sp_range * 30)|round(1) }} {% endfor %}"/>
+                        </svg>
+                    </div>
+                    {% endif %}
+
+                    <div class="wl-right" style="min-width:100px;">
+                        <div class="wl-price" style="font-size:15px;" data-live-price="{{ t.symbol }}">
+                            ${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}
+                        </div>
+                        <div class="wl-change {% if t.change >= 0 %}rh-green{% else %}rh-red{% endif %}" style="font-size:13px;" data-live-change="{{ t.symbol }}">
+                            {{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change|abs) }}
+                            ({{ "+" if t.change_pct >= 0 }}{{ "%.2f"|format(t.change_pct) }}%)
+                        </div>
+                    </div>
+                </a>
+                <form method="post" action="{{ url_for('brokerage.form_watchlist_toggle') }}" style="margin-left:16px;">
+                    <input type="hidden" name="symbol" value="{{ t.symbol }}">
+                    <button type="submit" class="rh-btn rh-btn-outline rh-btn-xs" title="Remove from list">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="7" x2="11" y2="7"/></svg>
+                    </button>
+                </form>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
-    {% if not alerts %}
-    <p style="color:#8b949e;padding:1rem;">No alerts set.</p>
-    {% endif %}
+            {% else %}
+            <div style="padding:40px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Your list is empty</div>
+                <div class="rh-label" style="margin-bottom:16px;">Add stocks to your list to track their performance.</div>
+                <a href="{{ url_for('brokerage.index') }}" class="rh-btn rh-btn-primary">Browse Stocks</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Price Alerts -->
+        {% if alerts %}
+        <div class="rh-card" style="margin-top:24px;">
+            <div class="rh-card-header">
+                <h2>Price Alerts</h2>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="rh-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Condition</th>
+                            <th class="right">Target Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in alerts %}
+                        <tr>
+                            <td style="font-weight:700;">{{ a.symbol }}</td>
+                            <td>
+                                <span class="rh-tag {% if a.condition == 'above' %}rh-tag-stock{% else %}rh-tag-crypto{% endif %}">
+                                    {{ a.condition|title }}
+                                </span>
+                            </td>
+                            <td class="right">${{ "%.2f"|format(a.price) if a.price >= 1 else "%.4f"|format(a.price) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar: Discover -->
+    <div class="rh-sidebar">
+        <div class="rh-card" style="position:sticky;top:80px;">
+            <div class="rh-card-header">
+                <h2 style="font-size:16px;">Discover</h2>
+            </div>
+            <div class="rh-card-body" style="text-align:center;">
+                <div class="rh-label" style="margin-bottom:12px;">Find new stocks to add to your list.</div>
+                <a href="{{ url_for('brokerage.index') }}" class="rh-btn rh-btn-outline rh-btn-sm">Explore Markets</a>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
+(function() {
+    var symbols = [];
+    document.querySelectorAll('[data-live-price]').forEach(function(el) {
+        var sym = el.getAttribute('data-live-price');
+        if (symbols.indexOf(sym) === -1) symbols.push(sym);
+    });
+
+    if (!symbols.length) return;
+
+    function updateUI(data) {
+        for (var sym in data) {
+            var d = data[sym];
+
+            document.querySelectorAll('[data-live-price="' + sym + '"]').forEach(function(el) {
+                var oldText = el.textContent.replace(/[^0-9.\-]/g, '');
+                var oldPrice = parseFloat(oldText) || 0;
+                el.textContent = d.price >= 1 ? '$' + d.price.toFixed(2) : '$' + d.price.toFixed(4);
+                if (d.price > oldPrice) { el.classList.remove('tick-up','tick-down'); void el.offsetWidth; el.classList.add('tick-up'); }
+                else if (d.price < oldPrice) { el.classList.remove('tick-up','tick-down'); void el.offsetWidth; el.classList.add('tick-down'); }
+            });
+
+            document.querySelectorAll('[data-live-change="' + sym + '"]').forEach(function(el) {
+                var sign = d.change >= 0 ? '+' : '';
+                el.textContent = sign + '$' + Math.abs(d.change).toFixed(2) + ' (' + sign + d.change_pct.toFixed(2) + '%)';
+                el.className = 'wl-change ' + (d.change >= 0 ? 'rh-green' : 'rh-red');
+                el.style.fontSize = '13px';
+            });
+        }
+    }
+
+    RH.startPolling(symbols, updateUI, 2000);
+})();
 </script>
 {% endblock %}

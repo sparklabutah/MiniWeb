@@ -2,6 +2,8 @@
 
 Temporal simulation with deterministic price walks, trading-hours awareness,
 portfolio management, order placement, watchlists, and options chain.
+Dynamic price simulation cycles through historical daily data based on
+wall-clock time so prices appear to change throughout the day.
 """
 import json
 import pathlib
@@ -11,10 +13,12 @@ from datetime import datetime, timedelta
 
 from flask import (Blueprint, Response, abort, jsonify, redirect, render_template,
                    request, session, url_for)
+from app import db
+from app.events import emit
 
+SITE = "brokerage"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
-DATA_DIR = SITE_DIR / "data"
 
 blueprint = Blueprint(
     "brokerage",
@@ -36,47 +40,59 @@ def _load_config():
 # Data loaders
 # ---------------------------------------------------------------------------
 
-def _load_json(name):
-    p = DATA_DIR / name
-    if p.exists():
-        return json.loads(p.read_text())
-    return []
-
-def _save_json(name, data):
-    (DATA_DIR / name).write_text(json.dumps(data, indent=2))
-
 def _load_tickers():
-    return _load_json("tickers.json")
+    return db.query(SITE, "tickers")
 
 def _load_price_history():
-    return _load_json("price_history.json")
+    """Load price history as a dict keyed by uppercase symbol.
+
+    The DB stores this as a single row with one column per symbol,
+    each containing JSON-encoded price data.
+    """
+    rows = db.query(SITE, "price_history")
+    if not rows:
+        return {}
+    row = rows[0]
+    result = {}
+    for col, val in row.items():
+        if col == "row_id" or col == "id":
+            continue
+        if val is not None:
+            try:
+                result[col.upper()] = json.loads(val) if isinstance(val, str) else val
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return result
 
 def _load_options():
-    return _load_json("options.json")
+    return db.query(SITE, "options")
 
 def _load_users():
-    return _load_json("users.json")
+    return db.query(SITE, "users")
 
 def _save_users(users):
-    _save_json("users.json", users)
+    db.save_collection(SITE, "users", users)
 
-def _load_portfolios():
-    return _load_json("portfolios.json")
+def _load_portfolios(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "portfolios", where=where)
 
 def _save_portfolios(portfolios):
-    _save_json("portfolios.json", portfolios)
+    db.save_collection(SITE, "portfolios", portfolios)
 
-def _load_orders():
-    return _load_json("orders.json")
+def _load_orders(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "orders", where=where, sort="-created_at")
 
 def _save_orders(orders):
-    _save_json("orders.json", orders)
+    db.save_collection(SITE, "orders", orders)
 
-def _load_watchlists():
-    return _load_json("watchlists.json")
+def _load_watchlists(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "watchlists", where=where)
 
 def _save_watchlists(watchlists):
-    _save_json("watchlists.json", watchlists)
+    db.save_collection(SITE, "watchlists", watchlists)
 
 # ---------------------------------------------------------------------------
 # Temporal simulation
@@ -153,12 +169,17 @@ def _is_market_open(ticker_type):
     return 9 * 60 + 30 <= time_val <= 16 * 60
 
 def _get_current_price(symbol):
-    """Get the current price for a symbol using intraday data at sim clock time.
+    """Get the current price for a symbol.
 
-    Uses intraday price history to return the price at the simulated time,
-    so prices fluctuate as the sim clock advances through the trading day.
-    Falls back through: same-day intraday → most recent day's intraday → daily close.
+    Prefers the dynamic simulated price (which cycles through daily data
+    based on wall-clock time). Falls back to intraday sim-clock lookup,
+    then daily close.
     """
+    # Prefer the dynamic simulated price
+    sim = _get_simulated_price(symbol)
+    if sim:
+        return sim["price"]
+
     ph = _load_price_history()
     if symbol not in ph:
         return None
@@ -227,27 +248,112 @@ def _get_price_change(symbol):
     return change, pct
 
 # ---------------------------------------------------------------------------
+# Dynamic price simulation
+# ---------------------------------------------------------------------------
+
+def _get_simulated_price(symbol):
+    """Get a simulated current price by cycling through daily price history.
+
+    Uses wall-clock time (hour * 60 + minute) modulo len(daily_data) to pick
+    a data point from the historical daily array.  This makes the displayed
+    price change every minute as the index advances through the history,
+    giving the appearance of a live market even though the underlying data
+    is static.
+
+    Returns a dict with keys: price, prev_close, change, change_pct,
+    direction ('up' or 'down'), day_high, day_low, day_open, volume,
+    and sparkline_prices (list of recent close prices for mini-chart).
+    Returns None if no daily data exists for the symbol.
+    """
+    ph = _load_price_history()
+    if symbol not in ph:
+        return None
+    daily = ph[symbol].get("daily", [])
+    if not daily:
+        return None
+
+    now = datetime.now()
+    minute_of_day = now.hour * 60 + now.minute  # 0-1439
+    idx = minute_of_day % len(daily)
+    prev_idx = (idx - 1) % len(daily)
+
+    current_day = daily[idx]
+    prev_day = daily[prev_idx]
+
+    # Use the close price as the "current" price; also incorporate a
+    # sub-minute interpolation between open and close based on seconds
+    # so that even reloads within the same minute show slight movement.
+    t_frac = now.second / 60.0
+    price = round(current_day["open"] + (current_day["close"] - current_day["open"]) * t_frac, 4)
+
+    prev_close = prev_day["close"]
+    change = round(price - prev_close, 4)
+    change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
+
+    # Build sparkline data: take all daily close prices, rotated so the
+    # current index is the last element, giving a "trailing" view.
+    sparkline = []
+    n = len(daily)
+    for i in range(n):
+        sparkline.append(daily[(idx - n + 1 + i) % n]["close"])
+
+    return {
+        "price": price,
+        "prev_close": prev_close,
+        "change": change,
+        "change_pct": change_pct,
+        "direction": "up" if change >= 0 else "down",
+        "day_high": current_day["high"],
+        "day_low": current_day["low"],
+        "day_open": current_day["open"],
+        "volume": current_day["volume"],
+        "sparkline_prices": sparkline,
+        "data_date": current_day["date"],
+    }
+
+# ---------------------------------------------------------------------------
 # Enrichment helpers
 # ---------------------------------------------------------------------------
 
 def _enrich_ticker(t):
-    """Add current_price, change, change_pct, market_open to a ticker dict."""
+    """Add current_price, change, change_pct, market_open, and sim data to a ticker dict."""
     sym = t["symbol"]
-    price = _get_current_price(sym)
-    change, pct = _get_price_change(sym)
+    sim = _get_simulated_price(sym)
+    if sim:
+        price = sim["price"]
+        change = sim["change"]
+        pct = sim["change_pct"]
+    else:
+        price = _get_current_price(sym)
+        change, pct = _get_price_change(sym)
     return {
         **t,
         "current_price": price or t["base_price"],
         "change": change,
         "change_pct": pct,
+        "direction": sim["direction"] if sim else ("up" if change >= 0 else "down"),
+        "day_high": sim["day_high"] if sim else None,
+        "day_low": sim["day_low"] if sim else None,
+        "day_open": sim["day_open"] if sim else None,
+        "volume": sim["volume"] if sim else None,
+        "sparkline_prices": sim["sparkline_prices"] if sim else [],
         "market_open": _is_market_open(t["type"]),
     }
 
 def _enrich_holding(h, tickers_map):
-    """Add current_price, market_value, gain/loss to a holding."""
+    """Add current_price, market_value, gain/loss, and price change to a holding."""
     sym = h["symbol"]
     t = tickers_map.get(sym, {})
-    current_price = _get_current_price(sym) or t.get("base_price", 0)
+    sim = _get_simulated_price(sym)
+    if sim:
+        current_price = sim["price"]
+        price_change = sim["change"]
+        price_change_pct = sim["change_pct"]
+        direction = sim["direction"]
+    else:
+        current_price = _get_current_price(sym) or t.get("base_price", 0)
+        price_change, price_change_pct = _get_price_change(sym)
+        direction = "up" if price_change >= 0 else "down"
     shares = h["shares"]
     avg_cost = h["avg_cost"]
     market_value = round(shares * current_price, 2)
@@ -263,6 +369,9 @@ def _enrich_holding(h, tickers_map):
         "cost_basis": cost_basis,
         "gain": gain,
         "gain_pct": gain_pct,
+        "price_change": price_change,
+        "price_change_pct": price_change_pct,
+        "direction": direction,
     }
 
 # ---------------------------------------------------------------------------
@@ -346,9 +455,35 @@ def index():
         results.sort(key=lambda t: -(t.get("market_cap_b") or 0))
 
     user = None
+    portfolio_value = 0
+    portfolio_change = 0
+    portfolio_change_pct = 0
+    watchlist_symbols = []
+    watchlist_tickers = []
+
     if "user_id" in session:
         users = _load_users()
         user = next((u for u in users if u["id"] == session["user_id"]), None)
+
+        if user:
+            # Portfolio summary for hero display
+            portfolios = _load_portfolios(user_id=user["id"])
+            if portfolios:
+                portfolio = portfolios[0]
+                tickers_map = {t["symbol"]: t for t in tickers}
+                enriched = [_enrich_holding(h, tickers_map) for h in portfolio["holdings"]]
+                portfolio_value = round(sum(h["market_value"] for h in enriched), 2)
+                total_cost = round(sum(h["cost_basis"] for h in enriched), 2)
+                portfolio_change = round(portfolio_value - total_cost, 2)
+                portfolio_change_pct = round((portfolio_change / total_cost) * 100, 2) if total_cost else 0
+
+            # Watchlist for sidebar
+            watchlists = _load_watchlists(user_id=user["id"])
+            if watchlists:
+                wl = watchlists[0]
+                watchlist_symbols = wl.get("symbols", [])
+                tickers_map_full = {t["symbol"]: t for t in tickers}
+                watchlist_tickers = [tickers_map_full[s] for s in watchlist_symbols if s in tickers_map_full]
 
     sim_time = _get_sim_clock()
 
@@ -356,7 +491,12 @@ def index():
                            tickers=results, sectors=sectors, types=types,
                            q=q, sec=sec, typ=typ, sort=sort,
                            price_min=price_min, price_max=price_max,
-                           user=user, sim_time=sim_time)
+                           user=user, sim_time=sim_time,
+                           portfolio_value=portfolio_value,
+                           portfolio_change=portfolio_change,
+                           portfolio_change_pct=portfolio_change_pct,
+                           watchlist_symbols=watchlist_symbols,
+                           watchlist_tickers=watchlist_tickers)
 
 
 @blueprint.route("/ticker/<symbol>")
@@ -372,28 +512,41 @@ def ticker_detail(symbol):
     # Options for this ticker
     options = [o for o in _load_options() if o["underlying"] == symbol.upper()]
 
+    # Related tickers (same sector, excluding current)
+    related_tickers = [
+        _enrich_ticker(t) for t in tickers
+        if t["sector"] == ticker["sector"] and t["symbol"] != ticker["symbol"]
+    ][:5]
+
     user = None
+    watchlist_symbols = []
     if "user_id" in session:
         users = _load_users()
         user = next((u for u in users if u["id"] == session["user_id"]), None)
+        if user:
+            watchlists = _load_watchlists(user_id=user["id"])
+            if watchlists:
+                watchlist_symbols = watchlists[0].get("symbols", [])
 
     return render_template("brokerage/ticker.html",
                            ticker=ticker, history=history, options=options,
-                           user=user, sim_time=_get_sim_clock())
+                           related_tickers=related_tickers,
+                           user=user, sim_time=_get_sim_clock(),
+                           watchlist_symbols=watchlist_symbols)
 
 
 @blueprint.route("/portfolio")
 def portfolio_page():
     if "user_id" not in session:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
     user_id = session["user_id"]
     users = _load_users()
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
 
-    portfolios = _load_portfolios()
-    portfolio = next((p for p in portfolios if p["user_id"] == user_id), {"user_id": user_id, "holdings": []})
+    portfolios = _load_portfolios(user_id=user_id)
+    portfolio = portfolios[0] if portfolios else {"user_id": user_id, "holdings": []}
     tickers_map = {t["symbol"]: t for t in _load_tickers()}
     enriched = [_enrich_holding(h, tickers_map) for h in portfolio["holdings"]]
     total_value = round(sum(h["market_value"] for h in enriched), 2)
@@ -401,25 +554,30 @@ def portfolio_page():
     total_cost = round(sum(h["cost_basis"] for h in enriched), 2)
     total_gain_pct = round((total_gain / total_cost) * 100, 2) if total_cost else 0
 
+    # Daily P&L: sum of (shares * price_change) for each holding
+    daily_pnl = round(sum(
+        h["shares"] * h["price_change"] for h in enriched
+    ), 2)
+
     return render_template("brokerage/portfolio.html",
                            user=user, holdings=enriched,
                            total_value=total_value, total_gain=total_gain,
                            total_gain_pct=total_gain_pct,
+                           daily_pnl=daily_pnl,
                            sim_time=_get_sim_clock())
 
 
 @blueprint.route("/orders")
 def orders_page():
     if "user_id" not in session:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
     user_id = session["user_id"]
     users = _load_users()
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
 
-    orders = _load_orders()
-    user_orders = [o for o in orders if o["user_id"] == user_id]
+    user_orders = _load_orders(user_id=user_id)
     status_filter = request.args.get("status", "").strip()
     if status_filter:
         user_orders = [o for o in user_orders if o["status"] == status_filter]
@@ -434,15 +592,15 @@ def orders_page():
 @blueprint.route("/watchlist")
 def watchlist_page():
     if "user_id" not in session:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
     user_id = session["user_id"]
     users = _load_users()
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
-        return render_template("brokerage/login.html", error=None)
+        return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
 
-    watchlists = _load_watchlists()
-    wl = next((w for w in watchlists if w["user_id"] == user_id), {"user_id": user_id, "symbols": [], "alerts": []})
+    watchlists = _load_watchlists(user_id=user_id)
+    wl = watchlists[0] if watchlists else {"user_id": user_id, "symbols": [], "alerts": []}
     tickers_map = {t["symbol"]: _enrich_ticker(t) for t in _load_tickers()}
     watched = [tickers_map[s] for s in wl["symbols"] if s in tickers_map]
 
@@ -465,10 +623,15 @@ def options_page():
     underlyings = sorted(set(o["underlying"] for o in _load_options()))
     tickers_map = {t["symbol"]: _enrich_ticker(t) for t in _load_tickers()}
 
+    user = None
+    if "user_id" in session:
+        users = _load_users()
+        user = next((u for u in users if u["id"] == session["user_id"]), None)
+
     return render_template("brokerage/options.html",
                            options=options, underlyings=underlyings,
                            underlying=underlying, opt_type=opt_type,
-                           tickers_map=tickers_map,
+                           tickers_map=tickers_map, user=user,
                            sim_time=_get_sim_clock())
 
 
@@ -482,14 +645,20 @@ def compare_page():
         selected = [t for t in tickers if t["symbol"] in syms]
     ph = _load_price_history()
 
+    user = None
+    if "user_id" in session:
+        users = _load_users()
+        user = next((u for u in users if u["id"] == session["user_id"]), None)
+
     return render_template("brokerage/compare.html",
                            tickers=tickers, selected=selected,
-                           price_history=ph, sim_time=_get_sim_clock())
+                           price_history=ph, user=user,
+                           sim_time=_get_sim_clock())
 
 
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    return render_template("brokerage/login.html", error=None)
+    return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
 
 
 @blueprint.route("/login", methods=["POST"])
@@ -500,7 +669,7 @@ def login_submit():
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         return render_template("brokerage/login.html",
-                               error="Invalid username or password")
+                               error="Invalid username or password", user=None, sim_time=_get_sim_clock())
     session["user_id"] = user["id"]
     return redirect(url_for("brokerage.portfolio_page"))
 
@@ -508,7 +677,7 @@ def login_submit():
 @blueprint.route("/logout")
 def logout():
     session.pop("user_id", None)
-    return render_template("brokerage/login.html", error=None)
+    return render_template("brokerage/login.html", error=None, user=None, sim_time=_get_sim_clock())
 
 
 @blueprint.route("/trade")
@@ -538,6 +707,7 @@ def trade_submit():
     order_type = request.form.get("order_type", "market").strip()
     quantity = request.form.get("quantity", "0")
     price = request.form.get("price", "")
+    account_type = request.form.get("account_type", "checking")
 
     try:
         quantity = float(quantity)
@@ -621,6 +791,8 @@ def trade_submit():
             _save_users(users)
 
         _save_portfolios(portfolios)
+
+        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=current_price, account_type=account_type)
 
     return redirect(url_for("brokerage.orders_page"))
 
@@ -903,9 +1075,8 @@ def api_user(user_id):
 
 @blueprint.route("/api/portfolio/<int:user_id>")
 def api_portfolio(user_id):
-    portfolios = _load_portfolios()
-    portfolio = next((p for p in portfolios if p["user_id"] == user_id),
-                     {"user_id": user_id, "holdings": []})
+    portfolios = _load_portfolios(user_id=user_id)
+    portfolio = portfolios[0] if portfolios else {"user_id": user_id, "holdings": []}
     tickers_map = {t["symbol"]: t for t in _load_tickers()}
     enriched = [_enrich_holding(h, tickers_map) for h in portfolio["holdings"]]
     total_value = round(sum(h["market_value"] for h in enriched), 2)
@@ -928,8 +1099,7 @@ def api_portfolio(user_id):
 
 @blueprint.route("/api/orders/<int:user_id>")
 def api_user_orders(user_id):
-    orders = _load_orders()
-    user_orders = [o for o in orders if o["user_id"] == user_id]
+    user_orders = _load_orders(user_id=user_id)
     status = request.args.get("status", "").strip()
     if status:
         user_orders = [o for o in user_orders if o["status"] == status]
@@ -952,6 +1122,7 @@ def api_place_order():
     order_type = data.get("order_type", "market").strip()
     quantity = data.get("quantity", 0)
     price = data.get("price")
+    account_type = data.get("account_type", "checking")
 
     if not user_id or not symbol or not side or not quantity:
         return jsonify({"error": "Missing required fields"}), 400
@@ -1028,6 +1199,8 @@ def api_place_order():
 
         _save_portfolios(portfolios)
 
+        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=current_price, account_type=account_type)
+
     return jsonify(new_order)
 
 
@@ -1050,9 +1223,8 @@ def api_cancel_order(order_id):
 
 @blueprint.route("/api/watchlist/<int:user_id>")
 def api_watchlist(user_id):
-    watchlists = _load_watchlists()
-    wl = next((w for w in watchlists if w["user_id"] == user_id),
-              {"user_id": user_id, "symbols": [], "alerts": []})
+    watchlists = _load_watchlists(user_id=user_id)
+    wl = watchlists[0] if watchlists else {"user_id": user_id, "symbols": [], "alerts": []}
     tickers_map = {t["symbol"]: _enrich_ticker(t) for t in _load_tickers()}
     watched = [tickers_map[s] for s in wl["symbols"] if s in tickers_map]
     return jsonify({"symbols": wl["symbols"], "tickers": watched, "alerts": wl["alerts"]})
@@ -1100,6 +1272,55 @@ def api_set_alert(user_id):
     wl["alerts"].append({"symbol": symbol, "condition": condition, "price": price})
     _save_watchlists(watchlists)
     return jsonify({"action": "alert_set", "symbol": symbol, "condition": condition, "price": price})
+
+
+@blueprint.route("/api/prices/live")
+def api_prices_live():
+    """Return current prices with small random fluctuations applied.
+
+    Each call applies a tiny random walk (+/- $0.01 to $0.50) to the base
+    simulated price, giving the illusion of a live-ticking market feed.
+    Returns a dict keyed by symbol with price, change, change_pct, direction.
+    """
+    symbols = request.args.get("symbols", "").strip()
+    tickers = _load_tickers()
+    if symbols:
+        sym_set = {s.strip().upper() for s in symbols.split(",") if s.strip()}
+        tickers = [t for t in tickers if t["symbol"] in sym_set]
+
+    result = {}
+    for t in tickers:
+        sym = t["symbol"]
+        sim = _get_simulated_price(sym)
+        if sim:
+            base_price = sim["price"]
+            prev_close = sim["prev_close"]
+        else:
+            base_price = _get_current_price(sym) or t["base_price"]
+            ph = _load_price_history()
+            daily = ph.get(sym, {}).get("daily", [])
+            prev_close = daily[-2]["close"] if len(daily) >= 2 else base_price
+
+        # Apply a small random fluctuation scaled to the price magnitude
+        # For a $200 stock: tick in range ~$0.01 to $0.50
+        # For a $0.50 crypto: tick in range ~$0.0001 to $0.005
+        magnitude = max(base_price * 0.002, 0.01)  # 0.2% of price or $0.01 min
+        tick = random.uniform(-magnitude, magnitude)
+        live_price = round(base_price + tick, 4)
+        if live_price <= 0:
+            live_price = round(base_price, 4)
+
+        change = round(live_price - prev_close, 4)
+        change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
+
+        result[sym] = {
+            "price": live_price,
+            "change": change,
+            "change_pct": change_pct,
+            "direction": "up" if change >= 0 else "down",
+        }
+
+    return jsonify(result)
 
 
 @blueprint.route("/api/rankings")

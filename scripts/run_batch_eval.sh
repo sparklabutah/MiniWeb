@@ -44,6 +44,7 @@ NEW_ONLY=false
 SITES=""
 SITE_TIMEOUT=1800     # 30 min per site
 TASK_TIMEOUT=180      # 3 min per task
+DATA_SOURCES="/scratch/general/vast/u1653932/data_sources"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -139,13 +140,46 @@ echo "Start time: $(date)" | tee "$MASTER_LOG"
 # Update TASK_TIMEOUT in tasks.py to match our setting
 sed -i "s/^TASK_TIMEOUT = .*/TASK_TIMEOUT = $TASK_TIMEOUT  # seconds per task/" evaluation/tasks.py
 
+# Site-ID to data_sources directory mapping (where they differ)
+declare -A DATA_DIR_MAP=(
+    ["academic-paper-db"]="arxiv"
+    ["comparison-aggregators"]="gsmarena"
+    ["conference-review-submission"]="PeerRead"
+    ["dictionaries-language-tools"]="wikidictionary"
+    ["e-commerce"]="webshop"
+    ["email"]="enron"
+    ["forums"]="reddit-augment"
+    ["health-fitness-tracking"]="health-fitness"
+    ["job-sites"]="indeed-jobs-augment"
+    ["live"]="live"
+    ["petitions-voting-info"]="petitions-voting"
+    ["qa-knowledge"]="stackexchange-augment"
+    ["ride-hailing-delivery"]="ride-hailing"
+    ["tax-filing-dmv-permits"]="tax-dmv"
+    ["team-chat-workspace"]="team-chat"
+    ["version-control"]="gitlab-augment"
+)
+
+# Resolve data_sources directory for a site
+get_data_dir() {
+    local site=$1
+    local mapped="${DATA_DIR_MAP[$site]:-}"
+    if [ -n "$mapped" ]; then
+        echo "$DATA_SOURCES/$mapped"
+    elif [ -d "$DATA_SOURCES/$site" ]; then
+        echo "$DATA_SOURCES/$site"
+    else
+        echo ""
+    fi
+}
+
 # Reset all site data to pristine before starting
 echo "Resetting all site data to pristine..." | tee -a "$MASTER_LOG"
 for site in "${SITE_LIST[@]}"; do
-    pristine="sites/$site/data/.pristine"
-    if [ -d "$pristine" ]; then
-        for f in "$pristine"/*.json; do
-            [ -f "$f" ] && cp "$f" "sites/$site/data/$(basename "$f")"
+    data_dir=$(get_data_dir "$site")
+    if [ -n "$data_dir" ] && [ -d "$data_dir/.pristine" ]; then
+        for f in "$data_dir/.pristine"/*.json; do
+            [ -f "$f" ] && cp "$f" "$data_dir/$(basename "$f")"
         done
     fi
 done
@@ -171,10 +205,11 @@ run_site_eval() {
     echo "[$(date +%H:%M:%S)] Starting $site round $round on port $port" | tee -a "$MASTER_LOG"
 
     # Reset data before each round
-    pristine="sites/$site/data/.pristine"
-    if [ -d "$pristine" ]; then
-        for f in "$pristine"/*.json; do
-            [ -f "$f" ] && cp "$f" "sites/$site/data/$(basename "$f")"
+    local data_dir
+    data_dir=$(get_data_dir "$site")
+    if [ -n "$data_dir" ] && [ -d "$data_dir/.pristine" ]; then
+        for f in "$data_dir/.pristine"/*.json; do
+            [ -f "$f" ] && cp "$f" "$data_dir/$(basename "$f")"
         done
     fi
 

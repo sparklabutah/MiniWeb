@@ -1,7 +1,25 @@
+"""LakeportWiki — collaborative wiki encyclopedia for Lakeport, WA.
+
+Data: reads real Wikipedia articles from the wikis_articles SQLite table,
+then merges Lakeport overlay pages on top.  Mutable state (pages, revisions,
+users) is persisted via db.save_collection().
+"""
 import json
 import pathlib
-from flask import Blueprint, render_template
+import re
+from collections import Counter
+from datetime import datetime
+
+from flask import (
+    Blueprint, abort, jsonify, redirect, render_template, request, session, url_for,
+)
+
+from app import db
+
+SITE = "wikis"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
+
+
 blueprint = Blueprint(
     "wikis",
     __name__,
@@ -9,6 +27,908 @@ blueprint = Blueprint(
     static_folder=str(SITE_DIR / "static"),
     static_url_path="/static",
 )
+
+# ---------------------------------------------------------------------------
+# Raw data interpreter — converts wiki article records to page dicts
+# ---------------------------------------------------------------------------
+
+# Wikipedia categories we recognise in the raw sample.  Used for merging into
+# the overlay category list and for browse-by-category.
+_WIKIPEDIA_CATEGORIES = [
+    "Science", "History", "Geography", "Technology", "Arts",
+    "Sports", "Politics", "Society", "Biography", "Nature",
+]
+
+
+def _normalise_slug(title):
+    """Convert an article title to a URL-safe slug."""
+    slug = title.lower().strip()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"[\s]+", "-", slug)
+    return slug
+
+
+def _interpret_wiki_article(raw, idx):
+    """Convert a raw JSONL record into the page dict shape the templates expect.
+
+    Expected raw fields (from extract_wiki_sample.py):
+        title, extract (or content), description, categories, views, pageid
+    """
+    title = raw.get("title", "").strip()
+    content = raw.get("content") or raw.get("extract") or raw.get("description") or ""
+    # Truncate very long content (ZIM articles can be 50KB+ of HTML)
+    if len(content) > 5000:
+        content = content[:5000]
+    # ZIM articles have path like "A/Article_Name" — extract slug from it
+    path = raw.get("path", "")
+    if path.startswith("A/"):
+        path = path[2:]
+    slug = raw.get("slug") or _normalise_slug(path or title)
+
+    # Pick a category from the raw record or fall back to the first known one
+    raw_cats = raw.get("categories", [])
+    category = "Wikipedia"
+    for rc in raw_cats:
+        for wc in _WIKIPEDIA_CATEGORIES:
+            if wc.lower() in rc.lower():
+                category = wc
+                break
+        if category != "Wikipedia":
+            break
+
+    views = raw.get("views", 0)
+    if isinstance(views, str):
+        views = int(re.sub(r"[^\d]", "", views) or "0")
+
+    return {
+        "id": 100000 + idx,          # high ID range to avoid overlay collisions
+        "title": title,
+        "slug": slug,
+        "content": content,
+        "category": category,
+        "author_id": 0,              # no specific overlay author
+        "created_at": raw.get("timestamp", "2022-05-01T00:00:00"),
+        "updated_at": raw.get("timestamp", "2022-05-01T00:00:00"),
+        "views": views,
+        "linked_pages": [],
+        "_source": "wikipedia",       # internal marker (not used by templates)
+    }
+
+
+def _load_raw_wiki():
+    """Load real Wikipedia articles from the wikis_articles table.
+
+    Returns a list of page dicts in the same shape as the overlay pages.
+    Returns an empty list when the table is empty (graceful fallback).
+    """
+    try:
+        from app.db import _get_conn, _deserialize_row
+        conn = _get_conn()
+        rows = conn.execute("SELECT * FROM wikis_articles LIMIT 5000").fetchall()
+    except Exception:
+        return []
+
+    pages = []
+    for idx, row in enumerate(rows, 1):
+        raw = _deserialize_row(row)
+        # Parse JSON columns stored as TEXT
+        if isinstance(raw.get("categories"), str):
+            try:
+                raw["categories"] = json.loads(raw["categories"])
+            except (json.JSONDecodeError, TypeError):
+                raw["categories"] = []
+        pages.append(_interpret_wiki_article(raw, idx))
+    return pages
+
+
+# ---------------------------------------------------------------------------
+# Data helpers
+# ---------------------------------------------------------------------------
+
+def _load_pages():
+    """Load merged page list: raw Wikipedia base + overlay Lakeport pages.
+
+    Overlay pages (IDs 1-30) always take precedence.  Raw Wikipedia articles
+    use IDs starting at 100 000.  The merged list is returned for read
+    operations; write operations only touch the overlay collection.
+    """
+    overlay_pages = db.query(SITE, "pages")
+    raw_pages = _load_raw_wiki()
+
+    if not raw_pages:
+        return overlay_pages
+
+    # Deduplicate: overlay slugs win over raw slugs
+    overlay_slugs = {p["slug"] for p in overlay_pages}
+    merged = list(overlay_pages)
+    for rp in raw_pages:
+        if rp["slug"] not in overlay_slugs:
+            merged.append(rp)
+
+    return merged
+
+
+def _load_overlay_pages():
+    """Load overlay pages only (for mutation operations)."""
+    return db.query(SITE, "pages")
+
+
+def _save_pages(pages):
+    """Save overlay pages only.  Caller must ensure no raw Wikipedia pages
+    are included — use _load_overlay_pages() for mutation workflows."""
+    db.save_collection(SITE, "pages", pages)
+
+
+def _load_revisions():
+    return db.query(SITE, "revisions")
+
+
+def _save_revisions(revisions):
+    db.save_collection(SITE, "revisions", revisions)
+
+
+def _load_categories():
+    """Load categories: overlay categories + any extra Wikipedia categories.
+
+    Wikipedia category entries are synthesised from the raw page data so they
+    appear in category listings and navigation without modifying the overlay
+    collection.
+    """
+    overlay_cats = db.query(SITE, "categories")
+    overlay_names = {c["name"] for c in overlay_cats}
+
+    # Gather categories introduced by raw Wikipedia pages
+    all_pages = _load_pages()
+    cat_counts = {}
+    for p in all_pages:
+        cat = p.get("category", "")
+        if cat:
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+    # Update counts for existing overlay categories
+    for c in overlay_cats:
+        c["page_count"] = cat_counts.get(c["name"], 0)
+
+    # Add new categories that only exist in the raw data
+    next_id = max((c["id"] for c in overlay_cats), default=0) + 1
+    for cat_name, count in sorted(cat_counts.items()):
+        if cat_name not in overlay_names:
+            overlay_cats.append({
+                "id": 1000 + next_id,
+                "name": cat_name,
+                "description": f"Articles about {cat_name} from Wikipedia.",
+                "page_count": count,
+            })
+            next_id += 1
+
+    return overlay_cats
+
+
+def _save_categories(categories):
+    db.save_collection(SITE, "categories", categories)
+
+
+def _load_users():
+    return db.query(SITE, "users")
+
+
+def _save_users(users):
+    db.save_collection(SITE, "users", users)
+
+
+def _get_user(user_id):
+    users = _load_users()
+    return next((u for u in users if u["id"] == user_id), None)
+
+
+def _get_page_by_slug(slug):
+    pages = _load_pages()
+    return next((p for p in pages if p["slug"] == slug), None)
+
+
+def _recount_categories():
+    """Recompute page_count for each category (overlay collection only)."""
+    overlay_pages = db.query(SITE, "pages")
+    categories = db.query(SITE, "categories")
+    counts = {}
+    for p in overlay_pages:
+        cat = p.get("category", "")
+        counts[cat] = counts.get(cat, 0) + 1
+    for c in categories:
+        c["page_count"] = counts.get(c["name"], 0)
+    _save_categories(categories)
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+def _search_pages(pages, query):
+    if not query:
+        return pages
+    q = query.lower().strip()
+    scored = []
+    for p in pages:
+        text = (p["title"] + " " + p["content"] + " " + p.get("category", "")).lower()
+        terms = q.split()
+        score = sum(1 for t in terms if t in text)
+        if score > 0:
+            scored.append((p, score))
+    scored.sort(key=lambda x: -x[1])
+    return [p for p, _ in scored]
+
+
+# ---------------------------------------------------------------------------
+# HTML routes
+# ---------------------------------------------------------------------------
+
 @blueprint.route("/")
 def index():
-    return render_template("wikis/index.html")
+    pages = _load_pages()
+    categories = _load_categories()
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    # Sort by views descending for main page
+    featured = sorted(pages, key=lambda p: -p["views"])[:10]
+    recent_edits = sorted(pages, key=lambda p: p["updated_at"], reverse=True)[:10]
+    return render_template("wikis/index.html",
+                           pages=pages, categories=categories,
+                           featured=featured, recent_edits=recent_edits,
+                           user=user)
+
+
+@blueprint.route("/wiki/<slug>")
+def wiki_page(slug):
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    pages = _load_pages()
+    revisions = _load_revisions()
+    page_revisions = [r for r in revisions if r["page_id"] == page["id"]]
+    page_revisions.sort(key=lambda r: r["timestamp"], reverse=True)
+    users = _load_users()
+    author = next((u for u in users if u["id"] == page["author_id"]), None)
+    # Resolve linked pages
+    linked = []
+    for lp_slug in page.get("linked_pages", []):
+        lp = next((p for p in pages if p["slug"] == lp_slug), None)
+        if lp:
+            linked.append(lp)
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template("wikis/article.html",
+                           page=page, revisions=page_revisions,
+                           author=author, linked=linked, user=user,
+                           categories=categories)
+
+
+@blueprint.route("/edit/<slug>")
+def edit_page(slug):
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template("wikis/edit.html", page=page, user=user,
+                           categories=categories)
+
+
+@blueprint.route("/edit/<slug>", methods=["POST"])
+def edit_page_submit(slug):
+    # For edits we work against the overlay file only.  If the slug belongs
+    # to a raw Wikipedia article we promote it into the overlay first.
+    overlay_pages = _load_overlay_pages()
+    page = next((p for p in overlay_pages if p["slug"] == slug), None)
+
+    if not page:
+        # Check if it's a raw Wikipedia page — promote to overlay for editing
+        all_pages = _load_pages()
+        raw_page = next((p for p in all_pages if p["slug"] == slug), None)
+        if not raw_page:
+            abort(404)
+        # Copy into overlay (strip internal marker)
+        promoted = {k: v for k, v in raw_page.items() if not k.startswith("_")}
+        overlay_pages.append(promoted)
+        page = promoted
+
+    new_content = request.form.get("content", "").strip()
+    new_title = request.form.get("title", "").strip() or page["title"]
+    new_category = request.form.get("category", "").strip() or page["category"]
+    summary = request.form.get("summary", "").strip() or "Updated page"
+
+    if not new_content:
+        return "Content is required", 400
+
+    old_lines = page["content"].count("\n")
+    new_lines = new_content.count("\n")
+
+    page["content"] = new_content
+    page["title"] = new_title
+    page["category"] = new_category
+    page["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    _save_pages(overlay_pages)
+
+    # Create revision
+    revisions = _load_revisions()
+    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
+    editor_id = session.get("user_id", 1)
+    revisions.append({
+        "id": new_rev_id,
+        "page_id": page["id"],
+        "editor_id": editor_id,
+        "timestamp": page["updated_at"],
+        "summary": summary,
+        "diff_lines_added": max(0, new_lines - old_lines + 2),
+        "diff_lines_removed": max(0, old_lines - new_lines + 1),
+    })
+    _save_revisions(revisions)
+
+    # Update user edit count
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+
+    _recount_categories()
+    return redirect(url_for("wikis.wiki_page", slug=slug))
+
+
+@blueprint.route("/create")
+def create_page():
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template("wikis/create.html", user=user, categories=categories)
+
+
+@blueprint.route("/create", methods=["POST"])
+def create_page_submit():
+    title = request.form.get("title", "").strip()
+    content = request.form.get("content", "").strip()
+    category = request.form.get("category", "").strip()
+    slug = request.form.get("slug", "").strip()
+
+    if not title or not content:
+        return "Title and content are required", 400
+
+    if not slug:
+        slug = title.lower().replace(" ", "-")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")
+
+    # Check slug uniqueness across ALL pages (overlay + raw)
+    all_pages = _load_pages()
+    if any(p["slug"] == slug for p in all_pages):
+        return "A page with that slug already exists", 400
+
+    # Use a safe ID that won't collide with raw IDs (100000+)
+    new_id = max((p["id"] for p in all_pages), default=0) + 1
+    editor_id = session.get("user_id", 1)
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    new_page = {
+        "id": new_id,
+        "title": title,
+        "slug": slug,
+        "content": content,
+        "category": category or "Lakeport City",
+        "author_id": editor_id,
+        "created_at": now,
+        "updated_at": now,
+        "views": 0,
+        "linked_pages": [],
+    }
+    # Only append to overlay pages, not the merged list
+    overlay_pages = _load_overlay_pages()
+    overlay_pages.append(new_page)
+    _save_pages(overlay_pages)
+
+    # Create revision
+    revisions = _load_revisions()
+    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
+    revisions.append({
+        "id": new_rev_id,
+        "page_id": new_id,
+        "editor_id": editor_id,
+        "timestamp": now,
+        "summary": f"Created article: {title}",
+        "diff_lines_added": content.count("\n") + 1,
+        "diff_lines_removed": 0,
+    })
+    _save_revisions(revisions)
+
+    # Update user edit count
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+
+    _recount_categories()
+    return redirect(url_for("wikis.wiki_page", slug=slug))
+
+
+@blueprint.route("/category/<int:cat_id>")
+def category_page(cat_id):
+    categories = _load_categories()
+    cat = next((c for c in categories if c["id"] == cat_id), None)
+    if not cat:
+        abort(404)
+    pages = _load_pages()
+    cat_pages = [p for p in pages if p["category"] == cat["name"]]
+    cat_pages.sort(key=lambda p: p["title"])
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    return render_template("wikis/category.html", category=cat,
+                           pages=cat_pages, categories=categories, user=user)
+
+
+@blueprint.route("/recent-changes")
+def recent_changes():
+    revisions = _load_revisions()
+    revisions_sorted = sorted(revisions, key=lambda r: r["timestamp"], reverse=True)
+    pages = _load_pages()
+    users = _load_users()
+    page_map = {p["id"]: p for p in pages}
+    user_map = {u["id"]: u for u in users}
+    enriched = []
+    for rev in revisions_sorted:
+        pg = page_map.get(rev["page_id"])
+        editor = user_map.get(rev["editor_id"])
+        enriched.append({
+            **rev,
+            "page_title": pg["title"] if pg else "Unknown",
+            "page_slug": pg["slug"] if pg else "",
+            "editor_name": editor["display_name"] if editor else "Unknown",
+            "editor_username": editor["username"] if editor else "",
+        })
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template("wikis/recent_changes.html",
+                           revisions=enriched, user=user, categories=categories)
+
+
+@blueprint.route("/search")
+def search():
+    q = request.args.get("q", "").strip()
+    results = []
+    if q:
+        # Search overlay pages first
+        overlay_results = db.search(SITE, "pages", q, limit=10)
+        # Search raw wiki articles via FTS5
+        try:
+            from app.db import _get_conn, _deserialize_row
+            conn = _get_conn()
+            terms = q.strip().split()
+            fts_query = " ".join(f'"{t}"*' for t in terms if t)
+            rows = conn.execute(
+                "SELECT a.* FROM wikis_articles a "
+                "JOIN fts_wikis_articles fts ON a.row_id = fts.rowid "
+                "WHERE fts_wikis_articles MATCH ? ORDER BY fts.rank LIMIT 40",
+                (fts_query,)).fetchall()
+            wiki_results = [_interpret_wiki_article(_deserialize_row(r), r['row_id']) for r in rows]
+        except Exception:
+            wiki_results = []
+        # Merge: overlay first, then wiki articles, deduplicate by title
+        seen = set()
+        for p in overlay_results + wiki_results:
+            if p["title"] not in seen:
+                seen.add(p["title"])
+                results.append(p)
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template("wikis/search.html", q=q, results=results,
+                           user=user, categories=categories)
+
+
+@blueprint.route("/login", methods=["GET"])
+def login_page():
+    return render_template("wikis/login.html", error=None)
+
+
+@blueprint.route("/login", methods=["POST"])
+def login_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user or user.get("password") != password:
+        return render_template("wikis/login.html", error="Invalid username or password")
+    session["user_id"] = user["id"]
+    return redirect(url_for("wikis.index"))
+
+
+@blueprint.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return redirect(url_for("wikis.index"))
+
+
+# ---------------------------------------------------------------------------
+# API routes — read
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/pages")
+def api_pages():
+    pages = _load_pages()
+    q = request.args.get("q", "").strip()
+    category = request.args.get("category", "").strip()
+    sort = request.args.get("sort", "title").strip()
+    limit = request.args.get("limit", type=int)
+
+    if q:
+        pages = _search_pages(pages, q)
+    if category:
+        pages = [p for p in pages if p["category"] == category]
+    if sort == "title":
+        pages.sort(key=lambda p: p["title"])
+    elif sort == "views":
+        pages.sort(key=lambda p: -p["views"])
+    elif sort == "updated":
+        pages.sort(key=lambda p: p["updated_at"], reverse=True)
+    elif sort == "created":
+        pages.sort(key=lambda p: p["created_at"], reverse=True)
+    if limit:
+        pages = pages[:limit]
+    return jsonify(pages)
+
+
+@blueprint.route("/api/pages/<slug>", methods=["GET"])
+def api_page_get(slug):
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    return jsonify(page)
+
+
+@blueprint.route("/api/pages/<slug>", methods=["PUT"])
+def api_page_update(slug):
+    overlay_pages = _load_overlay_pages()
+    page = next((p for p in overlay_pages if p["slug"] == slug), None)
+
+    if not page:
+        # Promote raw Wikipedia page to overlay for editing
+        all_pages = _load_pages()
+        raw_page = next((p for p in all_pages if p["slug"] == slug), None)
+        if not raw_page:
+            abort(404)
+        promoted = {k: v for k, v in raw_page.items() if not k.startswith("_")}
+        overlay_pages.append(promoted)
+        page = promoted
+
+    data = request.get_json(silent=True) or {}
+    summary = data.get("summary", "Updated page via API")
+
+    old_lines = page["content"].count("\n")
+
+    if "content" in data:
+        page["content"] = data["content"]
+    if "title" in data:
+        page["title"] = data["title"]
+    if "category" in data:
+        page["category"] = data["category"]
+    if "linked_pages" in data:
+        page["linked_pages"] = data["linked_pages"]
+
+    page["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    _save_pages(overlay_pages)
+
+    new_lines = page["content"].count("\n")
+
+    # Create revision
+    revisions = _load_revisions()
+    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
+    editor_id = data.get("editor_id", session.get("user_id", 1))
+    revisions.append({
+        "id": new_rev_id,
+        "page_id": page["id"],
+        "editor_id": editor_id,
+        "timestamp": page["updated_at"],
+        "summary": summary,
+        "diff_lines_added": max(0, new_lines - old_lines + 2),
+        "diff_lines_removed": max(0, old_lines - new_lines + 1),
+    })
+    _save_revisions(revisions)
+
+    # Update user edit count
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+
+    _recount_categories()
+    return jsonify(page)
+
+
+@blueprint.route("/api/pages", methods=["POST"])
+def api_page_create():
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+    category = data.get("category", "Lakeport City").strip()
+    slug = data.get("slug", "").strip()
+
+    if not title or not content:
+        return jsonify({"error": "title and content required"}), 400
+
+    if not slug:
+        slug = title.lower().replace(" ", "-")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")
+
+    # Check slug uniqueness across ALL pages (overlay + raw)
+    all_pages = _load_pages()
+    if any(p["slug"] == slug for p in all_pages):
+        return jsonify({"error": "slug already exists"}), 400
+
+    new_id = max((p["id"] for p in all_pages), default=0) + 1
+    editor_id = data.get("author_id", session.get("user_id", 1))
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    new_page = {
+        "id": new_id,
+        "title": title,
+        "slug": slug,
+        "content": content,
+        "category": category,
+        "author_id": editor_id,
+        "created_at": now,
+        "updated_at": now,
+        "views": 0,
+        "linked_pages": data.get("linked_pages", []),
+    }
+    overlay_pages = _load_overlay_pages()
+    overlay_pages.append(new_page)
+    _save_pages(overlay_pages)
+
+    # Create revision
+    revisions = _load_revisions()
+    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
+    revisions.append({
+        "id": new_rev_id,
+        "page_id": new_id,
+        "editor_id": editor_id,
+        "timestamp": now,
+        "summary": f"Created article: {title}",
+        "diff_lines_added": content.count("\n") + 1,
+        "diff_lines_removed": 0,
+    })
+    _save_revisions(revisions)
+
+    # Update user edit count
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+
+    _recount_categories()
+    return jsonify(new_page), 201
+
+
+@blueprint.route("/api/pages/<slug>/revisions")
+def api_page_revisions(slug):
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    revisions = _load_revisions()
+    page_revisions = [r for r in revisions if r["page_id"] == page["id"]]
+    page_revisions.sort(key=lambda r: r["timestamp"], reverse=True)
+    return jsonify(page_revisions)
+
+
+@blueprint.route("/api/categories")
+def api_categories():
+    categories = _load_categories()
+    return jsonify(categories)
+
+
+@blueprint.route("/api/recent-changes")
+def api_recent_changes():
+    revisions = _load_revisions()
+    revisions_sorted = sorted(revisions, key=lambda r: r["timestamp"], reverse=True)
+    limit = request.args.get("limit", type=int)
+    if limit:
+        revisions_sorted = revisions_sorted[:limit]
+    pages = _load_pages()
+    users = _load_users()
+    page_map = {p["id"]: p for p in pages}
+    user_map = {u["id"]: u for u in users}
+    enriched = []
+    for rev in revisions_sorted:
+        pg = page_map.get(rev["page_id"])
+        editor = user_map.get(rev["editor_id"])
+        enriched.append({
+            **rev,
+            "page_title": pg["title"] if pg else "Unknown",
+            "page_slug": pg["slug"] if pg else "",
+            "editor_name": editor["display_name"] if editor else "Unknown",
+            "editor_username": editor["username"] if editor else "",
+        })
+    return jsonify(enriched)
+
+
+@blueprint.route("/api/search")
+def api_search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    # Use FTS5 for fast search across 50K articles
+    try:
+        from app.db import _get_conn, _deserialize_row
+        conn = _get_conn()
+        terms = q.strip().split()
+        fts_query = " ".join(f'"{t}"*' for t in terms if t)
+        rows = conn.execute(
+            "SELECT a.* FROM wikis_articles a "
+            "JOIN fts_wikis_articles fts ON a.row_id = fts.rowid "
+            "WHERE fts_wikis_articles MATCH ? ORDER BY fts.rank LIMIT 30",
+            (fts_query,)).fetchall()
+        results = [_interpret_wiki_article(_deserialize_row(r), r['row_id']) for r in rows]
+    except Exception:
+        results = []
+    # Also search overlay pages
+    overlay = db.search(SITE, "pages", q, limit=10)
+    seen = {r["title"] for r in results}
+    for p in overlay:
+        if p["title"] not in seen:
+            results.insert(0, p)
+    return jsonify(results)
+
+
+@blueprint.route("/api/semantic-search")
+def api_semantic_search():
+    """FTS5-powered search with BM25 ranking (replaces Python-side scoring)."""
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    limit = request.args.get("limit", 30, type=int)
+    try:
+        from app.db import _get_conn, _deserialize_row
+        conn = _get_conn()
+        terms = q.strip().split()
+        fts_query = " ".join(f'"{t}"*' for t in terms if t)
+        rows = conn.execute(
+            "SELECT a.* FROM wikis_articles a "
+            "JOIN fts_wikis_articles fts ON a.row_id = fts.rowid "
+            "WHERE fts_wikis_articles MATCH ? ORDER BY fts.rank LIMIT ?",
+            (fts_query, limit)).fetchall()
+        results = [_interpret_wiki_article(_deserialize_row(r), r['row_id']) for r in rows]
+    except Exception:
+        results = []
+    return jsonify(results)
+
+
+@blueprint.route("/compare")
+def compare_page():
+    """Side-by-side comparison of two wiki pages selected via dropdowns."""
+    pages = _load_pages()
+    categories = _load_categories()
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    slug1 = request.args.get("page1", "").strip()
+    slug2 = request.args.get("page2", "").strip()
+    page1 = next((p for p in pages if p["slug"] == slug1), None) if slug1 else None
+    page2 = next((p for p in pages if p["slug"] == slug2), None) if slug2 else None
+    return render_template("wikis/compare.html",
+                           pages=pages, page1=page1, page2=page2,
+                           slug1=slug1, slug2=slug2,
+                           categories=categories, user=user)
+
+
+@blueprint.route("/api/compare")
+def api_compare():
+    """Compare two pages by slug. Returns a list of two page objects."""
+    slugs_param = request.args.get("slugs", "").strip()
+    if not slugs_param:
+        return jsonify({"error": "Provide ?slugs=slug1,slug2"}), 400
+    slugs = [s.strip() for s in slugs_param.split(",") if s.strip()]
+    if len(slugs) < 2:
+        return jsonify({"error": "Need exactly 2 slugs separated by comma"}), 400
+    pages = _load_pages()
+    results = []
+    for s in slugs[:2]:
+        p = next((p for p in pages if p["slug"] == s), None)
+        if p:
+            results.append(p)
+    return jsonify(results)
+
+
+@blueprint.route("/api/verify", methods=["POST"])
+def api_verify():
+    """Fact-check a claim against wiki page data.
+
+    Accepts JSON: {"slug": "...", "claim": "..."}
+    Returns: {"verified": true/false, "evidence": "...", "page_title": "..."}
+    """
+    data = request.get_json(silent=True) or {}
+    slug = data.get("slug", "").strip()
+    claim = data.get("claim", "").strip()
+    if not slug or not claim:
+        return jsonify({"error": "slug and claim required"}), 400
+
+    page = _get_page_by_slug(slug)
+    if not page:
+        return jsonify({"error": "page not found"}), 404
+
+    # Simple verification: check if claim terms appear in the page content.
+    # Filter out common stop-words to focus on meaningful terms.
+    stop_words = {"a", "an", "the", "is", "was", "are", "were", "in", "on",
+                  "at", "to", "for", "of", "by", "and", "or", "with", "from",
+                  "that", "this", "it", "its", "be", "been", "has", "have",
+                  "had", "not", "no", "as"}
+    content_lower = page["content"].lower()
+    raw_terms = claim.lower().split()
+    terms = [t for t in raw_terms if t not in stop_words]
+    if not terms:
+        terms = raw_terms  # fall back to all terms if everything is a stop word
+    matched = [t for t in terms if t in content_lower]
+    match_ratio = len(matched) / len(terms) if terms else 0
+
+    # Extract the first sentence containing any claim term as evidence
+    sentences = page["content"].replace("\n", " ").split(". ")
+    evidence = ""
+    for sent in sentences:
+        if any(t in sent.lower() for t in terms):
+            evidence = sent.strip()
+            if not evidence.endswith("."):
+                evidence += "."
+            break
+
+    return jsonify({
+        "verified": match_ratio >= 0.5,
+        "match_ratio": round(match_ratio, 2),
+        "matched_terms": matched,
+        "evidence": evidence,
+        "page_title": page["title"],
+        "page_slug": page["slug"],
+    })
+
+
+@blueprint.route("/api/categories/<int:cat_id>/pages")
+def api_category_pages(cat_id):
+    """List pages in a category by category ID."""
+    categories = _load_categories()
+    cat = next((c for c in categories if c["id"] == cat_id), None)
+    if not cat:
+        abort(404)
+    pages = _load_pages()
+    cat_pages = [p for p in pages if p["category"] == cat["name"]]
+    cat_pages.sort(key=lambda p: p["title"])
+    return jsonify(cat_pages)
+
+
+@blueprint.route("/api/stats")
+def api_stats():
+    pages = _load_pages()
+    revisions = _load_revisions()
+    categories = _load_categories()
+    users = _load_users()
+    total_views = sum(p["views"] for p in pages)
+    # Compute most-edited page
+    edit_counts = Counter(r["page_id"] for r in revisions)
+    most_edited_id = edit_counts.most_common(1)[0][0] if edit_counts else None
+    most_edited_page = None
+    if most_edited_id:
+        me = next((p for p in pages if p["id"] == most_edited_id), None)
+        if me:
+            most_edited_page = me["title"]
+    return jsonify({
+        "total_pages": len(pages),
+        "total_revisions": len(revisions),
+        "total_categories": len(categories),
+        "total_users": len(users),
+        "total_views": total_views,
+        "most_viewed": sorted(pages, key=lambda p: -p["views"])[0]["title"] if pages else None,
+        "most_edited_page": most_edited_page,
+        "latest_revision": max(revisions, key=lambda r: r["timestamp"])["timestamp"] if revisions else None,
+    })
+
+
+@blueprint.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user or user.get("password") != password:
+        return jsonify({"error": "Invalid credentials"}), 401
+    session["user_id"] = user["id"]
+    return jsonify({"user_id": user["id"], "username": user["username"]})

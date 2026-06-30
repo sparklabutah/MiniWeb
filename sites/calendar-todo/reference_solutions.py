@@ -26,7 +26,7 @@ def solve_004(client, base="/sites/calendar-todo"):
 
 
 def solve_005(client, base="/sites/calendar-todo"):
-    r = client.get(f"{base}/api/events/semantic?q=fitness+exercise+workout")
+    r = client.get(f"{base}/api/events/search?q=fitness+exercise+workout")
     results = json.loads(r.data)
     return results[0]["title"] if results else "No results"
 
@@ -49,7 +49,7 @@ def solve_008(client, base="/sites/calendar-todo"):
 
 
 def solve_009(client, base="/sites/calendar-todo"):
-    r = client.get(f"{base}/api/events/semantic?q=career+development+mentoring")
+    r = client.get(f"{base}/api/events/search?q=career+development+mentoring")
     results = json.loads(r.data)
     titles = [e["title"] for e in results]
     return ", ".join(titles) if titles else "No results"

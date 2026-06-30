@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse - SoundWave</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+        a { color: #1db954; text-decoration: none; }
+        a:hover { color: #1ed760; }
+
+        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h1 { font-size: 1.8rem; color: #fff; margin-bottom: 1rem; }
+        h2 { font-size: 1.3rem; color: #fff; margin: 1.5rem 0 1rem; }
+
+        .genre-pills { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 2rem; }
+        .genre-pill { display: inline-block; padding: .4rem 1rem; border-radius: 1rem; background: #282828; color: #e0e0e0; font-size: .85rem; transition: background .15s; }
+        .genre-pill:hover, .genre-pill.active { background: #1db954; color: #000; text-decoration: none; }
+
+        .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; }
+        .album-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
+        .album-card:hover { background: #282828; text-decoration: none; }
+        .album-card .cover { width: 100%; aspect-ratio: 1; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .8rem; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+        .card-name { font-weight: 600; font-size: .95rem; color: #fff; margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-meta { font-size: .8rem; color: #888; }
+
+        .artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; margin-bottom: 2rem; }
+        .artist-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
+        .artist-card:hover { background: #282828; text-decoration: none; }
+        .artist-card .avatar { width: 100%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: .8rem; }
+
+        .no-results { text-align: center; color: #666; padding: 3rem; font-size: 1.1rem; }
+
+        .filter-bar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .filter-bar label { font-size: .85rem; color: #888; }
+        .filter-bar select { padding: .4rem .8rem; border: 1px solid #333; border-radius: .3rem; background: #1a1a1a; color: #e0e0e0; font-size: .85rem; }
+        .filter-bar select:focus { border-color: #1db954; outline: none; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
+        <div class="nav-links">
+            <a href="{{ url_for('music.browse') }}" style="color:#fff;font-weight:600">Browse</a>
+            <a href="{{ url_for('music.playlists_page') }}">Playlists</a>
+            <a href="{{ url_for('music.library_page') }}">Library</a>
+            {% if user %}
+                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
+                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
+            {% else %}
+                <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>{% if selected_genre %}{{ selected_genre }}{% else %}Browse Music{% endif %}</h1>
+
+        <!-- Genre dropdown (navigate_by_dropdown / filter_by_dropdown) -->
+        <div class="filter-bar">
+            <label for="genre-select">Genre:</label>
+            <select id="genre-select" onchange="window.location.href=this.value">
+                <option value="{{ url_for('music.browse') }}" {% if not selected_genre %}selected{% endif %}>All Genres</option>
+                {% for g in genres %}
+                <option value="{{ url_for('music.browse', genre=g) }}" {% if selected_genre == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+            <label for="sort-select">Sort:</label>
+            <select id="sort-select" onchange="window.location.href=this.value">
+                <option value="{{ url_for('music.browse', genre=selected_genre, sort='release_date') }}" {% if not request.args.get('sort') or request.args.get('sort') == 'release_date' %}selected{% endif %}>Newest First</option>
+                <option value="{{ url_for('music.browse', genre=selected_genre, sort='title') }}" {% if request.args.get('sort') == 'title' %}selected{% endif %}>Title (A-Z)</option>
+                <option value="{{ url_for('music.browse', genre=selected_genre, sort='listeners') }}" {% if request.args.get('sort') == 'listeners' %}selected{% endif %}>Most Listeners</option>
+            </select>
+        </div>
+
+        <div class="genre-pills">
+            <a href="{{ url_for('music.browse') }}" class="genre-pill {% if not selected_genre %}active{% endif %}">All</a>
+            {% for g in genres %}
+            <a href="{{ url_for('music.browse', genre=g) }}" class="genre-pill {% if selected_genre == g %}active{% endif %}">{{ g }}</a>
+            {% endfor %}
+        </div>
+
+        {% if artists %}
+        <h2>Artists{% if selected_genre %} in {{ selected_genre }}{% endif %}</h2>
+        <div class="artist-grid">
+            {% for artist in artists %}
+            <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="artist-card">
+                <div class="avatar" style="background: linear-gradient(135deg, #1db954, #191414);">{{ artist.name[0] }}</div>
+                <div class="card-name">{{ artist.name }}</div>
+                <div class="card-meta">{{ artist.genre }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if albums %}
+        <h2>{% if selected_genre %}{{ selected_genre }} Albums{% else %}New Releases{% endif %}</h2>
+        <div class="album-grid">
+            {% for album in albums %}
+            <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="album-card">
+                <div class="cover" style="background: {{ album.cover_color }};">{{ album.title[0] }}</div>
+                <div class="card-name">{{ album.title }}</div>
+                <div class="card-meta">{{ album.release_date }} &middot; {{ album.genre }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if not artists and not albums %}
+        <div class="no-results">No results found for this genre.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - {{ profile_user.display_name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+
+        .profile-container { max-width: 935px; margin: 0 auto; padding: 30px 20px; }
+
+        /* Profile header */
+        .profile-header { display: flex; align-items: flex-start; gap: 40px; margin-bottom: 44px; padding-bottom: 20px; border-bottom: 1px solid #dbdbdb; }
+        .profile-avatar { width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .profile-info { flex: 1; }
+        .profile-top-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .profile-username { font-size: 26px; font-weight: 300; }
+        .profile-verified { color: #0095f6; font-size: 18px; }
+        .follow-btn { padding: 6px 24px; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #dbdbdb; background: #fff; }
+        .follow-btn.following { background: #fff; color: #262626; }
+        .follow-btn.not-following { background: #0095f6; color: #fff; border-color: #0095f6; }
+        .follow-btn:hover { opacity: 0.85; }
+        .profile-stats { display: flex; gap: 32px; margin-bottom: 16px; }
+        .profile-stats .stat { font-size: 16px; }
+        .profile-stats .stat strong { font-weight: 600; }
+        .profile-display-name { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+        .profile-bio { font-size: 14px; line-height: 1.5; color: #262626; }
+        .profile-handle { font-size: 13px; color: #8e8e8e; }
+
+        /* Post grid */
+        .profile-posts-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #8e8e8e; text-align: center; margin-bottom: 16px; padding-top: 8px; border-top: 1px solid #262626; display: inline-block; }
+        .posts-section { text-align: center; }
+        .post-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .grid-item { position: relative; aspect-ratio: 1; background: #efefef; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .grid-item .placeholder { font-size: 36px; color: #c7c7c7; }
+        .grid-item .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600; gap: 16px; }
+        .grid-item:hover .overlay { display: flex; }
+        .grid-item .type-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+
+        .empty-profile { text-align: center; padding: 60px 20px; color: #8e8e8e; }
+
+        @media (max-width: 735px) {
+            .profile-header { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
+            .profile-stats { justify-content: center; }
+            .profile-top-row { justify-content: center; flex-wrap: wrap; }
+            .profile-avatar { width: 80px; height: 80px; font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="profile-avatar" style="background: hsl({{ (profile_user.id | replace('mp-u-', '') | int * 40) }}, 50%, 50%);">
+                {{ profile_user.display_name[0] }}
+            </div>
+            <div class="profile-info">
+                <div class="profile-top-row">
+                    <span class="profile-username">{{ profile_user.username }}</span>
+                    {% if profile_user.is_verified %}
+                    <span class="profile-verified" title="Verified">&#10003;</span>
+                    {% endif %}
+                    {% if not is_own_profile %}
+                    <button class="follow-btn {{ 'following' if is_following else 'not-following' }}"
+                            id="follow-btn"
+                            onclick="toggleFollow('{{ profile_user.id }}')">
+                        {{ 'Following' if is_following else 'Follow' }}
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="profile-stats">
+                    <div class="stat"><strong>{{ posts | length }}</strong> posts</div>
+                    <div class="stat"><strong id="follower-count">{{ follower_count }}</strong> followers</div>
+                    <div class="stat"><strong>{{ following_count }}</strong> following</div>
+                </div>
+                <div class="profile-display-name">{{ profile_user.display_name }}</div>
+                <div class="profile-bio">{{ profile_user.bio }}</div>
+                <div class="profile-handle">{{ profile_user.handle }}</div>
+            </div>
+        </div>
+
+        <div class="posts-section">
+            <span class="profile-posts-label">&#9783; Posts</span>
+            {% if posts %}
+            <div class="post-grid">
+                {% for post in posts %}
+                <a href="{{ url_for('multimedia-posting.post_detail', post_id=post.id) }}" class="grid-item">
+                    {% if post.type == 'video' %}
+                    <span class="type-badge">&#9654;</span>
+                    {% elif post.type == 'carousel' %}
+                    <span class="type-badge">&#128194;</span>
+                    {% endif %}
+                    <span class="placeholder">&#128247;</span>
+                    <div class="overlay">
+                        <span>&#9825; {{ post.likes_count }}</span>
+                        <span>&#128172; {{ post.comments_count }}</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-profile">
+                <p>No posts yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function toggleFollow(userId) {
+        fetch(`{{ url_for('multimedia-posting.index') }}api/users/${userId}/follow`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const btn = document.getElementById('follow-btn');
+                const countEl = document.getElementById('follower-count');
+                if (data.status === 'followed') {
+                    btn.textContent = 'Following';
+                    btn.className = 'follow-btn following';
+                } else {
+                    btn.textContent = 'Follow';
+                    btn.className = 'follow-btn not-following';
+                }
+                if (data.follower_count !== undefined) {
+                    countEl.textContent = data.follower_count;
+                }
+            });
+    }
+    </script>
+</body>
+</html>

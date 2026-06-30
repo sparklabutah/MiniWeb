@@ -1,0 +1,45 @@
+{
+  "task_id": "academic-paper-db_c5e97b",
+  "site": "academic-paper-db",
+  "sites": [
+    "academic-paper-db"
+  ],
+  "instruction": "On the Academic Paper Database, navigate to paper 1, and follow the author Nazia Aslam.",
+  "difficulty": "easy",
+  "macros": [
+    "follow_by_toggle"
+  ],
+  "expected_answer": "done",
+  "eval": [
+    {
+      "evaluator": "GroundingEvaluator",
+      "required_urls": [
+        "/sites/academic-paper-db/",
+        "/sites/academic-paper-db/paper/1",
+        "/sites/academic-paper-db/?q=Nazia+Aslam"
+      ]
+    },
+    {
+      "evaluator": "BackendStateEvaluator",
+      "method": "GET",
+      "endpoint": "/_admin/user/academic-paper-db/1",
+      "field": "profile.followed_authors",
+      "comparison": "length_equals",
+      "expected": "1"
+    },
+    {
+      "evaluator": "BackendStateEvaluator",
+      "method": "GET",
+      "endpoint": "/_admin/log?method=POST&path=%2Fauthor%2FNazia%20Aslam%2Ffollow",
+      "field": "count",
+      "comparison": "greater_than",
+      "expected": "0"
+    }
+  ],
+  "eval_logic": "all",
+  "annotator": "Minh",
+  "mode": "queue",
+  "draft_source": 1,
+  "created_at": "2026-06-25T15:35:32.219235",
+  "trajectory_steps": 4
+}

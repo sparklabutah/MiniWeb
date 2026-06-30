@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search: {{ query }} - ForumHub</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #dae0e6; color: #1c1c1c; }
+        a { color: #0079d3; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #fff; border-bottom: 1px solid #edeff1; padding: 8px 20px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { font-weight: 700; font-size: 20px; color: #ff4500; }
+        .header .search-bar { flex: 1; max-width: 500px; }
+        .header .search-bar input { width: 100%; padding: 8px 12px; border: 1px solid #edeff1; border-radius: 20px; background: #f6f7f8; font-size: 14px; }
+        .container { max-width: 780px; margin: 16px auto; padding: 0 16px; }
+        h2 { font-size: 16px; color: #787c7e; margin-bottom: 12px; }
+        .sort-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+        .sort-bar a { padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; color: #878a8c; }
+        .sort-bar a.active { background: #edeff1; color: #1c1c1c; }
+        .post-card { background: #fff; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 8px; padding: 10px 14px; }
+        .post-card .title { font-size: 16px; font-weight: 500; }
+        .post-card .title a { color: #222; }
+        .post-card .meta { font-size: 12px; color: #787c7e; margin-top: 4px; }
+        .flair { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; background: #edeff1; margin-left: 6px; }
+        .no-results { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 20px; text-align: center; color: #787c7e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('forums.index') }}" class="logo">ForumHub</a>
+        <form class="search-bar" action="{{ url_for('forums.search_page') }}" method="GET">
+            <input type="text" name="q" placeholder="Search ForumHub" value="{{ query }}">
+        </form>
+    </div>
+    <div class="container">
+        {% if query %}
+        <h2>Search results for "{{ query }}" ({{ results | length }} found)</h2>
+        <div class="sort-bar">
+            <a href="{{ url_for('forums.search_page', q=query, sort='top') }}" class="{{ 'active' if sort == 'top' }}">Top</a>
+            <a href="{{ url_for('forums.search_page', q=query, sort='new') }}" class="{{ 'active' if sort == 'new' }}">New</a>
+            <a href="{{ url_for('forums.search_page', q=query, sort='hot') }}" class="{{ 'active' if sort == 'hot' }}">Hot</a>
+        </div>
+        {% for post in results %}
+        <div class="post-card">
+            <div class="title">
+                <a href="{{ url_for('forums.post_detail', post_id=post.id) }}">{{ post.title }}</a>
+                {% if post.flair %}<span class="flair">{{ post.flair }}</span>{% endif %}
+            </div>
+            <div class="meta">
+                <a href="{{ url_for('forums.subreddit_view', subreddit_name=post.subreddit) }}">r/{{ post.subreddit }}</a>
+                &middot; u/{{ post.author }} &middot; {{ post.score }} points
+            </div>
+        </div>
+        {% endfor %}
+        {% if not results %}
+        <div class="no-results">No results found for "{{ query }}"</div>
+        {% endif %}
+        {% else %}
+        <h2>Enter a search term above</h2>
+        {% endif %}
+    </div>
+</body>
+</html>

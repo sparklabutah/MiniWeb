@@ -5,7 +5,7 @@
 # Run once after cloning the repo:
 #   bash scripts/setup_chpc.sh
 #
-# Creates the conda environment, symlinks shared data, and prepares .env.
+# Creates the conda environment, checks shared data, and prepares .env.
 # =============================================================================
 set -euo pipefail
 
@@ -53,22 +53,7 @@ if [ "$ALL_OK" = false ]; then
     echo "Ask u1653932 to fix permissions: chmod -R g+rX $SHARED_DATA/"
 fi
 
-# ── 3. Create arXiv symlink ──────────────────────────────────────────────────
-echo ""
-ARXIV_LINK="$REPO_ROOT/sites/academic-paper-db/data/291/arxiv-metadata-oai-snapshot.json"
-ARXIV_TARGET="$SHARED_DATA/arxiv/arxiv-metadata-oai-snapshot.json"
-
-if [ -L "$ARXIV_LINK" ]; then
-    echo "[OK] arXiv symlink already exists."
-elif [ -f "$ARXIV_LINK" ]; then
-    echo "[SKIP] arXiv file exists as regular file (not symlink)."
-else
-    mkdir -p "$(dirname "$ARXIV_LINK")"
-    ln -s "$ARXIV_TARGET" "$ARXIV_LINK"
-    echo "[OK] Created arXiv symlink."
-fi
-
-# ── 4. Create conda environment ──────────────────────────────────────────────
+# ── 3. Create conda environment ──────────────────────────────────────────────
 echo ""
 if $CONDA_BIN info --envs 2>/dev/null | grep -q miniweb-eval; then
     echo "[OK] Conda env 'miniweb-eval' already exists."
@@ -79,7 +64,7 @@ else
     echo "[OK] Conda env created."
 fi
 
-# ── 5. Create .env ───────────────────────────────────────────────────────────
+# ── 4. Create .env ───────────────────────────────────────────────────────────
 echo ""
 if [ -f "$REPO_ROOT/.env" ]; then
     echo "[OK] .env already exists."
@@ -89,7 +74,7 @@ else
     echo "     Edit it to add your API keys: nano $REPO_ROOT/.env"
 fi
 
-# ── 6. Smoke test ────────────────────────────────────────────────────────────
+# ── 5. Smoke test ────────────────────────────────────────────────────────────
 echo ""
 echo "Running smoke test..."
 if $CONDA_BIN run -n miniweb-eval python -B -c \

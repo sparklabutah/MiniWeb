@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlow - Create New Form</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
+        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #ce93d8; font-size: .85rem; }
+        .container { max-width: 750px; margin: 0 auto; padding: 1.5rem; }
+        .form-section { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1.5rem; margin-bottom: 1rem; }
+        .form-section.title-section { border-top: 4px solid #673ab7; }
+        .form-section h2 { font-size: 1.2rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; color: #5f6368; margin-bottom: .3rem; }
+        .form-group input[type="text"], .form-group textarea, .form-group select {
+            width: 100%; padding: .65rem .8rem; border: 1.5px solid #dadce0; border-radius: 6px;
+            font-size: .95rem; font-family: inherit; outline: none; transition: border-color .15s;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #673ab7; }
+        .form-group textarea { min-height: 60px; resize: vertical; }
+        .field-builder { border: 1px solid #e8eaed; border-radius: 8px; padding: 1rem; margin-bottom: .75rem; background: #fafafa; position: relative; }
+        .field-builder .field-row { display: flex; gap: .5rem; margin-bottom: .5rem; }
+        .field-builder .field-row input, .field-builder .field-row select {
+            padding: .5rem .6rem; border: 1.5px solid #dadce0; border-radius: 4px; font-size: .88rem; outline: none;
+        }
+        .field-builder .field-row input:focus, .field-builder .field-row select:focus { border-color: #673ab7; }
+        .field-builder .field-row input[type="text"] { flex: 1; }
+        .field-builder .field-row select { width: 130px; }
+        .field-builder .options-input { margin-top: .3rem; }
+        .field-builder .options-input input { width: 100%; }
+        .field-builder .options-hint { font-size: .75rem; color: #80868b; margin-top: .2rem; }
+        .field-builder .required-check { font-size: .85rem; display: flex; align-items: center; gap: .3rem; }
+        .field-builder .required-check input { accent-color: #673ab7; }
+        .btn-remove-field { position: absolute; top: .5rem; right: .5rem; background: none; border: none; color: #80868b; font-size: 1.2rem; cursor: pointer; line-height: 1; padding: .2rem; }
+        .btn-remove-field:hover { color: #d32f2f; }
+        .btn-add-field { background: #fff; border: 2px dashed #dadce0; padding: .6rem 1rem; border-radius: 6px; font-size: .88rem; color: #673ab7; cursor: pointer; width: 100%; text-align: center; font-weight: 500; }
+        .btn-add-field:hover { border-color: #673ab7; background: #f3e5f5; }
+        .submit-section { display: flex; gap: .5rem; margin-top: 1rem; }
+        .btn-submit { background: #673ab7; color: #fff; border: none; padding: .7rem 2rem; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { background: #5e35b1; }
+        .btn-cancel { background: #fff; color: #5f6368; border: 1px solid #dadce0; padding: .7rem 1.5rem; border-radius: 6px; font-size: 1rem; cursor: pointer; text-decoration: none; }
+        .btn-cancel:hover { background: #f1f3f4; }
+        .template-hint { background: #f3e5f5; border-radius: 6px; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .88rem; }
+        .template-hint a { color: #673ab7; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FormFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
+            <a href="{{ url_for('forms-surveys.create_form_page') }}">Create</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('forms-surveys.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('forms-surveys.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="template-hint">
+            Start from scratch or <a href="{{ url_for('forms-surveys.templates_page') }}">browse templates</a> for a quick start.
+        </div>
+
+        <form method="POST" action="{{ url_for('forms-surveys.create_form_submit') }}" id="create-form">
+            <div class="form-section title-section">
+                <div class="form-group">
+                    <label for="title">Form Title</label>
+                    <input type="text" id="title" name="title" placeholder="Untitled Form" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" placeholder="Form description (optional)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        <option value="draft">Draft</option>
+                        <option value="active">Active (accepting responses)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Fields</h2>
+                <div id="fields-container">
+                    <div class="field-builder" data-index="0">
+                        <button type="button" class="btn-remove-field" onclick="removeField(this)">&times;</button>
+                        <div class="field-row">
+                            <input type="text" name="field_label_0" placeholder="Question" required>
+                            <select name="field_type_0" onchange="toggleOptions(this)">
+                                <option value="text">Short text</option>
+                                <option value="textarea">Long text</option>
+                                <option value="radio">Multiple choice</option>
+                                <option value="checkbox">Checkboxes</option>
+                                <option value="dropdown">Dropdown</option>
+                                <option value="rating">Rating (1-5)</option>
+                            </select>
+                        </div>
+                        <div class="options-input" style="display: none;">
+                            <input type="text" name="field_options_0" placeholder="Option 1, Option 2, Option 3">
+                            <div class="options-hint">Comma-separated options</div>
+                        </div>
+                        <label class="required-check">
+                            <input type="checkbox" name="field_required_0">
+                            Required
+                        </label>
+                    </div>
+                </div>
+                <button type="button" class="btn-add-field" onclick="addField()">+ Add Field</button>
+            </div>
+
+            <div class="submit-section">
+                <button type="submit" class="btn-submit">Create Form</button>
+                <a href="{{ url_for('forms-surveys.index') }}" class="btn-cancel">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    let fieldIndex = 1;
+    const needsOptions = ['radio', 'checkbox', 'dropdown'];
+
+    function toggleOptions(select) {
+        const parent = select.closest('.field-builder');
+        const optionsDiv = parent.querySelector('.options-input');
+        if (needsOptions.includes(select.value)) {
+            optionsDiv.style.display = '';
+        } else {
+            optionsDiv.style.display = 'none';
+        }
+    }
+
+    function addField() {
+        const container = document.getElementById('fields-container');
+        const div = document.createElement('div');
+        div.className = 'field-builder';
+        div.dataset.index = fieldIndex;
+        div.innerHTML = `
+            <button type="button" class="btn-remove-field" onclick="removeField(this)">&times;</button>
+            <div class="field-row">
+                <input type="text" name="field_label_${fieldIndex}" placeholder="Question" required>
+                <select name="field_type_${fieldIndex}" onchange="toggleOptions(this)">
+                    <option value="text">Short text</option>
+                    <option value="textarea">Long text</option>
+                    <option value="radio">Multiple choice</option>
+                    <option value="checkbox">Checkboxes</option>
+                    <option value="dropdown">Dropdown</option>
+                    <option value="rating">Rating (1-5)</option>
+                </select>
+            </div>
+            <div class="options-input" style="display: none;">
+                <input type="text" name="field_options_${fieldIndex}" placeholder="Option 1, Option 2, Option 3">
+                <div class="options-hint">Comma-separated options</div>
+            </div>
+            <label class="required-check">
+                <input type="checkbox" name="field_required_${fieldIndex}">
+                Required
+            </label>
+        `;
+        container.appendChild(div);
+        fieldIndex++;
+    }
+
+    function removeField(btn) {
+        const builder = btn.closest('.field-builder');
+        if (document.querySelectorAll('.field-builder').length > 1) {
+            builder.remove();
+        }
+    }
+    </script>
+</body>
+</html>

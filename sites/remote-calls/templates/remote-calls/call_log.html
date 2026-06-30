@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call Log - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .filters { background: #fff; padding: 1rem 1.2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.2rem; }
+        .filters form { display: flex; flex-wrap: wrap; gap: .8rem; align-items: flex-end; }
+        .filters .field { display: flex; flex-direction: column; gap: .3rem; }
+        .filters label { font-size: .75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .filters input, .filters select { padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .filters input:focus, .filters select:focus { border-color: #4fc3f7; outline: none; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .results-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        thead { background: #f8fafc; }
+        th { padding: .7rem 1rem; text-align: left; font-size: .8rem; color: #64748b; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f0f0f0; }
+        tr:hover { background: #f8fafc; }
+        .direction { display: inline-flex; align-items: center; gap: .3rem; }
+        .direction .arrow { font-size: 1rem; }
+        .direction .arrow.outgoing { color: #2e7d32; }
+        .direction .arrow.incoming { color: #1565c0; }
+        .direction .arrow.missed { color: #c62828; }
+        .tag { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; }
+        .tag.audio { background: #e3f2fd; color: #1565c0; }
+        .tag.video { background: #e8eaf6; color: #283593; }
+        .tag.completed { background: #e8f5e9; color: #2e7d32; }
+        .tag.missed { background: #fce4ec; color: #c62828; }
+        .note-text { font-size: .82rem; color: #64748b; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}" class="active">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>Call Log</h2>
+
+        <div class="filters">
+            <form method="get" action="{{ url_for('remote-calls.call_log_page') }}">
+                <div class="field">
+                    <label for="q">Search</label>
+                    <input type="text" name="q" id="q" value="{{ search }}" placeholder="Name or note...">
+                </div>
+                <div class="field">
+                    <label for="type">Type</label>
+                    <select name="type" id="type">
+                        <option value="">All</option>
+                        <option value="audio" {{ 'selected' if call_type == 'audio' }}>Audio</option>
+                        <option value="video" {{ 'selected' if call_type == 'video' }}>Video</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="">All</option>
+                        <option value="completed" {{ 'selected' if call_status == 'completed' }}>Completed</option>
+                        <option value="missed" {{ 'selected' if call_status == 'missed' }}>Missed</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="contact">Contact</label>
+                    <select name="contact" id="contact">
+                        <option value="">All</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {{ 'selected' if contact == u.id }}>{{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="date_from">From</label>
+                    <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+                </div>
+                <div class="field">
+                    <label for="date_to">To</label>
+                    <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+                </div>
+                <div class="field" style="justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                </div>
+                <div class="field" style="justify-content:flex-end;">
+                    <a href="{{ url_for('remote-calls.call_log_page') }}" class="btn btn-secondary">Reset</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="results-count">{{ calls|length }} call{{ 's' if calls|length != 1 }} found</div>
+
+        {% if calls %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Direction</th>
+                    <th>Contact</th>
+                    <th>Type</th>
+                    <th>Date &amp; Time</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in calls %}
+                {% set is_outgoing = (c.caller_id == user.id) %}
+                {% set other_id = c.callee_id if is_outgoing else c.caller_id %}
+                <tr>
+                    <td>
+                        <span class="direction">
+                            {% if c.status == 'missed' %}
+                                <span class="arrow missed">&#8599;</span> Missed
+                            {% elif is_outgoing %}
+                                <span class="arrow outgoing">&#8599;</span> Outgoing
+                            {% else %}
+                                <span class="arrow incoming">&#8601;</span> Incoming
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td><strong>{{ user_map.get(other_id, 'Unknown') }}</strong></td>
+                    <td><span class="tag {{ c.type }}">{{ c.type|capitalize }}</span></td>
+                    <td>{{ parse_dt(c.date).strftime('%b %d, %Y %I:%M %p') if parse_dt(c.date) else c.date }}</td>
+                    <td>{{ format_duration(c.duration_seconds) if c.duration_seconds > 0 else '--' }}</td>
+                    <td><span class="tag {{ c.status }}">{{ c.status|capitalize }}</span></td>
+                    <td><span class="note-text" title="{{ c.note or '' }}">{{ c.note or '--' }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">No calls match your filters.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

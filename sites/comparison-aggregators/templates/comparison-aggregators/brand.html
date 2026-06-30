@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ brand_name }} Phones — PhoneCompare</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a237e; color: #fff; padding: .7rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; margin-left: .8rem; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+
+        .main { max-width: 1100px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+        .breadcrumb { font-size: .8rem; color: #888; margin-bottom: 1rem; }
+        .breadcrumb a { color: #1a237e; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .brand-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .brand-header h2 { font-size: 1.4rem; color: #1a237e; }
+        .brand-header .count { font-size: .85rem; color: #888; }
+
+        .sort-bar { display: flex; gap: .5rem; align-items: center; margin-bottom: 1rem; }
+        .sort-bar label { font-size: .8rem; color: #666; }
+        .sort-bar select { padding: .35rem .5rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .8rem; }
+        .sort-bar button { padding: .35rem .8rem; background: #1a237e; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .8rem; }
+
+        /* Brand sidebar */
+        .layout { display: flex; gap: 1.5rem; }
+        .sidebar { width: 180px; flex-shrink: 0; }
+        .sidebar h4 { font-size: .8rem; color: #888; text-transform: uppercase; margin-bottom: .5rem; }
+        .sidebar ul { list-style: none; }
+        .sidebar li { margin-bottom: .2rem; }
+        .sidebar a { font-size: .82rem; color: #555; text-decoration: none; display: block; padding: .25rem .5rem; border-radius: .2rem; }
+        .sidebar a:hover { background: #e8eaf6; color: #1a237e; }
+        .sidebar a.active { background: #1a237e; color: #fff; font-weight: 600; }
+
+        .content { flex: 1; min-width: 0; }
+
+        .spec-table { width: 100%; border-collapse: collapse; background: #fff; font-size: .85rem; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .spec-table thead th { background: #f0f0f0; padding: .5rem .6rem; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #ddd; }
+        .spec-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .1s; }
+        .spec-table tbody tr:hover { background: #f8f9ff; }
+        .spec-table tbody td { padding: .5rem .6rem; vertical-align: middle; }
+        .spec-table .phone-name a { color: #1a237e; text-decoration: none; font-weight: 500; }
+        .spec-table .phone-name a:hover { text-decoration: underline; }
+        .spec-table .spec-cell { color: #555; font-size: .8rem; white-space: nowrap; }
+        .spec-table .price-cell { font-weight: 600; color: #2e7d32; white-space: nowrap; }
+        .spec-table .year-cell { color: #888; font-size: .8rem; }
+
+        .cmp-check { width: 16px; height: 16px; accent-color: #ff6600; cursor: pointer; }
+
+        .no-results { text-align: center; color: #999; padding: 3rem; background: #fff; border-radius: .4rem; }
+
+        .compare-tray { position: fixed; bottom: 0; left: 0; right: 0; background: #1a237e; color: #fff; padding: .6rem 2rem; display: flex; align-items: center; gap: 1rem; z-index: 100; box-shadow: 0 -2px 10px rgba(0,0,0,.2); }
+        .compare-tray .label { font-size: .85rem; font-weight: 600; }
+        .compare-tray .pills { display: flex; gap: .4rem; flex: 1; flex-wrap: wrap; }
+        .compare-tray .pill { background: rgba(255,255,255,.15); padding: .2rem .6rem; border-radius: 1rem; font-size: .8rem; }
+        .compare-tray .btn-go { background: #ff6600; color: #fff; padding: .4rem 1.2rem; border-radius: .3rem; text-decoration: none; font-weight: 600; font-size: .85rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('comparison-aggregators.index') }}">PhoneCompare</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Home</a>
+            <a href="{{ url_for('comparison-aggregators.compare_page') }}">Compare</a>
+            <a href="{{ url_for('comparison-aggregators.login_page') }}">Sign In</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Home</a> &rsaquo;
+            Brands &rsaquo;
+            {{ brand_name }}
+        </div>
+
+        <div class="layout">
+            <div class="sidebar">
+                <h4>All Brands</h4>
+                <ul>
+                    {% for b in brands %}
+                    <li><a href="{{ url_for('comparison-aggregators.brand_page', brand_name=b) }}" {% if b == brand_name %}class="active"{% endif %}>{{ b }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="content">
+                <div class="brand-header">
+                    <h2>{{ brand_name }}</h2>
+                    <span class="count">{{ phones|length }} phone{{ 's' if phones|length != 1 }}</span>
+                </div>
+
+                <form class="sort-bar" method="get" action="{{ url_for('comparison-aggregators.brand_page', brand_name=brand_name) }}">
+                    <label>Sort by:</label>
+                    <select name="sort">
+                        <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest First</option>
+                        <option value="oldest" {{ 'selected' if sort == 'oldest' }}>Oldest First</option>
+                        <option value="name" {{ 'selected' if sort == 'name' }}>Name A-Z</option>
+                        <option value="price_asc" {{ 'selected' if sort == 'price_asc' }}>Price: Low-High</option>
+                        <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Price: High-Low</option>
+                        <option value="battery_desc" {{ 'selected' if sort == 'battery_desc' }}>Battery: Largest</option>
+                    </select>
+                    <button type="submit">Apply</button>
+                </form>
+
+                {% if phones %}
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30px"></th>
+                            <th>Phone</th>
+                            <th>Year</th>
+                            <th>Display</th>
+                            <th>Camera</th>
+                            <th>RAM</th>
+                            <th>Battery</th>
+                            <th>OS</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in phones %}
+                        <tr>
+                            <td><input type="checkbox" class="cmp-check" value="{{ p.id }}" title="Add to compare"></td>
+                            <td class="phone-name"><a href="{{ url_for('comparison-aggregators.phone_detail', phone_id=p.id) }}">{{ p.name }}</a></td>
+                            <td class="year-cell">{{ p.year or '-' }}</td>
+                            <td class="spec-cell">{{ p.display_size or '-' }}</td>
+                            <td class="spec-cell">{{ p.camera_pixels or '-' }}</td>
+                            <td class="spec-cell">{{ p.ram or '-' }}</td>
+                            <td class="spec-cell">{{ p.battery_size or '-' }}</td>
+                            <td class="spec-cell">{{ p.os_family or '-' }}</td>
+                            <td class="price-cell">{% if p.price %}${{ "%.0f"|format(p.price) }}{% else %}-{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-results">No phones found for {{ brand_name }}.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="compare-tray" id="compare-tray" style="display:none">
+        <span class="label">Compare:</span>
+        <div class="pills" id="compare-pills"></div>
+        <a class="btn-go" id="compare-go" href="{{ url_for('comparison-aggregators.compare_page') }}">Compare Now</a>
+    </div>
+
+    <script>
+    var tray = document.getElementById('compare-tray');
+    var pills = document.getElementById('compare-pills');
+    var goBtn = document.getElementById('compare-go');
+    document.querySelectorAll('.cmp-check').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var checked = Array.from(document.querySelectorAll('.cmp-check:checked'));
+            if (checked.length > 0) {
+                tray.style.display = 'flex';
+                pills.innerHTML = checked.map(function(c) {
+                    var name = c.closest('tr').querySelector('.phone-name a').textContent;
+                    return '<span class="pill">' + name + '</span>';
+                }).join('');
+                var ids = checked.map(function(c) { return c.value; }).join(',');
+                goBtn.href = '{{ url_for("comparison-aggregators.compare_page") }}?ids=' + ids;
+            } else {
+                tray.style.display = 'none';
+            }
+        });
+    });
+    </script>
+</body>
+</html>

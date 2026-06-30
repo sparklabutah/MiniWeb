@@ -6,145 +6,276 @@
     <title>SalesPro CRM - Dashboard</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
-        .header { background: #0d9488; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.3rem; font-weight: 700; }
-        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
-        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
-        .header-nav a:hover { color: #fff; }
-        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        h2 { font-size: 1.2rem; color: #0d9488; margin-bottom: 1rem; }
-        .stats-ribbon { display: flex; align-items: center; gap: 0; background: #fff; border-radius: 8px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; overflow: hidden; }
-        .stats-ribbon .stat { flex: 1; padding: .8rem 1rem; text-align: center; border-right: 1px solid #e2e8f0; }
-        .stats-ribbon .stat:last-child { border-right: none; }
-        .stats-ribbon .stat .label { font-size: .7rem; color: #718096; text-transform: uppercase; letter-spacing: .05em; }
-        .stats-ribbon .stat .value { font-size: 1.3rem; font-weight: 700; color: #0d9488; margin-top: .2rem; }
-        .stats-ribbon .stat .value.green { color: #276749; }
-        .stats-ribbon .stat .value.blue { color: #2b6cb0; }
-        .pipeline-section { margin-bottom: 2rem; }
-        .pipeline-bar { display: flex; gap: 2px; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: .5rem; }
-        .pipeline-bar .segment { display: flex; align-items: center; justify-content: center; color: #fff; font-size: .75rem; font-weight: 600; min-width: 30px; }
-        .pipeline-bar .segment.prospecting { background: #a0aec0; }
-        .pipeline-bar .segment.qualification { background: #63b3ed; }
-        .pipeline-bar .segment.proposal { background: #f6ad55; }
-        .pipeline-bar .segment.negotiation { background: #9f7aea; }
-        .pipeline-bar .segment.closed-won { background: #48bb78; }
-        .pipeline-bar .segment.closed-lost { background: #fc8181; }
-        .pipeline-legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; }
-        .pipeline-legend .item { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: #4a5568; }
-        .pipeline-legend .dot { width: 12px; height: 12px; border-radius: 3px; }
-        .pipeline-legend .dot.prospecting { background: #a0aec0; }
-        .pipeline-legend .dot.qualification { background: #63b3ed; }
-        .pipeline-legend .dot.proposal { background: #f6ad55; }
-        .pipeline-legend .dot.negotiation { background: #9f7aea; }
-        .pipeline-legend .dot.closed-won { background: #48bb78; }
-        .pipeline-legend .dot.closed-lost { background: #fc8181; }
-        .stage-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-        .stage-table th, .stage-table td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #e2e8f0; font-size: .88rem; }
-        .stage-table th { background: #edf2f7; color: #4a5568; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
-        .stage-table td.amount { text-align: right; font-weight: 600; }
-        .stage-table a { color: #2b6cb0; text-decoration: none; }
-        .stage-table a:hover { text-decoration: underline; }
-        .activity-list { list-style: none; }
-        .activity-list li { background: #fff; border-radius: 6px; padding: .8rem 1rem; margin-bottom: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; gap: 1rem; align-items: flex-start; }
-        .activity-list .icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; flex-shrink: 0; color: #fff; }
-        .activity-list .icon.call { background: #3182ce; }
-        .activity-list .icon.email { background: #d69e2e; }
-        .activity-list .icon.meeting { background: #805ad5; }
-        .activity-list .icon.note { background: #718096; }
-        .activity-list .details { flex: 1; }
-        .activity-list .details .desc { font-size: .88rem; color: #2d3748; }
-        .activity-list .details .meta { font-size: .78rem; color: #a0aec0; margin-top: .2rem; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; }
+
+        /* ── Header ─────────────────────────────────────── */
+        .header { background: #032D60; color: #fff; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 52px; }
+        .header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: .5rem; }
+        .header h1 .logo-icon { width: 26px; height: 26px; background: #0073E6; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 800; color: #fff; }
+        .header-nav { display: flex; gap: .2rem; align-items: center; }
+        .header-nav a { color: #b4d7ff; text-decoration: none; font-size: .82rem; padding: .45rem .7rem; border-radius: 4px; transition: background .15s; }
+        .header-nav a:hover, .header-nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+        .header-nav .divider { width: 1px; height: 20px; background: rgba(255,255,255,.2); margin: 0 .4rem; }
+        .user-pill { background: rgba(255,255,255,.15); color: #e0ecff; font-size: .78rem; padding: .3rem .65rem; border-radius: 12px; display: flex; align-items: center; gap: .35rem; }
+        .user-pill .avatar-sm { width: 22px; height: 22px; border-radius: 50%; background: #0073E6; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 700; color: #fff; }
+
+        /* ── Layout ──────────────────────────────────────── */
+        .dashboard { max-width: 1320px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+        /* ── Metrics Row ─────────────────────────────────── */
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .metric-card { background: #fff; border-radius: 10px; padding: 1.1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #e8ecf1; }
+        .metric-card .metric-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7c93; margin-bottom: .35rem; }
+        .metric-card .metric-value { font-size: 1.6rem; font-weight: 700; color: #032D60; }
+        .metric-card .metric-value.blue { color: #0073E6; }
+        .metric-card .metric-value.green { color: #2E844A; }
+        .metric-card .metric-value.orange { color: #DD7A01; }
+        .metric-card .metric-sub { font-size: .72rem; color: #8899aa; margin-top: .2rem; }
+        @media (max-width: 768px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+
+        /* ── Section Headers ─────────────────────────────── */
+        .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+        .section-head h2 { font-size: 1rem; font-weight: 700; color: #032D60; }
+        .section-head .link { font-size: .8rem; color: #0073E6; text-decoration: none; font-weight: 500; }
+        .section-head .link:hover { text-decoration: underline; }
+
+        /* ── Pipeline Funnel ─────────────────────────────── */
+        .pipeline-funnel { background: #fff; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #e8ecf1; margin-bottom: 1.5rem; }
+        .funnel-bar { display: flex; height: 44px; border-radius: 8px; overflow: hidden; gap: 2px; margin-bottom: .75rem; }
+        .funnel-segment { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: 600; min-width: 40px; position: relative; transition: flex .3s; }
+        .funnel-segment .seg-count { font-size: .85rem; line-height: 1; }
+        .funnel-segment .seg-label { font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; opacity: .85; }
+        .funnel-segment.prospecting   { background: #939EAB; }
+        .funnel-segment.qualification { background: #1B96FF; }
+        .funnel-segment.proposal      { background: #DD7A01; }
+        .funnel-segment.negotiation   { background: #8B6FD0; }
+        .funnel-segment.closed-won    { background: #2E844A; }
+        .funnel-segment.closed-lost   { background: #C23934; }
+
+        .funnel-stages { display: flex; gap: 2px; }
+        .funnel-stage-card { flex: 1; background: #f9fafb; border: 1px solid #e8ecf1; border-radius: 8px; padding: .65rem .8rem; text-align: center; transition: border-color .15s; cursor: pointer; text-decoration: none; color: inherit; }
+        .funnel-stage-card:hover { border-color: #0073E6; }
+        .funnel-stage-card .fs-name { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #6b7c93; margin-bottom: .2rem; }
+        .funnel-stage-card .fs-deals { font-size: 1.15rem; font-weight: 700; color: #032D60; }
+        .funnel-stage-card .fs-value { font-size: .75rem; color: #8899aa; margin-top: .1rem; }
+        .funnel-stage-card.prospecting   .fs-name { color: #6b7280; }
+        .funnel-stage-card.qualification .fs-name { color: #0073E6; }
+        .funnel-stage-card.proposal      .fs-name { color: #DD7A01; }
+        .funnel-stage-card.negotiation   .fs-name { color: #7C3AED; }
+        .funnel-stage-card.closed-won    .fs-name { color: #2E844A; }
+        .funnel-stage-card.closed-lost   .fs-name { color: #C23934; }
+
+        /* ── Kanban ──────────────────────────────────────── */
+        .kanban { margin-bottom: 1.5rem; }
+        .kanban-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; }
+        .kanban-col { background: #f0f2f5; border-radius: 10px; padding: .6rem; min-height: 180px; }
+        .kanban-col-header { display: flex; align-items: center; justify-content: space-between; padding: .35rem .4rem .5rem; margin-bottom: .4rem; }
+        .kanban-col-header .col-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+        .kanban-col-header .col-count { font-size: .65rem; background: #d8dce3; color: #4a5568; padding: .1rem .4rem; border-radius: 10px; font-weight: 600; }
+        .kanban-col.prospecting   .col-title { color: #6b7280; }
+        .kanban-col.qualification .col-title { color: #0073E6; }
+        .kanban-col.proposal      .col-title { color: #DD7A01; }
+        .kanban-col.negotiation   .col-title { color: #7C3AED; }
+        .kanban-col.closed-won    .col-title { color: #2E844A; }
+        .kanban-col.closed-lost   .col-title { color: #C23934; }
+
+        .deal-card { background: #fff; border-radius: 8px; padding: .75rem .85rem; margin-bottom: .5rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); border: 1px solid #e8ecf1; transition: box-shadow .15s, border-color .15s; }
+        .deal-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); border-color: #0073E6; }
+        .deal-card .dc-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: .35rem; }
+        .deal-card .dc-name { font-size: .85rem; font-weight: 600; color: #1a1a2e; flex: 1; }
+        .deal-card .dc-name a { color: inherit; text-decoration: none; }
+        .deal-card .dc-name a:hover { color: #0073E6; }
+        .deal-card .dc-amount { font-size: .85rem; font-weight: 700; color: #0073E6; white-space: nowrap; margin-left: .5rem; }
+        .deal-card .dc-company { font-size: .75rem; color: #6b7c93; margin-bottom: .5rem; }
+        .deal-card .dc-footer { display: flex; align-items: center; justify-content: space-between; }
+        .deal-card .dc-owner { display: flex; align-items: center; gap: .35rem; }
+        .deal-card .dc-avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .deal-card .dc-avatar.a1 { background: #0073E6; }
+        .deal-card .dc-avatar.a2 { background: #7C3AED; }
+        .deal-card .dc-avatar.a3 { background: #DD7A01; }
+        .deal-card .dc-avatar.a4 { background: #2E844A; }
+        .deal-card .dc-avatar.a5 { background: #C23934; }
+        .deal-card .dc-owner-name { font-size: .72rem; color: #8899aa; }
+        .deal-card .dc-days { font-size: .68rem; color: #8899aa; background: #f0f2f5; padding: .15rem .4rem; border-radius: 10px; }
+        .deal-card.won .dc-amount { color: #2E844A; }
+        .deal-card.lost .dc-amount { color: #C23934; text-decoration: line-through; }
+
+        /* ── Activity Feed ────────────────────────────────── */
+        .activity-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #e8ecf1; padding: 1rem 1.15rem; height: fit-content; }
+        .activity-panel h2 { font-size: 1rem; font-weight: 700; color: #032D60; margin-bottom: .85rem; display: flex; align-items: center; gap: .4rem; }
+        .activity-panel h2 .pulse { width: 8px; height: 8px; background: #2E844A; border-radius: 50%; }
+        .activity-item { display: flex; gap: .65rem; padding: .65rem 0; border-bottom: 1px solid #f0f2f5; }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .activity-icon.call    { background: #E6F0FF; color: #0073E6; }
+        .activity-icon.email   { background: #FFF8E6; color: #DD7A01; }
+        .activity-icon.meeting { background: #F3EDFF; color: #7C3AED; }
+        .activity-icon.note    { background: #EDF2F7; color: #6b7c93; }
+        .activity-icon svg { width: 16px; height: 16px; fill: currentColor; }
+        .activity-body { flex: 1; min-width: 0; }
+        .activity-body .act-desc { font-size: .82rem; color: #1a1a2e; line-height: 1.4; }
+        .activity-body .act-desc strong { font-weight: 600; }
+        .activity-body .act-meta { font-size: .7rem; color: #8899aa; margin-top: .2rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+        .activity-body .act-meta .dot { color: #ccd3db; }
+        .empty-msg { font-size: .85rem; color: #8899aa; text-align: center; padding: 2rem 0; }
     </style>
 </head>
 <body>
+    <!-- ── Header ──────────────────────────────────────────── -->
     <div class="header">
-        <h1>SalesPro CRM</h1>
+        <h1><span class="logo-icon">S</span> SalesPro CRM</h1>
         <div class="header-nav">
-            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.index') }}" class="active">Dashboard</a>
             <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
             <a href="{{ url_for('crm.companies_page') }}">Companies</a>
             <a href="{{ url_for('crm.deals_page') }}">Deals</a>
             <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            <span class="divider"></span>
             {% if user %}
-            <span class="user-info">{{ user.name }}</span>
+            <span class="user-pill">
+                <span class="avatar-sm">{{ user.name[0] }}</span>
+                {{ user.name }}
+            </span>
             <a href="{{ url_for('crm.logout') }}">Logout</a>
             {% else %}
             <a href="{{ url_for('crm.login_page') }}">Login</a>
             {% endif %}
         </div>
     </div>
-    <div class="container">
-        <h2>Sales Dashboard</h2>
-        <div class="stats-ribbon">
-            <div class="stat">
-                <div class="label">Pipeline</div>
-                <div class="value blue">${{ "{:,.0f}".format(total_pipeline) }}</div>
+
+    <!-- ── Dashboard ───────────────────────────────────────── -->
+    <div class="dashboard">
+
+        <!-- Key Metrics -->
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-label">Total Pipeline</div>
+                <div class="metric-value blue">${{ "{:,.0f}".format(total_pipeline) }}</div>
+                <div class="metric-sub">{{ total_deals }} active deals</div>
             </div>
-            <div class="stat">
-                <div class="label">Revenue</div>
-                <div class="value green">${{ "{:,.0f}".format(total_revenue) }}</div>
+            <div class="metric-card">
+                <div class="metric-label">Closed Revenue</div>
+                <div class="metric-value green">${{ "{:,.0f}".format(total_revenue) }}</div>
+                <div class="metric-sub">Won deals total</div>
             </div>
-            <div class="stat">
-                <div class="label">Win Rate</div>
-                <div class="value">{{ win_rate }}%</div>
+            <div class="metric-card">
+                <div class="metric-label">Win Rate</div>
+                <div class="metric-value">{{ win_rate }}%</div>
+                <div class="metric-sub">Closed won vs lost</div>
             </div>
-            <div class="stat">
-                <div class="label">Forecast</div>
-                <div class="value blue">${{ "{:,.0f}".format(forecast) }}</div>
-            </div>
-            <div class="stat">
-                <div class="label">Deals</div>
-                <div class="value">{{ total_deals }}</div>
+            <div class="metric-card">
+                <div class="metric-label">Weighted Forecast</div>
+                <div class="metric-value orange">${{ "{:,.0f}".format(forecast) }}</div>
+                <div class="metric-sub">Probability-adjusted</div>
             </div>
         </div>
 
-        <div class="pipeline-section">
-            <h2>Pipeline Overview</h2>
+        <!-- Pipeline Funnel -->
+        <div class="pipeline-funnel">
+            <div class="section-head">
+                <h2>Pipeline Overview</h2>
+                <a class="link" href="{{ url_for('crm.deals_page') }}">View all deals &rarr;</a>
+            </div>
+
             {% set total_count = stage_counts.values()|sum %}
             {% if total_count > 0 %}
-            <div class="pipeline-bar">
+            <div class="funnel-bar">
                 {% for s in stages %}
                 {% if stage_counts[s] > 0 %}
-                <div class="segment {{ s }}" style="flex: {{ stage_counts[s] }};">{{ stage_counts[s] }}</div>
+                <div class="funnel-segment {{ s }}" style="flex: {{ stage_counts[s] }};">
+                    <span class="seg-count">{{ stage_counts[s] }}</span>
+                </div>
                 {% endif %}
                 {% endfor %}
             </div>
             {% endif %}
-            <div class="pipeline-legend">
+
+            <div class="funnel-stages">
                 {% for s in stages %}
-                <div class="item"><span class="dot {{ s }}"></span>{{ s|replace('-', ' ')|title }}: {{ stage_counts[s] }} (${{ "{:,.0f}".format(stage_values[s]) }})</div>
+                <a class="funnel-stage-card {{ s }}" href="{{ url_for('crm.deals_page', stage=s) }}">
+                    <div class="fs-name">{{ s|replace('-', ' ')|title }}</div>
+                    <div class="fs-deals">{{ stage_counts[s] }}</div>
+                    <div class="fs-value">${{ "{:,.0f}".format(stage_values[s]) }}</div>
+                </a>
                 {% endfor %}
             </div>
-            <table class="stage-table">
-                <thead><tr><th>Stage</th><th>Deals</th><th style="text-align:right">Total Value</th></tr></thead>
-                <tbody>
-                {% for s in stages %}
-                <tr>
-                    <td><a href="{{ url_for('crm.deals_page', stage=s) }}">{{ s|replace('-', ' ')|title }}</a></td>
-                    <td>{{ stage_counts[s] }}</td>
-                    <td class="amount">${{ "{:,.0f}".format(stage_values[s]) }}</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
         </div>
 
-        <h2>Recent Activities</h2>
-        <ul class="activity-list">
-        {% for a in recent_activities %}
-            <li>
-                <div class="icon {{ a.type }}">
-                    {% if a.type == 'call' %}PH{% elif a.type == 'email' %}EM{% elif a.type == 'meeting' %}MT{% else %}NT{% endif %}
+        <!-- Main Content Grid: Kanban + Activity Feed -->
+        <div class="dashboard-grid">
+            <div>
+                <!-- Kanban by Stage -->
+                <div class="kanban">
+                    <div class="section-head">
+                        <h2>Deals by Stage</h2>
+                    </div>
+                    <div class="kanban-columns">
+                        {% for s in stages %}
+                        {% set stage_deal_list = [] %}
+                        {% for a in recent_activities %}
+                        {# We don't have per-stage deals in index context, so show stage summary cards #}
+                        {% endfor %}
+                        <div class="kanban-col {{ s }}">
+                            <div class="kanban-col-header">
+                                <span class="col-title">{{ s|replace('-', ' ')|title }}</span>
+                                <span class="col-count">{{ stage_counts[s] }}</span>
+                            </div>
+                            {% if stage_counts[s] > 0 %}
+                            <div class="deal-card{% if s == 'closed-won' %} won{% elif s == 'closed-lost' %} lost{% endif %}">
+                                <div class="dc-top">
+                                    <span class="dc-name"><a href="{{ url_for('crm.deals_page', stage=s) }}">{{ stage_counts[s] }} deal{{ 's' if stage_counts[s] != 1 else '' }}</a></span>
+                                    <span class="dc-amount">${{ "{:,.0f}".format(stage_values[s]) }}</span>
+                                </div>
+                                <div class="dc-company">{{ s|replace('-', ' ')|title }} stage</div>
+                                <div class="dc-footer">
+                                    <a href="{{ url_for('crm.deals_page', stage=s) }}" style="font-size:.72rem;color:#0073E6;text-decoration:none;font-weight:500;">View deals &rarr;</a>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div style="font-size:.78rem;color:#8899aa;text-align:center;padding:1.5rem .5rem;">No deals</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                <div class="details">
-                    <div class="desc">{{ a.description }}</div>
-                    <div class="meta">{{ a.type|title }} &middot; {{ a._contact_name }} &middot; {{ a._user_name }} &middot; {{ a.date }}</div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div class="activity-panel">
+                <h2><span class="pulse"></span> Recent Activity</h2>
+                {% if recent_activities %}
+                {% for a in recent_activities %}
+                <div class="activity-item">
+                    <div class="activity-icon {{ a.type }}">
+                        {% if a.type == 'call' %}
+                        <svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.58.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.58 1 1 0 01-.25 1.01l-2.2 2.2z"/></svg>
+                        {% elif a.type == 'email' %}
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                        {% elif a.type == 'meeting' %}
+                        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                        {% else %}
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                        {% endif %}
+                    </div>
+                    <div class="activity-body">
+                        <div class="act-desc"><strong>{{ a._user_name }}</strong> {{ a.description }}</div>
+                        <div class="act-meta">
+                            <span>{{ a.type|title }}</span>
+                            <span class="dot">&middot;</span>
+                            <span>{{ a._contact_name }}</span>
+                            <span class="dot">&middot;</span>
+                            <span>{{ a.date }}</span>
+                        </div>
+                    </div>
                 </div>
-            </li>
-        {% endfor %}
-        </ul>
+                {% endfor %}
+                {% else %}
+                <div class="empty-msg">No recent activity</div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -6,67 +6,116 @@
 <title>MiniWeb — Task Annotation</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-.header { background: #1e293b; border-bottom: 1px solid #334155; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-.header h1 { font-size: 1.4rem; color: #38bdf8; }
-.header .stats { font-size: .85rem; color: #94a3b8; }
-.header a { color: #38bdf8; text-decoration: none; margin-left: 1.5rem; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+.header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.header h1 { font-size: 1.4rem; color: #0f172a; }
+.header .stats { font-size: .85rem; color: #64748b; }
+.header a { color: #2563eb; text-decoration: none; margin-left: 1.5rem; font-weight: 500; }
+.header a:hover { text-decoration: underline; }
 .main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
-h2 { font-size: 1.2rem; color: #f1f5f9; margin-bottom: 1rem; }
-.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 3rem; }
-.mode-card { background: #1e293b; border: 2px solid #334155; border-radius: .8rem; padding: 1.5rem; transition: border-color .2s; cursor: pointer; text-decoration: none; color: inherit; }
-.mode-card:hover { border-color: #38bdf8; }
-.mode-card h3 { font-size: 1.1rem; color: #f1f5f9; margin-bottom: .5rem; }
-.mode-card .tag { display: inline-block; background: #334155; color: #94a3b8; padding: .15rem .5rem; border-radius: .3rem; font-size: .75rem; margin-bottom: .8rem; }
-.mode-card p { font-size: .88rem; color: #94a3b8; line-height: 1.5; }
-.mode-card .est { font-size: .8rem; color: #38bdf8; margin-top: .8rem; }
+h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
+.modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 3rem; }
+.mode-card { background: #fff; border: 2px solid #e2e8f0; border-radius: .8rem; padding: 1.5rem; transition: border-color .2s, box-shadow .2s; cursor: pointer; text-decoration: none; color: inherit; }
+.mode-card:hover { border-color: #2563eb; box-shadow: 0 2px 8px rgba(37,99,235,.1); }
+.mode-card h3 { font-size: 1.1rem; color: #0f172a; margin-bottom: .5rem; }
+.mode-card .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: .15rem .5rem; border-radius: .3rem; font-size: .75rem; margin-bottom: .8rem; font-weight: 500; }
+.mode-card p { font-size: .88rem; color: #475569; line-height: 1.5; }
+.mode-card .est { font-size: .8rem; color: #2563eb; margin-top: .8rem; font-weight: 500; }
+
+/* Coverage grid */
+.grid-section { margin-bottom: 2rem; }
+.cell-grid { display: grid; grid-template-columns: auto repeat(4, 1fr); gap: 2px; max-width: 500px; font-size: .8rem; }
+.cell-grid .header-cell { background: #f1f5f9; padding: .4rem .6rem; font-weight: 600; text-align: center; color: #475569; }
+.cell-grid .row-label { background: #f1f5f9; padding: .4rem .6rem; font-weight: 600; color: #475569; }
+.cell-grid .cell { background: #fff; border: 1px solid #e2e8f0; padding: .4rem .6rem; text-align: center; }
+.cell-grid .cell.low { background: #fef2f2; color: #991b1b; }
+.cell-grid .cell.med { background: #fffbeb; color: #92400e; }
+.cell-grid .cell.good { background: #f0fdf4; color: #166534; }
+
 .sites-section { margin-bottom: 2rem; }
-.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; }
-.site-chip { background: #1e293b; border: 1px solid #334155; border-radius: .5rem; padding: .6rem .8rem; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; }
-.site-chip .name { color: #e2e8f0; }
-.site-chip .count { color: #38bdf8; font-size: .75rem; }
+.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .8rem; }
+.site-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: .7rem .9rem; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; }
+.site-chip .name { color: #0f172a; font-weight: 500; }
+.site-chip .count { color: #64748b; font-size: .75rem; }
 </style>
 </head>
 <body>
 <div class="header">
     <h1>MiniWeb Task Annotation</h1>
-    <div class="stats">{{ task_count }} tasks annotated · {{ sites|length }} sites available · {{ macros|length }} macros in vocabulary</div>
+    <div class="stats">{{ task_count }} tasks · {{ sites|length }} sites · {{ macros|length }} macros</div>
     <div>
         <a href="{{ url_for('annotation.dashboard') }}">Dashboard</a>
-        <a href="/" target="_blank">MiniWeb ↗</a>
+        <a href="/" target="_blank">MiniWeb Portal</a>
     </div>
 </div>
 
 <div class="main">
-    <h2>Choose annotation mode</h2>
-    <div class="modes" style="grid-template-columns: repeat(2, 1fr)">
-        <a class="mode-card" href="{{ url_for('annotation.annotate', mode='prompt') }}">
-            <h3>Macro Prompt</h3>
-            <span class="tag">Kenny / Farhan</span>
-            <p>The system gives you a random website and a small set of macros (e.g., "search_by_query + filter_by_dropdown + extract_by_route on the banking site"). You design a task that exercises those macros. Prioritizes under-covered macros and sites.</p>
-            <div class="est">~6 min/task · Guided creativity</div>
+    <h2>Choose mode</h2>
+    <div class="modes">
+        <a class="mode-card" href="{{ url_for('annotation.review') }}">
+            <h3>Review Sites</h3>
+            <span class="tag">Step 1</span>
+            <p>Browse each site, test functionality, and leave free-form feedback about bugs, data quality, missing features, and UI issues.</p>
+            <div class="est">~2 min/site · Quality check before annotation</div>
         </a>
-        <a class="mode-card" href="{{ url_for('annotation.annotate', mode='queue') }}">
-            <h3>Refine Drafts</h3>
-            <span class="tag">Minh</span>
-            <p>Pre-generated task drafts are loaded one by one. Walk through each on the live site, edit the instruction if unclear or impossible, record your trajectory, type the answer, select verifiers. Skip bad drafts. Auto-advances to the next draft after submitting.</p>
-            <div class="est">~4 min/task · Fastest with quality</div>
+        <a class="mode-card" href="{{ url_for('annotation.annotate') }}">
+            <h3>Annotate Tasks</h3>
+            <span class="tag">Step 2</span>
+            <p>System samples 1-3 websites and 1-4 macros. Design a task that exercises those macros, record trajectory, type answer, select verifiers.</p>
+            <div class="est">~6 min/task · Guided by macro coverage</div>
         </a>
     </div>
 
+    <div class="grid-section">
+        <h2>Task Coverage Grid (Sites x Macros)</h2>
+        <div class="cell-grid">
+            <div class="header-cell"></div>
+            <div class="header-cell">1 macro</div>
+            <div class="header-cell">2 macros</div>
+            <div class="header-cell">3 macros</div>
+            <div class="header-cell">4 macros</div>
+            {% for n in [1, 2, 3] %}
+            <div class="row-label">{{ n }} site{{ 's' if n > 1 }}</div>
+            {% for m in [1, 2, 3, 4] %}
+            {% set count = cell_counts.get((n, m), 0) %}
+            <div class="cell {{ 'good' if count >= 100 else ('med' if count >= 30 else 'low') }}">{{ count }}</div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        <div style="font-size: .75rem; color: #94a3b8; margin-top: .5rem;">Target: ~333 tasks per cell (4000+ total)</div>
+    </div>
+
     <div class="sites-section">
-        <h2>Sites (click to start annotating)</h2>
+        <h2>Sites ({{ sites|length }})</h2>
         <div class="site-grid">
             {% for site in sites %}
-            {% if site.evaluated %}
-            <a class="site-chip" href="{{ url_for('annotation.annotate', mode='queue', site=site.id) }}" style="text-decoration:none">
+            <div class="site-chip">
                 <span class="name">{{ site.name or site.id }}</span>
-                <span class="count">{{ coverage.get(site.id, 0) }} tasks</span>
-            </a>
-            {% endif %}
+                <span class="count">{{ site.annotated_count }} tasks · {{ site.review_count }} reviews</span>
+            </div>
             {% endfor %}
         </div>
     </div>
+
+    {% if task_count > 0 %}
+    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+        <button onclick="resetAnnotations()" style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: .5rem 1rem; border-radius: .4rem; cursor: pointer; font-size: .85rem;">Reset All Annotations</button>
+        <span style="font-size: .8rem; color: #94a3b8; margin-left: .8rem;">Deletes all {{ task_count }} reviewed tasks.</span>
+    </div>
+    {% endif %}
 </div>
+
+<script>
+function resetAnnotations() {
+    const count = {{ task_count }};
+    const msg = `This will permanently delete all ${count} task(s).\n\nType "reset" to confirm:`;
+    const input = prompt(msg);
+    if (input !== 'reset') return;
+    fetch('{{ url_for("annotation.api_reset_tasks") }}', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { alert(d.message || 'Done'); location.reload(); })
+        .catch(e => alert('Error: ' + e));
+}
+</script>
 </body>
 </html>

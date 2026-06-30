@@ -1,22 +1,20 @@
 """E-commerce — Online marketplace (Amazon/eBay style).
 
-Data interpreter: reads products.jsonl line by line, parses each JSON object,
-cleans and normalizes fields. The raw data file is never modified.
+Data is stored in SQLite: products in the e_commerce_products table, users and
+reviews in per-site typed tables.  Queried through app.db.
 """
 import json
 import pathlib
-import random
 import re
 import datetime
 from collections import Counter
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
+from app.db import _deserialize_row
 
+SITE = "e-commerce"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_FILE = SITE_DIR / "data" / "products.jsonl"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-REVIEWS_FILE = SITE_DIR / "data" / "reviews.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "e-commerce",
@@ -25,14 +23,6 @@ blueprint = Blueprint(
     static_folder=str(SITE_DIR / "static"),
     static_url_path="/static",
 )
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
 
 # ---------------------------------------------------------------------------
 # Data interpreter — reads raw JSONL, cleans, normalizes
@@ -141,113 +131,131 @@ def _interpret_product(raw, idx):
     }
 
 
-def _load_products():
-    """Read JSONL dataset, respecting config."""
-    config = _load_config()
-    n = config.get("num_data_points", -1)
-    seed = config.get("random_seed", 42)
-    rng = random.Random(seed)
+# ---------------------------------------------------------------------------
+# DB-backed data access  (e_commerce_products table)
+# ---------------------------------------------------------------------------
 
-    raw_records = []
-    with open(DATA_FILE) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                raw_records.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
 
-    if 0 < n < len(raw_records):
-        raw_records = rng.sample(raw_records, n)
+def _db_conn():
+    return db.get_conn()
 
+
+def _db_load_all_products():
+    """Load all products from DB, interpret, sort, and assign IDs."""
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT * FROM e_commerce_products ORDER BY asin"
+    ).fetchall()
     products = []
-    for idx, raw in enumerate(raw_records, 1):
-        products.append(_interpret_product(raw, idx))
-
+    for i, row in enumerate(rows):
+        raw = _deserialize_row(row)
+        # Parse JSON list columns that are stored as TEXT
+        for col in ("images", "small_description", "customization_options",
+                     "product_information"):
+            val = raw.get(col)
+            if isinstance(val, str):
+                try:
+                    raw[col] = json.loads(val)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        products.append(_interpret_product(raw, i + 1))
     products.sort(key=lambda p: p["name"].lower())
     for i, p in enumerate(products, 1):
         p["id"] = i
-
     return products
 
 
-# ---------------------------------------------------------------------------
-# Caching
-# ---------------------------------------------------------------------------
-
-_products = None
-_top_categories = None
-_all_brands = None
+# DB products cache — loaded once since it's only ~500 records
+_db_products = None
+_db_top_categories = None
+_db_all_brands = None
 
 
-def _ensure_loaded():
-    global _products, _top_categories, _all_brands
-    if _products is None:
-        _products = _load_products()
-        cat_counts = Counter(p["top_category"] for p in _products)
-        _top_categories = sorted(cat_counts.keys())
-        brand_counts = Counter(p["brand"] for p in _products if p["brand"])
-        _all_brands = sorted(brand_counts.keys())
+def _db_ensure_loaded():
+    global _db_products, _db_top_categories, _db_all_brands
+    if _db_products is None:
+        _db_products = _db_load_all_products()
+        cat_counts = Counter(p["top_category"] for p in _db_products)
+        _db_top_categories = sorted(cat_counts.keys())
+        brand_counts = Counter(p["brand"] for p in _db_products if p["brand"])
+        _db_all_brands = sorted(brand_counts.keys())
 
 
-def _get_products():
-    _ensure_loaded()
-    return _products
+def _db_get_products():
+    _db_ensure_loaded()
+    return _db_products
 
 
-def _get_top_categories():
-    _ensure_loaded()
-    return _top_categories
+def _db_get_top_categories():
+    _db_ensure_loaded()
+    return _db_top_categories
 
 
-def _get_all_brands():
-    _ensure_loaded()
-    return _all_brands
+def _db_get_all_brands():
+    _db_ensure_loaded()
+    return _db_all_brands
 
 
-def _get_product_by_id(product_id):
-    products = _get_products()
+def _db_get_product_by_id(product_id):
+    products = _db_get_products()
     return next((p for p in products if p["id"] == product_id), None)
 
 
-def _get_product_by_asin(asin):
-    products = _get_products()
+def _db_get_product_by_asin(asin):
+    products = _db_get_products()
     return next((p for p in products if p["asin"] == asin), None)
 
 
 # ---------------------------------------------------------------------------
-# Users (mutable state)
+# Unified accessors — always use DB
+# ---------------------------------------------------------------------------
+
+def _get_products():
+    return _db_get_products()
+
+
+def _get_top_categories():
+    return _db_get_top_categories()
+
+
+def _get_all_brands():
+    return _db_get_all_brands()
+
+
+def _get_product_by_id(product_id):
+    return _db_get_product_by_id(product_id)
+
+
+def _get_product_by_asin(asin):
+    return _db_get_product_by_asin(asin)
+
+
+# ---------------------------------------------------------------------------
+# Users (mutable state -- stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
-# Reviews (mutable state)
+# Reviews (mutable state -- stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_reviews():
-    if REVIEWS_FILE.exists():
-        return json.loads(REVIEWS_FILE.read_text())
-    return []
+    return db.query(SITE, "reviews")
 
 
 def _save_reviews(reviews):
-    REVIEWS_FILE.write_text(json.dumps(reviews, indent=2))
+    db.save_collection(SITE, "reviews", reviews)
 
 
 # ---------------------------------------------------------------------------
@@ -359,9 +367,7 @@ def product_detail(product_id):
     product = _get_product_by_id(product_id)
     if product is None:
         abort(404)
-    reviews = _load_reviews()
-    product_reviews = [r for r in reviews if r["product_asin"] == product["asin"]]
-    product_reviews.sort(key=lambda r: r["date"], reverse=True)
+    product_reviews = db.query(SITE, "reviews", where={"product_asin": product["asin"]}, sort="-date")
 
     # Related products in same category
     products = _get_products()
@@ -635,10 +641,24 @@ def form_checkout():
         "status": "processing",
     }
 
+    account_type = request.form.get("account_type", "checking")
+
     user.setdefault("orders", []).append(order)
     user["cart"] = []
     _save_users(users)
-    return redirect(url_for("e-commerce.orders_page"))
+
+    # 2FA: send verification code before completing the purchase
+    from app.events import request_2fa
+    item_names = ", ".join(i["name"] for i in order_items[:3])
+    verify_url = request_2fa("purchase",
+                             return_url=url_for("e-commerce.orders_page"),
+                             user_id=session.get("user_id", 1),
+                             merchant="MiniWeb Store",
+                             amount=order["total"],
+                             item_description=item_names,
+                             order_id=order_id,
+                             account_type=account_type)
+    return redirect(verify_url)
 
 
 @blueprint.route("/review/submit", methods=["POST"])
@@ -873,17 +893,28 @@ def api_place_order():
         "status": "processing",
     }
 
+    account_type = data.get("account_type", "checking")
+
     user.setdefault("orders", []).append(order)
     user["cart"] = []
     _save_users(users)
+
+    # Bridge: notify banking/email of purchase
+    try:
+        from app.bridges import on_purchase
+        item_names = ", ".join(i["name"] for i in order_items[:3])
+        on_purchase(user_id=user_id, merchant="MiniWeb Store",
+                    amount=order["total"], item_description=item_names,
+                    order_id=order_id, account_type=account_type)
+    except Exception:
+        pass  # bridge failure should never block the main flow
+
     return jsonify({"action": "placed", "order": order})
 
 
 @blueprint.route("/api/reviews/<asin>")
 def api_get_reviews(asin):
-    reviews = _load_reviews()
-    product_reviews = [r for r in reviews if r["product_asin"] == asin]
-    product_reviews.sort(key=lambda r: r["date"], reverse=True)
+    product_reviews = db.query(SITE, "reviews", where={"product_asin": asin}, sort="-date")
     return jsonify(product_reviews)
 
 

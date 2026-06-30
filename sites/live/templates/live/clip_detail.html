@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ clip.title }} - StreamHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; }
+        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #9147ff; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #dedee3; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+        .clip-player { background: #1f1f23; border-radius: .5rem; height: 350px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; }
+        .clip-player .play-icon { font-size: 4rem; color: #9147ff; }
+        .clip-header h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: .5rem; }
+        .clip-meta { font-size: .85rem; color: #adadb8; margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .clip-meta a { color: #9147ff; text-decoration: none; }
+        .btn { background: #9147ff; color: #fff; border: none; padding: .5rem 1rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #772ce8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
+        <div class="header-right">
+            <a href="{{ url_for('live.index') }}">Browse</a>
+            <a href="{{ url_for('live.clips_page') }}">Clips</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="clip-player">
+            <span class="play-icon">&#9654;</span>
+        </div>
+        <div class="clip-header">
+            <h2>{{ clip.title }}</h2>
+            <div class="clip-meta">
+                {% if channel_user %}
+                <span>Channel: <a href="{{ url_for('live.channel_page', user_id=clip.channel_id) }}">{{ channel_user.display_name }}</a></span>
+                {% endif %}
+                <span>{{ clip.duration_seconds }} seconds</span>
+                <span>{{ "{:,}".format(clip.views) }} views</span>
+                {% if stream %}
+                <span>From: <a href="{{ url_for('live.stream_detail', stream_id=clip.stream_id) }}">{{ stream.title }}</a></span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlow - {{ form.title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
+        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #ce93d8; font-size: .85rem; }
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+        .form-header { background: #fff; border-radius: 8px; border: 1px solid #dadce0; border-top: 4px solid #673ab7; padding: 1.5rem; margin-bottom: 1rem; }
+        .form-header h2 { font-size: 1.4rem; margin-bottom: .3rem; }
+        .form-header .desc { color: #5f6368; font-size: .9rem; margin-bottom: .8rem; }
+        .form-header .meta { font-size: .82rem; color: #80868b; }
+        .badge { display: inline-block; padding: .15rem .55rem; border-radius: 12px; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+        .badge.active { background: #e8f5e9; color: #2e7d32; }
+        .badge.draft { background: #fff3e0; color: #ef6c00; }
+        .badge.closed { background: #fce4ec; color: #c62828; }
+        .action-bar { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .btn { padding: .5rem 1rem; font-size: .88rem; border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124; text-decoration: none; cursor: pointer; font-weight: 500; }
+        .btn:hover { background: #f1f3f4; }
+        .btn.primary { background: #673ab7; color: #fff; border-color: #673ab7; }
+        .btn.primary:hover { background: #5e35b1; }
+        .field-card { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1.2rem 1.5rem; margin-bottom: .5rem; }
+        .field-card .field-label { font-size: .95rem; font-weight: 500; margin-bottom: .3rem; }
+        .field-card .field-label .required { color: #d32f2f; }
+        .field-card .field-type { font-size: .78rem; color: #80868b; text-transform: uppercase; margin-bottom: .5rem; }
+        .field-card .options-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .field-card .options-list .option { background: #f1f3f4; padding: .2rem .6rem; border-radius: 12px; font-size: .8rem; color: #5f6368; }
+        .section-title { font-size: 1.1rem; font-weight: 600; color: #202124; margin: 1.5rem 0 .8rem; }
+        .response-card { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1rem 1.2rem; margin-bottom: .5rem; }
+        .response-card .resp-meta { font-size: .78rem; color: #80868b; margin-bottom: .5rem; }
+        .response-card .answer { font-size: .88rem; margin-bottom: .3rem; }
+        .response-card .answer .q { font-weight: 500; color: #5f6368; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FormFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
+            <a href="{{ url_for('forms-surveys.create_form_page') }}">Create</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('forms-surveys.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('forms-surveys.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="form-header">
+            <h2>{{ form.title }}</h2>
+            <p class="desc">{{ form.description }}</p>
+            <div class="meta">
+                <span class="badge {{ form.status }}">{{ form.status }}</span>
+                Created by {{ form._owner_name }} on {{ form.created_at[:10] }}
+                &middot; {{ form.responses_count }} response{{ 's' if form.responses_count != 1 else '' }}
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <a href="{{ url_for('forms-surveys.index') }}" class="btn">&larr; Back</a>
+            {% if form.status == 'active' %}
+            <a href="{{ url_for('forms-surveys.respond_form', form_id=form.id) }}" class="btn primary">Fill Out Form</a>
+            {% endif %}
+            <a href="{{ url_for('forms-surveys.form_results', form_id=form.id) }}" class="btn">View Results</a>
+        </div>
+
+        <div class="section-title">Form Fields ({{ form.fields|length }})</div>
+        {% for field in form.fields %}
+        <div class="field-card">
+            <div class="field-label">
+                {{ field.label }}
+                {% if field.required %}<span class="required">*</span>{% endif %}
+            </div>
+            <div class="field-type">{{ field.type }}</div>
+            {% if field.options %}
+            <div class="options-list">
+                {% for opt in field.options %}
+                <span class="option">{{ opt }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if responses %}
+        <div class="section-title">Recent Responses ({{ responses|length }})</div>
+        {% for resp in responses[:10] %}
+        <div class="response-card">
+            <div class="resp-meta">
+                Response #{{ resp.id }} &middot; {{ resp.submitted_at[:16] | replace('T', ' ') }}
+                {% if resp.respondent_id %} &middot; User {{ resp.respondent_id }}{% endif %}
+            </div>
+            {% for field in form.fields %}
+            {% set val = resp.answers.get(field.id, '') %}
+            {% if val %}
+            <div class="answer">
+                <span class="q">{{ field.label }}:</span>
+                {% if val is string %}{{ val }}{% elif val is iterable %}{{ val|join(', ') }}{% else %}{{ val }}{% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</body>
+</html>

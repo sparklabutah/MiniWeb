@@ -3,14 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>JobQuest - Find Your Next Opportunity</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        .header-nav { display: flex; gap: 1rem; align-items: center; }
+        .header-nav a { color: #d1d5db; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-signin { background: #6366f1; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .header-nav .btn-signin:hover { background: #4f46e5; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; color: #4338ca; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #dc2626; }
+        .hero { background: linear-gradient(135deg, #1a1a2e, #312e81); padding: 3rem 2rem; text-align: center; color: #fff; }
+        .hero h2 { font-size: 2rem; margin-bottom: .8rem; font-weight: 300; }
+        .hero p { color: #c7d2fe; font-size: 1rem; max-width: 550px; margin: 0 auto 1.5rem; }
+        .search-box { max-width: 700px; margin: 0 auto; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .search-box input { flex: 1; min-width: 180px; padding: .7rem 1rem; border: none; border-radius: .4rem; font-size: .95rem; }
+        .search-box input:focus { outline: 2px solid #6366f1; }
+        .search-box button { background: #6366f1; color: #fff; border: none; padding: .7rem 1.5rem; border-radius: .4rem; font-size: .95rem; font-weight: 600; cursor: pointer; }
+        .search-box button:hover { background: #4f46e5; }
+        .main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: center; }
+        .stat-card .number { font-size: 2rem; font-weight: 700; color: #4338ca; }
+        .stat-card .label { font-size: .85rem; color: #6b7280; margin-top: .3rem; }
+        .section-title { font-size: 1.15rem; color: #1f2937; margin-bottom: 1rem; font-weight: 600; }
+        .recent-searches { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .search-item { display: flex; justify-content: space-between; align-items: center; padding: .7rem 0; border-bottom: 1px solid #f3f4f6; }
+        .search-item:last-child { border-bottom: none; }
+        .search-item .query { font-weight: 500; color: #312e81; }
+        .search-item .meta { font-size: .8rem; color: #9ca3af; }
+        .search-item a { color: #6366f1; text-decoration: none; font-size: .85rem; }
+        .search-item a:hover { text-decoration: underline; }
+        .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2rem; }
+        .quick-link { background: #fff; border: 1.5px solid #e5e7eb; padding: 1.2rem; border-radius: .5rem; text-decoration: none; color: #374151; text-align: center; font-weight: 500; }
+        .quick-link:hover { border-color: #6366f1; background: #f5f3ff; }
+        .quick-link .icon { font-size: 1.5rem; display: block; margin-bottom: .4rem; }
+        .footer { text-align: center; padding: 2rem; color: #9ca3af; font-size: .8rem; border-top: 1px solid #e5e7eb; margin-top: 3rem; background: #fff; }
+        .login-banner { max-width: 1100px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
+        .login-banner a { color: #4338ca; font-weight: 600; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+        <div class="header-nav">
+            {% if logged_in %}
+            <span style="color:#d1d5db;font-size:.85rem;">{{ user.display_name }}</span>
+            <a href="{{ url_for('job-sites.logout') }}" style="color:#fca5a5;">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('job-sites.login_page') }}" class="btn-signin">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
     </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}" class="active">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('job-sites.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('job-sites.login_page') }}">Sign In</a>
+        {% endif %}
+    </nav>
+
+    {% if not logged_in %}
+    <div class="login-banner">
+        Browsing as {{ user.display_name }} (demo mode). <a href="{{ url_for('job-sites.login_page') }}">Sign in</a> to manage your own job search.
+    </div>
+    {% endif %}
+
+    <div class="hero">
+        <h2>Find your next opportunity</h2>
+        <p>Search millions of jobs, track applications, and set up alerts for roles that match your skills.</p>
+        <form class="search-box" action="{{ url_for('job-sites.jobs_page') }}" method="get">
+            <input type="text" name="q" placeholder="Job title, keywords, or company" autocomplete="off">
+            <input type="text" name="location" placeholder="City, state, or remote">
+            <button type="submit">Search Jobs</button>
+        </form>
+    </div>
+
+    <div class="main">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number" id="saved-count">--</div>
+                <div class="label">Saved Jobs</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="apps-count">--</div>
+                <div class="label">Applications</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="interview-count">--</div>
+                <div class="label">Interviewing</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="alerts-count">--</div>
+                <div class="label">Active Alerts</div>
+            </div>
+        </div>
+
+        {% if recent_searches %}
+        <h3 class="section-title">Recent Searches</h3>
+        <div class="recent-searches">
+            {% for s in recent_searches %}
+            <div class="search-item">
+                <div>
+                    <span class="query">{{ s.query }}</span>
+                    <span class="meta"> &mdash; {{ s.results_count }} results</span>
+                </div>
+                <a href="{{ url_for('job-sites.jobs_page', q=s.query) }}">Search again</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="quick-links">
+            <a href="{{ url_for('job-sites.jobs_page') }}" class="quick-link">
+                <span class="icon">&#128270;</span>
+                Find Jobs
+            </a>
+            <a href="{{ url_for('job-sites.saved_page') }}" class="quick-link">
+                <span class="icon">&#128278;</span>
+                Saved Jobs
+            </a>
+            <a href="{{ url_for('job-sites.applications_page') }}" class="quick-link">
+                <span class="icon">&#128196;</span>
+                My Applications
+            </a>
+            <a href="{{ url_for('job-sites.alerts_page') }}" class="quick-link">
+                <span class="icon">&#128276;</span>
+                Job Alerts
+            </a>
+        </div>
+    </div>
+
+    <div class="footer">
+        JobQuest &mdash; Your job search, simplified. &copy; 2026
+    </div>
+
+    <script>
+    fetch("{{ url_for('job-sites.api_stats') }}")
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById("saved-count").textContent = d.saved_jobs_count;
+            document.getElementById("apps-count").textContent = d.total_applications;
+            document.getElementById("interview-count").textContent = d.interviewing_count;
+            document.getElementById("alerts-count").textContent = d.active_alerts;
+        })
+        .catch(() => {});
+    </script>
 </body>
 </html>

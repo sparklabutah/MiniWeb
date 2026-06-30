@@ -6,7 +6,7 @@
 
 ## Data Source
 
-Yelp Open Dataset?
+data_sources/rating-review/ (businesses.json, reviews.json, photos.json, users.json)
 
 ## Target Macros
 
@@ -14,9 +14,10 @@ navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, fi
 
 ## Site Description
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+A Yelp-style local business review platform for the fictional town of Lakeport, WA. Users browse 25 local businesses, read/write reviews with star ratings, upload photos, and interact socially.
+
+- **Domain**: Social media / rating & review
+- **Data**: 25 businesses, 8 users, ~40 reviews, ~20 photos across multiple categories (Restaurants, Shopping, Health & Fitness, etc.)
+- **Real-world model**: Yelp
+- **Temporal**: No temporal simulation needed; content is static user-generated
+- **Auth**: Users log in by username; default user is alex_r (id=1, root_user_id=1)

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ channel_user.display_name }} - StreamHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; }
+        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #9147ff; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #dedee3; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        .header-right a:hover { background: #2f2f35; }
+        .header-right .user-badge { background: #9147ff; color: #fff; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        .channel-banner { background: #18181b; border-radius: .5rem; padding: 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+        .avatar-lg { width: 80px; height: 80px; border-radius: 50%; background: #9147ff; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #fff; font-weight: 700; flex-shrink: 0; }
+        .channel-info { flex: 1; }
+        .channel-info h2 { font-size: 1.5rem; margin-bottom: .3rem; }
+        .channel-info .bio { color: #adadb8; font-size: .85rem; margin-bottom: .5rem; }
+        .channel-stats { display: flex; gap: 1.5rem; font-size: .85rem; color: #737380; }
+        .channel-stats span strong { color: #efeff1; }
+        .channel-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .btn { background: #9147ff; color: #fff; border: none; padding: .5rem 1rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #772ce8; }
+        .btn-outline { background: transparent; border: 1px solid #9147ff; color: #9147ff; }
+        .btn-outline:hover { background: #9147ff22; }
+        .btn-danger { background: #eb0400; }
+        .btn-danger:hover { background: #c00; }
+        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; margin-top: 1.5rem; }
+        .stream-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
+        .stream-card { background: #18181b; border-radius: .5rem; overflow: hidden; }
+        .stream-card a { text-decoration: none; color: inherit; }
+        .stream-thumb { background: #26262c; height: 140px; display: flex; align-items: center; justify-content: center; position: relative; }
+        .stream-thumb .play-icon { font-size: 2rem; color: #5c5c6a; }
+        .stream-thumb .badge { position: absolute; top: .4rem; right: .4rem; font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; font-weight: 700; }
+        .stream-thumb .badge.live { background: #eb0400; color: #fff; }
+        .stream-thumb .badge.completed { background: #3a3a44; color: #adadb8; }
+        .stream-card-info { padding: .7rem; }
+        .stream-card-info .title { font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+        .stream-card-info .meta { font-size: .75rem; color: #737380; }
+        .rewards-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .reward-card { background: #18181b; border-radius: .5rem; padding: 1rem; }
+        .reward-card h4 { font-size: .9rem; margin-bottom: .3rem; }
+        .reward-card .desc { font-size: .8rem; color: #adadb8; margin-bottom: .5rem; }
+        .reward-card .cost { font-size: .85rem; color: #9147ff; font-weight: 600; }
+        .no-content { color: #737380; padding: 2rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
+        <div class="header-right">
+            <a href="{{ url_for('live.index') }}">Browse</a>
+            <a href="{{ url_for('live.clips_page') }}">Clips</a>
+            {% if logged_in %}
+                <a href="{{ url_for('live.subscriptions_page') }}">Subscriptions</a>
+                <span class="user-badge">{{ user.display_name }}</span>
+                <a href="{{ url_for('live.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('live.login_page') }}" class="btn">Log In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="channel-banner">
+            <div class="avatar-lg">{{ channel_user.display_name[0] }}</div>
+            <div class="channel-info">
+                <h2>
+                    {{ channel_user.display_name }}
+                    {% if channel_user.is_partner %}
+                        <span style="color:#9147ff; font-size:.8rem;" title="Partner">&#10003;</span>
+                    {% elif channel_user.is_affiliate %}
+                        <span style="color:#adadb8; font-size:.8rem;" title="Affiliate">&#10003;</span>
+                    {% endif %}
+                </h2>
+                {% if channel_user.bio %}
+                <p class="bio">{{ channel_user.bio }}</p>
+                {% endif %}
+                <div class="channel-stats">
+                    <span><strong>{{ follower_count }}</strong> followers</span>
+                    <span><strong>{{ sub_count }}</strong> subscribers</span>
+                    <span><strong>{{ "{:,}".format(channel_user.total_views) }}</strong> total views</span>
+                </div>
+            </div>
+            <div class="channel-actions">
+                {% if logged_in and user.id != channel_user.id %}
+                    <button class="btn {{ 'btn-outline' if is_following }}" id="followBtn"
+                            onclick="toggleFollow()">
+                        {{ 'Unfollow' if is_following else 'Follow' }}
+                    </button>
+                    <button class="btn {{ 'btn-danger' if is_subscribed else '' }}" id="subBtn"
+                            onclick="toggleSubscribe()">
+                        {{ 'Unsubscribe' if is_subscribed else 'Subscribe' }}
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <h3 class="section-title">Streams ({{ streams|length }})</h3>
+        {% if streams %}
+        <div class="stream-grid">
+            {% for s in streams %}
+            <div class="stream-card">
+                <a href="{{ url_for('live.stream_detail', stream_id=s.id) }}">
+                    <div class="stream-thumb">
+                        <span class="play-icon">&#9654;</span>
+                        <span class="badge {{ s.status }}">{{ 'LIVE' if s.status == 'live' else 'VOD' }}</span>
+                    </div>
+                    <div class="stream-card-info">
+                        <div class="title">{{ s.title }}</div>
+                        <div class="meta">{{ s.category }} &middot; {{ s.duration_minutes }} min &middot; {{ "{:,}".format(s.total_views) }} views</div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="no-content">No streams yet.</p>
+        {% endif %}
+
+        {% if clips %}
+        <h3 class="section-title">Top Clips ({{ clips|length }})</h3>
+        <div class="stream-grid">
+            {% for c in clips %}
+            <div class="stream-card">
+                <a href="{{ url_for('live.clip_detail', clip_id=c.id) }}">
+                    <div class="stream-thumb" style="height:100px;">
+                        <span class="play-icon">&#9654;</span>
+                    </div>
+                    <div class="stream-card-info">
+                        <div class="title">{{ c.title }}</div>
+                        <div class="meta">{{ c.duration_seconds }}s &middot; {{ "{:,}".format(c.views) }} views</div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if channel_rewards %}
+        <h3 class="section-title">Channel Point Rewards</h3>
+        <div class="rewards-list">
+            {% for r in channel_rewards %}
+            <div class="reward-card">
+                <h4>{{ r.name }}</h4>
+                <p class="desc">{{ r.description }}</p>
+                <span class="cost">{{ "{:,}".format(r.cost) }} points</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if logged_in and user.id != channel_user.id %}
+    <script>
+        function toggleFollow() {
+            fetch('{{ url_for("live.api_channel_follow", user_id=channel_user.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}
+            }).then(r => r.json()).then(data => {
+                const btn = document.getElementById('followBtn');
+                if (data.status === 'followed') {
+                    btn.textContent = 'Unfollow';
+                    btn.classList.add('btn-outline');
+                } else {
+                    btn.textContent = 'Follow';
+                    btn.classList.remove('btn-outline');
+                }
+            });
+        }
+        function toggleSubscribe() {
+            fetch('{{ url_for("live.api_channel_subscribe", user_id=channel_user.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}
+            }).then(r => r.json()).then(data => {
+                const btn = document.getElementById('subBtn');
+                if (data.status === 'subscribed') {
+                    btn.textContent = 'Unsubscribe';
+                    btn.classList.add('btn-danger');
+                } else {
+                    btn.textContent = 'Subscribe';
+                    btn.classList.remove('btn-danger');
+                }
+            });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>

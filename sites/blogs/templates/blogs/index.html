@@ -99,12 +99,6 @@
                     <input type="text" name="q" class="search-box" placeholder="Search posts..." value="{{ q }}" autocomplete="off">
                     <button type="submit" class="search-btn">Search</button>
                 </form>
-                <h3 style="margin-top:.8rem">Semantic Search</h3>
-                <form id="semantic-search-form" onsubmit="semanticSearch(event)">
-                    <input type="text" id="semantic-q" class="search-box" placeholder="Semantic search..." autocomplete="off">
-                    <button type="submit" class="search-btn">Semantic Search</button>
-                </form>
-                <div id="semantic-results" style="margin-top:.5rem;font-size:.85rem;"></div>
             </div>
             <div class="sidebar-section">
                 <h3>Categories</h3>
@@ -142,7 +136,6 @@
                             <option value="date" {{ 'selected' if sort == 'date' }}>Newest</option>
                             <option value="oldest" {{ 'selected' if sort == 'oldest' }}>Oldest</option>
                             <option value="popular" {{ 'selected' if sort == 'popular' }}>Popular</option>
-                            <option value="relevance" {{ 'selected' if sort == 'relevance' }}>Relevance</option>
                         </select>
                     </div>
                     <div class="filter-row">
@@ -153,18 +146,10 @@
         </div>
 
         <div class="feed">
-            <div class="result-info">{{ posts|length }} posts{% if q %} matching "{{ q }}"{% endif %}{% if cat %} in {{ cat }}{% endif %}{% if tag %} tagged #{{ tag }}{% endif %}</div>
+            <div class="result-info">{{ total_count }} posts{% if q %} matching "{{ q }}"{% endif %}{% if cat %} in {{ cat }}{% endif %}{% if tag %} tagged #{{ tag }}{% endif %}</div>
 
-            {% set page = request.args.get('page', '1')|int %}
-            {% set per_page = 30 %}
-            {% set total_posts = posts|length %}
-            {% set total_pages = (total_posts + per_page - 1) // per_page %}
-            {% set start = (page - 1) * per_page %}
-            {% set end = start + per_page %}
-            {% set page_posts = posts[start:end] %}
-
-            {% if page_posts %}
-            {% for post in page_posts %}
+            {% if posts %}
+            {% for post in posts %}
             <div class="post-card" data-id="{{ post.id }}">
                 {% if post.image_url %}
                 <img src="{{ post.image_url }}" alt="" class="post-image">
@@ -235,25 +220,5 @@
             </div>
         </div>
     </div>
-<script>
-function semanticSearch(e) {
-    e.preventDefault();
-    var q = document.getElementById('semantic-q').value.trim();
-    if (!q) return;
-    fetch('{{ url_for("blogs.api_semantic_search") }}?q=' + encodeURIComponent(q))
-    .then(function(r) { return r.json(); })
-    .then(function(posts) {
-        var out = document.getElementById('semantic-results');
-        if (!posts.length) { out.innerHTML = '<p>No results found.</p>'; return; }
-        var html = '<p>' + posts.length + ' results:</p>';
-        posts.forEach(function(p) {
-            html += '<div style="margin:.3rem 0;padding:.3rem .5rem;background:#0f3460;border-radius:.3rem;">' +
-                '<a href="{{ url_for("blogs.post_detail", post_id=0) }}'.replace('0', p.id) + '">' + p.title + '</a>' +
-                ' <span style="color:#888;font-size:.75rem">' + p.category + '</span></div>';
-        });
-        out.innerHTML = html;
-    });
-}
-</script>
 </body>
 </html>

@@ -11,9 +11,10 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
+from app import db
+
+SITE = "calendar-todo"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-EVENTS_FILE = SITE_DIR / "data" / "events.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
@@ -42,60 +43,48 @@ def _simulated_today():
 # Data loading
 # ---------------------------------------------------------------------------
 
-def _load_events():
-    if EVENTS_FILE.exists():
-        return json.loads(EVENTS_FILE.read_text())
-    return []
+def _load_events(user_id=None, category=None, status=None):
+    where = {}
+    if user_id is not None:
+        where["user_id"] = user_id
+    if category:
+        where["category"] = category
+    if status:
+        where["status"] = status
+    events = db.query(SITE, "events", where=where if where else None)
+    # Ensure string fields are never None (SQLite NULLs)
+    for e in events:
+        for field in ("start", "end", "title", "description", "category",
+                       "calendar", "location", "priority", "status", "color"):
+            if e.get(field) is None:
+                e[field] = ""
+    return events
 
 
 def _save_events(events):
-    EVENTS_FILE.write_text(json.dumps(events, indent=2))
+    db.save_collection(SITE, "events", events)
 
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 def _next_event_id():
-    events = _load_events()
-    return max((e["id"] for e in events), default=0) + 1
+    max_id = db.execute("SELECT MAX(id) FROM [calendar_todo_events]", (), fetch="val")
+    return (max_id or 0) + 1
 
 
 # ---------------------------------------------------------------------------
 # Search / filter helpers
 # ---------------------------------------------------------------------------
-
-def _keyword_score(query, event):
-    terms = query.lower().split()
-    text = (event["title"] + " " + event.get("description", "") + " " +
-            event.get("category", "") + " " + event.get("location", "")).lower()
-    return sum(1 for t in terms if t in text)
-
-
-def _search_events(events, query, semantic=False):
-    if not query:
-        return events
-    q = query.lower().strip()
-    if semantic:
-        scored = [(e, _keyword_score(q, e)) for e in events]
-        scored = [(e, s) for e, s in scored if s > 0]
-        scored.sort(key=lambda x: -x[1])
-        return [e for e, _ in scored]
-    else:
-        return [e for e in events if q in e["title"].lower() or
-                q in e.get("description", "").lower() or
-                q in e.get("location", "").lower()]
 
 
 def _parse_date(s):
@@ -199,18 +188,27 @@ def index():
     uid = request.args.get("user_id", type=int)
     week_offset = request.args.get("week_offset", 0, type=int)
 
-    results = list(events)
-
     if q:
-        results = _search_events(results, q)
-    if uid:
-        results = [e for e in results if e["user_id"] == uid]
-    if cat:
-        results = [e for e in results if e.get("category", "").lower() == cat.lower()]
-    if cal:
-        results = [e for e in results if e.get("calendar", "").lower() == cal.lower()]
-    if priority:
-        results = [e for e in results if e.get("priority", "").lower() == priority.lower()]
+        where = {}
+        if uid:
+            where["user_id"] = uid
+        if cat:
+            where["category"] = cat
+        if cal:
+            where["calendar"] = cal
+        if priority:
+            where["priority"] = priority
+        results = db.search(SITE, "events", q, where=where if where else None, limit=200)
+    else:
+        results = list(events)
+        if uid:
+            results = [e for e in results if e["user_id"] == uid]
+        if cat:
+            results = [e for e in results if e.get("category", "").lower() == cat.lower()]
+        if cal:
+            results = [e for e in results if e.get("calendar", "").lower() == cal.lower()]
+        if priority:
+            results = [e for e in results if e.get("priority", "").lower() == priority.lower()]
 
     # Compute week start/end based on week_offset from simulated_today
     today_d = _parse_date(today)
@@ -431,7 +429,7 @@ def form_create_event():
     events = _load_events()
     events.append(event)
     _save_events(events)
-    return redirect(url_for("calendar-todo.event_detail", event_id=event["id"]))
+    return redirect(url_for("calendar-todo.index"))
 
 
 @blueprint.route("/event/<int:event_id>/edit", methods=["GET"])
@@ -517,12 +515,24 @@ def api_events():
     sort = request.args.get("sort", "date").strip()
     limit = request.args.get("limit", type=int)
 
-    results = list(events)
     if q:
-        results = _search_events(results, q)
-    results = _filter_events(results, user_id=user_id, category=category,
-                             calendar=calendar, date_from=date_from,
-                             date_to=date_to, priority=priority)
+        where = {}
+        if user_id:
+            where["user_id"] = user_id
+        if category:
+            where["category"] = category
+        if calendar:
+            where["calendar"] = calendar
+        if priority:
+            where["priority"] = priority
+        results = db.search(SITE, "events", q, where=where if where else None, limit=200)
+        # Apply date filters that FTS doesn't handle
+        results = _filter_events(results, date_from=date_from, date_to=date_to)
+    else:
+        results = list(events)
+        results = _filter_events(results, user_id=user_id, category=category,
+                                 calendar=calendar, date_from=date_from,
+                                 date_to=date_to, priority=priority)
     results = _sort_events(results, sort)
     if limit:
         results = results[:limit]
@@ -532,15 +542,10 @@ def api_events():
 @blueprint.route("/api/events/search")
 def api_search():
     q = request.args.get("q", "").strip()
-    events = _load_events()
-    return jsonify(_search_events(events, q))
-
-
-@blueprint.route("/api/events/semantic")
-def api_semantic_search():
-    q = request.args.get("q", "").strip()
-    events = _load_events()
-    return jsonify(_search_events(events, q, semantic=True))
+    if not q:
+        return jsonify([])
+    results = db.search(SITE, "events", q, limit=50)
+    return jsonify(results)
 
 
 @blueprint.route("/api/events/<int:event_id>")

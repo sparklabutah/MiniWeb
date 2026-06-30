@@ -16,7 +16,7 @@ from urllib.request import urlopen
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "sites" / "weather" / "data"
+OUTPUT_DIR = Path("/scratch/general/vast/u1653932/data_sources/weather")
 
 # 200 world cities with coordinates
 CITIES = [

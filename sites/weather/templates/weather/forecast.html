@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7-Day Forecast - Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+        .content { max-width: 1060px; margin: 1.5rem auto; padding: 0 2rem; }
+        .section-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.2rem; color: #1565c0; }
+
+        .forecast-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .forecast-table th { background: #e3f2fd; color: #1565c0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; padding: .8rem 1rem; text-align: left; }
+        .forecast-table td { padding: .8rem 1rem; border-top: 1px solid #f0f4f8; font-size: .9rem; }
+        .forecast-table tr:hover td { background: #f8fbff; }
+        .forecast-table .icon-cell { font-size: 1.5rem; text-align: center; }
+        .forecast-table .temp-high { font-weight: 600; color: #e65100; }
+        .forecast-table .temp-low { color: #64748b; }
+        .precip-bar { display: inline-block; height: 6px; background: #42a5f5; border-radius: 3px; vertical-align: middle; margin-left: .3rem; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            {% if user %}
+                <a href="{{ url_for('weather.locations_page') }}">My Locations</a>
+                <a href="{{ url_for('weather.logout') }}">Sign Out ({{ user.username }})</a>
+            {% else %}
+                <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}" class="active">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}">Alerts</a>
+        <a href="{{ url_for('weather.locations_page') }}">Locations</a>
+    </nav>
+
+    <div class="content">
+        <h2 class="section-title">7-Day Forecast &mdash; Lakeport, WA</h2>
+
+        <table class="forecast-table">
+            <thead>
+                <tr>
+                    <th>Day</th>
+                    <th>Date</th>
+                    <th></th>
+                    <th>Conditions</th>
+                    <th>High</th>
+                    <th>Low</th>
+                    <th>Precip</th>
+                    <th>Wind</th>
+                    <th>Humidity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in forecast %}
+                <tr>
+                    <td><strong>{{ day.day }}</strong></td>
+                    <td>{{ day.date }}</td>
+                    <td class="icon-cell">{{ icon_for(day.conditions) }}</td>
+                    <td>{{ day.conditions }}</td>
+                    <td class="temp-high">{{ day.high_f }}&deg;F</td>
+                    <td class="temp-low">{{ day.low_f }}&deg;F</td>
+                    <td>
+                        {{ day.precip_pct }}%
+                        <span class="precip-bar" style="width: {{ day.precip_pct * 0.6 }}px;"></span>
+                    </td>
+                    <td>{{ day.wind_mph }} mph</td>
+                    <td>{{ day.humidity }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+    </div>
+</body>
+</html>

@@ -64,7 +64,7 @@ def eval_agent_response(agent_answer, config):
 # BackendStateEvaluator
 # ---------------------------------------------------------------------------
 
-def eval_backend_state(server_url, config, session=None):
+def eval_backend_state(server_url, config, session=None, flask_client=None):
     """Check site API state after task completion.
 
     Config:
@@ -85,25 +85,31 @@ def eval_backend_state(server_url, config, session=None):
     if not endpoint:
         return False, "No endpoint configured"
 
-    url = f"{server_url}{endpoint}" if endpoint.startswith("/") else endpoint
-
-    # Use session for auth if provided
-    http = session or requests.Session()
-    auth = config.get("auth")
-    if auth and not session:
-        login_url = auth.get("login_url", f"{server_url}/api/login")
-        http.post(login_url, json={"username": auth["username"], "password": auth["password"]})
-
     try:
-        if method == "POST":
-            r = http.post(url, json=config.get("body", {}))
+        if flask_client and endpoint.startswith("/"):
+            # Use Flask test client for internal endpoints (shares session/cookies)
+            if method == "POST":
+                r = flask_client.post(endpoint, json=config.get("body", {}))
+            else:
+                r = flask_client.get(endpoint)
+            if r.status_code >= 400:
+                return False, f"HTTP {r.status_code} from {endpoint}"
+            data = r.get_json()
         else:
-            r = http.get(url)
-
-        if r.status_code >= 400:
-            return False, f"HTTP {r.status_code} from {endpoint}"
-
-        data = r.json()
+            # External HTTP request
+            url = f"{server_url}{endpoint}" if endpoint.startswith("/") else endpoint
+            http = session or requests.Session()
+            auth = config.get("auth")
+            if auth and not session:
+                login_url = auth.get("login_url", f"{server_url}/api/login")
+                http.post(login_url, json={"username": auth["username"], "password": auth["password"]})
+            if method == "POST":
+                r = http.post(url, json=config.get("body", {}))
+            else:
+                r = http.get(url)
+            if r.status_code >= 400:
+                return False, f"HTTP {r.status_code} from {endpoint}"
+            data = r.json()
     except Exception as e:
         return False, f"Error calling {endpoint}: {e}"
 
@@ -276,14 +282,14 @@ def eval_grounding(navigation_trace, config):
 # Unified evaluator runner
 # ---------------------------------------------------------------------------
 
-def run_eval(config, agent_answer=None, server_url=None, navigation_trace=None, session=None):
+def run_eval(config, agent_answer=None, server_url=None, navigation_trace=None, session=None, flask_client=None):
     """Run a single evaluator config block. Returns (passed, detail)."""
     evaluator = config.get("evaluator", "")
 
     if evaluator == "AgentResponseEvaluator":
         return eval_agent_response(agent_answer, config)
     elif evaluator == "BackendStateEvaluator":
-        return eval_backend_state(server_url, config, session=session)
+        return eval_backend_state(server_url, config, session=session, flask_client=flask_client)
     elif evaluator == "GroundingEvaluator":
         return eval_grounding(navigation_trace, config)
     else:

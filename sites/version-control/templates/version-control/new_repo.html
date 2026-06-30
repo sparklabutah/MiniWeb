@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create a new repository - MeridianGit</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-logo svg { fill: #f0f6fc; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-user .user-name { color: #e6edf3; font-weight: 500; font-size: 14px; }
+        .nav-user .btn-signin { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 16px; border-radius: 6px; font-size: 14px; }
+        .nav-user .btn-logout { color: #8b949e; font-size: 13px; }
+
+        .main-container { max-width: 768px; margin: 0 auto; padding: 32px; }
+
+        /* Page header */
+        .page-title { font-size: 24px; font-weight: 400; color: #e6edf3; margin-bottom: 4px; }
+        .page-subtitle { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
+        .divider { border: none; border-top: 1px solid #21262d; margin: 24px 0; }
+
+        /* Form */
+        .form-group { margin-bottom: 24px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+        .form-hint { font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+        .form-group input[type="text"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e6edf3;
+            padding: 5px 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #1f6feb;
+            box-shadow: 0 0 0 3px rgba(31,111,235,0.3);
+        }
+        .form-group input::placeholder,
+        .form-group textarea::placeholder { color: #484f58; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group select { cursor: pointer; }
+
+        /* Repo name row */
+        .repo-name-row { display: flex; align-items: flex-end; gap: 8px; }
+        .repo-name-row .form-group { flex: 1; margin-bottom: 0; }
+        .repo-name-row .separator { font-size: 24px; color: #484f58; padding-bottom: 4px; }
+
+        /* Visibility radio */
+        .visibility-options { display: flex; flex-direction: column; gap: 12px; }
+        .visibility-option { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; }
+        .visibility-option:hover { border-color: #484f58; }
+        .visibility-option input[type="radio"] { margin-top: 3px; accent-color: #1f6feb; }
+        .visibility-option .option-content { flex: 1; }
+        .visibility-option .option-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #e6edf3; }
+        .visibility-option .option-title svg { flex-shrink: 0; }
+        .visibility-option .option-desc { font-size: 12px; color: #8b949e; margin-top: 2px; }
+
+        /* Checkbox */
+        .checkbox-group { display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; border: 1px solid #30363d; border-radius: 6px; background: #161b22; }
+        .checkbox-group input[type="checkbox"] { margin-top: 3px; accent-color: #1f6feb; }
+        .checkbox-group .cb-label { font-size: 14px; color: #e6edf3; }
+        .checkbox-group .cb-desc { font-size: 12px; color: #8b949e; }
+
+        /* Submit */
+        .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 24px; border-top: 1px solid #21262d; }
+        .btn-create { background: #238636; color: #fff; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; padding: 5px 16px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .btn-create:hover { background: #2ea043; }
+        .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-cancel { background: transparent; color: #f85149; border: 1px solid #30363d; border-radius: 6px; padding: 5px 16px; font-size: 14px; cursor: pointer; text-decoration: none; }
+        .btn-cancel:hover { border-color: #f85149; text-decoration: none; }
+
+        /* Important notice */
+        .notice { background: #0c2d6b33; border: 1px solid #1f6feb55; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #8b949e; display: flex; align-items: center; gap: 8px; }
+        .notice svg { fill: #58a6ff; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+    <a href="{{ url_for('version-control.index') }}" class="nav-logo">
+        <svg height="28" width="28" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        MeridianGit
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('version-control.index') }}">Dashboard</a>
+        <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+        <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+        <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+        <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+    </div>
+    <div class="nav-user">
+        {% if session.get('vc_username') %}
+        <span class="user-name">{{ session.vc_name }}</span>
+        <a href="{{ url_for('version-control.logout') }}" class="btn-logout">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('version-control.login_page') }}" class="btn-signin" style="text-decoration:none;">Sign in</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="main-container">
+    <h1 class="page-title">Create a new repository</h1>
+    <p class="page-subtitle">A repository contains all project files, including the revision history. Already have a project repository elsewhere? <a href="#">Import a repository.</a></p>
+
+    <hr class="divider">
+
+    <div class="notice">
+        <svg width="16" height="16" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>
+        Required fields are marked with an asterisk (*).
+    </div>
+
+    <form id="new-repo-form">
+        <!-- Owner / Name -->
+        <div class="form-group">
+            <label>Owner *</label>
+            <select id="owner" name="owner_user_id">
+                {% for u in users %}
+                <option value="{{ u.root_user_id }}">{{ u.name }} (@{{ u.username }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="repo-name-row">
+            <div class="form-group" style="flex:2;">
+                <label for="name">Repository name *</label>
+                <input type="text" id="name" name="name" placeholder="my-awesome-project" required>
+            </div>
+        </div>
+        <p class="form-hint" style="margin-top:4px; margin-bottom:16px;">Great repository names are short and memorable. Need inspiration? How about <strong style="color:#3fb950;">sturdy-waffle</strong>?</p>
+
+        <div class="form-group">
+            <label for="description">Description <span style="color:#8b949e; font-weight:400;">(optional)</span></label>
+            <textarea id="description" name="description" placeholder="A short description of this repository"></textarea>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Visibility -->
+        <div class="form-group">
+            <label>Visibility</label>
+            <div class="visibility-options">
+                <label class="visibility-option">
+                    <input type="radio" name="visibility" value="public">
+                    <div class="option-content">
+                        <div class="option-title">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"></path></svg>
+                            Public
+                        </div>
+                        <div class="option-desc">Anyone on the internet can see this repository. You choose who can commit.</div>
+                    </div>
+                </label>
+                <label class="visibility-option">
+                    <input type="radio" name="visibility" value="private" checked>
+                    <div class="option-content">
+                        <div class="option-title">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e"><path d="M4 4a4 4 0 0 1 8 0v2h.25c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25v-5.5C2 6.784 2.784 6 3.75 6H4Zm8.5 3.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v5.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25Zm-6.5-3.75a2 2 0 1 1 4 0v2H6Z"></path></svg>
+                            Private
+                        </div>
+                        <div class="option-desc">You choose who can see and commit to this repository.</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Initialize -->
+        <div class="form-group">
+            <label>Initialize this repository with:</label>
+            <div style="margin-top: 8px;">
+                <div class="checkbox-group" style="margin-bottom: 8px;">
+                    <input type="checkbox" id="init_readme" name="init_readme" checked>
+                    <div>
+                        <div class="cb-label">Add a README file</div>
+                        <div class="cb-desc">This is where you can write a long description for your project.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="default_branch">Default branch</label>
+            <select id="default_branch" name="default_branch">
+                <option value="main" selected>main</option>
+                <option value="master">master</option>
+                <option value="develop">develop</option>
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('version-control.repos_page') }}" class="btn-cancel">Cancel</a>
+            <button type="submit" class="btn-create">Create repository</button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('new-repo-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        description: form.description.value,
+        visibility: form.querySelector('input[name="visibility"]:checked').value,
+        default_branch: form.default_branch.value,
+        owner_user_id: parseInt(form.owner_user_id.value),
+    };
+    fetch("{{ url_for('version-control.api_repos_create') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    })
+    .then(r => r.json())
+    .then(repo => {
+        window.location.href = "{{ url_for('version-control.repo_detail', repo_id=0) }}".replace('0', repo.id);
+    })
+    .catch(err => alert('Error creating repository: ' + err));
+});
+</script>
+</body>
+</html>

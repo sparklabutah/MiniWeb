@@ -72,9 +72,55 @@
                 <div><div class="detail-label">Tags</div><div class="detail-value">{% for k, v in instance.tags.items() %}<span class="tag">{{ k }}={{ v }}</span>{% endfor %}</div></div>
             </div>
         </div>
+        {% if live %}
+        <div class="section">
+            <h2>Current Status <span style="font-size:.7rem;color:#27ae60;animation:pulse 2s infinite;">LIVE</span></h2>
+            <style>
+                @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+                .live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
+                .live-stat { text-align: center; }
+                .live-stat .ls-label { font-size: .7rem; color: #64748b; text-transform: uppercase; }
+                .live-stat .ls-value { font-size: 1.4rem; font-weight: 700; margin: .2rem 0; }
+                .live-stat .ls-bar { height: 6px; background: #e9ecef; border-radius: 3px; overflow: hidden; margin-top: .3rem; }
+                .live-stat .ls-fill { height: 100%; border-radius: 3px; }
+            </style>
+            <div class="live-grid">
+                <div class="live-stat">
+                    <div class="ls-label">CPU</div>
+                    <div class="ls-value" style="{% if live.cpu_percent > 80 %}color:#e74c3c{% elif live.cpu_percent > 60 %}color:#f39c12{% else %}color:#27ae60{% endif %}">{{ live.cpu_percent }}%</div>
+                    <div class="ls-bar"><div class="ls-fill {% if live.cpu_percent > 80 %}fill-red{% elif live.cpu_percent > 60 %}fill-yellow{% else %}fill-green{% endif %}" style="width:{{ live.cpu_percent }}%"></div></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Memory</div>
+                    <div class="ls-value" style="{% if live.memory_percent > 80 %}color:#e74c3c{% elif live.memory_percent > 60 %}color:#f39c12{% else %}color:#27ae60{% endif %}">{{ live.memory_percent }}%</div>
+                    <div class="ls-bar"><div class="ls-fill {% if live.memory_percent > 80 %}fill-red{% elif live.memory_percent > 60 %}fill-yellow{% else %}fill-green{% endif %}" style="width:{{ live.memory_percent }}%"></div></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Network In</div>
+                    <div class="ls-value" style="color:#3498db;">{{ live.network_in_mbps }} <span style="font-size:.7rem;font-weight:400;">Mbps</span></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Network Out</div>
+                    <div class="ls-value" style="color:#3498db;">{{ live.network_out_mbps }} <span style="font-size:.7rem;font-weight:400;">Mbps</span></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Disk Read</div>
+                    <div class="ls-value">{{ live.disk_read_iops }} <span style="font-size:.7rem;font-weight:400;">IOPS</span></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Disk Write</div>
+                    <div class="ls-value">{{ live.disk_write_iops }} <span style="font-size:.7rem;font-weight:400;">IOPS</span></div>
+                </div>
+                <div class="live-stat">
+                    <div class="ls-label">Requests</div>
+                    <div class="ls-value" style="color:#16213e;">{{ live.request_count }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% if metrics %}
         <div class="section">
-            <h2>Performance Metrics</h2>
+            <h2>Performance Metrics (Recent)</h2>
             <table>
                 <thead><tr><th>Time</th><th>CPU %</th><th>Memory %</th><th>Net In (Mbps)</th><th>Net Out (Mbps)</th><th>Disk Read IOPS</th><th>Requests</th></tr></thead>
                 <tbody>

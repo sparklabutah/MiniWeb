@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Routes - Lakeport Transit Authority</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 16px; color: #1a237e; }
+        .filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 16px; border: 1px solid #ddd; border-radius: 20px; background: white; cursor: pointer; font-size: 13px; text-decoration: none; color: #333; }
+        .filter-btn:hover, .filter-btn.active { background: #1a237e; color: white; border-color: #1a237e; }
+        .route-list { display: flex; flex-direction: column; gap: 12px; }
+        .route-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 16px; align-items: flex-start; text-decoration: none; color: inherit; transition: box-shadow 0.2s; }
+        .route-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .route-badge { width: 56px; height: 56px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+        .route-info { flex: 1; }
+        .route-info h3 { font-size: 17px; margin-bottom: 4px; }
+        .route-info .desc { font-size: 13px; color: #666; margin-bottom: 8px; }
+        .route-details { display: flex; gap: 16px; flex-wrap: wrap; }
+        .route-detail-item { font-size: 13px; color: #555; }
+        .route-detail-item strong { color: #333; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .tag-local { background: #e3f2fd; color: #1565c0; }
+        .tag-express { background: #e8f5e9; color: #2e7d32; }
+        .tag-circulator { background: #f3e5f5; color: #7b1fa2; }
+        .accessible { font-size: 12px; color: #2e7d32; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Public Transit for Lakeport and the Region</div>
+    </div>
+    <div class="nav">
+        <a href="/">Home</a>
+        <a href="/routes" class="active">Routes</a>
+        <a href="/stops">Stops</a>
+        <a href="/trip-planner">Trip Planner</a>
+        <a href="/fares">Fares</a>
+        <a href="/login">Sign In</a>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">All Routes</h2>
+
+        <form method="get" action="/routes" style="background:white;border-radius:12px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+            <div>
+                <span style="font-size:13px;font-weight:600;color:#666;margin-right:8px;">Route Type:</span>
+                <label style="font-size:14px;cursor:pointer;margin-right:8px;"><input type="radio" name="type" value="" {% if not current_type %}checked{% endif %} onchange="this.form.submit()"> All</label>
+                {% for t in all_types %}
+                <label style="font-size:14px;cursor:pointer;margin-right:8px;"><input type="radio" name="type" value="{{ t }}" {% if current_type == t %}checked{% endif %} onchange="this.form.submit()"> {{ t | capitalize }}</label>
+                {% endfor %}
+            </div>
+            <div>
+                <label style="font-size:13px;font-weight:600;color:#666;margin-right:8px;" for="sort">Sort by:</label>
+                <select name="sort" id="sort" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <option value="">Default</option>
+                    <option value="name" {% if current_sort == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                    <option value="route_number" {% if current_sort == 'route_number' %}selected{% endif %}>Route Number</option>
+                    <option value="travel_time" {% if current_sort == 'travel_time' %}selected{% endif %}>Travel Time</option>
+                    <option value="frequency" {% if current_sort == 'frequency' %}selected{% endif %}>Frequency</option>
+                </select>
+            </div>
+        </form>
+
+        <div class="route-list">
+            {% for route in routes %}
+            <a href="/route/{{ route.id }}" class="route-card">
+                <div class="route-badge" style="background-color: {{ route.color }}">{{ route.route_number }}</div>
+                <div class="route-info">
+                    <h3>{{ route.name }} <span class="tag tag-{{ route.type }}">{{ route.type | capitalize }}</span></h3>
+                    <p class="desc">{{ route.description }}</p>
+                    <div class="route-details">
+                        <div class="route-detail-item"><strong>From:</strong> {{ route.start_point }}</div>
+                        <div class="route-detail-item"><strong>To:</strong> {{ route.end_point }}</div>
+                        <div class="route-detail-item"><strong>Peak:</strong> Every {{ route.frequency_peak_minutes }} min</div>
+                        <div class="route-detail-item"><strong>Off-Peak:</strong> Every {{ route.frequency_offpeak_minutes }} min</div>
+                        <div class="route-detail-item"><strong>Travel time:</strong> {{ route.estimated_travel_time_minutes }} min</div>
+                        <div class="route-detail-item"><strong>Service:</strong> {{ route.first_departure }} - {{ route.last_departure }}</div>
+                        <div class="route-detail-item"><strong>Zone:</strong> {{ route.fare_zone }}</div>
+                    </div>
+                    {% if route.wheelchair_accessible %}
+                    <div class="accessible">&#9855; Wheelchair Accessible{% if route.bike_rack %} &bull; Bike Rack{% endif %}</div>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

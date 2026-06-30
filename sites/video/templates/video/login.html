@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+
+        /* Login page */
+        .login-page { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 56px); padding: 24px; }
+        .login-card { background: #1a1a1a; border-radius: 16px; padding: 40px; width: 100%; max-width: 420px; }
+        .login-header { text-align: center; margin-bottom: 32px; }
+        .login-header .logo { font-size: 28px; font-weight: 700; color: #ff0000; margin-bottom: 8px; }
+        .login-header .logo span { color: #fff; }
+        .login-header h2 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+        .login-header p { font-size: 14px; color: #aaa; }
+
+        /* Error */
+        .error-msg { background: #5c0000; border: 1px solid #cc0000; color: #ffaaaa; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 20px; text-align: center; }
+
+        /* Form */
+        .login-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 13px; color: #aaa; font-weight: 500; }
+        .form-group input { background: #121212; border: 1px solid #303030; color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 14px; outline: none; }
+        .form-group input:focus { border-color: #3ea6ff; }
+        .signin-btn { background: #3ea6ff; color: #0f0f0f; border: none; padding: 12px; border-radius: 20px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
+        .signin-btn:hover { opacity: 0.9; }
+
+        /* Demo accounts */
+        .demo-section { border-top: 1px solid #272727; padding-top: 20px; }
+        .demo-section h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; text-align: center; font-weight: 400; }
+        .demo-list { display: flex; flex-direction: column; gap: 8px; }
+        .demo-account { display: flex; align-items: center; gap: 12px; background: #222; border: 1px solid #303030; border-radius: 8px; padding: 10px 16px; cursor: pointer; transition: background 0.15s; }
+        .demo-account:hover { background: #2a2a2a; border-color: #3ea6ff; }
+        .demo-avatar { width: 36px; height: 36px; border-radius: 50%; background: #7c4dff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; flex-shrink: 0; }
+        .demo-info { flex: 1; }
+        .demo-name { font-size: 14px; font-weight: 500; }
+        .demo-username { font-size: 12px; color: #aaa; }
+        .demo-arrow { color: #555; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="/search" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            <a href="{{ url_for('video.index') }}" class="nav-btn">Home</a>
+        </div>
+    </nav>
+
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">Stream<span>Hub</span></div>
+                <h2>Sign in</h2>
+                <p>to continue to StreamHub</p>
+            </div>
+
+            {% if error %}
+            <div class="error-msg">{{ error }}</div>
+            {% endif %}
+
+            <form class="login-form" method="post" action="/login">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="signin-btn">Sign in</button>
+            </form>
+
+            {% if users %}
+            <div class="demo-section">
+                <h3>Demo accounts (click to auto-fill)</h3>
+                <div class="demo-list">
+                    {% for u in users[:6] %}
+                    <div class="demo-account" onclick="document.getElementById('username').value='{{ u.username }}'; document.getElementById('password').value='{{ u.password if u.password else u.username }}';">
+                        <div class="demo-avatar">{{ (u.display_name or u.username)[0] }}</div>
+                        <div class="demo-info">
+                            <div class="demo-name">{{ u.display_name }}</div>
+                            <div class="demo-username">@{{ u.username }}</div>
+                        </div>
+                        <div class="demo-arrow">&#8594;</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

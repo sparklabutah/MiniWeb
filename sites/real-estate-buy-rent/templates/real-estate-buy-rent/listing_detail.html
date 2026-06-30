@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ listing.title }} - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
+        .back-link { font-size: .9rem; color: #0d47a1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back-link:hover { text-decoration: underline; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .detail-img { width: 100%; height: 350px; background: #e3f2fd; display: flex; align-items: center; justify-content: center; color: #90caf9; border-radius: .4rem; margin-bottom: 1rem; font-size: 1rem; }
+        .status-badge { display: inline-block; padding: .3rem .8rem; border-radius: .25rem; font-size: .8rem; font-weight: 600; color: #fff; margin-bottom: .5rem; }
+        .badge-sale { background: #2e7d32; }
+        .badge-rent { background: #1565c0; }
+        .badge-sold { background: #757575; }
+        .badge-rented { background: #757575; }
+        .detail-price { font-size: 2rem; font-weight: 700; color: #0d47a1; margin-bottom: .3rem; }
+        .detail-title { font-size: 1.3rem; color: #222; margin-bottom: .5rem; }
+        .detail-address { font-size: .95rem; color: #666; margin-bottom: 1rem; }
+        .key-facts { display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .key-fact { text-align: center; }
+        .key-fact .fact-value { font-size: 1.3rem; font-weight: 700; color: #333; }
+        .key-fact .fact-label { font-size: .75rem; color: #999; text-transform: uppercase; }
+        .detail-desc { font-size: .95rem; line-height: 1.7; color: #444; margin-bottom: 1.5rem; }
+        .features-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; }
+        .feature-tag { background: #e3f2fd; color: #1565c0; padding: .25rem .6rem; border-radius: .25rem; font-size: .8rem; }
+        .info-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+        .info-table th { text-align: left; color: #777; padding: .5rem .8rem; background: #fafafa; width: 160px; }
+        .info-table td { padding: .5rem .8rem; color: #444; }
+        .info-table tr { border-bottom: 1px solid #f0f0f0; }
+        .agent-card { background: #f8f9fa; border-radius: .4rem; padding: 1rem; margin: 1rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .agent-info h4 { font-size: .95rem; color: #333; margin-bottom: .2rem; }
+        .agent-info h4 a { color: #0d47a1; text-decoration: none; }
+        .agent-info p { font-size: .82rem; color: #888; }
+        .actions { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
+        .btn { padding: .5rem 1rem; border: 1px solid #ccc; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #555; display: inline-block; }
+        .btn:hover { background: #f5f5f5; }
+        .btn-primary { background: #0d47a1; color: #fff; border-color: #0d47a1; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-saved { background: #ff6f00; color: #fff; border-color: #ff6f00; }
+        .inquiry-form { background: #e3f2fd; border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+        .inquiry-form h4 { font-size: .9rem; margin-bottom: .5rem; color: #0d47a1; }
+        .inquiry-form textarea { width: 100%; padding: .6rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .85rem; margin: .3rem 0; font-family: inherit; }
+        .related { margin-top: 2rem; }
+        .related h3 { font-size: 1.1rem; color: #333; margin-bottom: .8rem; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; }
+        .related-item { background: #fff; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+        .related-item .ri-img { height: 100px; background: #e3f2fd; display: flex; align-items: center; justify-content: center; color: #90caf9; font-size: .75rem; }
+        .related-item .ri-body { padding: .6rem; }
+        .related-item .ri-price { font-weight: 700; color: #0d47a1; font-size: .9rem; }
+        .related-item .ri-title { font-size: .8rem; }
+        .related-item .ri-title a { color: #333; text-decoration: none; }
+        .related-item .ri-meta { font-size: .72rem; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}">Inquiries</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}">Buy</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}">Rent</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+
+    <div class="container">
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}" class="back-link">&larr; Back to listings</a>
+
+        <div class="detail-card">
+            <div class="detail-img">{{ listing.photos_count }} photos available</div>
+
+            {% if listing.status == 'for_sale' %}
+            <span class="status-badge badge-sale">FOR SALE</span>
+            {% elif listing.status == 'for_rent' %}
+            <span class="status-badge badge-rent">FOR RENT</span>
+            {% elif listing.status == 'sold' %}
+            <span class="status-badge badge-sold">SOLD</span>
+            {% elif listing.status == 'rented' %}
+            <span class="status-badge badge-rented">RENTED</span>
+            {% endif %}
+
+            {% if listing.price %}
+            <div class="detail-price">${{ "{:,.0f}".format(listing.price) }}</div>
+            {% elif listing.rent_monthly %}
+            <div class="detail-price">${{ "{:,.0f}".format(listing.rent_monthly) }}/month</div>
+            {% endif %}
+
+            <h2 class="detail-title">{{ listing.title }}</h2>
+            <div class="detail-address">{{ listing.address }}, {{ listing.city }}, {{ listing.state }} {{ listing.zip }}</div>
+
+            <div class="key-facts">
+                <div class="key-fact">
+                    <div class="fact-value">{{ listing.bedrooms }}</div>
+                    <div class="fact-label">Beds</div>
+                </div>
+                <div class="key-fact">
+                    <div class="fact-value">{{ listing.bathrooms }}</div>
+                    <div class="fact-label">Baths</div>
+                </div>
+                <div class="key-fact">
+                    <div class="fact-value">{{ "{:,.0f}".format(listing.sqft) }}</div>
+                    <div class="fact-label">Sqft</div>
+                </div>
+                {% if listing.lot_sqft %}
+                <div class="key-fact">
+                    <div class="fact-value">{{ "{:,.0f}".format(listing.lot_sqft) }}</div>
+                    <div class="fact-label">Lot Sqft</div>
+                </div>
+                {% endif %}
+                <div class="key-fact">
+                    <div class="fact-value">{{ listing.year_built }}</div>
+                    <div class="fact-label">Year Built</div>
+                </div>
+            </div>
+
+            <div class="detail-desc">{{ listing.description }}</div>
+
+            {% if listing.features %}
+            <h3 style="font-size:.95rem; margin-bottom:.5rem; color:#555;">Features</h3>
+            <div class="features-list">
+                {% for feat in listing.features %}
+                <span class="feature-tag">{{ feat }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <table class="info-table">
+                <tr><th>Listing ID</th><td>#{{ listing.id }}</td></tr>
+                <tr><th>Property Type</th><td style="text-transform:capitalize">{{ listing.type }}</td></tr>
+                <tr><th>Status</th><td>{{ listing.status | replace('_', ' ') | title }}</td></tr>
+                <tr><th>Listed Date</th><td>{{ listing.listed_date }}</td></tr>
+                <tr><th>Address</th><td>{{ listing.address }}, {{ listing.city }}, {{ listing.state }} {{ listing.zip }}</td></tr>
+                {% if listing.price %}<tr><th>Sale Price</th><td>${{ "{:,.0f}".format(listing.price) }}</td></tr>{% endif %}
+                {% if listing.rent_monthly %}<tr><th>Monthly Rent</th><td>${{ "{:,.0f}".format(listing.rent_monthly) }}</td></tr>{% endif %}
+                <tr><th>Bedrooms</th><td>{{ listing.bedrooms }}</td></tr>
+                <tr><th>Bathrooms</th><td>{{ listing.bathrooms }}</td></tr>
+                <tr><th>Square Feet</th><td>{{ "{:,.0f}".format(listing.sqft) }}</td></tr>
+                {% if listing.lot_sqft %}<tr><th>Lot Size</th><td>{{ "{:,.0f}".format(listing.lot_sqft) }} sqft</td></tr>{% endif %}
+                <tr><th>Year Built</th><td>{{ listing.year_built }}</td></tr>
+                <tr><th>Photos</th><td>{{ listing.photos_count }}</td></tr>
+            </table>
+
+            {% if agent %}
+            <div class="agent-card">
+                <div class="agent-info">
+                    <h4>Listed by <a href="{{ url_for('real-estate-buy-rent.agent_detail', agent_id=agent.id) }}">{{ agent.name }}</a></h4>
+                    <p>{{ agent.agency }} &middot; {{ agent.phone }}</p>
+                    <p>{{ agent.email }} &middot; Rating: {{ agent.rating }}/5.0</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="actions">
+                {% if user %}
+                <form method="post" action="{{ url_for('real-estate-buy-rent.save_listing', listing_id=listing.id) }}" style="display:inline">
+                    {% if is_saved %}
+                    <button type="submit" class="btn btn-saved">Unsave Listing</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-primary">Save Listing</button>
+                    {% endif %}
+                </form>
+                {% else %}
+                <a class="btn btn-primary" href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign in to save</a>
+                {% endif %}
+            </div>
+
+            {% if user and listing.status in ('for_sale', 'for_rent') %}
+            <div class="inquiry-form">
+                <h4>Contact Agent About This Property</h4>
+                <form method="post" action="{{ url_for('real-estate-buy-rent.submit_inquiry', listing_id=listing.id) }}">
+                    <textarea name="message" rows="4" placeholder="I'm interested in this property. Please send me more information..."></textarea>
+                    <button type="submit" class="btn btn-primary">Send Inquiry</button>
+                </form>
+            </div>
+            {% elif not user and listing.status in ('for_sale', 'for_rent') %}
+            <div class="inquiry-form">
+                <h4>Contact Agent</h4>
+                <p style="font-size:.85rem;color:#666"><a href="{{ url_for('real-estate-buy-rent.login_page') }}" style="color:#0d47a1">Sign in</a> to send an inquiry about this property.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>Similar Properties</h3>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-item">
+                    <div class="ri-img">{{ r.photos_count }} photos</div>
+                    <div class="ri-body">
+                        {% if r.price %}
+                        <div class="ri-price">${{ "{:,.0f}".format(r.price) }}</div>
+                        {% elif r.rent_monthly %}
+                        <div class="ri-price">${{ "{:,.0f}".format(r.rent_monthly) }}/mo</div>
+                        {% endif %}
+                        <div class="ri-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=r.id) }}">{{ r.title }}</a></div>
+                        <div class="ri-meta">{{ r.bedrooms }} bd &middot; {{ r.bathrooms }} ba &middot; {{ "{:,.0f}".format(r.sqft) }} sqft</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -23,7 +23,7 @@ import urllib.error
 from datetime import datetime, timedelta
 
 BASE_URL = "https://www.thesportsdb.com/api/v1/json/3"
-DATA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "sports-esports" / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/sports-esports")
 
 # ---------------------------------------------------------------------------
 # Helpers

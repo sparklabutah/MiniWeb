@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Explore</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .top-nav .nav-links a.active { color: #0095f6; font-weight: 600; }
+
+        .explore-layout { max-width: 935px; margin: 0 auto; padding: 20px; }
+
+        /* Search + Filters */
+        .filters-bar { background: #fff; border: 1px solid #dbdbdb; border-radius: 4px; padding: 16px; margin-bottom: 24px; }
+        .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+        .search-row input { flex: 1; padding: 8px 12px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; }
+        .search-row button { padding: 8px 20px; background: #0095f6; color: #fff; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; }
+        .search-row button:hover { background: #0081d6; }
+        .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-chip { padding: 6px 14px; border: 1px solid #dbdbdb; border-radius: 20px; font-size: 13px; color: #262626; cursor: pointer; background: #fff; text-decoration: none; }
+        .filter-chip:hover, .filter-chip.active { background: #0095f6; color: #fff; border-color: #0095f6; text-decoration: none; }
+
+        /* Grid */
+        .post-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .grid-item { position: relative; aspect-ratio: 1; background: #efefef; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .grid-item .placeholder { font-size: 36px; color: #c7c7c7; }
+        .grid-item .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600; gap: 16px; }
+        .grid-item:hover .overlay { display: flex; }
+        .grid-item .type-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+
+        /* Sidebar tags */
+        .explore-page { display: flex; gap: 32px; }
+        .explore-main { flex: 1; }
+        .explore-sidebar { width: 240px; }
+        .tag-cloud { background: #fff; border: 1px solid #dbdbdb; border-radius: 4px; padding: 16px; }
+        .tag-cloud h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+        .tag-link { display: inline-block; margin: 3px 2px; padding: 4px 10px; background: #efefef; border-radius: 4px; font-size: 12px; color: #262626; }
+        .tag-link:hover { background: #dbdbdb; text-decoration: none; }
+
+        @media (max-width: 768px) {
+            .post-grid { grid-template-columns: repeat(2, 1fr); }
+            .explore-sidebar { display: none; }
+        }
+
+        .results-info { font-size: 13px; color: #8e8e8e; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}" class="active">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="explore-layout">
+        <div class="filters-bar">
+            <form class="search-row" method="GET" action="{{ url_for('multimedia-posting.explore') }}">
+                <input type="text" name="q" placeholder="Search posts by caption, tags, or location..." value="{{ current_q }}">
+                {% if current_type %}<input type="hidden" name="type" value="{{ current_type }}">{% endif %}
+                {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag }}">{% endif %}
+                <select name="sort" style="padding: 8px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px;">
+                    <option value="newest" {{ 'selected' if current_sort == 'newest' else '' }}>Newest</option>
+                    <option value="oldest" {{ 'selected' if current_sort == 'oldest' else '' }}>Oldest</option>
+                    <option value="most_liked" {{ 'selected' if current_sort == 'most_liked' else '' }}>Most Liked</option>
+                    <option value="most_commented" {{ 'selected' if current_sort == 'most_commented' else '' }}>Most Commented</option>
+                </select>
+                <button type="submit">Search</button>
+            </form>
+            <div class="filter-chips">
+                <a href="{{ url_for('multimedia-posting.explore') }}" class="filter-chip {{ 'active' if not current_type else '' }}">All</a>
+                <a href="{{ url_for('multimedia-posting.explore', type='photo', q=current_q, tag=current_tag) }}" class="filter-chip {{ 'active' if current_type == 'photo' else '' }}">Photos</a>
+                <a href="{{ url_for('multimedia-posting.explore', type='video', q=current_q, tag=current_tag) }}" class="filter-chip {{ 'active' if current_type == 'video' else '' }}">Videos</a>
+                <a href="{{ url_for('multimedia-posting.explore', type='carousel', q=current_q, tag=current_tag) }}" class="filter-chip {{ 'active' if current_type == 'carousel' else '' }}">Carousels</a>
+                {% if current_tag %}
+                <span class="filter-chip active">#{{ current_tag }} <a href="{{ url_for('multimedia-posting.explore', type=current_type, q=current_q) }}" style="color:#fff; margin-left:4px;">&times;</a></span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="explore-page">
+            <div class="explore-main">
+                {% if current_q or current_type or current_tag %}
+                <div class="results-info">
+                    {{ posts | length }} result{{ 's' if posts | length != 1 else '' }} found
+                    {% if current_q %} for "{{ current_q }}"{% endif %}
+                    {% if current_tag %} tagged #{{ current_tag }}{% endif %}
+                    {% if current_type %} ({{ current_type }}s){% endif %}
+                </div>
+                {% endif %}
+                <div class="post-grid">
+                    {% for post in posts %}
+                    <a href="{{ url_for('multimedia-posting.post_detail', post_id=post.id) }}" class="grid-item">
+                        {% if post.type == 'video' %}
+                        <span class="type-badge">&#9654; VIDEO</span>
+                        {% elif post.type == 'carousel' %}
+                        <span class="type-badge">&#128194; {{ (post.additional_images | length) + 1 }}</span>
+                        {% endif %}
+                        <span class="placeholder">&#128247;</span>
+                        <div class="overlay">
+                            <span>&#9825; {{ post.likes_count }}</span>
+                            <span>&#128172; {{ post.comments_count }}</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="explore-sidebar">
+                <div class="tag-cloud">
+                    <h3>Popular Tags</h3>
+                    {% for tag, count in popular_tags %}
+                    <a href="{{ url_for('multimedia-posting.explore', tag=tag) }}" class="tag-link">#{{ tag }} <small>({{ count }})</small></a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

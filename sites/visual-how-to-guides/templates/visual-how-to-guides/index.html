@@ -3,14 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>StepVista - How-To Guides</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+        .navbar .search-box { display: flex; margin-right: 16px; }
+        .navbar .search-box input { border: 1px solid #ddd; border-radius: 4px 0 0 4px; padding: 6px 12px; font-size: 14px; width: 200px; outline: none; }
+        .navbar .search-box input:focus { border-color: #4CAF50; }
+        .navbar .search-box button { background: #4CAF50; color: #fff; border: none; padding: 6px 14px; border-radius: 0 4px 4px 0; cursor: pointer; font-size: 14px; }
+
+        .hero { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: #fff; text-align: center; padding: 60px 24px 50px; }
+        .hero h1 { font-size: 36px; margin-bottom: 12px; }
+        .hero p { font-size: 18px; opacity: 0.9; max-width: 600px; margin: 0 auto 24px; }
+        .hero .cta { display: inline-block; background: #fff; color: #4CAF50; padding: 12px 28px; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .hero .cta:hover { background: #f0f0f0; text-decoration: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        .section { padding: 40px 0; }
+        .section h2 { font-size: 24px; margin-bottom: 24px; color: #333; border-left: 4px solid #4CAF50; padding-left: 12px; }
+
+        .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .guide-card { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; background: #fff; }
+        .guide-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .guide-card .thumb { width: 100%; height: 160px; background: #e8f5e9; display: flex; align-items: center; justify-content: center; color: #4CAF50; font-size: 14px; }
+        .guide-card .card-body { padding: 16px; }
+        .guide-card .card-body h3 { font-size: 16px; margin-bottom: 8px; }
+        .guide-card .card-body h3 a { color: #333; }
+        .guide-card .card-body h3 a:hover { color: #4CAF50; }
+        .guide-card .meta { font-size: 13px; color: #777; display: flex; gap: 12px; flex-wrap: wrap; }
+        .guide-card .meta span { display: inline-flex; align-items: center; gap: 4px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+
+        .categories-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+        .categories-bar a { display: inline-block; padding: 8px 16px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; color: #555; background: #fafafa; }
+        .categories-bar a:hover { border-color: #4CAF50; color: #4CAF50; background: #e8f5e9; text-decoration: none; }
+
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <form class="search-box" action="{{ url_for('visual-how-to-guides.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search guides...">
+            <button type="submit">Search</button>
+        </form>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
     </div>
+
+    <div class="hero">
+        <h1>Learn How to Do Anything</h1>
+        <p>Step-by-step visual guides created by experts. Browse thousands of tutorials with clear instructions and helpful images.</p>
+        <a href="{{ url_for('visual-how-to-guides.guides_list') }}" class="cta">Browse All Guides</a>
+    </div>
+
+    <div class="container">
+        {% if categories %}
+        <div class="section">
+            <h2>Categories</h2>
+            <div class="categories-bar">
+                {% for cat in categories %}
+                <a href="{{ url_for('visual-how-to-guides.category_page', category_id=cat.id) }}">{{ cat.name }} ({{ cat.guide_count }})</a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if featured %}
+        <div class="section">
+            <h2>Featured Guides</h2>
+            <div class="guide-grid">
+                {% for guide in featured %}
+                <div class="guide-card">
+                    <div class="thumb">{% if guide.cover_image %}<img src="{{ guide.cover_image }}" alt="" style="width:100%;height:100%;object-fit:cover">{% else %}{{ guide.title[:30] }}{% endif %}</div>
+                    <div class="card-body">
+                        <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                        <div class="meta">
+                            <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                            <span>{{ guide.time_estimate }}</span>
+                            <span>{{ guide.rating }}/5</span>
+                            <span>{{ guide.steps|length }} steps</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if popular %}
+        <div class="section">
+            <h2>Most Popular</h2>
+            <div class="guide-grid">
+                {% for guide in popular %}
+                <div class="guide-card">
+                    <div class="thumb">{% if guide.cover_image %}<img src="{{ guide.cover_image }}" alt="" style="width:100%;height:100%;object-fit:cover">{% else %}{{ guide.title[:30] }}{% endif %}</div>
+                    <div class="card-body">
+                        <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                        <div class="meta">
+                            <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                            <span>{{ guide.time_estimate }}</span>
+                            <span>{{ guide.views }} views</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if recent %}
+        <div class="section">
+            <h2>Recently Updated</h2>
+            <div class="guide-grid">
+                {% for guide in recent %}
+                <div class="guide-card">
+                    <div class="thumb">{% if guide.cover_image %}<img src="{{ guide.cover_image }}" alt="" style="width:100%;height:100%;object-fit:cover">{% else %}{{ guide.title[:30] }}{% endif %}</div>
+                    <div class="card-body">
+                        <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                        <div class="meta">
+                            <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                            <span>{{ guide.time_estimate }}</span>
+                            <span>{{ guide.date_published }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
 </body>
 </html>

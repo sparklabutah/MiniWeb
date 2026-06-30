@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Inquiries - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover, .nav-bar a.active { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+        .page-title { font-size: 1.3rem; margin-bottom: 1rem; }
+        .inq-list { display: flex; flex-direction: column; gap: .8rem; }
+        .inq-card { background: #fff; border-radius: .5rem; padding: 1rem 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .inq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; }
+        .inq-title a { color: #0d47a1; text-decoration: none; font-weight: 600; }
+        .inq-title a:hover { text-decoration: underline; }
+        .inq-status { font-size: .75rem; padding: .2rem .5rem; border-radius: .2rem; font-weight: 600; text-transform: uppercase; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-replied { background: #dcfce7; color: #166534; }
+        .inq-msg { font-size: .85rem; color: #555; margin: .4rem 0; line-height: 1.5; }
+        .inq-date { font-size: .78rem; color: #aaa; }
+        .empty { text-align: center; color: #999; padding: 3rem; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}" style="color:#fff">Inquiries</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout ({{ user.name }})</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}">Buy</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}">Rent</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">My Inquiries ({{ inquiries|length }})</h1>
+        {% if inquiries %}
+        <div class="inq-list">
+            {% for item in inquiries %}
+            <div class="inq-card">
+                <div class="inq-header">
+                    <div class="inq-title">
+                        {% if item.listing %}
+                        <a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=item.listing.id) }}">{{ item.listing.title }}</a>
+                        {% else %}
+                        <span>Listing unavailable</span>
+                        {% endif %}
+                    </div>
+                    <span class="inq-status status-{{ item.inquiry.status }}">{{ item.inquiry.status }}</span>
+                </div>
+                <div class="inq-msg">{{ item.inquiry.message }}</div>
+                <div class="inq-date">Sent on {{ item.inquiry.date }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">You haven't sent any inquiries yet.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

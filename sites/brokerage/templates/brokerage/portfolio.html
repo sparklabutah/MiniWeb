@@ -1,79 +1,220 @@
 {% extends "brokerage/base.html" %}
-{% block title %}Portfolio — TradeCore{% endblock %}
+{% block title %}Portfolio | TradeVista{% endblock %}
 {% block content %}
-<div class="grid-3" style="margin-bottom:1rem;">
-    <div class="card">
-        <h2>Portfolio Value</h2>
-        <div class="stat-value">${{ "{:,.2f}".format(total_value) }}</div>
-        <div class="stat-label">Total Market Value</div>
-    </div>
-    <div class="card">
-        <h2>Total Gain/Loss</h2>
-        <div class="stat-value {% if total_gain >= 0 %}positive{% else %}negative{% endif %}">
-            {{ "+" if total_gain >= 0 }}${{ "{:,.2f}".format(total_gain) }}
+<div class="rh-main">
+    <div class="rh-content">
+        <!-- Portfolio Value Hero -->
+        <div style="margin-bottom:8px;">
+            <div class="rh-label" style="margin-bottom:4px;">Investing</div>
+            <div class="rh-price-hero" id="live-total-value">${{ "{:,.2f}".format(total_value) }}</div>
+            <div class="rh-change" id="portfolio-change-display">
+                <span class="{% if total_gain >= 0 %}rh-green{% else %}rh-red{% endif %}">
+                    {{ "+" if total_gain >= 0 }}${{ "{:,.2f}".format(total_gain|abs) }}
+                    ({{ "+" if total_gain_pct >= 0 }}{{ "%.2f"|format(total_gain_pct) }}%)
+                </span>
+                <span class="rh-label" style="margin-left:8px;">All Time</span>
+            </div>
         </div>
-        <div class="stat-label {% if total_gain_pct >= 0 %}positive{% else %}negative{% endif %}">
-            {{ "+" if total_gain_pct >= 0 }}{{ total_gain_pct }}%
-        </div>
-    </div>
-    <div class="card">
-        <h2>Account</h2>
-        <div class="stat-value">${{ "{:,.2f}".format(user.cash_balance) }}</div>
-        <div class="stat-label">Cash Balance | {{ user.account_type|title }} Account</div>
-    </div>
-</div>
 
-<div class="card">
-    <h2>Portfolio Allocation</h2>
-    {% if holdings %}
-    <div class="bar-chart" style="height:100px;">
-        {% set max_val = holdings|map(attribute='market_value')|max %}
-        {% for h in holdings %}
-        <div class="bar-col">
-            <div class="bar-fill" style="height:{{ (h.market_value / max_val * 90 + 5)|int }}px;
-                 background:{% if h.gain >= 0 %}#3fb950{% else %}#f85149{% endif %};"></div>
-            <div class="bar-label">{{ h.symbol }}</div>
+        <!-- Portfolio Chart (allocation visualization) -->
+        {% if holdings %}
+        <div style="margin-bottom:32px;position:relative;">
+            {% set max_val = holdings|map(attribute='market_value')|max %}
+            <svg viewBox="0 0 800 200" style="width:100%;height:200px;display:block;" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="port-grad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="{% if total_gain >= 0 %}#00C805{% else %}#FF5000{% endif %}" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="{% if total_gain >= 0 %}#00C805{% else %}#FF5000{% endif %}" stop-opacity="0.01"/>
+                    </linearGradient>
+                </defs>
+                {% set ns = namespace(points='', fill_points='') %}
+                {% for h in holdings %}
+                {% set x = (loop.index0 / (holdings|length - 1 if holdings|length > 1 else 1) * 780 + 10) %}
+                {% set y = (190 - h.market_value / max_val * 170) %}
+                {% set ns.points = ns.points ~ x|round(1) ~ ',' ~ y|round(1) ~ ' ' %}
+                {% endfor %}
+                <polygon fill="url(#port-grad)" points="{{ ns.points }}790,190 10,190"/>
+                <polyline fill="none" stroke="{% if total_gain >= 0 %}#00C805{% else %}#FF5000{% endif %}" stroke-width="2" points="{{ ns.points }}"/>
+            </svg>
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
+        {% endif %}
 
-<div class="card">
-    <h2>Holdings ({{ holdings|length }})</h2>
-    <table id="holdings-table">
-        <thead>
-            <tr>
-                <th>Symbol</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Shares</th>
-                <th>Avg Cost</th>
-                <th>Current Price</th>
-                <th>Market Value</th>
-                <th>Gain/Loss</th>
-                <th>Gain %</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for h in holdings %}
-            <tr>
-                <td><a href="{{ url_for('brokerage.ticker_detail', symbol=h.symbol) }}"><strong>{{ h.symbol }}</strong></a></td>
-                <td>{{ h.name }}</td>
-                <td><span class="tag tag-{{ h.type }}">{{ h.type }}</span></td>
-                <td>{{ h.shares }}</td>
-                <td>${{ "%.2f"|format(h.avg_cost) if h.avg_cost >= 1 else "%.4f"|format(h.avg_cost) }}</td>
-                <td>${{ "%.2f"|format(h.current_price) if h.current_price >= 1 else "%.4f"|format(h.current_price) }}</td>
-                <td>${{ "{:,.2f}".format(h.market_value) }}</td>
-                <td class="{% if h.gain >= 0 %}positive{% else %}negative{% endif %}">
-                    {{ "+" if h.gain >= 0 }}${{ "{:,.2f}".format(h.gain) }}
-                </td>
-                <td class="{% if h.gain_pct >= 0 %}positive{% else %}negative{% endif %}">
-                    {{ "+" if h.gain_pct >= 0 }}{{ h.gain_pct }}%
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <!-- Daily P&L Summary -->
+        <div class="rh-card" style="margin-bottom:24px;">
+            <div class="rh-card-header">
+                <h2>Daily P&L</h2>
+            </div>
+            <div class="rh-card-body" style="padding:0;">
+                <div style="display:flex;flex-wrap:wrap;">
+                    <div style="flex:1;padding:20px;border-right:1px solid rgba(47,51,54,0.5);">
+                        <div class="rh-label">Today's Change</div>
+                        <div style="font-size:24px;font-weight:700;margin-top:4px;" id="daily-pnl-value">
+                            <span class="{% if daily_pnl >= 0 %}rh-green{% else %}rh-red{% endif %}">
+                                {{ "+" if daily_pnl >= 0 }}${{ "{:,.2f}".format(daily_pnl|abs) }}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="flex:1;padding:20px;border-right:1px solid rgba(47,51,54,0.5);">
+                        <div class="rh-label">Total Return</div>
+                        <div style="font-size:24px;font-weight:700;margin-top:4px;">
+                            <span class="{% if total_gain >= 0 %}rh-green{% else %}rh-red{% endif %}">
+                                {{ "+" if total_gain >= 0 }}${{ "{:,.2f}".format(total_gain|abs) }}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="flex:1;padding:20px;">
+                        <div class="rh-label">Cash Balance</div>
+                        <div style="font-size:24px;font-weight:700;margin-top:4px;">
+                            ${{ "{:,.2f}".format(user.cash_balance) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Holdings -->
+        <div class="rh-card">
+            <div class="rh-card-header">
+                <h2>Stocks</h2>
+                <span class="rh-label">{{ holdings|length }} holding{{ 's' if holdings|length != 1 }}</span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="rh-table" id="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th class="right">Shares</th>
+                            <th class="right">Price</th>
+                            <th class="right">Avg Cost</th>
+                            <th class="right">Total Return</th>
+                            <th class="right">Equity</th>
+                            <th class="right">Allocation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in holdings %}
+                        <tr onclick="window.location='{{ url_for('brokerage.ticker_detail', symbol=h.symbol) }}'" style="cursor:pointer;">
+                            <td>
+                                <div style="font-weight:700;">{{ h.symbol }}</div>
+                                <div style="font-size:12px;color:#6F7782;">{{ h.name }}</div>
+                            </td>
+                            <td class="right">{{ h.shares }}</td>
+                            <td class="right">
+                                <div data-live-price="{{ h.symbol }}" style="font-weight:600;">
+                                    ${{ "%.2f"|format(h.current_price) if h.current_price >= 1 else "%.4f"|format(h.current_price) }}
+                                </div>
+                                <div class="rh-change-sm {% if h.price_change >= 0 %}rh-green{% else %}rh-red{% endif %}" data-live-change="{{ h.symbol }}">
+                                    {{ "+" if h.price_change >= 0 }}${{ "%.2f"|format(h.price_change|abs) }}
+                                    ({{ "+" if h.price_change_pct >= 0 }}{{ "%.2f"|format(h.price_change_pct) }}%)
+                                </div>
+                            </td>
+                            <td class="right">${{ "%.2f"|format(h.avg_cost) if h.avg_cost >= 1 else "%.4f"|format(h.avg_cost) }}</td>
+                            <td class="right">
+                                <div class="{% if h.gain >= 0 %}rh-green{% else %}rh-red{% endif %}" style="font-weight:600;">
+                                    {{ "+" if h.gain >= 0 }}${{ "{:,.2f}".format(h.gain|abs) }}
+                                </div>
+                                <div class="rh-change-sm {% if h.gain_pct >= 0 %}rh-green{% else %}rh-red{% endif %}">
+                                    {{ "+" if h.gain_pct >= 0 }}{{ "%.2f"|format(h.gain_pct) }}%
+                                </div>
+                            </td>
+                            <td class="right" data-live-mktval="{{ h.symbol }}" data-shares="{{ h.shares }}">
+                                <div style="font-weight:600;">${{ "{:,.2f}".format(h.market_value) }}</div>
+                            </td>
+                            <td class="right">
+                                <div style="font-size:13px;">{{ "%.1f"|format(h.market_value / total_value * 100 if total_value else 0) }}%</div>
+                                <div style="width:60px;height:4px;background:#2F3336;border-radius:2px;margin-top:4px;margin-left:auto;">
+                                    <div style="width:{{ (h.market_value / total_value * 100 if total_value else 0)|round(0)|int }}%;height:100%;background:{% if h.gain >= 0 %}#00C805{% else %}#FF5000{% endif %};border-radius:2px;"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not holdings %}
+            <div style="padding:40px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;margin-bottom:8px;">No holdings yet</div>
+                <div class="rh-label" style="margin-bottom:16px;">Start building your portfolio by buying your first stock.</div>
+                <a href="{{ url_for('brokerage.index') }}" class="rh-btn rh-btn-primary">Browse Stocks</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="rh-sidebar">
+        <!-- Account Summary -->
+        <div class="rh-card" style="position:sticky;top:80px;">
+            <div class="rh-card-header">
+                <h2 style="font-size:16px;">Account</h2>
+            </div>
+            <div class="rh-card-body">
+                <div style="margin-bottom:16px;">
+                    <div class="rh-label">Buying Power</div>
+                    <div style="font-size:24px;font-weight:700;margin-top:4px;">${{ "{:,.2f}".format(user.buying_power) }}</div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <div class="rh-label">Account Type</div>
+                    <div style="font-size:14px;font-weight:600;margin-top:4px;">{{ user.account_type|title }}</div>
+                </div>
+
+                <a href="{{ url_for('brokerage.trade_page') }}" class="rh-btn rh-btn-primary" style="width:100%;margin-top:8px;">Trade</a>
+                <a href="{{ url_for('brokerage.orders_page') }}" class="rh-btn rh-btn-outline" style="width:100%;margin-top:8px;text-align:center;">Order History</a>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var symbols = [];
+    var prevPrices = {};
+    document.querySelectorAll('[data-live-price]').forEach(function(el) {
+        var sym = el.getAttribute('data-live-price');
+        if (symbols.indexOf(sym) === -1) symbols.push(sym);
+        var txt = el.textContent.replace(/[^0-9.\-]/g, '');
+        prevPrices[sym] = parseFloat(txt) || 0;
+    });
+
+    if (!symbols.length) return;
+
+    function updateUI(data) {
+        var totalVal = 0;
+        for (var sym in data) {
+            var d = data[sym];
+
+            document.querySelectorAll('[data-live-price="' + sym + '"]').forEach(function(el) {
+                var oldPrice = prevPrices[sym] || d.price;
+                el.textContent = d.price >= 1 ? '$' + d.price.toFixed(2) : '$' + d.price.toFixed(4);
+                if (d.price > oldPrice) { el.classList.remove('tick-up','tick-down'); void el.offsetWidth; el.classList.add('tick-up'); }
+                else if (d.price < oldPrice) { el.classList.remove('tick-up','tick-down'); void el.offsetWidth; el.classList.add('tick-down'); }
+            });
+
+            document.querySelectorAll('[data-live-change="' + sym + '"]').forEach(function(el) {
+                var sign = d.change >= 0 ? '+' : '';
+                el.textContent = sign + '$' + Math.abs(d.change).toFixed(2) + ' (' + sign + d.change_pct.toFixed(2) + '%)';
+                el.className = 'rh-change-sm ' + (d.change >= 0 ? 'rh-green' : 'rh-red');
+            });
+
+            document.querySelectorAll('[data-live-mktval="' + sym + '"]').forEach(function(el) {
+                var shares = parseFloat(el.getAttribute('data-shares')) || 0;
+                var mv = shares * d.price;
+                el.querySelector('div').textContent = '$' + mv.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                totalVal += mv;
+            });
+
+            prevPrices[sym] = d.price;
+        }
+
+        if (totalVal > 0) {
+            var totalEl = document.getElementById('live-total-value');
+            if (totalEl) totalEl.textContent = '$' + totalVal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+    }
+
+    RH.startPolling(symbols, updateUI, 2000);
+})();
+</script>
 {% endblock %}

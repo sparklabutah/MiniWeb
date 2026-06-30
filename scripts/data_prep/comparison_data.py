@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 random.seed(42)
 
-SITE_DATA = pathlib.Path(__file__).resolve().parents[2] / "sites" / "comparison-aggregator" / "data"
+SITE_DATA = pathlib.Path("/scratch/general/vast/u1653932/data_sources/comparison-aggregators")
 PRISTINE = SITE_DATA / ".pristine"
 
 # ---------------------------------------------------------------------------

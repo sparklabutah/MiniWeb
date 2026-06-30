@@ -1,20 +1,26 @@
-"""Agency Portals -- Cedar Grove Municipal Services Portal (.gov style).
+"""Agency Portals -- Lakeport Municipal Services Portal (.gov style).
 
 Synthesized data: departments, services, permits, public records, users,
 announcements, appointments, payments.
 """
-import json
 import pathlib
 import random
-import copy
 
 from flask import (Blueprint, Response, abort, jsonify, render_template,
                    request, session, redirect, url_for)
+from app import db
 
+
+def _send_confirmation_email(user_id, subject, body):
+    """Send a confirmation email via the cross-site bridge."""
+    try:
+        from app.bridges import _add_email
+        _add_email(user_id, from_addr="noreply@lakeport.gov", subject=subject, body=body)
+    except Exception:
+        pass
+
+SITE = "agency-portals"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
-PRISTINE_DIR = DATA_DIR / ".pristine"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "agency-portals",
@@ -24,58 +30,61 @@ blueprint = Blueprint(
     static_url_path="/static",
 )
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
 
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
+@blueprint.context_processor
+def _inject_departments():
+    """Make departments available in all templates (for nav dropdown)."""
+    return {"departments": _load_departments()}
+
 
 # ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-def _read_json(filename):
-    fpath = DATA_DIR / filename
-    if fpath.exists():
-        return json.loads(fpath.read_text())
-    return []
-
-def _write_json(filename, data):
-    fpath = DATA_DIR / filename
-    fpath.write_text(json.dumps(data, indent=2))
-
 def _load_departments():
-    return _read_json("departments.json")
+    return db.query(SITE, "departments")
 
-def _load_services():
-    return _read_json("services.json")
+def _load_services(department_id=None, category=None):
+    where = {}
+    if department_id is not None:
+        where["department_id"] = department_id
+    if category:
+        where["category"] = category
+    return db.query(SITE, "services", where=where if where else None)
 
-def _load_permits():
-    return _read_json("permits.json")
+def _load_permits(department_id=None, status=None, ptype=None):
+    where = {}
+    if department_id is not None:
+        where["department_id"] = department_id
+    if status:
+        where["status"] = status
+    if ptype:
+        where["type"] = ptype
+    return db.query(SITE, "permits", where=where if where else None)
 
-def _load_records():
-    return _read_json("records.json")
+def _load_records(rtype=None):
+    where = {}
+    if rtype:
+        where["type"] = rtype
+    return db.query(SITE, "records", where=where if where else None)
 
 def _load_users():
-    return _read_json("users.json")
+    return db.query(SITE, "users")
 
 def _save_users(users):
-    _write_json("users.json", users)
+    db.save_collection(SITE, "users", users)
 
 def _load_announcements():
-    return _read_json("announcements.json")
+    return db.query(SITE, "announcements")
 
 def _load_appointment_types():
-    return _read_json("appointment_types.json")
+    return db.query(SITE, "appointment_types")
 
 def _load_payment_types():
-    return _read_json("payment_types.json")
+    return db.query(SITE, "payment_types")
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 # ---------------------------------------------------------------------------
 # Search / filter helpers
@@ -115,7 +124,7 @@ def _search_records(records, query):
     q = query.lower().strip()
     scored = []
     for r in records:
-        text = f"{r['title']} {r['type']} {r['department_name']} {r['summary']}"
+        text = f"{r['record_id']} {r['type']} {r['owner']} {r['address']} {r['description']}"
         sc = _keyword_score(q, text)
         if sc > 0:
             scored.append((r, sc))
@@ -153,42 +162,40 @@ def departments_page():
 
 @blueprint.route("/department/<int:dept_id>")
 def department_detail(dept_id):
-    departments = _load_departments()
-    dept = next((d for d in departments if d["id"] == dept_id), None)
+    dept = db.get_item(SITE, "departments", dept_id)
     if dept is None:
         abort(404)
-    services = [s for s in _load_services() if s["department_id"] == dept_id]
-    permits = [p for p in _load_permits() if p["department_id"] == dept_id]
-    records = [r for r in _load_records() if r["department_id"] == dept_id]
+    services = _load_services(department_id=dept_id)
+    permits = _load_permits(department_id=dept_id)
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
     return render_template("agency-portals/department_detail.html",
                            dept=dept, services=services, permits=permits,
-                           records=records, user=user)
+                           user=user)
 
 
 @blueprint.route("/services")
 def services_page():
-    services = _load_services()
     departments = _load_departments()
     q = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
     dept_id = request.args.get("department", "").strip()
 
-    results = list(services)
-    if q:
-        results = _search_services(results, q)
-    if category:
-        results = [s for s in results if s["category"] == category]
+    did = None
     if dept_id:
         try:
             did = int(dept_id)
-            results = [s for s in results if s["department_id"] == did]
         except ValueError:
             pass
 
-    categories = sorted(set(s["category"] for s in services))
+    results = _load_services(department_id=did, category=category or None)
+    if q:
+        results = _search_services(results, q)
+
+    cat_rows = db.execute(
+        "SELECT DISTINCT [category] FROM [agency_portals_services] ORDER BY [category]", ())
+    categories = [r["category"] for r in cat_rows]
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -200,12 +207,10 @@ def services_page():
 
 @blueprint.route("/service/<int:service_id>")
 def service_detail(service_id):
-    services = _load_services()
-    service = next((s for s in services if s["id"] == service_id), None)
+    service = db.get_item(SITE, "services", service_id)
     if service is None:
         abort(404)
-    departments = _load_departments()
-    dept = next((d for d in departments if d["id"] == service["department_id"]), None)
+    dept = db.get_item(SITE, "departments", service["department_id"])
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -215,27 +220,24 @@ def service_detail(service_id):
 
 @blueprint.route("/permits")
 def permits_page():
-    permits = _load_permits()
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
     ptype = request.args.get("type", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
 
-    results = list(permits)
-    if q:
-        results = _search_permits(results, q)
-    if status:
-        results = [p for p in results if p["status"] == status]
-    if ptype:
-        results = [p for p in results if p["type"] == ptype]
+    results = _load_permits(status=status or None, ptype=ptype or None)
     if date_from:
         results = [p for p in results if p["date_submitted"] >= date_from]
     if date_to:
         results = [p for p in results if p["date_submitted"] <= date_to]
+    if q:
+        results = _search_permits(results, q)
 
-    statuses = sorted(set(p["status"] for p in permits))
-    types = sorted(set(p["type"] for p in permits))
+    stat_rows = db.execute("SELECT DISTINCT [status] FROM [agency_portals_permits] ORDER BY [status]", ())
+    statuses = [r["status"] for r in stat_rows]
+    type_rows = db.execute("SELECT DISTINCT [type] FROM [agency_portals_permits] ORDER BY [type]", ())
+    types = [r["type"] for r in type_rows]
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -247,8 +249,7 @@ def permits_page():
 
 @blueprint.route("/permit/<int:permit_id>")
 def permit_detail(permit_id):
-    permits = _load_permits()
-    permit = next((p for p in permits if p["id"] == permit_id), None)
+    permit = db.get_item(SITE, "permits", permit_id)
     if permit is None:
         abort(404)
     user = None
@@ -260,7 +261,6 @@ def permit_detail(permit_id):
 
 @blueprint.route("/records")
 def records_page():
-    records = _load_records()
     departments = _load_departments()
     q = request.args.get("q", "").strip()
     rtype = request.args.get("type", "").strip()
@@ -268,23 +268,23 @@ def records_page():
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
 
-    results = list(records)
-    if q:
-        results = _search_records(results, q)
-    if rtype:
-        results = [r for r in results if r["type"] == rtype]
+    did = None
     if dept_id:
         try:
             did = int(dept_id)
-            results = [r for r in results if r["department_id"] == did]
         except ValueError:
             pass
-    if date_from:
-        results = [r for r in results if r["date_published"] >= date_from]
-    if date_to:
-        results = [r for r in results if r["date_published"] <= date_to]
 
-    record_types = sorted(set(r["type"] for r in records))
+    results = _load_records(rtype=rtype or None)
+    if date_from:
+        results = [r for r in results if r["date_filed"] >= date_from]
+    if date_to:
+        results = [r for r in results if r["date_filed"] <= date_to]
+    if q:
+        results = _search_records(results, q)
+
+    type_rows = db.execute("SELECT DISTINCT [type] FROM [agency_portals_records] ORDER BY [type]", ())
+    record_types = [r["type"] for r in type_rows]
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -365,6 +365,13 @@ def register_submit():
     }
     users.append(new_user)
     _save_users(users)
+    _send_confirmation_email(
+        new_id,
+        "Welcome to City of Lakeport Online Services",
+        f"Hello {name},\n\nYour account has been created successfully.\n"
+        f"Username: {username}\nVerification Code: {verification_code}\n\n"
+        f"Please verify your identity to access all services.\n\n"
+        f"City of Lakeport Municipal Services")
     return render_template("agency-portals/register.html",
                            error=None, success=True, new_user=new_user)
 
@@ -447,6 +454,14 @@ def apply_submit(service_id):
                 }
                 user_permits.append(new_permit)
                 _save_users(users)
+                _send_confirmation_email(
+                    u["id"],
+                    f"Permit Application Received — {permit_code}",
+                    f"Hello {u['name']},\n\nYour {permit_type} permit application has been received.\n"
+                    f"Permit Code: {permit_code}\nService: {service['name']}\n"
+                    f"Address: {address}\nStatus: Submitted\n\n"
+                    f"You will be notified when your application is reviewed.\n\n"
+                    f"City of Lakeport Municipal Services")
 
     return render_template("agency-portals/apply.html",
                            service=service, user=user, success=True,
@@ -493,6 +508,13 @@ def book_submit():
                     "time": time,
                 })
                 _save_users(users)
+                _send_confirmation_email(
+                    u["id"],
+                    f"Appointment Confirmed — {conf_num}",
+                    f"Hello {u['name']},\n\nYour appointment has been confirmed.\n"
+                    f"Confirmation: {conf_num}\nType: {appt_type['name']}\n"
+                    f"Date: {date}\nTime: {time}\n\n"
+                    f"City of Lakeport Municipal Services")
 
     return render_template("agency-portals/book.html",
                            appointment_types=appointment_types, user=user,
@@ -534,6 +556,13 @@ def pay_submit():
                     "account": account,
                 })
                 _save_users(users)
+                _send_confirmation_email(
+                    u["id"],
+                    f"Payment Received — {conf}",
+                    f"Hello {u['name']},\n\nYour payment has been processed.\n"
+                    f"Confirmation: {conf}\nType: {pay_type}\n"
+                    f"Amount: ${amount}\n\n"
+                    f"City of Lakeport Municipal Services")
 
     return render_template("agency-portals/pay.html",
                            payment_types=payment_types, user=user,
@@ -607,8 +636,7 @@ def api_departments():
 
 @blueprint.route("/api/departments/<int:dept_id>")
 def api_department(dept_id):
-    departments = _load_departments()
-    dept = next((d for d in departments if d["id"] == dept_id), None)
+    dept = db.get_item(SITE, "departments", dept_id)
     if dept is None:
         abort(404)
     return jsonify(dept)
@@ -616,25 +644,19 @@ def api_department(dept_id):
 
 @blueprint.route("/api/services")
 def api_services():
-    services = _load_services()
     q = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
     dept_id = request.args.get("department", type=int)
 
-    results = list(services)
+    results = _load_services(department_id=dept_id, category=category or None)
     if q:
         results = _search_services(results, q)
-    if category:
-        results = [s for s in results if s["category"] == category]
-    if dept_id:
-        results = [s for s in results if s["department_id"] == dept_id]
     return jsonify(results)
 
 
 @blueprint.route("/api/services/<int:service_id>")
 def api_service(service_id):
-    services = _load_services()
-    service = next((s for s in services if s["id"] == service_id), None)
+    service = db.get_item(SITE, "services", service_id)
     if service is None:
         abort(404)
     return jsonify(service)
@@ -665,31 +687,25 @@ def api_services_semantic():
 
 @blueprint.route("/api/permits")
 def api_permits():
-    permits = _load_permits()
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "").strip()
     ptype = request.args.get("type", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
 
-    results = list(permits)
-    if q:
-        results = _search_permits(results, q)
-    if status:
-        results = [p for p in results if p["status"] == status]
-    if ptype:
-        results = [p for p in results if p["type"] == ptype]
+    results = _load_permits(status=status or None, ptype=ptype or None)
     if date_from:
         results = [p for p in results if p["date_submitted"] >= date_from]
     if date_to:
         results = [p for p in results if p["date_submitted"] <= date_to]
+    if q:
+        results = _search_permits(results, q)
     return jsonify(results)
 
 
 @blueprint.route("/api/permits/<int:permit_id>")
 def api_permit(permit_id):
-    permits = _load_permits()
-    permit = next((p for p in permits if p["id"] == permit_id), None)
+    permit = db.get_item(SITE, "permits", permit_id)
     if permit is None:
         abort(404)
     return jsonify(permit)
@@ -708,31 +724,25 @@ def api_permits_search():
 
 @blueprint.route("/api/records")
 def api_records():
-    records = _load_records()
     q = request.args.get("q", "").strip()
     rtype = request.args.get("type", "").strip()
     dept_id = request.args.get("department", type=int)
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
 
-    results = list(records)
+    results = _load_records(rtype=rtype or None)
+    if date_from:
+        results = [r for r in results if r["date_filed"] >= date_from]
+    if date_to:
+        results = [r for r in results if r["date_filed"] <= date_to]
     if q:
         results = _search_records(results, q)
-    if rtype:
-        results = [r for r in results if r["type"] == rtype]
-    if dept_id:
-        results = [r for r in results if r["department_id"] == dept_id]
-    if date_from:
-        results = [r for r in results if r["date_published"] >= date_from]
-    if date_to:
-        results = [r for r in results if r["date_published"] <= date_to]
     return jsonify(results)
 
 
 @blueprint.route("/api/records/<int:record_id>")
 def api_record(record_id):
-    records = _load_records()
-    record = next((r for r in records if r["id"] == record_id), None)
+    record = db.get_item(SITE, "records", record_id)
     if record is None:
         abort(404)
     return jsonify(record)
@@ -745,16 +755,12 @@ def api_announcements():
 
 @blueprint.route("/api/stats")
 def api_stats():
-    departments = _load_departments()
-    services = _load_services()
-    permits = _load_permits()
-    records = _load_records()
     dept_id = request.args.get("department", type=int)
 
-    if dept_id:
-        services = [s for s in services if s["department_id"] == dept_id]
-        permits = [p for p in permits if p["department_id"] == dept_id]
-        records = [r for r in records if r["department_id"] == dept_id]
+    total_departments = db.count(SITE, "departments")
+    services = _load_services(department_id=dept_id)
+    permits = _load_permits(department_id=dept_id)
+    records = _load_records()
 
     permit_statuses = {}
     for p in permits:
@@ -765,7 +771,7 @@ def api_stats():
         service_categories[s["category"]] = service_categories.get(s["category"], 0) + 1
 
     return jsonify({
-        "total_departments": len(departments),
+        "total_departments": total_departments,
         "total_services": len(services),
         "total_permits": len(permits),
         "total_records": len(records),
@@ -799,15 +805,15 @@ def api_export():
             for p in data:
                 lines.append(f'{p["id"]},"{p["code"]}","{p["type"]}","{p["applicant"]}","{p["address"]}","{p["status"]}",{p["date_submitted"]},{p["fee"]}')
         elif data_type == "records":
-            lines = ["id,doc_id,type,title,department_name,date_published,pages"]
+            lines = ["id,record_id,type,owner,address,date_filed,status"]
             for r in data:
-                title = r["title"].replace('"', '""')
-                lines.append(f'{r["id"]},"{r["doc_id"]}","{r["type"]}","{title}","{r["department_name"]}",{r["date_published"]},{r["pages"]}')
+                owner = r["owner"].replace('"', '""')
+                lines.append(f'{r["id"]},"{r["record_id"]}","{r["type"]}","{owner}","{r["address"]}",{r["date_filed"]},"{r["status"]}"')
         else:
-            lines = ["id,code,name,category,department_id,fee,online"]
+            lines = ["id,code,name,category,department_id,fee_range,online"]
             for s in data:
                 name = s["name"].replace('"', '""')
-                lines.append(f'{s["id"]},"{s["code"]}","{name}","{s["category"]}",{s["department_id"]},{s["fee"]},{s["online"]}')
+                lines.append(f'{s["id"]},"{s["code"]}","{name}","{s["category"]}",{s["department_id"]},"{s["fee_range"]}",{s["online"]}')
         return Response("\n".join(lines), mimetype="text/csv",
                         headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
     return jsonify(data)

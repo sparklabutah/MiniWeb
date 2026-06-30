@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlights - {{ match.home_team.abbreviation }} vs {{ match.away_team.abbreviation }} - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 span { color: #00d4aa; }
+        .nav { display: flex; gap: 1.2rem; align-items: center; }
+        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
+        .nav a:hover { color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3498db; text-decoration: none; }
+        .page-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; }
+
+        .player-area { background: #000; border-radius: .75rem; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+        .player-area .placeholder { color: #666; font-size: 1.1rem; text-align: center; }
+        .play-btn { width: 72px; height: 72px; border-radius: 50%; background: rgba(0,212,170,.85); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: .5rem; }
+        .play-btn:hover { background: rgba(0,212,170,1); }
+        .play-icon { width: 0; height: 0; border-style: solid; border-width: 14px 0 14px 24px; border-color: transparent transparent transparent #fff; margin-left: 4px; }
+
+        .highlight-list { display: flex; flex-direction: column; gap: .75rem; }
+        .highlight-item { background: #fff; border-radius: .5rem; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); cursor: pointer; transition: box-shadow .15s; }
+        .highlight-item:hover { box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+        .hl-time { background: #1a1a2e; color: #00d4aa; padding: .3rem .6rem; border-radius: .3rem; font-size: .8rem; font-weight: 700; font-family: monospace; min-width: 50px; text-align: center; }
+        .hl-desc { font-size: .9rem; }
+
+        .no-highlights { text-align: center; color: #94a3b8; padding: 3rem; background: #fff; border-radius: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport <span>Sports Hub</span></h1>
+        <div class="nav">
+            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
+            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
+            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('sports-esports.index') }}">Home</a> /
+            <a href="{{ url_for('sports-esports.match_detail', match_id=match.id) }}">Match #{{ match.id }}</a> /
+            Highlights
+        </div>
+
+        <div class="page-title">{{ match.home_team.name }} vs {{ match.away_team.name }} - Highlights</div>
+
+        {% if match.status == 'scheduled' %}
+        <div class="no-highlights">This match has not started yet. Highlights will be available after the match.</div>
+        {% else %}
+        <div class="player-area">
+            <div class="placeholder">
+                <button class="play-btn" id="playBtn"><span class="play-icon"></span></button>
+                <div>{{ match.home_team.abbreviation }} {{ match.home_score }} - {{ match.away_score }} {{ match.away_team.abbreviation }}</div>
+                <div style="margin-top:.5rem; font-size: .8rem; color: #999;">Click play to watch highlights</div>
+            </div>
+        </div>
+
+        <div class="highlight-list">
+            <div class="highlight-item" data-time="0:12">
+                <span class="hl-time">00:12</span>
+                <span class="hl-desc">Opening play</span>
+            </div>
+            <div class="highlight-item" data-time="15:34">
+                <span class="hl-time">15:34</span>
+                <span class="hl-desc">Key scoring moment</span>
+            </div>
+            <div class="highlight-item" data-time="42:10">
+                <span class="hl-time">42:10</span>
+                <span class="hl-desc">Turning point</span>
+            </div>
+            <div class="highlight-item" data-time="58:00">
+                <span class="hl-time">58:00</span>
+                <span class="hl-desc">Final moments</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

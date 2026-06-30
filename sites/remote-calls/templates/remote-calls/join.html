@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Meeting - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .join-container { max-width: 500px; margin: 5rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); text-align: center; }
+        .join-container h2 { color: #1a1a2e; margin-bottom: .5rem; font-size: 1.5rem; }
+        .join-container .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; text-align: left; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .8rem 1rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: 1.1rem; text-align: center; letter-spacing: .15em; font-family: monospace; }
+        .form-group input:focus { border-color: #4fc3f7; outline: none; box-shadow: 0 0 0 3px rgba(79,195,247,.15); }
+        .btn-join { width: 100%; padding: .8rem; background: #1976d2; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-join:hover { background: #1565c0; }
+        .result-msg { padding: .8rem 1rem; border-radius: .4rem; font-size: .9rem; margin-top: 1rem; display: none; }
+        .result-msg.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .result-msg.error { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.join_page') }}" class="active">Join</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="join-container">
+        <h2>Join a Meeting</h2>
+        <p class="subtitle">Enter the meeting code to join</p>
+        <form id="join-form" onsubmit="return joinMeeting(event)">
+            <div class="form-group">
+                <label for="code">Meeting Code</label>
+                <input type="text" id="code" name="code" required placeholder="e.g. mtg-005" autocomplete="off">
+            </div>
+            <button type="submit" class="btn-join">Join Meeting</button>
+        </form>
+        <div id="result-msg" class="result-msg"></div>
+    </div>
+
+    <script>
+    function joinMeeting(event) {
+        event.preventDefault();
+        var code = document.getElementById('code').value.trim();
+        var msgEl = document.getElementById('result-msg');
+        fetch('{{ url_for("remote-calls.api_join_meeting") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: code})
+        })
+        .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+        .then(function(result) {
+            if (result.status >= 200 && result.status < 300) {
+                msgEl.className = 'result-msg success';
+                msgEl.textContent = 'Joined "' + result.data.meeting.title + '" successfully! (' + result.data.meeting.participant_count + ' participants)';
+            } else {
+                msgEl.className = 'result-msg error';
+                msgEl.textContent = result.data.error || 'Failed to join meeting.';
+            }
+            msgEl.style.display = 'block';
+        })
+        .catch(function(err) {
+            msgEl.className = 'result-msg error';
+            msgEl.textContent = 'Error: ' + err;
+            msgEl.style.display = 'block';
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

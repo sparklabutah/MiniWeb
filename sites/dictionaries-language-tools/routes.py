@@ -1,23 +1,23 @@
 """Dictionaries & Language Tools -- Merriam-Webster / Dictionary.com style dictionary.
 
-Data interpreter: reads the original Wiktionary JSONL snapshot,
-loads all entries based on config/config.json, and serves through Flask routes.
-The raw data file is never modified.
+Data is stored in SQLite: wiktionary entries in the raw_data table, users in a
+per-site typed table.  Queried through app.db.
 """
-import json
 import math
 import pathlib
 import random
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import date
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
 
+SITE = "dictionaries-language-tools"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_FILE = SITE_DIR / "data" / "wiktionary_sample.jsonl"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
+
+# Use db's row deserializer to auto-parse JSON columns (senses, head_templates, etc.)
+from app.db import _deserialize_row
 
 blueprint = Blueprint(
     "dictionaries-language-tools",
@@ -28,21 +28,22 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------------------------
 # Data interpreter -- reads raw JSONL, never modifies it
 # ---------------------------------------------------------------------------
 
+def _g(raw, key, default=None):
+    """Get a value from a dict, coalescing None to the default.
+
+    SQLite NULL columns come back as None even with dict.get(key, default),
+    because the key exists with value None.
+    """
+    val = raw.get(key, default)
+    return val if val is not None else default
+
+
 def _extract_ipa(raw):
     """Extract IPA pronunciation strings from the sounds field."""
-    sounds = raw.get("sounds", [])
+    sounds = _g(raw, "sounds", [])
     if not sounds:
         return []
     ipas = []
@@ -160,6 +161,14 @@ def _format_pos(pos_code):
 
 def _interpret_entry(raw, idx):
     """Interpret a raw JSONL record into a normalized dictionary entry."""
+    # Coalesce NULL values from SQLite — .get("key", []) returns None
+    # when the key exists with value None, so fix them here.
+    for k, v in list(raw.items()):
+        if v is None:
+            raw[k] = [] if k in ("senses", "head_templates", "sounds",
+                                  "synonyms", "antonyms", "related", "derived",
+                                  "hypernyms", "hyponyms", "forms",
+                                  "hyphenations", "categories") else ""
     word = raw.get("word", "").strip()
     pos_code = raw.get("pos", "")
     pos = _format_pos(pos_code)
@@ -207,117 +216,283 @@ def _interpret_entry(raw, idx):
     }
 
 
-def _load_words():
-    """Read JSONL dataset. num_data_points=-1 loads all records; positive N
-    uses reservoir sampling to pick N records."""
-    config = _load_config()
-    n = config.get("num_data_points", -1)
-    seed = config.get("random_seed", 42)
-    rng = random.Random(seed)
-
-    if n > 0:
-        reservoir = []
-        with open(DATA_FILE) as f:
-            for i, line in enumerate(f):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    raw = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if len(reservoir) < n:
-                    reservoir.append(raw)
-                else:
-                    j = rng.randint(0, i)
-                    if j < n:
-                        reservoir[j] = raw
-        selected = reservoir
-    else:
-        selected = []
-        with open(DATA_FILE) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    selected.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-
-    entries = []
-    for idx, raw in enumerate(selected, 1):
-        entries.append(_interpret_entry(raw, idx))
-
-    entries.sort(key=lambda e: e["word_lower"])
-    for i, e in enumerate(entries, 1):
-        e["id"] = i
-
-    return entries
-
-
 # ---------------------------------------------------------------------------
-# Caching
+# DB-backed data access — queries dictionaries_language_tools_entries directly
 # ---------------------------------------------------------------------------
 
-_entries = None
+_TABLE = "dictionaries_language_tools_entries"
 
 
-def _ensure_loaded():
-    global _entries
-    if _entries is None:
-        _entries = _load_words()
+def _db_conn():
+    return db.get_conn()
+
+def _db_search_words(query, pos=None, letter=None, limit=50, offset=0):
+    """Search entries with filters on real columns."""
+    conn = _db_conn()
+    q = query.lower().strip() if query else ""
+    clauses = []
+    params = []
+
+    if q:
+        clauses.append("LOWER(word) LIKE ?")
+        params.append(f"%{q}%")
+    if pos:
+        clauses.append("pos = ?")
+        params.append(pos)
+    if letter:
+        clauses.append("UPPER(SUBSTR(word, 1, 1)) = ?")
+        params.append(letter.upper())
+
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    sql = f"SELECT rowid, * FROM [{_TABLE}]{where} LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = conn.execute(sql, params).fetchall()
+    return [_interpret_entry(_deserialize_row(r), offset + i + 1) for i, r in enumerate(rows)]
 
 
-def _get_entries():
-    _ensure_loaded()
-    return _entries
+def _db_search_words_scored(query, limit=50, offset=0):
+    """Search with relevance scoring: exact > prefix > contains."""
+    conn = _db_conn()
+    q = query.lower().strip()
+    if not q:
+        return []
+
+    results = []
+    seen = set()
+
+    # 1. Exact match (score 100)
+    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) = ? LIMIT ?", (q, limit)).fetchall():
+        key = r["rowid"]
+        if key not in seen:
+            seen.add(key)
+            results.append((_interpret_entry(_deserialize_row(r), len(results) + 1), 100))
+
+    remaining = limit - len(results)
+    if remaining <= 0:
+        return [e for e, _ in results]
+
+    # 2. Prefix match (score 50)
+    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? AND LOWER(word) != ? LIMIT ?", (f"{q}%", q, remaining)).fetchall():
+        key = r["rowid"]
+        if key not in seen:
+            seen.add(key)
+            results.append((_interpret_entry(_deserialize_row(r), len(results) + 1), 50))
+
+    remaining = limit - len(results)
+    if remaining <= 0:
+        results.sort(key=lambda x: (-x[1], x[0]["word_lower"]))
+        return [e for e, _ in results]
+
+    # 3. Contains match (score 20)
+    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? AND LOWER(word) NOT LIKE ? LIMIT ?", (f"%{q}%", f"{q}%", remaining)).fetchall():
+        key = r["rowid"]
+        if key not in seen:
+            seen.add(key)
+            results.append((_interpret_entry(_deserialize_row(r), len(results) + 1), 20))
+
+    results.sort(key=lambda x: (-x[1], x[0]["word_lower"]))
+    return [e for e, _ in results]
 
 
-# ---------------------------------------------------------------------------
-# Word-of-the-day — deterministic based on day of year + seed
-# ---------------------------------------------------------------------------
+def _db_count_search(query="", pos=None, letter=None):
+    """Count matching entries."""
+    conn = _db_conn()
+    clauses = []
+    params = []
+    if query:
+        clauses.append("LOWER(word) LIKE ?")
+        params.append(f"%{query.lower().strip()}%")
+    if pos:
+        clauses.append("pos = ?")
+        params.append(pos)
+    if letter:
+        clauses.append("UPPER(SUBSTR(word, 1, 1)) = ?")
+        params.append(letter.upper())
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return conn.execute(f"SELECT COUNT(*) FROM [{_TABLE}]{where}", params).fetchone()[0]
 
-def _word_of_the_day(entries=None):
-    """Pick a word of the day deterministically from entries with definitions."""
-    if entries is None:
-        entries = _get_entries()
-    config = _load_config()
-    seed = config.get("random_seed", 42)
+
+def _db_get_word(word_text):
+    """Look up entries for a word (case-insensitive)."""
+    conn = _db_conn()
+    rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) = ?", (word_text.lower(),)).fetchall()
+    if not rows:
+        rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? LIMIT 10", (f"{word_text.lower()}%",)).fetchall()
+    return [_interpret_entry(_deserialize_row(r), i + 1) for i, r in enumerate(rows)]
+
+
+def _db_browse_by_letter(letter, limit=50, offset=0):
+    """Browse entries starting with a given letter."""
+    conn = _db_conn()
+    rows = conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] WHERE UPPER(SUBSTR(word, 1, 1)) = ? ORDER BY LOWER(word) LIMIT ? OFFSET ?",
+        (letter.upper(), limit, offset),
+    ).fetchall()
+    return [_interpret_entry(_deserialize_row(r), offset + i + 1) for i, r in enumerate(rows)]
+
+
+_letters_cache = None
+
+def _db_get_letters():
+    global _letters_cache
+    if _letters_cache is not None:
+        return _letters_cache
+    _letters_cache = [chr(c) for c in range(ord('A'), ord('Z') + 1)]
+    return _letters_cache
+
+
+_total_entries_cache = None
+
+def _db_total_entries():
+    global _total_entries_cache
+    if _total_entries_cache is None:
+        conn = _db_conn()
+        _total_entries_cache = conn.execute(f"SELECT COUNT(*) FROM [{_TABLE}]").fetchone()[0]
+    return _total_entries_cache
+
+_min_rowid_cache = None
+
+def _db_min_rowid():
+    global _min_rowid_cache
+    if _min_rowid_cache is not None:
+        return _min_rowid_cache
+    conn = _db_conn()
+    _min_rowid_cache = conn.execute(f"SELECT MIN(rowid) FROM [{_TABLE}]").fetchone()[0] or 0
+    return _min_rowid_cache
+
+
+
+_wotd_cache = None
+_wotd_cache_date = None
+
+def _db_word_of_the_day():
+    """Pick a word of the day from DB deterministically. Cached per day."""
+    global _wotd_cache, _wotd_cache_date
     today = date.today()
+    if _wotd_cache is not None and _wotd_cache_date == today:
+        return _wotd_cache
+    seed = 42
     day_of_year = today.timetuple().tm_yday
     year = today.year
 
-    # Filter to entries that have at least one real definition
-    candidates = [e for e in entries if e["num_definitions"] > 0 and len(e["word"]) > 2]
-    if not candidates:
-        candidates = entries
-
     rng = random.Random(seed + year * 1000 + day_of_year)
-    return rng.choice(candidates)
+    conn = _db_conn()
+    total = _db_total_entries()
+    if total == 0:
+        return None
+    pick = rng.randint(0, total - 1)
+    # Use rowid for O(1) lookup instead of slow OFFSET scan on millions of rows
+    min_rowid = _db_min_rowid()
+    row = conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] WHERE rowid >= ? LIMIT 1",
+        (min_rowid + pick,),
+    ).fetchone()
+    if not row:
+        return None
+    _wotd_cache = _interpret_entry(_deserialize_row(row), pick + 1)
+    _wotd_cache_date = today
+    return _wotd_cache
+
+
+def _db_random_word(extra_seed=0):
+    """Return a random word entry from DB."""
+    rng = random.Random(42 + extra_seed)
+    conn = _db_conn()
+    total = _db_total_entries()
+    if total == 0:
+        return None
+    pick = rng.randint(0, total - 1)
+    min_rowid = _db_min_rowid()
+    row = conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] WHERE rowid >= ? LIMIT 1",
+        (min_rowid + pick,),
+    ).fetchone()
+    if not row:
+        return None
+    return _interpret_entry(_deserialize_row(row), pick + 1)
+
+
+def _db_compute_stats():
+    """Compute aggregate statistics from DB (sampled for performance)."""
+    conn = _db_conn()
+    total = _db_total_entries()
+    sample_limit = min(total, 10000)
+    rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] LIMIT ?", (sample_limit,)).fetchall()
+
+    pos_counts = Counter()
+    letter_counts = Counter()
+    with_ipa = 0
+    with_etymology = 0
+    with_synonyms = 0
+    total_defs = 0
+
+    for row in rows:
+        entry = _interpret_entry(_deserialize_row(row), 0)
+        pos_counts[entry["pos"]] += 1
+        letter_counts[entry["first_letter"]] += 1
+        if entry["ipa"]:
+            with_ipa += 1
+        if entry["etymology"]:
+            with_etymology += 1
+        if entry["synonyms"]:
+            with_synonyms += 1
+        total_defs += entry["num_definitions"]
+
+    avg_defs = round(total_defs / sample_limit, 2) if sample_limit > 0 else 0
+    scale = total / sample_limit if sample_limit > 0 else 1
+    return {
+        "total_words": total,
+        "total_definitions": int(total_defs * scale),
+        "avg_definitions_per_word": avg_defs,
+        "words_with_pronunciation": int(with_ipa * scale),
+        "words_with_etymology": int(with_etymology * scale),
+        "words_with_synonyms": int(with_synonyms * scale),
+        "pos_distribution": {k: int(v * scale) for k, v in pos_counts.most_common()},
+        "letter_distribution": {k: int(letter_counts[k] * scale) for k in sorted(letter_counts.keys())},
+        "unique_letters": len(letter_counts),
+    }
+
+
+def _db_check_word_exists(word_text):
+    """Check if a word exists in DB."""
+    conn = _db_conn()
+    row = conn.execute(
+        f"SELECT COUNT(*) FROM [{_TABLE}] WHERE LOWER(word) = ?",
+        (word_text.lower(),),
+    ).fetchone()
+    return row[0] > 0
+
+
 
 
 # ---------------------------------------------------------------------------
-# Users (mutable state)
+# Word-of-the-day -- deterministic based on day of year + seed
+# ---------------------------------------------------------------------------
+
+def _word_of_the_day(entries=None):
+    """Pick a word of the day deterministically."""
+    return _db_word_of_the_day()
+
+
+# ---------------------------------------------------------------------------
+# Users (mutable state -- stored in per-site SQLite table)
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
-# Search helpers
+# Search helpers (file-based fallback)
 # ---------------------------------------------------------------------------
 
 def _search_words(entries, query):
@@ -361,7 +536,7 @@ def _browse_by_letter(entries, letter):
 
 
 # ---------------------------------------------------------------------------
-# Statistics helpers
+# Statistics helpers (file-based fallback)
 # ---------------------------------------------------------------------------
 
 def _compute_stats(entries):
@@ -394,33 +569,32 @@ def _compute_stats(entries):
 
 @blueprint.route("/")
 def index():
-    entries = _get_entries()
-    q = request.args.get("q", "").strip()
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
 
-    wotd = _word_of_the_day(entries)
+    q = request.args.get("q", "").strip()
+
+    wotd = _db_word_of_the_day()
+    letters = _db_get_letters()
 
     results = None
     total_results = 0
     page = 1
     total_pages = 1
     if q:
-        all_results = _search_words(entries, q)
-        total_results = len(all_results)
         PER_PAGE = 20
         page = request.args.get("page", 1, type=int)
         if page < 1:
             page = 1
+        total_results = _db_count_search(query=q)
         total_pages = max(1, math.ceil(total_results / PER_PAGE))
         if page > total_pages:
             page = total_pages
-        start = (page - 1) * PER_PAGE
-        results = all_results[start:start + PER_PAGE]
-
-    # Alphabet letters present in the data
-    letters = sorted(set(e["first_letter"] for e in entries if e["first_letter"].isalpha()))
+        offset = (page - 1) * PER_PAGE
+        results = _db_search_words_scored(q, limit=PER_PAGE, offset=0)
+        if page > 1 or len(results) == 0:
+            results = _db_search_words(q, limit=PER_PAGE, offset=offset)
 
     return render_template("dictionaries-language-tools/index.html",
                            q=q, results=results, wotd=wotd,
@@ -431,18 +605,13 @@ def index():
 
 @blueprint.route("/word/<path:word_text>")
 def word_detail(word_text):
-    entries = _get_entries()
-    # Find matching entry (case-insensitive)
-    matches = [e for e in entries if e["word_lower"] == word_text.lower()]
-    if not matches:
-        # Try partial match
-        matches = [e for e in entries if e["word_lower"].startswith(word_text.lower())]
+    matches = _db_get_word(word_text)
+
     if not matches:
         abort(404)
 
-    # If multiple entries (same word, different POS), show all
     entry = matches[0]
-    all_entries = matches  # All POS entries for this word
+    all_entries = matches
 
     user = None
     if "user_id" in session:
@@ -454,9 +623,8 @@ def word_detail(word_text):
         is_saved = word_text.lower() in [w.lower() for w in user.get("saved_words", [])]
 
     # Find cross-references: words that appear in related/synonyms that exist in our dictionary
-    word_set = {e["word_lower"] for e in entries}
-    linked_synonyms = [s for s in entry["synonyms"] if s.lower() in word_set]
-    linked_related = [r for r in entry["related"] if r.lower() in word_set]
+    linked_synonyms = [s for s in entry["synonyms"] if _db_check_word_exists(s)]
+    linked_related = [r for r in entry["related"] if _db_check_word_exists(r)]
 
     return render_template("dictionaries-language-tools/word.html",
                            entry=entry, all_entries=all_entries,
@@ -467,25 +635,22 @@ def word_detail(word_text):
 
 @blueprint.route("/browse/<letter>")
 def browse(letter):
-    entries = _get_entries()
     letter = letter.upper()
     if not letter.isalpha() or len(letter) != 1:
         abort(404)
 
-    all_words = _browse_by_letter(entries, letter)
-    letters = sorted(set(e["first_letter"] for e in entries if e["first_letter"].isalpha()))
-
-    # Pagination
     PER_PAGE = 20
     page = request.args.get("page", 1, type=int)
     if page < 1:
         page = 1
-    total = len(all_words)
+
+    total = _db_count_search(letter=letter)
     total_pages = max(1, math.ceil(total / PER_PAGE))
     if page > total_pages:
         page = total_pages
-    start = (page - 1) * PER_PAGE
-    words = all_words[start:start + PER_PAGE]
+    offset = (page - 1) * PER_PAGE
+    words = _db_browse_by_letter(letter, limit=PER_PAGE, offset=offset)
+    letters = _db_get_letters()
 
     user = None
     if "user_id" in session:
@@ -528,24 +693,21 @@ def dashboard():
     if not user:
         return redirect(url_for("dictionaries-language-tools.login_page"))
 
-    entries = _get_entries()
-    word_map = {e["word_lower"]: e for e in entries}
-
     # Resolve saved words to full entries
     saved_entries = []
     for w in user.get("saved_words", []):
-        e = word_map.get(w.lower())
-        if e:
-            saved_entries.append(e)
+        matches = _db_get_word(w)
+        if matches:
+            saved_entries.append(matches[0])
 
     # Resolve vocabulary list words
     vocab_lists = []
     for vl in user.get("vocabulary_lists", []):
         resolved = []
         for w in vl.get("words", []):
-            e = word_map.get(w.lower())
-            if e:
-                resolved.append(e)
+            matches = _db_get_word(w)
+            if matches:
+                resolved.append(matches[0])
         vocab_lists.append({
             "name": vl["name"],
             "words": resolved,
@@ -585,23 +747,15 @@ def form_save_word(word_text):
 @blueprint.route("/api/words")
 def api_words():
     """Search words. Query params: q, pos, letter, limit, page, per_page."""
-    entries = _get_entries()
     q = request.args.get("q", "").strip()
     pos = request.args.get("pos", "").strip()
     letter = request.args.get("letter", "").strip().upper()
     limit = request.args.get("limit", type=int)
 
-    results = list(entries)
-    if q:
-        results = _search_words(results, q)
-    if pos:
-        results = [e for e in results if e["pos_code"] == pos or e["pos"] == pos]
-    if letter:
-        results = [e for e in results if e["first_letter"] == letter]
-    if limit:
-        results = results[:limit]
-
-    # Lightweight response: omit full definitions
+    effective_limit = limit if limit else 50
+    results = _db_search_words(q if q else None, pos=pos if pos else None,
+                               letter=letter if letter else None,
+                               limit=effective_limit)
     out = []
     for e in results:
         out.append({
@@ -620,8 +774,7 @@ def api_words():
 @blueprint.route("/api/words/<path:word_text>")
 def api_word(word_text):
     """Get full details for a word."""
-    entries = _get_entries()
-    matches = [e for e in entries if e["word_lower"] == word_text.lower()]
+    matches = _db_get_word(word_text)
     if not matches:
         return jsonify({"error": "Word not found"}), 404
     # Return all matching entries (could be multiple POS)
@@ -633,8 +786,7 @@ def api_word(word_text):
 @blueprint.route("/api/words/<path:word_text>/synonyms")
 def api_word_synonyms(word_text):
     """Get synonyms for a specific word."""
-    entries = _get_entries()
-    matches = [e for e in entries if e["word_lower"] == word_text.lower()]
+    matches = _db_get_word(word_text)
     if not matches:
         return jsonify({"error": "Word not found"}), 404
     entry = matches[0]
@@ -648,17 +800,15 @@ def api_word_synonyms(word_text):
 @blueprint.route("/api/words/random")
 def api_random_word():
     """Return a random word entry."""
-    entries = _get_entries()
-    config = _load_config()
-    seed = config.get("random_seed", 42)
-    # Use a seed + current request to be somewhat varied but reproducible
     timestamp_str = request.args.get("seed", "0")
     try:
         extra_seed = int(timestamp_str)
     except ValueError:
         extra_seed = 0
-    rng = random.Random(seed + extra_seed)
-    entry = rng.choice(entries)
+
+    entry = _db_random_word(extra_seed)
+    if entry is None:
+        return jsonify({"error": "No entries available"}), 404
     return jsonify(entry)
 
 
@@ -672,11 +822,11 @@ def api_word_of_the_day():
 @blueprint.route("/api/browse/<letter>")
 def api_browse(letter):
     """Browse words by starting letter."""
-    entries = _get_entries()
     letter = letter.upper()
     if not letter.isalpha() or len(letter) != 1:
         return jsonify({"error": "Invalid letter"}), 400
-    words = _browse_by_letter(entries, letter)
+
+    words = _db_browse_by_letter(letter, limit=50)
     out = []
     for e in words:
         out.append({
@@ -692,8 +842,7 @@ def api_browse(letter):
 @blueprint.route("/api/stats")
 def api_stats():
     """Return dictionary statistics."""
-    entries = _get_entries()
-    stats = _compute_stats(entries)
+    stats = _db_compute_stats()
     return jsonify(stats)
 
 

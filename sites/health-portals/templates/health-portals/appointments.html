@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointments - Lakeport Medical Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #7ee8e8; }
+        .header-right a { color: #c0e8e8; text-decoration: none; font-size: .85rem; margin-left: 1rem; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #e6f7f7; }
+        nav a.active { font-weight: 700; background: #d0f0f0; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; }
+        .page-header h2 { font-size: 1.4rem; color: #1a202c; }
+        .btn-primary { background: #0d6e6e; color: #fff; padding: .5rem 1.2rem; border-radius: .4rem; text-decoration: none; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; }
+        .btn-primary:hover { background: #148f8f; }
+        .filters { background: #fff; padding: 1rem 1.2rem; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.2rem; }
+        .filters form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; }
+        .filter-group { display: flex; flex-direction: column; gap: .3rem; }
+        .filter-group label { font-size: .75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .filter-group select, .filter-group input { padding: .45rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .btn-filter { padding: .45rem 1rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-size: .85rem; cursor: pointer; align-self: end; }
+        .btn-clear { padding: .45rem 1rem; background: #e2e8f0; color: #475569; border: none; border-radius: .3rem; font-size: .85rem; cursor: pointer; text-decoration: none; align-self: end; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .8rem 1rem; font-size: .78rem; color: #64748b; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .8rem 1rem; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
+        tr:hover { background: #f8fafc; }
+        td a { color: #0d6e6e; text-decoration: none; font-weight: 500; }
+        td a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; }
+        .badge-scheduled { background: #dbeafe; color: #1d4ed8; }
+        .badge-completed { background: #dcfce7; color: #16a34a; }
+        .badge-cancelled { background: #fee2e2; color: #dc2626; }
+        .empty { padding: 3rem; text-align: center; color: #94a3b8; background: #fff; border-radius: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('health-portals.index') }}">Lakeport <span>Medical</span> Center</a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+                <a href="{{ url_for('health-portals.logout') }}">Sign Out ({{ user.first_name }})</a>
+            {% else %}
+                <a href="{{ url_for('health-portals.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
+        <a href="{{ url_for('health-portals.appointments_page') }}" class="active">Appointments</a>
+        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
+        <a href="{{ url_for('health-portals.messages_page') }}">Messages</a>
+        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </nav>
+
+    <div class="main">
+        <div class="page-header">
+            <h2>My Appointments</h2>
+            <a href="{{ url_for('health-portals.schedule_page') }}" class="btn-primary">Schedule New</a>
+        </div>
+
+        <div class="filters">
+            <form method="get">
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="">All</option>
+                        <option value="scheduled" {{ 'selected' if filters.status == 'scheduled' }}>Scheduled</option>
+                        <option value="completed" {{ 'selected' if filters.status == 'completed' }}>Completed</option>
+                        <option value="cancelled" {{ 'selected' if filters.status == 'cancelled' }}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Provider</label>
+                    <select name="provider">
+                        <option value="">All</option>
+                        {% for p in providers %}
+                        <option value="{{ p.id }}" {{ 'selected' if filters.provider == p.id|string }}>{{ p.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>From</label>
+                    <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+                </div>
+                <div class="filter-group">
+                    <label>To</label>
+                    <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
+                </div>
+                <div class="filter-group">
+                    <label>Department</label>
+                    <select name="department">
+                        <option value="">All</option>
+                        <option value="Primary Care" {{ 'selected' if filters.department == 'Primary Care' }}>Primary Care</option>
+                        <option value="Physical Therapy" {{ 'selected' if filters.department == 'Physical Therapy' }}>Physical Therapy</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-filter">Filter</button>
+                <a href="{{ url_for('health-portals.appointments_page') }}" class="btn-clear">Clear</a>
+            </form>
+        </div>
+
+        {% if appointments %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Provider</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for appt in appointments %}
+                <tr>
+                    <td><a href="{{ url_for('health-portals.appointment_detail', appt_id=appt.id) }}">{{ appt.date }}</a></td>
+                    <td>{{ appt.time }}</td>
+                    <td>{{ appt.category }}</td>
+                    <td>{{ appt.provider_name }}</td>
+                    <td style="font-size: .8rem; color: #64748b;">{{ appt.location.split(',')[0] }}</td>
+                    <td>
+                        <span class="badge badge-{{ appt.status }}">{{ appt.status|capitalize }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No appointments found matching your filters.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        Lakeport Medical Center &mdash; (555) 800-2200 &mdash; Patient Portal
+    </div>
+</body>
+</html>

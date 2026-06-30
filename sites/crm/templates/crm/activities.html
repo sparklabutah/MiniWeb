@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPro CRM - Activities</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.2rem; color: #1a365d; margin-bottom: 1rem; }
+        .toolbar { display: flex; gap: .8rem; margin-bottom: 1.2rem; flex-wrap: wrap; align-items: center; }
+        .toolbar select { padding: .5rem .8rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem; background: #fff; }
+        .toolbar button { padding: .5rem 1rem; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; font-size: .9rem; cursor: pointer; }
+        .toolbar button:hover { background: #2c5282; }
+        .result-count { font-size: .85rem; color: #718096; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+        th, td { text-align: left; padding: .7rem .8rem; border-bottom: 1px solid #edf2f7; font-size: .88rem; }
+        th { background: #edf2f7; color: #4a5568; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+        td a { color: #2b6cb0; text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .78rem; font-weight: 600; }
+        .badge-call { background: #e6fffa; color: #285e61; }
+        .badge-meeting { background: #ebf8ff; color: #2b6cb0; }
+        .badge-email { background: #fefcbf; color: #975a16; }
+        .badge-note { background: #faf5ff; color: #6b46c1; }
+        .create-form { background: #fff; padding: 1.2rem; border-radius: 8px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-top: 1.5rem; }
+        .create-form h3 { font-size: 1rem; margin-bottom: .8rem; color: #1a365d; }
+        .form-row { display: flex; gap: .8rem; margin-bottom: .8rem; flex-wrap: wrap; }
+        .form-row label { display: block; font-size: .82rem; color: #4a5568; margin-bottom: .3rem; }
+        .form-row input, .form-row select, .form-row textarea { padding: .45rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem; width: 100%; }
+        .form-row textarea { min-height: 60px; resize: vertical; }
+        .form-group { flex: 1; min-width: 150px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <h2>Activities</h2>
+        <form class="toolbar" method="GET" action="{{ url_for('crm.activities_page') }}">
+            <select name="type">
+                <option value="">All Types</option>
+                <option value="call" {% if type_filter == 'call' %}selected{% endif %}>Call</option>
+                <option value="meeting" {% if type_filter == 'meeting' %}selected{% endif %}>Meeting</option>
+                <option value="email" {% if type_filter == 'email' %}selected{% endif %}>Email</option>
+                <option value="note" {% if type_filter == 'note' %}selected{% endif %}>Note</option>
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+        <div class="result-count">{{ activities|length }} activit{{ 'ies' if activities|length != 1 else 'y' }}</div>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Type</th><th>Contact</th><th>Deal</th><th>User</th><th>Description</th><th>Duration</th></tr>
+            </thead>
+            <tbody>
+            {% for a in activities %}
+                <tr>
+                    <td>{{ a.date }}</td>
+                    <td><span class="badge badge-{{ a.type }}">{{ a.type }}</span></td>
+                    <td>{{ a._contact_name }}</td>
+                    <td>{{ a._deal_name }}</td>
+                    <td>{{ a._user_name }}</td>
+                    <td>{{ a.description }}</td>
+                    <td>{{ a.duration_minutes }} min</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if user %}
+        <div class="create-form">
+            <h3>Log New Activity</h3>
+            <form method="POST" action="{{ url_for('crm.form_create_activity') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="type">Type</label>
+                        <select name="type" id="type">
+                            <option value="call">Call</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="email">Email</option>
+                            <option value="note">Note</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_id">Contact ID</label>
+                        <input type="number" name="contact_id" id="contact_id" placeholder="Contact ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="deal_id">Deal ID</label>
+                        <input type="number" name="deal_id" id="deal_id" placeholder="Deal ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input type="date" name="date" id="date">
+                    </div>
+                    <div class="form-group">
+                        <label for="duration_minutes">Duration (min)</label>
+                        <input type="number" name="duration_minutes" id="duration_minutes" placeholder="Minutes">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 3;">
+                        <label for="description">Description</label>
+                        <textarea name="description" id="description" placeholder="Activity description..."></textarea>
+                    </div>
+                </div>
+                <button type="submit" style="padding: .5rem 1.5rem; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; font-size: .9rem; cursor: pointer;">Log Activity</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

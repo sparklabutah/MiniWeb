@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category|replace('_', ' ')|title }} - AppVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --gp-green: #01875f;
+            --gp-blue: #1a73e8;
+            --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa;
+            --gp-surface: #fff;
+            --gp-text: #202124;
+            --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0;
+            --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            --gp-shadow-hover: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+
+        .topbar { background: var(--gp-surface); border-bottom: 1px solid var(--gp-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .6rem 1.5rem; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
+        .logo-icon { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
+        .nav-links { display: flex; gap: .25rem; align-items: center; margin-left: auto; }
+        .nav-links a { padding: .45rem .85rem; border-radius: 20px; text-decoration: none; font-size: .85rem; font-weight: 500; color: var(--gp-text-secondary); transition: background .15s; white-space: nowrap; }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+
+        .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+        .breadcrumb { font-size: .85rem; color: var(--gp-text-secondary); margin-bottom: 1rem; }
+        .breadcrumb a { color: var(--gp-blue); text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .75rem; }
+        .page-title { font-size: 1.4rem; font-weight: 500; }
+        .page-count { font-size: .85rem; color: var(--gp-text-secondary); }
+        .sort-bar select { padding: .45rem .65rem; border: 1px solid var(--gp-border); border-radius: 8px; font-size: .85rem; outline: none; background: var(--gp-surface); }
+
+        .genre-chips { display: flex; gap: .4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: none; }
+        .genre-chips::-webkit-scrollbar { display: none; }
+        .genre-chip {
+            padding: .35rem .85rem; border-radius: 20px; border: 1px solid var(--gp-border);
+            text-decoration: none; font-size: .8rem; font-weight: 500; white-space: nowrap;
+            color: var(--gp-text-secondary); background: var(--gp-surface); transition: all .15s;
+        }
+        .genre-chip:hover { border-color: var(--gp-blue); color: var(--gp-blue); background: var(--gp-blue-light); }
+        .genre-chip.active { border-color: var(--gp-blue); color: var(--gp-blue); background: var(--gp-blue-light); }
+
+        .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+        .app-card { text-decoration: none; color: inherit; transition: transform .15s; }
+        .app-card:hover { transform: translateY(-2px); }
+        .app-icon {
+            width: 100%; aspect-ratio: 1; border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; font-weight: 700; color: #fff;
+            margin-bottom: .6rem; box-shadow: 0 1px 4px rgba(0,0,0,.12);
+        }
+        .app-card h3 { font-size: .88rem; font-weight: 500; line-height: 1.3; margin-bottom: .15rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .app-card .app-meta { color: var(--gp-text-secondary); font-size: .78rem; margin-bottom: .25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .app-card .app-rating { display: flex; align-items: center; gap: .3rem; font-size: .78rem; color: var(--gp-text-secondary); }
+        .app-card .app-rating .star { color: var(--gp-star); }
+        .app-card .app-price { font-weight: 500; font-size: .82rem; margin-top: .15rem; }
+        .app-price.free { color: var(--gp-green); }
+
+        .pagination { display: flex; gap: .35rem; justify-content: center; align-items: center; margin-top: 1.5rem; flex-wrap: wrap; }
+        .pagination a, .pagination span { display: inline-block; padding: .45rem .85rem; border: 1px solid var(--gp-border); border-radius: 20px; text-decoration: none; color: var(--gp-text); font-size: .85rem; }
+        .pagination .active { background: var(--gp-blue); color: #fff; border-color: var(--gp-blue); }
+        .pagination a:hover { border-color: var(--gp-blue); background: var(--gp-blue-light); }
+
+        .sidebar-cats { margin-top: 2rem; border-top: 1px solid var(--gp-border); padding-top: 1.5rem; }
+        .sidebar-cats h3 { font-size: 1.1rem; font-weight: 500; margin-bottom: .75rem; }
+        .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .5rem; }
+        .cat-grid a { padding: .4rem .75rem; color: var(--gp-text-secondary); text-decoration: none; font-size: .85rem; border-radius: 8px; transition: background .15s; }
+        .cat-grid a:hover { background: var(--gp-blue-light); color: var(--gp-blue); }
+        .cat-grid a.active { font-weight: 600; color: var(--gp-blue); background: var(--gp-blue-light); }
+
+        .empty { text-align: center; padding: 3rem; color: var(--gp-text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-inner">
+            <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+                <div class="logo-icon">A</div>
+                AppVault
+            </a>
+            <div class="nav-links">
+                <a href="{{ url_for('software-marketplace.index') }}">Home</a>
+                <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+                {% if user %}
+                    <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                    <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+                {% else %}
+                    <a href="{{ url_for('software-marketplace.login_page') }}">Login</a>
+                {% endif %}
+                <a href="/">MiniWeb</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('software-marketplace.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Apps</a> &rsaquo;
+            {{ category|replace('_', ' ')|title }}
+        </div>
+
+        <div class="page-header">
+            <div>
+                <h2 class="page-title">{{ category|replace('_', ' ')|title }}</h2>
+                <span class="page-count">{{ "{:,}".format(total_results) }} app{{ 's' if total_results != 1 }}</span>
+            </div>
+            <div class="sort-bar">
+                <form method="get">
+                    {% if genre %}<input type="hidden" name="genre" value="{{ genre }}">{% endif %}
+                    <select name="sort" onchange="this.form.submit()">
+                        <option value="reviews" {% if sort == 'reviews' %}selected{% endif %}>Most Popular</option>
+                        <option value="rating" {% if sort == 'rating' %}selected{% endif %}>Rating</option>
+                        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+                        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        {% if genres %}
+        <div class="genre-chips">
+            <a class="genre-chip {% if not genre %}active{% endif %}" href="{{ url_for('software-marketplace.category_page', cat=category, sort=sort) }}">All</a>
+            {% for g_name, g_count in genres %}
+            <a class="genre-chip {% if genre == g_name %}active{% endif %}" href="{{ url_for('software-marketplace.category_page', cat=category, genre=g_name, sort=sort) }}">
+                {{ g_name }} ({{ g_count }})
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if apps %}
+        <div class="app-grid">
+            {% set card_colors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7b1fa2', '#c2185b', '#00897b', '#5c6bc0', '#f4511e', '#8d6e63', '#0097a7', '#689f38', '#e64a19', '#512da8', '#303f9f', '#c62828', '#00838f', '#4e342e', '#1565c0', '#2e7d32', '#f57f17', '#ad1457'] %}
+            {% for app in apps %}
+            <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                <div class="app-icon" style="background: linear-gradient(135deg, {{ card_colors[loop.index0 % 24] }}, {{ card_colors[(loop.index0 + 7) % 24] }});">
+                    {{ app.name[0] }}
+                </div>
+                <h3>{{ app.name }}</h3>
+                <div class="app-meta">{{ app.developer }}</div>
+                <div class="app-rating">
+                    <span class="star">&#9733;</span> {{ app.rating }}
+                    &middot; {{ app.installs }}
+                </div>
+                <div class="app-price {% if app.price == 0 %}free{% else %}paid{% endif %}">
+                    {% if app.price == 0 %}Free{% else %}${{ "%.2f"|format(app.price) }}{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('software-marketplace.category_page', cat=category, genre=genre, sort=sort, page=page-1) }}">&#8592; Prev</a>
+            {% endif %}
+            {% set start_page = [1, page - 3]|max %}
+            {% set end_page = [total_pages, page + 3]|min %}
+            {% if start_page > 1 %}
+            <a href="{{ url_for('software-marketplace.category_page', cat=category, genre=genre, sort=sort, page=1) }}">1</a>
+            {% if start_page > 2 %}<span style="border: none;">...</span>{% endif %}
+            {% endif %}
+            {% for p in range(start_page, end_page + 1) %}
+                {% if p == page %}
+                <span class="active">{{ p }}</span>
+                {% else %}
+                <a href="{{ url_for('software-marketplace.category_page', cat=category, genre=genre, sort=sort, page=p) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if end_page < total_pages %}
+            {% if end_page < total_pages - 1 %}<span style="border: none;">...</span>{% endif %}
+            <a href="{{ url_for('software-marketplace.category_page', cat=category, genre=genre, sort=sort, page=total_pages) }}">{{ total_pages }}</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('software-marketplace.category_page', cat=category, genre=genre, sort=sort, page=page+1) }}">Next &#8594;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty">No apps found in this category{% if genre %} with genre "{{ genre }}"{% endif %}.</div>
+        {% endif %}
+
+        <div class="sidebar-cats">
+            <h3>All Categories</h3>
+            <div class="cat-grid">
+                {% for cat_name, cat_count in categories %}
+                {% if cat_name and cat_name != '1.9' %}
+                <a href="{{ url_for('software-marketplace.category_page', cat=cat_name) }}" class="{% if cat_name == category %}active{% endif %}">
+                    {{ cat_name|replace('_', ' ')|title }} ({{ cat_count }})
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ policy.policy_number }} - Cascadia Insurance &amp; Lending</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1a3c5e, #2b5f8a); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8fe; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a3c5e; text-decoration: none; font-size: .88rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef4fb; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #1a3c5e; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #2563eb; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .policy-header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .policy-header h2 { color: #1a3c5e; font-size: 1.3rem; }
+        .policy-header .meta { font-size: .88rem; color: #64748b; margin-top: .3rem; }
+        .badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .78rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .card h3 { color: #334155; font-size: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .5rem; }
+        .detail-row { display: flex; justify-content: space-between; padding: .4rem 0; font-size: .88rem; border-bottom: 1px solid #f8fafc; }
+        .detail-row .label { color: #64748b; font-weight: 500; }
+        .detail-row .value { color: #1e293b; font-weight: 500; text-align: right; max-width: 60%; }
+        .section { margin-bottom: 2rem; }
+        .section h3 { color: #334155; font-size: 1.05rem; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+        th, td { padding: .6rem .8rem; text-align: left; font-size: .85rem; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; font-size: .78rem; text-transform: uppercase; }
+        td { border-top: 1px solid #f1f5f9; color: #334155; }
+        a.table-link { color: #2563eb; text-decoration: none; }
+        a.table-link:hover { text-decoration: underline; }
+        .notes-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: .4rem; padding: 1rem; font-size: .88rem; color: #78350f; line-height: 1.5; }
+        .action-btn { display: inline-block; padding: .5rem 1.2rem; background: #1a3c5e; color: #fff; text-decoration: none; border-radius: .3rem; font-size: .88rem; font-weight: 500; }
+        .action-btn:hover { background: #2b5f8a; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+        .badge-open { background: #fef3c7; color: #92400e; }
+        .badge-in_review { background: #dbeafe; color: #1e40af; }
+        .badge-closed { background: #f1f5f9; color: #475569; }
+        .badge-completed { background: #dcfce7; color: #166534; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('insurance-loans.index') }}">Cascadia <span>Insurance &amp; Lending</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('insurance-loans.index') }}">Dashboard</a>
+        <a href="{{ url_for('insurance-loans.policies_page') }}" class="active">Policies</a>
+        <a href="{{ url_for('insurance-loans.claims_page') }}">Claims</a>
+        <a href="{{ url_for('insurance-loans.file_claim_page') }}">File Claim</a>
+        <a href="{{ url_for('insurance-loans.loans_page') }}">Loans</a>
+        <a href="{{ url_for('insurance-loans.payments_page') }}">Payments</a>
+        {% if logged_in %}
+        <a href="{{ url_for('insurance-loans.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('insurance-loans.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('insurance-loans.policies_page') }}">Policies</a> / {{ policy.policy_number }}
+        </div>
+
+        <div class="policy-header">
+            <div>
+                <h2>{{ policy.policy_number }}</h2>
+                <div class="meta">{{ policy.type|replace('_', ' ')|title }} -- {{ policy.subtype|replace('_', ' ')|title }}</div>
+            </div>
+            <span class="badge badge-{{ policy.status }}">{{ policy.status|replace('_', ' ')|title }}</span>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Policy Information</h3>
+                <div class="detail-row"><span class="label">Policyholder</span><span class="value">{{ policy.policyholder_name }}</span></div>
+                <div class="detail-row"><span class="label">Type</span><span class="value">{{ policy.type|replace('_', ' ')|title }}</span></div>
+                <div class="detail-row"><span class="label">Subtype</span><span class="value">{{ policy.subtype|replace('_', ' ')|title }}</span></div>
+                <div class="detail-row"><span class="label">Underwriter</span><span class="value">{{ policy.underwriter }}</span></div>
+                <div class="detail-row"><span class="label">Agent</span><span class="value">{{ policy.agent }}</span></div>
+                <div class="detail-row"><span class="label">Agent Phone</span><span class="value">{{ policy.agent_phone }}</span></div>
+            </div>
+
+            <div class="card">
+                <h3>Premium &amp; Dates</h3>
+                <div class="detail-row"><span class="label">Monthly Premium</span><span class="value">${{ "%.2f"|format(policy.premium_monthly) }}</span></div>
+                <div class="detail-row"><span class="label">Annual Premium</span><span class="value">${{ "%.2f"|format(policy.premium_annual) }}</span></div>
+                <div class="detail-row"><span class="label">Deductible</span><span class="value">{% if policy.deductible is not none %}${{ "%.0f"|format(policy.deductible) }}{% else %}N/A{% endif %}</span></div>
+                <div class="detail-row"><span class="label">Effective Date</span><span class="value">{{ policy.effective_date }}</span></div>
+                <div class="detail-row"><span class="label">Renewal Date</span><span class="value">{{ policy.renewal_date or 'N/A' }}</span></div>
+                <div class="detail-row"><span class="label">Expiration Date</span><span class="value">{{ policy.expiration_date }}</span></div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>Coverage Details</h3>
+            {% if policy.coverage %}
+            {% for key, val in policy.coverage.items() %}
+            <div class="detail-row">
+                <span class="label">{{ key|replace('_', ' ')|title }}</span>
+                <span class="value">
+                    {% if val is mapping %}
+                        {% for k2, v2 in val.items() %}{{ k2 }}: {{ v2 }}{% if not loop.last %}, {% endif %}{% endfor %}
+                    {% elif val is iterable and val is not string %}
+                        {% for item in val %}
+                            {% if item is mapping %}
+                                {% for k2, v2 in item.items() %}{{ k2 }}: {{ v2 }}{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}; {% endif %}
+                            {% else %}
+                                {{ item }}{% if not loop.last %}, {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% elif val is number %}
+                        {% if val >= 1000 %}${{ "{:,.0f}".format(val) }}{% else %}{{ val }}{% endif %}
+                    {% elif val == true %}
+                        Yes
+                    {% elif val == false %}
+                        No
+                    {% else %}
+                        {{ val }}
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if policy.vehicle %}
+            <div class="detail-row"><span class="label">Vehicle</span><span class="value">{{ policy.vehicle.year }} {{ policy.vehicle.make }} {{ policy.vehicle.model }} {{ policy.vehicle.trim }}</span></div>
+            <div class="detail-row"><span class="label">VIN (last 6)</span><span class="value">{{ policy.vehicle.vin_last_six }}</span></div>
+            {% endif %}
+
+            {% if policy.property_address %}
+            <div class="detail-row"><span class="label">Property Address</span><span class="value">{{ policy.property_address }}</span></div>
+            {% endif %}
+
+            {% if policy.landlord_name %}
+            <div class="detail-row"><span class="label">Landlord</span><span class="value">{{ policy.landlord_name }}</span></div>
+            {% endif %}
+        </div>
+
+        {% if policy.notes %}
+        <div class="notes-box" style="margin-bottom: 1.5rem;">
+            <strong>Notes:</strong> {{ policy.notes }}
+        </div>
+        {% endif %}
+
+        {% if claims %}
+        <div class="section">
+            <h3>Claims on This Policy</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Claim #</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Date Filed</th>
+                        <th>Payout</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in claims %}
+                    <tr>
+                        <td><a href="{{ url_for('insurance-loans.claim_detail', claim_id=c.id) }}" class="table-link">{{ c.claim_number }}</a></td>
+                        <td>{{ c.type|replace('_', ' ')|title }}</td>
+                        <td><span class="badge badge-{{ c.status }}">{{ c.status|replace('_', ' ')|title }}</span></td>
+                        <td>{{ c.date_filed }}</td>
+                        <td>{% if c.payout_amount is not none %}${{ "%.2f"|format(c.payout_amount) }}{% else %}--{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if payments %}
+        <div class="section">
+            <h3>Payment History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th>Confirmation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pay in payments %}
+                    <tr>
+                        <td>{{ pay.payment_date }}</td>
+                        <td>${{ "%.2f"|format(pay.amount) }}</td>
+                        <td>{{ pay.method|replace('_', ' ')|title }}</td>
+                        <td><span class="badge badge-{{ pay.status }}">{{ pay.status|title }}</span></td>
+                        <td style="font-size:.8rem; color:#94a3b8;">{{ pay.confirmation_number }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <a href="{{ url_for('insurance-loans.file_claim_page') }}" class="action-btn">File a Claim on This Policy</a>
+        <a href="{{ url_for('insurance-loans.policy_document', policy_id=policy.id) }}" class="action-btn" style="background:#2d6a4f;" target="_blank">View Policy Document</a>
+    </div>
+
+    <div class="footer">Cascadia Insurance &amp; Lending</div>
+</body>
+</html>

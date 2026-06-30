@@ -4,15 +4,18 @@ Data interpreter: reads synthesized cloud infrastructure JSON files,
 serves through Flask routes. Mutable state (users.json, alerts.json)
 is modified via API calls.
 """
+import hashlib
 import json
+import math
 import pathlib
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from app import db
 
+SITE = "cloud-dev-consoles"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "cloud-dev-consoles",
@@ -23,101 +26,38 @@ blueprint = Blueprint(
 )
 
 # ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-def _load_json(filename):
-    fp = DATA_DIR / filename
-    if fp.exists():
-        return json.loads(fp.read_text())
-    return []
-
-
-def _save_json(filename, data):
-    fp = DATA_DIR / filename
-    fp.write_text(json.dumps(data, indent=2))
-
-
-# ---------------------------------------------------------------------------
-# Cached data
-# ---------------------------------------------------------------------------
-
-_services = None
-_instances = None
-_functions = None
-_databases = None
-_buckets = None
-_iam_users = None
-_billing = None
-_metrics = None
-_logs = None
-_api_endpoints = None
-
-
-def _ensure_loaded():
-    global _services, _instances, _functions, _databases, _buckets
-    global _iam_users, _billing, _metrics, _logs, _api_endpoints
-    if _services is None:
-        _services = _load_json("services.json")
-        _instances = _load_json("instances.json")
-        _functions = _load_json("functions.json")
-        _databases = _load_json("databases.json")
-        _buckets = _load_json("storage_buckets.json")
-        _iam_users = _load_json("iam_users.json")
-        _billing = _load_json("billing.json")
-        _metrics = _load_json("metrics.json")
-        _logs = _load_json("logs.json")
-        _api_endpoints = _load_json("api_endpoints.json")
-
-
 def _get_services():
-    _ensure_loaded()
-    return _services
+    return db.query(SITE, "services")
 
 def _get_instances():
-    _ensure_loaded()
-    return _instances
+    return db.query(SITE, "instances")
 
 def _get_functions():
-    _ensure_loaded()
-    return _functions
+    return db.query(SITE, "functions")
 
 def _get_databases():
-    _ensure_loaded()
-    return _databases
+    return db.query(SITE, "databases")
 
 def _get_buckets():
-    _ensure_loaded()
-    return _buckets
+    return db.query(SITE, "storage_buckets")
 
 def _get_iam_users():
-    _ensure_loaded()
-    return _iam_users
+    return db.query(SITE, "iam_users")
 
 def _get_billing():
-    _ensure_loaded()
-    return _billing
+    return db.query(SITE, "billing")
 
 def _get_metrics():
-    _ensure_loaded()
-    return _metrics
+    return db.query(SITE, "metrics")
 
 def _get_logs():
-    _ensure_loaded()
-    return _logs
+    return db.query(SITE, "logs")
 
 def _get_api_endpoints():
-    _ensure_loaded()
-    return _api_endpoints
+    return db.query(SITE, "api_endpoints")
 
 
 # ---------------------------------------------------------------------------
@@ -125,28 +65,190 @@ def _get_api_endpoints():
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    return _load_json("users.json")
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    _save_json("users.json", users)
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
 # Alerts (mutable state)
 # ---------------------------------------------------------------------------
 
-def _load_alerts():
-    return _load_json("alerts.json")
+def _load_alerts(status=None):
+    where = {"status": status} if status else None
+    return db.query(SITE, "alerts", where=where)
 
 
 def _save_alerts(alerts):
-    _save_json("alerts.json", alerts)
+    db.save_collection(SITE, "alerts", alerts)
+
+
+# ---------------------------------------------------------------------------
+# Temporal simulation helpers
+# ---------------------------------------------------------------------------
+
+def _deterministic_float(seed_str, min_val=0.0, max_val=1.0):
+    """Return a deterministic pseudo-random float in [min_val, max_val] from a string seed."""
+    h = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    normalized = (h % 10000) / 10000.0
+    return min_val + normalized * (max_val - min_val)
+
+
+def _simulated_metrics_for_instance(instance_id, now=None):
+    """Generate time-varying metrics for an instance based on the current time.
+
+    The same minute always produces the same values (deterministic).
+    Returns a dict with cpu_percent, memory_percent, network_in_mbps,
+    network_out_mbps, disk_read_iops, disk_write_iops, request_count.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    # Quantize to the current minute for reproducibility
+    minute_key = now.strftime("%Y%m%d%H%M")
+    seed = f"{instance_id}:{minute_key}"
+
+    # Use instance_id hash as a per-instance phase offset
+    phase_offset = _deterministic_float(f"phase:{instance_id}", 0, 2 * math.pi)
+
+    # Hours as a float for daily pattern (0.0 - 24.0)
+    hour_frac = now.hour + now.minute / 60.0
+
+    # --- CPU: sine wave following daily load pattern + noise ---
+    # Daily pattern: low at night (0-5), ramp up to peak at ~13, back down
+    daily_factor = 0.5 + 0.5 * math.sin((hour_frac - 7) * math.pi / 12)
+    daily_factor = max(0.0, min(1.0, daily_factor))
+    noise = _deterministic_float(f"cpu:{seed}", -0.12, 0.12)
+    cpu_base = 15 + daily_factor * 55 + phase_offset * 3  # 15-85 range
+    cpu = max(5.0, min(95.0, cpu_base + noise * 100))
+    cpu = round(cpu, 1)
+
+    # --- Memory: gradual climb with periodic drops (GC simulation) ---
+    # Slow sawtooth: climbs over ~20 minutes, drops periodically
+    cycle_pos = (now.minute % 20) / 20.0  # 0..1 within a 20-minute cycle
+    gc_seed = _deterministic_float(f"gc:{instance_id}:{now.minute // 20}", 0, 1)
+    if gc_seed > 0.7:
+        # GC event: memory drops at the start of a new cycle
+        mem_base = 35 + daily_factor * 20
+    else:
+        mem_base = 35 + daily_factor * 20 + cycle_pos * 18
+    mem_noise = _deterministic_float(f"mem:{seed}", -3, 3)
+    memory = max(20.0, min(92.0, mem_base + mem_noise))
+    memory = round(memory, 1)
+
+    # --- Network I/O: random bursts tied to request load ---
+    net_base_in = 5 + daily_factor * 60
+    net_burst = _deterministic_float(f"net:{seed}", 0.6, 1.5)
+    network_in = round(max(1.0, net_base_in * net_burst), 1)
+    network_out = round(max(1.0, network_in * _deterministic_float(f"netout:{seed}", 1.2, 2.0)), 1)
+
+    # --- Request rate: daily pattern (low at night, peak midday) ---
+    req_base = 100 + daily_factor * 9000
+    req_noise = _deterministic_float(f"req:{seed}", 0.7, 1.3)
+    request_count = max(10, int(req_base * req_noise))
+
+    # --- Disk I/O ---
+    disk_read = max(20, int(150 + daily_factor * 600 + _deterministic_float(f"dr:{seed}", -80, 80)))
+    disk_write = max(10, int(80 + daily_factor * 400 + _deterministic_float(f"dw:{seed}", -60, 60)))
+
+    return {
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "instance_id": instance_id,
+        "cpu_percent": cpu,
+        "memory_percent": memory,
+        "network_in_mbps": network_in,
+        "network_out_mbps": network_out,
+        "disk_read_iops": disk_read,
+        "disk_write_iops": disk_write,
+        "request_count": request_count,
+    }
+
+
+def _generate_live_metrics(instances, now=None):
+    """Generate current simulated metrics for all running instances."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    results = []
+    for inst in instances:
+        if inst.get("status") == "running":
+            results.append(_simulated_metrics_for_instance(inst["id"], now))
+    return results
+
+
+def _generate_recent_metrics(instance_id, count=12, now=None):
+    """Generate a time series of recent metrics for an instance (one per 5 min)."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    series = []
+    for i in range(count - 1, -1, -1):
+        t = now - timedelta(minutes=i * 5)
+        series.append(_simulated_metrics_for_instance(instance_id, t))
+    return series
+
+
+def _simulated_service_health(service, now=None):
+    """Deterministically assign a health status to a service based on time.
+
+    Most services are 'healthy' most of the time. Occasionally one will
+    show 'degraded' or 'warning'. Returns one of: healthy, degraded, warning.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    minute_key = now.strftime("%Y%m%d%H%M")
+    seed = f"health:{service['id']}:{minute_key}"
+    roll = _deterministic_float(seed, 0, 1)
+    # ~85% healthy, ~10% degraded, ~5% warning
+    if roll < 0.85:
+        return "healthy"
+    elif roll < 0.95:
+        return "degraded"
+    else:
+        return "warning"
+
+
+def _relativize_log_timestamps(logs, now=None):
+    """Return copies of log entries with timestamps adjusted relative to now.
+
+    Offsets are preserved from the original data: the newest log becomes
+    'just now', and older ones are spaced proportionally.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if not logs:
+        return []
+
+    result = []
+    sorted_logs = sorted(logs, key=lambda l: l["timestamp"], reverse=True)
+    for idx, log in enumerate(sorted_logs):
+        entry = dict(log)
+        # Space logs out: newest=0min, each subsequent +2-3 min
+        offset_minutes = idx * 2 + int(_deterministic_float(
+            f"logoff:{log['id']}", 0, 2))
+        log_time = now - timedelta(minutes=offset_minutes)
+        entry["timestamp"] = log_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        entry["relative_time"] = _format_relative_time(offset_minutes)
+        result.append(entry)
+    return result
+
+
+def _format_relative_time(minutes):
+    """Format a minute offset as a human-readable relative time string."""
+    if minutes < 1:
+        return "just now"
+    elif minutes < 60:
+        return f"{minutes} min ago"
+    elif minutes < 1440:
+        hours = minutes // 60
+        return f"{hours}h ago"
+    else:
+        days = minutes // 1440
+        return f"{days}d ago"
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +336,10 @@ def index():
     instances = _get_instances()
     alerts = _load_alerts()
     billing = _get_billing()
+    logs = _get_logs()
     categories = _get_service_categories()
+
+    now = datetime.now(timezone.utc)
 
     # Summary stats
     running_instances = sum(1 for i in instances if i["status"] == "running")
@@ -243,29 +348,63 @@ def index():
     critical_alerts = sum(1 for a in alerts if a["status"] == "active" and a["severity"] == "critical")
 
     # Current month billing
-    current_month = "2026-06"
+    current_month = now.strftime("%Y-%m")
     month_billing = [b for b in billing if b["month"] == current_month]
+    if not month_billing:
+        month_billing = [b for b in billing if b["month"] == "2026-06"]
     total_cost = sum(b["cost"] for b in month_billing)
     total_budget = sum(b["budget"] for b in month_billing)
+
+    # Simulated real-time metrics for running instances
+    live_metrics = _generate_live_metrics(instances, now)
+
+    # Aggregate live metrics for dashboard summary
+    if live_metrics:
+        avg_cpu = round(sum(m["cpu_percent"] for m in live_metrics) / len(live_metrics), 1)
+        avg_memory = round(sum(m["memory_percent"] for m in live_metrics) / len(live_metrics), 1)
+        total_requests = sum(m["request_count"] for m in live_metrics)
+    else:
+        avg_cpu = 0.0
+        avg_memory = 0.0
+        total_requests = 0
+
+    # Service health status
+    services_with_health = []
+    for svc in services:
+        svc_copy = dict(svc)
+        svc_copy["health"] = _simulated_service_health(svc, now)
+        services_with_health.append(svc_copy)
+
+    health_counts = Counter(s["health"] for s in services_with_health)
+
+    # Recent logs with relative timestamps
+    recent_logs = _relativize_log_timestamps(logs[:10], now)
 
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
 
     return render_template("cloud-dev-consoles/index.html",
-                           services=services, categories=categories,
+                           services=services_with_health, categories=categories,
                            running_instances=running_instances,
                            total_instances=total_instances,
                            active_alerts=active_alerts,
                            critical_alerts=critical_alerts,
                            total_cost=total_cost, total_budget=total_budget,
-                           alerts=alerts, user=user)
+                           alerts=alerts, user=user,
+                           live_metrics=live_metrics,
+                           avg_cpu=avg_cpu, avg_memory=avg_memory,
+                           total_requests=total_requests,
+                           health_counts=health_counts,
+                           recent_logs=recent_logs,
+                           now=now)
 
 
 @blueprint.route("/services")
 def services_page():
     services = _get_services()
     categories = _get_service_categories()
+    now = datetime.now(timezone.utc)
 
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
@@ -273,7 +412,13 @@ def services_page():
     region = request.args.get("region", "").strip()
     sort = request.args.get("sort", "name").strip()
 
-    results = list(services)
+    # Attach health status
+    results = []
+    for svc in services:
+        svc_copy = dict(svc)
+        svc_copy["health"] = _simulated_service_health(svc, now)
+        results.append(svc_copy)
+
     if q:
         results = _search_resources(results, q, ["name", "description", "category", "tags"])
     if cat:
@@ -309,10 +454,17 @@ def service_detail(service_id):
     if service is None:
         abort(404)
 
+    now = datetime.now(timezone.utc)
+
+    # Add health status to service
+    service = dict(service)
+    service["health"] = _simulated_service_health(service, now)
+
     instances = [i for i in _get_instances() if i.get("service_id") == service_id]
     related_logs = [l for l in _get_logs()
                     if l.get("source") == service_id or
                     any(i["id"] == l.get("source") for i in instances)][:10]
+    related_logs = _relativize_log_timestamps(related_logs, now)
 
     user = None
     if "user_id" in session:
@@ -368,15 +520,25 @@ def instance_detail(instance_id):
     if instance is None:
         abort(404)
 
-    metrics = [m for m in _get_metrics() if m["instance_id"] == instance_id]
-    metrics.sort(key=lambda m: m["timestamp"])
+    now = datetime.now(timezone.utc)
+
+    # Use simulated recent metrics (last hour, every 5 min) for running instances
+    if instance.get("status") == "running":
+        metrics = _generate_recent_metrics(instance_id, count=12, now=now)
+    else:
+        metrics = [m for m in _get_metrics() if m["instance_id"] == instance_id]
+        metrics.sort(key=lambda m: m["timestamp"])
+
+    # Current live metric snapshot
+    live = _simulated_metrics_for_instance(instance_id, now)
 
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
 
     return render_template("cloud-dev-consoles/instance_detail.html",
-                           instance=instance, metrics=metrics, user=user)
+                           instance=instance, metrics=metrics,
+                           live=live, user=user)
 
 
 @blueprint.route("/databases")
@@ -550,6 +712,7 @@ def billing_page():
 @blueprint.route("/logs")
 def logs_page():
     logs = _get_logs()
+    now = datetime.now(timezone.utc)
     q = request.args.get("q", "").strip()
     level = request.args.get("level", "").strip()
     category = request.args.get("category", "").strip()
@@ -557,7 +720,9 @@ def logs_page():
     date_to = request.args.get("date_to", "").strip()
     sort = request.args.get("sort", "time").strip()
 
-    results = list(logs)
+    # Relativize timestamps so logs look fresh
+    results = _relativize_log_timestamps(logs, now)
+
     if q:
         results = _search_resources(results, q, ["message", "service", "source", "trace_id"])
     if level:
@@ -627,7 +792,13 @@ def metrics_page():
     instance_id = request.args.get("instance_id", "").strip()
     threshold = request.args.get("cpu_threshold", type=float)
 
-    metrics = _get_metrics()
+    now = datetime.now(timezone.utc)
+
+    # Include simulated live metrics alongside historical data
+    metrics = list(_get_metrics())
+    live_metrics = _generate_live_metrics(instances, now)
+    metrics.extend(live_metrics)
+
     if instance_id:
         metrics = [m for m in metrics if m["instance_id"] == instance_id]
 
@@ -1048,11 +1219,17 @@ def api_billing_summary():
 @blueprint.route("/api/metrics")
 def api_metrics():
     metrics = _get_metrics()
+    now = datetime.now(timezone.utc)
+    instances = _get_instances()
+
+    # Append current live metrics
+    results = list(metrics)
+    results.extend(_generate_live_metrics(instances, now))
+
     instance_id = request.args.get("instance_id", "").strip()
     time_from = request.args.get("time_from", "").strip()
     time_to = request.args.get("time_to", "").strip()
 
-    results = list(metrics)
     if instance_id:
         results = [m for m in results if m["instance_id"] == instance_id]
     if time_from:

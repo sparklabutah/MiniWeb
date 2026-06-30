@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniWeb — Site Review</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; }
+
+.topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1.5rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); flex-shrink: 0; }
+.topbar h1 { font-size: 1.1rem; color: #0f172a; white-space: nowrap; }
+.topbar .nav-controls { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+.topbar input[type=text] { padding: .3rem .6rem; border: 1px solid #e2e8f0; border-radius: .3rem; font-size: .85rem; width: 140px; }
+.topbar a { color: #2563eb; text-decoration: none; font-size: .85rem; font-weight: 500; }
+.topbar a:hover { text-decoration: underline; }
+.counter { font-size: .85rem; color: #64748b; font-weight: 500; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* Left: site list */
+.sidebar { width: 240px; border-right: 1px solid #e2e8f0; background: #fff; overflow-y: auto; flex-shrink: 0; }
+.site-item { padding: .6rem .8rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; font-size: .82rem; transition: background .15s; }
+.site-item:hover { background: #f1f5f9; }
+.site-item.active { background: #eff6ff; border-left: 3px solid #2563eb; }
+.site-item .name { color: #0f172a; font-weight: 500; }
+.site-item .badge { font-size: .7rem; padding: .1rem .4rem; border-radius: .25rem; }
+.badge.reviewed { background: #dcfce7; color: #166534; }
+.badge.pending { background: #fef3c7; color: #92400e; }
+
+/* Right: iframe + feedback */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.iframe-wrap { flex: 1; position: relative; }
+.iframe-wrap iframe { width: 100%; height: 100%; border: none; }
+.feedback-panel { border-top: 2px solid #2563eb; background: #fff; padding: 1rem 1.5rem; flex-shrink: 0; }
+.feedback-panel h3 { font-size: .9rem; color: #0f172a; margin-bottom: .5rem; }
+.feedback-panel textarea { width: 100%; height: 80px; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .5rem; font-size: .85rem; resize: vertical; font-family: inherit; }
+.feedback-panel .actions { display: flex; gap: .8rem; align-items: center; margin-top: .6rem; }
+.btn { padding: .4rem 1rem; border-radius: .4rem; font-size: .85rem; cursor: pointer; border: none; font-weight: 500; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-nav { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: .3rem .6rem; font-size: .85rem; }
+.btn-nav:hover { background: #e2e8f0; }
+.status-msg { font-size: .8rem; color: #16a34a; font-weight: 500; }
+
+/* Previous reviews */
+.prev-reviews { margin-top: .6rem; max-height: 100px; overflow-y: auto; }
+.prev-review { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .3rem; padding: .4rem .6rem; margin-bottom: .3rem; font-size: .78rem; }
+.prev-review .meta { color: #94a3b8; font-size: .72rem; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <h1>Site Review</h1>
+    <span class="counter" id="counter">0 / {{ sites|length }}</span>
+    <div class="nav-controls">
+        <button class="btn-nav" onclick="prevSite()">&larr; Prev</button>
+        <button class="btn-nav" onclick="nextSite()">Next &rarr;</button>
+        <input type="text" id="annotator" placeholder="Your name" value="">
+        <a href="{{ url_for('annotation.index') }}">Home</a>
+    </div>
+</div>
+
+<div class="main">
+    <div class="sidebar" id="siteList"></div>
+    <div class="content">
+        <div class="iframe-wrap">
+            <iframe id="siteFrame" src="about:blank"></iframe>
+        </div>
+        <div class="feedback-panel">
+            <h3 id="feedbackTitle">Select a site to review</h3>
+            <textarea id="feedback" placeholder="Type your feedback here... (bugs, data issues, missing features, UI problems, etc.)"></textarea>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="submitFeedback()">Submit & Next</button>
+                <button class="btn btn-secondary" onclick="nextSite()">Skip</button>
+                <span class="status-msg" id="statusMsg"></span>
+            </div>
+            <div class="prev-reviews" id="prevReviews"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const sites = {{ sites | tojson }};
+let currentIdx = 0;
+
+function renderSiteList() {
+    const list = document.getElementById('siteList');
+    list.innerHTML = sites.map((s, i) => `
+        <div class="site-item ${i === currentIdx ? 'active' : ''}" onclick="goToSite(${i})">
+            <span class="name">${s.name || s.id}</span>
+            <span class="badge ${s.review_count > 0 ? 'reviewed' : 'pending'}">${s.review_count > 0 ? s.review_count + ' reviews' : 'pending'}</span>
+        </div>
+    `).join('');
+}
+
+function goToSite(idx) {
+    currentIdx = idx;
+    const site = sites[currentIdx];
+    document.getElementById('siteFrame').src = site.url;
+    document.getElementById('feedbackTitle').textContent = `Feedback for: ${site.name || site.id}`;
+    document.getElementById('feedback').value = '';
+    document.getElementById('statusMsg').textContent = '';
+    document.getElementById('counter').textContent = `${currentIdx + 1} / ${sites.length}`;
+    renderSiteList();
+    loadPreviousReviews(site.id);
+    // Scroll active item into view
+    document.querySelector('.site-item.active')?.scrollIntoView({ block: 'nearest' });
+}
+
+function nextSite() {
+    if (currentIdx < sites.length - 1) {
+        goToSite(currentIdx + 1);
+    }
+}
+
+function prevSite() {
+    if (currentIdx > 0) {
+        goToSite(currentIdx - 1);
+    }
+}
+
+async function submitFeedback() {
+    const site = sites[currentIdx];
+    const feedback = document.getElementById('feedback').value.trim();
+    const annotator = document.getElementById('annotator').value.trim() || 'anonymous';
+    if (!feedback) {
+        document.getElementById('statusMsg').textContent = 'Please enter feedback first';
+        return;
+    }
+    try {
+        const resp = await fetch(`/annotate/api/review/${site.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedback, annotator }),
+        });
+        const data = await resp.json();
+        document.getElementById('statusMsg').textContent = `Saved (${data.count} total reviews)`;
+        site.review_count = data.count;
+        renderSiteList();
+        // Auto-advance after 500ms
+        setTimeout(() => nextSite(), 500);
+    } catch (e) {
+        document.getElementById('statusMsg').textContent = 'Error: ' + e.message;
+    }
+}
+
+async function loadPreviousReviews(siteId) {
+    const container = document.getElementById('prevReviews');
+    try {
+        const resp = await fetch(`/annotate/api/reviews/${siteId}`);
+        const reviews = await resp.json();
+        if (reviews.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = reviews.map(r => `
+            <div class="prev-review">
+                <div>${r.feedback}</div>
+                <div class="meta">${r.annotator} &middot; ${r.timestamp?.slice(0, 16)}</div>
+            </div>
+        `).join('');
+    } catch {
+        container.innerHTML = '';
+    }
+}
+
+// Initialize
+renderSiteList();
+if (sites.length > 0) goToSite(0);
+</script>
+</body>
+</html>

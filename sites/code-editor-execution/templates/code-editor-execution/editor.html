@@ -25,12 +25,38 @@
         .output-panel { flex: 1; display: flex; flex-direction: column; }
         .panel-header { background: #181825; padding: .5rem 1rem; font-size: .85rem; color: #a6adc8; border-bottom: 1px solid #313244; display: flex; align-items: center; justify-content: space-between; }
         .panel-header .title { font-weight: 600; }
-        textarea#code-input {
-            flex: 1; width: 100%; background: #11111b; color: #cdd6f4;
-            font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
-            font-size: {{ font_size }}px; line-height: 1.5; padding: 1rem;
-            border: none; resize: none; outline: none; tab-size: {{ tab_size }};
+        .code-editor-wrap {
+            flex: 1; position: relative; overflow: hidden; background: #11111b;
         }
+        #code-highlight, textarea#code-input {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 1rem; margin: 0; border: none;
+            font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+            font-size: {{ font_size }}px; line-height: 1.5; tab-size: {{ tab_size }};
+            white-space: pre-wrap; word-wrap: break-word;
+            overflow: auto;
+        }
+        #code-highlight {
+            color: #cdd6f4; pointer-events: none; z-index: 1;
+        }
+        textarea#code-input {
+            background: transparent; color: transparent; caret-color: #cdd6f4;
+            resize: none; outline: none; z-index: 2;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Syntax token colors (Catppuccin Mocha) */
+        .tok-kw { color: #cba6f7; }
+        .tok-str { color: #a6e3a1; }
+        .tok-num { color: #fab387; }
+        .tok-com { color: #6c7086; font-style: italic; }
+        .tok-fn { color: #89b4fa; }
+        .tok-cls { color: #f9e2af; }
+        .tok-dec { color: #f5c2e7; }
+        .tok-bool { color: #fab387; }
+        .tok-self { color: #f38ba8; }
+        .tok-op { color: #89dceb; }
+        .tok-brace { color: #f9e2af; }
+        .tok-builtin { color: #94e2d5; }
         .output-area {
             flex: 1; background: #11111b; padding: 1rem; overflow: auto;
             font-family: 'Fira Code', 'Consolas', monospace;
@@ -103,8 +129,11 @@
                 <span class="title">Python 3</span>
                 <span id="line-count">Lines: 1</span>
             </div>
-            <textarea id="code-input" spellcheck="false" placeholder="# Write your Python code here...">{% if code is defined and code %}{{ code }}{% elif snippet %}{{ snippet.code }}{% else %}# Write your Python code here
+            <div class="code-editor-wrap">
+                <pre id="code-highlight" aria-hidden="true"></pre>
+                <textarea id="code-input" spellcheck="false" placeholder="# Write your Python code here...">{% if code is defined and code %}{{ code }}{% elif snippet %}{{ snippet.code }}{% else %}# Write your Python code here
 print("Hello, World!"){% endif %}</textarea>
+            </div>
         </div>
         <div class="output-panel">
             <div class="panel-header">
@@ -139,11 +168,132 @@ print("Hello, World!"){% endif %}</textarea>
 
     <script>
     const codeInput = document.getElementById('code-input');
+    const codeHighlight = document.getElementById('code-highlight');
     const outputArea = document.querySelector('.output-area');
     const execStatus = document.getElementById('exec-status');
     const lineCount = document.getElementById('line-count');
 
-    codeInput.addEventListener('input', updateLineCount);
+    // ---- Python syntax highlighter ----
+    const PY_KW = new Set(['False','None','True','and','as','assert','async','await','break',
+        'class','continue','def','del','elif','else','except','finally','for','from',
+        'global','if','import','in','is','lambda','nonlocal','not','or','pass','raise',
+        'return','try','while','with','yield']);
+    const PY_BUILTIN = new Set(['print','len','range','int','str','float','list','dict','set',
+        'tuple','type','isinstance','enumerate','zip','map','filter','sorted','reversed',
+        'open','input','abs','max','min','sum','any','all','hasattr','getattr','setattr',
+        'super','property','staticmethod','classmethod','ValueError','TypeError','KeyError',
+        'IndexError','Exception','StopIteration','RuntimeError','AttributeError','ImportError',
+        'FileNotFoundError','OSError','IOError','NotImplementedError','ZeroDivisionError']);
+
+    function highlightPython(code) {
+        // Escape HTML first
+        let html = '';
+        let i = 0;
+        while (i < code.length) {
+            // Comments
+            if (code[i] === '#') {
+                let end = code.indexOf('\n', i);
+                if (end === -1) end = code.length;
+                html += '<span class="tok-com">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Triple-quoted strings
+            if ((code.slice(i, i+3) === '"""' || code.slice(i, i+3) === "'''")) {
+                let q = code.slice(i, i+3);
+                let end = code.indexOf(q, i+3);
+                if (end === -1) end = code.length; else end += 3;
+                html += '<span class="tok-str">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Strings
+            if (code[i] === '"' || code[i] === "'") {
+                let q = code[i], j = i + 1;
+                while (j < code.length && code[j] !== q && code[j] !== '\n') {
+                    if (code[j] === '\\') j++;
+                    j++;
+                }
+                if (j < code.length && code[j] === q) j++;
+                html += '<span class="tok-str">' + esc(code.slice(i, j)) + '</span>';
+                i = j;
+                continue;
+            }
+            // Decorators
+            if (code[i] === '@' && (i === 0 || code[i-1] === '\n')) {
+                let end = code.indexOf('\n', i);
+                if (end === -1) end = code.length;
+                html += '<span class="tok-dec">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Numbers
+            if (/\d/.test(code[i]) && (i === 0 || /[\s(=,+\-*\/:[\]{}<>!]/.test(code[i-1]))) {
+                let j = i;
+                while (j < code.length && /[\d.xXoObBeE_]/.test(code[j])) j++;
+                html += '<span class="tok-num">' + esc(code.slice(i, j)) + '</span>';
+                i = j;
+                continue;
+            }
+            // Words (keywords, builtins, identifiers)
+            if (/[a-zA-Z_]/.test(code[i])) {
+                let j = i;
+                while (j < code.length && /[a-zA-Z0-9_]/.test(code[j])) j++;
+                let word = code.slice(i, j);
+                if (word === 'self' || word === 'cls') {
+                    html += '<span class="tok-self">' + word + '</span>';
+                } else if (word === 'True' || word === 'False' || word === 'None') {
+                    html += '<span class="tok-bool">' + word + '</span>';
+                } else if (PY_KW.has(word)) {
+                    html += '<span class="tok-kw">' + word + '</span>';
+                } else if (PY_BUILTIN.has(word)) {
+                    html += '<span class="tok-builtin">' + word + '</span>';
+                } else if (j < code.length && code[j] === '(') {
+                    html += '<span class="tok-fn">' + word + '</span>';
+                } else if (word[0] === word[0].toUpperCase() && word[0] !== '_') {
+                    html += '<span class="tok-cls">' + word + '</span>';
+                } else {
+                    html += esc(word);
+                }
+                i = j;
+                continue;
+            }
+            // Operators
+            if ('+-*/%=<>!&|^~'.includes(code[i])) {
+                html += '<span class="tok-op">' + esc(code[i]) + '</span>';
+                i++;
+                continue;
+            }
+            // Braces
+            if ('()[]{}:,'.includes(code[i])) {
+                html += '<span class="tok-brace">' + esc(code[i]) + '</span>';
+                i++;
+                continue;
+            }
+            html += esc(code[i]);
+            i++;
+        }
+        // Add trailing newline so pre matches textarea height
+        return html + '\n';
+    }
+
+    function esc(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function syncHighlight() {
+        codeHighlight.innerHTML = highlightPython(codeInput.value);
+        // Sync scroll
+        codeHighlight.scrollTop = codeInput.scrollTop;
+        codeHighlight.scrollLeft = codeInput.scrollLeft;
+    }
+
+    codeInput.addEventListener('input', function() { updateLineCount(); syncHighlight(); });
+    codeInput.addEventListener('scroll', function() {
+        codeHighlight.scrollTop = codeInput.scrollTop;
+        codeHighlight.scrollLeft = codeInput.scrollLeft;
+    });
+    syncHighlight();
     codeInput.addEventListener('keydown', function(e) {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -203,11 +353,13 @@ print("Hello, World!"){% endif %}</textarea>
     function changeFontSize(val) {
         document.getElementById('font-size-val').textContent = val + 'px';
         codeInput.style.fontSize = val + 'px';
+        codeHighlight.style.fontSize = val + 'px';
         outputArea.style.fontSize = val + 'px';
     }
 
     function changeTabSize(val) {
         codeInput.style.tabSize = val;
+        codeHighlight.style.tabSize = val;
     }
 
     function escapeHtml(text) {

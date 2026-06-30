@@ -3,14 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
+    <title>LakeportWiki</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; gap: 1rem; align-items: center; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; }
+        .header-nav a:hover { color: #2563eb; }
+        .search-bar { display: flex; gap: .4rem; }
+        .search-bar input { padding: .4rem .7rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .88rem; width: 200px; }
+        .search-bar button { padding: .4rem .8rem; background: #2563eb; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        .main { max-width: 960px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .welcome { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .welcome h2 { font-size: 1.2rem; margin-bottom: .5rem; }
+        .welcome p { color: #64748b; font-size: .92rem; line-height: 1.5; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; }
+        .section h3 { font-size: 1rem; color: #1e3a5f; margin-bottom: .8rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .4rem; }
+        .section ul { list-style: none; }
+        .section ul li { padding: .35rem 0; border-bottom: 1px solid #f1f5f9; }
+        .section ul li:last-child { border-bottom: none; }
+        .section ul li a { color: #2563eb; text-decoration: none; font-size: .9rem; }
+        .section ul li a:hover { text-decoration: underline; }
+        .section ul li .meta { font-size: .78rem; color: #94a3b8; margin-left: .5rem; }
+        .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .8rem; }
+        .cat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .8rem; text-align: center; }
+        .cat-card a { color: #1e3a5f; text-decoration: none; font-weight: 600; font-size: .9rem; }
+        .cat-card a:hover { color: #2563eb; }
+        .cat-card .count { font-size: .78rem; color: #94a3b8; margin-top: .2rem; }
+        .stats-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: .8rem 1.2rem; margin-bottom: 1.5rem; display: flex; gap: 2rem; font-size: .85rem; color: #64748b; }
+        .stats-bar strong { color: #1e3a5f; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+            <a href="{{ url_for('wikis.recent_changes') }}">Recent Changes</a>
+            <a href="{{ url_for('wikis.compare_page') }}">Compare Pages</a>
+            <a href="{{ url_for('wikis.create_page') }}">Create Article</a>
+            {% if user %}
+            <a href="{{ url_for('wikis.logout') }}">Logout ({{ user.display_name }})</a>
+            {% else %}
+            <a href="{{ url_for('wikis.login_page') }}">Login</a>
+            {% endif %}
+            <form class="search-bar" action="{{ url_for('wikis.search') }}" method="get">
+                <input type="text" name="q" placeholder="Search wiki..." id="search-input">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="welcome">
+            <h2>Welcome to LakeportWiki</h2>
+            <p>The free encyclopedia for Lakeport, Washington &mdash; covering the city's history, people, landmarks, technology companies, and Pacific Northwest geography. Currently hosting <strong>{{ pages|length }}</strong> articles across <strong>{{ categories|length }}</strong> categories.</p>
+        </div>
+
+        <div class="stats-bar">
+            <span><strong>{{ pages|length }}</strong> articles</span>
+            <span><strong>{{ categories|length }}</strong> categories</span>
+        </div>
+
+        <h3 style="font-size:1rem; margin-bottom:.8rem; color:#1e3a5f;">Browse by Category</h3>
+        <div class="cat-grid" style="margin-bottom:1.5rem;">
+            {% for cat in categories %}
+            <div class="cat-card">
+                <a href="{{ url_for('wikis.category_page', cat_id=cat.id) }}">{{ cat.name }}</a>
+                <div class="count">{{ cat.page_count }} articles</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="two-col">
+            <div class="section">
+                <h3>Featured Articles</h3>
+                <ul>
+                    {% for p in featured %}
+                    <li>
+                        <a href="{{ url_for('wikis.wiki_page', slug=p.slug) }}">{{ p.title }}</a>
+                        <span class="meta">{{ p.views }} views</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="section">
+                <h3>Recently Edited</h3>
+                <ul>
+                    {% for p in recent_edits %}
+                    <li>
+                        <a href="{{ url_for('wikis.wiki_page', slug=p.slug) }}">{{ p.title }}</a>
+                        <span class="meta">{{ p.updated_at[:10] }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
     </div>
 </body>
 </html>

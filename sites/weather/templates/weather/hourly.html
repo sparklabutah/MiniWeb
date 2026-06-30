@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hourly Forecast - Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+        .content { max-width: 1060px; margin: 1.5rem auto; padding: 0 2rem; }
+        .section-title { font-size: 1.4rem; font-weight: 600; margin-bottom: .5rem; color: #1565c0; }
+        .section-subtitle { font-size: .9rem; color: #64748b; margin-bottom: 1.2rem; }
+
+        .hourly-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: .6rem; margin-bottom: 2rem; }
+        .hour-card { background: #fff; border-radius: .4rem; padding: .8rem .6rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: transform .1s; }
+        .hour-card:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+        .hour-card .hour-time { font-size: .8rem; font-weight: 600; color: #1565c0; margin-bottom: .3rem; }
+        .hour-card .hour-icon { font-size: 1.5rem; margin: .2rem 0; }
+        .hour-card .hour-temp { font-size: 1.2rem; font-weight: 600; }
+        .hour-card .hour-cond { font-size: .7rem; color: #64748b; margin-top: .2rem; }
+        .hour-card .hour-details { font-size: .7rem; color: #94a3b8; margin-top: .3rem; }
+
+        .current-summary { background: linear-gradient(135deg, #1976d2, #1565c0); color: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .current-summary .cs-icon { font-size: 2rem; }
+        .current-summary .cs-temp { font-size: 2rem; font-weight: 300; }
+        .current-summary .cs-loc { font-size: .9rem; opacity: .8; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            {% if user %}
+                <a href="{{ url_for('weather.locations_page') }}">My Locations</a>
+                <a href="{{ url_for('weather.logout') }}">Sign Out ({{ user.username }})</a>
+            {% else %}
+                <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}" class="active">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}">Alerts</a>
+        <a href="{{ url_for('weather.locations_page') }}">Locations</a>
+    </nav>
+
+    <div class="content">
+        <div class="current-summary">
+            <div class="cs-icon">{{ icon_for(current.conditions) }}</div>
+            <div>
+                <div class="cs-temp">{{ current.temp_f }}&deg;F</div>
+                <div class="cs-loc">{{ current.location }} &middot; {{ current.conditions }}</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">24-Hour Forecast</h2>
+        <p class="section-subtitle">Hour-by-hour conditions for Lakeport, WA</p>
+
+        <div class="hourly-grid">
+            {% for h in hourly %}
+            <div class="hour-card">
+                <div class="hour-time">{{ h.hour }}</div>
+                <div class="hour-icon">{{ icon_for(h.conditions) }}</div>
+                <div class="hour-temp">{{ h.temp_f }}&deg;</div>
+                <div class="hour-cond">{{ h.conditions }}</div>
+                <div class="hour-details">
+                    &#128167; {{ h.precip_pct }}% &middot; &#127788;&#65039; {{ h.wind_mph }} mph
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">
+        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+    </div>
+</body>
+</html>

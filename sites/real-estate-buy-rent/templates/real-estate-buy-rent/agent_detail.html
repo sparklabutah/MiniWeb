@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ agent.name }} - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
+        .back-link { font-size: .9rem; color: #0d47a1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .profile-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+        .profile-card h2 { font-size: 1.4rem; color: #0d47a1; margin-bottom: .3rem; }
+        .profile-card .agency { font-size: 1rem; color: #666; margin-bottom: .8rem; }
+        .profile-details { display: flex; gap: 2rem; flex-wrap: wrap; font-size: .9rem; color: #555; }
+        .profile-details p { margin-bottom: .3rem; }
+        .profile-details .rating { color: #ff6f00; font-weight: 600; font-size: 1.1rem; }
+        .section-title { font-size: 1.1rem; color: #333; margin: 1.5rem 0 .8rem; }
+        .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .listing-card { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .card-img { width: 100%; height: 150px; background: #e3f2fd; display: flex; align-items: center; justify-content: center; color: #90caf9; font-size: .8rem; position: relative; }
+        .card-badge { position: absolute; top: .5rem; left: .5rem; padding: .2rem .6rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; color: #fff; }
+        .badge-sale { background: #2e7d32; }
+        .badge-rent { background: #1565c0; }
+        .badge-sold { background: #757575; }
+        .card-body { padding: .7rem; }
+        .card-price { font-size: 1rem; font-weight: 700; color: #0d47a1; }
+        .card-title { font-size: .85rem; margin-top: .2rem; }
+        .card-title a { color: #333; text-decoration: none; }
+        .card-title a:hover { color: #0d47a1; }
+        .card-meta { font-size: .75rem; color: #999; margin-top: .2rem; }
+        .no-listings { color: #999; font-size: .9rem; padding: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+
+    <div class="container">
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}" class="back-link">&larr; Back to agents</a>
+
+        <div class="profile-card">
+            <h2>{{ agent.name }}</h2>
+            <div class="agency">{{ agent.agency }}</div>
+            <div class="profile-details">
+                <div>
+                    <p>Phone: {{ agent.phone }}</p>
+                    <p>Email: {{ agent.email }}</p>
+                </div>
+                <div>
+                    <p>Rating: <span class="rating">{{ agent.rating }}/5.0</span></p>
+                    <p>Total Listings: {{ agent.listings_count }}</p>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="section-title">Active Listings ({{ active_listings|length }})</h3>
+        {% if active_listings %}
+        <div class="listing-grid">
+            {% for listing in active_listings %}
+            <div class="listing-card">
+                <div class="card-img">
+                    {% if listing.status == 'for_sale' %}
+                    <span class="card-badge badge-sale">FOR SALE</span>
+                    {% elif listing.status == 'for_rent' %}
+                    <span class="card-badge badge-rent">FOR RENT</span>
+                    {% endif %}
+                    {{ listing.photos_count }} photos
+                </div>
+                <div class="card-body">
+                    {% if listing.price %}
+                    <div class="card-price">${{ "{:,.0f}".format(listing.price) }}</div>
+                    {% elif listing.rent_monthly %}
+                    <div class="card-price">${{ "{:,.0f}".format(listing.rent_monthly) }}/mo</div>
+                    {% endif %}
+                    <div class="card-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=listing.id) }}">{{ listing.title }}</a></div>
+                    <div class="card-meta">{{ listing.bedrooms }} bd &middot; {{ listing.bathrooms }} ba &middot; {{ "{:,.0f}".format(listing.sqft) }} sqft</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="no-listings">No active listings.</p>
+        {% endif %}
+
+        {% if sold_listings %}
+        <h3 class="section-title">Recently Sold/Rented ({{ sold_listings|length }})</h3>
+        <div class="listing-grid">
+            {% for listing in sold_listings %}
+            <div class="listing-card">
+                <div class="card-img">
+                    <span class="card-badge badge-sold">{{ listing.status | upper }}</span>
+                    {{ listing.photos_count }} photos
+                </div>
+                <div class="card-body">
+                    {% if listing.price %}
+                    <div class="card-price" style="color:#757575">${{ "{:,.0f}".format(listing.price) }}</div>
+                    {% elif listing.rent_monthly %}
+                    <div class="card-price" style="color:#757575">${{ "{:,.0f}".format(listing.rent_monthly) }}/mo</div>
+                    {% endif %}
+                    <div class="card-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=listing.id) }}">{{ listing.title }}</a></div>
+                    <div class="card-meta">{{ listing.bedrooms }} bd &middot; {{ listing.bathrooms }} ba &middot; {{ "{:,.0f}".format(listing.sqft) }} sqft</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

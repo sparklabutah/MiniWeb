@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .settings-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group select { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; }
+        .form-group select:focus { border-color: #4fc3f7; outline: none; box-shadow: 0 0 0 3px rgba(79,195,247,.15); }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .3rem; font-size: .9rem; font-weight: 600; cursor: pointer; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .success-msg { background: #e8f5e9; color: #2e7d32; padding: .8rem 1rem; border-radius: .4rem; font-size: .9rem; margin-bottom: 1rem; border: 1px solid #c8e6c9; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">Signed in as <strong>{{ user.display_name }}</strong></div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.settings_page') }}" class="active">Settings</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>Meeting Settings</h2>
+        <div id="success-msg" class="success-msg"></div>
+        <div class="settings-card">
+            <form id="settings-form" onsubmit="return saveSettings(event)">
+                <div class="form-group">
+                    <label for="default_duration">Default Meeting Duration</label>
+                    <select id="default_duration" name="default_duration">
+                        <option value="15" {{ 'selected' if user_settings.get('default_duration') == 15 }}>15 minutes</option>
+                        <option value="30" {{ 'selected' if user_settings.get('default_duration', 30) == 30 }}>30 minutes</option>
+                        <option value="45" {{ 'selected' if user_settings.get('default_duration') == 45 }}>45 minutes</option>
+                        <option value="60" {{ 'selected' if user_settings.get('default_duration') == 60 }}>60 minutes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="notification_sound">Notification Sound</label>
+                    <select id="notification_sound" name="notification_sound">
+                        <option value="default" {{ 'selected' if user_settings.get('notification_sound', 'default') == 'default' }}>Default</option>
+                        <option value="chime" {{ 'selected' if user_settings.get('notification_sound') == 'chime' }}>Chime</option>
+                        <option value="bell" {{ 'selected' if user_settings.get('notification_sound') == 'bell' }}>Bell</option>
+                        <option value="none" {{ 'selected' if user_settings.get('notification_sound') == 'none' }}>None</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="background">Virtual Background</label>
+                    <select id="background" name="background">
+                        <option value="none" {{ 'selected' if user_settings.get('background', 'none') == 'none' }}>None</option>
+                        <option value="blur" {{ 'selected' if user_settings.get('background') == 'blur' }}>Blur</option>
+                        <option value="office" {{ 'selected' if user_settings.get('background') == 'office' }}>Office</option>
+                        <option value="nature" {{ 'selected' if user_settings.get('background') == 'nature' }}>Nature</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="language">Language</label>
+                    <select id="language" name="language">
+                        <option value="en" {{ 'selected' if user_settings.get('language', 'en') == 'en' }}>English</option>
+                        <option value="es" {{ 'selected' if user_settings.get('language') == 'es' }}>Spanish</option>
+                        <option value="fr" {{ 'selected' if user_settings.get('language') == 'fr' }}>French</option>
+                        <option value="de" {{ 'selected' if user_settings.get('language') == 'de' }}>German</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function saveSettings(event) {
+        event.preventDefault();
+        var payload = {
+            default_duration: parseInt(document.getElementById('default_duration').value),
+            notification_sound: document.getElementById('notification_sound').value,
+            background: document.getElementById('background').value,
+            language: document.getElementById('language').value
+        };
+        fetch('{{ url_for("remote-calls.api_settings_update") }}', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var msg = document.getElementById('success-msg');
+            msg.textContent = 'Settings saved successfully!';
+            msg.style.display = 'block';
+            setTimeout(function() { msg.style.display = 'none'; }, 3000);
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

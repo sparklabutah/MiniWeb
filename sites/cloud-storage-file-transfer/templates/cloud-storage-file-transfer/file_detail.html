@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ file.name }} - MeridianCloud</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #1a73e8; text-decoration: none; }
+        .header-right { display: flex; align-items: center; gap: 0.6rem; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.8rem; font-weight: 600; }
+        .btn { padding: 0.4rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-outline { background: #fff; border: 1px solid #dadce0; color: #5f6368; }
+        .btn-outline:hover { background: #f1f3f4; }
+        .btn-danger { background: #d93025; color: #fff; }
+        .btn-danger:hover { background: #b3261e; }
+        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+
+        .content { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .breadcrumb { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 1rem; font-size: 0.88rem; flex-wrap: wrap; }
+        .breadcrumb a { color: #1a73e8; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb .sep { color: #80868b; }
+
+        .file-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+        .file-icon-lg { font-size: 2.5rem; }
+        .file-title h1 { font-size: 1.4rem; font-weight: 500; color: #202124; }
+        .file-title .meta { font-size: 0.85rem; color: #5f6368; margin-top: 0.3rem; }
+        .file-actions { display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
+
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .detail-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1.2rem; }
+        .detail-card h3 { font-size: 0.9rem; font-weight: 600; color: #202124; margin-bottom: 0.8rem; border-bottom: 1px solid #f1f3f4; padding-bottom: 0.5rem; }
+        .detail-row { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; }
+        .detail-row .label { color: #5f6368; }
+        .detail-row .value { color: #202124; font-weight: 500; }
+        .detail-card.full-width { grid-column: 1 / -1; }
+
+        .share-list { list-style: none; }
+        .share-item { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f3f4; }
+        .share-item:last-child { border-bottom: none; }
+        .share-user { display: flex; align-items: center; gap: 0.5rem; }
+        .avatar-sm { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.65rem; font-weight: 600; }
+        .permission-badge { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 10px; font-weight: 500; }
+        .permission-badge.edit { background: #e8f5e9; color: #2e7d32; }
+        .permission-badge.view { background: #e3f2fd; color: #1565c0; }
+
+        .transfer-list { list-style: none; }
+        .transfer-item { padding: 0.5rem 0; border-bottom: 1px solid #f1f3f4; font-size: 0.85rem; }
+        .transfer-item:last-child { border-bottom: none; }
+        .status-badge { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 10px; font-weight: 500; }
+        .status-badge.active { background: #e8f5e9; color: #2e7d32; }
+        .status-badge.completed { background: #e3f2fd; color: #1565c0; }
+        .status-badge.expired { background: #fce4ec; color: #c62828; }
+
+        .star-btn { background: none; border: none; cursor: pointer; font-size: 1.3rem; color: #dadce0; }
+        .star-btn.starred { color: #f4b400; }
+
+        @media (max-width: 768px) {
+            .detail-grid { grid-template-columns: 1fr; }
+            .file-header { flex-direction: column; }
+            .file-actions { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="logo">&#9729; MeridianCloud</a>
+        </div>
+        <div class="header-right">
+            {% if user %}
+            <span style="font-size:0.85rem;color:#5f6368;">{{ user.name }}</span>
+            <a href="{{ url_for('cloud-storage-file-transfer.logout') }}" class="btn btn-outline btn-sm">Logout</a>
+            <div class="avatar" style="background:{{ user.avatar_color }};">{{ user.name[0] }}</div>
+            {% else %}
+            <a href="{{ url_for('cloud-storage-file-transfer.login_page') }}" class="btn btn-primary btn-sm">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content">
+        <nav class="breadcrumb">
+            <a href="{{ url_for('cloud-storage-file-transfer.index') }}">My Files</a>
+            {% for bc in breadcrumb %}
+            <span class="sep">&#8250;</span>
+            <a href="{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=bc.id) }}">{{ bc.name }}</a>
+            {% endfor %}
+            <span class="sep">&#8250;</span>
+            <span style="color:#202124;font-weight:500;">{{ file.name }}</span>
+        </nav>
+
+        <div class="file-header">
+            <span class="file-icon-lg">{{ file_icon(file.type)|safe }}</span>
+            <div class="file-title">
+                <h1>{{ file.name }}</h1>
+                <div class="meta">
+                    {% if file.owner_id in user_map %}
+                    Owned by {{ user_map[file.owner_id].name }}
+                    {% endif %}
+                    &middot; {{ format_size(file.size_bytes) }}
+                    &middot; Modified {{ file.modified_at[:10] }}
+                </div>
+            </div>
+            <div class="file-actions">
+                <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star">
+                    {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
+                </button>
+                <button class="btn btn-outline btn-sm">&#128279; Share</button>
+                <button class="btn btn-outline btn-sm">&#8595; Download</button>
+                <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:inline;" onsubmit="return confirm('Move this file to trash?');">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color:#d93025;">&#128465; Delete</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="detail-grid">
+            <div class="detail-card">
+                <h3>File Details</h3>
+                <div class="detail-row">
+                    <span class="label">Type</span>
+                    <span class="value">{{ file.type }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">MIME Type</span>
+                    <span class="value" style="font-size:0.8rem;">{{ file.mime_type }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Size</span>
+                    <span class="value">{{ format_size(file.size_bytes) }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Created</span>
+                    <span class="value">{{ file.created_at[:10] }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Modified</span>
+                    <span class="value">{{ file.modified_at[:10] }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Path</span>
+                    <span class="value" style="font-size:0.78rem;word-break:break-all;">{{ file.path }}</span>
+                </div>
+            </div>
+
+            <div class="detail-card">
+                <h3>Sharing ({{ shares|length }})</h3>
+                {% if shares %}
+                <ul class="share-list">
+                    {% for share in shares %}
+                    <li class="share-item">
+                        <div class="share-user">
+                            {% if share.shared_with and share.shared_with in user_map %}
+                            <span class="avatar-sm" style="background:{{ user_map[share.shared_with].avatar_color }};">{{ user_map[share.shared_with].name[0] }}</span>
+                            <span style="font-size:0.85rem;">{{ user_map[share.shared_with].name }}</span>
+                            {% elif share.link %}
+                            <span style="font-size:0.85rem;">&#128279; Link: <code style="font-size:0.75rem;background:#f1f3f4;padding:0.1rem 0.3rem;border-radius:3px;">{{ share.link }}</code></span>
+                            {% else %}
+                            <span style="font-size:0.85rem;color:#5f6368;">Unknown user</span>
+                            {% endif %}
+                        </div>
+                        <span class="permission-badge {{ share.permission }}">{{ share.permission }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="color:#80868b;font-size:0.85rem;padding:1rem 0;text-align:center;">Not shared with anyone</p>
+                {% endif %}
+            </div>
+
+            {% if transfers %}
+            <div class="detail-card full-width">
+                <h3>File Transfers ({{ transfers|length }})</h3>
+                <ul class="transfer-list">
+                    {% for transfer in transfers %}
+                    <li class="transfer-item">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="font-weight:500;">To: {{ transfer.recipient_email }}</span>
+                                <br>
+                                <span style="color:#5f6368;font-size:0.8rem;">Sent {{ transfer.created_at[:10] }} &middot; Expires {{ transfer.expires_at[:10] }} &middot; {{ transfer.download_count }} downloads</span>
+                            </div>
+                            <span class="status-badge {{ transfer.status }}">{{ transfer.status }}</span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="margin-top:1rem;">
+            <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="btn btn-outline">&larr; Back to files</a>
+            {% if breadcrumb %}
+            <a href="{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=breadcrumb[-1].id) }}" class="btn btn-outline">&larr; Back to {{ breadcrumb[-1].name }}</a>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

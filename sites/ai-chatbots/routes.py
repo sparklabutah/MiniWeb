@@ -26,13 +26,11 @@ def _get_openai_key():
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return os.environ.get("OPENAI_API_KEY", "")
 
+from app import db
+
+SITE = "ai-chatbots"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
-KB_FILE = SITE_DIR / "data" / "knowledge_base.json"
-FAQ_FILE = SITE_DIR / "data" / "faq.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-CONVS_FILE = SITE_DIR / "data" / "conversations.json"
-PROMPTS_FILE = SITE_DIR / "data" / "prompts_library.json"
 
 blueprint = Blueprint(
     "ai-chatbots",
@@ -55,58 +53,37 @@ def _load_config():
 # Data loading
 # ---------------------------------------------------------------------------
 
-_kb = None
-_faq = None
-_prompts = None
-
-
 def _load_kb():
-    global _kb
-    if _kb is None:
-        with open(KB_FILE) as f:
-            _kb = json.load(f)
-    return _kb
+    return db.query(SITE, "knowledge_base")
 
 
 def _load_faq():
-    global _faq
-    if _faq is None:
-        with open(FAQ_FILE) as f:
-            _faq = json.load(f)
-    return _faq
+    return db.query(SITE, "faq")
 
 
 def _load_prompts():
-    global _prompts
-    if _prompts is None:
-        with open(PROMPTS_FILE) as f:
-            _prompts = json.load(f)
-    return _prompts
+    return db.query(SITE, "prompts_library")
 
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
-def _load_conversations():
-    if CONVS_FILE.exists():
-        return json.loads(CONVS_FILE.read_text())
-    return []
+def _load_conversations(user_id=None):
+    where = {"user_id": user_id} if user_id is not None else None
+    return db.query(SITE, "conversations", where=where)
 
 
 def _save_conversations(convs):
-    CONVS_FILE.write_text(json.dumps(convs, indent=2))
+    db.save_collection(SITE, "conversations", convs)
 
 
 # ---------------------------------------------------------------------------
@@ -328,10 +305,9 @@ def index():
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
-    convs = _load_conversations()
     user_convs = []
     if user:
-        user_convs = [c for c in convs if c["user_id"] == user["id"] and not c.get("archived")]
+        user_convs = [c for c in _load_conversations(user_id=user["id"]) if not c.get("archived")]
     return render_template("ai-chatbots/index.html",
                            config=config, user=user,
                            conversations=user_convs,
@@ -345,14 +321,13 @@ def chat_page(conv_id=None):
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
-    convs = _load_conversations()
     user_convs = []
     if user:
-        user_convs = [c for c in convs if c["user_id"] == user["id"] and not c.get("archived")]
+        user_convs = [c for c in _load_conversations(user_id=user["id"]) if not c.get("archived")]
 
     current_conv = None
     if conv_id:
-        current_conv = next((c for c in convs if c["id"] == conv_id), None)
+        current_conv = db.get_item(SITE, "conversations", conv_id)
 
     bot = request.args.get("bot", config.get("default_bot", "Assistant"))
     return render_template("ai-chatbots/chat.html",
@@ -455,8 +430,7 @@ def login_submit():
         return render_template("ai-chatbots/login.html",
                                error="Invalid username or password", config=config)
     session["user_id"] = user["id"]
-    convs = _load_conversations()
-    user_convs = [c for c in convs if c["user_id"] == user["id"] and not c.get("archived")]
+    user_convs = [c for c in _load_conversations(user_id=user["id"]) if not c.get("archived")]
     return render_template("ai-chatbots/index.html",
                            config=config, user=user,
                            conversations=user_convs,
@@ -523,6 +497,33 @@ def logout():
 # ---------------------------------------------------------------------------
 # Form-based POST routes (for browser automation compatibility)
 # ---------------------------------------------------------------------------
+
+@blueprint.route("/form/new-conversation", methods=["POST"])
+def form_new_conversation():
+    """Create a new empty conversation and redirect to it."""
+    user_id = session.get("user_id", 0)
+    bot = request.form.get("bot", "Assistant")
+
+    convs = _load_conversations()
+    # Count existing user conversations to generate a sequential name
+    user_conv_count = len([c for c in convs if c.get("user_id") == user_id])
+    conv_id = f"conv_{uuid.uuid4().hex[:8]}"
+    conv = {
+        "id": conv_id,
+        "user_id": user_id,
+        "title": f"New Chat #{user_conv_count + 1}",
+        "bot": bot,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "messages": [],
+        "shared": False,
+        "archived": False,
+    }
+    convs.append(conv)
+    _save_conversations(convs)
+
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
 
 @blueprint.route("/form/chat", methods=["POST"])
 def form_chat():
@@ -670,10 +671,7 @@ def form_upload():
     }
     kb.append(new_entry)
 
-    global _kb
-    _kb = kb
-    with open(KB_FILE, "w") as f:
-        json.dump(kb, f, indent=2)
+    db.save_collection(SITE, "knowledge_base", kb)
 
     return redirect(url_for("ai-chatbots.settings_page"))
 
@@ -779,10 +777,8 @@ def api_chat():
 @blueprint.route("/api/conversations")
 def api_conversations():
     """List conversations, optionally filtered by user_id."""
-    convs = _load_conversations()
     user_id = request.args.get("user_id", type=int)
-    if user_id is not None:
-        convs = [c for c in convs if c["user_id"] == user_id]
+    convs = _load_conversations(user_id=user_id)
     archived = request.args.get("archived")
     if archived is not None:
         show_archived = archived.lower() in ("true", "1")
@@ -793,8 +789,7 @@ def api_conversations():
 @blueprint.route("/api/conversations/<conv_id>")
 def api_conversation(conv_id):
     """Get a single conversation by ID."""
-    convs = _load_conversations()
-    conv = next((c for c in convs if c["id"] == conv_id), None)
+    conv = db.get_item(SITE, "conversations", conv_id)
     if not conv:
         abort(404)
     return jsonify(conv)
@@ -838,8 +833,7 @@ def api_delete_conversation(conv_id):
 @blueprint.route("/api/conversations/<conv_id>/messages")
 def api_conversation_messages(conv_id):
     """Get messages for a conversation."""
-    convs = _load_conversations()
-    conv = next((c for c in convs if c["id"] == conv_id), None)
+    conv = db.get_item(SITE, "conversations", conv_id)
     if not conv:
         abort(404)
     return jsonify(conv.get("messages", []))
@@ -873,8 +867,7 @@ def api_knowledge():
 @blueprint.route("/api/knowledge/<int:entry_id>")
 def api_knowledge_entry(entry_id):
     """Get a single knowledge base entry."""
-    kb = _load_kb()
-    entry = next((e for e in kb if e["id"] == entry_id), None)
+    entry = db.get_item(SITE, "knowledge_base", entry_id)
     if not entry:
         abort(404)
     return jsonify(entry)
@@ -964,8 +957,7 @@ def api_prompts():
 @blueprint.route("/api/prompts/<int:prompt_id>")
 def api_prompt(prompt_id):
     """Get a single prompt."""
-    prompts = _load_prompts()
-    prompt = next((p for p in prompts if p["id"] == prompt_id), None)
+    prompt = db.get_item(SITE, "prompts_library", prompt_id)
     if not prompt:
         abort(404)
     return jsonify(prompt)
@@ -1207,10 +1199,7 @@ def api_upload():
     }
     kb.append(new_entry)
 
-    global _kb
-    _kb = kb
-    with open(KB_FILE, "w") as f:
-        json.dump(kb, f, indent=2)
+    db.save_collection(SITE, "knowledge_base", kb)
 
     return jsonify({"id": new_id, "topic": topic, "status": "uploaded"}), 201
 
@@ -1222,25 +1211,13 @@ def api_upload():
 @blueprint.route("/api/stats")
 def api_stats():
     """Overall statistics."""
-    kb = _load_kb()
-    faq = _load_faq()
-    prompts = _load_prompts()
-    convs = _load_conversations()
-    users = _load_users()
-
-    total_messages = sum(len(c.get("messages", [])) for c in convs)
-    bots_used = {}
-    for c in convs:
-        b = c.get("bot", "Unknown")
-        bots_used[b] = bots_used.get(b, 0) + 1
-
     return jsonify({
-        "knowledge_entries": len(kb),
-        "faq_entries": len(faq),
-        "prompts": len(prompts),
-        "conversations": len(convs),
-        "total_messages": total_messages,
-        "users": len(users),
-        "bots_used": bots_used,
-        "kb_categories": sorted(set(e.get("category", "") for e in kb))
+        "knowledge_entries": db.count(SITE, "knowledge_base"),
+        "faq_entries": db.count(SITE, "faq"),
+        "prompts": db.count(SITE, "prompts_library"),
+        "conversations": db.count(SITE, "conversations"),
+        "total_messages": 0,
+        "users": db.count(SITE, "users"),
+        "bots_used": {},
+        "kb_categories": sorted(set(e.get("category", "") for e in _load_kb()))
     })

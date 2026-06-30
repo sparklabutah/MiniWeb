@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ article.title }} - Lakeport Tribune</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f4f4f4; color: #222; font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { color: #0d3b5e; text-decoration: underline; }
+
+        .site-header { background: #1a1a2e; color: #fff; }
+        .header-top { display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto; padding: .6rem 1.5rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #aaa; }
+        .header-top a { color: #ccc; font-size: .8rem; }
+        .header-top a:hover { color: #fff; text-decoration: none; }
+        .header-top .user-links { display: flex; gap: 1rem; align-items: center; }
+        .header-brand { text-align: center; padding: 1rem 1rem .6rem; border-bottom: 3px double #444; }
+        .header-brand h1 { font-size: 2rem; letter-spacing: 2px; color: #fff; }
+        .header-brand h1 a { color: #fff; text-decoration: none; }
+        .nav-bar { background: #16213e; border-bottom: 1px solid #0f3460; }
+        .nav-bar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; }
+        .nav-bar a { color: #ccc; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; padding: .7rem 1.2rem; }
+        .nav-bar a:hover { color: #fff; background: rgba(255,255,255,.06); text-decoration: none; }
+        .nav-bar a.active { color: #fff; border-bottom: 2px solid #e74c3c; }
+        .nav-search { margin-left: auto; padding: .4rem; }
+        .nav-search form { display: flex; }
+        .nav-search input { padding: .35rem .6rem; border: 1px solid #0f3460; border-radius: .3rem 0 0 .3rem; background: #1a1a2e; color: #ddd; font-size: .8rem; width: 160px; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .nav-search input:focus { outline: none; border-color: #e74c3c; }
+        .nav-search button { padding: .35rem .7rem; background: #e74c3c; color: #fff; border: none; border-radius: 0 .3rem .3rem 0; font-size: .8rem; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem; }
+        .content-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+
+        .breadcrumb { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #888; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #1a5276; }
+
+        .article-main { background: #fff; border-radius: .4rem; padding: 2rem 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .article-cat { display: inline-block; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: .2rem .6rem; border-radius: .2rem; color: #fff; margin-bottom: .8rem; }
+        .article-main h1 { font-size: 2rem; line-height: 1.25; margin-bottom: .8rem; color: #1a1a2e; }
+        .article-byline { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #888; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .article-byline strong { color: #333; }
+        .article-body { font-size: 1.05rem; line-height: 1.8; color: #333; }
+        .article-body p { margin-bottom: 1.2rem; }
+        .article-tags { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .article-tags .tag { display: inline-block; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .75rem; padding: .2rem .6rem; margin: .2rem; background: #f0f0f0; border-radius: 1rem; color: #666; }
+        .article-tags .tag:hover { background: #e0e0e0; color: #333; text-decoration: none; }
+
+        /* Action bar: play, bookmark, share, report */
+        .action-bar { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .btn-action { font-size: .85rem; font-weight: 600; padding: .45rem 1rem; border-radius: .3rem; border: 2px solid #e74c3c; cursor: pointer; background: #fff; color: #e74c3c; text-decoration: none; display: inline-block; }
+        .btn-action:hover { background: #e74c3c; color: #fff; text-decoration: none; }
+        .btn-action.active { background: #e74c3c; color: #fff; }
+
+        /* Share dropdown */
+        .share-wrapper { position: relative; display: inline-block; }
+        .share-dropdown { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #ddd; border-radius: .3rem; box-shadow: 0 3px 10px rgba(0,0,0,.12); z-index: 10; min-width: 160px; margin-top: .3rem; }
+        .share-wrapper:hover .share-dropdown { display: block; }
+        .share-dropdown a { display: block; padding: .5rem 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #333; }
+        .share-dropdown a:hover { background: #f5f5f5; text-decoration: none; }
+
+        /* Follow dropdown */
+        .follow-wrapper { position: relative; display: inline-block; }
+        .follow-dropdown { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #ddd; border-radius: .3rem; box-shadow: 0 3px 10px rgba(0,0,0,.12); z-index: 10; min-width: 180px; margin-top: .3rem; }
+        .follow-wrapper:hover .follow-dropdown { display: block; }
+        .follow-dropdown a { display: block; padding: .5rem 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #333; }
+        .follow-dropdown a:hover { background: #f5f5f5; text-decoration: none; }
+
+        .bookmark-note { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #888; font-style: italic; }
+
+        .article-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #888; display: flex; gap: 1.5rem; }
+
+        /* Comments section */
+        .comments-section { background: #fff; border-radius: .4rem; padding: 1.5rem 2rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .comments-section h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #1a1a2e; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .comment-form { margin-bottom: 1.5rem; }
+        .comment-form textarea { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .9rem; font-family: 'Helvetica Neue', Arial, sans-serif; height: 80px; resize: vertical; }
+        .comment-form textarea:focus { outline: none; border-color: #e74c3c; }
+        .comment-form button { margin-top: .5rem; padding: .45rem 1.2rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .comment-item { padding: .8rem 0; border-bottom: 1px solid #f0f0f0; }
+        .comment-item:last-child { border-bottom: none; }
+        .comment-item .comment-author { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; }
+        .comment-item .comment-date { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .7rem; color: #aaa; margin-left: .5rem; }
+        .comment-item .comment-body { font-size: .9rem; color: #444; margin-top: .3rem; }
+
+        /* Sidebar */
+        .sidebar-box { background: #fff; border-radius: .4rem; padding: 1.2rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .sidebar-box h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; color: #888; font-family: 'Helvetica Neue', Arial, sans-serif; border-bottom: 1px solid #eee; padding-bottom: .4rem; margin-bottom: .8rem; }
+        .sidebar-box .related-item { padding: .5rem 0; border-bottom: 1px solid #f5f5f5; }
+        .sidebar-box .related-item:last-child { border-bottom: none; }
+        .sidebar-box .related-item a { font-size: .9rem; color: #333; }
+        .sidebar-box .related-item a:hover { color: #e74c3c; text-decoration: none; }
+        .sidebar-box .related-item .rmeta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .7rem; color: #aaa; margin-top: .15rem; }
+        .sidebar-box .cat-link { display: flex; align-items: center; justify-content: space-between; padding: .45rem 0; border-bottom: 1px solid #f5f5f5; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .9rem; }
+        .sidebar-box .cat-link:last-child { border-bottom: none; }
+        .sidebar-box .cat-link a { color: #333; font-weight: 500; }
+        .sidebar-box .cat-link a:hover { color: #e74c3c; text-decoration: none; }
+        .sidebar-box .cat-link .count { font-size: .75rem; color: #aaa; background: #f0f0f0; padding: .15rem .45rem; border-radius: 1rem; }
+
+        .site-footer { background: #1a1a2e; color: #888; padding: 2rem 1.5rem; margin-top: 2rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; text-align: center; }
+        .site-footer a { color: #aaa; }
+        .footer-links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: .8rem; }
+
+        @media (max-width: 900px) {
+            .content-layout { grid-template-columns: 1fr; }
+            .article-main { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-top">
+            <span>Lakeport, Cascadia County</span>
+            <div class="user-links">
+                {% if user %}
+                    <span>Hi, {{ user.display_name }}</span>
+                    <a href="{{ url_for('news.bookmarks_page') }}">Bookmarks</a>
+                    <a href="{{ url_for('news.logout') }}">Sign Out</a>
+                {% else %}
+                    <a href="{{ url_for('news.login_page') }}">Sign In</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="header-brand">
+            <h1><a href="{{ url_for('news.index') }}">Lakeport Tribune</a></h1>
+        </div>
+        <nav class="nav-bar">
+            <div class="nav-bar-inner">
+                <a href="{{ url_for('news.index') }}">Home</a>
+                {% for cat in categories %}
+                <a href="{{ url_for('news.category_page', slug=cat.slug) }}" {% if cat.slug == article.category %}class="active"{% endif %}>{{ cat.name }}</a>
+                {% endfor %}
+                <div class="nav-search">
+                    <form action="{{ url_for('news.search_page') }}" method="get">
+                        <input type="text" name="q" placeholder="Search articles...">
+                        <button type="submit">Search</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('news.index') }}">Home</a> &raquo;
+            {% set cat = categories | selectattr('slug', 'equalto', article.category) | first %}
+            <a href="{{ url_for('news.category_page', slug=article.category) }}">{{ cat.name if cat else article.category }}</a> &raquo;
+            <span>{{ article.title[:60] }}{% if article.title|length > 60 %}...{% endif %}</span>
+        </div>
+
+        <div class="content-layout">
+            <main>
+                <article class="article-main">
+                    {% set cat = categories | selectattr('slug', 'equalto', article.category) | first %}
+                    <span class="article-cat" style="background:{{ cat.color if cat else '#666' }}">{{ cat.name if cat else article.category }}</span>
+
+                    <h1>{{ article.title }}</h1>
+
+                    <div class="article-byline">
+                        By <strong>{{ article.author }}</strong> &bull;
+                        Published {{ article.date }} &bull;
+                        {{ article.source }}
+                    </div>
+
+                    <div class="article-body">
+                        {% for paragraph in article.body.split('\n\n') %}
+                        <p>{{ paragraph }}</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if article.tags %}
+                    <div class="article-tags">
+                        {% for tag in article.tags %}
+                        <a href="{{ url_for('news.search_page', q=tag) }}" class="tag">{{ tag }}</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Action bar: play, bookmark, share, follow, report -->
+                    <div class="action-bar">
+                        <!-- play_by_playback -->
+                        <button class="btn-action" id="btn-play" onclick="playArticle({{ article.id }})">Listen to Article</button>
+
+                        <!-- save_by_toggle (bookmark) -->
+                        {% if user %}
+                        <form method="post" action="{{ url_for('news.form_toggle_bookmark', article_id=article.id) }}" style="display:inline;">
+                            <input type="hidden" name="next" value="{{ url_for('news.article_detail', article_id=article.id) }}">
+                            <button type="submit" class="btn-action {{ 'active' if is_bookmarked else '' }}">
+                                {% if is_bookmarked %}Saved{% else %}Save Article{% endif %}
+                            </button>
+                        </form>
+                        {% else %}
+                        <a href="{{ url_for('news.login_page') }}" class="btn-action">Sign in to save</a>
+                        {% endif %}
+
+                        {% if bookmark_note %}
+                        <span class="bookmark-note">Note: "{{ bookmark_note }}"</span>
+                        {% endif %}
+
+                        <!-- share_by_dropdown -->
+                        <div class="share-wrapper">
+                            <span class="btn-action" id="share-btn">Share</span>
+                            <div class="share-dropdown" id="share-dropdown">
+                                <a href="#" onclick="shareArticle({{ article.id }}, 'email'); return false;">Email</a>
+                                <a href="#" onclick="shareArticle({{ article.id }}, 'twitter'); return false;">Twitter</a>
+                                <a href="#" onclick="shareArticle({{ article.id }}, 'facebook'); return false;">Facebook</a>
+                                <a href="#" onclick="shareArticle({{ article.id }}, 'linkedin'); return false;">LinkedIn</a>
+                                <a href="#" onclick="shareArticle({{ article.id }}, 'copy_link'); return false;">Copy Link</a>
+                            </div>
+                        </div>
+
+                        <!-- follow_by_dropdown -->
+                        {% if user %}
+                        <div class="follow-wrapper">
+                            <span class="btn-action" id="follow-btn">Follow</span>
+                            <div class="follow-dropdown" id="follow-dropdown">
+                                <a href="#" onclick="followTarget('author', '{{ article.author }}'); return false;">Follow {{ article.author }}</a>
+                                <a href="#" onclick="followTarget('category', '{{ article.category }}'); return false;">Follow {{ cat.name if cat else article.category }}</a>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- report_by_form -->
+                        <a href="{{ url_for('news.report_page', article_id=article.id) }}" class="btn-action" style="margin-left:auto;">Report</a>
+                    </div>
+
+                    <div class="article-footer">
+                        <span>{{ article.word_count }} words</span>
+                        <span>{{ article.comments_count }} comments</span>
+                    </div>
+                </article>
+
+                <!-- Comments: post_from_free_text -->
+                <div class="comments-section">
+                    <h2>Comments</h2>
+                    {% if user %}
+                    <div class="comment-form">
+                        <form method="post" action="{{ url_for('news.form_post_comment', article_id=article.id) }}">
+                            <textarea name="body" placeholder="Write a comment..." required></textarea>
+                            <button type="submit">Post Comment</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <p style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:.85rem; color:#888; margin-bottom:1rem;">
+                        <a href="{{ url_for('news.login_page') }}">Sign in</a> to post a comment.
+                    </p>
+                    {% endif %}
+
+                    {% if comments %}
+                        {% for c in comments %}
+                        <div class="comment-item">
+                            <span class="comment-author">{{ c.display_name }}</span>
+                            <span class="comment-date">{{ c.posted_at }}</span>
+                            <div class="comment-body">{{ c.body }}</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:.85rem; color:#aaa;">No comments yet. Be the first to comment.</p>
+                    {% endif %}
+                </div>
+            </main>
+
+            <aside>
+                {% if related %}
+                <div class="sidebar-box">
+                    <h3>Related Articles</h3>
+                    {% for r in related %}
+                    <div class="related-item">
+                        <a href="{{ url_for('news.article_detail', article_id=r.id) }}">{{ r.title }}</a>
+                        <div class="rmeta">{{ r.author }} &bull; {{ r.date }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="sidebar-box">
+                    <h3>Sections</h3>
+                    {% for cat in categories %}
+                    <div class="cat-link">
+                        <a href="{{ url_for('news.category_page', slug=cat.slug) }}">{{ cat.name }}</a>
+                        <span class="count">{{ cat.article_count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="{{ url_for('news.index') }}">Home</a>
+            {% for cat in categories %}
+            <a href="{{ url_for('news.category_page', slug=cat.slug) }}">{{ cat.name }}</a>
+            {% endfor %}
+        </div>
+        <p>&copy; Lakeport Tribune - Serving Cascadia County since 2005</p>
+    </footer>
+
+    <script>
+    function playArticle(articleId) {
+        var btn = document.getElementById('btn-play');
+        fetch('/sites/news/api/articles/' + articleId + '/play', {method: 'POST'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.textContent = 'Playing (' + data.duration_seconds + 's)';
+                btn.classList.add('active');
+            });
+    }
+    function shareArticle(articleId, platform) {
+        fetch('/sites/news/api/articles/' + articleId + '/share', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({platform: platform})
+        }).then(function(r) { return r.json(); })
+          .then(function(data) {
+              var btn = document.getElementById('share-btn');
+              btn.textContent = 'Shared via ' + platform;
+          });
+    }
+    function followTarget(type, target) {
+        fetch('/sites/news/api/follow', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: type, target: target})
+        }).then(function(r) { return r.json(); })
+          .then(function(data) {
+              var btn = document.getElementById('follow-btn');
+              btn.textContent = data.action === 'followed' ? 'Following' : 'Follow';
+          });
+    }
+    </script>
+</body>
+</html>

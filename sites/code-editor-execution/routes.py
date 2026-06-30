@@ -4,7 +4,6 @@ Serves a snippet gallery, an in-browser code editor, and executes Python code
 via subprocess with a 5-second timeout and dangerous-import rejection.
 Data lives in data/snippets.json and data/users.json.
 """
-import json
 import pathlib
 import subprocess
 import re
@@ -16,10 +15,10 @@ from flask import (
     render_template, request, session, url_for,
 )
 
+from app import db
+
+SITE = "code-editor-execution"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-SNIPPETS_FILE = SITE_DIR / "data" / "snippets.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "code-editor-execution",
@@ -28,14 +27,6 @@ blueprint = Blueprint(
     static_folder=str(SITE_DIR / "static"),
     static_url_path="/static",
 )
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
 
 # ---------------------------------------------------------------------------
 # Dangerous-import check
@@ -101,25 +92,17 @@ def _execute_code(code, timeout=5):
 # Data loading
 # ---------------------------------------------------------------------------
 
-_snippets_cache = None
-
-
-def _load_snippets():
-    global _snippets_cache
-    if _snippets_cache is None:
-        config = _load_config()
-        with open(SNIPPETS_FILE) as f:
-            all_snippets = json.load(f)
-        n = config.get("num_data_points", -1)
-        if n > 0:
-            all_snippets = all_snippets[:n]
-        _snippets_cache = all_snippets
-    return _snippets_cache
+def _load_snippets(language=None, user_id=None, limit=None):
+    where = {}
+    if language:
+        where["language"] = language
+    if user_id is not None:
+        where["user_id"] = user_id
+    return db.query(SITE, "snippets", where=where if where else None, limit=limit)
 
 
 def _get_snippet(snippet_id):
-    snippets = _load_snippets()
-    return next((s for s in snippets if s["id"] == snippet_id), None)
+    return db.get_item(SITE, "snippets", snippet_id)
 
 
 def _get_categories():
@@ -133,18 +116,15 @@ def _get_categories():
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -359,10 +339,7 @@ def upload_page():
                 "expected_output": "",
             }
             snippets.append(new_snippet)
-            with open(SNIPPETS_FILE, "w") as f:
-                json.dump(snippets, f, indent=2)
-            global _snippets_cache
-            _snippets_cache = None
+            db.save_collection(SITE, "snippets", snippets)
             message = f"Snippet '{title}' created with ID {new_id}."
     return render_template("code-editor-execution/upload.html",
                            user=user, message=message, new_snippet=new_snippet)
@@ -678,14 +655,7 @@ def api_upload_snippet():
         "expected_output": data.get("expected_output", ""),
     }
     snippets.append(new_snippet)
-
-    # Write back
-    with open(SNIPPETS_FILE, "w") as f:
-        json.dump(snippets, f, indent=2)
-
-    # Invalidate cache
-    global _snippets_cache
-    _snippets_cache = None
+    db.save_collection(SITE, "snippets", snippets)
 
     return jsonify(new_snippet), 201
 
@@ -712,10 +682,6 @@ def api_edit_snippet(snippet_id):
     if "expected_output" in data:
         snippet["expected_output"] = data["expected_output"]
 
-    with open(SNIPPETS_FILE, "w") as f:
-        json.dump(snippets, f, indent=2)
-
-    global _snippets_cache
-    _snippets_cache = None
+    db.save_collection(SITE, "snippets", snippets)
 
     return jsonify(snippet)

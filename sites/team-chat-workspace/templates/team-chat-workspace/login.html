@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Meridian Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: #222529; border-radius: 8px; padding: 2.5rem; width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+        .login-card h1 { color: #fff; font-size: 1.5rem; margin-bottom: .5rem; text-align: center; }
+        .login-card .subtitle { color: #ababad; font-size: .9rem; margin-bottom: 2rem; text-align: center; }
+        .user-list { list-style: none; }
+        .user-list li { margin-bottom: .5rem; }
+        .user-list li button { width: 100%; padding: .8rem 1rem; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 6px; color: #d1d2d3; font-size: .95rem; cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; }
+        .user-list li button:hover { background: #1264a3; border-color: #1264a3; color: #fff; }
+        .avatar { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
+        .avatar-0 { background: #e04e4e; } .avatar-1 { background: #e07b2e; } .avatar-2 { background: #d4a72c; }
+        .avatar-3 { background: #2ea854; } .avatar-4 { background: #1d9bd1; } .avatar-5 { background: #7b68ee; }
+        .user-info .name { font-weight: 600; } .user-info .role { font-size: .8rem; color: #8b8b8d; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>Meridian Chat</h1>
+        <p class="subtitle">Select your account to sign in</p>
+        <ul class="user-list">
+            {% for u in users %}
+            <li>
+                <form method="post" action="{{ url_for('team-chat-workspace.login_submit') }}" style="display:inline;width:100%;">
+                    <input type="hidden" name="user_id" value="{{ u.root_user_id }}">
+                    <button type="submit">
+                        <div class="avatar avatar-{{ loop.index0 % 6 }}">{{ u.display_name[:1] }}</div>
+                        <div class="user-info">
+                            <div class="name">{{ u.display_name }}</div>
+                            <div class="role">{{ u.title }} - {{ u.department }}</div>
+                        </div>
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

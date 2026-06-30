@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Links - SnapLink</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #c4b5fd; }
+        .header-right a { color: #e0e7ff; text-decoration: none; font-size: .85rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; }
+        nav a { color: #4f46e5; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef2ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+        .filters { background: #fff; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
+        .filters input, .filters select { padding: .5rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .85rem; }
+        .filters input { flex: 1; min-width: 180px; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .4rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #7c3aed; color: #fff; }
+        .btn-sm { padding: .35rem .7rem; font-size: .78rem; }
+        .btn-outline { background: transparent; border: 1.5px solid #d1d5db; color: #475569; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .link-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: .6rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+        .link-card:hover { border-color: #7c3aed; }
+        .link-info h3 { font-size: .95rem; margin-bottom: .2rem; }
+        .link-info h3 a { color: #4f46e5; text-decoration: none; }
+        .link-info .meta { font-size: .8rem; color: #64748b; }
+        .link-info .meta .code { font-family: monospace; background: #f1f5f9; padding: .1rem .4rem; border-radius: .2rem; color: #7c3aed; font-weight: 600; }
+        .link-actions { display: flex; gap: .4rem; align-items: center; }
+        .link-stats { text-align: right; min-width: 60px; }
+        .link-stats .clicks { font-size: 1.1rem; font-weight: 700; color: #7c3aed; }
+        .link-stats .label { font-size: .7rem; color: #94a3b8; }
+        .badge { font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+        .empty { text-align: center; color: #94a3b8; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('url-shorteners-qr.index') }}">Snap<span>Link</span></a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+            <a href="{{ url_for('url-shorteners-qr.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('url-shorteners-qr.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('url-shorteners-qr.index') }}">Create</a>
+        <a href="{{ url_for('url-shorteners-qr.links_page') }}" class="active">My Links</a>
+    </nav>
+
+    <div class="container">
+        <form class="filters" method="get" action="{{ url_for('url-shorteners-qr.links_page') }}">
+            <input type="text" name="q" placeholder="Search links..." value="{{ q }}">
+            <select name="status">
+                <option value="">All Status</option>
+                <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
+                <option value="inactive" {{ 'selected' if status == 'inactive' }}>Inactive</option>
+            </select>
+            <select name="sort">
+                <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest</option>
+                <option value="oldest" {{ 'selected' if sort == 'oldest' }}>Oldest</option>
+                <option value="clicks" {{ 'selected' if sort == 'clicks' }}>Most Clicks</option>
+            </select>
+            <input type="date" name="date_from" placeholder="From" value="{{ date_from }}" title="Created after" style="min-width:130px; flex:0;">
+            <input type="date" name="date_to" placeholder="To" value="{{ date_to }}" title="Created before" style="min-width:130px; flex:0;">
+            <input type="text" name="tag" placeholder="Tag filter" value="{{ tag }}" style="min-width:100px; flex:0;">
+            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        </form>
+
+        {% if links %}
+        {% for link in links %}
+        <div class="link-card">
+            <div class="link-info">
+                <h3><a href="{{ url_for('url-shorteners-qr.link_detail', link_id=link.id) }}">{{ link.title }}</a></h3>
+                <div class="meta">
+                    <span class="code">{{ link.short_code }}</span>
+                    &rarr; {{ link.original_url[:70] }}{% if link.original_url|length > 70 %}...{% endif %}
+                    &middot; {{ link.created_at[:10] }}
+                    <span class="badge {{ 'badge-active' if link.is_active else 'badge-inactive' }}">
+                        {{ 'Active' if link.is_active else 'Inactive' }}
+                    </span>
+                </div>
+            </div>
+            <div class="link-actions">
+                <a href="{{ url_for('url-shorteners-qr.qr_page', link_id=link.id) }}" class="btn btn-outline btn-sm">QR</a>
+                <div class="link-stats">
+                    <div class="clicks">{{ link.clicks }}</div>
+                    <div class="label">clicks</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty">No links match your criteria.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

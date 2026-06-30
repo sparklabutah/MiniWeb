@@ -6,7 +6,7 @@
 
 ## Data Source
 
-Reddit from WebArena
+data_sources/reddit-augment/ (overlay format: users_overlay.json, posts_overlay.json, comments_overlay.json)
 
 ## Target Macros
 
@@ -14,9 +14,10 @@ navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, 
 
 ## Site Description
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+A Reddit-style community discussion forum. Users browse subreddits, read and create posts, comment in threaded discussions, vote on content, and interact socially (follow users, join communities, save posts, send direct messages, report/block). Modeled after reddit.com.
+
+- **Domain**: Social media / forums
+- **Data**: 6 users, 12 posts across 10 subreddits, 15 threaded comments, plus runtime-created messages and reports
+- **Real-world model**: Reddit
+- **Temporal**: No temporal simulation needed; content is static user-generated
+- **Auth**: Users log in by reddit_username; default user is cascadia_coder (root_user_id=1)

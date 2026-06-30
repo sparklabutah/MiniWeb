@@ -2,7 +2,20 @@
 
 ## Abstract
 
-We present MiniWeb, a large-scale web agent benchmark of 78 fully-local websites spanning 15 domain categories, with 4,680 human-written tasks. Each task is annotated with its constituent **macros** — atomic interaction skills like `search_by_query` or `filter_by_dropdown` — drawn from a closed vocabulary of 163 macros induced from four existing benchmarks. Unlike prior benchmarks that report only aggregate pass rates, MiniWeb enables **skill-decomposed evaluation**: measuring which specific interaction capabilities an agent has or lacks, whether skills transfer across domains, and how macro composition predicts task difficulty. We evaluate N frontier agents and find that (1) per-macro pass rates are remarkably consistent across websites, validating macros as transferable skills; (2) task difficulty is predictable from macro composition; and (3) agents exhibit distinct skill profiles — strengths and blind spots that aggregate scores obscure. MiniWeb and its macro vocabulary are publicly available at [url].
+Other benchmark:
+- not skill centric, an agent success on a task cannot be attribute to wether there are specific skill that helps it
+- big live web dataset, which are brittles, or small number containerized synthetic websites. 
+- Websites rarely cross interacts
+- Tasks are not cross site
+- Agent idendity is not synced
+
+MiniWeb
+- A comprehensive web embodiedment universe, agent are freely interact among 70 human curated site, and interactions are reflected cross site.
+- Agent assumed a single identity with comprehensive employment, education, social circle. Such identity is consistent across websites
+- Website and Tasks are constructed starting from macros, which allows for fine grain agent capability evaluation instead of just SR
+- 5000 human annotated tasks
+
+<!-- As large language models increasingly power web-based autonomous agents, robust and diagnostic evaluation is critical. However, existing benchmarks struggle to capture the true complexity of the internet, either relying on brittle, ever-changing live websites or defaulting to isolated environments where platforms rarely interact. Furthermore, current benchmarks primarily measure binary success rates, failing to isolate the specific skills driving performance, and lack a consistent user persona required for complex, cross-site tasks. To bridge this gap, we introduce MiniWeb, a comprehensive, interconnected web ecosystem designed for fine-grained agent evaluation. MiniWeb features 70 human-curated websites backed by a blend of real and synthetic data, where actions on one platform naturally cascade and reflect across others. Within this universe, the agent is grounded in a persistent identity—complete with a consistent employment history, educational background, and social circle that sync seamlessly across all sites. Crucially, both the websites and our 5,000 human-annotated tasks are built upon foundational "macros." This macro-annotated architecture allows researchers to move beyond superficial success rates, directly attributing task success or failure to specific, granular agent capabilities.  -->
 
 ---
 
@@ -85,21 +98,17 @@ The modifier axis captures UI affordance: by_query (text input), by_dropdown (se
 
 | Category | Sites | Example sites |
 |----------|-------|---------------|
-| Shopping & transactional | 11 | e-commerce, grocery, flights-hotels, ticketing, auctions |
-| Financial | 4 | banking, credit-card, brokerage, stock-crypto |
+| Financial | 2 | banking, brokerage |
 | Productivity | 14 | documents, CRM, calendar, cloud-storage, project-mgmt, code-editor |
 | Communication | 5 | email, instant-messaging, team-chat, remote-calls, AI-chatbots |
-| Social | 6 | forums, dating, classifieds, multimedia-posting, rating-review |
+| Social | 5 | forums, dating, multimedia-posting, rating-review |
 | Media & streaming | 7 | music, video, live, podcasts, books-comics, sports-esports |
 | Education | 3 | course-sites, MOOCs, conference-review |
-| Search & reference | 5 | search-engines, wikis, Q&A, comparison-aggregators, academic-paper-db |
-| Static & informational | 5 | restaurants, business-company, personal-portfolio, project-homepages, help-center |
 | Dynamic feeds | 3 | news, blogs, weather |
 | Government & civic | 3 | agency-portals, tax-filing, petitions |
 | Health | 2 | health-portals, health-fitness-tracking |
 | Maps & navigation | 2 | map-services, transit-directions |
 | Utilities | 4 | converters, dictionaries, password-managers, URL-shorteners |
-| Gaming | 2 | single-player, multiplayer-online |
 | Editing | 3 | documents, spreadsheets-slides, handwritten-notes |
 
 ### 3.4 Task format

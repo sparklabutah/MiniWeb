@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - JobQuest</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; color: #4338ca; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #dc2626; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
+        .section { background: #fff; border-radius: .5rem; padding: 1.5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .section h3 { font-size: 1rem; color: #374151; margin-bottom: .8rem; border-bottom: 1px solid #f3f4f6; padding-bottom: .5rem; }
+        .detail-row { display: flex; gap: 1rem; margin-bottom: .5rem; font-size: .9rem; }
+        .detail-row .label { font-weight: 600; color: #374151; min-width: 160px; }
+        .detail-row .value { color: #4b5563; }
+        .company-list { list-style: none; padding: 0; }
+        .company-list li { padding: .5rem 0; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; font-size: .9rem; }
+        .company-list li:last-child { border-bottom: none; }
+        .company-list a { color: #6366f1; text-decoration: none; }
+        .company-list a:hover { text-decoration: underline; }
+        .btn-sm { padding: .3rem .7rem; border-radius: .3rem; font-size: .8rem; font-weight: 600; cursor: pointer; border: none; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .btn-sm:hover { background: #fee2e2; }
+        .empty-text { color: #6b7280; font-size: .9rem; }
+        .footer { text-align: center; padding: 2rem; color: #9ca3af; font-size: .8rem; border-top: 1px solid #e5e7eb; margin-top: 3rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <span class="spacer"></span>
+        <a href="{{ url_for('job-sites.profile_page') }}" class="active">Profile</a>
+        {% if logged_in %}
+        <a href="{{ url_for('job-sites.logout') }}" class="btn-logout">Sign Out</a>
+        {% endif %}
+    </nav>
+
+    <div class="main">
+        <div class="section">
+            <h3>Profile</h3>
+            <div class="detail-row"><span class="label">Name</span><span class="value">{{ user.display_name }}</span></div>
+            <div class="detail-row"><span class="label">Email</span><span class="value">{{ user.email }}</span></div>
+            <div class="detail-row"><span class="label">Headline</span><span class="value">{{ user.profile.headline }}</span></div>
+            <div class="detail-row"><span class="label">Location</span><span class="value">{{ user.profile.location }}</span></div>
+            <div class="detail-row"><span class="label">Experience</span><span class="value">{{ user.profile.experience_years }} years</span></div>
+            <div class="detail-row"><span class="label">Current Title</span><span class="value">{{ user.profile.current_title }}</span></div>
+            <div class="detail-row"><span class="label">Desired Title</span><span class="value">{{ user.profile.desired_title }}</span></div>
+            <div class="detail-row"><span class="label">Work Mode</span><span class="value" style="text-transform:capitalize;">{{ user.profile.preferred_work_mode }}</span></div>
+            <div class="detail-row"><span class="label">Resume</span><span class="value">{{ "Uploaded" if user.profile.resume_uploaded else "Not uploaded" }}</span></div>
+        </div>
+
+        <div class="section">
+            <h3>Followed Companies ({{ followed_companies|length }})</h3>
+            {% if followed_companies %}
+            <ul class="company-list">
+                {% for c in followed_companies %}
+                <li>
+                    <a href="{{ url_for('job-sites.company_page', company_name=c) }}">{{ c }}</a>
+                    <button class="btn-sm" onclick="unfollow('{{ c }}', this)">Unfollow</button>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-text">No companies followed yet. Visit a company page and click "Follow Company" to get started.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Alert Subscriptions ({{ subscribed_alerts|length }})</h3>
+            {% if subscribed_alerts %}
+            <ul class="company-list">
+                {% for a in subscribed_alerts %}
+                <li>{{ a }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-text">No alert subscriptions. <a href="{{ url_for('job-sites.alerts_page') }}" style="color:#6366f1;">Set up job alerts</a></p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">
+        JobQuest &mdash; Your job search, simplified. &copy; 2026
+    </div>
+
+    <script>
+    function unfollow(companyName, btn) {
+        fetch("{{ url_for('job-sites.api_follow_company') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({company: companyName})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.action === "unfollowed") {
+                btn.closest("li").style.display = "none";
+            }
+        });
+    }
+    </script>
+</body>
+</html>

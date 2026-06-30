@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ recording.title }} - Recording - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #1976d2; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .player-section { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: .5rem; padding: 2.5rem; text-align: center; color: #fff; margin-bottom: 1.5rem; }
+        .player-section .play-btn { display: inline-block; width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,.15); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1rem; cursor: pointer; }
+        .player-section .play-btn:hover { background: rgba(255,255,255,.25); }
+        .player-section h2 { font-size: 1.2rem; margin-bottom: .5rem; }
+        .player-section .player-meta { font-size: .85rem; color: #b0bec5; }
+        .detail-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; margin-bottom: 1.5rem; }
+        .detail-card h3 { padding: 1rem 1.5rem; border-bottom: 1px solid #f0f0f0; font-size: 1rem; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+        @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+        .detail-field { padding: 1rem 1.5rem; border-bottom: 1px solid #f5f5f5; }
+        .detail-field:nth-child(odd) { border-right: 1px solid #f5f5f5; }
+        .detail-field .label { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: .3rem; }
+        .detail-field .value { font-size: .95rem; color: #1a1a2e; }
+        .tag { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; }
+        .tag.transcript { background: #e8f5e9; color: #2e7d32; }
+        .tag.no-transcript { background: #fce4ec; color: #c62828; }
+        .tag.access { background: #e3f2fd; color: #1565c0; }
+        .meeting-link { background: #f8fafc; padding: 1rem 1.5rem; border-top: 1px solid #f0f0f0; }
+        .meeting-link a { color: #1976d2; text-decoration: none; font-weight: 500; }
+        .meeting-link a:hover { text-decoration: underline; }
+        .actions { display: flex; gap: .8rem; margin-top: 1rem; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}" class="active">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a> &raquo; {{ recording.title }}
+        </div>
+
+        <div class="player-section">
+            <div class="play-btn">&#9654;</div>
+            <h2>{{ recording.title }}</h2>
+            <div class="player-meta">
+                {{ format_duration_minutes(recording.duration_minutes) }}
+                &middot; {{ recording.file_size_mb }} MB
+                &middot; {{ recording.format|upper }}
+                &middot; {{ recording.views }} views
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h3>Recording Details</h3>
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="label">Recording ID</div>
+                    <div class="value" style="font-family: monospace;">{{ recording.id }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Date Recorded</div>
+                    <div class="value">{{ parse_dt(recording.date).strftime('%A, %B %d, %Y at %I:%M %p') if parse_dt(recording.date) else recording.date }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Duration</div>
+                    <div class="value">{{ format_duration_minutes(recording.duration_minutes) }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">File Size</div>
+                    <div class="value">{{ recording.file_size_mb }} MB</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Format</div>
+                    <div class="value">{{ recording.format|upper }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Recorded By</div>
+                    <div class="value">{{ recorded_by.display_name if recorded_by else 'Unknown' }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Transcript</div>
+                    <div class="value">
+                        {% if recording.transcript_available %}
+                            <span class="tag transcript">Available</span>
+                        {% else %}
+                            <span class="tag no-transcript">Not available</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Access Level</div>
+                    <div class="value"><span class="tag access">{{ recording.access|capitalize }}</span></div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Views</div>
+                    <div class="value">{{ recording.views }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Meeting ID</div>
+                    <div class="value" style="font-family: monospace;">{{ recording.meeting_id }}</div>
+                </div>
+            </div>
+
+            {% if meeting %}
+            <div class="meeting-link">
+                Related meeting: <a href="{{ url_for('remote-calls.meeting_detail', meeting_id=meeting.id) }}">{{ meeting.title }}</a>
+                &middot; {{ meeting.participants|length }} participants
+                &middot; {{ meeting.status|capitalize }}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="actions">
+            <a href="{{ url_for('remote-calls.recordings_page') }}" class="btn btn-secondary">Back to Recordings</a>
+        </div>
+    </div>
+</body>
+</html>

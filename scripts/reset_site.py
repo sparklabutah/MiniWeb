@@ -6,8 +6,8 @@ Usage:
     python scripts/reset_site.py --all               # reset all sites
     python scripts/reset_site.py --snapshot <site-id> # save current state as new pristine baseline
 
-Each site stores its pristine data in  sites/<id>/data/.pristine/.
-The reset copies those files back into  sites/<id>/data/, overwriting
+Each site stores its pristine data in  data_sources/<id>/.pristine/.
+The reset copies those files back into  data_sources/<id>/, overwriting
 any mutations from agent runs or eval harnesses.
 """
 
@@ -19,6 +19,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITES_DIR = PROJECT_ROOT / "sites"
+DATA_SOURCES_DIR = Path("/scratch/general/vast/u1653932/data_sources")
 
 
 def discover_sites():
@@ -34,8 +35,8 @@ def discover_sites():
 
 def reset_site(site_id: str) -> bool:
     """Copy .pristine/*.json back to data/. Returns True on success."""
-    pristine = SITES_DIR / site_id / "data" / ".pristine"
-    data_dir = SITES_DIR / site_id / "data"
+    pristine = DATA_SOURCES_DIR / site_id / ".pristine"
+    data_dir = DATA_SOURCES_DIR / site_id
 
     if not pristine.exists():
         print(f"  SKIP {site_id}: no .pristine/ directory")
@@ -56,7 +57,7 @@ def reset_site(site_id: str) -> bool:
 
 def snapshot_site(site_id: str) -> bool:
     """Save current data/*.json as the new pristine baseline."""
-    data_dir = SITES_DIR / site_id / "data"
+    data_dir = DATA_SOURCES_DIR / site_id
     pristine = data_dir / ".pristine"
 
     if not data_dir.exists():

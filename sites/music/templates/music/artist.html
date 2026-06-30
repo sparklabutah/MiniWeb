@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ artist.name }} - SoundWave</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+        a { color: #1db954; text-decoration: none; }
+        a:hover { color: #1ed760; }
+
+        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+
+        .hero { padding: 3rem 1.5rem 2rem; background: linear-gradient(135deg, #1db954 0%, #0a0a0a 70%); max-width: 1200px; margin: 0 auto; }
+        .hero-content { display: flex; align-items: flex-end; gap: 2rem; }
+        .hero-avatar { width: 200px; height: 200px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 700; color: #fff; background: rgba(0,0,0,.3); box-shadow: 0 8px 24px rgba(0,0,0,.5); flex-shrink: 0; }
+        .hero-info h1 { font-size: 3rem; color: #fff; margin-bottom: .3rem; }
+        .hero-info .meta { font-size: 1rem; color: #ccc; margin-bottom: .5rem; }
+        .hero-info .bio { font-size: .95rem; color: #aaa; max-width: 600px; margin-bottom: 1rem; }
+        .hero-info .stats { display: flex; gap: 2rem; font-size: .9rem; color: #888; }
+        .verified-badge { background: #1db954; color: #000; padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; margin-left: .5rem; vertical-align: middle; }
+
+        .btn-follow { display: inline-block; padding: .5rem 1.5rem; border-radius: 1.5rem; font-weight: 700; font-size: .9rem; border: 1px solid #fff; color: #fff; background: transparent; cursor: pointer; transition: all .15s; }
+        .btn-follow:hover { transform: scale(1.05); }
+        .btn-follow.following { background: #1db954; border-color: #1db954; color: #000; }
+        .btn-subscribe { display: inline-block; padding: .5rem 1.5rem; border-radius: 1.5rem; font-weight: 700; font-size: .9rem; border: 1px solid #888; color: #fff; background: transparent; cursor: pointer; transition: all .15s; }
+        .btn-subscribe:hover { border-color: #1db954; }
+        .btn-subscribe.subscribed { background: #f59e0b; border-color: #f59e0b; color: #000; }
+        .btn-play { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1.5rem; border-radius: 1.5rem; font-weight: 700; font-size: .9rem; border: none; color: #000; background: #1db954; cursor: pointer; }
+        .btn-play:hover { background: #1ed760; }
+        .dropdown-wrap { position: relative; display: inline-block; }
+        .dropdown-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1.2rem; border-radius: 1.5rem; font-weight: 600; font-size: .85rem; border: 1px solid #888; color: #fff; background: transparent; cursor: pointer; }
+        .dropdown-btn:hover { border-color: #1db954; }
+        .dropdown-menu { display: none; position: absolute; top: 110%; left: 0; background: #282828; border-radius: .4rem; min-width: 180px; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 50; overflow: hidden; }
+        .dropdown-menu.open { display: block; }
+        .dropdown-item { padding: .6rem 1rem; font-size: .85rem; color: #e0e0e0; cursor: pointer; display: block; border: none; background: none; width: 100%; text-align: left; }
+        .dropdown-item:hover { background: #333; color: #1db954; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.3rem; color: #fff; margin: 1.5rem 0 1rem; }
+
+        .track-list { list-style: none; }
+        .track-row { display: flex; align-items: center; padding: .6rem .8rem; border-radius: .3rem; gap: .8rem; transition: background .15s; }
+        .track-row:hover { background: #1a1a1a; }
+        .track-num { width: 2rem; text-align: right; color: #888; font-size: .9rem; flex-shrink: 0; }
+        .track-cover-sm { width: 40px; height: 40px; border-radius: .2rem; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: rgba(255,255,255,.6); flex-shrink: 0; }
+        .track-info { flex: 1; min-width: 0; }
+        .track-title { font-size: .95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-title a { color: #fff; }
+        .track-title a:hover { color: #1db954; }
+        .track-album { font-size: .8rem; color: #888; }
+        .track-album a { color: #888; }
+        .track-album a:hover { color: #1db954; }
+        .track-plays { color: #888; font-size: .85rem; min-width: 60px; text-align: right; }
+        .track-duration { color: #888; font-size: .85rem; min-width: 45px; text-align: right; }
+
+        .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; }
+        .album-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
+        .album-card:hover { background: #282828; text-decoration: none; }
+        .album-card .cover { width: 100%; aspect-ratio: 1; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .8rem; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+        .card-name { font-weight: 600; font-size: .95rem; color: #fff; margin-bottom: .2rem; }
+        .card-meta { font-size: .8rem; color: #888; }
+
+        @media (max-width: 768px) {
+            .hero-content { flex-direction: column; align-items: center; text-align: center; }
+            .hero-avatar { width: 150px; height: 150px; font-size: 3.5rem; }
+            .hero-info h1 { font-size: 2rem; }
+            .hero-info .stats { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
+        <div class="nav-links">
+            <a href="{{ url_for('music.browse') }}">Browse</a>
+            <a href="{{ url_for('music.playlists_page') }}">Playlists</a>
+            <a href="{{ url_for('music.library_page') }}">Library</a>
+            {% if user %}
+                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
+                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
+            {% else %}
+                <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="hero">
+        <div class="hero-content">
+            <div class="hero-avatar">{{ artist.name[0] }}</div>
+            <div class="hero-info">
+                <h1>{{ artist.name }}{% if artist.verified %}<span class="verified-badge">Verified</span>{% endif %}</h1>
+                <div class="meta">{{ artist.genre }}</div>
+                <div class="bio">{{ artist.bio }}</div>
+                <div class="stats">
+                    <span>{{ "{:,}".format(artist.monthly_listeners) }} monthly listeners</span>
+                    <span>{{ albums|length }} albums</span>
+                </div>
+                <div style="margin-top:1rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">
+                    <!-- Follow toggle (follow_by_toggle) -->
+                    <button type="button" class="btn-follow {% if is_following %}following{% endif %}" onclick="toggleFollow({{ artist.id }})" id="follow-btn">
+                        {% if is_following %}Following{% else %}Follow{% endif %}
+                    </button>
+                    <!-- Follow dropdown (follow_by_dropdown) -->
+                    <div class="dropdown-wrap">
+                        <button class="dropdown-btn" onclick="toggleDropdown('follow-menu')">More</button>
+                        <div class="dropdown-menu" id="follow-menu">
+                            <button class="dropdown-item" onclick="toggleFollow({{ artist.id }})">{% if is_following %}Unfollow{% else %}Follow{% endif %} Artist</button>
+                            <button class="dropdown-item" onclick="shareItem('artist', {{ artist.id }}, 'link')">Share Artist</button>
+                        </div>
+                    </div>
+                    <!-- Subscribe toggle (subscribe_by_toggle) -->
+                    <button type="button" class="btn-subscribe {% if is_subscribed %}subscribed{% endif %}" onclick="toggleSubscribe({{ artist.id }})" id="subscribe-btn">
+                        {% if is_subscribed %}Subscribed{% else %}Subscribe{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Popular Tracks</h2>
+        <ul class="track-list">
+            {% for track in tracks[:10] %}
+            <li class="track-row">
+                <span class="track-num">{{ loop.index }}</span>
+                <div class="track-cover-sm" style="background: {{ track.album_cover_color }};">{{ track.title[0] }}</div>
+                <div class="track-info">
+                    <div class="track-title"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                    <div class="track-album"><a href="{{ url_for('music.album_detail', album_id=track.album_id) }}">{{ track.album_title }}</a></div>
+                </div>
+                <span class="track-plays">{{ track.plays_formatted }}</span>
+                <span class="track-duration">{{ track.duration_formatted }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <h2>Discography</h2>
+        <div class="album-grid">
+            {% for album in albums %}
+            <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="album-card">
+                <div class="cover" style="background: {{ album.cover_color }};">{{ album.title[0] }}</div>
+                <div class="card-name">{{ album.title }}</div>
+                <div class="card-meta">{{ album.release_date }} &middot; {{ album.tracks_count }} tracks</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    function toggleFollow(artistId) {
+        fetch("{{ url_for('music.api_follow_artist') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({artist_id: artistId})
+        }).then(r => r.json()).then(data => {
+            const btn = document.getElementById("follow-btn");
+            if (data.action === "followed") {
+                btn.textContent = "Following";
+                btn.classList.add("following");
+            } else {
+                btn.textContent = "Follow";
+                btn.classList.remove("following");
+            }
+            document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("open"));
+        });
+    }
+    function toggleSubscribe(artistId) {
+        fetch("/sites/music/api/subscribe", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({type: "artist", id: artistId})
+        }).then(r => r.json()).then(data => {
+            const btn = document.getElementById("subscribe-btn");
+            if (data.action === "subscribed") {
+                btn.textContent = "Subscribed";
+                btn.classList.add("subscribed");
+            } else {
+                btn.textContent = "Subscribe";
+                btn.classList.remove("subscribed");
+            }
+        });
+    }
+    function toggleDropdown(menuId) {
+        document.querySelectorAll(".dropdown-menu").forEach(m => {
+            if (m.id !== menuId) m.classList.remove("open");
+        });
+        document.getElementById(menuId).classList.toggle("open");
+    }
+    function shareItem(type, id, platform) {
+        fetch("/sites/music/api/share", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({type: type, id: id, platform: platform})
+        }).then(r => r.json()).then(data => {
+            alert("Shared! Link: " + data.share_url);
+            document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("open"));
+        });
+    }
+    document.addEventListener("click", function(e) {
+        if (!e.target.closest(".dropdown-wrap")) {
+            document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("open"));
+        }
+    });
+    </script>
+</body>
+</html>

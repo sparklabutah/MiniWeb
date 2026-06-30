@@ -3,124 +3,294 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}TradeCore{% endblock %}</title>
+    <title>{% block title %}TradeVista{% endblock %}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
-        a { color: #58a6ff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        body { font-family: 'Capsule Sans Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1E2124; color: #E8E8E8; min-height: 100vh; }
+        a { color: #E8E8E8; text-decoration: none; }
+        a:hover { color: #00C805; }
 
-        .topbar { background: #161b22; border-bottom: 1px solid #30363d; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .topbar .logo { font-size: 1.3rem; font-weight: 700; color: #58a6ff; }
-        .topbar nav a { margin-left: 1.2rem; font-size: 0.9rem; color: #8b949e; }
-        .topbar nav a:hover { color: #c9d1d9; text-decoration: none; }
-        .topbar nav a.active { color: #58a6ff; }
-        .topbar .market-status { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 0.25rem; }
-        .status-open { background: #0d4429; color: #3fb950; }
-        .status-closed { background: #3d1f00; color: #d29922; }
+        /* ---- Top Nav (TradeVista style) ---- */
+        .rh-nav { background: #1E2124; border-bottom: 1px solid #2F3336; height: 64px; display: flex; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 100; }
+        .rh-nav .rh-logo { display: flex; align-items: center; gap: 8px; margin-right: 32px; }
+        .rh-nav .rh-logo svg { width: 32px; height: 32px; }
+        .rh-nav .rh-logo-text { font-size: 20px; font-weight: 700; color: #00C805; letter-spacing: -0.5px; }
+        .rh-nav .rh-search { flex: 1; max-width: 400px; position: relative; }
+        .rh-nav .rh-search input { width: 100%; background: #2F3336; border: 1px solid #3B4043; color: #E8E8E8; padding: 10px 16px 10px 40px; border-radius: 24px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .rh-nav .rh-search input:focus { border-color: #00C805; }
+        .rh-nav .rh-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6F7782; }
+        .rh-nav-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+        .rh-nav-links a { font-size: 14px; font-weight: 500; color: #C9CACC; padding: 8px 16px; border-radius: 24px; transition: all 0.15s; }
+        .rh-nav-links a:hover { color: #00C805; background: rgba(0,200,5,0.08); }
+        .rh-nav-links a.active { color: #00C805; }
+        .rh-nav-links .nav-account { display: flex; align-items: center; gap: 6px; }
+        .rh-nav-links .avatar-sm { width: 28px; height: 28px; background: #00C805; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #1E2124; }
 
-        .container { max-width: 1280px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+        /* ---- Layout ---- */
+        .rh-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .rh-main { display: flex; gap: 24px; padding-top: 24px; padding-bottom: 80px; }
+        .rh-content { flex: 1; min-width: 0; }
+        .rh-sidebar { width: 320px; flex-shrink: 0; }
 
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
-        .card h2 { font-size: 1rem; color: #8b949e; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        /* ---- Cards ---- */
+        .rh-card { background: #1E2124; border: 1px solid #2F3336; border-radius: 8px; margin-bottom: 16px; }
+        .rh-card-header { padding: 16px 20px; border-bottom: 1px solid #2F3336; display: flex; align-items: center; justify-content: space-between; }
+        .rh-card-header h2 { font-size: 18px; font-weight: 700; color: #E8E8E8; }
+        .rh-card-body { padding: 20px; }
 
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; }
+        /* ---- Typography ---- */
+        .rh-price-hero { font-size: 48px; font-weight: 700; letter-spacing: -1.5px; line-height: 1.1; color: #E8E8E8; }
+        .rh-price-lg { font-size: 32px; font-weight: 700; letter-spacing: -1px; color: #E8E8E8; }
+        .rh-change { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+        .rh-change-sm { font-size: 13px; font-weight: 500; }
+        .rh-label { font-size: 13px; color: #6F7782; font-weight: 400; }
+        .rh-section-title { font-size: 20px; font-weight: 700; color: #E8E8E8; margin-bottom: 16px; }
 
-        .stat-value { font-size: 1.5rem; font-weight: 700; color: #f0f6fc; }
-        .stat-label { font-size: 0.8rem; color: #8b949e; }
-        .positive { color: #3fb950; }
-        .negative { color: #f85149; }
+        /* ---- Colors ---- */
+        .rh-green, .positive { color: #00C805; }
+        .rh-red, .negative { color: #FF5000; }
+        .rh-muted { color: #6F7782; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 0.6rem 0.8rem; font-size: 0.75rem; color: #8b949e; text-transform: uppercase; border-bottom: 1px solid #30363d; }
-        td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #21262d; font-size: 0.9rem; }
-        tr:hover { background: #1c2128; }
+        /* ---- Buttons ---- */
+        .rh-btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 24px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; }
+        .rh-btn-primary { background: #00C805; color: #1E2124; }
+        .rh-btn-primary:hover { background: #00E006; color: #1E2124; }
+        .rh-btn-sell { background: #FF5000; color: #fff; }
+        .rh-btn-sell:hover { background: #FF6A20; }
+        .rh-btn-outline { background: transparent; border: 1px solid #2F3336; color: #E8E8E8; }
+        .rh-btn-outline:hover { border-color: #00C805; color: #00C805; }
+        .rh-btn-sm { padding: 6px 16px; font-size: 13px; border-radius: 20px; }
+        .rh-btn-xs { padding: 4px 12px; font-size: 12px; border-radius: 16px; }
 
-        .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 0.375rem; font-size: 0.85rem; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; }
-        .btn:hover { background: #30363d; text-decoration: none; }
-        .btn-primary { background: #238636; border-color: #2ea043; color: #fff; }
-        .btn-primary:hover { background: #2ea043; }
-        .btn-danger { background: #da3633; border-color: #f85149; color: #fff; }
-        .btn-danger:hover { background: #f85149; }
-        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+        /* ---- Tables ---- */
+        .rh-table { width: 100%; border-collapse: collapse; }
+        .rh-table th { text-align: left; padding: 12px 16px; font-size: 12px; color: #6F7782; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #2F3336; }
+        .rh-table th.right, .rh-table td.right { text-align: right; }
+        .rh-table td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid rgba(47,51,54,0.5); }
+        .rh-table tbody tr { transition: background 0.1s; }
+        .rh-table tbody tr:hover { background: rgba(47,51,54,0.3); }
 
-        select, input[type="text"], input[type="number"], input[type="password"], input[type="date"] {
-            background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 0.4rem 0.6rem;
-            border-radius: 0.375rem; font-size: 0.85rem;
+        /* ---- Watchlist Sidebar ---- */
+        .wl-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(47,51,54,0.5); transition: background 0.1s; cursor: pointer; }
+        .wl-item:hover { background: rgba(47,51,54,0.3); }
+        .wl-item:last-child { border-bottom: none; }
+        .wl-sym { font-size: 14px; font-weight: 700; }
+        .wl-name { font-size: 12px; color: #6F7782; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+        .wl-right { text-align: right; }
+        .wl-price { font-size: 14px; font-weight: 600; }
+        .wl-change { font-size: 12px; font-weight: 500; }
+        .wl-sparkline { margin: 0 12px; }
+
+        /* ---- Sparkline SVG ---- */
+        .sparkline-svg { display: block; }
+
+        /* ---- Tag/Badge ---- */
+        .rh-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+        .rh-tag-stock { background: rgba(0,200,5,0.12); color: #00C805; }
+        .rh-tag-crypto { background: rgba(255,152,0,0.12); color: #FF9800; }
+        .rh-tag-index_fund { background: rgba(130,177,255,0.12); color: #82B1FF; }
+        .rh-tag-futures { background: rgba(186,104,255,0.12); color: #BA68FF; }
+
+        /* ---- Period Selector ---- */
+        .period-selector { display: flex; gap: 4px; margin-top: 12px; }
+        .period-btn { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; background: transparent; color: #6F7782; border: none; cursor: pointer; transition: all 0.15s; }
+        .period-btn:hover { color: #E8E8E8; }
+        .period-btn.active { color: #00C805; background: rgba(0,200,5,0.08); }
+
+        /* ---- Chart Tooltip ---- */
+        .chart-tooltip { position: absolute; background: #2F3336; color: #E8E8E8; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; transform: translateX(-50%); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+        /* ---- Stats Grid ---- */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+        .stat-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(47,51,54,0.5); }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-key { font-size: 13px; color: #6F7782; }
+        .stat-val { font-size: 13px; font-weight: 600; color: #E8E8E8; }
+
+        /* ---- Options Chain ---- */
+        .options-tabs { display: flex; border-bottom: 2px solid #2F3336; margin-bottom: 16px; }
+        .options-tab { padding: 8px 24px; font-size: 14px; font-weight: 600; color: #6F7782; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+        .options-tab:hover { color: #E8E8E8; }
+        .options-tab.active { color: #00C805; border-bottom-color: #00C805; }
+        .itm-row { background: rgba(0,200,5,0.04); }
+        .otm-row { }
+
+        /* ---- Trade Panel ---- */
+        .trade-panel { background: #1E2124; border: 1px solid #2F3336; border-radius: 8px; position: sticky; top: 80px; }
+        .trade-panel-header { padding: 16px 20px; border-bottom: 1px solid #2F3336; }
+        .trade-toggle { display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #2F3336; }
+        .trade-toggle-btn { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; background: transparent; color: #6F7782; border: none; }
+        .trade-toggle-btn.active-buy { background: #00C805; color: #1E2124; }
+        .trade-toggle-btn.active-sell { background: #FF5000; color: #fff; }
+
+        .trade-input-group { padding: 12px 20px; border-bottom: 1px solid rgba(47,51,54,0.5); display: flex; justify-content: space-between; align-items: center; }
+        .trade-input-group label { font-size: 14px; color: #E8E8E8; font-weight: 500; }
+        .trade-input-group input, .trade-input-group select { background: transparent; border: none; color: #E8E8E8; font-size: 14px; text-align: right; outline: none; font-weight: 600; width: 120px; }
+        .trade-input-group select { cursor: pointer; appearance: none; -webkit-appearance: none; }
+        .trade-input-group select option { background: #2F3336; color: #E8E8E8; }
+
+        .trade-estimate { padding: 16px 20px; border-top: 1px solid #2F3336; }
+        .trade-estimate-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
+        .trade-estimate-row:last-child { margin-bottom: 0; }
+
+        /* ---- Flash Animations ---- */
+        @keyframes flash-green { 0% { background: rgba(0,200,5,0.2); } 100% { background: transparent; } }
+        @keyframes flash-red { 0% { background: rgba(255,80,0,0.2); } 100% { background: transparent; } }
+        .tick-up { animation: flash-green 0.5s ease-out; }
+        .tick-down { animation: flash-red 0.5s ease-out; }
+
+        /* ---- Form Controls ---- */
+        select, input[type="text"], input[type="number"], input[type="password"] {
+            background: #2F3336; border: 1px solid #3B4043; color: #E8E8E8; padding: 10px 16px;
+            border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s;
         }
-        select:focus, input:focus { border-color: #58a6ff; outline: none; }
+        select:focus, input:focus { border-color: #00C805; }
 
-        .filters { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
-        .filters label { font-size: 0.8rem; color: #8b949e; }
+        /* ---- Messages ---- */
+        .msg { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; display: none; }
+        .msg-success { background: rgba(0,200,5,0.1); color: #00C805; border: 1px solid rgba(0,200,5,0.2); }
+        .msg-error { background: rgba(255,80,0,0.1); color: #FF5000; border: 1px solid rgba(255,80,0,0.2); }
 
-        .sparkline { display: inline-flex; align-items: flex-end; gap: 1px; height: 30px; }
-        .sparkline .bar { width: 4px; background: #58a6ff; border-radius: 1px 1px 0 0; min-height: 1px; }
-        .sparkline .bar.down { background: #f85149; }
-        .sparkline .bar.up { background: #3fb950; }
-
-        .chart-container { padding: 0.5rem 0; }
-        .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 0.5rem 0; }
-        .bar-chart .bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
-        .bar-chart .bar-fill { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.3s; }
-        .bar-chart .bar-label { font-size: 0.6rem; color: #8b949e; margin-top: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50px; }
-
-        .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 600; }
-        .tag-stock { background: #1f3a5f; color: #58a6ff; }
-        .tag-crypto { background: #3d2800; color: #d29922; }
-        .tag-index_fund { background: #0d4429; color: #3fb950; }
-        .tag-futures { background: #3d1f3f; color: #bc8cff; }
-
-        .msg { display: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.85rem; margin: 0.5rem 0; }
-        .msg-success { background: #0d4429; color: #3fb950; border: 1px solid #2ea043; }
-        .msg-error { background: #3d1f00; color: #f85149; border: 1px solid #da3633; }
-
-        .radio-group { display: flex; gap: 0.5rem; }
-        .radio-group label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer; padding: 0.3rem 0.6rem; border: 1px solid #30363d; border-radius: 0.375rem; }
-        .radio-group input[type="radio"] { accent-color: #58a6ff; }
-        .radio-group label:has(input:checked) { border-color: #58a6ff; background: #1f2937; }
-
-        .slider-container { display: flex; align-items: center; gap: 0.5rem; }
-        .slider-container input[type="range"] { flex: 1; accent-color: #58a6ff; }
-        .slider-value { font-size: 0.85rem; min-width: 60px; text-align: right; }
-
-        .sim-clock { font-size: 0.75rem; color: #8b949e; }
-
-        @media (max-width: 768px) {
-            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-            .filters { flex-direction: column; align-items: stretch; }
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .rh-main { flex-direction: column; }
+            .rh-sidebar { width: 100%; }
+            .rh-nav { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 8px; }
+            .rh-nav .rh-search { max-width: 100%; order: 3; width: 100%; }
+            .rh-nav-links { gap: 2px; }
+            .rh-nav-links a { padding: 6px 10px; font-size: 13px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .rh-price-hero { font-size: 36px; }
         }
     </style>
 </head>
 <body>
-    <div class="topbar">
-        <div style="display:flex;align-items:center;gap:1rem;">
-            <a href="{{ url_for('brokerage.index') }}" class="logo" style="text-decoration:none">TradeCore</a>
-            <span class="market-status {% if sim_time.weekday() < 5 %}status-open{% else %}status-closed{% endif %}">
-                {% if sim_time.weekday() < 5 %}Market Open{% else %}Market Closed{% endif %}
+    <div class="rh-nav">
+        <a href="{{ url_for('brokerage.index') }}" class="rh-logo">
+            <svg viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="16" fill="#00C805"/>
+                <path d="M10 22V12l6-4 6 4v10l-6 4-6-4z" fill="#1E2124" opacity="0.9"/>
+                <path d="M16 8l6 4v10l-6 4" fill="none" stroke="#1E2124" stroke-width="1.5"/>
+            </svg>
+            <span class="rh-logo-text">TradeVista</span>
+        </a>
+        <div class="rh-search">
+            <span class="search-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.007 1.007 0 00-.115-.1zM12 6.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z"/></svg>
             </span>
-            <span class="sim-clock">{{ sim_time.strftime('%b %d, %Y %I:%M %p') }} ET</span>
+            <form method="GET" action="{{ url_for('brokerage.index') }}">
+                <input type="text" name="q" placeholder="Search" value="{{ request.args.get('q', '') }}">
+            </form>
         </div>
-        <nav>
-            <a href="{{ url_for('brokerage.index') }}">Markets</a>
-            <a href="{{ url_for('brokerage.options_page') }}">Options</a>
-            <a href="{{ url_for('brokerage.compare_page') }}">Compare</a>
+        <div class="rh-nav-links">
             {% if user %}
             <a href="{{ url_for('brokerage.portfolio_page') }}">Portfolio</a>
-            <a href="{{ url_for('brokerage.orders_page') }}">Orders</a>
-            <a href="{{ url_for('brokerage.watchlist_page') }}">Watchlist</a>
+            <a href="{{ url_for('brokerage.watchlist_page') }}">Lists</a>
+            <a href="{{ url_for('brokerage.orders_page') }}">History</a>
             <a href="{{ url_for('brokerage.trade_page') }}">Trade</a>
-            <a href="{{ url_for('brokerage.logout') }}">Logout</a>
+            <a href="{{ url_for('brokerage.logout') }}" class="nav-account">
+                <span class="avatar-sm">{{ user.name[0]|upper if user.name else 'U' }}</span>
+            </a>
             {% else %}
-            <a href="{{ url_for('brokerage.login_page') }}">Login</a>
+            <a href="{{ url_for('brokerage.login_page') }}">Log In</a>
             {% endif %}
-            <a href="/">MiniWeb</a>
-        </nav>
+            <a href="/" style="color:#6F7782;font-size:12px;">MiniWeb</a>
+        </div>
     </div>
-    <div class="container">
+    <div class="rh-container">
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Shared price state manager -->
+    <script>
+    var RH = window.RH || {};
+
+    // Shared price state via sessionStorage
+    RH.prices = (function() {
+        var KEY = 'rh_live_prices';
+        var state = {};
+
+        function load() {
+            try {
+                var stored = sessionStorage.getItem(KEY);
+                if (stored) state = JSON.parse(stored);
+            } catch(e) {}
+            return state;
+        }
+
+        function save() {
+            try {
+                sessionStorage.setItem(KEY, JSON.stringify(state));
+            } catch(e) {}
+        }
+
+        function update(sym, data) {
+            state[sym] = {
+                price: data.price,
+                change: data.change,
+                change_pct: data.change_pct,
+                direction: data.direction,
+                ts: Date.now()
+            };
+            save();
+        }
+
+        function get(sym) {
+            load();
+            return state[sym] || null;
+        }
+
+        function getAll() {
+            load();
+            return state;
+        }
+
+        load();
+        return { update: update, get: get, getAll: getAll, load: load };
+    })();
+
+    RH.fmt = function(p) {
+        if (p === null || p === undefined) return '$0.00';
+        return p >= 1 ? '$' + p.toFixed(2) : '$' + p.toFixed(4);
+    };
+
+    RH.fmtComma = function(n) {
+        return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    RH.fmtPct = function(pct) {
+        var sign = pct >= 0 ? '+' : '';
+        return sign + pct.toFixed(2) + '%';
+    };
+
+    RH.fmtChange = function(change, pct) {
+        var sign = change >= 0 ? '+' : '';
+        return sign + '$' + Math.abs(change).toFixed(2) + ' (' + sign + pct.toFixed(2) + '%)';
+    };
+
+    // Poll live prices for given symbols
+    RH.startPolling = function(symbols, callback, intervalMs) {
+        intervalMs = intervalMs || 2000;
+        if (!symbols || !symbols.length) return;
+
+        function tick() {
+            fetch("{{ url_for('brokerage.api_prices_live') }}?symbols=" + symbols.join(","))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    for (var sym in data) {
+                        RH.prices.update(sym, data[sym]);
+                    }
+                    if (callback) callback(data);
+                })
+                .catch(function() {});
+        }
+
+        tick();
+        return setInterval(tick, intervalMs);
+    };
+
+    window.RH = RH;
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Businesses - LakeReview</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f5f5f5; color: #333; }
+        a { color: #d32323; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #d32323; color: #fff; }
+        .header-top { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header-top .logo { font-size: 24px; font-weight: 700; color: #fff; }
+        .header-top .logo:hover { text-decoration: none; }
+        .header-nav a { color: #fff; margin-left: 18px; font-size: 14px; }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+        h1 { font-size: 26px; margin-bottom: 20px; }
+
+        .layout { display: flex; gap: 24px; }
+        .sidebar { width: 260px; flex-shrink: 0; }
+        .main { flex: 1; }
+
+        .filter-section { background: #fff; border-radius: 8px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .filter-section h3 { font-size: 14px; margin-bottom: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-section label { display: block; font-size: 13px; padding: 4px 0; cursor: pointer; color: #444; }
+        .filter-section input[type="radio"] { margin-right: 6px; }
+        .filter-section select, .filter-section input[type="text"] { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-bottom: 8px; }
+        .filter-btn { display: inline-block; padding: 8px 16px; background: #d32323; color: #fff; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; }
+        .filter-btn:hover { background: #b91c1c; text-decoration: none; }
+        .clear-link { font-size: 12px; color: #888; margin-left: 8px; }
+
+        .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+        .sort-bar a { padding: 6px 12px; background: #fff; border: 1px solid #ddd; border-radius: 4px; color: #555; }
+        .sort-bar a.active { background: #d32323; color: #fff; border-color: #d32323; }
+        .sort-bar a:hover { text-decoration: none; }
+
+        .result-count { font-size: 14px; color: #888; margin-bottom: 16px; }
+
+        .biz-list-item { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 16px; }
+        .biz-list-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+        .biz-rank { font-size: 20px; font-weight: 700; color: #ccc; width: 30px; flex-shrink: 0; padding-top: 2px; }
+        .biz-info { flex: 1; }
+        .biz-info h3 { font-size: 17px; margin-bottom: 4px; }
+        .biz-info h3 a { color: #333; }
+        .biz-info h3 a:hover { color: #d32323; }
+        .stars { color: #f5a623; font-size: 15px; letter-spacing: 1px; }
+        .stars .empty { color: #ddd; }
+        .biz-meta { font-size: 13px; color: #777; margin-top: 4px; }
+        .biz-category { display: inline-block; font-size: 12px; background: #f0f0f0; padding: 2px 10px; border-radius: 12px; color: #666; margin-top: 4px; }
+        .price-tag { font-weight: 600; color: #2b8a3e; margin-left: 8px; }
+        .biz-attrs { font-size: 12px; color: #888; margin-top: 4px; }
+        .biz-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+        .write-review-btn { display: inline-block; padding: 6px 14px; background: #d32323; color: #fff; border-radius: 4px; font-size: 12px; }
+        .write-review-btn:hover { background: #b91c1c; text-decoration: none; }
+
+        .footer { background: #333; color: #aaa; text-align: center; padding: 24px 20px; font-size: 13px; margin-top: 40px; }
+
+        @media (max-width: 768px) {
+            .layout { flex-direction: column; }
+            .sidebar { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <a href="{{ url_for('rating-review.index') }}" class="logo">LakeReview</a>
+            <nav class="header-nav">
+                <a href="{{ url_for('rating-review.businesses_list') }}">Businesses</a>
+                <a href="{{ url_for('rating-review.photo_gallery') }}">Photos</a>
+                {% if user %}
+                    <a href="{{ url_for('rating-review.my_reviews') }}">My Reviews</a>
+                    <a href="{{ url_for('rating-review.logout') }}">Logout ({{ user.display_name }})</a>
+                {% else %}
+                    <a href="{{ url_for('rating-review.login') }}">Log In</a>
+                {% endif %}
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>
+            {% if filters.search %}Search results for "{{ filters.search }}"
+            {% elif filters.category %}{{ filters.category }}
+            {% else %}All Businesses
+            {% endif %}
+        </h1>
+
+        <div class="layout">
+            <div class="sidebar">
+                <form action="{{ url_for('rating-review.businesses_list') }}" method="get">
+                    <div class="filter-section">
+                        <h3>Search</h3>
+                        <input type="text" name="search" value="{{ filters.search }}" placeholder="Business name, cuisine...">
+                    </div>
+
+                    <div class="filter-section">
+                        <h3>Category</h3>
+                        <select name="category">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-section">
+                        <h3>Price Range</h3>
+                        {% for pr in price_ranges %}
+                        <label><input type="radio" name="price" value="{{ pr }}" {% if filters.price == pr %}checked{% endif %}> {{ pr }}</label>
+                        {% endfor %}
+                        <label><input type="radio" name="price" value="" {% if not filters.price %}checked{% endif %}> Any</label>
+                    </div>
+
+                    <div class="filter-section">
+                        <h3>Minimum Rating</h3>
+                        <select name="min_rating">
+                            <option value="">Any Rating</option>
+                            <option value="4.5" {% if filters.min_rating == '4.5' %}selected{% endif %}>4.5+</option>
+                            <option value="4.0" {% if filters.min_rating == '4.0' %}selected{% endif %}>4.0+</option>
+                            <option value="3.5" {% if filters.min_rating == '3.5' %}selected{% endif %}>3.5+</option>
+                            <option value="3.0" {% if filters.min_rating == '3.0' %}selected{% endif %}>3.0+</option>
+                        </select>
+                    </div>
+
+                    <input type="hidden" name="sort" value="{{ filters.sort }}">
+                    <button type="submit" class="filter-btn">Apply Filters</button>
+                    <a href="{{ url_for('rating-review.businesses_list') }}" class="clear-link">Clear All</a>
+                </form>
+            </div>
+
+            <div class="main">
+                <div class="sort-bar">
+                    <span>Sort by:</span>
+                    <a href="{{ url_for('rating-review.businesses_list', category=filters.category, price=filters.price, min_rating=filters.min_rating, search=filters.search, sort='rating') }}" class="{% if filters.sort == 'rating' %}active{% endif %}">Rating</a>
+                    <a href="{{ url_for('rating-review.businesses_list', category=filters.category, price=filters.price, min_rating=filters.min_rating, search=filters.search, sort='reviews') }}" class="{% if filters.sort == 'reviews' %}active{% endif %}">Most Reviewed</a>
+                    <a href="{{ url_for('rating-review.businesses_list', category=filters.category, price=filters.price, min_rating=filters.min_rating, search=filters.search, sort='name') }}" class="{% if filters.sort == 'name' %}active{% endif %}">Name</a>
+                </div>
+
+                <div class="result-count">{{ businesses | length }} businesses found</div>
+
+                {% for biz in businesses %}
+                <div class="biz-list-item">
+                    <div class="biz-rank">{{ loop.index }}.</div>
+                    <div class="biz-info">
+                        <h3><a href="{{ url_for('rating-review.business_detail', business_id=biz.id) }}">{{ biz.name }}</a></h3>
+                        <div class="stars">
+                            {% set full = biz.overall_rating | int %}
+                            {% set half = (biz.overall_rating - full) >= 0.3 %}
+                            {% for i in range(full) %}&#9733;{% endfor %}{% if half %}&#9733;{% endif %}{% for i in range(5 - full - (1 if half else 0)) %}<span class="empty">&#9733;</span>{% endfor %}
+                            <span style="color:#555; font-size:13px; margin-left:4px;">{{ biz.overall_rating }}</span>
+                            <span style="color:#888; font-size:12px;">({{ biz.review_count }} reviews)</span>
+                        </div>
+                        <div class="biz-meta">{{ biz.address }} &middot; {{ biz.phone }}</div>
+                        <div>
+                            <span class="biz-category">{{ biz.subcategory }}</span>
+                            <span class="price-tag">{{ biz.price_range }}</span>
+                        </div>
+                        <div class="biz-attrs">{{ biz.attributes | join(", ") }}</div>
+                    </div>
+                    <div class="biz-actions">
+                        <a href="{{ url_for('rating-review.write_review', business_id=biz.id) }}" class="write-review-btn">Write a Review</a>
+                        <a href="/sites/map-services/directions?to={{ biz.address|urlencode }}" style="color:#0073e6;font-size:.82rem;text-decoration:none;">Get Directions</a>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if businesses | length == 0 %}
+                <div style="text-align:center; padding:40px; color:#888;">
+                    <p style="font-size:18px;">No businesses found matching your criteria.</p>
+                    <p style="margin-top:10px;"><a href="{{ url_for('rating-review.businesses_list') }}">View all businesses</a></p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        LakeReview &copy; 2026 &mdash; Lakeport's trusted local review platform
+    </div>
+</body>
+</html>

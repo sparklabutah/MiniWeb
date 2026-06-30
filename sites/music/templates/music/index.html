@@ -3,14 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>SoundWave Music</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+        a { color: #1db954; text-decoration: none; }
+        a:hover { color: #1ed760; }
+
+        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; letter-spacing: 1px; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .search-form { display: flex; gap: .4rem; }
+        .top-bar .search-form input { padding: .4rem .8rem; border: 1px solid #333; border-radius: 1rem; background: #1a1a1a; color: #e0e0e0; font-size: .85rem; width: 200px; }
+        .top-bar .search-form input:focus { border-color: #1db954; outline: none; }
+        .top-bar .search-form button { display: none; }
+        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+        .top-bar .btn-login:hover { background: #1ed760; color: #000; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2.section-title { font-size: 1.4rem; margin-bottom: 1rem; color: #fff; }
+        .section { margin-bottom: 2.5rem; }
+
+        .artist-grid, .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; }
+        .artist-card, .album-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
+        .artist-card:hover, .album-card:hover { background: #282828; text-decoration: none; color: inherit; }
+        .artist-card .avatar { width: 100%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: .8rem; }
+        .album-card .cover { width: 100%; aspect-ratio: 1; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .8rem; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+        .card-name { font-weight: 600; font-size: .95rem; color: #fff; margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-meta { font-size: .8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .track-list { list-style: none; }
+        .track-row { display: flex; align-items: center; padding: .6rem .8rem; border-radius: .3rem; gap: .8rem; transition: background .15s; }
+        .track-row:hover { background: #1a1a1a; }
+        .track-num { width: 2rem; text-align: right; color: #888; font-size: .9rem; flex-shrink: 0; }
+        .track-cover-sm { width: 40px; height: 40px; border-radius: .2rem; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: rgba(255,255,255,.6); flex-shrink: 0; }
+        .track-info { flex: 1; min-width: 0; }
+        .track-title { font-size: .95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-title a { color: #fff; }
+        .track-title a:hover { color: #1db954; }
+        .track-artist { font-size: .8rem; color: #888; }
+        .track-artist a { color: #888; }
+        .track-artist a:hover { color: #1db954; }
+        .track-plays { color: #888; font-size: .85rem; min-width: 60px; text-align: right; }
+        .track-duration { color: #888; font-size: .85rem; min-width: 45px; text-align: right; }
+
+        .genre-pills { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 2rem; }
+        .genre-pill { display: inline-block; padding: .4rem 1rem; border-radius: 1rem; background: #282828; color: #e0e0e0; font-size: .85rem; transition: background .15s; }
+        .genre-pill:hover { background: #1db954; color: #000; text-decoration: none; }
+
+        @media (max-width: 768px) {
+            .artist-grid, .album-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        }
+    </style>
 </head>
 <body>
+    <div class="top-bar">
+        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
+        <div class="nav-links">
+            <a href="{{ url_for('music.browse') }}">Browse</a>
+            <a href="{{ url_for('music.playlists_page') }}">Playlists</a>
+            <a href="{{ url_for('music.library_page') }}">Library</a>
+            <form class="search-form" action="{{ url_for('music.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search artists, albums, tracks..." autocomplete="off">
+                <button type="submit">Search</button>
+            </form>
+            {% if user %}
+                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
+                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
+            {% else %}
+                <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+        <!-- Genre quick links -->
+        <div class="genre-pills">
+            {% for g in genres %}
+            <a href="{{ url_for('music.browse', genre=g) }}" class="genre-pill">{{ g }}</a>
+            {% endfor %}
+        </div>
+
+        <!-- Featured Artists -->
+        <div class="section">
+            <h2 class="section-title">Popular Artists</h2>
+            <div class="artist-grid">
+                {% for artist in featured_artists %}
+                <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="artist-card">
+                    <div class="avatar" style="background: linear-gradient(135deg, #1db954, #191414);">{{ artist.name[0] }}</div>
+                    <div class="card-name">{{ artist.name }}</div>
+                    <div class="card-meta">{{ artist.genre }}{% if artist.verified %} &middot; Verified{% endif %}</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- New Releases -->
+        <div class="section">
+            <h2 class="section-title">New Releases</h2>
+            <div class="album-grid">
+                {% for album in new_releases %}
+                <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="album-card">
+                    <div class="cover" style="background: {{ album.cover_color }};">{{ album.title[0] }}</div>
+                    <div class="card-name">{{ album.title }}</div>
+                    <div class="card-meta">{{ album.release_date }} &middot; {{ album.tracks_count }} tracks</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Popular Tracks -->
+        <div class="section">
+            <h2 class="section-title">Popular Tracks</h2>
+            <ul class="track-list">
+                {% for track in popular_tracks %}
+                <li class="track-row">
+                    <span class="track-num">{{ loop.index }}</span>
+                    <div class="track-cover-sm" style="background: {{ track.album_cover_color }};">{{ track.title[0] }}</div>
+                    <div class="track-info">
+                        <div class="track-title"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                        <div class="track-artist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a></div>
+                    </div>
+                    <span class="track-plays">{{ track.plays_formatted }}</span>
+                    <span class="track-duration">{{ track.duration_formatted }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 </body>
 </html>

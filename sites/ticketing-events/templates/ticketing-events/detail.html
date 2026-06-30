@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.name }} - Lakeport Events</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .header-actions a { color: #fff; text-decoration: none; font-size: .9rem; margin-left: 1rem; padding: .4rem .8rem; border-radius: .3rem; }
+        .header-actions a:hover { background: rgba(255,255,255,.15); }
+        nav { max-width: 1200px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #333; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #fff5f5; color: #d63031; }
+        nav a.active { font-weight: 700; background: #fff0f0; color: #d63031; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+        .breadcrumb { font-size: .85rem; color: #666; margin-bottom: 1.2rem; }
+        .breadcrumb a { color: #d63031; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .event-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+        @media (max-width: 768px) { .event-layout { grid-template-columns: 1fr; } }
+
+        .event-banner { height: 240px; border-radius: .6rem; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 4rem; margin-bottom: 1.5rem;
+            {% if event.category == 'Music' %}background: linear-gradient(135deg, #667eea, #764ba2);
+            {% elif event.category == 'Festival' %}background: linear-gradient(135deg, #f7971e, #ffd200);
+            {% elif event.category == 'Sports' %}background: linear-gradient(135deg, #11998e, #38ef7d);
+            {% elif event.category == 'Convention' %}background: linear-gradient(135deg, #4568dc, #b06ab3);
+            {% elif event.category == 'Workshop' %}background: linear-gradient(135deg, #ee9ca7, #ffdde1);
+            {% elif event.category == 'Arts & Culture' %}background: linear-gradient(135deg, #e44d26, #f16529);
+            {% elif event.category == 'Technology' %}background: linear-gradient(135deg, #0f2027, #2c5364);
+            {% else %}background: linear-gradient(135deg, #667eea, #764ba2);
+            {% endif %}
+        }
+
+        .event-main h2 { font-size: 1.8rem; margin-bottom: .5rem; color: #1a1a2e; }
+        .event-category-badge { display: inline-block; padding: .2rem .6rem; background: #fff0f0; color: #d63031; font-size: .75rem; font-weight: 700; text-transform: uppercase; border-radius: .2rem; margin-bottom: 1rem; }
+        .status-badge { display: inline-block; padding: .2rem .6rem; font-size: .75rem; font-weight: 700; text-transform: uppercase; border-radius: .2rem; margin-left: .5rem; }
+        .status-on-sale { background: #d4edda; color: #155724; }
+        .status-completed { background: #e2e3e5; color: #383d41; }
+
+        .event-details { margin-bottom: 1.5rem; }
+        .detail-row { display: flex; align-items: flex-start; gap: .8rem; padding: .6rem 0; border-bottom: 1px solid #f0f0f0; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-icon { width: 28px; text-align: center; color: #d63031; font-size: 1.1rem; flex-shrink: 0; }
+        .detail-content { flex: 1; }
+        .detail-content strong { display: block; font-size: .85rem; color: #333; }
+        .detail-content span { font-size: .85rem; color: #666; }
+
+        .event-description { margin-bottom: 1.5rem; }
+        .event-description h3 { font-size: 1.1rem; margin-bottom: .6rem; }
+        .event-description p { font-size: .95rem; color: #444; line-height: 1.7; }
+
+        .event-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; }
+        .event-tags .tag { padding: .2rem .6rem; background: #f0f0f0; color: #666; font-size: .78rem; border-radius: 1rem; }
+
+        .ticket-panel { background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 1.5rem; position: sticky; top: 1.5rem; }
+        .ticket-panel h3 { font-size: 1.1rem; margin-bottom: 1rem; color: #1a1a2e; }
+
+        .ticket-type { border: 1.5px solid #e2e8f0; border-radius: .4rem; padding: .8rem 1rem; margin-bottom: .8rem; display: flex; justify-content: space-between; align-items: center; }
+        .ticket-type.selected { border-color: #d63031; background: #fff8f8; }
+        .ticket-type-info h4 { font-size: .95rem; color: #333; margin-bottom: .2rem; }
+        .ticket-type-info .price { font-size: 1.1rem; font-weight: 700; color: #d63031; }
+        .ticket-type-info .price.free { color: #00b894; }
+        .ticket-type-info .avail { font-size: .78rem; color: #999; }
+        .ticket-type-info .avail.low { color: #e17055; font-weight: 600; }
+        .ticket-type-info .avail.sold-out { color: #d63031; font-weight: 600; }
+
+        .ticket-qty { display: flex; align-items: center; gap: .4rem; }
+        .ticket-qty button { width: 28px; height: 28px; border: 1.5px solid #d1d5db; background: #fff; border-radius: .3rem; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .ticket-qty button:hover { background: #f0f0f0; }
+        .ticket-qty input { width: 36px; text-align: center; border: 1.5px solid #d1d5db; border-radius: .3rem; padding: .2rem; font-size: .9rem; }
+
+        .order-summary { background: #f8f9fa; border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+        .order-line { display: flex; justify-content: space-between; font-size: .85rem; color: #555; padding: .2rem 0; }
+        .order-line.total { font-weight: 700; color: #1a1a2e; font-size: 1rem; border-top: 1px solid #dee2e6; padding-top: .5rem; margin-top: .3rem; }
+
+        .btn-buy { width: 100%; padding: .8rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: .5rem; }
+        .btn-buy:hover { background: #c0392b; }
+        .btn-buy:disabled { background: #ccc; cursor: not-allowed; }
+
+        .purchase-msg { padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-top: .8rem; display: none; }
+        .purchase-msg.success { display: block; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .purchase-msg.error { display: block; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .organizer-info { background: #fff; border-radius: .6rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 1rem 1.2rem; margin-top: 1.5rem; }
+        .organizer-info h4 { font-size: .9rem; color: #999; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .4rem; }
+        .organizer-info p { font-size: .95rem; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+        <div class="header-actions">
+            {% if logged_in %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.logout') }}">Sign Out ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('ticketing-events.index') }}">All Events</a>
+        <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+        {% if not logged_in %}
+        <a href="{{ url_for('ticketing-events.login_page') }}">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('ticketing-events.index') }}">Events</a> /
+            <a href="{{ url_for('ticketing-events.index') }}?category={{ event.category }}">{{ event.category }}</a> /
+            {{ event.name }}
+        </div>
+
+        <div class="event-banner">
+            {% if event.category == 'Music' %}&#9835;
+            {% elif event.category == 'Festival' %}&#9733;
+            {% elif event.category == 'Sports' %}&#9917;
+            {% elif event.category == 'Convention' %}&#9881;
+            {% elif event.category == 'Workshop' %}&#9998;
+            {% elif event.category == 'Arts & Culture' %}&#9734;
+            {% elif event.category == 'Technology' %}&#9000;
+            {% else %}&#9733;
+            {% endif %}
+        </div>
+
+        <div class="event-layout">
+            <div class="event-main">
+                <span class="event-category-badge">{{ event.category }}</span>
+                <span class="status-badge {% if event.status == 'on_sale' %}status-on-sale{% else %}status-completed{% endif %}">{{ event.status | replace('_', ' ') }}</span>
+                <h2>{{ event.name }}</h2>
+
+                <div class="event-details">
+                    <div class="detail-row">
+                        <div class="detail-icon">&#128197;</div>
+                        <div class="detail-content">
+                            <strong>{{ event.date }}</strong>
+                            <span>{{ event.time }}</span>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-icon">&#128205;</div>
+                        <div class="detail-content">
+                            <strong>{{ event.venue }}</strong>
+                            <span>{{ event.address }}</span>
+                            <div style="margin-top:4px;">
+                                <a href="/sites/map-services/?q={{ event.venue|urlencode }}" style="color:#1a73e8;font-size:.85rem;text-decoration:none;">View on Map</a>
+                                &middot;
+                                <a href="/sites/map-services/directions?to={{ (event.address or event.venue)|urlencode }}" style="color:#1a73e8;font-size:.85rem;text-decoration:none;">Get Directions &rarr;</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-icon">&#128682;</div>
+                        <div class="detail-content">
+                            <strong>Doors Open</strong>
+                            <span>{{ event.doors_open }}</span>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-icon">&#128100;</div>
+                        <div class="detail-content">
+                            <strong>Age Restriction</strong>
+                            <span>{{ event.age_restriction }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="event-description">
+                    <h3>About This Event</h3>
+                    <p>{{ event.description }}</p>
+                </div>
+
+                <div class="event-tags">
+                    {% for tag in event.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="organizer-info">
+                    <h4>Organized By</h4>
+                    <p>{{ event.organizer }}</p>
+                </div>
+            </div>
+
+            <div class="ticket-sidebar">
+                <div class="ticket-panel">
+                    <h3>Tickets</h3>
+
+                    {% if event.status == 'on_sale' %}
+                    <form id="purchaseForm" onsubmit="return false;">
+                        {% for tt in event.ticket_types %}
+                        {% set remaining = tt.available - tt.sold if tt.available > 0 else 0 %}
+                        <div class="ticket-type" data-type="{{ tt.type }}" data-price="{{ tt.price }}" data-remaining="{{ remaining }}">
+                            <div class="ticket-type-info">
+                                <h4>{{ tt.type }}</h4>
+                                {% if tt.price == 0 %}
+                                <div class="price free">Free</div>
+                                {% else %}
+                                <div class="price">${{ "%.2f" | format(tt.price) }}</div>
+                                {% endif %}
+                                {% if tt.available == 0 %}
+                                <div class="avail">Unlimited</div>
+                                {% elif remaining <= 0 %}
+                                <div class="avail sold-out">Sold Out</div>
+                                {% elif remaining <= 10 %}
+                                <div class="avail low">Only {{ remaining }} left!</div>
+                                {% else %}
+                                <div class="avail">{{ remaining }} available</div>
+                                {% endif %}
+                            </div>
+                            {% if remaining > 0 or tt.available == 0 %}
+                            <div class="ticket-qty">
+                                <button type="button" onclick="changeQty(this, -1)">-</button>
+                                <input type="number" class="qty-input" value="0" min="0" max="{{ remaining if tt.available > 0 else 99 }}" readonly>
+                                <button type="button" onclick="changeQty(this, 1)">+</button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="order-summary" id="orderSummary" style="display:none;">
+                            <div id="orderLines"></div>
+                            <div class="order-line">
+                                <span>Service Fee (12%)</span>
+                                <span id="feeAmount">$0.00</span>
+                            </div>
+                            <div class="order-line total">
+                                <span>Total</span>
+                                <span id="totalAmount">$0.00</span>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-buy" id="buyBtn" onclick="purchaseTickets()" disabled>Select Tickets</button>
+                    </form>
+                    {% else %}
+                    <p style="color: #666; font-size: .9rem; text-align: center; padding: 1rem 0;">
+                        {% if event.status == 'completed' %}
+                        This event has ended.
+                        {% else %}
+                        Tickets are not currently available.
+                        {% endif %}
+                    </p>
+                    {% endif %}
+
+                    <div class="purchase-msg" id="purchaseMsg"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if event.status == 'on_sale' %}
+    <script>
+        var userId = {{ user.id }};
+        var eventId = {{ event.id }};
+
+        function changeQty(btn, delta) {
+            var row = btn.closest('.ticket-type');
+            var input = row.querySelector('.qty-input');
+            var val = parseInt(input.value) || 0;
+            var max = parseInt(input.getAttribute('max')) || 99;
+            val = Math.max(0, Math.min(max, val + delta));
+            input.value = val;
+            updateSummary();
+        }
+
+        function updateSummary() {
+            var rows = document.querySelectorAll('.ticket-type');
+            var subtotal = 0;
+            var hasQty = false;
+            var linesHtml = '';
+
+            rows.forEach(function(row) {
+                var input = row.querySelector('.qty-input');
+                if (!input) return;
+                var qty = parseInt(input.value) || 0;
+                var price = parseFloat(row.getAttribute('data-price'));
+                var typeName = row.getAttribute('data-type');
+                if (qty > 0) {
+                    hasQty = true;
+                    var lineTotal = qty * price;
+                    subtotal += lineTotal;
+                    linesHtml += '<div class="order-line"><span>' + qty + 'x ' + typeName + '</span><span>$' + lineTotal.toFixed(2) + '</span></div>';
+                    row.classList.add('selected');
+                } else {
+                    row.classList.remove('selected');
+                }
+            });
+
+            var summary = document.getElementById('orderSummary');
+            var buyBtn = document.getElementById('buyBtn');
+
+            if (hasQty) {
+                var fees = subtotal > 0 ? Math.round(subtotal * 0.12 * 100) / 100 : 0;
+                var total = subtotal + fees;
+                document.getElementById('orderLines').innerHTML = linesHtml;
+                document.getElementById('feeAmount').textContent = '$' + fees.toFixed(2);
+                document.getElementById('totalAmount').textContent = '$' + total.toFixed(2);
+                summary.style.display = 'block';
+                buyBtn.disabled = false;
+                buyBtn.textContent = total > 0 ? 'Buy Now - $' + total.toFixed(2) : 'Reserve Now - Free';
+            } else {
+                summary.style.display = 'none';
+                buyBtn.disabled = true;
+                buyBtn.textContent = 'Select Tickets';
+            }
+        }
+
+        function purchaseTickets() {
+            var rows = document.querySelectorAll('.ticket-type');
+            var purchases = [];
+
+            rows.forEach(function(row) {
+                var input = row.querySelector('.qty-input');
+                if (!input) return;
+                var qty = parseInt(input.value) || 0;
+                if (qty > 0) {
+                    purchases.push({
+                        ticket_type: row.getAttribute('data-type'),
+                        quantity: qty
+                    });
+                }
+            });
+
+            if (purchases.length === 0) return;
+
+            var buyBtn = document.getElementById('buyBtn');
+            buyBtn.disabled = true;
+            buyBtn.textContent = 'Processing...';
+
+            var msgEl = document.getElementById('purchaseMsg');
+            msgEl.className = 'purchase-msg';
+            msgEl.style.display = 'none';
+
+            // Process each ticket type as a separate order
+            var completed = 0;
+            var errors = [];
+            var orderIds = [];
+
+            purchases.forEach(function(p) {
+                fetch('{{ url_for("ticketing-events.api_orders_create") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        event_id: eventId,
+                        ticket_type: p.ticket_type,
+                        quantity: p.quantity
+                    })
+                })
+                .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+                .then(function(res) {
+                    if (res.ok) {
+                        orderIds.push(res.data.id);
+                    } else {
+                        errors.push(res.data.error || 'Purchase failed');
+                    }
+                    completed++;
+                    if (completed === purchases.length) {
+                        if (errors.length > 0) {
+                            msgEl.className = 'purchase-msg error';
+                            msgEl.textContent = errors.join('; ');
+                            msgEl.style.display = 'block';
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = 'Try Again';
+                        } else {
+                            msgEl.className = 'purchase-msg success';
+                            msgEl.textContent = 'Purchase confirmed! Order ' + orderIds.join(', ') + ' created. Check My Tickets for details.';
+                            msgEl.style.display = 'block';
+                            buyBtn.textContent = 'Purchased!';
+                            // Refresh availability display after short delay
+                            setTimeout(function() { location.reload(); }, 2000);
+                        }
+                    }
+                })
+                .catch(function() {
+                    errors.push('Network error');
+                    completed++;
+                    if (completed === purchases.length) {
+                        msgEl.className = 'purchase-msg error';
+                        msgEl.textContent = errors.join('; ');
+                        msgEl.style.display = 'block';
+                        buyBtn.disabled = false;
+                        buyBtn.textContent = 'Try Again';
+                    }
+                });
+            });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>

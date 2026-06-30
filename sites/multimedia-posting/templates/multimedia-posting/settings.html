@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Settings</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .container { max-width: 600px; margin: 40px auto; padding: 20px; }
+        .settings-card { background: #fff; border: 1px solid #dbdbdb; border-radius: 8px; padding: 24px; }
+        .settings-card h2 { font-size: 20px; margin-bottom: 24px; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #efefef; }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-label { font-size: 14px; font-weight: 500; }
+        .setting-desc { font-size: 12px; color: #8e8e8e; margin-top: 2px; }
+        .toggle { position: relative; width: 44px; height: 24px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 24px; transition: 0.3s; }
+        .toggle .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle input:checked + .slider { background: #0095f6; }
+        .toggle input:checked + .slider:before { transform: translateX(20px); }
+        .save-msg { text-align: center; color: #00a86b; font-size: 13px; margin-top: 16px; display: none; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.settings_page') }}" style="color:#0095f6;font-weight:600;">Settings</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="settings-card">
+            <h2>Settings</h2>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Push Notifications</div>
+                    <div class="setting-desc">Receive notifications for likes, comments, and follows</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="notifications_enabled" checked onchange="updateSetting('notifications_enabled', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Private Account</div>
+                    <div class="setting-desc">Only approved followers can see your posts</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="private_account" onchange="updateSetting('private_account', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Show Activity Status</div>
+                    <div class="setting-desc">Let others see when you were last active</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="show_activity_status" checked onchange="updateSetting('show_activity_status', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Allow Sharing</div>
+                    <div class="setting-desc">Allow others to share your posts</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="allow_sharing" checked onchange="updateSetting('allow_sharing', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Dark Mode</div>
+                    <div class="setting-desc">Use dark theme throughout the app</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="dark_mode" onchange="updateSetting('dark_mode', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="save-msg" class="save-msg">Settings saved</div>
+        </div>
+    </div>
+
+    <script>
+    const baseUrl = "{{ url_for('multimedia-posting.index') }}";
+
+    // Load current settings
+    fetch(`${baseUrl}api/settings`)
+        .then(r => r.json())
+        .then(settings => {
+            if (settings.error) return;
+            for (const [key, val] of Object.entries(settings)) {
+                const el = document.getElementById(key);
+                if (el) el.checked = val;
+            }
+        });
+
+    function updateSetting(key, value) {
+        const body = {};
+        body[key] = value;
+        fetch(`${baseUrl}api/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        }).then(r => r.json()).then(() => {
+            const msg = document.getElementById('save-msg');
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 2000);
+        });
+    }
+    </script>
+</body>
+</html>

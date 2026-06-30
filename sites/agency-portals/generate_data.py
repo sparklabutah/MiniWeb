@@ -11,7 +11,7 @@ import shutil
 import string
 
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = SITE_DIR / "data"
+DATA_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/agency-portals")
 PRISTINE_DIR = DATA_DIR / ".pristine"
 CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
@@ -94,7 +94,7 @@ def generate(seed=42):
          "description": "Schedule a fire safety inspection for commercial properties."},
         {"id": 11, "name": "Business License Application", "department_id": 8, "code": "SVC-BLA",
          "category": "Licenses", "fee": 100.00, "online": True,
-         "description": "Apply for a new business license in Cedar Grove."},
+         "description": "Apply for a new business license in Lakeport."},
         {"id": 12, "name": "Birth Certificate Request", "department_id": 8, "code": "SVC-BCR",
          "category": "Vital Records", "fee": 15.00, "online": True,
          "description": "Request a certified copy of a birth certificate."},

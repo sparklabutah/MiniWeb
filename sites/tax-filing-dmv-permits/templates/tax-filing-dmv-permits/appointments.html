@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Appointment - Lakeport Government Services</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1b3a4b, #274c5b); padding: .8rem 2rem; } .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; } .header h1 a span { color: #5db8a3; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+        nav a { color: #1b3a4b; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; }
+        .container { max-width: 700px; margin: 2rem auto; padding: 0 2rem; }
+        .form-card { background: #fff; padding: 2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .form-card h2 { color: #1b3a4b; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; color: #334155; margin-bottom: .3rem; }
+        .form-group input, .form-group select { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .submit-btn { width: 100%; padding: .8rem; background: #1b3a4b; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .success-msg { background: #d1fae5; color: #065f46; padding: 1rem; border-radius: .3rem; margin-bottom: 1rem; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Lakeport <span>Gov</span>Services</a></h1></div>
+    <nav><a href="{{ url_for('tax-filing-dmv-permits.index') }}">Dashboard</a></nav>
+    <div class="container">
+        <div class="form-card">
+            <h2>Book a DMV Appointment</h2>
+            <div id="success-msg" class="success-msg"></div>
+            <form id="appt-form" onsubmit="return bookAppt(event)">
+                <div class="form-group"><label for="service">Service</label>
+                    <select id="service"><option value="Vehicle Registration">Vehicle Registration</option><option value="License Renewal">License Renewal</option><option value="Title Transfer">Title Transfer</option><option value="Permit Application">Permit Application</option><option value="Tax Filing Assistance">Tax Filing Assistance</option></select>
+                </div>
+                <div class="form-group"><label for="appt_date">Date</label><input type="date" id="appt_date" required></div>
+                <div class="form-group"><label for="time_slot">Time Slot</label>
+                    <select id="time_slot"><option value="9:00 AM">9:00 AM</option><option value="10:00 AM">10:00 AM</option><option value="11:00 AM">11:00 AM</option><option value="1:00 PM">1:00 PM</option><option value="2:00 PM">2:00 PM</option><option value="3:00 PM">3:00 PM</option></select>
+                </div>
+                <div class="form-group"><label for="location">Location</label>
+                    <select id="location"><option value="Lakeport DMV Office">Lakeport DMV Office</option><option value="Lakeport City Hall">Lakeport City Hall</option></select>
+                </div>
+                <button type="submit" class="submit-btn">Book Appointment</button>
+            </form>
+        </div>
+    </div>
+    <script>
+    function bookAppt(e) {
+        e.preventDefault();
+        var data = {
+            service: document.getElementById('service').value,
+            date: document.getElementById('appt_date').value,
+            time_slot: document.getElementById('time_slot').value,
+            location: document.getElementById('location').value,
+        };
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/appointments', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var msg = document.getElementById('success-msg');
+            msg.style.display = 'block';
+            msg.textContent = 'Appointment booked! ID: ' + d.appointment_id + ' on ' + d.date + ' at ' + d.time_slot;
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

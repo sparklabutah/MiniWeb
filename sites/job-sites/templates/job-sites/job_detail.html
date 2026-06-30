@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ job.job_title }} at {{ job.company }} - JobQuest</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #dc2626; }
+        .login-banner { max-width: 900px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
+        .login-banner a { color: #4338ca; font-weight: 600; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #6b7280; margin-bottom: 1rem; }
+        .breadcrumb a { color: #6366f1; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .job-header { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .job-header h2 { font-size: 1.5rem; color: #1e1b4b; margin-bottom: .3rem; }
+        .job-header .company { font-size: 1.1rem; color: #374151; font-weight: 500; }
+        .job-header .rating { color: #f59e0b; }
+        .job-meta { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; font-size: .9rem; color: #6b7280; }
+        .job-meta .item { display: flex; align-items: center; gap: .3rem; }
+        .job-actions { display: flex; gap: .8rem; margin-top: 1.2rem; }
+        .btn { padding: .6rem 1.5rem; border-radius: .4rem; font-size: .9rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #6366f1; color: #fff; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-primary:disabled, .btn-primary.disabled { background: #a5b4fc; cursor: not-allowed; }
+        .btn-secondary { background: #fff; color: #6366f1; border: 1.5px solid #6366f1; }
+        .btn-secondary:hover { background: #f5f3ff; }
+        .btn-success { background: #059669; color: #fff; }
+        .section { background: #fff; border-radius: .5rem; padding: 1.5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .section h3 { font-size: 1rem; color: #374151; margin-bottom: .8rem; border-bottom: 1px solid #f3f4f6; padding-bottom: .5rem; }
+        .section p { font-size: .9rem; line-height: 1.6; color: #4b5563; }
+        .requirements { list-style: none; padding: 0; }
+        .requirements li { padding: .4rem 0; font-size: .9rem; color: #4b5563; padding-left: 1.2rem; position: relative; }
+        .requirements li::before { content: "&#10003;"; position: absolute; left: 0; color: #059669; font-weight: 700; }
+        .tags { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+        .tag { background: #e0e7ff; color: #3730a3; padding: .2rem .6rem; border-radius: .3rem; font-size: .8rem; font-weight: 500; }
+        .notes-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: .5rem; padding: 1rem 1.5rem; font-size: .9rem; color: #92400e; }
+        .notes-section strong { display: block; margin-bottom: .3rem; }
+        .footer { text-align: center; padding: 2rem; color: #9ca3af; font-size: .8rem; border-top: 1px solid #e5e7eb; margin-top: 3rem; background: #fff; }
+        #apply-status { margin-top: .8rem; font-size: .9rem; font-weight: 500; }
+        .applied-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: .3rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('job-sites.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('job-sites.login_page') }}">Sign In</a>
+        {% endif %}
+    </nav>
+
+    {% if not logged_in %}
+    <div class="login-banner">
+        Browsing as {{ user.display_name }} (demo mode). <a href="{{ url_for('job-sites.login_page') }}">Sign in</a> to apply or save jobs.
+    </div>
+    {% endif %}
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('job-sites.jobs_page') }}">Jobs</a> &raquo; {{ job.job_title }}
+        </div>
+
+        <div class="job-header">
+            <h2>{{ job.job_title }}</h2>
+            <div class="company">{{ job.company }} {% if job.company_rating %}<span class="rating">&#9733; {{ job.company_rating }}</span>{% endif %}</div>
+            <div class="job-meta">
+                <span class="item">{{ job.location }}</span>
+                <span class="item">{{ job.salary_range }}</span>
+                <span class="item" style="text-transform:capitalize;">{{ job.job_type }}</span>
+                <span class="item">Posted {{ job.posted_date }}</span>
+            </div>
+            <div class="job-actions">
+                {% if applied %}
+                <span class="applied-badge">Applied</span>
+                {% else %}
+                <a href="{{ url_for('job-sites.apply_form_page', job_id=job.row_id) }}" class="btn btn-primary">Apply Now</a>
+                {% endif %}
+                <button class="btn btn-secondary" id="save-btn" onclick="toggleSave({{ job.row_id }})">Save Job</button>
+                <button class="btn btn-secondary" id="follow-btn" onclick="toggleFollow('{{ job.company }}')">
+                    {% if is_following %}Following{% else %}Follow {{ job.company }}{% endif %}
+                </button>
+            </div>
+            <div id="apply-status"></div>
+        </div>
+
+        <div class="section">
+            <h3>Job Description</h3>
+            <p>{{ job.job_description }}</p>
+        </div>
+
+        {% if job.requirements %}
+        <div class="section">
+            <h3>Requirements</h3>
+            <ul class="requirements">
+                {% for req in job.requirements %}
+                <li>{{ req }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if job.tags %}
+        <div class="section">
+            <h3>Tags</h3>
+            <div class="tags">
+                {% for tag in job.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if job.notes %}
+        <div class="notes-section">
+            <strong>Your Notes</strong>
+            {{ job.notes }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        JobQuest &mdash; Your job search, simplified. &copy; 2026
+    </div>
+
+    <script>
+    function applyJob(jobId) {
+        const btn = document.getElementById("apply-btn");
+        btn.disabled = true;
+        btn.textContent = "Applying...";
+        fetch("{{ url_for('job-sites.index') }}api/jobs/" + jobId + "/apply", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+        })
+        .then(r => {
+            if (r.status === 409) {
+                document.getElementById("apply-status").innerHTML =
+                    '<span style="color:#dc2626;">You have already applied to this position.</span>';
+                btn.textContent = "Already Applied";
+                return;
+            }
+            return r.json();
+        })
+        .then(d => {
+            if (d) {
+                document.getElementById("apply-status").innerHTML =
+                    '<span style="color:#059669;">Application submitted successfully!</span>';
+                btn.textContent = "Applied";
+                btn.classList.add("disabled");
+            }
+        })
+        .catch(() => {
+            document.getElementById("apply-status").innerHTML =
+                '<span style="color:#dc2626;">Error submitting application.</span>';
+            btn.disabled = false;
+            btn.textContent = "Apply Now";
+        });
+    }
+
+    function toggleSave(jobId) {
+        const btn = document.getElementById("save-btn");
+        fetch("{{ url_for('job-sites.index') }}api/jobs/" + jobId + "/save", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+        })
+        .then(r => r.json())
+        .then(d => {
+            btn.textContent = d.status === "saved" ? "Unsave Job" : "Save Job";
+        });
+    }
+
+    function toggleFollow(companyName) {
+        fetch("{{ url_for('job-sites.api_follow_company') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({company: companyName})
+        })
+        .then(r => r.json())
+        .then(d => {
+            var btn = document.getElementById("follow-btn");
+            if (d.action === "followed") {
+                btn.textContent = "Following";
+            } else {
+                btn.textContent = "Follow " + companyName;
+            }
+        });
+    }
+    </script>
+</body>
+</html>

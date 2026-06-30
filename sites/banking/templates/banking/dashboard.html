@@ -6,100 +6,264 @@
     <title>Dashboard - SecureBank Online</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
-        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.2rem; }
-        .header h1 a { color: #fff; text-decoration: none; }
-        .header h1 a span { color: #4da6ff; }
-        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
-        nav a:hover { background: #f0f4ff; }
-        nav a.active { font-weight: 700; background: #dbeafe; }
-        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
-        nav .btn-login:hover { background: #1e3a6e; }
-        nav .btn-logout { color: #dc2626; margin-left: auto; }
-        .login-banner { max-width: 1000px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
-        .login-banner a { color: #0a2463; font-weight: 600; }
-        .welcome { max-width: 1000px; margin: 1.5rem auto; padding: 0 2rem; }
-        .welcome h2 { color: #0a2463; font-size: 1.4rem; margin-bottom: .3rem; }
-        .welcome p { color: #64748b; font-size: .9rem; }
-        .accounts-grid { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
-        .account-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid #0a2463; }
-        .account-card.checking { border-left-color: #0a2463; }
-        .account-card.savings { border-left-color: #059669; }
-        .account-card.credit { border-left-color: #dc2626; }
-        .account-card.loan { border-left-color: #d97706; }
-        .account-type { font-size: .75rem; text-transform: uppercase; font-weight: 700; letter-spacing: .05rem; color: #64748b; margin-bottom: .3rem; }
-        .account-number { font-size: .85rem; color: #94a3b8; margin-bottom: .5rem; }
-        .account-balance { font-size: 1.6rem; font-weight: 700; color: #1a1a2e; }
-        .account-balance.negative { color: #dc2626; }
-        .account-link { display: inline-block; margin-top: .8rem; font-size: .85rem; color: #4da6ff; text-decoration: none; }
-        .account-link:hover { text-decoration: underline; }
-        .quick-actions { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
-        .quick-actions h3 { color: #334155; font-size: 1rem; margin-bottom: .8rem; }
-        .action-buttons { display: flex; gap: .8rem; flex-wrap: wrap; }
-        .action-btn { background: #fff; border: 1.5px solid #e2e8f0; padding: .7rem 1.5rem; border-radius: .4rem; text-decoration: none; color: #0a2463; font-size: .9rem; font-weight: 500; }
-        .action-btn:hover { border-color: #4da6ff; background: #f8fbff; }
-        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; margin-top: 3rem; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; display: flex; min-height: 100vh; }
+
+        /* ── Sidebar ── */
+        .sidebar { width: 260px; background: #0B2545; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto; z-index: 100; }
+        .sidebar-logo { padding: 1.5rem 1.4rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .sidebar-logo a { color: #fff; text-decoration: none; font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
+        .sidebar-logo a span { color: #64B5F6; }
+        .sidebar-nav { flex: 1; padding: .8rem 0; }
+        .sidebar-nav a { display: flex; align-items: center; gap: .75rem; padding: .7rem 1.4rem; color: rgba(255,255,255,.7); text-decoration: none; font-size: .9rem; font-weight: 500; transition: background .15s, color .15s; }
+        .sidebar-nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
+        .sidebar-nav a.active { background: rgba(21,101,192,.45); color: #fff; border-left: 3px solid #64B5F6; }
+        .sidebar-nav a .nav-icon { width: 20px; text-align: center; font-size: 1rem; flex-shrink: 0; }
+        .sidebar-nav .nav-divider { height: 1px; background: rgba(255,255,255,.08); margin: .6rem 1.4rem; }
+
+        .sidebar-cc { margin: 0 1rem 1rem; padding: 1rem; background: linear-gradient(135deg, #1A237E, #283593); border-radius: .6rem; }
+        .sidebar-cc-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.5); margin-bottom: .4rem; }
+        .sidebar-cc-number { font-size: .85rem; letter-spacing: 1.5px; color: rgba(255,255,255,.85); margin-bottom: .25rem; }
+        .sidebar-cc-balance { font-size: 1.1rem; font-weight: 700; color: #EF9A9A; }
+        .sidebar-cc-meta { font-size: .72rem; color: rgba(255,255,255,.5); margin-top: .3rem; }
+        .sidebar-cc-link { display: inline-block; margin-top: .6rem; font-size: .78rem; color: #90CAF9; text-decoration: none; }
+        .sidebar-cc-link:hover { color: #fff; text-decoration: underline; }
+
+        .sidebar-footer { padding: 1rem 1.4rem; border-top: 1px solid rgba(255,255,255,.08); }
+        .sidebar-footer a { color: rgba(255,255,255,.5); text-decoration: none; font-size: .82rem; }
+        .sidebar-footer a:hover { color: #EF9A9A; }
+
+        /* ── Main Content ── */
+        .main { flex: 1; margin-left: 260px; }
+        .topbar { background: #fff; border-bottom: 1px solid #e8ecf1; padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+        .topbar-title { font-size: 1.05rem; color: #0B2545; font-weight: 600; }
+        .topbar-right { display: flex; align-items: center; gap: 1rem; }
+        .topbar-user { font-size: .85rem; color: #64748b; }
+        .topbar-user strong { color: #0B2545; }
+        .btn-signin { background: #1565C0; color: #fff; padding: .45rem 1.1rem; border-radius: .35rem; text-decoration: none; font-size: .82rem; font-weight: 600; }
+        .btn-signin:hover { background: #0D47A1; }
+
+        .content { padding: 1.5rem 2rem 3rem; max-width: 960px; }
+
+        /* Login banner */
+        .login-banner { background: #FFF8E1; border: 1px solid #FFE082; border-radius: .4rem; padding: .65rem 1rem; font-size: .83rem; color: #6D4C00; margin-bottom: 1.5rem; }
+        .login-banner a { color: #1565C0; font-weight: 600; text-decoration: none; }
+        .login-banner a:hover { text-decoration: underline; }
+
+        /* Welcome */
+        .welcome { margin-bottom: 1.8rem; }
+        .welcome h2 { font-size: 1.5rem; font-weight: 700; color: #0B2545; margin-bottom: .2rem; }
+        .welcome p { color: #94a3b8; font-size: .85rem; }
+
+        /* Quick actions bar */
+        .quick-actions-bar { display: flex; gap: .8rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .qa-btn { display: flex; flex-direction: column; align-items: center; gap: .35rem; background: #fff; border: 1px solid #e8ecf1; border-radius: .5rem; padding: .9rem 1.4rem; text-decoration: none; color: #0B2545; font-size: .78rem; font-weight: 600; min-width: 100px; transition: box-shadow .15s, border-color .15s; }
+        .qa-btn:hover { border-color: #1565C0; box-shadow: 0 2px 8px rgba(21,101,192,.12); }
+        .qa-btn .qa-icon { width: 38px; height: 38px; border-radius: 50%; background: #E3F2FD; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #1565C0; }
+
+        /* Account rows */
+        .accounts-section { margin-bottom: 2rem; }
+        .accounts-section h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 700; margin-bottom: .8rem; }
+        .account-row { display: flex; align-items: center; background: #fff; border-radius: .5rem; padding: 1rem 1.3rem; margin-bottom: .6rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); border-left: 4px solid #1565C0; text-decoration: none; color: inherit; transition: box-shadow .15s; }
+        .account-row:hover { box-shadow: 0 3px 12px rgba(0,0,0,.08); }
+        .account-row.savings { border-left-color: #2E7D32; }
+        .account-row.credit { border-left-color: #C62828; }
+        .account-row.loan { border-left-color: #E65100; }
+        .account-row .acct-icon { width: 42px; height: 42px; border-radius: .4rem; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; margin-right: 1rem; flex-shrink: 0; }
+        .account-row.checking .acct-icon { background: #E3F2FD; color: #1565C0; }
+        .account-row.savings .acct-icon { background: #E8F5E9; color: #2E7D32; }
+        .account-row.credit .acct-icon { background: #FFEBEE; color: #C62828; }
+        .account-row.loan .acct-icon { background: #FFF3E0; color: #E65100; }
+        .acct-details { flex: 1; }
+        .acct-name { font-weight: 600; font-size: .92rem; color: #1a1a2e; text-transform: capitalize; }
+        .acct-number { font-size: .78rem; color: #94a3b8; margin-top: .1rem; }
+        .acct-balance { text-align: right; }
+        .acct-balance .amount { font-size: 1.35rem; font-weight: 700; color: #0B2545; }
+        .acct-balance .amount.negative { color: #C62828; }
+        .acct-balance .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-top: .1rem; }
+        .acct-arrow { margin-left: 1rem; color: #CBD5E0; font-size: 1.1rem; }
+
+        /* Footer */
+        .footer { text-align: center; color: #94a3b8; font-size: .75rem; padding: 2rem 0 1rem; border-top: 1px solid #e8ecf1; margin-top: 1rem; }
+        .footer span { margin: 0 .6rem; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
-    </div>
 
-    <nav>
-        <a href="{{ url_for('banking.index') }}" class="active">Dashboard</a>
-        <a href="{{ url_for('banking.accounts_page') }}">Accounts</a>
-        <a href="{{ url_for('banking.transactions_page') }}">Transactions</a>
-        <a href="{{ url_for('banking.transfer_page') }}">Transfer</a>
-        <a href="{{ url_for('banking.pay_bills_page') }}">Pay Bills</a>
-        <a href="{{ url_for('banking.payees_page') }}">Payees</a>
-        <a href="{{ url_for('banking.loans_page') }}">Loans</a>
-        <a href="{{ url_for('banking.settings_page') }}">Settings</a>
-        <a href="{{ url_for('banking.verify_identity_page') }}">Verify ID</a>
-        {% if logged_in %}
-        <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
-        {% else %}
-        <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <a href="{{ url_for('banking.index') }}">Secure<span>Bank</span></a>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('banking.index') }}" class="active">
+                <span class="nav-icon">&#9632;</span> Dashboard
+            </a>
+            <a href="{{ url_for('banking.accounts_page') }}">
+                <span class="nav-icon">&#9776;</span> Accounts
+            </a>
+            <a href="{{ url_for('banking.transactions_page') }}">
+                <span class="nav-icon">&#8644;</span> Transactions
+            </a>
+            <div class="nav-divider"></div>
+            <a href="{{ url_for('banking.transfer_page') }}">
+                <span class="nav-icon">&#10132;</span> Transfer Money
+            </a>
+            <a href="{{ url_for('banking.pay_bills_page') }}">
+                <span class="nav-icon">&#9993;</span> Pay Bills
+            </a>
+            <a href="{{ url_for('banking.payees_page') }}">
+                <span class="nav-icon">&#9733;</span> Payees
+            </a>
+            <div class="nav-divider"></div>
+            <a href="{{ url_for('banking.loans_page') }}">
+                <span class="nav-icon">&#8453;</span> Loans
+            </a>
+            <a href="{{ url_for('banking.cc_index') }}">
+                <span class="nav-icon">&#9646;</span> Credit Cards
+            </a>
+            <div class="nav-divider"></div>
+            <a href="{{ url_for('banking.settings_page') }}">
+                <span class="nav-icon">&#9881;</span> Settings
+            </a>
+            <a href="{{ url_for('banking.verify_identity_page') }}">
+                <span class="nav-icon">&#128274;</span> Verify ID
+            </a>
+        </nav>
+
+        {% if cc_user %}
+        <div class="sidebar-cc">
+            <div class="sidebar-cc-label">Credit Card</div>
+            <div class="sidebar-cc-number">**** {{ cc_user.card_number_last4 }}</div>
+            <div class="sidebar-cc-balance">${{ "%.2f"|format(cc_user.current_balance) }}</div>
+            <div class="sidebar-cc-meta">{{ cc_user.card_tier }} &middot; {{ "{:,}".format(cc_user.rewards_points) }} pts</div>
+            <a href="{{ url_for('banking.cc_index') }}" class="sidebar-cc-link">Manage Card</a>
+        </div>
         {% endif %}
-    </nav>
 
-    {% if not logged_in %}
-    <div class="login-banner">
-        Browsing as {{ user.name }} (demo mode). <a href="{{ url_for('banking.login_page') }}">Sign in</a> to access your own accounts or make changes.
-    </div>
-    {% endif %}
+        <div class="sidebar-footer">
+            {% if logged_in %}
+            <a href="{{ url_for('banking.logout') }}">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('banking.login_page') }}" style="color:#64B5F6;">Sign In</a>
+            {% endif %}
+        </div>
+    </aside>
 
-    <div class="welcome">
-        <h2>Welcome, {{ user.name }}</h2>
-        <p>Last login: June 21, 2026</p>
-    </div>
-
-    <div class="accounts-grid">
-        {% for acct in accounts %}
-        <div class="account-card {{ acct.type }}">
-            <div class="account-type">{{ acct.type }} Account</div>
-            <div class="account-number">{{ acct.account_number }}</div>
-            <div class="account-balance {% if acct.balance < 0 %}negative{% endif %}">
-                ${{ "%.2f"|format(acct.balance|abs) }}{% if acct.balance < 0 %} owed{% endif %}
+    <!-- ── Main Content ── -->
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-title">Account Overview</div>
+            <div class="topbar-right">
+                <span class="topbar-user">Hello, <strong>{{ user.name }}</strong></span>
+                {% if not logged_in %}
+                <a href="{{ url_for('banking.login_page') }}" class="btn-signin">Sign In</a>
+                {% endif %}
             </div>
-            <a href="{{ url_for('banking.account_detail', account_id=acct.id) }}" class="account-link">View Details</a>
         </div>
-        {% endfor %}
+
+        <div class="content">
+            {% if not logged_in %}
+            <div class="login-banner">
+                Browsing as {{ user.name }} (demo mode). <a href="{{ url_for('banking.login_page') }}">Sign in</a> to access your own accounts or make changes.
+            </div>
+            {% endif %}
+
+            <div class="welcome">
+                <h2>Welcome, {{ user.name }}</h2>
+                <p>Last login: June 21, 2026</p>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions-bar">
+                <a href="{{ url_for('banking.transfer_page') }}" class="qa-btn">
+                    <div class="qa-icon">&#10132;</div>
+                    Transfer
+                </a>
+                <a href="{{ url_for('banking.pay_bills_page') }}" class="qa-btn">
+                    <div class="qa-icon">&#9993;</div>
+                    Pay Bill
+                </a>
+                <a href="{{ url_for('banking.transactions_page') }}" class="qa-btn">
+                    <div class="qa-icon">&#8644;</div>
+                    Activity
+                </a>
+                <a href="{{ url_for('banking.loans_page') }}" class="qa-btn">
+                    <div class="qa-icon">&#8453;</div>
+                    Loans
+                </a>
+                <a href="{{ url_for('banking.settings_page') }}" class="qa-btn">
+                    <div class="qa-icon">&#9881;</div>
+                    Settings
+                </a>
+            </div>
+
+            <!-- Accounts -->
+            <div class="accounts-section">
+                <h3>Your Accounts</h3>
+                {% for acct in accounts %}
+                <a href="{{ url_for('banking.account_detail', account_id=acct.id) }}" class="account-row {{ acct.type }}">
+                    <div class="acct-icon">
+                        {% if acct.type == 'checking' %}&#9632;
+                        {% elif acct.type == 'savings' %}&#9733;
+                        {% elif acct.type == 'credit' %}&#9646;
+                        {% elif acct.type == 'loan' %}&#8453;
+                        {% else %}&#9632;
+                        {% endif %}
+                    </div>
+                    <div class="acct-details">
+                        <div class="acct-name">{{ acct.type }} Account</div>
+                        <div class="acct-number">{{ acct.account_number }}</div>
+                    </div>
+                    <div class="acct-balance">
+                        <div class="amount {% if acct.balance < 0 %}negative{% endif %}">
+                            ${{ "%.2f"|format(acct.balance|abs) }}
+                        </div>
+                        <div class="label">{% if acct.balance < 0 %}Amount Owed{% else %}Available Balance{% endif %}</div>
+                    </div>
+                    <div class="acct-arrow">&#8250;</div>
+                </a>
+                {% endfor %}
+            </div>
+
+            {% if cc_user %}
+            <!-- Credit Card Summary -->
+            <div class="accounts-section">
+                <h3>Credit Card</h3>
+                <a href="{{ url_for('banking.cc_index') }}" class="account-row credit">
+                    <div class="acct-icon">&#9646;</div>
+                    <div class="acct-details">
+                        <div class="acct-name">{{ cc_user.card_tier }} Card</div>
+                        <div class="acct-number">**** **** **** {{ cc_user.card_number_last4 }}</div>
+                    </div>
+                    <div class="acct-balance">
+                        <div class="amount negative">${{ "%.2f"|format(cc_user.current_balance) }}</div>
+                        <div class="label">Current Balance</div>
+                    </div>
+                    <div class="acct-arrow">&#8250;</div>
+                </a>
+                <div style="display:flex; gap:1.5rem; margin-top:.4rem; padding-left:3.5rem;">
+                    <span style="font-size:.8rem; color:#64748b;">Available: <strong style="color:#2E7D32;">${{ "%.2f"|format(cc_user.available_credit) }}</strong></span>
+                    <span style="font-size:.8rem; color:#64748b;">Rewards: <strong style="color:#1565C0;">{{ "{:,}".format(cc_user.rewards_points) }} pts</strong></span>
+                    <a href="{{ url_for('banking.cc_index') }}" style="font-size:.8rem; color:#1565C0; text-decoration:none; font-weight:600; margin-left:auto;">Credit Card Details &#8250;</a>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="footer">
+                <span>SecureBank Online</span>
+                <span>&middot;</span>
+                <span>FDIC Insured</span>
+                <span>&middot;</span>
+                <span>Equal Housing Lender</span>
+            </div>
+        </div>
     </div>
 
-    <div class="quick-actions">
-        <h3>Quick Actions</h3>
-        <div class="action-buttons">
-            <a href="{{ url_for('banking.transfer_page') }}" class="action-btn">Transfer Funds</a>
-            <a href="{{ url_for('banking.pay_bills_page') }}" class="action-btn">Pay a Bill</a>
-            <a href="{{ url_for('banking.transactions_page') }}" class="action-btn">View Transactions</a>
-            <a href="{{ url_for('banking.loans_page') }}" class="action-btn">Manage Loans</a>
-            <a href="{{ url_for('banking.settings_page') }}" class="action-btn">Account Settings</a>
-        </div>
-    </div>
-
-    <div class="footer">SecureBank Online -- FDIC Insured</div>
 </body>
 </html>

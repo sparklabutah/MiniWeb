@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Records - Lakeport Medical Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #7ee8e8; }
+        .header-right a { color: #c0e8e8; text-decoration: none; font-size: .85rem; margin-left: 1rem; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #e6f7f7; }
+        nav a.active { font-weight: 700; background: #d0f0f0; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        .page-header { margin-bottom: 1.2rem; }
+        .page-header h2 { font-size: 1.4rem; color: #1a202c; }
+        .page-header p { font-size: .9rem; color: #64748b; margin-top: .3rem; }
+        .record-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 1.2rem 1.5rem; margin-bottom: .8rem; display: flex; justify-content: space-between; align-items: center; transition: box-shadow .2s; }
+        .record-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .record-info { flex: 1; }
+        .record-info .title { font-size: 1rem; font-weight: 600; color: #1a202c; margin-bottom: .3rem; }
+        .record-info .title a { color: #0d6e6e; text-decoration: none; }
+        .record-info .title a:hover { text-decoration: underline; }
+        .record-info .meta { font-size: .82rem; color: #64748b; }
+        .record-info .summary { font-size: .85rem; color: #475569; margin-top: .4rem; line-height: 1.4; }
+        .badge { display: inline-block; padding: .2rem .6rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; }
+        .badge-annual_physical { background: #dbeafe; color: #1d4ed8; }
+        .badge-follow_up { background: #e0e7ff; color: #4338ca; }
+        .badge-quarterly_checkup { background: #fef3c7; color: #d97706; }
+        .badge-physical_therapy_evaluation { background: #dcfce7; color: #16a34a; }
+        .badge-physical_therapy_progress { background: #d1fae5; color: #059669; }
+        .badge-vaccination { background: #fce7f3; color: #db2777; }
+        .badge-referral { background: #f3e8ff; color: #7c3aed; }
+        .empty { padding: 3rem; text-align: center; color: #94a3b8; background: #fff; border-radius: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('health-portals.index') }}">Lakeport <span>Medical</span> Center</a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+                <a href="{{ url_for('health-portals.logout') }}">Sign Out ({{ user.first_name }})</a>
+            {% else %}
+                <a href="{{ url_for('health-portals.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
+        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
+        <a href="{{ url_for('health-portals.records_page') }}" class="active">Records</a>
+        <a href="{{ url_for('health-portals.messages_page') }}">Messages</a>
+        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </nav>
+
+    <div class="main">
+        <div class="page-header">
+            <h2>Medical Records</h2>
+            <p>View your visit summaries, lab results, and clinical notes</p>
+        </div>
+
+        {% if records %}
+            {% for record in records %}
+            <div class="record-card">
+                <div class="record-info">
+                    <div class="title">
+                        <a href="{{ url_for('health-portals.record_detail', record_id=record.id) }}">{{ record.record_type|replace('_', ' ')|title }}</a>
+                        <span class="badge badge-{{ record.record_type }}">{{ record.record_type|replace('_', ' ')|title }}</span>
+                    </div>
+                    <div class="meta">{{ record.date }} &mdash; {{ record.provider_name }}</div>
+                    <div class="summary">{{ record.summary[:150] }}{% if record.summary|length > 150 %}...{% endif %}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No medical records found.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        Lakeport Medical Center &mdash; (555) 800-2200 &mdash; Patient Portal
+    </div>
+</body>
+</html>

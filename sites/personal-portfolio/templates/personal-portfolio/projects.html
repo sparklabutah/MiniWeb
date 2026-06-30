@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects - {{ profile.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #e94560; }
+        .header .user-info { color: #94a3b8; font-size: .85rem; }
+        .header .user-info a { color: #e94560; text-decoration: none; margin-left: .5rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #fce4ec; color: #e94560; }
+        nav .spacer { flex: 1; }
+
+        .page-title { max-width: 1000px; margin: 1.5rem auto .5rem; padding: 0 2rem; }
+        .page-title h2 { font-size: 1.5rem; color: #1a1a2e; }
+        .page-title p { color: #64748b; font-size: .9rem; margin-top: .3rem; }
+
+        .filters { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
+        .filters form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; width: 100%; }
+        .filters select, .filters input[type="text"] { padding: .45rem .7rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .85rem; background: #fff; }
+        .filters select:focus, .filters input[type="text"]:focus { border-color: #e94560; outline: none; }
+        .filters .btn-filter { padding: .45rem 1rem; background: #e94560; color: #fff; border: none; border-radius: .4rem; font-size: .85rem; cursor: pointer; }
+        .filters .btn-filter:hover { background: #d63851; }
+        .filters .btn-clear { padding: .45rem 1rem; background: #f1f5f9; color: #334155; border: none; border-radius: .4rem; font-size: .85rem; cursor: pointer; text-decoration: none; display: inline-block; }
+        .filters .btn-clear:hover { background: #e2e8f0; }
+
+        .projects-grid { max-width: 1000px; margin: 1rem auto; padding: 0 2rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.2rem; }
+        .project-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid #e94560; transition: box-shadow .2s; }
+        .project-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+        .project-card .meta-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+        .project-card .type-badge { font-size: .7rem; text-transform: uppercase; font-weight: 600; padding: .15rem .4rem; border-radius: .2rem; background: #eef2ff; color: #4338ca; }
+        .project-card .status-badge { font-size: .7rem; text-transform: uppercase; font-weight: 600; padding: .15rem .4rem; border-radius: .2rem; }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-archived { background: #f1f5f9; color: #64748b; }
+        .status-paused { background: #fef3c7; color: #92400e; }
+        .project-card h4 { margin-bottom: .3rem; font-size: 1.05rem; }
+        .project-card h4 a { color: #1a1a2e; text-decoration: none; }
+        .project-card h4 a:hover { color: #e94560; }
+        .project-card .tagline { color: #64748b; font-size: .85rem; margin-bottom: .8rem; line-height: 1.4; }
+        .project-card .tech-tags { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .8rem; }
+        .project-card .tech-tag { background: #f1f5f9; color: #334155; font-size: .7rem; padding: .2rem .5rem; border-radius: .3rem; }
+        .project-card .project-links { display: flex; gap: .8rem; align-items: center; }
+        .project-card .project-links a { font-size: .8rem; color: #e94560; text-decoration: none; }
+        .project-card .project-links a:hover { text-decoration: underline; }
+        .project-card .date { font-size: .75rem; color: #94a3b8; }
+
+        .no-results { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; text-align: center; color: #64748b; }
+        .result-count { max-width: 1000px; margin: .5rem auto; padding: 0 2rem; font-size: .85rem; color: #94a3b8; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; margin-top: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('personal-portfolio.index') }}">{{ profile.name.split()[0] }}<span>Dev</span></a></h1>
+        <div class="user-info">
+            {% if logged_in %}
+                {{ user.display_name }}
+                <a href="{{ url_for('personal-portfolio.logout') }}">Sign Out</a>
+            {% else %}
+                <a href="{{ url_for('personal-portfolio.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('personal-portfolio.index') }}">Home</a>
+        <a href="{{ url_for('personal-portfolio.projects_page') }}" class="active">Projects</a>
+        <a href="{{ url_for('personal-portfolio.resume_page') }}">Resume</a>
+        <a href="{{ url_for('personal-portfolio.blog_page') }}">Blog</a>
+        <a href="{{ url_for('personal-portfolio.index') }}#contact">Contact</a>
+    </nav>
+
+    <div class="page-title">
+        <h2>Projects</h2>
+        <p>Things I've built, am building, or have contributed to.</p>
+    </div>
+
+    <div class="filters">
+        <form method="get" action="{{ url_for('personal-portfolio.projects_page') }}">
+            <input type="text" name="q" placeholder="Search projects..." value="{{ current_search }}">
+            <select name="category">
+                <option value="">All Types</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select name="tech">
+                <option value="">All Technologies</option>
+                {% for t in technologies %}
+                <option value="{{ t }}" {% if current_tech == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+            <select name="status">
+                <option value="">All Statuses</option>
+                <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                <option value="archived" {% if current_status == 'archived' %}selected{% endif %}>Archived</option>
+                <option value="paused" {% if current_status == 'paused' %}selected{% endif %}>Paused</option>
+            </select>
+            <button type="submit" class="btn-filter">Filter</button>
+            <a href="{{ url_for('personal-portfolio.projects_page') }}" class="btn-clear">Clear</a>
+        </form>
+    </div>
+
+    <div class="result-count">{{ projects|length }} project{{ 's' if projects|length != 1 else '' }} found</div>
+
+    {% if projects %}
+    <div class="projects-grid">
+        {% for project in projects %}
+        <div class="project-card">
+            <div class="meta-row">
+                <span class="type-badge">{{ project.type }}</span>
+                <span class="status-badge status-{{ project.status }}">{{ project.status }}</span>
+                {% if project.featured %}<span class="status-badge" style="background:#fef3c7;color:#92400e;">Featured</span>{% endif %}
+            </div>
+            <h4><a href="{{ url_for('personal-portfolio.project_detail', project_id=project.id) }}">{{ project.title }}</a></h4>
+            <p class="tagline">{{ project.tagline }}</p>
+            <div class="tech-tags">
+                {% for tech in project.technologies %}
+                <span class="tech-tag">{{ tech }}</span>
+                {% endfor %}
+            </div>
+            <div class="project-links">
+                <a href="{{ url_for('personal-portfolio.project_detail', project_id=project.id) }}">View Details</a>
+                {% if project.github_url %}<a href="{{ project.github_url }}">Source</a>{% endif %}
+                {% if project.live_url %}<a href="{{ project.live_url }}">Live Site</a>{% endif %}
+                <span class="date">Updated {{ project.last_updated }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-results">
+        <p>No projects found matching your criteria.</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        &copy; 2026 {{ profile.name }}. Built with Flask.
+    </div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscriptions - StreamHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; }
+        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #9147ff; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #dedee3; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        .header-right a:hover { background: #2f2f35; }
+        .header-right .user-badge { background: #9147ff; color: #fff; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+        .sub-list { display: flex; flex-direction: column; gap: .8rem; }
+        .sub-card { background: #18181b; border-radius: .5rem; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 1rem; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #9147ff; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff; font-weight: 700; flex-shrink: 0; }
+        .sub-info { flex: 1; }
+        .sub-info .name { font-weight: 600; font-size: .9rem; }
+        .sub-info .name a { color: #efeff1; text-decoration: none; }
+        .sub-info .name a:hover { color: #9147ff; }
+        .sub-info .meta { font-size: .8rem; color: #adadb8; }
+        .no-results { text-align: center; padding: 3rem; color: #737380; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
+        <div class="header-right">
+            <a href="{{ url_for('live.index') }}">Browse</a>
+            <a href="{{ url_for('live.clips_page') }}">Clips</a>
+            <a href="{{ url_for('live.subscriptions_page') }}" style="color:#9147ff;font-weight:700;">Subscriptions</a>
+            <span class="user-badge">{{ user.display_name }}</span>
+            <a href="{{ url_for('live.logout') }}">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">Your Subscriptions ({{ subscriptions|length }})</h2>
+        {% if subscriptions %}
+        <div class="sub-list">
+            {% for sub in subscriptions %}
+            {% set channel = user_map.get(sub.channel_id) %}
+            <div class="sub-card">
+                <div class="avatar">{{ channel.display_name[0] if channel else '?' }}</div>
+                <div class="sub-info">
+                    <div class="name">
+                        <a href="{{ url_for('live.channel_page', user_id=sub.channel_id) }}">
+                            {{ channel.display_name if channel else 'Unknown' }}
+                        </a>
+                    </div>
+                    <div class="meta">
+                        {{ sub.tier | replace('_', ' ') | title }}
+                        &middot; {{ sub.months_subscribed }} months
+                        &middot; ${{ sub.monthly_price_usd }}/mo
+                        {% if sub.is_gift %} &middot; Gift{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-results"><p>You don't have any active subscriptions.</p></div>
+        {% endif %}
+    </div>
+</body>
+</html>

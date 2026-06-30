@@ -63,15 +63,21 @@
         <div class="section">
             <h2>{{ assignment.title }}</h2>
             <div class="meta-row">
-                <span class="badge type-{{ assignment.type }}">{{ assignment.type }}</span>
+                <span class="badge type-{{ assignment.category }}">{{ assignment.category }}</span>
                 <span>Due: {{ assignment.due_date }}</span>
-                <span>Points: {{ assignment.points }}</span>
+                <span>Points: {{ assignment.points_possible }}</span>
                 <span>Course: {{ course.code }}</span>
             </div>
             <p class="description">{{ assignment.description }}</p>
 
             {% if user and user.role == 'student' %}
             <form method="post" action="{{ url_for('course-sites-classrooms.form_submit_assignment', course_id=course.id, assignment_id=assignment.id) }}">
+                <div style="margin-bottom:.8rem;">
+                    <label for="submission_content" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Your Submission</label>
+                    <textarea id="submission_content" name="content" required
+                              placeholder="Enter your work here..."
+                              style="width:100%;min-height:150px;padding:.6rem;border:1px solid #cbd5e1;border-radius:.3rem;font-size:.9rem;font-family:inherit;resize:vertical;line-height:1.5;"></textarea>
+                </div>
                 <button type="submit" class="btn btn-primary">Submit Assignment</button>
             </form>
             {% endif %}
@@ -87,6 +93,7 @@
                         <th>Student</th>
                         {% endif %}
                         <th>Submitted</th>
+                        <th>Content</th>
                         <th>Score</th>
                         <th>Status</th>
                         <th>Feedback</th>
@@ -99,11 +106,12 @@
                         <td>{{ sub.student_name|default('--') }}</td>
                         {% endif %}
                         <td>{{ sub.submitted_at[:16] }}</td>
+                        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ sub.content|default('') }}">{{ sub.content|default('--')|truncate(80) }}</td>
                         <td>
                             {% if sub.score is not none %}
-                                {% set pct = (sub.score / assignment.points * 100)|round(1) %}
+                                {% set pct = (sub.score / assignment.points_possible * 100)|round(1) %}
                                 <span class="{% if pct >= 80 %}score-good{% elif pct >= 60 %}score-mid{% else %}score-low{% endif %}">
-                                    {{ sub.score }}/{{ assignment.points }} ({{ pct }}%)
+                                    {{ sub.score }}/{{ assignment.points_possible }} ({{ pct }}%)
                                 </span>
                             {% else %}
                                 --
@@ -124,7 +132,7 @@
                         <label style="font-size:.8rem;">Student ID:</label>
                         <input type="number" name="student_id" required style="width:80px;">
                         <label style="font-size:.8rem;">Score:</label>
-                        <input type="number" name="score" required style="width:80px;" step="0.1" max="{{ assignment.points }}">
+                        <input type="number" name="score" required style="width:80px;" step="0.1" max="{{ assignment.points_possible }}">
                     </div>
                     <div class="form-row">
                         <label style="font-size:.8rem;">Feedback:</label>

@@ -9,11 +9,10 @@ import pathlib
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
 
-SITE_DIR = pathlib.Path(__file__).resolve().parent
-CONVERSIONS_FILE = SITE_DIR / "data" / "conversions.json"
-USERS_FILE = SITE_DIR / "data" / "users.json"
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
+from app import db
 
+SITE = "converters-calculators"
+SITE_DIR = pathlib.Path(__file__).resolve().parent
 blueprint = Blueprint(
     "converters-calculators",
     __name__,
@@ -21,15 +20,6 @@ blueprint = Blueprint(
     static_folder=str(SITE_DIR / "static"),
     static_url_path="/static",
 )
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-
 
 # ---------------------------------------------------------------------------
 # Data interpreter -- reads conversions.json
@@ -41,8 +31,20 @@ _conversions = None
 def _load_conversions():
     global _conversions
     if _conversions is None:
-        with open(CONVERSIONS_FILE) as f:
-            _conversions = json.load(f)
+        rows = db.query(SITE, "conversions")
+        if rows:
+            row = rows[0]
+            # Reconstruct the original dict from the flattened row
+            _conversions = {}
+            for key in ("length", "weight", "temperature", "currency", "volume", "area", "speed"):
+                val = row.get(key)
+                if val is not None:
+                    if isinstance(val, str):
+                        _conversions[key] = json.loads(val)
+                    else:
+                        _conversions[key] = val
+        else:
+            _conversions = {}
     return _conversions
 
 
@@ -243,18 +245,15 @@ def convert_number_base(value_str, from_base, to_base):
 # ---------------------------------------------------------------------------
 
 def _load_users():
-    if USERS_FILE.exists():
-        return json.loads(USERS_FILE.read_text())
-    return []
+    return db.query(SITE, "users")
 
 
 def _save_users(users):
-    USERS_FILE.write_text(json.dumps(users, indent=2))
+    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
-    users = _load_users()
-    return next((u for u in users if u["id"] == user_id), None)
+    return db.get_item(SITE, "users", user_id)
 
 
 # ---------------------------------------------------------------------------

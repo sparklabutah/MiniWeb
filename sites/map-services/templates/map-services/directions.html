@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directions - CascadiaMaps</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202124; font-size: 14px; }
+
+        .app { display: flex; height: 100vh; flex-direction: column; }
+        .top-bar { background:#fff;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e8eaed;flex-shrink:0; }
+        .top-bar .brand { font-size:16px;font-weight:500;color:#5f6368;text-decoration:none; }
+        .top-bar .brand b { color:#4285f4; }
+        .top-bar .nav-link { font-size:12px;color:#5f6368;text-decoration:none;padding:4px 8px;border-radius:16px; }
+        .top-bar .nav-link:hover { background:#f1f3f4; }
+        .top-bar .spacer { flex:1; }
+
+        .main-area { display: flex; flex: 1; overflow: hidden; }
+
+        /* Left panel */
+        .panel { width: 400px; height: 100%; display: flex; flex-direction: column; background: #fff; box-shadow: 2px 0 6px rgba(0,0,0,.1); z-index: 10; flex-shrink: 0; overflow: hidden; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+        .route-planner h2 { font-size: 15px; color: #202124; margin-bottom: 12px; font-weight: 500; }
+        .route-form { display: grid; gap: 10px; }
+        .form-row { display: flex; gap: 8px; align-items: center; }
+        .form-row label { font-size: 12px; color: #5f6368; font-weight: 600; width: 50px; flex-shrink: 0; }
+        .form-row input, .form-row select { flex: 1; padding: 8px 10px; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; }
+        .form-row input:focus, .form-row select:focus { border-color: #4285f4; outline: none; }
+        .mode-selector { display: flex; gap: 4px; }
+        .mode-btn { padding: 6px 12px; border: 1px solid #dadce0; border-radius: 20px; background: #fff; font-size: 12px; cursor: pointer; color: #5f6368; font-weight: 500; }
+        .mode-btn.active, .mode-btn:hover { background: #e8f0fe; border-color: #4285f4; color: #1967d2; }
+        .btn-directions { width: 100%; padding: 10px; background: #4285f4; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 4px; }
+        .btn-directions:hover { background: #3367d6; }
+
+        .saved-routes { margin-top: 16px; }
+        .saved-routes h3 { font-size: 14px; color: #202124; margin-bottom: 8px; font-weight: 500; }
+        .route-list { display: grid; gap: 6px; }
+        .route-card { background: #fff; border: 1px solid #e8eaed; border-radius: 8px; padding: 10px 12px; transition: box-shadow .15s; }
+        .route-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+        .route-card h4 { font-size: 13px; margin-bottom: 3px; }
+        .route-card h4 a { color: #202124; text-decoration: none; }
+        .route-card h4 a:hover { color: #1a73e8; }
+        .route-meta { font-size: 12px; color: #5f6368; display: flex; flex-wrap: wrap; gap: 6px; }
+        .route-meta .badge { background: #f1f3f4; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+        .route-meta .badge.driving { background: #e8f0fe; color: #1a73e8; }
+        .route-meta .badge.cycling { background: #e8f5e9; color: #2d9249; }
+        .route-meta .badge.walking { background: #fff3e0; color: #e65100; }
+        .route-meta .badge.transit { background: #f3e5f5; color: #7b1fa2; }
+        .route-endpoints { font-size: 12px; color: #70757a; margin-top: 3px; }
+        .route-endpoints .arrow { color: #4285f4; font-weight: 700; }
+
+        .empty { text-align: center; padding: 24px 16px; color: #5f6368; font-size: 13px; }
+        .empty a { color: #1a73e8; text-decoration: none; }
+
+        /* Route result inline */
+        .route-result-box { background: #e8f0fe; padding: 12px; border-radius: 8px; margin-top: 12px; }
+        .route-result-box strong { font-size: 13px; }
+        .route-result-box .details { font-size: 12px; color: #5f6368; margin-top: 3px; }
+        .route-result-box .steps { margin-top: 6px; font-size: 12px; max-height: 200px; overflow-y: auto; }
+
+        /* User section */
+        .user-section { padding: 10px 16px; border-top: 1px solid #e8eaed; font-size: 12px; color: #5f6368; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .user-section a { color: #1a73e8; text-decoration: none; }
+
+        /* Map */
+        #map { flex: 1; z-index: 0; }
+
+        /* Map pins */
+        .map-pin { background: none !important; border: none !important; }
+
+        @media (max-width: 768px) {
+            .panel { width: 100%; height: 50vh; }
+            .main-area { flex-direction: column; }
+            #map { height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="top-bar">
+        <a href="{{ url_for('map-services.index') }}" class="brand"><b>Cascadia</b>Maps</a>
+        <a href="{{ url_for('map-services.directions') }}" class="nav-link" style="color:#1967d2;font-weight:500;">Directions</a>
+        <a href="{{ url_for('map-services.saved_places') }}" class="nav-link">Saved</a>
+        <span class="spacer"></span>
+        <a href="/" class="nav-link">MiniWeb</a>
+    </div>
+    <div class="main-area">
+        <div class="panel">
+            <div class="panel-content">
+                <div class="route-planner">
+                    <h2>Get Directions</h2>
+                    <div class="route-form">
+                        <div class="form-row">
+                            <label>From</label>
+                            <input type="text" id="origin" placeholder="Starting point or address" list="locations-list" value="{{ prefill_from }}">
+                        </div>
+                        <div class="form-row">
+                            <label>To</label>
+                            <input type="text" id="destination" placeholder="Destination or address" list="locations-list" value="{{ prefill_to }}">
+                        </div>
+                        <datalist id="locations-list">
+                            {% for loc in locations %}
+                            <option value="{{ loc.address }}">{{ loc.name }}</option>
+                            {% endfor %}
+                        </datalist>
+                        <div class="form-row">
+                            <label>Mode</label>
+                            <div class="mode-selector">
+                                <button type="button" class="mode-btn active" data-mode="driving" onclick="selectMode(this)">Driving</button>
+                                <button type="button" class="mode-btn" data-mode="cycling" onclick="selectMode(this)">Cycling</button>
+                                <button type="button" class="mode-btn" data-mode="walking" onclick="selectMode(this)">Walking</button>
+                                <button type="button" class="mode-btn" data-mode="transit" onclick="selectMode(this)">Transit</button>
+                            </div>
+                        </div>
+                        <button class="btn-directions" onclick="computeRoute()">Get Directions</button>
+                    </div>
+                    <div id="route-result" style="display:none;">
+                        <div class="route-result-box">
+                            <strong id="result-name"></strong>
+                            <div id="result-details" class="details"></div>
+                            <div id="result-steps" class="steps"></div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if user_routes %}
+                <div class="saved-routes">
+                    <h3>Your Saved Routes ({{ user_routes | length }})</h3>
+                    <div class="route-list">
+                        {% for r in user_routes %}
+                        <div class="route-card">
+                            <h4><a href="{{ url_for('map-services.route_detail', route_id=r.id) }}">{{ r.name }}</a></h4>
+                            <div class="route-meta">
+                                <span class="badge {{ r.mode }}">{{ r.mode | title }}</span>
+                                <span>{{ r.distance_km }} km</span>
+                                <span>{{ r.duration_minutes }} min</span>
+                                <span>Used {{ r.use_count }} times</span>
+                            </div>
+                            <div class="route-endpoints">
+                                {{ r.origin }} <span class="arrow">&rarr;</span> {{ r.destination }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% elif user %}
+                <div class="empty">
+                    <p>No saved routes yet. Compute a route above to get started.</p>
+                </div>
+                {% else %}
+                <div class="empty">
+                    <p><a href="{{ url_for('map-services.login_page') }}">Sign in</a> to see your saved routes.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="user-section">
+                {% if user %}
+                <span>{{ user.full_name }}</span>
+                <a href="{{ url_for('map-services.logout') }}">Sign out</a>
+                {% else %}
+                <a href="{{ url_for('map-services.login_page') }}">Sign in</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+</div>
+
+<script>
+let selectedMode = 'driving';
+var routeLayer = null;
+var markersLayer = null;
+
+var map = L.map('map', {zoomControl: false}).setView([45.5231, -122.6765], 13);
+L.control.zoom({position: 'topright'}).addTo(map);
+
+L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap &amp; CartoDB',
+    maxZoom: 19,
+    
+}).addTo(map);
+
+function selectMode(btn) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedMode = btn.dataset.mode;
+}
+
+function drawRoute(geometry, originName, destName) {
+    if (routeLayer) map.removeLayer(routeLayer);
+    if (markersLayer) map.removeLayer(markersLayer);
+    markersLayer = L.layerGroup().addTo(map);
+
+    if (geometry && geometry.length > 1) {
+        routeLayer = L.polyline(geometry, {
+            color: '#4285f4', weight: 5, opacity: 0.85
+        }).addTo(map);
+
+        // Start marker (green drop pin)
+        var startIcon = L.divIcon({
+            className: 'map-pin',
+            html: '<div style="background:#34a853;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:12px;">A</span></div>',
+            iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
+        });
+        L.marker(geometry[0], {icon: startIcon}).bindPopup('<b>Start:</b> ' + originName).addTo(markersLayer);
+
+        // End marker (red drop pin)
+        var endIcon = L.divIcon({
+            className: 'map-pin',
+            html: '<div style="background:#ea4335;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:12px;">B</span></div>',
+            iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
+        });
+        L.marker(geometry[geometry.length - 1], {icon: endIcon}).bindPopup('<b>End:</b> ' + destName).addTo(markersLayer);
+
+        map.fitBounds(routeLayer.getBounds(), {padding: [30, 30]});
+    }
+}
+
+// Check which modes have pre-computed routes and grey out unavailable ones
+function checkAvailableModes() {
+    const origin = document.getElementById('origin').value.trim();
+    const dest = document.getElementById('destination').value.trim();
+    if (!origin || !dest) return;
+
+    fetch('{{ url_for("map-services.api_route_compute") }}?origin=' + encodeURIComponent(origin) +
+          '&destination=' + encodeURIComponent(dest) + '&check_modes=1')
+        .then(r => r.json())
+        .then(data => {
+            var available = data.available_modes || ['driving', 'walking', 'cycling', 'transit'];
+            document.querySelectorAll('.mode-btn').forEach(function(btn) {
+                var mode = btn.dataset.mode;
+                if (available.indexOf(mode) === -1) {
+                    btn.classList.add('unavailable');
+                    btn.style.opacity = '0.35';
+                    btn.style.cursor = 'not-allowed';
+                    btn.title = 'No route available for this mode';
+                } else {
+                    btn.classList.remove('unavailable');
+                    btn.style.opacity = '';
+                    btn.style.cursor = '';
+                    btn.title = '';
+                }
+            });
+            // If selected mode is unavailable, switch to first available
+            if (available.indexOf(selectedMode) === -1 && available.length > 0) {
+                var firstBtn = document.querySelector('.mode-btn[data-mode="' + available[0] + '"]');
+                if (firstBtn) selectMode(firstBtn);
+            }
+        })
+        .catch(function() {});
+}
+
+document.getElementById('origin').addEventListener('change', checkAvailableModes);
+document.getElementById('destination').addEventListener('change', checkAvailableModes);
+// Also check on page load if prefilled
+if (document.getElementById('destination').value) setTimeout(checkAvailableModes, 500);
+
+function computeRoute() {
+    const origin = document.getElementById('origin').value;
+    const dest = document.getElementById('destination').value;
+    if (!origin || !dest) { alert('Please enter origin and destination.'); return; }
+    if (document.querySelector('.mode-btn.active.unavailable')) {
+        alert('This transport mode is not available for this route. Please select another mode.');
+        return;
+    }
+    fetch('{{ url_for("map-services.api_route_create") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({origin: origin, destination: dest, mode: selectedMode})
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('route-result').style.display = 'block';
+        document.getElementById('result-name').textContent = data.name;
+        document.getElementById('result-details').textContent =
+            data.distance_km + ' km \u00b7 ' + data.duration_minutes + ' min \u00b7 ' + data.mode;
+        let stepsHtml = '';
+        if (data.steps) {
+            data.steps.forEach((s, i) => {
+                stepsHtml += '<div style="padding:2px 0;">' + (i+1) + '. ' + s.instruction +
+                    ' <span style="color:#70757a;">(' + s.distance_km + ' km, ' + s.duration_minutes + ' min)</span></div>';
+            });
+        }
+        document.getElementById('result-steps').innerHTML = stepsHtml;
+
+        if (data.geometry && data.geometry.length > 1) {
+            drawRoute(data.geometry, origin, dest);
+        } else {
+            // No polyline geometry — still show origin/destination markers if we have coords
+            initRouteMap();
+            if (markersLayer) map.removeLayer(markersLayer);
+            markersLayer = L.layerGroup().addTo(map);
+
+            // Try to place markers from the returned location data
+            var pts = [];
+            if (data.origin_location && data.origin_location.lat) {
+                var p = [data.origin_location.lat, data.origin_location.lng];
+                L.marker(p).bindPopup('<b>Start:</b> ' + origin).addTo(markersLayer);
+                pts.push(p);
+            }
+            if (data.destination_location && data.destination_location.lat) {
+                var p = [data.destination_location.lat, data.destination_location.lng];
+                L.marker(p).bindPopup('<b>End:</b> ' + dest).addTo(markersLayer);
+                pts.push(p);
+            }
+            // Draw straight dashed line between them
+            if (pts.length === 2) {
+                if (routeLayer) map.removeLayer(routeLayer);
+                routeLayer = L.polyline(pts, {color:'#1a73e8', weight:3, dashArray:'8,8', opacity:0.6}).addTo(map);
+                map.fitBounds(pts, {padding: [50, 50]});
+            } else if (pts.length === 1) {
+                map.setView(pts[0], 15);
+            }
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('route-result').style.display = 'block';
+        document.getElementById('result-name').textContent = 'Error computing route';
+        document.getElementById('result-details').textContent = 'Could not find one or both locations. Try a different address.';
+        document.getElementById('result-steps').innerHTML = '';
+    });
+}
+</script>
+</body>
+</html>

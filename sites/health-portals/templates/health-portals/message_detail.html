@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message - Lakeport Medical Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: 1rem 2rem; }
+        .header h1 { color: #fff; font-size: 1.3rem; }
+        .header h1 span { color: #7ee8e8; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; }
+        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a.active { font-weight: 700; background: #d0f0f0; }
+        .main { max-width: 800px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { display: inline-block; margin-bottom: 1rem; color: #0d6e6e; text-decoration: none; font-size: .85rem; }
+        .msg-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; }
+        .msg-card h2 { font-size: 1.1rem; margin-bottom: .5rem; }
+        .msg-meta { font-size: .8rem; color: #64748b; margin-bottom: 1rem; }
+        .msg-body { font-size: .9rem; line-height: 1.6; white-space: pre-wrap; }
+        .thread-msg { border-left: 3px solid #d0f0f0; margin-left: 1rem; padding-left: 1rem; margin-bottom: 1rem; }
+        .thread-msg .sender { font-weight: 600; font-size: .85rem; }
+        .thread-msg .date { font-size: .75rem; color: #94a3b8; }
+        .thread-msg .body { font-size: .85rem; margin-top: .3rem; white-space: pre-wrap; }
+        .reply-btn { display: inline-block; padding: .5rem 1.2rem; background: #0d6e6e; color: #fff; text-decoration: none; border-radius: .3rem; font-weight: 600; font-size: .85rem; margin-top: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>Lakeport <span>Medical</span> Center</h1></div>
+    <nav>
+        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
+        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
+        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
+        <a href="{{ url_for('health-portals.messages_page') }}" class="active">Messages</a>
+        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </nav>
+    <div class="main">
+        <a href="{{ url_for('health-portals.messages_page') }}" class="back">&larr; Back to Messages</a>
+        <div class="msg-card">
+            <h2>{{ message.subject }}</h2>
+            <div class="msg-meta">From: {{ thread[0].sender_name if thread else 'Unknown' }} &mdash; {{ message.date[:10] }}</div>
+        </div>
+        {% for m in thread %}
+        <div class="thread-msg">
+            <div class="sender">{{ m.sender_name }}</div>
+            <div class="date">{{ m.date }}</div>
+            <div class="body">{{ m.body }}</div>
+        </div>
+        {% endfor %}
+        <a href="{{ url_for('health-portals.compose_page', reply_to=message.id, thread_id=message.thread_id, subject='RE: ' + message.subject) }}" class="reply-btn">Reply</a>
+    </div>
+    <div class="footer">Lakeport Medical Center Patient Portal</div>
+</body>
+</html>

@@ -1,0 +1,153 @@
+[
+  {
+    "type": "observation",
+    "step": 0,
+    "url": "/sites/business-company/",
+    "title": "Apex Dynamics Corp - Homepage",
+    "ax_tree_summary": "Homepage for Apex Dynamics Corp. H1: Empowering Businesses Through Technology. Navigation: Products, Team, Services, Blog, Careers, Contact, Newsletter. Featured Products: Real-time Security Gateway, Streamlined API Management Layer, Cloud-native Data Pipeline. Services section with 6 services. Team section with 6 members. Blog section with 3 latest articles. Newsletter subscribe form. Export CSV links for products, services, team, posts."
+  },
+  {
+    "type": "action",
+    "step": 1,
+    "macro": "export_by_dropdown",
+    "action": "GET /sites/business-company/api/export?resource=products&format=csv",
+    "description": "Clicked the 'Export CSV' link on the Products section to export all products as CSV."
+  },
+  {
+    "type": "observation",
+    "step": 1,
+    "url": "/sites/business-company/api/export?resource=products&format=csv",
+    "title": "Products CSV Export",
+    "ax_tree_summary": "CSV file downloaded with header row (id,name,category,description,price_monthly,features,is_featured) and 12 data rows, one for each product.",
+    "extracted_value": {
+      "format": "csv",
+      "resource": "products",
+      "header_columns": 7,
+      "data_rows": 12
+    }
+  },
+  {
+    "type": "action",
+    "step": 2,
+    "macro": "extract_by_dropdown",
+    "action": "GET /sites/business-company/products",
+    "description": "Navigated to the Products page to find the category dropdown filter."
+  },
+  {
+    "type": "observation",
+    "step": 2,
+    "url": "/sites/business-company/products",
+    "title": "Products Page",
+    "ax_tree_summary": "Products page showing 12 products total. Filter form with category select dropdown (options: All Categories, Automation, Cloud Services, Cybersecurity, Data Analytics, Enterprise Software) and search text input."
+  },
+  {
+    "type": "action",
+    "step": 3,
+    "macro": "extract_by_dropdown",
+    "action": "GET /sites/business-company/products?category=Cloud+Services",
+    "description": "Selected 'Cloud Services' from the category dropdown to filter products by that category.",
+    "form_data": {
+      "category": "Cloud Services"
+    },
+    "method": "GET"
+  },
+  {
+    "type": "observation",
+    "step": 3,
+    "url": "/sites/business-company/products?category=Cloud+Services",
+    "title": "Products - Cloud Services",
+    "ax_tree_summary": "Products page filtered by Cloud Services showing 4 products: Cloud-native Data Pipeline (#3), Intelligent Monitoring System (#8), Automated Reporting Dashboard (#10), Real-time API Management Layer (#12).",
+    "extracted_value": {
+      "category": "Cloud Services",
+      "count": 4,
+      "products": [
+        "Cloud-native Data Pipeline",
+        "Intelligent Monitoring System",
+        "Automated Reporting Dashboard",
+        "Real-time API Management Layer"
+      ]
+    }
+  },
+  {
+    "type": "action",
+    "step": 4,
+    "macro": "extract_by_route",
+    "action": "GET /sites/business-company/product/3",
+    "description": "Navigated directly to product detail page for product ID 3 via URL route."
+  },
+  {
+    "type": "observation",
+    "step": 4,
+    "url": "/sites/business-company/product/3",
+    "title": "Product Detail - Cloud-native Data Pipeline",
+    "ax_tree_summary": "Product detail page for Cloud-native Data Pipeline. Category: Cloud Services. Price: Contact for pricing. Features: Audit logging, 24/7 support, Multi-tenant architecture. Related products shown from same category.",
+    "extracted_value": {
+      "product_id": 3,
+      "name": "Cloud-native Data Pipeline",
+      "category": "Cloud Services",
+      "features": [
+        "Audit logging",
+        "24/7 support",
+        "Multi-tenant architecture"
+      ]
+    }
+  },
+  {
+    "type": "action",
+    "step": 5,
+    "macro": "extract_from_table",
+    "action": "GET /sites/business-company/api/compare?resource=products&ids=1,2",
+    "description": "Used the compare API to compare products with ID 1 and ID 2, extracting their categories."
+  },
+  {
+    "type": "observation",
+    "step": 5,
+    "url": "/sites/business-company/api/compare?resource=products&ids=1,2",
+    "title": "Product Comparison",
+    "ax_tree_summary": "API returned comparison of 2 products: Product 1 (Real-time Security Gateway, category Automation, no price) and Product 2 (Streamlined API Management Layer, category Enterprise Software, $18900/mo).",
+    "extracted_value": {
+      "product_1": {
+        "id": 1,
+        "name": "Real-time Security Gateway",
+        "category": "Automation"
+      },
+      "product_2": {
+        "id": 2,
+        "name": "Streamlined API Management Layer",
+        "category": "Enterprise Software"
+      }
+    }
+  },
+  {
+    "type": "action",
+    "step": 6,
+    "macro": "navigate_by_dropdown",
+    "action": "GET /sites/business-company/careers",
+    "description": "Navigated to the Careers page to find the department dropdown filter."
+  },
+  {
+    "type": "observation",
+    "step": 6,
+    "url": "/sites/business-company/careers",
+    "title": "Careers Page",
+    "ax_tree_summary": "Careers page showing 10 open positions. Filter form with department dropdown and location dropdown. Departments include: Customer Success, Finance, Legal, Marketing, Product Management, Research & Development, Sales."
+  },
+  {
+    "type": "action",
+    "step": 7,
+    "macro": "navigate_by_dropdown",
+    "action": "GET /sites/business-company/careers?department=Marketing",
+    "description": "Selected 'Marketing' from the department dropdown to filter job openings by Marketing department.",
+    "form_data": {
+      "department": "Marketing"
+    },
+    "method": "GET"
+  },
+  {
+    "type": "observation",
+    "step": 7,
+    "url": "/sites/business-company/careers?department=Marketing",
+    "title": "Careers - Marketing",
+    "ax_tree_summary": "Careers page filtered by Marketing department showing 2 open positions: Content Strategist (Boston, MA, Full-time) and Brand Manager (Chicago, IL, Full-time)."
+  }
+]

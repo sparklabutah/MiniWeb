@@ -3,14 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Lakeport Transit Authority - Schedules &amp; Routes</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+        /* Header */
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+        /* Nav */
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+
+        /* Layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* Service alert banner */
+        .alert-banner { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 14px; color: #856404; }
+        .alert-banner strong { margin-right: 6px; }
+
+        /* System overview */
+        .system-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
+        .overview-card { background: white; border-radius: 8px; padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .overview-card .val { font-size: 24px; font-weight: 700; color: #1a237e; }
+        .overview-card .lbl { font-size: 12px; color: #666; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Route summary table */
+        .section-heading { font-size: 18px; font-weight: 600; color: #1a237e; margin: 28px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #1a237e; }
+        .route-summary-table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden; margin-bottom: 28px; }
+        .route-summary-table thead { background: #1a237e; color: white; }
+        .route-summary-table th { padding: 10px 14px; font-size: 13px; text-align: left; font-weight: 600; letter-spacing: 0.3px; }
+        .route-summary-table td { padding: 10px 14px; font-size: 14px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        .route-summary-table tr:last-child td { border-bottom: none; }
+        .route-summary-table tr:hover { background: #f8f9ff; }
+        .route-badge { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 28px; border-radius: 5px; color: white; font-weight: 700; font-size: 13px; }
+        .route-type-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+        .route-type-tag.local { background: #e3f2fd; color: #1565c0; }
+        .route-type-tag.express { background: #e8f5e9; color: #2e7d32; }
+        .route-type-tag.circulator { background: #f3e5f5; color: #7b1fa2; }
+        .days-info { font-size: 12px; color: #888; }
+        .accessible-icon { font-size: 14px; color: #1a237e; }
+
+        /* Timetable */
+        .timetable-section { margin-bottom: 32px; }
+        .timetable-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; padding: 10px 14px; background: white; border-radius: 8px 8px 0 0; border-bottom: 2px solid #eee; }
+        .timetable-header .route-badge { width: 42px; height: 32px; font-size: 15px; }
+        .timetable-header .route-title { font-size: 16px; font-weight: 600; color: #333; }
+        .timetable-header .route-dir { font-size: 13px; color: #666; margin-left: auto; }
+        .timetable-header .service-tag { font-size: 11px; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+        .timetable-wrapper { overflow-x: auto; }
+        .timetable { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-size: 13px; }
+        .timetable thead { background: #37474f; color: white; }
+        .timetable th { padding: 8px 10px; text-align: center; font-weight: 600; font-size: 12px; white-space: nowrap; min-width: 55px; }
+        .timetable th.stop-col { text-align: left; min-width: 180px; background: #263238; position: sticky; left: 0; z-index: 1; }
+        .timetable td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #eee; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; font-size: 12px; white-space: nowrap; }
+        .timetable td.stop-name { text-align: left; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 500; color: #333; background: #fafafa; position: sticky; left: 0; z-index: 1; }
+        .timetable tr:hover td { background: #f0f4ff; }
+        .timetable tr:hover td.stop-name { background: #e8eeff; }
+        .timetable tr:last-child td { border-bottom: none; }
+        .timetable-note { font-size: 12px; color: #888; margin-top: 6px; padding: 0 4px; }
+
+        /* No-schedule note */
+        .no-schedule { background: white; border-radius: 8px; padding: 16px; margin-bottom: 16px; color: #888; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+        /* Fare summary */
+        .fare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .fare-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .fare-card h4 { font-size: 14px; color: #1a237e; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .fare-table { width: 100%; border-collapse: collapse; }
+        .fare-table th, .fare-table td { padding: 6px 10px; font-size: 13px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        .fare-table th { font-weight: 600; color: #555; }
+        .fare-table td:last-child { text-align: right; font-weight: 600; }
+        .fare-table tr:last-child th, .fare-table tr:last-child td { border-bottom: none; }
+
+        /* Quick links */
+        .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 28px; }
+        .quick-link { display: block; background: white; border-radius: 8px; padding: 16px; text-decoration: none; color: inherit; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
+        .quick-link:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.15); }
+        .quick-link h4 { font-size: 14px; color: #1a237e; margin-bottom: 4px; }
+        .quick-link p { font-size: 12px; color: #888; }
+
+        /* Footer */
+        .footer { text-align: center; padding: 24px; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; margin-top: 12px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .timetable th, .timetable td { padding: 5px 6px; font-size: 11px; min-width: 44px; }
+            .timetable th.stop-col, .timetable td.stop-name { min-width: 130px; font-size: 12px; }
+        }
+    </style>
 </head>
 <body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Bus Schedules &amp; Route Information</div>
+    </div>
+    <div class="nav">
+        <a href="/" class="active">Schedules</a>
+        <a href="/routes">All Routes</a>
+        <a href="/stops">Stops &amp; Map</a>
+        <a href="/sites/map-services/directions?mode=transit">Trip Planner</a>
+        <a href="/fares">Fares &amp; Passes</a>
+        <a href="/login">Sign In</a>
+    </div>
+
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+
+        <!-- Service alert -->
+        <div class="alert-banner">
+            <strong>Service Notice:</strong> Weekday schedules in effect. Weekend and holiday schedules may differ. Check individual route pages for details.
+        </div>
+
+        <!-- System overview -->
+        <div class="system-overview">
+            <div class="overview-card">
+                <div class="val">{{ total_routes }}</div>
+                <div class="lbl">Bus Routes</div>
+            </div>
+            <div class="overview-card">
+                <div class="val">{{ total_stops }}</div>
+                <div class="lbl">Stops Served</div>
+            </div>
+            <div class="overview-card">
+                <div class="val">5:00a</div>
+                <div class="lbl">First Bus</div>
+            </div>
+            <div class="overview-card">
+                <div class="val">11:30p</div>
+                <div class="lbl">Last Bus</div>
+            </div>
+            <div class="overview-card">
+                <div class="val">${{ "%.2f"|format(fares.single_ride.zone_A.adult) }}</div>
+                <div class="lbl">Adult Fare (Zone A)</div>
+            </div>
+        </div>
+
+        <!-- Route summary table -->
+        <h2 class="section-heading">Route Overview</h2>
+        <table class="route-summary-table">
+            <thead>
+                <tr>
+                    <th>Route</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>From / To</th>
+                    <th>Peak Freq.</th>
+                    <th>Service Hours</th>
+                    <th>Travel Time</th>
+                    <th>Zone</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for route in routes %}
+                <tr>
+                    <td><span class="route-badge" style="background-color: {{ route.color }}">{{ route.route_number }}</span></td>
+                    <td><a href="/route/{{ route.id }}" style="color: #1a237e; text-decoration: none; font-weight: 500;">{{ route.name }}</a></td>
+                    <td><span class="route-type-tag {{ route.type }}">{{ route.type }}</span></td>
+                    <td>{{ route.start_point }} &rarr; {{ route.end_point }}</td>
+                    <td>{{ route.frequency_peak_minutes }} min</td>
+                    <td>{{ route.first_departure }} &ndash; {{ route.last_departure }}</td>
+                    <td>{{ route.estimated_travel_time_minutes }} min</td>
+                    <td>{{ route.fare_zone }}</td>
+                    <td>
+                        {% if route.wheelchair_accessible %}<span class="accessible-icon" title="Wheelchair accessible">&#9855;</span>{% endif %}
+                        {% if route.bike_rack %}<span class="accessible-icon" title="Bike rack available">&#128690;</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Timetables -->
+        <h2 class="section-heading">Bus Schedules &mdash; Weekday Timetables</h2>
+
+        {% for route in routes %}
+        <div class="timetable-section">
+            <div class="timetable-header">
+                <span class="route-badge" style="background-color: {{ route.color }}">{{ route.route_number }}</span>
+                <span class="route-title">{{ route.name }}</span>
+                {% if route.id in route_schedules %}
+                <span class="service-tag">{{ route_schedules[route.id].service_type }}</span>
+                <span class="route-dir">{{ route_schedules[route.id].direction_label }}</span>
+                {% endif %}
+            </div>
+
+            {% if route.id in route_schedules and route_schedules[route.id].timetable %}
+            {% set sched = route_schedules[route.id] %}
+            {% set tt = sched.timetable %}
+            {% set num_times = tt[0].times | length if tt else 0 %}
+            <div class="timetable-wrapper">
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th class="stop-col">Stop</th>
+                            {% for i in range(num_times) %}
+                            <th>{{ tt[0].times[i] }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in tt %}
+                        <tr>
+                            <td class="stop-name">{{ entry.stop }}</td>
+                            {% for t in entry.times %}
+                            <td>{{ t }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="timetable-note">Showing selected weekday departure times. Full schedule available on the <a href="/route/{{ route.id }}">route detail page</a>.</p>
+            {% else %}
+            <div class="no-schedule">
+                <strong>Route {{ route.route_number }} {{ route.name }}:</strong>
+                Service runs every {{ route.frequency_peak_minutes }} minutes (peak) / {{ route.frequency_offpeak_minutes }} minutes (off-peak).
+                {{ route.first_departure }} &ndash; {{ route.last_departure }}.
+                <a href="/route/{{ route.id }}" style="color: #1a237e;">View route details &raquo;</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Fare summary -->
+        <h2 class="section-heading">Fares at a Glance</h2>
+        <div class="fare-grid">
+            <div class="fare-card">
+                <h4>Zone A &mdash; Local Routes</h4>
+                <table class="fare-table">
+                    <tr><th>Adult (single ride)</th><td>${{ "%.2f"|format(fares.single_ride.zone_A.adult) }}</td></tr>
+                    <tr><th>Youth (6-18)</th><td>${{ "%.2f"|format(fares.single_ride.zone_A.youth_6_18) }}</td></tr>
+                    <tr><th>Senior / Disabled</th><td>${{ "%.2f"|format(fares.single_ride.zone_A.senior_65_plus) }}</td></tr>
+                    <tr><th>Child under 6</th><td>Free</td></tr>
+                    <tr><th>Day Pass (Adult)</th><td>${{ "%.2f"|format(fares.day_pass.zone_A.adult) }}</td></tr>
+                    <tr><th>Monthly Pass (Adult)</th><td>${{ "%.2f"|format(fares.monthly_pass.zone_A.adult) }}</td></tr>
+                </table>
+            </div>
+            <div class="fare-card">
+                <h4>Zone B &mdash; Express Routes</h4>
+                <table class="fare-table">
+                    <tr><th>Adult (single ride)</th><td>${{ "%.2f"|format(fares.single_ride.zone_B.adult) }}</td></tr>
+                    <tr><th>Youth (6-18)</th><td>${{ "%.2f"|format(fares.single_ride.zone_B.youth_6_18) }}</td></tr>
+                    <tr><th>Senior / Disabled</th><td>${{ "%.2f"|format(fares.single_ride.zone_B.senior_65_plus) }}</td></tr>
+                    <tr><th>Child under 6</th><td>Free</td></tr>
+                    <tr><th>Day Pass (Adult)</th><td>${{ "%.2f"|format(fares.day_pass.zone_B.adult) }}</td></tr>
+                    <tr><th>Monthly Pass (Adult)</th><td>${{ "%.2f"|format(fares.monthly_pass.zone_B.adult) }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Quick links -->
+        <h2 class="section-heading">Rider Resources</h2>
+        <div class="quick-links">
+            <a href="/sites/map-services/directions?mode=transit" class="quick-link">
+                <h4>Plan a Trip</h4>
+                <p>Get directions, transfers, and estimated travel times.</p>
+            </a>
+            <a href="/sites/map-services/?category=bus_stop" class="quick-link">
+                <h4>Find a Stop</h4>
+                <p>Search {{ total_stops }} stops on the map by name or zone.</p>
+            </a>
+            <a href="/routes" class="quick-link">
+                <h4>Route Details</h4>
+                <p>Full schedules, stops served, and route maps.</p>
+            </a>
+            <a href="/fares" class="quick-link">
+                <h4>Fares &amp; Passes</h4>
+                <p>Fare zones, pass options, and payment methods.</p>
+            </a>
+        </div>
+
+        <div class="footer">
+            Lakeport Transit Authority &mdash; Connecting Communities<br>
+            Schedules effective June 2026. Subject to change without notice.
+        </div>
     </div>
 </body>
 </html>

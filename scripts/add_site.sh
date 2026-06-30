@@ -58,6 +58,6 @@ echo
 echo "Next steps:"
 echo "  1. Edit $SITE_DIR/site.json to update tags"
 echo "  2. Build your pages in $SITE_DIR/templates/$SITE_ID/"
-echo "  3. Add data files to $SITE_DIR/data/"
+echo "  3. Add data files to /scratch/general/vast/u1653932/data_sources/$SITE_ID/"
 echo "  4. Edit $SITE_DIR/routes.py to add your routes"
 echo "  5. Restart: python run.py"

@@ -16,6 +16,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "forums"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -52,8 +53,8 @@ def _load_users():
 
 
 def _get_user_by_username(username):
-    """Fetch a single user by reddit_username."""
-    users = db.query(SITE, "users", where={"reddit_username": username}, limit=1)
+    """Fetch a single user by username."""
+    users = db.query(SITE, "users", where={"username": username}, limit=1)
     if users:
         return _fix_user_json(users[0])
     return None
@@ -124,7 +125,11 @@ def _get_current_user():
 
 
 def _get_subreddits():
-    """Return sorted list of unique subreddit names from posts."""
+    """Return sorted list of unique subreddit names from posts.
+
+    Values are stored without ``r/`` prefix in the DB (e.g. ``AskReddit``).
+    This helper returns them as-is; templates add the ``r/`` display prefix.
+    """
     table = db.get_table_name(SITE, "posts")
     if not table:
         return []
@@ -136,7 +141,7 @@ def _hot_score(post):
     """Simple hot-ranking: score biased by recency."""
     score = int(post.get("score", 0) or 0)
     try:
-        created = datetime.fromisoformat(post["created_at"].replace("Z", "+00:00"))
+        created = datetime.fromisoformat(post["created_utc"].replace("Z", "+00:00"))
         age_hours = (datetime.now(timezone.utc) - created).total_seconds() / 3600
     except (KeyError, ValueError):
         age_hours = 10000
@@ -147,7 +152,7 @@ def _hot_score(post):
 
 def _sort_posts(posts, sort="hot"):
     if sort == "new":
-        return sorted(posts, key=lambda p: p.get("created_at", ""), reverse=True)
+        return sorted(posts, key=lambda p: p.get("created_utc", ""), reverse=True)
     elif sort == "top":
         return sorted(posts, key=lambda p: p.get("score", 0), reverse=True)
     else:  # hot
@@ -290,11 +295,9 @@ def index():
     date_to = request.args.get("date_to")
 
     # Build SQL WHERE clause for filtered post query
-    where = {}
-    if subreddit_filter:
-        if not subreddit_filter.startswith("r/"):
-            subreddit_filter = f"r/{subreddit_filter}"
-        where["subreddit"] = subreddit_filter
+    # Subreddit values are stored without "r/" prefix in the DB.
+    if subreddit_filter and subreddit_filter.startswith("r/"):
+        subreddit_filter = subreddit_filter[2:]
 
     # For date range filters and sorting, use db.execute for more control
     table = db.get_table_name(SITE, "posts")
@@ -306,16 +309,16 @@ def index():
             clauses.append("[subreddit] = ?")
             params.append(subreddit_filter)
         if date_from:
-            clauses.append("[created_at] >= ?")
+            clauses.append("[created_utc] >= ?")
             params.append(date_from)
         if date_to:
-            clauses.append("[created_at] <= ?")
+            clauses.append("[created_utc] <= ?")
             params.append(date_to)
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
 
         if sort == "new":
-            sql += " ORDER BY [created_at] DESC"
+            sql += " ORDER BY [created_utc] DESC"
         elif sort == "top":
             sql += " ORDER BY [score] DESC"
         else:
@@ -326,9 +329,9 @@ def index():
     else:
         posts = []
 
-    # Get comment counts for the displayed posts only
+    # num_comments is already a column — use it directly, no per-post DB query
     for p in posts:
-        p["_comment_count"] = _count_comments(where={"post_id": p["id"]})
+        p["_comment_count"] = p.get("num_comments") or 0
 
     subreddits = _get_subreddits()
     return render_template("forums/index.html", posts=posts, sort=sort,
@@ -337,17 +340,17 @@ def index():
 
 @blueprint.route("/r/<subreddit_name>")
 def subreddit_view(subreddit_name):
-    sub = f"r/{subreddit_name}"
+    # Subreddit values are stored without "r/" prefix in the DB.
     sort = request.args.get("sort", "hot")
 
-    sort_col = "score" if sort in ("top", "hot") else "created_at"
-    sub_posts = _load_posts(where={"subreddit": sub}, sort=f"-{sort_col}", limit=50)
+    sort_col = "score" if sort in ("top", "hot") else "created_utc"
+    sub_posts = _load_posts(where={"subreddit": subreddit_name}, sort=f"-{sort_col}", limit=50)
     if not sub_posts:
         abort(404)
     for p in sub_posts:
         p["_comment_count"] = _count_comments(where={"post_id": p["id"]})
     return render_template("forums/subreddit.html", posts=sub_posts, sort=sort,
-                           subreddit=sub)
+                           subreddit=subreddit_name)
 
 
 @blueprint.route("/post/<post_id>")
@@ -367,8 +370,8 @@ def user_profile(username):
     user = _get_user_by_username(username)
     if not user:
         abort(404)
-    user_posts = _load_posts(where={"reddit_username": username}, sort="-created_at", limit=50)
-    user_comments = _load_comments(where={"reddit_username": username}, sort="-created_at", limit=50)
+    user_posts = _load_posts(where={"author": username}, sort="-created_utc", limit=50)
+    user_comments = _load_comments(where={"author": username}, sort="-created_utc", limit=50)
     # Enrich comments with parent post info
     for c in user_comments:
         parent_post = _get_post(c["post_id"])
@@ -401,18 +404,19 @@ def submit_post_form():
         subreddits = _get_subreddits()
         return render_template("forums/submit.html", subreddits=subreddits,
                                error="Title and subreddit are required.")
-    if not subreddit.startswith("r/"):
-        subreddit = f"r/{subreddit}"
+    # Strip r/ prefix if present -- DB stores bare names
+    if subreddit.startswith("r/"):
+        subreddit = subreddit[2:]
     new_post = {
         "id": _next_post_id(),
         "author_root_user_id": user["root_user_id"],
-        "reddit_username": user["reddit_username"],
+        "author": user["username"],
         "subreddit": subreddit,
         "title": title,
         "body": body,
         "score": 1,
         "num_comments": 0,
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "flair": flair,
     }
     db.save_item(SITE, "posts", new_post["id"], new_post)
@@ -428,7 +432,7 @@ def search_page():
     if q:
         table = db.get_table_name(SITE, "posts")
         if table:
-            sort_col = "score" if sort == "top" else "created_at"
+            sort_col = "score" if sort == "top" else "created_utc"
             results = db.execute(
                 f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? ORDER BY [{sort_col}] DESC LIMIT 50",
                 (f"%{q}%", f"%{q}%")
@@ -475,13 +479,13 @@ def register_submit():
         return render_template("forums/register.html",
                                error="Password is required.")
     users = _load_users()
-    if any(u["reddit_username"] == username for u in users):
+    if any(u["username"] == username for u in users):
         return render_template("forums/register.html",
                                error="Username already taken.")
     max_id = max((u["root_user_id"] for u in users), default=0)
     new_user = {
         "root_user_id": max_id + 100,
-        "reddit_username": username,
+        "username": username,
         "karma": 0,
         "subscribed_subreddits": [],
         "cake_day": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -492,6 +496,8 @@ def register_submit():
     }
     users.append(new_user)
     _save_users(users)
+    emit("signup", user_id=new_user["root_user_id"], site_name="forums",
+         username=username, password=password, email="")
     session["user_id"] = new_user["root_user_id"]
     return redirect(url_for("forums.index"))
 
@@ -503,10 +509,10 @@ def messages_page():
     if not user:
         return redirect(url_for("forums.login_page"))
     messages = _load_messages()
-    inbox = sorted([m for m in messages if m["to_username"] == user["reddit_username"]],
-                   key=lambda m: m.get("created_at", ""), reverse=True)
-    sent = sorted([m for m in messages if m["from_username"] == user["reddit_username"]],
-                  key=lambda m: m.get("created_at", ""), reverse=True)
+    inbox = sorted([m for m in messages if m["to_username"] == user["username"]],
+                   key=lambda m: m.get("created_utc", ""), reverse=True)
+    sent = sorted([m for m in messages if m["from_username"] == user["username"]],
+                  key=lambda m: m.get("created_utc", ""), reverse=True)
     return render_template("forums/messages.html", inbox=inbox, sent=sent)
 
 
@@ -537,18 +543,19 @@ def api_list_posts():
     params = []
     clauses = []
     if sub:
-        if not sub.startswith("r/"):
-            sub = f"r/{sub}"
+        # Strip r/ prefix if present -- DB stores bare names
+        if sub.startswith("r/"):
+            sub = sub[2:]
         clauses.append("[subreddit] = ?")
         params.append(sub)
     if user:
-        clauses.append("[reddit_username] = ?")
+        clauses.append("[author] = ?")
         params.append(user)
     if date_from:
-        clauses.append("[created_at] >= ?")
+        clauses.append("[created_utc] >= ?")
         params.append(date_from)
     if date_to:
-        clauses.append("[created_at] <= ?")
+        clauses.append("[created_utc] <= ?")
         params.append(date_to)
     if flair:
         clauses.append("LOWER([flair]) = ?")
@@ -557,7 +564,7 @@ def api_list_posts():
         sql += " WHERE " + " AND ".join(clauses)
 
     if sort == "new":
-        sql += " ORDER BY [created_at] DESC"
+        sql += " ORDER BY [created_utc] DESC"
     elif sort == "top":
         sql += " ORDER BY [score] DESC"
     else:
@@ -584,18 +591,19 @@ def api_create_post():
         return jsonify({"error": "Title is required"}), 400
     if not subreddit:
         return jsonify({"error": "Subreddit is required"}), 400
-    if not subreddit.startswith("r/"):
-        subreddit = f"r/{subreddit}"
+    # Strip r/ prefix if present -- DB stores bare names
+    if subreddit.startswith("r/"):
+        subreddit = subreddit[2:]
     new_post = {
         "id": _next_post_id(),
         "author_root_user_id": user["root_user_id"],
-        "reddit_username": user["reddit_username"],
+        "author": user["username"],
         "subreddit": subreddit,
         "title": title,
         "body": body,
         "score": 1,
         "num_comments": 0,
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "flair": data.get("flair", ""),
     }
     db.save_item(SITE, "posts", new_post["id"], new_post)
@@ -727,10 +735,10 @@ def api_add_comment(post_id):
         "id": _next_comment_id(),
         "post_id": post_id,
         "author_root_user_id": user["root_user_id"],
-        "reddit_username": user["reddit_username"],
+        "author": user["username"],
         "body": body,
         "score": 1,
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "parent_comment_id": parent_comment_id,
     }
     db.save_item(SITE, "comments", new_comment["id"], new_comment)
@@ -783,7 +791,7 @@ def api_list_subreddits():
     sub_stats = db.execute(
         f"SELECT [subreddit], COUNT(*) as post_count, "
         f"COALESCE(SUM([score]), 0) as total_score, "
-        f"COUNT(DISTINCT [reddit_username]) as unique_authors "
+        f"COUNT(DISTINCT [author]) as unique_authors "
         f"FROM [{posts_table}] GROUP BY [subreddit] ORDER BY post_count DESC"
     )
 
@@ -814,7 +822,7 @@ def api_list_subreddits():
 @blueprint.route("/api/subreddits/<subreddit_name>/stats", methods=["GET"])
 def api_subreddit_stats(subreddit_name):
     """extract_by_dropdown: get detailed stats for one subreddit."""
-    sub = f"r/{subreddit_name}"
+    sub = subreddit_name
     posts_table = db.get_table_name(SITE, "posts")
     comments_table = db.get_table_name(SITE, "comments")
     if not posts_table:
@@ -823,7 +831,7 @@ def api_subreddit_stats(subreddit_name):
     # Aggregate post stats in SQL
     stats_row = db.execute(
         f"SELECT COUNT(*) as post_count, COALESCE(SUM([score]), 0) as total_score, "
-        f"COUNT(DISTINCT [reddit_username]) as post_authors "
+        f"COUNT(DISTINCT [author]) as post_authors "
         f"FROM [{posts_table}] WHERE [subreddit] = ?",
         (sub,), fetch="one"
     )
@@ -834,7 +842,7 @@ def api_subreddit_stats(subreddit_name):
     comment_authors_count = 0
     if comments_table:
         cc = db.execute(
-            f"SELECT COUNT(*) as cnt, COUNT(DISTINCT c.[reddit_username]) as authors "
+            f"SELECT COUNT(*) as cnt, COUNT(DISTINCT c.[author]) as authors "
             f"FROM [{comments_table}] c INNER JOIN [{posts_table}] p ON c.[post_id] = p.[id] "
             f"WHERE p.[subreddit] = ?",
             (sub,), fetch="one"
@@ -877,7 +885,7 @@ def api_search():
     table = db.get_table_name(SITE, "posts")
     if not table:
         return jsonify({"query": q, "count": 0, "posts": []})
-    sort_col = "score" if sort == "top" else "created_at"
+    sort_col = "score" if sort == "top" else "created_utc"
     results = db.execute(
         f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? "
         f"ORDER BY [{sort_col}] DESC LIMIT 50",
@@ -935,7 +943,7 @@ def api_get_user(username):
     if posts_table:
         row = db.execute(
             f"SELECT COUNT(*) as cnt, COALESCE(SUM([score]), 0) as karma "
-            f"FROM [{posts_table}] WHERE [reddit_username] = ?",
+            f"FROM [{posts_table}] WHERE [author] = ?",
             (username,), fetch="one"
         )
         if row:
@@ -943,7 +951,7 @@ def api_get_user(username):
     if comments_table:
         row = db.execute(
             f"SELECT COUNT(*) as cnt, COALESCE(SUM([score]), 0) as karma "
-            f"FROM [{comments_table}] WHERE [reddit_username] = ?",
+            f"FROM [{comments_table}] WHERE [author] = ?",
             (username,), fetch="one"
         )
         if row:
@@ -964,7 +972,7 @@ def api_login():
     if password and password != stored_pw:
         return jsonify({"error": "Incorrect password"}), 401
     session["user_id"] = user["root_user_id"]
-    return jsonify({"user_id": user["root_user_id"], "username": user["reddit_username"]})
+    return jsonify({"user_id": user["root_user_id"], "username": user["username"]})
 
 
 @blueprint.route("/api/register", methods=["POST"])
@@ -978,12 +986,12 @@ def api_register():
     if not password:
         return jsonify({"error": "Password is required"}), 400
     users = _load_users()
-    if any(u["reddit_username"] == username for u in users):
+    if any(u["username"] == username for u in users):
         return jsonify({"error": "Username already taken"}), 409
     max_id = max((u["root_user_id"] for u in users), default=0)
     new_user = {
         "root_user_id": max_id + 100,
-        "reddit_username": username,
+        "username": username,
         "karma": 0,
         "subscribed_subreddits": [],
         "cake_day": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -994,6 +1002,8 @@ def api_register():
     }
     users.append(new_user)
     _save_users(users)
+    emit("signup", user_id=new_user["root_user_id"], site_name="forums",
+         username=username, password=password, email="")
     session["user_id"] = new_user["root_user_id"]
     return jsonify({"user_id": new_user["root_user_id"], "username": username}), 201
 
@@ -1032,7 +1042,7 @@ def api_follow_user(username):
     if not user:
         return jsonify({"error": "Not logged in"}), 401
     users = _load_users()
-    target = next((u for u in users if u["reddit_username"] == username), None)
+    target = next((u for u in users if u["username"] == username), None)
     if not target:
         return jsonify({"error": "User not found"}), 404
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
@@ -1054,7 +1064,7 @@ def api_join_subreddit(subreddit_name):
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
-    sub = f"r/{subreddit_name}"
+    sub = subreddit_name
     users = _load_users()
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
     subs = me.get("subscribed_subreddits", [])
@@ -1099,11 +1109,11 @@ def api_share_post(post_id):
             messages = _load_messages()
             messages.append({
                 "id": _next_message_id(),
-                "from_username": user["reddit_username"],
+                "from_username": user["username"],
                 "to_username": target_user,
                 "subject": f"Shared post: {post['title']}",
                 "body": f"Check out this post: {share_url}",
-                "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "read": False,
             })
             _save_messages(messages)
@@ -1127,12 +1137,12 @@ def api_report():
         return jsonify({"error": "reason is required"}), 400
     report = {
         "id": _next_report_id(),
-        "reporter_username": user["reddit_username"],
+        "reporter_username": user["username"],
         "target_type": target_type,
         "target_id": target_id,
         "reason": reason,
         "description": description,
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "status": "pending",
     }
     reports = _load_reports()
@@ -1148,7 +1158,7 @@ def api_block_user(username):
     if not user:
         return jsonify({"error": "Not logged in"}), 401
     users = _load_users()
-    target = next((u for u in users if u["reddit_username"] == username), None)
+    target = next((u for u in users if u["username"] == username), None)
     if not target:
         return jsonify({"error": "User not found"}), 404
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
@@ -1171,8 +1181,8 @@ def api_list_messages():
     if not user:
         return jsonify({"error": "Not logged in"}), 401
     messages = _load_messages()
-    inbox = [m for m in messages if m["to_username"] == user["reddit_username"]]
-    sent = [m for m in messages if m["from_username"] == user["reddit_username"]]
+    inbox = [m for m in messages if m["to_username"] == user["username"]]
+    sent = [m for m in messages if m["from_username"] == user["username"]]
     return jsonify({"inbox": inbox, "sent": sent})
 
 
@@ -1191,22 +1201,22 @@ def api_send_message():
     if not body:
         return jsonify({"error": "Message body is required"}), 400
     users = _load_users()
-    target = next((u for u in users if u["reddit_username"] == to_username), None)
+    target = next((u for u in users if u["username"] == to_username), None)
     if not target:
         return jsonify({"error": "Recipient not found"}), 404
     # Check if blocked
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
     if to_username in me.get("blocked_users", []):
         return jsonify({"error": "You have blocked this user"}), 403
-    if user["reddit_username"] in target.get("blocked_users", []):
+    if user["username"] in target.get("blocked_users", []):
         return jsonify({"error": "This user has blocked you"}), 403
     msg = {
         "id": _next_message_id(),
-        "from_username": user["reddit_username"],
+        "from_username": user["username"],
         "to_username": to_username,
         "subject": subject or "(no subject)",
         "body": body,
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "read": False,
     }
     messages = _load_messages()

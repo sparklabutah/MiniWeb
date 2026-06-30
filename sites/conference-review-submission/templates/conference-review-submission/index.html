@@ -3,158 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenReview ICLR 2017 -- Conference Management</title>
+    <title>OpenReview — Venues</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1e293b; }
-        .header { border-bottom: 2px solid #7c3aed; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
-        .header h1 { font-size: 1.2rem; color: #7c3aed; }
-        .header h1 a { color: inherit; text-decoration: none; }
-        .header-nav a { margin-left: .8rem; font-size: .85rem; color: #475569; text-decoration: none; }
-        .header-nav a:hover { color: #7c3aed; }
-        .header-nav .btn-signin { background: #7c3aed; color: #fff; padding: .25rem .7rem; border-radius: .3rem; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
 
-        /* Stats banner */
-        .stats-banner { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .8rem 2rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
-        .stat-item { text-align: center; }
-        .stat-item .num { font-size: 1.3rem; font-weight: 700; color: #7c3aed; }
-        .stat-item .label { font-size: .7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-        .stat-item.green .num { color: #059669; }
-        .stat-item.red .num { color: #dc2626; }
+        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
+        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
+        .topbar a:hover { color: #fff; }
+        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
+        .topbar .right a { margin-right: 0; }
 
-        /* Layout: sidebar + main */
-        .layout { display: flex; max-width: 1100px; margin: 1rem auto; padding: 0 1rem; gap: 1.5rem; }
+        .page-header { border-bottom: 1px solid #e8e8e8; background: #fafafa; padding: 28px 0 20px; }
+        .page-inner { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+        .page-title { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+        .page-subtitle { font-size: 14px; color: #777; }
 
-        /* Faceted sidebar */
-        .sidebar { width: 240px; flex-shrink: 0; }
-        .sidebar-section { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: 1rem; margin-bottom: 1rem; }
-        .sidebar-section h3 { font-size: .8rem; text-transform: uppercase; color: #94a3b8; letter-spacing: .05em; margin-bottom: .6rem; }
-        .sidebar-section label { display: block; font-size: .85rem; padding: .25rem 0; cursor: pointer; color: #475569; }
-        .sidebar-section label:hover { color: #7c3aed; }
-        .sidebar-section input[type="radio"], .sidebar-section input[type="number"] { accent-color: #7c3aed; }
-        .sidebar-section input[type="number"] { width: 55px; padding: .2rem .4rem; border: 1px solid #cbd5e1; border-radius: .2rem; font-size: .8rem; }
-        .sidebar-section .score-range { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: #64748b; }
-        .sidebar .search-box { width: 100%; padding: .5rem .7rem; border: 2px solid #cbd5e1; border-radius: .4rem; font-size: .9rem; margin-bottom: 1rem; }
-        .sidebar .search-box:focus { border-color: #7c3aed; outline: none; }
-        .sidebar .apply-btn { width: 100%; padding: .5rem; background: #7c3aed; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        .content { max-width: 900px; margin: 0 auto; padding: 24px 24px 64px; }
 
-        /* Paper list */
-        .paper-list { flex: 1; min-width: 0; }
-        .result-count { font-size: .8rem; color: #94a3b8; margin-bottom: .8rem; }
+        .pending-banner { background: #e8f0fe; border: 1px solid #c6dafc; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #1967d2; }
+        .pending-banner strong { font-weight: 600; }
+        .pending-banner a { color: #1967d2; font-weight: 600; text-decoration: none; }
+        .pending-banner a:hover { text-decoration: underline; }
 
-        .paper-row { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; margin-bottom: .5rem; padding: .8rem 1rem; display: flex; gap: 1rem; align-items: flex-start; transition: border-color .1s; }
-        .paper-row:hover { border-color: #7c3aed; }
-        .paper-row.accepted { border-left: 4px solid #059669; }
-        .paper-row.rejected { border-left: 4px solid #dc2626; }
+        .search-box { margin-bottom: 24px; }
+        .search-input { width: 100%; max-width: 500px; padding: 10px 14px; border: 1px solid #d0d0d0; border-radius: 6px; font-size: 14px; background: #fff; }
+        .search-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
 
-        .paper-score { width: 48px; flex-shrink: 0; text-align: center; }
-        .paper-score .score-num { font-size: 1.2rem; font-weight: 700; }
-        .paper-score .score-num.high { color: #059669; }
-        .paper-score .score-num.mid { color: #d97706; }
-        .paper-score .score-num.low { color: #dc2626; }
-        .paper-score .score-bar { height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: .3rem; }
-        .paper-score .score-fill { height: 100%; border-radius: 2px; }
-        .paper-score .score-fill.high { background: #059669; }
-        .paper-score .score-fill.mid { background: #d97706; }
-        .paper-score .score-fill.low { background: #dc2626; }
+        .venue-card { border: 1px solid #e8e8e8; border-radius: 8px; padding: 18px 20px; margin-bottom: 12px; transition: box-shadow .15s; }
+        .venue-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .venue-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .venue-name { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 600; }
+        .venue-name a { color: #1a73e8; text-decoration: none; }
+        .venue-name a:hover { text-decoration: underline; }
+        .venue-fullname { font-size: 13px; color: #777; margin-bottom: 4px; }
+        .venue-desc { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .venue-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+        .venue-meta .dot { color: #ccc; }
 
-        .paper-info { flex: 1; min-width: 0; }
-        .paper-title { font-size: .95rem; font-weight: 600; margin-bottom: .2rem; }
-        .paper-title a { color: #1e293b; text-decoration: none; }
-        .paper-title a:hover { color: #7c3aed; text-decoration: underline; }
-        .paper-authors { font-size: .8rem; color: #64748b; margin-bottom: .3rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-        .paper-meta { font-size: .75rem; color: #94a3b8; display: flex; gap: .8rem; align-items: center; }
-        .badge { display: inline-block; padding: .1rem .4rem; border-radius: .2rem; font-size: .7rem; font-weight: 600; }
-        .badge-accept { background: #d1fae5; color: #065f46; }
-        .badge-reject { background: #fee2e2; color: #991b1b; }
-        .review-count { font-size: .75rem; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+        .badge-posted { background: #e6f4ea; color: #137333; }
+        .badge-review { background: #e8f0fe; color: #1967d2; }
+        .badge-archived { background: #f5f5f5; color: #888; }
+        .badge-conf { background: #fef7e0; color: #b06d00; }
+        .badge-workshop { background: #f3e8fd; color: #7b2cbf; }
 
-        .no-results { text-align: center; color: #94a3b8; padding: 3rem; }
+        .empty-state { text-align: center; color: #999; padding: 48px 16px; font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('conference-review-submission.index') }}">OpenReview ICLR 2017</a></h1>
-        <div class="header-nav">
-            <a href="{{ url_for('conference-review-submission.index') }}">Papers</a>
-            <a href="{{ url_for('conference-review-submission.stats_page') }}">Statistics</a>
+    <div class="topbar">
+        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">OpenReview</a>
+        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+        <div class="right">
             {% if user %}
-            <a href="{{ url_for('conference-review-submission.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
             <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
             {% else %}
-            <a href="{{ url_for('conference-review-submission.login_page') }}" class="btn-signin">Sign In</a>
+            <a href="{{ url_for('conference-review-submission.login_page') }}">Login</a>
             {% endif %}
             <a href="/">MiniWeb</a>
         </div>
     </div>
 
-    <div class="stats-banner">
-        <div class="stat-item"><div class="num">{{ papers|length }}</div><div class="label">Submissions</div></div>
-        <div class="stat-item green"><div class="num">{{ papers|selectattr('accepted')|list|length }}</div><div class="label">Accepted</div></div>
-        <div class="stat-item red"><div class="num">{{ papers|rejectattr('accepted')|list|length }}</div><div class="label">Rejected</div></div>
-        <div class="stat-item"><div class="num">{{ "%.1f"|format(papers|selectattr('accepted')|list|length / papers|length * 100) }}%</div><div class="label">Accept Rate</div></div>
-    </div>
-
-    <div class="layout">
-        <form class="sidebar" method="get" action="{{ url_for('conference-review-submission.index') }}">
-            <input type="text" class="search-box" name="q" placeholder="Search papers..." value="{{ q }}">
-
-            <div class="sidebar-section">
-                <h3>Decision</h3>
-                <label><input type="radio" name="status" value="" {{ 'checked' if not status }}> All ({{ papers|length }})</label>
-                <label><input type="radio" name="status" value="accepted" {{ 'checked' if status == 'accepted' }}> Accepted</label>
-                <label><input type="radio" name="status" value="rejected" {{ 'checked' if status == 'rejected' }}> Rejected</label>
-            </div>
-
-            <div class="sidebar-section">
-                <h3>Score Range</h3>
-                <div class="score-range">
-                    <input type="number" name="score_min" value="{{ score_min }}" min="1" max="10" step="0.5" placeholder="Min">
-                    <span>to</span>
-                    <input type="number" name="score_max" value="{{ score_max }}" min="1" max="10" step="0.5" placeholder="Max">
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <h3>Sort By</h3>
-                <label><input type="radio" name="sort" value="title" {{ 'checked' if sort == 'title' }}> Title</label>
-                <label><input type="radio" name="sort" value="score_desc" {{ 'checked' if sort == 'score_desc' }}> Score (High-Low)</label>
-                <label><input type="radio" name="sort" value="score_asc" {{ 'checked' if sort == 'score_asc' }}> Score (Low-High)</label>
-                <label><input type="radio" name="sort" value="reviews" {{ 'checked' if sort == 'reviews' }}> Most Reviews</label>
-            </div>
-
-            <button type="submit" class="apply-btn">Apply Filters</button>
-        </form>
-
-        <div class="paper-list">
-            <div class="result-count">{{ papers|length }} submissions</div>
-
-            {% if papers %}
-            {% for paper in papers[:50] %}
-            {% set score_class = 'high' if paper.avg_score and paper.avg_score >= 7 else ('mid' if paper.avg_score and paper.avg_score >= 5 else 'low') %}
-            <div class="paper-row {{ 'accepted' if paper.accepted else 'rejected' }}">
-                <div class="paper-score">
-                    {% if paper.avg_score is not none %}
-                    <div class="score-num {{ score_class }}">{{ paper.avg_score }}</div>
-                    <div class="score-bar"><div class="score-fill {{ score_class }}" style="width: {{ paper.avg_score / 10 * 100 }}%"></div></div>
-                    {% else %}
-                    <div class="score-num" style="color:#ccc">-</div>
-                    {% endif %}
-                </div>
-                <div class="paper-info">
-                    <div class="paper-title"><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></div>
-                    <div class="paper-authors">{{ paper.authors_str }}</div>
-                    <div class="paper-meta">
-                        {% if paper.accepted %}<span class="badge badge-accept">Accept</span>{% else %}<span class="badge badge-reject">Reject</span>{% endif %}
-                        <span class="review-count">{{ paper.num_reviews }} reviews</span>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="no-results">No submissions match your criteria.</div>
-            {% endif %}
+    <div class="page-header">
+        <div class="page-inner">
+            <div class="page-title">Open Venues</div>
+            <div class="page-subtitle">Browse conferences, workshops, and journals hosted on OpenReview</div>
         </div>
     </div>
+
+    <div class="content">
+        {% if user and pending_count > 0 %}
+        <div class="pending-banner">
+            <strong>{{ pending_count }}</strong> pending review task{{ 's' if pending_count != 1 }} assigned to you.
+            <a href="{{ url_for('conference-review-submission.console') }}">Go to Console</a>
+        </div>
+        {% endif %}
+
+        <div class="search-box">
+            <input type="text" class="search-input" placeholder="Search venues..." id="venueSearch" oninput="filterVenues()">
+        </div>
+
+        <div id="venueList">
+        {% for venue in venues %}
+        <div class="venue-card" data-name="{{ venue.name|lower }} {{ venue.full_name|lower }}">
+            <div class="venue-top">
+                <div>
+                    <div class="venue-name">
+                        {% if venue.paper_count > 0 %}
+                        <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>
+                        {% else %}
+                        <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}" style="color:#555">{{ venue.name }}</a>
+                        {% endif %}
+                    </div>
+                    <div class="venue-fullname">{{ venue.full_name }}</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                    {% if venue.type == 'workshop' %}
+                    <span class="badge badge-workshop">Workshop</span>
+                    {% else %}
+                    <span class="badge badge-conf">Conference</span>
+                    {% endif %}
+                    {% if venue.status == 'decisions_posted' %}
+                    <span class="badge badge-posted">Decisions Posted</span>
+                    {% elif venue.status == 'under_review' %}
+                    <span class="badge badge-review">Under Review</span>
+                    {% elif venue.status == 'archived' %}
+                    <span class="badge badge-archived">Archived</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if venue.description %}
+            <div class="venue-desc">{{ venue.description }}</div>
+            {% endif %}
+            <div class="venue-meta">
+                {% if venue.location %}<span>{{ venue.location }}</span><span class="dot">&middot;</span>{% endif %}
+                {% if venue.dates %}<span>{{ venue.dates }}</span><span class="dot">&middot;</span>{% endif %}
+                <span>{{ venue.paper_count }} submission{{ 's' if venue.paper_count != 1 }}</span>
+                {% if venue.paper_count > 0 and venue.status == 'decisions_posted' %}
+                <span class="dot">&middot;</span>
+                <span>{{ venue.accepted_count }} accepted ({{ "%.0f"|format(venue.accepted_count / venue.paper_count * 100) }}%)</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+
+        {% if not venues %}
+        <div class="empty-state">No venues available.</div>
+        {% endif %}
+    </div>
+
+    <script>
+    function filterVenues() {
+        var q = document.getElementById('venueSearch').value.toLowerCase();
+        var cards = document.querySelectorAll('.venue-card');
+        cards.forEach(function(card) {
+            var name = card.getAttribute('data-name');
+            card.style.display = (q === '' || name.indexOf(q) >= 0) ? '' : 'none';
+        });
+    }
+    </script>
 </body>
 </html>

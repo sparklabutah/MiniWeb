@@ -3,14 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My New Site</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Lakeport Medical Center - Patient Portal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .header h1 span { color: #7ee8e8; }
+        .header-nav a { color: #c0e8e8; text-decoration: none; margin-left: 1.2rem; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-signin { background: #7ee8e8; color: #0d6e6e; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #e6f7f7; }
+        nav a.active { font-weight: 700; background: #d0f0f0; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        .welcome { background: linear-gradient(135deg, #0d6e6e, #148f8f); color: #fff; padding: 2rem; border-radius: .6rem; margin-bottom: 1.5rem; }
+        .welcome h2 { font-size: 1.6rem; font-weight: 300; margin-bottom: .5rem; }
+        .welcome p { color: #c0e8e8; font-size: .95rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: center; }
+        .stat-card .number { font-size: 2rem; font-weight: 700; color: #0d6e6e; }
+        .stat-card .label { font-size: .8rem; color: #64748b; margin-top: .2rem; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+        .panel { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden; }
+        .panel-header { padding: 1rem 1.2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h3 { font-size: 1rem; color: #1a202c; }
+        .panel-header a { font-size: .8rem; color: #0d6e6e; text-decoration: none; font-weight: 600; }
+        .panel-body { padding: .5rem 0; }
+        .list-item { padding: .8rem 1.2rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .list-item:last-child { border-bottom: none; }
+        .list-item .title { font-size: .9rem; font-weight: 500; color: #1a202c; }
+        .list-item .subtitle { font-size: .78rem; color: #64748b; margin-top: .15rem; }
+        .list-item a { text-decoration: none; color: inherit; flex: 1; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; }
+        .badge-scheduled { background: #dbeafe; color: #1d4ed8; }
+        .badge-completed { background: #dcfce7; color: #16a34a; }
+        .badge-unread { background: #fee2e2; color: #dc2626; }
+        .badge-pending { background: #fef3c7; color: #d97706; }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .empty { padding: 1.5rem; text-align: center; color: #94a3b8; font-size: .85rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
-        <h1>My New Site</h1>
-        <p>Replace this with your site content.</p>
+    <div class="header">
+        <h1>Lakeport <span>Medical</span> Center</h1>
+        <div class="header-nav">
+            {% if logged_in %}
+                <a href="{{ url_for('health-portals.logout') }}">Sign Out ({{ user.first_name }})</a>
+            {% else %}
+                <a href="{{ url_for('health-portals.login_page') }}" class="btn-signin">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('health-portals.index') }}" class="active">Dashboard</a>
+        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
+        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
+        <a href="{{ url_for('health-portals.messages_page') }}">Messages{% if unread_count %} ({{ unread_count }}){% endif %}</a>
+        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </nav>
+
+    <div class="main">
+        <div class="welcome">
+            <h2>Welcome back, {{ user.first_name }}</h2>
+            <p>Manage your health all in one place. View appointments, records, messages, and more.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number">{{ upcoming|length }}</div>
+                <div class="label">Upcoming Appointments</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ unread_count }}</div>
+                <div class="label">Unread Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ active_prescriptions }}</div>
+                <div class="label">Active Prescriptions</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">${{ "%.2f"|format(total_due) }}</div>
+                <div class="label">Balance Due</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Upcoming Appointments</h3>
+                    <a href="{{ url_for('health-portals.appointments_page') }}">View All</a>
+                </div>
+                <div class="panel-body">
+                    {% if upcoming %}
+                        {% for appt in upcoming %}
+                        <div class="list-item">
+                            <a href="{{ url_for('health-portals.appointment_detail', appt_id=appt.id) }}">
+                                <div class="title">{{ appt.category }}</div>
+                                <div class="subtitle">{{ appt.date }} at {{ appt.time }} &mdash; {{ appt.provider_name }}</div>
+                            </a>
+                            <span class="badge badge-scheduled">{{ appt.status }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty">No upcoming appointments</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Recent Messages</h3>
+                    <a href="{{ url_for('health-portals.messages_page') }}">View All</a>
+                </div>
+                <div class="panel-body">
+                    {% if recent_msgs %}
+                        {% for msg in recent_msgs %}
+                        <div class="list-item">
+                            <a href="{{ url_for('health-portals.message_detail', msg_id=msg.id) }}">
+                                <div class="title">{{ msg.subject }}</div>
+                                <div class="subtitle">{{ msg.sender_name }} &mdash; {{ msg.date[:10] }}</div>
+                            </a>
+                            {% if not msg.read and msg.recipient_id == user.id %}
+                                <span class="badge badge-unread">New</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty">No messages</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Pending Bills</h3>
+                    <a href="{{ url_for('health-portals.billing_page') }}">View All</a>
+                </div>
+                <div class="panel-body">
+                    {% if pending_bills %}
+                        {% for bill in pending_bills %}
+                        <div class="list-item">
+                            <div>
+                                <div class="title">{{ bill.description }}</div>
+                                <div class="subtitle">{{ bill.date_of_service }} &mdash; ${{ "%.2f"|format(bill.patient_responsibility or bill.patient_copay) }}</div>
+                            </div>
+                            <span class="badge badge-pending">Pending</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty">No pending bills</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Quick Actions</h3>
+                </div>
+                <div class="panel-body" style="padding: 1.2rem;">
+                    <div style="display: flex; flex-direction: column; gap: .6rem;">
+                        <a href="{{ url_for('health-portals.schedule_page') }}" style="display: block; padding: .7rem 1rem; background: #0d6e6e; color: #fff; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem;">Schedule Appointment</a>
+                        <a href="{{ url_for('health-portals.compose_page') }}" style="display: block; padding: .7rem 1rem; background: #fff; color: #0d6e6e; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem; border: 1.5px solid #0d6e6e;">Send Message</a>
+                        <a href="{{ url_for('health-portals.prescriptions_page') }}" style="display: block; padding: .7rem 1rem; background: #fff; color: #0d6e6e; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem; border: 1.5px solid #0d6e6e;">Request Refill</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Lakeport Medical Center &mdash; 800 Health Plaza, Lakeport, WA 98401 &mdash; (555) 800-2200<br>
+        Patient Portal &copy; 2026. HIPAA Compliant. All rights reserved.
     </div>
 </body>
 </html>

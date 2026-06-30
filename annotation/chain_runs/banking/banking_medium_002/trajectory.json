@@ -1,0 +1,85 @@
+[
+  {
+    "type": "observation",
+    "step": 0,
+    "url": "/sites/banking/",
+    "title": "Secure Bank Online - Dashboard",
+    "ax_tree_summary": "Dashboard showing Welcome James Smith. Accounts: loan LN-969693 ($92352.08 owed), checking CHK-338968 ($1622.70). Quick Actions: Transfer Funds, Pay a Bill, View Transactions, Manage Loans, Account Settings. Navigation links to all site sections. Sign Out link confirms logged-in state."
+  },
+  {
+    "type": "action",
+    "step": 1,
+    "macro": "extract_by_query",
+    "action": "GET /sites/banking/transactions?q=Rent",
+    "description": "Used the transaction search form to query for 'Rent'. The search input (name=q) accepts text to search by description, category, or reference.",
+    "form_data": {"q": "Rent"},
+    "method": "GET"
+  },
+  {
+    "type": "observation",
+    "step": 1,
+    "url": "/sites/banking/transactions?q=Rent",
+    "title": "Transaction History - Search Results",
+    "ax_tree_summary": "Search results for 'Rent' showing 1 of 1 transactions. Table row: Date=2026-03-23, Description=Lyft, Category=Rent, Amount=-$427.50, Type=debit, Status=posted, Ref=TXN000119. Each row has Flag and Del action buttons.",
+    "extracted_value": {
+      "description": "Lyft",
+      "category": "Rent",
+      "amount": "-$427.50",
+      "date": "2026-03-23",
+      "type": "debit",
+      "status": "posted",
+      "reference": "TXN000119"
+    }
+  },
+  {
+    "type": "action",
+    "step": 2,
+    "macro": "pay_by_form",
+    "action": "POST /sites/banking/pay-bills",
+    "description": "Navigated to Pay Bills page which shows a table of bills. Bill_id=1 is Comcast Internet, $115.32, due 2026-06-05, status Overdue, Auto-Pay Yes. Submitted the pay form with bill_id=1.",
+    "form_data": {"bill_id": "1"},
+    "method": "POST"
+  },
+  {
+    "type": "observation",
+    "step": 2,
+    "url": "/sites/banking/pay-bills",
+    "title": "Bills and Payments - After Payment",
+    "ax_tree_summary": "Success message: 'Bill to Comcast Internet paid successfully ($115.32).' Bills table now shows bill_id=1 (Comcast Internet) with status=Paid. The Pay Now button for bill_id=1 is gone. A new transaction (BILL000001) for -$115.32 was created and appears in transaction history. Remaining unpaid bills: bill_id=4, bill_id=7, bill_id=10.",
+    "payment_result": {
+      "payee": "Comcast Internet",
+      "amount": "$115.32",
+      "category": "Other",
+      "status_before": "Overdue",
+      "status_after": "Paid",
+      "success_message": "Bill to Comcast Internet paid successfully ($115.32)."
+    }
+  },
+  {
+    "type": "action",
+    "step": 3,
+    "macro": "select_from_table",
+    "action": "POST /sites/banking/transactions/flag",
+    "description": "Viewed the transactions table (38 total transactions, including the new bill payment). Selected transaction tx_id=4 (AT&T, -$235.76, Utilities, posted, ref TXN000093, date 2026-05-29) and clicked the Flag button to flag it for review.",
+    "form_data": {"tx_id": "4"},
+    "method": "POST"
+  },
+  {
+    "type": "observation",
+    "step": 3,
+    "url": "/sites/banking/transactions",
+    "title": "Transaction History - After Flagging",
+    "ax_tree_summary": "Transaction table showing 38 transactions. Transaction tx_id=4 (AT&T, -$235.76) now has button text 'Flagged' instead of 'Flag', confirming the flag action succeeded. The bill payment (BILL000001, -$115.32) appears as the newest transaction. Page 1 of 2 displayed (30 of 38 transactions).",
+    "selected_row": {
+      "tx_id": 4,
+      "date": "2026-05-29",
+      "description": "AT&T",
+      "category": "Utilities",
+      "amount": "-$235.76",
+      "type": "debit",
+      "status": "posted",
+      "reference": "TXN000093",
+      "flag_status": "Flagged"
+    }
+  }
+]

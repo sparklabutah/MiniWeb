@@ -14,9 +14,32 @@ navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, se
 
 ## Site Description
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+PixShare is an Instagram/Twitter-inspired multimedia social media platform. Users create and share photo, video, and carousel posts with captions, tags, and locations. The platform supports a feed of posts from followed users, an explore page with search/filter/sort, stories, user profiles, and extensive social interactions.
+
+### Data Files
+- `users.json` -- 9 user profiles with usernames, bios, follower counts
+- `posts.json` -- 40 multimedia posts (photo/video/carousel) with captions, tags, locations
+- `comments.json` -- 50 comments linked to posts
+- `stories.json` -- 18 ephemeral stories with active/expired status
+- `follows.json` -- 50 follower/following relationships
+
+### Key Features
+- Feed (posts from followed users), Explore (all posts with search/filter/sort)
+- Post types: photo, video, carousel
+- Reactions: like (react_by_toggle), save (save_by_toggle)
+- Sharing via dropdown (link, DM, email, embed)
+- User interactions: follow toggle, follow by dropdown, subscribe, block
+- Content management: create posts, edit captions, delete posts
+- Comment system: post comments, delete comments
+- Stories with play/view tracking
+- Search by keyword and semantic multi-word matching
+- Filter by type (radio chips), checkbox multi-type, sort by dropdown
+- Export posts as CSV/JSON, upload media files
+- User settings with toggle controls (dark mode, notifications, privacy)
+- Report posts via form, block users via toggle
+
+### Real-World Model
+Modeled after Instagram with elements of Twitter -- photo grid explore, story ring, post detail with side panel, profile with follower stats.
+
+### No Temporal Dynamics
+Stories have `is_active`/`expires_at` fields but no continuous time simulation. Data is static snapshot-based.

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ business.name }} - LakeReview</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f5f5f5; color: #333; }
+        a { color: #d32323; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #d32323; color: #fff; }
+        .header-top { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header-top .logo { font-size: 24px; font-weight: 700; color: #fff; }
+        .header-top .logo:hover { text-decoration: none; }
+        .header-nav a { color: #fff; margin-left: 18px; font-size: 14px; }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+        .breadcrumb { font-size: 13px; color: #888; margin-bottom: 16px; }
+        .breadcrumb a { color: #888; }
+        .breadcrumb a:hover { color: #d32323; }
+
+        .biz-header { background: #fff; border-radius: 8px; padding: 28px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .biz-header h1 { font-size: 30px; margin-bottom: 8px; }
+        .stars { color: #f5a623; font-size: 18px; letter-spacing: 1px; }
+        .stars .empty { color: #ddd; }
+        .biz-header-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-size: 14px; color: #555; }
+        .biz-header-meta span { display: flex; align-items: center; gap: 4px; }
+        .claimed-badge { display: inline-block; background: #e8f5e9; color: #2e7d32; font-size: 12px; padding: 2px 10px; border-radius: 10px; margin-left: 10px; }
+        .price-tag { font-weight: 700; color: #2b8a3e; }
+        .write-review-btn { display: inline-block; padding: 10px 24px; background: #d32323; color: #fff; border-radius: 4px; font-size: 14px; font-weight: 600; margin-top: 14px; }
+        .write-review-btn:hover { background: #b91c1c; text-decoration: none; }
+
+        .layout { display: flex; gap: 24px; }
+        .main { flex: 1; }
+        .sidebar { width: 320px; flex-shrink: 0; }
+
+        .info-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .info-card h3 { font-size: 16px; margin-bottom: 12px; color: #333; }
+        .info-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #888; }
+        .info-value { color: #333; font-weight: 500; text-align: right; }
+
+        .attrs-list { display: flex; flex-wrap: wrap; gap: 6px; }
+        .attr-tag { display: inline-block; font-size: 12px; background: #f0f0f0; padding: 4px 12px; border-radius: 14px; color: #555; }
+
+        .rating-dist { margin-top: 10px; }
+        .rating-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+        .rating-bar .bar-label { width: 40px; text-align: right; color: #888; }
+        .rating-bar .bar-track { flex: 1; height: 12px; background: #eee; border-radius: 6px; overflow: hidden; }
+        .rating-bar .bar-fill { height: 100%; background: #f5a623; border-radius: 6px; }
+        .rating-bar .bar-count { width: 30px; color: #888; font-size: 12px; }
+
+        .section-title { font-size: 20px; font-weight: 700; margin: 24px 0 16px 0; }
+        .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+        .sort-bar a { padding: 5px 12px; background: #fff; border: 1px solid #ddd; border-radius: 4px; color: #555; }
+        .sort-bar a.active { background: #d32323; color: #fff; border-color: #d32323; }
+        .sort-bar a:hover { text-decoration: none; }
+
+        .review-item { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .review-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .review-user-info { display: flex; align-items: center; gap: 10px; }
+        .review-avatar { width: 40px; height: 40px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #888; font-size: 16px; }
+        .review-user { font-weight: 600; font-size: 14px; }
+        .review-user-stats { font-size: 11px; color: #999; }
+        .review-date { font-size: 12px; color: #999; }
+        .review-title { font-weight: 600; margin-bottom: 6px; font-size: 15px; }
+        .review-text { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 10px; }
+        .review-photos { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .review-photo { width: 120px; height: 90px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; border: 1px solid #e0e0e0; overflow: hidden; }
+        .review-actions { display: flex; gap: 16px; font-size: 13px; color: #888; }
+        .review-actions button { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 4px 12px; font-size: 12px; color: #666; cursor: pointer; }
+        .review-actions button:hover { background: #f5f5f5; }
+
+        .photos-section { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+        .photo-thumb { width: 140px; height: 105px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; border: 1px solid #e0e0e0; }
+
+        .footer { background: #333; color: #aaa; text-align: center; padding: 24px 20px; font-size: 13px; margin-top: 40px; }
+
+        @media (max-width: 768px) {
+            .layout { flex-direction: column; }
+            .sidebar { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <a href="{{ url_for('rating-review.index') }}" class="logo">LakeReview</a>
+            <nav class="header-nav">
+                <a href="{{ url_for('rating-review.businesses_list') }}">Businesses</a>
+                <a href="{{ url_for('rating-review.photo_gallery') }}">Photos</a>
+                {% if user %}
+                    <a href="{{ url_for('rating-review.my_reviews') }}">My Reviews</a>
+                    <a href="{{ url_for('rating-review.logout') }}">Logout ({{ user.display_name }})</a>
+                {% else %}
+                    <a href="{{ url_for('rating-review.login') }}">Log In</a>
+                {% endif %}
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('rating-review.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('rating-review.businesses_list', category=business.category) }}">{{ business.category }}</a> &rsaquo;
+            {{ business.name }}
+        </div>
+
+        <div class="biz-header">
+            <h1>
+                {{ business.name }}
+                {% if business.claimed %}<span class="claimed-badge">Claimed</span>{% endif %}
+            </h1>
+            <div class="stars">
+                {% set full = business.overall_rating | int %}
+                {% set half = (business.overall_rating - full) >= 0.3 %}
+                {% for i in range(full) %}&#9733;{% endfor %}{% if half %}&#9733;{% endif %}{% for i in range(5 - full - (1 if half else 0)) %}<span class="empty">&#9733;</span>{% endfor %}
+                <span style="color:#555; font-size:15px; margin-left:6px;">{{ business.overall_rating }}</span>
+                <span style="color:#888; font-size:14px;">({{ review_count }} reviews)</span>
+            </div>
+            <div class="biz-header-meta">
+                <span><strong class="price-tag">{{ business.price_range }}</strong></span>
+                <span>{{ business.subcategory }}</span>
+                <span>{{ business.address }}</span>
+            </div>
+            <a href="{{ url_for('rating-review.write_review', business_id=business.id) }}" class="write-review-btn">Write a Review</a>
+        </div>
+
+        <div class="layout">
+            <div class="main">
+                {% if photos %}
+                <h2 class="section-title">Photos ({{ photos | length }})</h2>
+                <div class="photos-section">
+                    {% for p in photos %}
+                    <div class="photo-thumb" title="{{ p.caption }}">{{ p.caption[:20] }}{% if p.caption|length > 20 %}...{% endif %}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <h2 class="section-title">Reviews ({{ review_count }})</h2>
+                <div class="sort-bar">
+                    <span>Sort:</span>
+                    <a href="{{ url_for('rating-review.business_detail', business_id=business.id, sort='date') }}" class="{% if sort == 'date' %}active{% endif %}">Newest</a>
+                    <a href="{{ url_for('rating-review.business_detail', business_id=business.id, sort='rating_high') }}" class="{% if sort == 'rating_high' %}active{% endif %}">Highest Rated</a>
+                    <a href="{{ url_for('rating-review.business_detail', business_id=business.id, sort='rating_low') }}" class="{% if sort == 'rating_low' %}active{% endif %}">Lowest Rated</a>
+                    <a href="{{ url_for('rating-review.business_detail', business_id=business.id, sort='useful') }}" class="{% if sort == 'useful' %}active{% endif %}">Most Useful</a>
+                </div>
+
+                {% for r in reviews %}
+                <div class="review-item" id="review-{{ r.id }}">
+                    <div class="review-header">
+                        <div class="review-user-info">
+                            <div class="review-avatar">{{ r._user.display_name[0] if r._user else '?' }}</div>
+                            <div>
+                                <div class="review-user">{{ r._user.display_name if r._user else 'Anonymous' }}</div>
+                                <div class="review-user-stats">
+                                    {% if r._user %}{{ r._user.location }} &middot; {{ r._user.review_count }} reviews{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="review-date">{{ r.date }}</div>
+                    </div>
+                    <div class="stars" style="margin-bottom:8px;">
+                        {% for i in range(r.rating) %}&#9733;{% endfor %}{% for i in range(5 - r.rating) %}<span class="empty">&#9733;</span>{% endfor %}
+                    </div>
+                    <div class="review-title">{{ r.title }}</div>
+                    <div class="review-text">{{ r.text }}</div>
+                    {% if r._photos %}
+                    <div class="review-photos">
+                        {% for p in r._photos %}
+                        <div class="review-photo" title="{{ p.caption }}">{{ p.caption[:18] }}{% if p.caption|length > 18 %}...{% endif %}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="review-actions">
+                        <button onclick="voteHelpful({{ r.id }}, 'useful', this)">Useful ({{ r.useful_count }})</button>
+                        <button onclick="voteHelpful({{ r.id }}, 'funny', this)">Funny ({{ r.funny_count }})</button>
+                        <button onclick="voteHelpful({{ r.id }}, 'cool', this)">Cool ({{ r.cool_count }})</button>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if reviews | length == 0 %}
+                <div style="text-align:center; padding:40px; background:#fff; border-radius:8px; color:#888;">
+                    <p style="font-size:16px;">No reviews yet. Be the first to review!</p>
+                    <a href="{{ url_for('rating-review.write_review', business_id=business.id) }}" class="write-review-btn" style="margin-top:14px;">Write a Review</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="sidebar">
+                <div class="info-card">
+                    <h3>Business Info</h3>
+                    <div class="info-row">
+                        <span class="info-label">Address</span>
+                        <span class="info-value">{{ business.address }}
+                            <a href="/sites/map-services/?q={{ business.name|urlencode }}" style="color:#0073e6;font-size:.8rem;margin-left:.4rem;">View on Map</a>
+                            <a href="/sites/map-services/directions?to={{ business.address|urlencode }}" style="color:#0073e6;font-size:.8rem;margin-left:.4rem;">Get Directions &rarr;</a>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value">{{ business.phone }}</span>
+                    </div>
+                    {% if business.website %}
+                    <div class="info-row">
+                        <span class="info-label">Website</span>
+                        <span class="info-value"><a href="{{ business.website }}">{{ business.website | replace('https://', '') }}</a></span>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <span class="info-label">Price Range</span>
+                        <span class="info-value price-tag">{{ business.price_range }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Category</span>
+                        <span class="info-value">{{ business.category }} &middot; {{ business.subcategory }}</span>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>Hours</h3>
+                    {% for day, hours in business.hours.items() %}
+                    <div class="info-row">
+                        <span class="info-label">{{ day | capitalize }}</span>
+                        <span class="info-value">{{ hours }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="info-card">
+                    <h3>Amenities & Features</h3>
+                    <div class="attrs-list">
+                        {% for attr in business.attributes %}
+                        <span class="attr-tag">{{ attr }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>Rating Distribution</h3>
+                    <div class="rating-dist">
+                        {% for star in [5, 4, 3, 2, 1] %}
+                        {% set count = rating_distribution[star] %}
+                        {% set pct = (count / review_count * 100) if review_count > 0 else 0 %}
+                        <div class="rating-bar">
+                            <span class="bar-label">{{ star }} star</span>
+                            <div class="bar-track"><div class="bar-fill" style="width:{{ pct }}%"></div></div>
+                            <span class="bar-count">{{ count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        LakeReview &copy; 2026 &mdash; Lakeport's trusted local review platform
+    </div>
+
+    <script>
+    function voteHelpful(reviewId, type, btn) {
+        fetch("{{ url_for('rating-review.index') }}api/reviews/" + reviewId + "/helpful", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({type: type})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                var key = type + "_count";
+                btn.textContent = type.charAt(0).toUpperCase() + type.slice(1) + " (" + data[key] + ")";
+            }
+        });
+    }
+    </script>
+</body>
+</html>

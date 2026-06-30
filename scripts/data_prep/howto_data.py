@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 random.seed(42)
 
-OUTPUT_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "sites" / "visual-howto-guides" / "data"
+OUTPUT_DIR = pathlib.Path("/scratch/general/vast/u1653932/data_sources/visual-how-to-guides")
 
 # ── Authors with specialties ──────────────────────────────────────────────────
 

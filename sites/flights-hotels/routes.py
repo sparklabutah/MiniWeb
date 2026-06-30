@@ -17,7 +17,6 @@ from app import db
 
 SITE = "flights-hotels"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-CONFIG_FILE = SITE_DIR / "config" / "config.json"
 
 blueprint = Blueprint(
     "flights-hotels",
@@ -145,13 +144,25 @@ def index():
     cities = []
     airlines = []
     if flights_table:
-        origin_rows = db.execute(f"SELECT DISTINCT [origin] FROM [{flights_table}] ORDER BY [origin]")
-        dest_rows = db.execute(f"SELECT DISTINCT [destination] FROM [{flights_table}] ORDER BY [destination]")
-        airports = sorted(set(r["origin"] for r in origin_rows) | set(r["destination"] for r in dest_rows))
-        airline_rows = db.execute(f"SELECT DISTINCT [airline] FROM [{flights_table}] ORDER BY [airline]")
-        airlines = [r["airline"] for r in airline_rows]
+        # Raw data uses airport_1/airport_2, synthetic uses origin/destination
+        origin_rows = db.execute(
+            f"SELECT DISTINCT COALESCE(NULLIF([origin],''), [airport_1]) as ap "
+            f"FROM [{flights_table}] WHERE COALESCE(NULLIF([origin],''), [airport_1]) != '' "
+            f"ORDER BY ap LIMIT 200")
+        dest_rows = db.execute(
+            f"SELECT DISTINCT COALESCE(NULLIF([destination],''), [airport_2]) as ap "
+            f"FROM [{flights_table}] WHERE COALESCE(NULLIF([destination],''), [airport_2]) != '' "
+            f"ORDER BY ap LIMIT 200")
+        airports = sorted(set(r["ap"] for r in origin_rows) | set(r["ap"] for r in dest_rows))
+        airline_rows = db.execute(
+            f"SELECT DISTINCT COALESCE(NULLIF([airline],''), [carrier_lg]) as al "
+            f"FROM [{flights_table}] WHERE COALESCE(NULLIF([airline],''), [carrier_lg]) != '' "
+            f"ORDER BY al LIMIT 100")
+        airlines = [r["al"] for r in airline_rows]
     if hotels_table:
-        city_rows = db.execute(f"SELECT DISTINCT [city] FROM [{hotels_table}] ORDER BY [city]")
+        city_rows = db.execute(
+            f"SELECT DISTINCT [city] FROM [{hotels_table}] WHERE [city] IS NOT NULL AND [city] != '' "
+            f"ORDER BY [city] LIMIT 200")
         cities = [r["city"] for r in city_rows]
     return render_template("flights-hotels/index.html",
                            user=user, logged_in=logged_in,
@@ -175,21 +186,33 @@ def flights_page():
     flights = []
     total = 0
     if flights_table:
-        sql = f"SELECT * FROM [{flights_table}]"
+        # Use COALESCE to handle both synthetic (origin/destination/price/airline)
+        # and raw (airport_1/airport_2/fare/carrier_lg) columns
+        _orig = "COALESCE(NULLIF([origin],''), [airport_1])"
+        _dest = "COALESCE(NULLIF([destination],''), [airport_2])"
+        _price = "COALESCE(NULLIF([price],0), [fare])"
+        _airline = "COALESCE(NULLIF([airline],''), [carrier_lg])"
+        _city1 = "COALESCE(NULLIF([origin_city],''), [city1])"
+        _city2 = "COALESCE(NULLIF([dest_city],''), [city2])"
+
+        sql = (f"SELECT *, {_orig} as eff_origin, {_dest} as eff_dest, "
+               f"{_price} as eff_price, {_airline} as eff_airline, "
+               f"{_city1} as eff_origin_city, {_city2} as eff_dest_city "
+               f"FROM [{flights_table}]")
         count_sql = f"SELECT COUNT(*) as cnt FROM [{flights_table}]"
         params = []
         clauses = []
         if origin:
-            clauses.append("[origin] = ?")
+            clauses.append(f"({_orig}) = ?")
             params.append(origin)
         if destination:
-            clauses.append("[destination] = ?")
+            clauses.append(f"({_dest}) = ?")
             params.append(destination)
         if date:
             clauses.append("[date] = ?")
             params.append(date)
         if airline:
-            clauses.append("[airline] = ?")
+            clauses.append(f"({_airline}) = ?")
             params.append(airline)
         if flight_class:
             clauses.append("[class] = ?")
@@ -197,7 +220,7 @@ def flights_page():
         if max_price:
             try:
                 mp = float(max_price)
-                clauses.append("[price] <= ?")
+                clauses.append(f"({_price}) <= ?")
                 params.append(mp)
             except ValueError:
                 pass
@@ -208,18 +231,20 @@ def flights_page():
                 params.append(ms)
             except ValueError:
                 pass
-        if clauses:
-            where_clause = " WHERE " + " AND ".join(clauses)
-            sql += where_clause
-            count_sql += where_clause
+        # Always filter to rows that have at least an origin
+        clauses.append(f"({_orig}) != ''")
+
+        where_clause = " WHERE " + " AND ".join(clauses)
+        sql += where_clause
+        count_sql += where_clause
 
         sort_map = {
-            "price": "[price] ASC",
-            "duration": "[duration_minutes] ASC",
+            "price": f"({_price}) ASC",
+            "duration": "[duration_minutes] ASC, [nsmiles] ASC",
             "departure": "[departure_time] ASC",
             "date": "[date] ASC, [departure_time] ASC",
         }
-        sql += f" ORDER BY {sort_map.get(sort, '[price] ASC')} LIMIT 50"
+        sql += f" ORDER BY {sort_map.get(sort, f'({_price}) ASC')} LIMIT 50"
 
         flights = db.execute(sql, tuple(params))
         for f in flights:
@@ -228,11 +253,14 @@ def flights_page():
         total = cnt_row["cnt"] if cnt_row else 0
 
         # Get unique airports/airlines for filter dropdowns
-        origin_rows = db.execute(f"SELECT DISTINCT [origin] FROM [{flights_table}] ORDER BY [origin]")
-        dest_rows = db.execute(f"SELECT DISTINCT [destination] FROM [{flights_table}] ORDER BY [destination]")
-        airports = sorted(set(r["origin"] for r in origin_rows) | set(r["destination"] for r in dest_rows))
-        airline_rows = db.execute(f"SELECT DISTINCT [airline] FROM [{flights_table}] ORDER BY [airline]")
-        airlines_list = [r["airline"] for r in airline_rows]
+        origin_rows = db.execute(
+            f"SELECT DISTINCT {_orig} as ap FROM [{flights_table}] WHERE {_orig} != '' ORDER BY ap LIMIT 200")
+        dest_rows = db.execute(
+            f"SELECT DISTINCT {_dest} as ap FROM [{flights_table}] WHERE {_dest} != '' ORDER BY ap LIMIT 200")
+        airports = sorted(set(r["ap"] for r in origin_rows) | set(r["ap"] for r in dest_rows))
+        airline_rows = db.execute(
+            f"SELECT DISTINCT {_airline} as al FROM [{flights_table}] WHERE {_airline} != '' ORDER BY al LIMIT 100")
+        airlines_list = [r["al"] for r in airline_rows]
     else:
         airports = []
         airlines_list = []
@@ -274,13 +302,34 @@ def hotels_page():
     cities = []
     all_amenities = []
     if hotels_table:
-        sql = f"SELECT * FROM [{hotels_table}]"
+        # Use COALESCE for both synthetic (name/city/price_per_night/stars/amenities)
+        # and raw (hotelname/cityname+countyname/hotelrating/hotelfacilities) columns
+        _name = "COALESCE(NULLIF([name],''), [hotelname])"
+        _city = "COALESCE(NULLIF([city],''), [cityname] || ', ' || [countyname])"
+        _stars_expr = ("CASE WHEN [stars] > 0 THEN [stars] "
+                       "WHEN [hotelrating] LIKE '%Five%' THEN 5 "
+                       "WHEN [hotelrating] LIKE '%Four%' THEN 4 "
+                       "WHEN [hotelrating] LIKE '%Three%' THEN 3 "
+                       "WHEN [hotelrating] LIKE '%Two%' THEN 2 "
+                       "ELSE 3 END")
+        # Generate price from stars for raw hotels (no price data)
+        _price = (f"CASE WHEN [price_per_night] > 0 THEN [price_per_night] "
+                  f"ELSE ({_stars_expr}) * 60 + 40 END")
+        _amenities = "COALESCE(NULLIF([amenities],''), [hotelfacilities])"
+        _desc = "COALESCE(NULLIF([description],''), '')"
+
+        sql = (f"SELECT *, {_name} as eff_name, {_city} as eff_city, "
+               f"{_price} as eff_price, {_stars_expr} as eff_stars, "
+               f"{_amenities} as eff_amenities, {_desc} as eff_desc "
+               f"FROM [{hotels_table}]")
         count_sql = f"SELECT COUNT(*) as cnt FROM [{hotels_table}]"
         params = []
         clauses = []
+        # Only show hotels with a name
+        clauses.append(f"({_name}) != ''")
         if city:
-            clauses.append("[city] = ?")
-            params.append(city)
+            clauses.append(f"({_city}) LIKE ?")
+            params.append(f"%{city}%")
         if min_rating:
             try:
                 clauses.append("[rating] >= ?")
@@ -289,32 +338,32 @@ def hotels_page():
                 pass
         if max_price:
             try:
-                clauses.append("[price_per_night] <= ?")
+                clauses.append(f"({_price}) <= ?")
                 params.append(float(max_price))
             except ValueError:
                 pass
         if min_stars:
             try:
-                clauses.append("[stars] >= ?")
+                clauses.append(f"({_stars_expr}) >= ?")
                 params.append(int(min_stars))
             except ValueError:
                 pass
         if amenity:
-            clauses.append("[amenities] LIKE ?")
+            clauses.append(f"({_amenities}) LIKE ?")
             params.append(f"%{amenity}%")
-        if clauses:
-            where_clause = " WHERE " + " AND ".join(clauses)
-            sql += where_clause
-            count_sql += where_clause
+
+        where_clause = " WHERE " + " AND ".join(clauses)
+        sql += where_clause
+        count_sql += " WHERE " + " AND ".join(clauses)
 
         sort_map = {
-            "price": "[price_per_night] ASC",
-            "price_desc": "[price_per_night] DESC",
+            "price": f"({_price}) ASC",
+            "price_desc": f"({_price}) DESC",
             "rating": "[rating] DESC",
-            "stars": "[stars] DESC",
-            "name": "[name] ASC",
+            "stars": f"({_stars_expr}) DESC",
+            "name": f"({_name}) ASC",
         }
-        sql += f" ORDER BY {sort_map.get(sort, '[price_per_night] ASC')} LIMIT 50"
+        sql += f" ORDER BY {sort_map.get(sort, f'({_price}) ASC')} LIMIT 50"
 
         hotels = db.execute(sql, tuple(params))
         for h in hotels:
@@ -322,8 +371,10 @@ def hotels_page():
         cnt_row = db.execute(count_sql, tuple(params), fetch="one")
         total = cnt_row["cnt"] if cnt_row else 0
 
-        city_rows = db.execute(f"SELECT DISTINCT [city] FROM [{hotels_table}] ORDER BY [city]")
-        cities = [r["city"] for r in city_rows]
+        city_rows = db.execute(
+            f"SELECT DISTINCT {_city} as c FROM [{hotels_table}] WHERE ({_name}) != '' "
+            f"ORDER BY c LIMIT 200")
+        cities = [r["c"] for r in city_rows if r["c"]]
         # For amenities dropdown, sample from a small subset
         sample_rows = db.execute(f"SELECT [amenities] FROM [{hotels_table}] LIMIT 100")
         amenity_set = set()
@@ -629,6 +680,7 @@ def api_bookings_create():
         "total_price": total_price,
         "travelers": travelers,
     }
+    account_type = data.get("account_type", "checking")
     bookings.append(booking)
     _save_bookings(bookings)
 
@@ -652,7 +704,8 @@ def api_bookings_create():
                        service_name="SkyLodge Travel",
                        confirmation_id=str(new_id))
         bridge_pay(user_id=user_id, recipient="SkyLodge Travel",
-                   amount=total_price, category="Travel")
+                   amount=total_price, category="Travel",
+                   account_type=account_type)
     except Exception:
         pass  # bridge failure should never block the main flow
 
@@ -753,6 +806,7 @@ def book_flight(flight_id):
     if not flight:
         abort(404)
     travelers = request.form.get("travelers", 1, type=int)
+    account_type = request.form.get("account_type", "checking")
     total_price = round(flight["price"] * travelers, 2)
 
     bookings = _load_bookings()
@@ -770,9 +824,9 @@ def book_flight(flight_id):
     bookings.append(booking)
     _save_bookings(bookings)
 
-    # Bridge: calendar booking + banking payment for flight
+    # Bridge: calendar booking (non-financial, no 2FA needed)
     try:
-        from app.bridges import on_booking, on_payment
+        from app.bridges import on_booking
         on_booking(user_id=user["id"],
                    title=f"Flight {flight['flight_number']} {flight['origin']}-{flight['destination']}",
                    start=f"{flight['date']}T{flight['departure_time']}",
@@ -780,12 +834,19 @@ def book_flight(flight_id):
                    location=f"{flight['origin']} to {flight['destination']}",
                    service_name="SkyLodge Travel",
                    confirmation_id=str(new_id))
-        on_payment(user_id=user["id"], recipient="SkyLodge Travel",
-                   amount=total_price, category="Travel")
     except Exception:
         pass  # bridge failure should never block the main flow
 
-    return redirect(url_for("flights-hotels.booking_detail", booking_id=new_id))
+    # 2FA: send verification code before completing the payment
+    from app.events import request_2fa
+    verify_url = request_2fa("payment",
+                             return_url=url_for("flights-hotels.bookings_page"),
+                             user_id=user["id"],
+                             recipient="SkyLodge Travel",
+                             amount=total_price,
+                             category="Travel",
+                             account_type=account_type)
+    return redirect(verify_url)
 
 
 @blueprint.route("/book/hotel/<int:hotel_id>", methods=["POST"])
@@ -799,6 +860,7 @@ def book_hotel(hotel_id):
         abort(404)
     nights = request.form.get("nights", 1, type=int)
     travelers = request.form.get("travelers", 1, type=int)
+    account_type = request.form.get("account_type", "checking")
     total_price = round(hotel["price_per_night"] * nights, 2)
 
     bookings = _load_bookings()
@@ -816,9 +878,9 @@ def book_hotel(hotel_id):
     bookings.append(booking)
     _save_bookings(bookings)
 
-    # Bridge: calendar booking + banking payment for hotel
+    # Bridge: calendar booking (non-financial, no 2FA needed)
     try:
-        from app.bridges import on_booking, on_payment
+        from app.bridges import on_booking
         check_in = request.form.get("check_in", booking["booking_date"])
         on_booking(user_id=user["id"],
                    title=f"Hotel: {hotel['name']}",
@@ -826,12 +888,19 @@ def book_hotel(hotel_id):
                    location=f"{hotel['name']}, {hotel['city']}",
                    service_name="SkyLodge Travel",
                    confirmation_id=str(new_id))
-        on_payment(user_id=user["id"], recipient="SkyLodge Travel",
-                   amount=total_price, category="Travel")
     except Exception:
         pass  # bridge failure should never block the main flow
 
-    return redirect(url_for("flights-hotels.booking_detail", booking_id=new_id))
+    # 2FA: send verification code before completing the payment
+    from app.events import request_2fa
+    verify_url = request_2fa("payment",
+                             return_url=url_for("flights-hotels.bookings_page"),
+                             user_id=user["id"],
+                             recipient="SkyLodge Travel",
+                             amount=total_price,
+                             category="Travel",
+                             account_type=account_type)
+    return redirect(verify_url)
 
 
 @blueprint.route("/booking/<int:booking_id>/cancel", methods=["POST"])
@@ -1086,6 +1155,7 @@ def api_checkout():
         "payment_method": "credit_card",
         "card_last_four": card_last_four,
     }
+    account_type_val = data.get("account_type", "checking")
     bookings.append(booking)
     _save_bookings(bookings)
 
@@ -1109,7 +1179,8 @@ def api_checkout():
                        service_name="SkyLodge Travel",
                        confirmation_id=str(new_id))
         bridge_pay(user_id=user_id, recipient="SkyLodge Travel",
-                   amount=total_price, category="Travel")
+                   amount=total_price, category="Travel",
+                   account_type=account_type_val)
     except Exception:
         pass  # bridge failure should never block the main flow
 
