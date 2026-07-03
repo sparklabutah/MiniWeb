@@ -500,12 +500,12 @@ def _generate_prompt(sites, coverage, force_single=False):
     # Load graph
     outgoing, incoming = _load_graph_edges()
 
-    # 1. Pick cell — each chain is exactly 1 macro, 1-3 sites
+    # 1. Pick cell — freeform macros, 1-3 sites, 1-4 macros
     cell_counts = _get_cell_counts()
     if force_single:
-        cells = [(1, 1)]
+        cells = [(1, m) for m in [1, 2, 3]]
     else:
-        cells = [(n, 1) for n in [1, 2, 3]]
+        cells = [(n, m) for n in [1, 2, 3] for m in [1, 2, 3, 4] if m >= n]
     cell_weights = [1.0 / (cell_counts.get((n, m), 0) + 1) for n, m in cells]
     total = sum(cell_weights)
     cell_weights = [w / total for w in cell_weights]
