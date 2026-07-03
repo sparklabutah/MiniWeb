@@ -58,7 +58,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 .left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .left-panel iframe { flex: 1; border: none; background: #fff; }
-.right-panel { width: 520px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.right-panel { width: 520px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: auto; flex-shrink: 0; resize: horizontal; min-width: 380px; max-width: 900px; direction: rtl; }
+.right-panel > * { direction: ltr; }
 
 .steps-bar { display: flex; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
 .steps-bar .step { flex: 1; padding: .5rem .2rem; text-align: center; font-size: .7rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
@@ -231,8 +232,9 @@ textarea#instruction:focus {
 .macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .55rem; padding: .05rem .2rem; cursor: pointer; color: #94a3b8; }
 .macro-node .mn-btns button:hover { color: #2563eb; border-color: #93c5fd; }
 .macro-node .mn-btns button.active { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
-#macro-graph.expanded { min-height: 500px !important; }
-#macro-graph.expanded #macro-nodes { min-height: 500px; }
+#macro-graph.expanded { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; z-index: 9999; border-radius: 0; border: none; min-height: 100vh !important; background: #fff; }
+#macro-graph.expanded #macro-nodes { min-height: 100vh; }
+#macro-graph.expanded #graph-close-btn { display: block !important; }
 .macro-locs { padding: .1rem 0 0 0; margin: 0; list-style: none; }
 .macro-locs li { font-size: .6rem; color: #94a3b8; line-height: 1.2; }
 .macro-locs li b { color: #64748b; }
@@ -372,7 +374,8 @@ textarea#instruction:focus {
                     <label style="margin:0">Macros</label>
                     <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .4rem;margin-left:auto" title="Expand macro graph">&#x26F6; Expand</button>
                 </div>
-                <div id="macro-graph" style="position:relative;min-height:180px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem;transition:min-height .2s">
+                <div id="macro-graph" style="position:relative;min-height:180px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem">
+                    <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">&#x2715; Close</button>
                     <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
                     <div id="macro-nodes" style="position:relative;z-index:2;min-height:180px"></div>
                 </div>
