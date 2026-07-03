@@ -219,12 +219,21 @@ textarea#instruction:focus {
 .api-route .returns { font-size: .65rem; color: #94a3b8; font-family: 'SF Mono', Menlo, monospace; padding-left: 46px; }
 
 /* Macro items with tooltips */
-.macro-item { position: relative; display: flex; align-items: center; gap: .4rem; padding: .4rem .5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .35rem; font-size: .8rem; cursor: grab; }
-.macro-item:hover { background: #f1f5f9; }
-.macro-item.dragging { opacity: .4; cursor: grabbing; }
-.macro-item.drag-over { border-top: 2px solid #2563eb; margin-top: -.1rem; }
-.macro-item .drag-handle { color: #cbd5e1; font-size: .7rem; cursor: grab; user-select: none; padding-right: .2rem; }
-.macro-item .macro-name { flex: 1; font-weight: 600; color: #1e293b; }
+.macro-node { position: absolute; display: flex; flex-direction: column; gap: .2rem; padding: .4rem .6rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .4rem; font-size: .75rem; cursor: grab; min-width: 140px; max-width: 220px; box-shadow: 0 1px 3px rgba(0,0,0,.08); user-select: none; z-index: 2; }
+.macro-node:hover { border-color: #93c5fd; box-shadow: 0 2px 6px rgba(37,99,235,.15); }
+.macro-node.dragging { opacity: .5; cursor: grabbing; z-index: 10; }
+.macro-node.arrow-target { border-color: #2563eb; background: #eff6ff; }
+.macro-node .mn-header { display: flex; align-items: center; gap: .3rem; }
+.macro-node .mn-name { font-weight: 600; color: #1e293b; font-size: .72rem; flex: 1; }
+.macro-node .mn-arrow-handle { cursor: crosshair; color: #93c5fd; font-size: .8rem; padding: .1rem .2rem; border-radius: .2rem; }
+.macro-node .mn-arrow-handle:hover { background: #dbeafe; color: #2563eb; }
+.macro-node .mn-btns { display: flex; gap: .15rem; }
+.macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .55rem; padding: .05rem .2rem; cursor: pointer; color: #94a3b8; }
+.macro-node .mn-btns button:hover { color: #2563eb; border-color: #93c5fd; }
+.macro-node .mn-btns button.active { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.macro-locs { padding: .1rem 0 0 0; margin: 0; list-style: none; }
+.macro-locs li { font-size: .6rem; color: #94a3b8; line-height: 1.2; }
+.macro-locs li b { color: #64748b; }
 .macro-locs { width: 100%; padding: .15rem 0 0 1.4rem; margin: 0; list-style: none; }
 .macro-locs li { font-size: .65rem; color: #64748b; line-height: 1.35; padding: .05rem 0; }
 .macro-locs li b { color: #475569; font-weight: 600; }
@@ -337,10 +346,16 @@ textarea#instruction:focus {
                     <span id="login-status" style="font-size:.72rem;color:#16a34a;margin-left:auto;"></span>
                 </div>
 
-                <!-- Macros section -->
-                <label>Macros <span style="font-weight:400;text-transform:none;color:#94a3b8">(uncheck to disable, arrows to reorder)</span></label>
-                <div id="macro-list"></div>
-                <div class="chain-display" id="chain-display"></div>
+                <!-- Macros section — freeform node graph -->
+                <label>Macros <span style="font-weight:400;text-transform:none;color:#94a3b8">(drag to arrange, click+drag between nodes to draw arrows)</span></label>
+                <div id="macro-graph" style="position:relative;min-height:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem">
+                    <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
+                    <div id="macro-nodes" style="position:relative;z-index:2;min-height:200px"></div>
+                </div>
+                <div style="font-size:.65rem;color:#94a3b8;margin-bottom:.3rem">
+                    Drag nodes to position. Drag from the <strong>arrow handle</strong> (&#x27A1;) on a node to another node to draw a dependency arrow.
+                    Right-click an arrow to delete it.
+                </div>
 
                 <!-- Controls -->
                 <div style="display:flex;gap:.4rem;margin-top:.6rem">
@@ -480,7 +495,7 @@ let selectedMacros = currentPrompt ? currentPrompt.macros.slice() : [];
 let trajectory = [];
 let recording = false;
 let recordInterval = null;
-let macroSpans = {};  // {macroName: [actionIndex, ...]}
+let macroSpans = {}; macroEdges = []; macroPositions = {};  // {macroName: [actionIndex, ...]}
 let selectedActionIdx = null;  // currently selected action for tagging
 let lastUrl = '';
 // verifierConfigs populated by buildVerifiers()
@@ -756,109 +771,228 @@ let qaAnswers = {};            // {macro: answer} — inline answers for QA macr
 const QA_VERBS = new Set(['extract','compute','count','compare','verify','calculate','rank','list']);
 function isQAMacro(macro) { return QA_VERBS.has(macro.split('_')[0]); }
 
+// Macro graph state
+let macroPositions = {};  // {macro: {x, y}}
+let macroEdges = [];      // [{from, to}]
+let _arrowDrag = null;    // {from: macroName, startX, startY}
+
 function renderMacroList() {
-    const container = document.getElementById('macro-list');
+    const container = document.getElementById('macro-nodes');
+    const graphEl = document.getElementById('macro-graph');
     if (!container) return;
-    container.innerHTML = selectedMacros.map((m, i) => {
-        const desc = macroDescriptions[m] || {};
+
+    // Initialize positions if not set — auto-layout in a grid
+    const gw = graphEl ? graphEl.offsetWidth - 20 : 300;
+    const cols = Math.max(1, Math.floor(gw / 170));
+    selectedMacros.forEach((m, i) => {
+        if (!macroPositions[m]) {
+            macroPositions[m] = {
+                x: 10 + (i % cols) * 160,
+                y: 10 + Math.floor(i / cols) * 80
+            };
+        }
+    });
+
+    // Render nodes
+    container.innerHTML = '';
+    selectedMacros.forEach((m, i) => {
         const isNA = m in macrosNotApplicable;
         const isSkip = m in macrosSkipped;
         const excluded = isNA || isSkip;
         const isQA = isQAMacro(m);
-        const statusLabel = isNA ? "N/A for site" : isSkip ? "skipped" : "";
-        const savedAnswer = qaAnswers[m] || '';
-
         const macroDesc = (macroDescriptions[m] || {}).description || m;
-        let row = `<div class="macro-item" data-macro="${m}" data-idx="${i}" draggable="true"
-                style="${excluded ? 'opacity:.3;' : ''}${isNA ? 'text-decoration:line-through;' : ''}flex-wrap:wrap">
-            <span class="drag-handle">&#x2630;</span>
-            <input type="checkbox" ${excluded ? '' : 'checked'} onchange="toggleMacroCheck('${m}', this.checked)" ${excluded ? 'disabled' : ''}>
-            <span class="macro-name" style="font-size:.75rem">${macroDesc}</span>`;
+        const pos = macroPositions[m] || {x: 10, y: 10 + i * 70};
 
-        if (isQA && !excluded) {
-            row += `<span style="font-size:.6rem;color:#2563eb;background:#eff6ff;padding:.1rem .3rem;border-radius:.2rem;margin-left:.2rem">QA</span>`;
-        }
-        if (statusLabel) {
-            row += `<span style="font-size:.6rem;color:#94a3b8;margin-left:.2rem">${statusLabel}</span>`;
-        }
+        const node = document.createElement('div');
+        node.className = 'macro-node';
+        node.dataset.macro = m;
+        node.style.left = pos.x + 'px';
+        node.style.top = pos.y + 'px';
+        if (excluded) node.style.opacity = '.35';
 
-        row += `<div style="display:flex;gap:.15rem;margin-left:auto">
-                <button onclick="event.stopPropagation();toggleSkip('${m}')" title="Don't need this macro for this task"
-                    style="background:${isSkip ? '#fef3c7' : 'none'};border:1px solid ${isSkip ? '#fcd34d' : '#e2e8f0'};border-radius:.2rem;font-size:.55rem;padding:.1rem .25rem;cursor:pointer;color:${isSkip ? '#92400e' : '#94a3b8'}">
-                    ${isSkip ? 'skip \u2713' : 'skip'}
-                </button>
-                <button onclick="event.stopPropagation();toggleNA('${m}')" title="This macro doesn't apply to any of the sampled sites"
-                    style="background:${isNA ? '#fecaca' : 'none'};border:1px solid ${isNA ? '#f87171' : '#e2e8f0'};border-radius:.2rem;font-size:.55rem;padding:.1rem .25rem;cursor:pointer;color:${isNA ? '#dc2626' : '#94a3b8'}">
-                    ${isNA ? 'N/A \u2713' : 'N/A'}
-                </button>
-            </div>`;
+        // Header: arrow handle + name + skip/NA buttons
+        let html = `<div class="mn-header">
+            <span class="mn-arrow-handle" onmousedown="startArrowDrag(event,'${m}')" title="Drag to another node to draw arrow">&#x27A1;</span>
+            <span class="mn-name">${escHtml(macroDesc)}</span>
+            ${isQA ? '<span style="font-size:.55rem;color:#2563eb;background:#eff6ff;padding:.05rem .2rem;border-radius:.15rem">QA</span>' : ''}
+        </div>`;
 
-        // QA macros get an inline answer field — no trajectory tagging needed
-        if (isQA && !excluded) {
-            row += `<div style="width:100%;margin-top:.2rem;padding-left:1.4rem">
-                <input type="text" placeholder="Answer for this macro" value="${escHtml(savedAnswer)}"
-                       oninput="qaAnswers['${m}']=this.value"
-                       onclick="event.stopPropagation()"
-                       style="width:100%;font-size:.75rem;padding:.25rem .4rem;border:1px solid #93c5fd;border-radius:.25rem;background:#eff6ff">
-            </div>`;
-        }
+        // Buttons
+        html += `<div class="mn-btns">
+            <button class="${isSkip ? 'active' : ''}" onclick="event.stopPropagation();toggleSkip('${m}')">${isSkip ? 'skip \u2713' : 'skip'}</button>
+            <button class="${isNA ? 'active' : ''}" onclick="event.stopPropagation();toggleNA('${m}')" style="${isNA ? 'background:#fecaca;border-color:#f87171;color:#dc2626' : ''}">${isNA ? 'N/A \u2713' : 'N/A'}</button>
+        </div>`;
 
-        // Inline UI locations — always visible
+        // UI locations
         if (!excluded) {
             const locs = _getLocationsForMacro(m);
             if (locs.length) {
-                row += '<ul class="macro-locs">';
+                html += '<ul class="macro-locs">';
                 for (const {site, loc} of locs) {
-                    const siteLabel = currentPrompt.sites.length > 1 ? `<b>${site}</b>: ` : '';
-                    row += `<li>${siteLabel}${loc}</li>`;
+                    const siteLabel = currentPrompt && currentPrompt.sites.length > 1 ? `<b>${site}</b>: ` : '';
+                    html += `<li>${siteLabel}${loc}</li>`;
                 }
-                row += '</ul>';
+                html += '</ul>';
             }
         }
 
-        row += '</div>';
-        return row;
-    }).join('');
-    updateChainDisplay();
-    _initMacroDrag();
+        node.innerHTML = html;
+
+        // Make node draggable
+        node.addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('mn-arrow-handle') || e.target.tagName === 'BUTTON') return;
+            e.preventDefault();
+            const startX = e.clientX - pos.x;
+            const startY = e.clientY - pos.y;
+            node.classList.add('dragging');
+
+            function onMove(ev) {
+                const rect = graphEl.getBoundingClientRect();
+                pos.x = Math.max(0, ev.clientX - rect.left - startX);
+                pos.y = Math.max(0, ev.clientY - rect.top - startY);
+                node.style.left = pos.x + 'px';
+                node.style.top = pos.y + 'px';
+                macroPositions[m] = {x: pos.x, y: pos.y};
+                _drawArrows();
+            }
+            function onUp() {
+                node.classList.remove('dragging');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                _resizeGraph();
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        container.appendChild(node);
+    });
+
+    _resizeGraph();
+    _drawArrows();
+}
+
+function _resizeGraph() {
+    // Expand graph container to fit all nodes
+    const graphEl = document.getElementById('macro-graph');
+    if (!graphEl) return;
+    let maxY = 200;
+    for (const m of selectedMacros) {
+        const p = macroPositions[m];
+        if (p && p.y + 90 > maxY) maxY = p.y + 90;
+    }
+    graphEl.style.minHeight = maxY + 'px';
+}
+
+function startArrowDrag(e, fromMacro) {
+    e.preventDefault();
+    e.stopPropagation();
+    const graphEl = document.getElementById('macro-graph');
+    const rect = graphEl.getBoundingClientRect();
+    _arrowDrag = { from: fromMacro, startX: e.clientX - rect.left, startY: e.clientY - rect.top };
+
+    const svg = document.getElementById('macro-arrows');
+    let tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    tempLine.id = 'temp-arrow';
+    tempLine.setAttribute('stroke', '#2563eb');
+    tempLine.setAttribute('stroke-width', '2');
+    tempLine.setAttribute('stroke-dasharray', '4');
+    tempLine.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(tempLine);
+
+    // Highlight potential targets
+    document.querySelectorAll('.macro-node').forEach(n => {
+        if (n.dataset.macro !== fromMacro) n.classList.add('arrow-target');
+    });
+
+    function onMove(ev) {
+        const x = ev.clientX - rect.left;
+        const y = ev.clientY - rect.top;
+        tempLine.setAttribute('x1', _arrowDrag.startX);
+        tempLine.setAttribute('y1', _arrowDrag.startY);
+        tempLine.setAttribute('x2', x);
+        tempLine.setAttribute('y2', y);
+    }
+    function onUp(ev) {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        tempLine.remove();
+        document.querySelectorAll('.arrow-target').forEach(n => n.classList.remove('arrow-target'));
+
+        // Find which node we dropped on
+        const x = ev.clientX, y = ev.clientY;
+        const target = document.elementFromPoint(x, y)?.closest('.macro-node');
+        if (target && target.dataset.macro && target.dataset.macro !== fromMacro) {
+            const toMacro = target.dataset.macro;
+            // Don't add duplicate edges
+            if (!macroEdges.some(e => e.from === fromMacro && e.to === toMacro)) {
+                macroEdges.push({from: fromMacro, to: toMacro});
+                _drawArrows();
+            }
+        }
+        _arrowDrag = null;
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+function _drawArrows() {
+    const svg = document.getElementById('macro-arrows');
+    if (!svg) return;
+
+    // Ensure arrowhead marker exists
+    if (!svg.querySelector('#arrowhead')) {
+        svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+        </marker></defs>`;
+    }
+
+    // Remove old arrows (keep defs)
+    svg.querySelectorAll('line.edge-line, text.edge-delete').forEach(el => el.remove());
+
+    for (let i = 0; i < macroEdges.length; i++) {
+        const edge = macroEdges[i];
+        const fromPos = macroPositions[edge.from];
+        const toPos = macroPositions[edge.to];
+        if (!fromPos || !toPos) continue;
+
+        // Calculate center of each node
+        const fromNode = document.querySelector(`.macro-node[data-macro="${edge.from}"]`);
+        const toNode = document.querySelector(`.macro-node[data-macro="${edge.to}"]`);
+        const fw = fromNode ? fromNode.offsetWidth : 150;
+        const fh = fromNode ? fromNode.offsetHeight : 60;
+        const tw = toNode ? toNode.offsetWidth : 150;
+        const th = toNode ? toNode.offsetHeight : 60;
+
+        const x1 = fromPos.x + fw / 2;
+        const y1 = fromPos.y + fh / 2;
+        const x2 = toPos.x + tw / 2;
+        const y2 = toPos.y + th / 2;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.className.baseVal = 'edge-line';
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#2563eb');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('marker-end', 'url(#arrowhead)');
+        line.style.pointerEvents = 'stroke';
+        line.style.cursor = 'pointer';
+        const idx = i;
+        line.addEventListener('contextmenu', function(ev) {
+            ev.preventDefault();
+            macroEdges.splice(idx, 1);
+            _drawArrows();
+        });
+        svg.appendChild(line);
+    }
+}
+
+// Keep old name as alias for compatibility
+function updateChainDisplay() { _drawArrows(); }
 }
 
 // Drag-and-drop reordering for macro items
-let _dragIdx = null;
-function _initMacroDrag() {
-    const container = document.getElementById('macro-list');
-    if (!container) return;
-    container.querySelectorAll('.macro-item[draggable]').forEach(el => {
-        el.addEventListener('dragstart', e => {
-            _dragIdx = parseInt(el.dataset.idx);
-            el.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        });
-        el.addEventListener('dragend', () => {
-            el.classList.remove('dragging');
-            container.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
-            _dragIdx = null;
-        });
-        el.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            container.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
-            el.classList.add('drag-over');
-        });
-        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => {
-            e.preventDefault();
-            el.classList.remove('drag-over');
-            const dropIdx = parseInt(el.dataset.idx);
-            if (_dragIdx !== null && _dragIdx !== dropIdx) {
-                const moved = selectedMacros.splice(_dragIdx, 1)[0];
-                selectedMacros.splice(dropIdx, 0, moved);
-                renderMacroList();
-            }
-        });
-    });
-}
-
 function toggleSkip(name) {
     if (name in macrosSkipped) {
         delete macrosSkipped[name];
@@ -939,7 +1073,7 @@ function reshufflePrompt() {
             // Clear stale data from previous task
             trajectory = [];
             actionCounter = 0;
-            macroSpans = {};
+            macroSpans = {}; macroEdges = []; macroPositions = {};
             cachedApiCalls = null;
             cachedRequestLog = null;
             agentResult = null;
@@ -1157,7 +1291,7 @@ function pollServerLog() {
 function startRecording() {
     trajectory = [];
     actionCounter = 0;
-    macroSpans = {};
+    macroSpans = {}; macroEdges = []; macroPositions = {};
     selectedActionIdx = null;
     cachedApiCalls = null;
     cachedRequestLog = null;
@@ -1347,7 +1481,7 @@ function removeSpan(macroName) {
 }
 
 function clearAllTags() {
-    macroSpans = {};
+    macroSpans = {}; macroEdges = []; macroPositions = {};
     renderTimeline();
     renderMacroSpanSummary();
 }
@@ -2411,6 +2545,8 @@ async function submitTask() {
                 expected_answer: document.getElementById('final-answer').value,
                 macros: enabledMacros,
                 macro_spans: macroSpans,
+                macro_edges: macroEdges,
+                macro_positions: macroPositions,
                 macros_not_applicable: macrosNotApplicable,
                 qa_answers: qaAnswers,
                 answer_type: document.getElementById('answer-type').value,
@@ -2430,7 +2566,7 @@ async function submitTask() {
             setTimeout(() => {
                 trajectory = [];
                 actionCounter = 0;
-                macroSpans = {};
+                macroSpans = {}; macroEdges = []; macroPositions = {};
                 macrosNotApplicable = {};
                 macrosSkipped = {};
                 qaAnswers = {};
