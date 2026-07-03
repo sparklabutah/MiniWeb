@@ -438,14 +438,24 @@ def _get_cell_counts():
 
 
 def _load_graph_edges():
-    """Load cross-site edges from annotation DB, grouped by source."""
+    """Load cross-site edges from proposed_edges.csv, grouped by source."""
+    import csv
     from collections import defaultdict
-    edges = []
-    outgoing = defaultdict(list)  # site -> [(target, event_type)]
+
+    outgoing = defaultdict(list)
     incoming = defaultdict(list)
-    for e in edges:
-        outgoing[e["source"]].append((e["target"], e["event_type"]))
-        incoming[e["target"]].append((e["source"], e["event_type"]))
+    edges_file = Path(__file__).parent / "proposed_edges.csv"
+    if edges_file.exists():
+        with open(edges_file) as f:
+            for row in csv.DictReader(f):
+                if row.get("status") != "approved":
+                    continue
+                src = row.get("source", "")
+                tgt = row.get("target", "")
+                evt = row.get("event_type", "")
+                if src and tgt:
+                    outgoing[src].append((tgt, evt))
+                    incoming[tgt].append((src, evt))
     return outgoing, incoming
 
 
@@ -1136,8 +1146,22 @@ def _generate_route_description(method, path, func_name, params, body_fields):
 
 @annotation_bp.route("/api/graph/edges")
 def api_graph_edges():
-    """Get all graph edges (built-in + custom)."""
-    return jsonify([])
+    """Get all graph edges from proposed_edges.csv."""
+    import csv
+    edges = []
+    edges_file = Path(__file__).parent / "proposed_edges.csv"
+    if edges_file.exists():
+        with open(edges_file) as f:
+            for i, row in enumerate(csv.DictReader(f)):
+                if row.get("status") == "approved":
+                    edges.append({
+                        "id": i,
+                        "source": row.get("source", ""),
+                        "target": row.get("target", ""),
+                        "event_type": row.get("event_type", ""),
+                        "kind": row.get("kind", ""),
+                    })
+    return jsonify(edges)
 
 
 @annotation_bp.route("/api/graph/edges", methods=["POST"])
