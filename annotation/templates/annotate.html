@@ -1063,16 +1063,22 @@ function updateChainDisplay() { _drawArrows(); }
         startX = e.clientX;
         startW = panel.offsetWidth;
         resizer.classList.add('active');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
         function onMove(ev) {
             const dx = startX - ev.clientX;
-            const newW = Math.max(350, Math.min(window.innerWidth * 0.7, startW + dx));
+            const newW = Math.max(350, Math.min(window.innerWidth * 0.8, startW + dx));
             panel.style.width = newW + 'px';
+            panel.style.flexShrink = '0';
+            panel.style.flexGrow = '0';
+            panel.style.flexBasis = newW + 'px';
         }
         function onUp() {
             resizer.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
-            // Re-render macro graph for new width
             renderMacroList();
         }
         document.addEventListener('mousemove', onMove);
