@@ -104,11 +104,11 @@
     </div>
     <div class="nav">
         <a href="/" class="active">Schedules</a>
-        <a href="/routes">All Routes</a>
-        <a href="/stops">Stops &amp; Map</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}">All Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}">Stops &amp; Map</a>
         <a href="/sites/map-services/directions?mode=transit">Trip Planner</a>
-        <a href="/fares">Fares &amp; Passes</a>
-        <a href="/login">Sign In</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}">Fares &amp; Passes</a>
+        <a href="{{ url_for('transit-directions.login') }}">Sign In</a>
     </div>
 
     <div class="container">
@@ -162,7 +162,7 @@
                 {% for route in routes %}
                 <tr>
                     <td><span class="route-badge" style="background-color: {{ route.color }}">{{ route.route_number }}</span></td>
-                    <td><a href="/route/{{ route.id }}" style="color: #1a237e; text-decoration: none; font-weight: 500;">{{ route.name }}</a></td>
+                    <td><a href="{{ url_for('transit-directions.route_detail', route_id=route.id) }}" style="color: #1a237e; text-decoration: none; font-weight: 500;">{{ route.name }}</a></td>
                     <td><span class="route-type-tag {{ route.type }}">{{ route.type }}</span></td>
                     <td>{{ route.start_point }} &rarr; {{ route.end_point }}</td>
                     <td>{{ route.frequency_peak_minutes }} min</td>
@@ -218,13 +218,13 @@
                     </tbody>
                 </table>
             </div>
-            <p class="timetable-note">Showing selected weekday departure times. Full schedule available on the <a href="/route/{{ route.id }}">route detail page</a>.</p>
+            <p class="timetable-note">Showing selected weekday departure times. Full schedule available on the <a href="{{ url_for('transit-directions.route_detail', route_id=route.id) }}">route detail page</a>.</p>
             {% else %}
             <div class="no-schedule">
                 <strong>Route {{ route.route_number }} {{ route.name }}:</strong>
                 Service runs every {{ route.frequency_peak_minutes }} minutes (peak) / {{ route.frequency_offpeak_minutes }} minutes (off-peak).
                 {{ route.first_departure }} &ndash; {{ route.last_departure }}.
-                <a href="/route/{{ route.id }}" style="color: #1a237e;">View route details &raquo;</a>
+                <a href="{{ url_for('transit-directions.route_detail', route_id=route.id) }}" style="color: #1a237e;">View route details &raquo;</a>
             </div>
             {% endif %}
         </div>
@@ -268,11 +268,11 @@
                 <h4>Find a Stop</h4>
                 <p>Search {{ total_stops }} stops on the map by name or zone.</p>
             </a>
-            <a href="/routes" class="quick-link">
+            <a href="{{ url_for('transit-directions.routes_list') }}" class="quick-link">
                 <h4>Route Details</h4>
                 <p>Full schedules, stops served, and route maps.</p>
             </a>
-            <a href="/fares" class="quick-link">
+            <a href="{{ url_for('transit-directions.fares_page') }}" class="quick-link">
                 <h4>Fares &amp; Passes</h4>
                 <p>Fare zones, pass options, and payment methods.</p>
             </a>

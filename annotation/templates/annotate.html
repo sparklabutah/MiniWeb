@@ -17,9 +17,48 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .site-pill.active { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.2); }
 
 .split { display: flex; flex: 1; overflow: hidden; }
+.action-sidebar { width: 280px; background: #fff; border-right: 1px solid #e2e8f0; display: none; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.action-sidebar.visible { display: flex; }
+.action-sidebar-header { padding: .5rem .6rem; border-bottom: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; gap: .4rem; }
+.action-sidebar-header h3 { font-size: .82rem; font-weight: 700; color: #0f172a; }
+.action-sidebar-header .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: pulse 1s infinite; }
+.action-sidebar-body { flex: 1; overflow-y: auto; padding: .3rem; }
+.action-sidebar-footer { border-top: 1px solid #e2e8f0; padding: .4rem .6rem; background: #f8fafc; }
+
+/* Action timeline entries */
+.act-entry { padding: .35rem .5rem; margin-bottom: .2rem; border-radius: .35rem; border: 1.5px solid transparent; cursor: pointer; font-size: .78rem; transition: all .1s; position: relative; }
+.act-entry:hover { background: #f1f5f9; }
+.act-entry.selected { border-color: #2563eb; background: #eff6ff; }
+.act-entry.in-range { background: #dbeafe; border-color: #93c5fd; }
+.act-entry.rewound { opacity: .35; }
+.net-entry { padding: .15rem .5rem .15rem 2rem; font-size: .68rem; color: #64748b; font-family: monospace; border-left: 2px solid #e2e8f0; margin-left: 1rem; margin-bottom: .1rem; }
+.net-entry.net-err { border-left-color: #ef4444; background: #fef2f2; }
+.net-entry .net-method { font-weight: 700; margin-right: .3rem; }
+.net-entry .net-method.get { color: #16a34a; } .net-entry .net-method.post { color: #2563eb; }
+.net-entry .net-method.put { color: #d97706; } .net-entry .net-method.delete { color: #ef4444; }
+.net-entry .net-status { margin: 0 .3rem; font-weight: 600; }
+.net-entry .net-status.ok { color: #16a34a; } .net-entry .net-status.err { color: #ef4444; }
+.net-entry .net-dur { color: #94a3b8; margin-left: .3rem; }
+.net-entry .net-body { color: #94a3b8; font-size: .6rem; max-height: 1.2em; overflow: hidden; cursor: pointer; }
+.net-entry .net-body.expanded { max-height: none; white-space: pre-wrap; }
+.net-entry .net-error-msg { color: #ef4444; font-weight: 600; font-size: .7rem; font-family: sans-serif; display: block; padding: .1rem 0; }
+.act-entry .rewind-btn { display: none; position: absolute; right: 4px; top: 4px; background: #2563eb; color: #fff; border: none; border-radius: .25rem; font-size: .55rem; padding: .1rem .3rem; cursor: pointer; }
+.act-entry:hover .rewind-btn { display: block; }
+.act-entry .rewind-btn:hover { background: #1d4ed8; }
+.act-entry .act-num { display: inline-block; width: 20px; color: #94a3b8; font-size: .7rem; font-weight: 600; }
+.act-entry .act-icon { margin-right: .2rem; }
+.act-entry .act-verb { font-weight: 600; color: #1e293b; }
+.act-entry .act-target { color: #475569; }
+.act-entry .act-detail { color: #64748b; font-size: .72rem; font-style: italic; }
+.act-entry .act-tags { display: flex; flex-wrap: wrap; gap: .15rem; margin-top: .2rem; }
+.act-entry .macro-tag { font-size: .55rem; padding: .05rem .25rem; border-radius: .6rem; font-weight: 500; cursor: pointer; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+
+/* Range selection hint */
+.range-hint { font-size: .72rem; color: #2563eb; padding: .3rem .5rem; background: #eff6ff; border-radius: .3rem; margin-bottom: .3rem; text-align: center; }
+
 .left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .left-panel iframe { flex: 1; border: none; background: #fff; }
-.right-panel { width: 480px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.right-panel { width: 440px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
 
 .steps-bar { display: flex; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
 .steps-bar .step { flex: 1; padding: .5rem .2rem; text-align: center; font-size: .7rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
@@ -80,11 +119,58 @@ textarea#instruction:focus {
 .traj-obs:hover { max-height: none; color: #475569; }
 .traj-obs .obs-label { color: #16a34a; font-weight: 700; font-size: .65rem; }
 
-/* Verifier options */
-.verifier-option { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .5rem .6rem; margin-bottom: .3rem; display: flex; gap: .5rem; align-items: flex-start; cursor: pointer; }
-.verifier-option:hover { border-color: #cbd5e1; background: #f1f5f9; }
-.verifier-option.selected { border-color: #2563eb; background: #eff6ff; }
-.verifier-option input[type="checkbox"] { margin-top: .15rem; accent-color: #2563eb; }
+/* Verifier builder */
+.vb-card { border: 1px solid #e2e8f0; border-radius: .5rem; margin-bottom: .5rem; overflow: hidden; }
+.vb-card-header { padding: .4rem .6rem; display: flex; align-items: center; gap: .4rem; }
+.vb-card-body { padding: .5rem .6rem; border-top: 1px solid #f1f5f9; min-height: 40px; }
+.vb-card-body.drag-over { background: #eff6ff; border-color: #2563eb; outline: 2px dashed #93c5fd; }
+.vb-card-body.empty-hint::after { content: 'Drop checks here'; color: #94a3b8; font-size: .75rem; font-style: italic; }
+
+/* Palette check chips (draggable) */
+.pal-check { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .5rem; background: #fff; border: 1px solid #e2e8f0; border-radius: .35rem; font-size: .72rem; cursor: grab; user-select: none; transition: all .1s; }
+.pal-check:hover { border-color: #2563eb; background: #eff6ff; }
+.pal-check:active { cursor: grabbing; opacity: .7; }
+.pal-check .pal-icon { font-size: .8rem; }
+.pal-check .pal-name { font-weight: 600; color: #1e293b; }
+.pal-check .pal-hint { color: #94a3b8; font-size: .65rem; }
+
+/* Dropped check items (in macro zone) */
+.dropped-check { display: flex; align-items: flex-start; gap: .4rem; padding: .3rem .5rem; background: #fff; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .25rem; font-size: .75rem; }
+.dropped-check .dc-icon { font-size: .8rem; flex-shrink: 0; margin-top: .1rem; }
+.dropped-check .dc-body { flex: 1; }
+.dropped-check .dc-title { font-weight: 600; color: #1e293b; font-size: .75rem; }
+.dropped-check .dc-fields { margin-top: .2rem; }
+.dropped-check .dc-fields input, .dropped-check .dc-fields select { font-size: .72rem; padding: .15rem .3rem; border: 1px solid #cbd5e1; border-radius: .2rem; }
+.dropped-check .dc-fields input[type="text"] { width: 100%; }
+.dropped-check .dc-remove { color: #94a3b8; cursor: pointer; font-size: .85rem; flex-shrink: 0; }
+.dropped-check .dc-remove:hover { color: #ef4444; }
+.dropped-check .dc-result { font-size: .68rem; margin-top: .15rem; }
+.dropped-check .dc-result.pass { color: #16a34a; } .dropped-check .dc-result.fail { color: #ef4444; }
+.vb-section { margin-bottom: .5rem; }
+.vb-section-title { font-size: .72rem; font-weight: 600; color: #64748b; margin-bottom: .3rem; text-transform: uppercase; letter-spacing: .03em; }
+.vb-action-list { font-size: .75rem; color: #475569; }
+.vb-action-item { padding: .15rem 0; display: flex; align-items: center; gap: .3rem; }
+.vb-action-item .act-icon { font-size: .7rem; }
+.vb-api-call { font-size: .72rem; padding: .2rem .4rem; background: #f1f5f9; border-radius: .25rem; margin-bottom: .2rem; display: flex; align-items: center; gap: .3rem; cursor: pointer; }
+.vb-api-call:hover { background: #e2e8f0; }
+.vb-api-call.checked { background: #dbeafe; border: 1px solid #93c5fd; }
+.vb-api-call .method { font-weight: 700; font-size: .65rem; }
+.vb-api-call .method.post { color: #2563eb; } .vb-api-call .method.get { color: #16a34a; }
+.vb-api-call .method.put { color: #d97706; } .vb-api-call .method.delete { color: #ef4444; }
+.vb-check-row { display: flex; align-items: center; gap: .4rem; padding: .25rem 0; font-size: .78rem; }
+.vb-check-row select, .vb-check-row input { font-size: .75rem; padding: .2rem .3rem; border: 1px solid #cbd5e1; border-radius: .25rem; }
+.vb-check-row select { max-width: 180px; }
+.vb-check-row input[type="text"] { flex: 1; min-width: 80px; }
+.vb-test-pass { color: #16a34a; font-weight: 600; } .vb-test-fail { color: #ef4444; font-weight: 600; }
+
+/* Task suggestions */
+.sug-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .4rem .6rem; margin-bottom: .3rem; cursor: pointer; font-size: .78rem; transition: all .1s; }
+.sug-card:hover { border-color: #2563eb; background: #eff6ff; }
+.sug-card .sug-diff { font-size: .6rem; padding: .1rem .3rem; border-radius: .2rem; font-weight: 600; margin-right: .3rem; }
+.sug-card .sug-diff.easy { background: #d1fae5; color: #065f46; }
+.sug-card .sug-diff.medium { background: #fef3c7; color: #92400e; }
+.sug-card .sug-diff.hard { background: #fecaca; color: #9f1239; }
+.sug-card .sug-text { color: #1e293b; line-height: 1.4; }
 .verifier-option .v-info { flex: 1; }
 .verifier-option .v-label { font-size: .82rem; color: #0f172a; font-weight: 500; }
 .verifier-option .v-desc { font-size: .72rem; color: #64748b; margin-top: .1rem; }
@@ -96,6 +182,15 @@ textarea#instruction:focus {
 .macro-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
 .macro-chip { background: #f1f5f9; color: #475569; padding: .15rem .4rem; border-radius: 1rem; font-size: .72rem; cursor: pointer; border: 1px solid transparent; }
 .macro-chip.selected { background: #dbeafe; color: #1e40af; border-color: #2563eb; }
+
+/* Macro tagging colors */
+.macro-tag { display: inline-block; padding: .05rem .3rem; border-radius: .8rem; font-size: .6rem; font-weight: 600; cursor: pointer; margin-left: .2rem; }
+.traj-entry.tagging { border-color: #2563eb !important; box-shadow: 0 0 0 2px rgba(37,99,235,.15); }
+.traj-entry .tag-row { display: flex; flex-wrap: wrap; gap: .15rem; padding: .15rem .4rem; border-top: 1px solid #f1f5f9; }
+.tag-palette { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .4rem .5rem; margin-top: .4rem; }
+.tag-palette-title { font-size: .72rem; color: #64748b; margin-bottom: .3rem; font-weight: 600; }
+.tag-palette .macro-chip { font-size: .68rem; padding: .1rem .35rem; }
+.tag-palette .macro-chip:hover { background: #dbeafe; }
 
 .bottom-bar { border-top: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; gap: .3rem; align-items: center; flex-shrink: 0; background: #f8fafc; }
 .bottom-bar .status { flex: 1; font-size: .78rem; color: #64748b; }
@@ -124,22 +219,15 @@ textarea#instruction:focus {
 .api-route .returns { font-size: .65rem; color: #94a3b8; font-family: 'SF Mono', Menlo, monospace; padding-left: 46px; }
 
 /* Macro items with tooltips */
-.macro-item { position: relative; display: flex; align-items: center; gap: .4rem; padding: .3rem .4rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .25rem; font-size: .8rem; }
+.macro-item { position: relative; display: flex; align-items: center; gap: .4rem; padding: .4rem .5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .35rem; font-size: .8rem; cursor: grab; }
 .macro-item:hover { background: #f1f5f9; }
-.macro-item .macro-name { flex: 1; font-weight: 500; color: #1e293b; }
-.macro-item .macro-verb { font-size: .65rem; color: #64748b; text-transform: uppercase; letter-spacing: .03em; }
-.macro-item .reorder-btns { display: flex; flex-direction: column; gap: 0; }
-.macro-item .reorder-btns button { background: none; border: none; cursor: pointer; font-size: .6rem; color: #94a3b8; padding: 0 .15rem; line-height: 1; }
-.macro-item .reorder-btns button:hover { color: #2563eb; }
-.macro-tooltip {
-    display: none; position: absolute; left: 100%; top: -5px; margin-left: 8px;
-    background: #1e293b; color: #fff; padding: .5rem .7rem; border-radius: .4rem;
-    font-size: .75rem; width: 280px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.2);
-    line-height: 1.4; pointer-events: none;
-}
-.macro-item:hover .macro-tooltip { display: block; }
-.macro-tooltip .tt-desc { margin-bottom: .3rem; }
-.macro-tooltip .tt-example { color: #94a3b8; font-style: italic; }
+.macro-item.dragging { opacity: .4; cursor: grabbing; }
+.macro-item.drag-over { border-top: 2px solid #2563eb; margin-top: -.1rem; }
+.macro-item .drag-handle { color: #cbd5e1; font-size: .7rem; cursor: grab; user-select: none; padding-right: .2rem; }
+.macro-item .macro-name { flex: 1; font-weight: 600; color: #1e293b; }
+.macro-locs { width: 100%; padding: .15rem 0 0 1.4rem; margin: 0; list-style: none; }
+.macro-locs li { font-size: .65rem; color: #64748b; line-height: 1.35; padding: .05rem 0; }
+.macro-locs li b { color: #475569; font-weight: 600; }
 
 /* Chain display */
 .chain-display { font-family: monospace; font-size: .75rem; color: #2563eb; background: #eff6ff; padding: .3rem .5rem; border-radius: .3rem; margin-top: .4rem; min-height: 1.4em; }
@@ -155,33 +243,77 @@ textarea#instruction:focus {
 .skip-modal h3 { font-size: .95rem; margin-bottom: .6rem; color: #0f172a; }
 .skip-modal select { width: 100%; padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .85rem; margin-bottom: .5rem; }
 .skip-modal textarea { width: 100%; padding: .35rem .5rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .82rem; min-height: 60px; resize: vertical; }
+
+/* Name entry gate */
+.name-gate { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,.6); z-index: 9000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.name-gate-box { background: #fff; padding: 2rem; border-radius: .8rem; width: 360px; max-width: 90vw; box-shadow: 0 12px 40px rgba(0,0,0,.2); text-align: center; }
+.name-gate-box h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: .3rem; }
+.name-gate-box p { font-size: .85rem; color: #64748b; margin-bottom: 1.2rem; }
+.name-gate-box input { width: 100%; padding: .6rem .8rem; border: 2px solid #2563eb; border-radius: .5rem; font-size: 1rem; text-align: center; outline: none; }
+.name-gate-box input:focus { box-shadow: 0 0 0 3px rgba(37,99,235,.2); }
+.name-gate-box button { margin-top: 1rem; padding: .6rem 2rem; background: #2563eb; color: #fff; border: none; border-radius: .5rem; font-size: .95rem; font-weight: 600; cursor: pointer; }
+.name-gate-box button:hover { background: #1d4ed8; }
+.name-gate-box button:disabled { opacity: .4; cursor: not-allowed; }
 </style>
 </head>
 <body>
 
+<!-- Name entry gate -->
+<div class="name-gate" id="name-gate" style="display:none">
+    <div class="name-gate-box">
+        <h2>Welcome to MiniWeb Annotator</h2>
+        <p>Enter your name to begin this annotation session.</p>
+        <input type="text" id="name-gate-input" placeholder="Your name" autofocus
+               onkeydown="if(event.key==='Enter')submitNameGate()"
+               oninput="document.getElementById('name-gate-btn').disabled=!this.value.trim()">
+        <br>
+        <button id="name-gate-btn" disabled onclick="submitNameGate()">Start Annotating</button>
+    </div>
+</div>
+
 <div class="topbar">
-    <h1>Annotator</h1>
-    {% if prompt and prompt.sites %}
-    {% for s in prompt.sites %}
-    <span class="site-pill active" style="background:{{ ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'][loop.index0 % 5] }};color:{{ ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'][loop.index0 % 5] }}" onclick="switchToSite('{{ s.id }}', this)">{{ s.name }}</span>
-    {% endfor %}
-    {% endif %}
-    <input type="text" id="annotator-name" placeholder="your name" style="width:110px;margin-left:auto">
+    <h1>MiniWeb Annotator</h1>
+    <span id="annotator-display" style="font-size:.8rem;color:#64748b"></span>
+    <span style="flex:1"></span>
+    <button class="btn btn-secondary btn-sm" onclick="resetSession()" title="Reset all site data to pristine state">Reset Session</button>
     <a href="{{ url_for('annotation.index') }}">Home</a>
     <a href="{{ url_for('annotation.dashboard') }}">Dashboard</a>
 </div>
 
+<div id="instruction-banner" style="display:none;background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:.3rem .8rem;font-size:.8rem;color:#1e40af;flex-shrink:0">
+    <span style="font-weight:600;margin-right:.3rem">Task:</span>
+    <span id="instruction-banner-text"></span>
+</div>
+
 <div class="split">
+    <div class="action-sidebar" id="action-sidebar">
+        <div class="action-sidebar-header">
+            <span class="rec-dot" id="sidebar-rec-dot"></span>
+            <h3>Actions</h3>
+            <span style="margin-left:auto;font-size:.7rem;color:#64748b" id="action-count">0</span>
+        </div>
+        <div class="action-sidebar-body" id="action-timeline"></div>
+        <div class="action-sidebar-footer">
+            <div id="range-controls" style="display:none">
+                <div class="range-hint" id="range-hint">Select start action</div>
+                <div id="range-macro-chips" class="macro-chips" style="margin-top:.3rem"></div>
+            </div>
+            <div style="display:flex;gap:.3rem;margin-top:.3rem">
+                <button class="btn btn-sm btn-secondary" onclick="startRangeSelect()" id="range-btn" title="Select a range of actions for a macro">Tag Range</button>
+                <button class="btn btn-sm btn-secondary" onclick="clearAllTags()" title="Clear all macro tags">Clear Tags</button>
+            </div>
+        </div>
+    </div>
     <div class="left-panel">
-        <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/sites/{{ prompt.sites[0].id }}/{% else %}/{% endif %}" allow="clipboard-write"></iframe>
+        <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/?open={{ prompt.sites | map(attribute='id') | join(',') }}{% else %}/{% endif %}" allow="clipboard-write"></iframe>
     </div>
 
     <div class="right-panel">
         <div class="steps-bar">
             <div class="step active" onclick="goStep(1)"><span class="num">1</span> Task</div>
             <div class="step" onclick="goStep(2)"><span class="num">2</span> Record</div>
-            <div class="step" onclick="goStep(3)"><span class="num">3</span> Answer</div>
-            <div class="step" onclick="goStep(4)"><span class="num">4</span> Verify</div>
+            <div class="step" onclick="goStep(3)"><span class="num">3</span> Submit</div>
+            <span id="agent-status-badge" style="display:none;font-size:.6rem;padding:.15rem .4rem;border-radius:1rem;background:#fef3c7;color:#92400e;margin:auto .5rem;white-space:nowrap"></span>
         </div>
 
         <div class="step-content">
@@ -190,9 +322,20 @@ textarea#instruction:focus {
             <div class="step-panel active" id="step-1">
                 <h3>Step 1: Design a Task From This Prompt</h3>
 
-                <!-- Sites section -->
+                <!-- Sites (shown as browser tabs in the left panel) -->
                 <label>Sites</label>
-                <div class="site-tabs" id="site-tabs"></div>
+                <div id="site-labels" style="font-size:.82rem;color:#64748b;margin-bottom:.4rem"></div>
+                <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem;padding:.4rem .6rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;flex-wrap:wrap">
+                    <label style="display:flex;align-items:center;gap:.4rem;margin:0;cursor:pointer;font-size:.8rem;text-transform:none;letter-spacing:0;font-weight:500;color:#475569;">
+                        <input type="checkbox" id="auto-login-toggle" checked onchange="handleLoginToggle(this.checked)" style="accent-color:#2563eb;width:16px;height:16px;">
+                        Logged in
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.4rem;margin:0;cursor:pointer;font-size:.8rem;text-transform:none;letter-spacing:0;font-weight:500;color:#475569;">
+                        <input type="checkbox" id="single-site-toggle" onchange="reshufflePrompt()" style="accent-color:#2563eb;width:16px;height:16px;">
+                        Single site only
+                    </label>
+                    <span id="login-status" style="font-size:.72rem;color:#16a34a;margin-left:auto;"></span>
+                </div>
 
                 <!-- Macros section -->
                 <label>Macros <span style="font-weight:400;text-transform:none;color:#94a3b8">(uncheck to disable, arrows to reorder)</span></label>
@@ -205,8 +348,23 @@ textarea#instruction:focus {
                     <button class="btn btn-danger btn-sm" onclick="openSkipModal()">Skip</button>
                 </div>
 
+                <!-- Task suggestions from existing validated tasks -->
+                <div id="task-suggestions" style="margin-bottom:.5rem"></div>
+
                 <label>Instruction</label>
-                <textarea id="instruction" rows="4" placeholder="Write your task here. Example: Navigate to the Transactions page, filter by category 'Groceries', and report how many transactions match."></textarea>
+                <textarea id="instruction" rows="4" placeholder="Pick a suggestion above, or write your own task here."></textarea>
+                <div style="display:flex;gap:.4rem;margin-top:.3rem;align-items:center">
+                    <button class="btn btn-secondary btn-sm" onclick="refineInstruction()" id="refine-btn">Refine with AI</button>
+                    <span id="refine-status" style="font-size:.72rem;color:#94a3b8"></span>
+                </div>
+                <div id="refined-box" style="display:none;margin-top:.4rem">
+                    <div style="font-size:.72rem;color:#16a34a;font-weight:600;margin-bottom:.2rem">Refined version:</div>
+                    <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.4rem;padding:.5rem .6rem;font-size:.85rem;line-height:1.5;color:#0f172a;cursor:pointer" onclick="acceptRefinement()" title="Click to use this version"></div>
+                    <div style="display:flex;gap:.3rem;margin-top:.3rem">
+                        <button class="btn btn-success btn-sm" onclick="acceptRefinement()">Use refined</button>
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
+                    </div>
+                </div>
 
                 <div class="nav-btns">
                     <button class="btn btn-primary" onclick="startRecording()">Start Recording &rarr;</button>
@@ -216,15 +374,16 @@ textarea#instruction:focus {
             <!-- STEP 2: Record trajectory -->
             <div class="step-panel" id="step-2">
                 <h3>Step 2: Solve the Task</h3>
-                <p class="hint">Navigate the site on the left. Recording captures every page you visit.</p>
+                <p class="hint">Navigate the site on the left. Actions appear in the sidebar. After recording, tag action ranges with macros.</p>
 
                 <div style="display:flex;gap:.3rem;margin-bottom:.5rem;align-items:center">
                     <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">Recording...</button>
                     <span id="rec-status" style="font-size:.78rem;color:#ef4444;font-weight:600">REC</span>
-                    <span id="rec-count" style="font-size:.78rem;color:#64748b;margin-left:auto">0 entries</span>
+                    <span id="rec-count" style="font-size:.78rem;color:#64748b;margin-left:auto">0 actions</span>
                 </div>
 
-                <div id="trajectory-list" style="max-height:350px;overflow-y:auto"></div>
+                <!-- Macro span summary -->
+                <div id="macro-span-summary" style="margin-top:.5rem"></div>
 
                 <div class="nav-btns">
                     <button class="btn btn-secondary" onclick="goStep(1)">&larr; Back</button>
@@ -234,51 +393,49 @@ textarea#instruction:focus {
 
             <!-- STEP 3: Type answer -->
             <div class="step-panel" id="step-3">
-                <h3>Step 3: What's the Answer?</h3>
-                <p class="hint">Based on your walkthrough, what is the correct answer?</p>
-                <label>Answer</label>
-                <textarea id="final-answer" rows="2" placeholder="The answer you found..."></textarea>
-                <label>Type</label>
-                <select id="answer-type">
-                    <option value="string">Text</option>
-                    <option value="number">Number</option>
-                    <option value="boolean">Yes/No</option>
-                    <option value="string_list">List</option>
-                </select>
-                <label>Alternatives (one per line)</label>
-                <textarea id="alternatives" rows="2" placeholder="other valid answers..."></textarea>
+                <h3>Step 3: Answer & Submit</h3>
+                <p class="hint">Provide the expected answer, then submit. Verifiers will be built later.</p>
+
+                <label>Answer <span style="font-weight:400;text-transform:none;color:#94a3b8">(if the task asks for a value)</span></label>
+                <textarea id="final-answer" rows="2" placeholder="The answer you found (e.g. '5', '$1,234.50', 'John Smith')"></textarea>
+
+                <div style="display:flex;gap:.5rem">
+                    <div style="flex:1">
+                        <label>Type</label>
+                        <select id="answer-type">
+                            <option value="string">Text</option>
+                            <option value="number">Number</option>
+                            <option value="boolean">Yes/No</option>
+                            <option value="string_list">List</option>
+                        </select>
+                    </div>
+                    <div style="flex:1">
+                        <label>Alternatives</label>
+                        <textarea id="alternatives" rows="1" placeholder="other valid answers (one per line)"></textarea>
+                    </div>
+                </div>
+
+                <label>Expected Outcome <span style="font-weight:400;text-transform:none;color:#94a3b8">(plain English — what should the verifier check later?)</span></label>
+                <textarea id="expected-outcome" rows="3" placeholder="Describe what should be true after the task completes. Examples:&#10;- 'A new transaction of $45.20 should appear in banking'&#10;- 'The category filter shows only 5 grocery transactions'&#10;- 'The post was deleted from the blog'"></textarea>
+
+                <div style="margin-top:.6rem;padding:.5rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.4rem;font-size:.75rem;color:#065f46">
+                    <strong>What gets saved:</strong> instruction, macro, trajectory (all actions + network requests), expected answer, and outcome description.
+                    Verifiers will be built in a separate review pass.
+                </div>
+
                 <div class="nav-btns">
                     <button class="btn btn-secondary" onclick="goStep(2)">&larr; Back</button>
-                    <button class="btn btn-primary" onclick="goToVerifiers()">Select Verifiers &rarr;</button>
+                    <button class="btn btn-success btn-lg" onclick="submitTask()">Submit &amp; Next Task</button>
                 </div>
             </div>
 
-            <!-- STEP 4: Select verifiers -->
-            <div class="step-panel" id="step-4">
-                <h3>Step 4: Select Verifiers</h3>
-                <p class="hint">Check what should be verified after the agent completes this task.</p>
-
-                <div id="verifier-checklist"></div>
-
-                <div id="user-state-section" style="margin-top:.6rem">
-                    <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:.3rem">User State After Task</div>
-                    <div id="user-state-list" style="font-size:.75rem;color:#64748b">Loading...</div>
-                </div>
-
-                <div id="interaction-log-section" style="margin-top:.6rem">
-                    <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:.3rem">Agent Actions (mutations)</div>
-                    <div id="interaction-log-list" style="font-size:.75rem;color:#64748b">No mutations recorded yet</div>
-                </div>
-
-                <div style="display:flex;gap:.3rem;margin-top:.6rem">
-                    <button class="btn btn-primary btn-sm" onclick="testAllVerifiers()">Test All</button>
-                </div>
-                <div id="test-result" style="margin-top:.4rem;font-size:.78rem"></div>
-                <div class="nav-btns">
-                    <button class="btn btn-secondary" onclick="goStep(3)">&larr; Back</button>
-                    <button class="btn btn-success btn-lg" onclick="submitTask()">Submit</button>
-                </div>
-            </div>
+            <!-- Hidden elements needed by verifier code (kept for future verifier view) -->
+            <div id="check-palette" style="display:none"><div id="palette-checks"></div></div>
+            <div id="verifier-builder" style="display:none"></div>
+            <div id="task-verdict" style="display:none"></div>
+            <div id="agent-results" style="display:none"></div>
+            <span id="verifier-status" style="display:none"></span>
+            <button id="agent-btn" style="display:none"></button>
         </div>
 
         <div id="api-ref-panel" class="api-ref collapsed">
@@ -313,28 +470,258 @@ textarea#instruction:focus {
     </div>
 </div>
 
+
 <script>
 const macroDescriptions = {{ macro_descriptions | tojson }};
+const macroLocations = {{ macro_locations | tojson }};
 let currentPrompt = {{ prompt | tojson }};
 let currentStep = 1;
 let selectedMacros = currentPrompt ? currentPrompt.macros.slice() : [];
 let trajectory = [];
 let recording = false;
 let recordInterval = null;
+let macroSpans = {};  // {macroName: [actionIndex, ...]}
+let selectedActionIdx = null;  // currently selected action for tagging
 let lastUrl = '';
-let selectedVerifiers = [];
+// verifierConfigs populated by buildVerifiers()
 let verifierCounter = 0;
 let activeSiteIdx = 0;
+let rewindPoint = null;  // action index where we rewound to (null = no rewind)
+let agentResult = null;  // cached result from background agent run
+let agentRunning = false;
 
-document.addEventListener('DOMContentLoaded', () => {
+function startBackgroundAgent() {
+    if (!currentPrompt || !currentPrompt.sites || agentRunning) return;
+    const instruction = document.getElementById('instruction')?.value;
+    if (!instruction || instruction.length < 10) return;
+
+    agentRunning = true;
+    const badge = document.getElementById('agent-status-badge');
+    if (badge) { badge.textContent = 'Agent running...'; badge.style.display = ''; }
+
+    fetch('/annotate/api/agent_validate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            configs: [],  // no verifiers yet — agent just solves the task
+            instruction: instruction,
+            sites: currentPrompt.sites,
+        })
+    }).then(r => r.json()).then(d => {
+        agentResult = d;
+        agentRunning = false;
+        if (badge) {
+            badge.textContent = d.agent_passed ? 'Agent: done' : 'Agent: done';
+            badge.style.background = '#dbeafe';
+            badge.style.color = '#1e40af';
+        }
+    }).catch(e => {
+        agentRunning = false;
+        agentResult = {agent_errors: [e.message], agent_answer: '', agent_passed: false, agent_response: 'Failed'};
+        if (badge) { badge.textContent = 'Agent: error'; badge.style.background = '#fecaca'; }
+    });
+}
+
+function _getLocationsForMacro(macroName) {
+    // Get locations from all currently sampled sites
+    if (!currentPrompt || !currentPrompt.sites) return [];
+    const locs = [];
+    for (const site of currentPrompt.sites) {
+        const siteId = typeof site === 'string' ? site : site.id;
+        const siteName = typeof site === 'string' ? site : (site.name || site.id);
+        const siteLocs = (macroLocations[siteId] || {})[macroName];
+        if (siteLocs && siteLocs.length) {
+            for (const loc of siteLocs) {
+                locs.push({site: siteName, loc});
+            }
+        }
+    }
+    return locs;
+}
+
+function showMacroTooltip(el, macroName) {
+    const tt = document.getElementById('macro-tooltip-el');
+    const desc = macroDescriptions[macroName] || {};
+    const locs = _getLocationsForMacro(macroName);
+
+    let html = `<div class="tt-desc">${desc.description || 'No description'}</div>`;
+    if (locs.length) {
+        html += '<ul class="tt-locs">';
+        for (const {site, loc} of locs) {
+            const siteLabel = currentPrompt.sites.length > 1 ? `<b>${site}</b>: ` : '';
+            html += `<li>${siteLabel}${loc}</li>`;
+        }
+        html += '</ul>';
+    } else {
+        html += '<div class="tt-no-loc">No known UI location for this macro on sampled sites</div>';
+    }
+    tt.innerHTML = html;
+
+    const rect = el.getBoundingClientRect();
+    tt.style.top = rect.top + 'px';
+    tt.style.left = (rect.left - 310) + 'px';
+    tt.style.display = 'block';
+    if (rect.left - 310 < 0) {
+        tt.style.left = rect.left + 'px';
+        tt.style.top = (rect.bottom + 4) + 'px';
+    }
+}
+function hideMacroTooltip() {
+    document.getElementById('macro-tooltip-el').style.display = 'none';
+}
+
+function resetSession() {
+    if (!confirm('Reset all site data to pristine state? This reverts any changes you made while exploring.')) return;
+    fetch('/_reset_data', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+            const iframe = document.getElementById('site-iframe');
+            if (iframe) iframe.src = iframe.src;
+            alert('Session reset to pristine state.');
+        })
+        .catch(() => alert('Reset failed.'));
+}
+
+function _resetSessionSilent() {
+    return fetch('/_reset_data', { method: 'POST' }).then(r => r.json()).catch(() => {});
+}
+
+function getAnnotatorName() {
+    return sessionStorage.getItem('annotator_name') || '';
+}
+
+function submitNameGate() {
+    const name = document.getElementById('name-gate-input').value.trim();
+    if (!name) return;
+    sessionStorage.setItem('annotator_name', name);
+    document.getElementById('name-gate').style.display = 'none';
+    document.getElementById('annotator-display').textContent = name;
+    // Reset session to start fresh (logged out)
+    _resetSessionSilent().then(() => initAnnotation());
+}
+
+function updateInstructionBanner() {
+    const text = document.getElementById('instruction')?.value?.trim() || '';
+    const banner = document.getElementById('instruction-banner');
+    const bannerText = document.getElementById('instruction-banner-text');
+    if (banner && bannerText) {
+        if (text) {
+            bannerText.textContent = text.length > 120 ? text.slice(0, 117) + '...' : text;
+            banner.style.display = '';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+}
+
+function renderSiteLabels() {
+    const container = document.getElementById('site-labels');
+    if (!container || !currentPrompt || !currentPrompt.sites) { return; }
+    const bgs = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
+    const fgs = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
+    container.innerHTML = currentPrompt.sites.map((s, i) =>
+        `<span style="display:inline-block;padding:.15rem .5rem;border-radius:1rem;font-size:.75rem;font-weight:600;background:${bgs[i%5]};color:${fgs[i%5]};margin-right:.3rem">${s.name}</span>`
+    ).join('');
+}
+
+function initAnnotation() {
     if (currentPrompt) {
-        renderSiteTabs();
+        renderSiteLabels();
         renderMacroList();
         updateChainDisplay();
-        // Load API reference for first site
+        renderTagPalette();
         if (currentPrompt.sites.length > 0) {
             loadApiRef(currentPrompt.sites[0].id);
         }
+        // Auto-login if toggle is checked
+        const toggle = document.getElementById('auto-login-toggle');
+        if (toggle && toggle.checked) {
+            autoLoginSites();
+        }
+    }
+}
+
+async function autoLoginSites() {
+    if (!currentPrompt || !currentPrompt.sites.length) return;
+    const siteIds = currentPrompt.sites.map(s => s.id);
+    const statusEl = document.getElementById('login-status');
+    statusEl.textContent = 'Logging in...';
+    try {
+        const r = await fetch('/annotate/api/auto_login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ sites: siteIds })
+        });
+        const d = await r.json();
+        if (d.logged_in && d.logged_in.length) {
+            statusEl.textContent = 'Logged in to ' + d.logged_in.length + ' site(s)';
+        } else {
+            statusEl.textContent = 'No sites to log in';
+        }
+    } catch(e) { statusEl.textContent = 'Login failed'; }
+}
+
+async function handleLoginToggle(checked) {
+    const statusEl = document.getElementById('login-status');
+    const iframe = document.getElementById('site-iframe');
+    if (checked) {
+        await autoLoginSites();
+        if (iframe) iframe.src = iframe.src;
+    } else {
+        await _resetSessionSilent();
+        statusEl.textContent = 'Logged out';
+        if (iframe) iframe.src = iframe.src;
+    }
+}
+
+async function refineInstruction() {
+    const text = document.getElementById('instruction').value.trim();
+    if (!text) { alert('Write an instruction first, then refine it.'); return; }
+    const btn = document.getElementById('refine-btn');
+    const status = document.getElementById('refine-status');
+    btn.disabled = true;
+    status.textContent = 'Refining...';
+    document.getElementById('refined-box').style.display = 'none';
+    try {
+        const r = await fetch('/annotate/api/refine', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                instruction: text,
+                sites: currentPrompt ? currentPrompt.sites.map(s => s.id) : [],
+                macros: getEnabledMacros(),
+            })
+        });
+        const d = await r.json();
+        if (d.refined) {
+            document.getElementById('refined-text').textContent = d.refined;
+            document.getElementById('refined-box').style.display = 'block';
+            status.textContent = '';
+        } else {
+            status.textContent = d.error || 'Refinement failed';
+        }
+    } catch(e) {
+        status.textContent = 'Error: ' + e.message;
+    }
+    btn.disabled = false;
+}
+
+function acceptRefinement() {
+    const refined = document.getElementById('refined-text').textContent;
+    if (refined) {
+        document.getElementById('instruction').value = refined;
+        document.getElementById('refined-box').style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedName = getAnnotatorName();
+    if (savedName) {
+        document.getElementById('annotator-display').textContent = savedName;
+        // Reset session for fresh start, then init
+        _resetSessionSilent().then(() => initAnnotation());
+    } else {
+        document.getElementById('name-gate').style.display = 'flex';
+        document.getElementById('name-gate-input').focus();
     }
 });
 
@@ -348,63 +735,154 @@ function goStep(n) {
         s.classList.toggle('done', i + 1 < n);
     });
     document.querySelectorAll('.steps-bar .step')[n - 1].classList.add('active');
-}
-
-// --- Site tabs ---
-function renderSiteTabs() {
-    if (!currentPrompt || !currentPrompt.sites) return;
-    const container = document.getElementById('site-tabs');
-    const colors = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
-    const textColors = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
-    container.innerHTML = currentPrompt.sites.map((s, i) =>
-        `<button class="site-tab${i === activeSiteIdx ? ' active' : ''}" onclick="switchToSiteIdx(${i})" style="background:${i === activeSiteIdx ? colors[i % 5] : '#fff'};color:${textColors[i % 5]}">${s.name}</button>`
-    ).join('');
-}
-
-function switchToSite(siteId, el) {
-    const idx = currentPrompt.sites.findIndex(s => s.id === siteId);
-    if (idx >= 0) switchToSiteIdx(idx);
-}
-
-function switchToSiteIdx(idx) {
-    if (!currentPrompt || idx < 0 || idx >= currentPrompt.sites.length) return;
-    activeSiteIdx = idx;
-    const siteId = currentPrompt.sites[idx].id;
-    document.getElementById('site-iframe').src = '/sites/' + siteId + '/';
-    renderSiteTabs();
-    loadApiRef(siteId);
-    // Update topbar pills
-    document.querySelectorAll('.topbar .site-pill').forEach((pill, i) => {
-        pill.classList.toggle('active', i === idx);
-    });
+    // Show action sidebar from step 2 onward (when there are actions)
+    const sidebar = document.getElementById('action-sidebar');
+    if (n >= 2 && trajectory.length > 0) {
+        sidebar.classList.add('visible');
+    } else if (n === 1) {
+        sidebar.classList.remove('visible');
+    }
+    // Start background agent when leaving step 1
+    if (n === 2 && !agentRunning && !agentResult) {
+        startBackgroundAgent();
+    }
 }
 
 // --- Macro list with checkboxes, tooltips, reorder ---
+let macrosNotApplicable = {};  // {macro: site_id} — doesn't apply to this site
+let macrosSkipped = {};        // {macro: true} — not needed for this task
+let qaAnswers = {};            // {macro: answer} — inline answers for QA macros
+
+const QA_VERBS = new Set(['extract','compute','count','compare','verify','calculate','rank','list']);
+function isQAMacro(macro) { return QA_VERBS.has(macro.split('_')[0]); }
+
 function renderMacroList() {
     const container = document.getElementById('macro-list');
     if (!container) return;
     container.innerHTML = selectedMacros.map((m, i) => {
         const desc = macroDescriptions[m] || {};
-        return `<div class="macro-item" data-macro="${m}">
-            <input type="checkbox" checked onchange="toggleMacroCheck('${m}', this.checked)">
-            <span class="macro-name">${m}</span>
-            <span class="macro-verb">${desc.verb || ''}</span>
-            <div class="reorder-btns">
-                <button onclick="moveMacro(${i}, -1)" title="Move up"${i === 0 ? ' disabled' : ''}>&uarr;</button>
-                <button onclick="moveMacro(${i}, 1)" title="Move down"${i === selectedMacros.length - 1 ? ' disabled' : ''}>&darr;</button>
-            </div>
-            <div class="macro-tooltip">
-                <div class="tt-desc">${desc.description || 'No description'}</div>
-                <div class="tt-example">${desc.example || ''}</div>
-            </div>
-        </div>`;
+        const isNA = m in macrosNotApplicable;
+        const isSkip = m in macrosSkipped;
+        const excluded = isNA || isSkip;
+        const isQA = isQAMacro(m);
+        const statusLabel = isNA ? "N/A for site" : isSkip ? "skipped" : "";
+        const savedAnswer = qaAnswers[m] || '';
+
+        const macroDesc = (macroDescriptions[m] || {}).description || m;
+        let row = `<div class="macro-item" data-macro="${m}" data-idx="${i}" draggable="true"
+                style="${excluded ? 'opacity:.3;' : ''}${isNA ? 'text-decoration:line-through;' : ''}flex-wrap:wrap">
+            <span class="drag-handle">&#x2630;</span>
+            <input type="checkbox" ${excluded ? '' : 'checked'} onchange="toggleMacroCheck('${m}', this.checked)" ${excluded ? 'disabled' : ''}>
+            <span class="macro-name" style="font-size:.75rem">${macroDesc}</span>`;
+
+        if (isQA && !excluded) {
+            row += `<span style="font-size:.6rem;color:#2563eb;background:#eff6ff;padding:.1rem .3rem;border-radius:.2rem;margin-left:.2rem">QA</span>`;
+        }
+        if (statusLabel) {
+            row += `<span style="font-size:.6rem;color:#94a3b8;margin-left:.2rem">${statusLabel}</span>`;
+        }
+
+        row += `<div style="display:flex;gap:.15rem;margin-left:auto">
+                <button onclick="event.stopPropagation();toggleSkip('${m}')" title="Don't need this macro for this task"
+                    style="background:${isSkip ? '#fef3c7' : 'none'};border:1px solid ${isSkip ? '#fcd34d' : '#e2e8f0'};border-radius:.2rem;font-size:.55rem;padding:.1rem .25rem;cursor:pointer;color:${isSkip ? '#92400e' : '#94a3b8'}">
+                    ${isSkip ? 'skip \u2713' : 'skip'}
+                </button>
+                <button onclick="event.stopPropagation();toggleNA('${m}')" title="This macro doesn't apply to any of the sampled sites"
+                    style="background:${isNA ? '#fecaca' : 'none'};border:1px solid ${isNA ? '#f87171' : '#e2e8f0'};border-radius:.2rem;font-size:.55rem;padding:.1rem .25rem;cursor:pointer;color:${isNA ? '#dc2626' : '#94a3b8'}">
+                    ${isNA ? 'N/A \u2713' : 'N/A'}
+                </button>
+            </div>`;
+
+        // QA macros get an inline answer field — no trajectory tagging needed
+        if (isQA && !excluded) {
+            row += `<div style="width:100%;margin-top:.2rem;padding-left:1.4rem">
+                <input type="text" placeholder="Answer for this macro" value="${escHtml(savedAnswer)}"
+                       oninput="qaAnswers['${m}']=this.value"
+                       onclick="event.stopPropagation()"
+                       style="width:100%;font-size:.75rem;padding:.25rem .4rem;border:1px solid #93c5fd;border-radius:.25rem;background:#eff6ff">
+            </div>`;
+        }
+
+        // Inline UI locations — always visible
+        if (!excluded) {
+            const locs = _getLocationsForMacro(m);
+            if (locs.length) {
+                row += '<ul class="macro-locs">';
+                for (const {site, loc} of locs) {
+                    const siteLabel = currentPrompt.sites.length > 1 ? `<b>${site}</b>: ` : '';
+                    row += `<li>${siteLabel}${loc}</li>`;
+                }
+                row += '</ul>';
+            }
+        }
+
+        row += '</div>';
+        return row;
     }).join('');
     updateChainDisplay();
+    _initMacroDrag();
+}
+
+// Drag-and-drop reordering for macro items
+let _dragIdx = null;
+function _initMacroDrag() {
+    const container = document.getElementById('macro-list');
+    if (!container) return;
+    container.querySelectorAll('.macro-item[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            _dragIdx = parseInt(el.dataset.idx);
+            el.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+            container.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+            _dragIdx = null;
+        });
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            container.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+            el.classList.add('drag-over');
+        });
+        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            el.classList.remove('drag-over');
+            const dropIdx = parseInt(el.dataset.idx);
+            if (_dragIdx !== null && _dragIdx !== dropIdx) {
+                const moved = selectedMacros.splice(_dragIdx, 1)[0];
+                selectedMacros.splice(dropIdx, 0, moved);
+                renderMacroList();
+            }
+        });
+    });
+}
+
+function toggleSkip(name) {
+    if (name in macrosSkipped) {
+        delete macrosSkipped[name];
+    } else {
+        macrosSkipped[name] = true;
+        delete macrosNotApplicable[name];  // can't be both
+    }
+    renderMacroList();
+}
+
+function toggleNA(name) {
+    if (name in macrosNotApplicable) {
+        delete macrosNotApplicable[name];
+    } else {
+        // Find which site this macro was sampled from
+        const sites = currentPrompt ? currentPrompt.sites.map(s => s.id) : [];
+        macrosNotApplicable[name] = sites.join(',');
+        delete macrosSkipped[name];  // can't be both
+    }
+    renderMacroList();
 }
 
 function toggleMacroCheck(name, checked) {
     if (!checked) {
-        // Uncheck: visually disable but keep in list for reorder context
         const item = document.querySelector(`.macro-item[data-macro="${name}"]`);
         if (item) {
             item.style.opacity = '0.4';
@@ -432,15 +910,6 @@ function getEnabledMacros() {
     return enabled;
 }
 
-function moveMacro(idx, direction) {
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= selectedMacros.length) return;
-    const temp = selectedMacros[idx];
-    selectedMacros[idx] = selectedMacros[newIdx];
-    selectedMacros[newIdx] = temp;
-    renderMacroList();
-}
-
 function updateChainDisplay() {
     const display = document.getElementById('chain-display');
     if (!display) return;
@@ -453,7 +922,8 @@ function updateChainDisplay() {
 // --- Reshuffle ---
 function reshufflePrompt() {
     document.getElementById('status').textContent = 'Loading new prompt...';
-    fetch('/annotate/api/prompt')
+    const singleSite = document.getElementById('single-site-toggle')?.checked ? '1' : '';
+    fetch('/annotate/api/prompt' + (singleSite ? '?single=1' : ''))
         .then(r => r.json())
         .then(prompt => {
             if (!prompt || !prompt.sites || !prompt.macros) {
@@ -462,35 +932,42 @@ function reshufflePrompt() {
             }
             currentPrompt = prompt;
             selectedMacros = prompt.macros.slice();
+            macrosNotApplicable = {};
+            macrosSkipped = {};
+            qaAnswers = {};
             activeSiteIdx = 0;
+            // Clear stale data from previous task
+            trajectory = [];
+            actionCounter = 0;
+            macroSpans = {};
+            cachedApiCalls = null;
+            cachedRequestLog = null;
+            agentResult = null;
+            agentRunning = false;
+            rewindPoint = null;
+            droppedChecks = {};
+            document.getElementById('agent-results').innerHTML = '';
+            const badge = document.getElementById('agent-status-badge');
+            if (badge) { badge.style.display = 'none'; badge.textContent = ''; }
+            // Clear server-side request log
+            fetch('/_admin/log/clear', {method: 'POST'}).catch(() => {});
 
-            // Update topbar pills
-            const topbar = document.querySelector('.topbar');
-            topbar.querySelectorAll('.site-pill').forEach(p => p.remove());
-            const nameInput = document.getElementById('annotator-name');
-            const colors = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
-            const textColors = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
-            prompt.sites.forEach((s, i) => {
-                const pill = document.createElement('span');
-                pill.className = 'site-pill active';
-                pill.style.background = colors[i % 5];
-                pill.style.color = textColors[i % 5];
-                pill.textContent = s.name;
-                pill.onclick = () => switchToSite(s.id, pill);
-                topbar.insertBefore(pill, nameInput);
-            });
-
-            // Update iframe
+            // Reload portal iframe with new site tabs
             if (prompt.sites.length > 0) {
-                document.getElementById('site-iframe').src = '/sites/' + prompt.sites[0].id + '/';
+                const siteIds = prompt.sites.map(s => s.id).join(',');
+                document.getElementById('site-iframe').src = '/?open=' + siteIds;
                 loadApiRef(prompt.sites[0].id);
             }
 
-            renderSiteTabs();
+            renderSiteLabels();
             renderMacroList();
             updateChainDisplay();
+            renderTagPalette();
             document.getElementById('instruction').value = '';
             document.getElementById('status').textContent = 'New prompt loaded';
+            // Re-login if toggle is checked
+            const toggle = document.getElementById('auto-login-toggle');
+            if (toggle && toggle.checked) { autoLoginSites(); }
         })
         .catch(e => {
             document.getElementById('status').textContent = 'Error: ' + e.message;
@@ -510,7 +987,7 @@ async function confirmSkip() {
     const reason = document.getElementById('skip-reason').value;
     const details = document.getElementById('skip-details').value.trim();
     if (!details) { alert('Please provide details'); return; }
-    const annotator = document.getElementById('annotator-name').value || 'anonymous';
+    const annotator = getAnnotatorName() || 'anonymous';
     const sites = currentPrompt ? currentPrompt.sites.map(s => s.id) : [];
     const macros = getEnabledMacros();
     try {
@@ -626,31 +1103,95 @@ function copyRoute(path) {
     }).catch(() => {});
 }
 
-// --- Recording ---
+// --- Recording via postMessage from recorder.js ---
+let actionCounter = 0;
+
+// Action type display config
+const ACTION_ICONS = {
+    click: '\u{1F5B1}', type: '\u2328', select: '\u25BC', check: '\u2611',
+    scroll: '\u2195', keypress: '\u23CE', navigate: '\u{1F310}',
+    drag: '\u2922', hover: '\u{1F441}',
+    tab_switch: '\u{1F4D1}', change: '\u{1F504}',
+    submit: '\u{1F4E8}',
+};
+
+// Poll /_admin/log to inject server-side requests into trajectory
+var logPollTimer = null;
+var lastLogCount = 0;
+
+function pollServerLog() {
+    if (!recording) return;
+    fetch('/_admin/log?last=20').then(r => r.json()).then(d => {
+        const entries = d.entries || [];
+        if (entries.length <= lastLogCount) return;
+        // Only process new entries
+        const newEntries = entries.slice(lastLogCount);
+        lastLogCount = entries.length;
+        for (const e of newEntries) {
+            if (!e.path || !e.path.startsWith('/sites/')) continue;
+            // Skip static assets
+            if (/\.(css|js|png|jpg|ico|svg|woff|ttf)(\?|$)/.test(e.path)) continue;
+            // Check if this request is already in trajectory (from fetch interceptor)
+            const shortUrl = e.path.replace('/sites/', '');
+            const isDupe = trajectory.some(t =>
+                t.type === 'network' && t.url && t.url.includes(shortUrl) &&
+                Math.abs(new Date(t.timestamp) - new Date(e.timestamp)) < 2000
+            );
+            if (isDupe) continue;
+            trajectory.push({
+                type: 'network',
+                method: e.method || 'GET',
+                url: e.path + (e.query && Object.keys(e.query).length ? '?' + Object.entries(e.query).map(([k,v])=>k+'='+v).join('&') : ''),
+                status: e.status || 0,
+                requestBody: e.body || null,
+                responseBody: e.response || e.response_preview || null,
+                duration: e.duration_ms || 0,
+                timestamp: e.timestamp || new Date().toISOString(),
+                source: 'server',  // distinguish from fetch interceptor
+            });
+        }
+        if (newEntries.length) renderTrajectory();
+    }).catch(() => {});
+}
+
 function startRecording() {
     trajectory = [];
-    renderTrajectory();
+    actionCounter = 0;
+    macroSpans = {};
+    selectedActionIdx = null;
+    cachedApiCalls = null;
+    cachedRequestLog = null;
+    rewindPoint = null;
+    rangeMode = false;
+    lastLogCount = 0;
+    // Clear server-side logs
+    fetch('/_admin/log/clear', {method: 'POST'}).catch(() => {});
+    rangeStart = null;
+    rangeEnd = null;
+    renderTimeline();
+    renderMacroSpanSummary();
     recording = true;
     lastUrl = '';
+    // Start polling server log
+    if (logPollTimer) clearInterval(logPollTimer);
+    logPollTimer = setInterval(pollServerLog, 1500);
+    // Show instruction banner
+    updateInstructionBanner();
     goStep(2);
     updateRecUI();
-    recordInterval = setInterval(pollIframe, 500);
-    pollIframe();
+    document.getElementById('action-sidebar').classList.add('visible');
 }
 
 function toggleRecording() {
     recording = !recording;
-    if (recording) {
-        recordInterval = setInterval(pollIframe, 500);
-    } else {
-        clearInterval(recordInterval);
-    }
     updateRecUI();
 }
 
 function stopAndNext() {
     recording = false;
-    clearInterval(recordInterval);
+    if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+    // Final poll to catch any last requests
+    pollServerLog();
     updateRecUI();
     goStep(3);
 }
@@ -671,100 +1212,388 @@ function updateRecUI() {
     }
 }
 
-function pollIframe() {
+// Listen for postMessage from recorder.js injected in site pages
+window.addEventListener('message', function(e) {
     if (!recording) return;
-    try {
-        const iframe = document.getElementById('site-iframe');
-        const win = iframe.contentWindow;
-        const doc = win.document;
-        const url = win.location.pathname + win.location.search;
+    var d = e.data;
+    if (!d || !d.mw) return;
 
-        if (url !== lastUrl) {
-            const ts = new Date().toISOString();
-            const title = doc.title || '';
+    if (d.mw === 'action') {
+        actionCounter++;
+        trajectory.push({
+            type: 'action',
+            action: d.action,
+            target: d.target || '',
+            selector: d.selector || '',
+            timestamp: d.timestamp || new Date().toISOString(),
+            x: d.x, y: d.y, button: d.button,
+            text: d.text,
+            value: d.value, option_text: d.option_text,
+            checked: d.checked,
+            key: d.key,
+            dx: d.dx, dy: d.dy, scroll_top: d.scroll_top,
+            from_x: d.from_x, from_y: d.from_y, to_x: d.to_x, to_y: d.to_y,
+            url: d.url, from_url: d.from_url,
+            method: d.method, formData: d.formData,
+        });
+        renderTrajectory();
+    } else if (d.mw === 'network') {
+        // Attach network request to the most recent action
+        trajectory.push({
+            type: 'network',
+            method: d.method || 'GET',
+            url: d.url || '',
+            status: d.status || 0,
+            requestBody: d.requestBody || null,
+            responseBody: d.responseBody || null,
+            responseSize: d.responseSize || 0,
+            duration: d.duration || 0,
+            error: d.error || '',
+            timestamp: d.timestamp || new Date().toISOString(),
+        });
+        renderTrajectory();
+    } else if (d.mw === 'observation') {
+        trajectory.push({
+            type: 'observation',
+            url: d.url || '',
+            title: d.title || '',
+            timestamp: d.timestamp || new Date().toISOString(),
+        });
+        renderTrajectory();
+    }
+});
 
-            let rawHtml = '';
-            try { rawHtml = doc.documentElement.outerHTML.substring(0, 5000); } catch(e) {}
-
-            let axTree = '';
-            try {
-                const parts = [];
-                const headings = [...doc.querySelectorAll('h1,h2,h3,h4')].map(h =>
-                    `[${h.tagName}] ${h.textContent.trim()}`).filter(Boolean).slice(0, 10);
-                if (headings.length) parts.push('HEADINGS:\n  ' + headings.join('\n  '));
-                const inputs = [...doc.querySelectorAll('input,textarea,select')].map(el => {
-                    const label = el.labels?.[0]?.textContent?.trim() || el.placeholder || el.name || el.id || '';
-                    return `[${el.tagName}:${el.type||'text'}] ${label}${el.value ? ' = "'+el.value.substring(0,30)+'"' : ''}`;
-                }).slice(0, 15);
-                if (inputs.length) parts.push('INPUTS:\n  ' + inputs.join('\n  '));
-                const buttons = [...doc.querySelectorAll('button,input[type=submit],[role=button],.btn')].map(b =>
-                    `[button] ${b.textContent.trim().substring(0, 40)}`).filter(s => s.length > 10).slice(0, 10);
-                if (buttons.length) parts.push('BUTTONS:\n  ' + buttons.join('\n  '));
-                const links = [...doc.querySelectorAll('a[href]')].map(a => {
-                    const text = a.textContent.trim().substring(0, 40);
-                    const href = a.getAttribute('href') || '';
-                    return text.length > 1 ? `[link] ${text} -> ${href}` : null;
-                }).filter(Boolean).slice(0, 15);
-                if (links.length) parts.push('LINKS:\n  ' + links.join('\n  '));
-                const tables = [...doc.querySelectorAll('table')];
-                if (tables.length) {
-                    const t = tables[0];
-                    const rows = t.querySelectorAll('tr').length;
-                    const cols = t.querySelector('tr')?.querySelectorAll('th,td').length || 0;
-                    parts.push(`TABLES: ${tables.length} table(s), first is ${rows}x${cols}`);
-                }
-                const bodyText = doc.body?.innerText?.substring(0, 300).replace(/\s+/g, ' ').trim() || '';
-                if (bodyText) parts.push('TEXT: ' + bodyText);
-                axTree = parts.join('\n\n');
-            } catch(e) {}
-
-            let screenshot = '[screenshot:pending]';
-
-            trajectory.push({ type: 'action', url: url, timestamp: ts });
-            trajectory.push({ type: 'observation', title: title, url: url, raw_html: rawHtml, ax_tree: axTree, screenshot: screenshot, timestamp: ts });
-
-            lastUrl = url;
-            renderTrajectory();
-        }
-    } catch(e) {}
+// ── Macro tag colors ──
+const TAG_COLORS = [
+    {bg:'#dbeafe',fg:'#1e40af',border:'#93c5fd'}, {bg:'#fce7f3',fg:'#9d174d',border:'#f9a8d4'},
+    {bg:'#d1fae5',fg:'#065f46',border:'#6ee7b7'}, {bg:'#fef3c7',fg:'#92400e',border:'#fcd34d'},
+    {bg:'#e0e7ff',fg:'#3730a3',border:'#a5b4fc'}, {bg:'#fecdd3',fg:'#9f1239',border:'#fda4af'},
+    {bg:'#ccfbf1',fg:'#134e4a',border:'#5eead4'}, {bg:'#fde68a',fg:'#78350f',border:'#fbbf24'},
+];
+function getMacroColor(m) {
+    const macros = getEnabledMacros();
+    const idx = macros.indexOf(m);
+    return TAG_COLORS[(idx >= 0 ? idx : m.length) % TAG_COLORS.length];
+}
+function getActionMacros(actIdx) {
+    const tags = [];
+    for (const [macro, range] of Object.entries(macroSpans)) {
+        if (actIdx >= range[0] && actIdx <= range[1]) tags.push(macro);
+    }
+    return tags;
 }
 
-function renderTrajectory() {
-    const list = document.getElementById('trajectory-list');
+// ── Range selection for macro tagging ──
+let rangeMode = false;  // are we selecting a range?
+let rangeStart = null;
+let rangeEnd = null;
+
+function startRangeSelect() {
+    rangeMode = true;
+    rangeStart = null;
+    rangeEnd = null;
+    selectedActionIdx = null;
+    document.getElementById('range-controls').style.display = 'block';
+    document.getElementById('range-hint').textContent = 'Click the first action in the range';
+    document.getElementById('range-btn').textContent = 'Cancel';
+    document.getElementById('range-btn').onclick = cancelRangeSelect;
+    renderTimeline();
+    renderRangeMacroChips();
+}
+
+function cancelRangeSelect() {
+    rangeMode = false;
+    rangeStart = null;
+    rangeEnd = null;
+    document.getElementById('range-controls').style.display = 'none';
+    document.getElementById('range-btn').textContent = 'Tag Range';
+    document.getElementById('range-btn').onclick = startRangeSelect;
+    renderTimeline();
+}
+
+function handleTimelineClick(actIdx) {
+    if (!rangeMode) {
+        // Simple click — toggle selection for viewing observation
+        selectedActionIdx = (selectedActionIdx === actIdx) ? null : actIdx;
+        renderTimeline();
+        return;
+    }
+    // Range selection mode
+    if (rangeStart === null) {
+        rangeStart = actIdx;
+        document.getElementById('range-hint').textContent = 'Now click the last action (action ' + actIdx + ' to ...)';
+        renderTimeline();
+    } else if (rangeEnd === null) {
+        rangeEnd = Math.max(rangeStart, actIdx);
+        rangeStart = Math.min(rangeStart, actIdx);
+        document.getElementById('range-hint').textContent = 'Actions ' + rangeStart + '-' + rangeEnd + ' selected. Pick a macro below:';
+        renderTimeline();
+        renderRangeMacroChips();
+    }
+}
+
+function assignRangeToMacro(macroName) {
+    if (rangeStart === null || rangeEnd === null) return;
+    macroSpans[macroName] = [rangeStart, rangeEnd];
+    cancelRangeSelect();
+    renderTimeline();
+    renderMacroSpanSummary();
+}
+
+function removeSpan(macroName) {
+    delete macroSpans[macroName];
+    renderTimeline();
+    renderMacroSpanSummary();
+}
+
+function clearAllTags() {
+    macroSpans = {};
+    renderTimeline();
+    renderMacroSpanSummary();
+}
+
+function renderRangeMacroChips() {
+    const container = document.getElementById('range-macro-chips');
+    if (!container) return;
+    const macros = getEnabledMacros();
+    const hasRange = rangeStart !== null && rangeEnd !== null;
+    container.innerHTML = macros.map(m => {
+        const c = getMacroColor(m);
+        const alreadyUsed = m in macroSpans;
+        const chipLabel = (macroDescriptions[m]||{}).description || m;
+        return `<span class="macro-chip" style="background:${c.bg};color:${c.fg};opacity:${hasRange ? 1 : 0.4};${alreadyUsed ? 'text-decoration:line-through;' : ''}"
+            onclick="${hasRange ? "assignRangeToMacro('" + m + "')" : ''}"
+            title="${alreadyUsed ? 'Will replace existing span' : m}">${chipLabel}</span>`;
+    }).join('');
+}
+
+// ── Action timeline (sidebar) ──
+
+function actionDescription(t) {
+    // Returns {verb, target, detail} for human-readable display
+    const verb = t.action || 'action';
+    let target = t.target || '';
+    let detail = '';
+    if (t.action === 'click') { /* target is enough */ }
+    else if (t.action === 'type' && t.text) { detail = '"' + (t.text.length > 25 ? t.text.slice(0,22)+'...' : t.text) + '"'; }
+    else if (t.action === 'select' && t.option_text) { detail = '"' + t.option_text + '"'; }
+    else if (t.action === 'check') { detail = t.checked ? 'checked' : 'unchecked'; }
+    else if (t.action === 'keypress' && t.key) { detail = t.key; target = ''; }
+    else if (t.action === 'navigate' && t.url) { target = t.url; }
+    else if (t.action === 'scroll') { detail = 'scrollTop ' + (t.scroll_top || 0); target = ''; }
+    else if (t.action === 'drag') { detail = Math.round(t.from_x)+','+Math.round(t.from_y)+' \u2192 '+Math.round(t.to_x)+','+Math.round(t.to_y); }
+    else if (t.action === 'tab_switch') { target = t.to_tab || ''; detail = t.from_tab ? 'from ' + t.from_tab : ''; }
+    else if (t.action === 'focus') { detail = t.value ? 'value: "' + t.value.slice(0,20) + '"' : ''; }
+    else if (t.action === 'change') { detail = t.value || ''; }
+    else if (t.action === 'submit') { detail = (t.method || 'POST') + ' ' + (t.url || '').replace(/^.*\/sites\//, '').slice(0,30); }
+    // Shorten target
+    if (target.length > 35) target = target.slice(0, 32) + '...';
+    return {verb, target, detail};
+}
+
+function renderTimeline() {
+    const timeline = document.getElementById('action-timeline');
+    if (!timeline) return;
     let html = '';
-    let stepNum = 0;
+    let actNum = 0;
+    let netCount = 0;
+
     for (let i = 0; i < trajectory.length; i++) {
         const t = trajectory[i];
-        if (t.type === 'action') {
-            stepNum++;
-            const obs = (i + 1 < trajectory.length && trajectory[i+1].type === 'observation') ? trajectory[i+1] : null;
-            const obsId = 'obs-' + stepNum;
-            html += `<div class="traj-entry">
-                <div class="traj-action">
-                    <span class="badge">ACT ${stepNum}</span>
-                    <span class="url">${t.url}</span>
-                    <span class="ts">${t.timestamp.split('T')[1]?.slice(0,8) || ''}</span>
-                </div>`;
-            if (obs) {
-                html += `<div class="traj-obs">
-                    <div style="display:flex;gap:.2rem;margin-bottom:.2rem">
-                        <span class="obs-label" style="margin-right:.3rem">OBS</span>
-                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','ax')" style="padding:.1rem .3rem;font-size:.62rem">AX Tree</button>
-                        <button class="btn btn-sm btn-secondary" onclick="showObsTab('${obsId}','html')" style="padding:.1rem .3rem;font-size:.62rem">HTML</button>
-                        <b style="margin-left:.3rem;font-size:.72rem;color:#0f172a">${obs.title}</b>
-                    </div>
-                    <div id="${obsId}-ax" style="font-size:.68rem;color:#475569;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml(obs.ax_tree || '(empty)')}</div>
-                    <div id="${obsId}-html" style="display:none;font-size:.65rem;color:#64748b;white-space:pre-wrap;max-height:120px;overflow-y:auto;font-family:monospace">${escHtml((obs.raw_html || '').substring(0, 2000))}</div>
-                </div>`;
-                i++;
+
+        if (t.type === 'network') {
+            netCount++;
+            // Skip static assets and recorder noise
+            if (t.url && /\.(css|js|png|jpg|ico|svg|woff|ttf)(\?|$)/.test(t.url)) continue;
+            if (t.url && (t.url.includes('/_admin') || t.url.includes('/annotate'))) continue;
+
+            const methodCls = (t.method || 'get').toLowerCase();
+            const statusCls = t.status >= 200 && t.status < 400 ? 'ok' : 'err';
+            const shortUrl = (t.url || '').replace(/^https?:\/\/[^/]+/, '').replace('/sites/', '');
+            const bodyPreview = t.responseBody
+                ? (typeof t.responseBody === 'object' ? JSON.stringify(t.responseBody).slice(0, 80) : String(t.responseBody).slice(0, 80))
+                : '';
+
+            // Extract error message from response
+            const isErr = t.status >= 400 || t.status === 0;
+            let errorMsg = '';
+            if (isErr && t.responseBody) {
+                const rb = t.responseBody;
+                if (typeof rb === 'object') {
+                    errorMsg = rb.error || rb.message || rb.detail || rb.reason || '';
+                } else if (typeof rb === 'string') {
+                    // Try to find error text in HTML responses
+                    const m = rb.match(/(?:error|alert|warning|denied|unauthorized|forbidden)[^<]*?[>:]([^<]{5,80})/i);
+                    if (m) errorMsg = m[1].trim();
+                    else if (rb.length < 100) errorMsg = rb;
+                }
             }
-            html += '</div>';
+            // Also check for redirect to login (302 to /login)
+            if (t.status === 302 && t.responseBody && typeof t.responseBody === 'string' && /login/i.test(t.responseBody)) {
+                errorMsg = errorMsg || 'Redirected to login — not authenticated';
+            }
+
+            html += `<div class="net-entry${isErr ? ' net-err' : ''}">
+                <span class="net-method ${methodCls}">${t.method || 'GET'}</span>
+                <span>${escHtml(shortUrl.slice(0, 50))}</span>
+                <span class="net-status ${statusCls}">${t.status || '?'}</span>
+                <span class="net-dur">${t.duration || 0}ms</span>
+                ${errorMsg ? '<span class="net-error-msg">\u26A0 ' + escHtml(errorMsg) + '</span>' : ''}
+                ${bodyPreview && !errorMsg ? '<div class="net-body" onclick="this.classList.toggle(\'expanded\')">' + escHtml(bodyPreview) + '</div>' : ''}
+            </div>`;
+            continue;
+        }
+
+        if (t.type === 'observation') continue;
+        if (t.type !== 'action') continue;
+
+        actNum++;
+        const actIdx = actNum;
+        const icon = ACTION_ICONS[t.action] || '\u25CB';
+        const {verb, target, detail} = actionDescription(t);
+        const tags = getActionMacros(actIdx);
+        const isSelected = selectedActionIdx === actIdx;
+        const inRange = rangeMode && rangeStart !== null && (
+            (rangeEnd !== null && actIdx >= rangeStart && actIdx <= rangeEnd) ||
+            (rangeEnd === null && actIdx === rangeStart)
+        );
+        const isRewound = rewindPoint !== null && actIdx > rewindPoint;
+
+        let tagHtml = '';
+        if (tags.length) {
+            tagHtml = '<div class="act-tags">' + tags.map(m => {
+                const c = getMacroColor(m);
+                const tagLabel = (macroDescriptions[m]||{}).description || m;
+                return `<span class="macro-tag" style="background:${c.bg};color:${c.fg};border:1px solid ${c.border}" title="${m}">${tagLabel}</span>`;
+            }).join('') + '</div>';
+        }
+
+        html += `<div class="act-entry${isSelected ? ' selected' : ''}${inRange ? ' in-range' : ''}${isRewound ? ' rewound' : ''}" onclick="handleTimelineClick(${actIdx})">
+            <span class="act-num">${actIdx}</span>
+            <span class="act-icon">${icon}</span>
+            <span class="act-verb">${verb}</span>
+            <span class="act-target">${escHtml(target)}</span>
+            ${detail ? '<div class="act-detail">' + escHtml(detail) + '</div>' : ''}
+            ${tagHtml}
+            <button class="rewind-btn" onclick="event.stopPropagation(); rewindTo(${actIdx})" title="Rewind to this step">&#x23EA; rewind here</button>
+        </div>`;
+    }
+
+    if (rewindPoint !== null) {
+        html += `<div style="text-align:center;padding:.4rem;font-size:.7rem;color:#2563eb;background:#eff6ff;border-radius:.3rem;margin:.3rem 0">
+            Rewound to step ${rewindPoint} — recording new actions from here
+            <button onclick="cancelRewind()" style="margin-left:.5rem;font-size:.65rem;padding:.1rem .3rem;border:1px solid #93c5fd;border-radius:.2rem;background:#fff;cursor:pointer">Cancel rewind</button>
+        </div>`;
+    }
+
+    timeline.innerHTML = html;
+    document.getElementById('action-count').textContent = actNum + (netCount ? ' + ' + netCount + ' requests' : '');
+    const countEl = document.getElementById('rec-count');
+    if (countEl) countEl.textContent = actNum + ' actions, ' + netCount + ' requests';
+    if (rewindPoint === null) timeline.scrollTop = timeline.scrollHeight;
+}
+
+function rewindTo(actIdx) {
+    // Find the observation (HTML snapshot) right before this action
+    let snapshot = null;
+    let targetUrl = '';
+    let actCount = 0;
+    for (let i = 0; i < trajectory.length; i++) {
+        const t = trajectory[i];
+        if (t.type === 'observation') {
+            if (t.raw_html) snapshot = t.raw_html;
+            if (t.url) targetUrl = t.url;
+        }
+        if (t.type === 'action') {
+            actCount++;
+            if (actCount === actIdx) break;
         }
     }
-    list.innerHTML = html;
-    document.getElementById('rec-count').textContent = stepNum + ' pages';
-    list.scrollTop = list.scrollHeight;
+
+    // Truncate trajectory: keep everything up to and including this action
+    let keepCount = 0;
+    let cutIdx = trajectory.length;
+    for (let i = 0; i < trajectory.length; i++) {
+        if (trajectory[i].type === 'action') {
+            keepCount++;
+            if (keepCount > actIdx) {
+                cutIdx = i;
+                break;
+            }
+        }
+    }
+    while (cutIdx < trajectory.length && trajectory[cutIdx].type === 'observation') cutIdx++;
+    trajectory.splice(cutIdx);
+
+    rewindPoint = actIdx;
+
+    // Restore the page state
+    const iframe = document.getElementById('site-iframe');
+    if (iframe) {
+        if (snapshot) {
+            // Restore HTML snapshot into the portal's inner content frame
+            try {
+                const innerFrame = iframe.contentDocument.getElementById('site-content');
+                if (innerFrame && innerFrame.contentDocument) {
+                    innerFrame.contentDocument.open();
+                    innerFrame.contentDocument.write(snapshot);
+                    innerFrame.contentDocument.close();
+                }
+            } catch(e) {
+                // Cross-origin fallback: navigate to the URL instead
+                if (targetUrl) {
+                    iframe.contentWindow.postMessage({type: 'navigate', url: targetUrl}, '*');
+                }
+            }
+        } else if (targetUrl) {
+            iframe.contentWindow.postMessage({type: 'navigate', url: targetUrl}, '*');
+        }
+    }
+
+    // Start recording automatically so new actions append
+    if (!recording) {
+        toggleRecording();
+    }
+
+    renderTimeline();
+    renderRangeMacroChips();
 }
+
+function cancelRewind() {
+    rewindPoint = null;
+    renderTimeline();
+}
+
+function renderMacroSpanSummary() {
+    const el = document.getElementById('macro-span-summary');
+    if (!el) return;
+    const macros = getEnabledMacros();
+    if (Object.keys(macroSpans).length === 0) {
+        el.innerHTML = '<div style="font-size:.75rem;color:#94a3b8;margin-bottom:.3rem">No macros tagged yet. Use "Tag Range" in the action sidebar.</div>';
+        return;
+    }
+    let html = '<label style="margin-top:0">Macro Spans</label>';
+    for (const m of macros) {
+        if (!(m in macroSpans)) continue;
+        const c = getMacroColor(m);
+        const [s, e] = macroSpans[m];
+        html += `<div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.2rem;padding:.2rem .4rem;background:${c.bg};border:1px solid ${c.border};border-radius:.3rem;font-size:.78rem;">
+            <span style="color:${c.fg};font-weight:600;flex:1">${m}</span>
+            <span style="color:${c.fg};font-size:.72rem">actions ${s}\u2013${e}</span>
+            <button onclick="removeSpan('${m}')" style="background:none;border:none;color:${c.fg};cursor:pointer;font-size:.85rem;opacity:.6" title="Remove">\u00d7</button>
+        </div>`;
+    }
+    // Show untagged macros
+    const untagged = macros.filter(m => !(m in macroSpans));
+    if (untagged.length) {
+        html += `<div style="font-size:.7rem;color:#94a3b8;margin-top:.3rem">Untagged: ${untagged.join(', ')}</div>`;
+    }
+    el.innerHTML = html;
+}
+
+// Legacy compatibility
+function renderTrajectory() { renderTimeline(); renderMacroSpanSummary(); }
+function renderTagPalette() { renderRangeMacroChips(); }
 
 function showObsTab(obsId, tab) {
     ['ax','html'].forEach(t => {
@@ -774,270 +1603,803 @@ function showObsTab(obsId, tab) {
 }
 
 function escHtml(s) {
+    if (s === null || s === undefined) return '';
+    if (typeof s !== 'string') s = String(s);
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// --- Verifiers ---
-function goToVerifiers() {
-    populateVerifiers();
-    goStep(4);
-}
+// --- Verifiers (human-assembled) ---
+let verifierConfigs = [];
+let siteCollections = {};  // cache: {siteId: [collection_names]}
 
-function populateVerifiers() {
-    const answer = document.getElementById('final-answer').value;
-    const answerType = document.getElementById('answer-type').value;
-    const alts = document.getElementById('alternatives').value.split('\n').map(s => s.trim()).filter(Boolean);
-    const urls = [...new Set(trajectory.filter(t => t.type === 'action' && t.url).map(t => t.url))];
-    const siteId = currentPrompt && currentPrompt.sites.length > 0 ? currentPrompt.sites[0].id : '';
+// ── Check primitives catalog (used by verifier view, kept for future use) ──
+const CHECK_CATALOG = [
+    {
+        id: 'answer_match', icon: '\u2705', name: 'Answer matches',
+        hint: 'The agent gave the correct answer',
+        fields: [
+            {key: 'expected', label: 'Answer', type: 'answer'},
+            {key: 'match_mode', label: 'Mode', type: 'select', options: ['exact','fuzzy','includes']},
+            {key: 'match_type', label: 'Type', type: 'select', options: ['string','number','boolean','date']},
+        ],
+    },
+    {
+        id: 'page_visited', icon: '\u{1F310}', name: 'Page was visited',
+        hint: 'The agent navigated to a specific page',
+        fields: [
+            {key: 'url', label: 'Page', type: 'trajectory_urls'},
+        ],
+    },
+    {
+        id: 'action_performed', icon: '\u{1F5B1}', name: 'Request was made',
+        hint: 'The server received a specific HTTP request (works with any agent)',
+        fields: [
+            {key: 'request', label: 'Request', type: 'request_log'},
+        ],
+    },
+    {
+        id: 'api_succeeded', icon: '\u{1F4E6}', name: 'API call succeeded',
+        hint: 'A specific API call was made and returned success',
+        fields: [
+            {key: 'api_call', label: 'Which call', type: 'trajectory_api_calls'},
+        ],
+    },
+    {
+        id: 'response_contains', icon: '\u{1F50D}', name: 'Response contains',
+        hint: 'An API response contains specific text',
+        fields: [
+            {key: 'api_call', label: 'Which call', type: 'trajectory_api_calls'},
+            {key: 'text', label: 'Contains', type: 'trajectory_texts'},
+        ],
+    },
+    {
+        id: 'count_equals', icon: '\u{1F522}', name: 'Result count equals',
+        hint: 'Number of results equals N',
+        fields: [
+            {key: 'api_call', label: 'Which call', type: 'trajectory_api_calls'},
+            {key: 'count', label: 'Count', type: 'number', placeholder: '5'},
+        ],
+    },
+    {
+        id: 'record_exists', icon: '\u2714\uFE0F', name: 'Record exists',
+        hint: 'A record with matching field value exists in a collection',
+        fields: [
+            {key: 'collection', label: 'Collection', type: 'schema_collections'},
+            {key: 'field', label: 'Field', type: 'schema_fields'},
+            {key: 'expected', label: 'Value', type: 'text', placeholder: 'expected value'},
+        ],
+    },
+    {
+        id: 'record_absent', icon: '\u274C', name: 'Record absent',
+        hint: 'No record with matching field value exists',
+        fields: [
+            {key: 'collection', label: 'Collection', type: 'schema_collections'},
+            {key: 'field', label: 'Field', type: 'schema_fields'},
+            {key: 'expected', label: 'Value', type: 'text', placeholder: 'value that should NOT exist'},
+        ],
+    },
+    {
+        id: 'field_equals', icon: '\u{1F3AF}', name: 'Field equals value',
+        hint: 'A specific field on a record equals an expected value',
+        fields: [
+            {key: 'collection', label: 'Collection', type: 'schema_collections'},
+            {key: 'record_id', label: 'Record ID', type: 'text', placeholder: '1'},
+            {key: 'field', label: 'Field', type: 'schema_fields'},
+            {key: 'expected', label: 'Expected', type: 'text', placeholder: 'expected value'},
+        ],
+    },
+];
 
-    const cl = document.getElementById('verifier-checklist');
-    cl.innerHTML = '';
-    selectedVerifiers = [];
-
-    // 1. Answer match (auto-checked)
-    if (answer) {
-        addVerifier({id: 'v_ans', checked: true,
-            label: `Answer matches: "${answer.length > 60 ? answer.slice(0,60)+'...' : answer}"`,
-            desc: `Type: ${answerType}`,
-            config: {evaluator: 'AgentResponseEvaluator', type: answerType, expected: answer, alternatives: alts}
-        });
+// Extract context from trajectory for dropdowns
+function getTrajectoryUrls() {
+    const urls = new Set();
+    for (const e of trajectory) {
+        if (e.type === 'action' && e.url && e.url.startsWith('/sites/'))
+            urls.add(e.url.split('?')[0]);
+        if (e.type === 'observation' && e.url && e.url.startsWith('/sites/'))
+            urls.add(e.url.split('?')[0]);
     }
+    return [...urls];
+}
 
-    // 2. Grounding (auto-checked)
-    if (urls.length > 0) {
-        addVerifier({id: 'v_ground', checked: true,
-            label: `Agent visited ${urls.length} page(s)`,
-            desc: urls.slice(0, 3).join(', ') + (urls.length > 3 ? ` +${urls.length-3} more` : ''),
-            config: {evaluator: 'GroundingEvaluator', required_urls: urls}
-        });
+function getTrajectoryActions() {
+    const actions = [];
+    for (const e of trajectory) {
+        if (e.type !== 'action') continue;
+        let label = e.action || '';
+        // value format: action|||target|||value (value = typed text or selected option)
+        const actionVal = e.option_text || e.text || e.value || '';
+        let val = e.action + '|||' + (e.target || '').slice(0, 50) + '|||' + (actionVal || '').slice(0, 80);
+        if (e.action === 'type' && e.text) label = 'type "' + e.text.slice(0, 25) + '"';
+        else if (e.action === 'select' && e.option_text) label = 'select "' + e.option_text + '"';
+        else if (e.action === 'tab_switch') label = 'switch to ' + (e.to_tab || '');
+        else if (e.target) label += ' ' + e.target.slice(0, 30);
+        const icon = ACTION_ICONS[e.action] || '';
+        actions.push({value: val, label: icon + ' ' + label});
     }
-
-    // 3. Fetch user state and interaction log
-    if (siteId) {
-        fetchUserState(siteId);
-        fetchInteractionLog();
-    }
+    return actions;
 }
 
-function addVerifier(opts) {
-    const div = document.createElement('div');
-    div.className = 'verifier-option' + (opts.checked ? ' selected' : '');
-    div.dataset.vid = opts.id;
-    const configStr = JSON.stringify(opts.config);
-    div.innerHTML = `
-        <input type="checkbox" ${opts.checked ? 'checked' : ''} onchange="toggleVerifier('${opts.id}', this.checked)">
-        <div class="v-info"><div class="v-label">${opts.label}</div><div class="v-desc">${opts.desc}</div></div>
-        <span class="indicator pending" id="ind-${opts.id}"></span>`;
-    div.dataset.config = configStr;
-    document.getElementById('verifier-checklist').appendChild(div);
-    if (opts.checked) selectedVerifiers.push({id: opts.id, config: opts.config});
-}
+let cachedApiCalls = null;
+let cachedRequestLog = null;
 
-function toggleVerifier(id, checked) {
-    const el = document.querySelector(`[data-vid="${id}"]`);
-    if (!el) return;
-    el.classList.toggle('selected', checked);
-    const config = JSON.parse(el.dataset.config);
-    // Read any editable expected value
-    const expInput = el.querySelector('[data-expected]');
-    if (expInput) config.expected = expInput.value;
-    selectedVerifiers = selectedVerifiers.filter(v => v.id !== id);
-    if (checked) selectedVerifiers.push({id, config});
-}
-
-function fetchUserState(siteId) {
-    // Get the actual logged-in user from the session
-    fetch('/_admin/session').then(r => r.json()).then(sess => {
-        const userId = sess.user_id || 1;
-        _fetchUserStateForId(siteId, userId);
-    }).catch(() => _fetchUserStateForId(siteId, 1));
-}
-
-function _fetchUserStateForId(siteId, userId) {
-    // Use /_admin/user which correctly aggregates across all ref fields
-    // (user_id, author_id, seller_id, etc.)
-    fetch(`/_admin/user/${siteId}/${userId}`)
-        .then(r => r.json())
-        .then(data => {
-            const container = document.getElementById('user-state-list');
-            let html = '';
-
-            // Profile fields (embedded data like cart, wishlist, saved_posts)
-            const profile = data.profile || {};
-            const interesting = Object.entries(profile).filter(([k,v]) =>
-                Array.isArray(v) || (typeof v === 'object' && v !== null)
-            );
-            if (interesting.length) {
-                html += '<div style="margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Profile data:</div>';
-                interesting.forEach(([key, val]) => {
-                    const vid = 'v_profile_' + key;
-                    const isArray = Array.isArray(val);
-                    const valStr = isArray
-                        ? (val.length ? JSON.stringify(val).slice(0,60) : '[]')
-                        : JSON.stringify(val).slice(0,60);
-                    const cmp = isArray ? 'contains' : 'equals';
-                    const placeholder = isArray ? 'expected item ID (e.g. 5)' : 'expected value after task';
-                    html += makeStateVerifier(vid,
-                        `${key}: <span style="color:#64748b;font-weight:400">${valStr}</span>`,
-                        {evaluator: 'BackendStateEvaluator', method: 'GET',
-                         endpoint: `/_admin/user/${siteId}/${userId}`,
-                         field: `profile.${key}`, comparison: cmp, expected: ''},
-                        placeholder
-                    );
-                });
-            }
-
-            // Collection counts — use the aggregated data from /_admin/user
-            const collections = Object.entries(data).filter(([k,v]) =>
-                k.endsWith('_count') && typeof v === 'number'
-            );
-            if (collections.length) {
-                html += '<div style="margin-top:.4rem;margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Data counts:</div>';
-                collections.forEach(([key, val]) => {
-                    const collection = key.replace('_count', '');
-                    const vid = 'v_count_' + collection;
-                    html += makeStateVerifier(vid,
-                        `${collection}: <span style="color:#64748b;font-weight:400">${val} items</span>`,
-                        {evaluator: 'BackendStateEvaluator', method: 'GET',
-                         endpoint: `/_admin/user/${siteId}/${userId}`,
-                         field: `${key}`, comparison: 'equals', expected: ''},
-                        'expected count after task'
-                    );
-                });
-            }
-
-            // Also show total counts (not user-scoped) for each data file
-            fetch(`/_admin/files/${siteId}`).then(r => r.json()).then(files => {
-                const dataFiles = files.filter(f => f !== 'users.json');
-                if (dataFiles.length) {
-                    html += '<div style="margin-top:.4rem;margin-bottom:.3rem;font-size:.72rem;color:#475569;font-weight:600">Total site data:</div>';
-                    const promises = dataFiles.map(f =>
-                        fetch(`/_admin/data/${siteId}/${f.replace('.json','')}?_count=1`)
-                            .then(r => r.json()).then(d => ({file: f, count: d.count}))
-                            .catch(() => ({file: f, count: '?'}))
-                    );
-                    Promise.all(promises).then(results => {
-                        results.forEach(({file, count}) => {
-                            const name = file.replace('.json', '');
-                            const vid = 'v_total_' + name;
-                            html += makeStateVerifier(vid,
-                                `ALL ${name}: <span style="color:#64748b;font-weight:400">${count} total</span>`,
-                                {evaluator: 'BackendStateEvaluator', method: 'GET',
-                                 endpoint: `/_admin/data/${siteId}/${name}?_count=1`,
-                                 field: 'count', comparison: 'equals', expected: ''},
-                                'expected total count'
-                            );
-                        });
-                        container.innerHTML = html || '<span style="color:#94a3b8">No user state data</span>';
-                    });
-                } else {
-                    container.innerHTML = html || '<span style="color:#94a3b8">No user state data</span>';
-                }
-            });
-        })
-        .catch(() => {
-            document.getElementById('user-state-list').innerHTML = '<span style="color:#94a3b8">Could not load user state</span>';
-        });
-}
-
-function makeStateVerifier(vid, label, config, placeholder) {
-    return `<div class="verifier-option" data-vid="${vid}" data-config='${JSON.stringify(config).replace(/'/g, "&#39;")}'>
-        <input type="checkbox" onchange="toggleVerifier('${vid}', this.checked)">
-        <div class="v-info">
-            <div class="v-label">${label}</div>
-            <div style="margin-top:.15rem"><input type="text" data-expected placeholder="${placeholder}" style="font-size:.72rem;padding:.2rem;width:100%" oninput="updateVerifierExpected('${vid}',this.value)"></div>
-        </div>
-    </div>`;
-}
-
-function fetchInteractionLog() {
-    // Fetch all mutation requests (POST, PUT, DELETE) from server-side log
-    fetch('/_admin/log')
-        .then(r => r.json())
-        .then(data => {
-            const mutations = (data.entries || []).filter(e =>
-                ['POST', 'PUT', 'DELETE'].includes(e.method) &&
-                !e.path.includes('/login') && !e.path.includes('/api/login')
-            );
-            const container = document.getElementById('interaction-log-list');
-            if (!mutations.length) {
-                container.innerHTML = '<span style="color:#94a3b8">No mutations recorded. Record a trajectory first.</span>';
-                return;
-            }
-            // Use BackendStateEvaluator to check /_admin/log for these actions
-            container.innerHTML = mutations.map((e, i) => {
-                const vid = 'v_action_' + i;
-                const bodyStr = e.body ? JSON.stringify(e.body).slice(0,80) : '';
-                const pathForCheck = e.path.replace(/^\/sites\/[^/]+/, '');
-                return `<div class="verifier-option" data-vid="${vid}" data-config='${JSON.stringify({
-                    evaluator: 'BackendStateEvaluator', method: 'GET',
-                    endpoint: `/_admin/log?method=${e.method}&path=${encodeURIComponent(pathForCheck)}`,
-                    field: 'count', comparison: 'greater_than', expected: '0'
-                }).replace(/'/g, "&#39;")}'>
-                    <input type="checkbox" onchange="toggleVerifier('${vid}', this.checked)">
-                    <div class="v-info">
-                        <div class="v-label"><span style="color:${e.method==='DELETE'?'#ef4444':e.method==='PUT'?'#d97706':'#2563eb'};font-weight:700">${e.method}</span> ${e.path}</div>
-                        ${bodyStr ? `<div class="v-desc">${bodyStr}</div>` : ''}
-                    </div>
-                </div>`;
-            }).join('');
-        })
-        .catch(() => {});
-}
-
-function updateVerifierExpected(vid, value) {
-    const el = document.querySelector(`[data-vid="${vid}"]`);
-    if (!el) return;
-    const config = JSON.parse(el.dataset.config);
-    config.expected = value;
-    el.dataset.config = JSON.stringify(config);
-    // Update in selectedVerifiers if already checked
-    const sv = selectedVerifiers.find(v => v.id === vid);
-    if (sv) sv.config.expected = value;
-}
-
-async function testAllVerifiers() {
-    // Re-read expected values from inputs
-    selectedVerifiers.forEach(v => {
-        const el = document.querySelector(`[data-vid="${v.id}"]`);
-        if (!el) return;
-        const expInput = el.querySelector('[data-expected]');
-        if (expInput) v.config.expected = expInput.value;
-    });
-    const res = document.getElementById('test-result');
-    res.innerHTML = '<span style="color:#d97706">Testing...</span>';
+function getRequestLogEntries() {
+    if (cachedRequestLog) return cachedRequestLog;
     try {
-        const r = await fetch('/annotate/api/validate_eval', {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/_admin/log', false);
+        xhr.send();
+        if (xhr.status === 200) {
+            const d = JSON.parse(xhr.responseText);
+            const entries = d.entries || [];
+            const reqs = [];
+            const seen = new Set();
+            for (const e of entries) {
+                if (!e.path || !e.path.startsWith('/sites/')) continue;
+                // Skip static assets
+                if (e.path.match(/\.(css|js|png|jpg|ico|svg|woff)$/)) continue;
+
+                const shortPath = e.path.replace('/sites/', '');
+                const paramStr = Object.entries(e.query || {}).map(([k,v]) => k+'='+v).join('&');
+                const bodyStr = e.body ? JSON.stringify(e.body).slice(0, 40) : '';
+                const key = e.method + ' ' + e.path + (paramStr ? '?' + paramStr : '');
+                if (seen.has(key)) continue;
+                seen.add(key);
+
+                // Build human-readable label
+                let label = e.method + ' ' + shortPath;
+                if (paramStr) label += '?' + paramStr.slice(0, 40);
+                label += ' → ' + e.status;
+                if (bodyStr) label += '  body:' + bodyStr.slice(0, 25);
+
+                // value format: method|||path|||param_key|||param_value
+                let mainParam = '';
+                let mainVal = '';
+                for (const [k, v] of Object.entries({...(e.query||{}), ...(e.body||{})})) {
+                    if (k !== '_' && v && String(v).length > 0) {
+                        mainParam = k;
+                        mainVal = String(v);
+                        break;
+                    }
+                }
+                reqs.push({
+                    value: e.method + '|||' + e.path + '|||' + mainParam + '|||' + mainVal,
+                    label: label,
+                });
+            }
+            cachedRequestLog = reqs;
+        }
+    } catch(e) {}
+    return cachedRequestLog || [];
+}
+let cachedSchemas = {};  // {siteId: {collection: [{name, type, samples}]}}
+
+async function loadSiteSchemas() {
+    if (!currentPrompt || !currentPrompt.sites) return;
+    for (const site of currentPrompt.sites) {
+        const siteId = typeof site === 'string' ? site : site.id;
+        if (cachedSchemas[siteId]) continue;
+        try {
+            const r = await fetch(`/annotate/api/schema/${siteId}`);
+            cachedSchemas[siteId] = await r.json();
+        } catch(e) { cachedSchemas[siteId] = {}; }
+    }
+}
+
+function getSchemaCollections() {
+    const colls = [];
+    for (const [siteId, schema] of Object.entries(cachedSchemas)) {
+        for (const coll of Object.keys(schema)) {
+            colls.push({value: siteId + '|||' + coll, label: siteId + ' / ' + coll});
+        }
+    }
+    return colls;
+}
+
+function getSchemaFields(collKey) {
+    if (!collKey) return [];
+    const [siteId, coll] = collKey.split('|||');
+    const fields = (cachedSchemas[siteId] || {})[coll] || [];
+    return fields.map(f => ({
+        value: f.name,
+        label: f.name + ' (' + f.type + ')' + (f.samples && f.samples.length ? ' e.g. ' + f.samples[0].slice(0, 25) : ''),
+    }));
+}
+
+// Load schemas on page load
+loadSiteSchemas();
+
+function _buildApiCallsList(entries) {
+    const calls = [];
+    const seenPaths = new Set();
+
+    for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (!e.path || !e.path.startsWith('/sites/')) continue;
+        const shortPath = e.path.replace('/sites/', '');
+        const bodySnippet = e.body ? JSON.stringify(e.body).slice(0, 60) : '';
+        let respSnippet = '';
+        if (e.response) {
+            if (Array.isArray(e.response)) respSnippet = `[${e.response.length} items]`;
+            else if (typeof e.response === 'object') respSnippet = JSON.stringify(e.response).slice(0, 60);
+        } else if (e.response_preview) {
+            respSnippet = e.response_preview.slice(0, 50);
+        }
+        const label = e.method + ' ' + shortPath + ' \u2192 ' + e.status +
+            (bodySnippet ? '  sent: ' + bodySnippet.slice(0, 35) : '') +
+            (respSnippet ? '  got: ' + respSnippet.slice(0, 35) : '');
+        calls.push({
+            value: e.method + '|||' + e.path,
+            label: label,
+            method: e.method,
+            path: e.path,
+            status: e.status,
+        });
+
+        // Also generate admin API equivalents for /api/ paths
+        if (e.path.includes('/api/')) {
+            const apiParts = e.path.split('/api/');
+            const site = apiParts[0].replace('/sites/', '');
+            const coll = apiParts[1].split('/')[0].split('?')[0];
+            const adminPath = `/_admin/data/${site}/${coll}`;
+            if (!seenPaths.has(adminPath)) {
+                seenPaths.add(adminPath);
+                calls.push({
+                    value: 'GET|||' + adminPath,
+                    label: '\u{1F50D} admin: ' + site + '/' + coll,
+                    method: 'GET',
+                    path: adminPath,
+                    status: 200,
+                });
+            }
+        }
+    }
+    return calls;
+}
+
+async function fetchApiCalls() {
+    if (cachedApiCalls) return cachedApiCalls;
+    try {
+        const r = await fetch('/_admin/log');
+        const d = await r.json();
+        cachedApiCalls = _buildApiCallsList(d.entries || []);
+    } catch(err) { cachedApiCalls = []; }
+    return cachedApiCalls;
+}
+
+function getTrajectoryApiCalls() {
+    if (cachedApiCalls && cachedApiCalls.length) return cachedApiCalls;
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/_admin/log', false);
+        xhr.send();
+        if (xhr.status === 200) {
+            const d = JSON.parse(xhr.responseText);
+            cachedApiCalls = _buildApiCallsList(d.entries || []);
+        }
+    } catch(e) {}
+    return cachedApiCalls || [];
+}
+
+function getTrajectoryTexts() {
+    // Collect all text values the annotator typed, selected, or submitted
+    const texts = new Set();
+    for (const e of trajectory) {
+        if (e.type !== 'action') continue;
+        if (e.text) texts.add(e.text);
+        if (e.option_text) texts.add(e.option_text);
+        if (e.value) texts.add(String(e.value));
+    }
+    // Add the final answer
+    const ans = document.getElementById('final-answer');
+    if (ans && ans.value.trim()) texts.add(ans.value.trim());
+    // Add QA answers
+    for (const v of Object.values(qaAnswers)) { if (v) texts.add(v); }
+    return [...texts].filter(t => t.length > 0 && t.length < 200);
+}
+
+let droppedChecks = {};  // {macro: [{checkId, values, resultEl}, ...]}
+let dragCheckId = null;
+let collOptionsHtmlCache = '';
+
+function renderPalette() {
+    const el = document.getElementById('palette-checks');
+    if (!el) return;
+    el.innerHTML = CHECK_CATALOG.map(c =>
+        `<div class="pal-check" draggable="true"
+              ondragstart="dragCheckId='${c.id}'"
+              title="${c.hint}\nExample: ${c.example}">
+            <span class="pal-icon">${c.icon}</span>
+            <span class="pal-name">${c.name}</span>
+            <span class="pal-hint">${c.hint}</span>
+        </div>`
+    ).join('');
+}
+
+async function populateVerifierBuilder() {
+    const container = document.getElementById('verifier-builder');
+    if (!container) return;
+
+    // Fetch API call log
+    await fetchApiCalls();
+
+    // Fetch collections for each site
+    const sites = currentPrompt ? currentPrompt.sites : [];
+    for (const s of sites) {
+        const sid = s.id || s;
+        if (!siteCollections[sid]) {
+            try {
+                const r = await fetch(`/_admin/files/${sid}`);
+                siteCollections[sid] = await r.json();
+            } catch(e) { siteCollections[sid] = []; }
+        }
+    }
+    // Cache collection options HTML
+    const collOpts = [];
+    for (const s of sites) {
+        const sid = s.id || s;
+        for (const coll of (siteCollections[sid] || [])) {
+            collOpts.push({value: `${sid}/${coll}`, label: `${sid} / ${coll}`});
+        }
+    }
+    collOptionsHtmlCache = '<option value="">pick collection...</option>' +
+        collOpts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+
+    // Render palette
+    renderPalette();
+
+    // Build drop zones per macro
+    const macros = getEnabledMacros();
+    let html = '';
+    for (const macro of macros) {
+        const span = macroSpans[macro];
+        if (!span || span.length < 2) continue;
+        const c = getMacroColor(macro);
+        const macroId = macro.replace(/[^a-zA-Z0-9]/g, '_');
+
+        if (!droppedChecks[macro]) droppedChecks[macro] = [];
+
+        html += `<div class="vb-card">
+            <div class="vb-card-header" style="background:${c.bg}">
+                <span style="font-weight:700;color:${c.fg};font-size:.82rem">${macro}</span>
+                <span style="font-size:.68rem;color:${c.fg};opacity:.7;margin-left:auto">actions ${span[0]}\u2013${span[1]}</span>
+            </div>
+            <div class="vb-card-body${droppedChecks[macro].length ? '' : ' empty-hint'}" id="drop-${macroId}"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="event.preventDefault();this.classList.remove('drag-over');dropCheck('${macro}')">
+                ${renderDroppedChecks(macro)}
+            </div>
+        </div>`;
+    }
+
+    // QA macros without spans — auto-add answer check
+    for (const macro of macros) {
+        if (!macroSpans[macro] && isQAMacro(macro) && qaAnswers[macro]) {
+            if (!droppedChecks[macro]) droppedChecks[macro] = [];
+            if (!droppedChecks[macro].some(c => c.checkId === 'answer_match')) {
+                droppedChecks[macro].push({checkId: 'answer_match', values: {expected: qaAnswers[macro], match_type: 'string'}});
+            }
+        }
+    }
+
+    if (!html) {
+        html = '<div style="color:#94a3b8;font-size:.82rem;padding:.5rem">No macro spans tagged. Tag actions in Step 2, or QA macros just need an answer.</div>';
+    }
+    container.innerHTML = html;
+}
+
+function dropCheck(macro) {
+    if (!dragCheckId) return;
+    if (!droppedChecks[macro]) droppedChecks[macro] = [];
+    droppedChecks[macro].push({checkId: dragCheckId, values: {}, result: null});
+    dragCheckId = null;
+    refreshDropZone(macro);
+}
+
+function removeDroppedCheck(macro, idx) {
+    droppedChecks[macro].splice(idx, 1);
+    refreshDropZone(macro);
+}
+
+function refreshDropZone(macro) {
+    const macroId = macro.replace(/[^a-zA-Z0-9]/g, '_');
+    const el = document.getElementById('drop-' + macroId);
+    if (!el) return;
+    el.innerHTML = renderDroppedChecks(macro);
+    el.classList.toggle('empty-hint', !droppedChecks[macro] || !droppedChecks[macro].length);
+}
+
+function refreshDroppedCheck(macro, idx) {
+    // Re-render just this macro's drop zone (so dependent fields like schema_fields update)
+    refreshDropZone(macro);
+}
+
+function renderDroppedChecks(macro) {
+    const checks = droppedChecks[macro] || [];
+    if (!checks.length) return '';
+    return checks.map((dc, idx) => {
+        const cat = CHECK_CATALOG.find(c => c.id === dc.checkId);
+        if (!cat) return '';
+        const resultHtml = dc.result != null
+            ? `<div class="dc-result ${dc.result ? 'pass' : 'fail'}">${dc.result ? '\u2713 Pass' : '\u2717 Fail'}${dc.resultDetail ? ' \u2014 ' + escHtml(dc.resultDetail) : ''}</div>`
+            : '';
+        const fieldsHtml = cat.fields.map(f => {
+            const val = dc.values[f.key] || '';
+            const chg = `droppedChecks['${macro}'][${idx}].values['${f.key}']=this.value; refreshDroppedCheck('${macro}', ${idx})`;
+            const ss = 'font-size:.72rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.2rem';
+
+            if (f.type === 'collection') {
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:180px">
+                        ${collOptionsHtmlCache.replace(`value="${val}"`, `value="${val}" selected`)}
+                    </select></div>`;
+            } else if (f.type === 'select') {
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss}">
+                        ${f.options.map(o => `<option ${o===val?'selected':''}>${o}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'trajectory_urls') {
+                const urls = getTrajectoryUrls();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:220px">
+                        <option value="">pick page...</option>
+                        ${urls.map(u => `<option value="${u}" ${u===val?'selected':''}>${u.replace('/sites/','')}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'request_log') {
+                const reqs = getRequestLogEntries();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:280px">
+                        <option value="">pick request...</option>
+                        ${reqs.map(r => `<option value="${escHtml(r.value)}" ${r.value===val?'selected':''}>${escHtml(r.label)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'trajectory_actions') {
+                const acts = getTrajectoryActions();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:220px">
+                        <option value="">pick action...</option>
+                        ${acts.map(a => `<option value="${escHtml(a.value)}" ${a.value===val?'selected':''}>${escHtml(a.label)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'trajectory_api_calls') {
+                const calls = getTrajectoryApiCalls();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:240px">
+                        <option value="">pick API call...</option>
+                        ${calls.map(c => `<option value="${escHtml(c.value)}" ${c.value===val?'selected':''}>${escHtml(c.label)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'trajectory_texts') {
+                const texts = getTrajectoryTexts();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:200px">
+                        <option value="">pick value...</option>
+                        ${texts.map(t => `<option value="${escHtml(t)}" ${t===val?'selected':''}>${escHtml(t.length>40?t.slice(0,37)+'...':t)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'answer') {
+                // Pre-fill from final answer
+                const ans = val || document.getElementById('final-answer')?.value || '';
+                if (!val && ans) dc.values[f.key] = ans;
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <input type="text" value="${escHtml(ans)}" onchange="${chg}" style="${ss};width:100%"></div>`;
+            } else if (f.type === 'schema_collections') {
+                const colls = getSchemaCollections();
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:240px">
+                        <option value="">pick collection...</option>
+                        ${colls.map(c => `<option value="${escHtml(c.value)}" ${c.value===val?'selected':''}>${escHtml(c.label)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'schema_fields') {
+                // Get fields from the selected collection (look for sibling 'collection' value)
+                const collKey = dc.values['collection'] || '';
+                const fields = getSchemaFields(collKey);
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <select onchange="${chg}" style="${ss};max-width:240px">
+                        <option value="">pick field...</option>
+                        ${fields.map(fi => `<option value="${escHtml(fi.value)}" ${fi.value===val?'selected':''}>${escHtml(fi.label)}</option>`).join('')}
+                    </select></div>`;
+            } else if (f.type === 'collection_fields') {
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <input type="text" value="${escHtml(val)}" placeholder="field name" onchange="${chg}" style="${ss};width:100%"></div>`;
+            } else {
+                return `<div style="margin-bottom:.15rem"><span style="font-size:.68rem;color:#64748b">${f.label}:</span>
+                    <input type="${f.type||'text'}" value="${escHtml(val)}" placeholder="${f.placeholder||''}"
+                           onchange="${chg}" style="${ss};width:100%"></div>`;
+            }
+        }).join('');
+        return `<div class="dropped-check">
+            <span class="dc-icon">${cat.icon}</span>
+            <div class="dc-body">
+                <div class="dc-title">${cat.name}</div>
+                <div style="font-size:.65rem;color:#94a3b8;margin-bottom:.2rem">${cat.hint}</div>
+                <div class="dc-fields">${fieldsHtml}</div>
+                ${resultHtml}
+            </div>
+            <span class="dc-remove" onclick="removeDroppedCheck('${macro}',${idx})" title="Remove">\u00d7</span>
+        </div>`;
+    }).join('');
+}
+
+function _apiPathToEndpoint(path) {
+    // Use the actual API path directly — no conversion needed
+    return path || '';
+}
+
+function collectVerifierConfigs() {
+    const configs = [];
+    const macros = getEnabledMacros();
+
+    for (const macro of macros) {
+        const span = macroSpans[macro] || [];
+        const dcs = droppedChecks[macro] || [];
+        // Also include QA inline answers
+        if (isQAMacro(macro) && qaAnswers[macro] && !dcs.some(d => d.checkId === 'answer_match')) {
+            dcs.unshift({checkId: 'answer_match', values: {expected: qaAnswers[macro], match_type: qaAnswers[macro].match(/^\d+\.?\d*$/) ? 'number' : 'string'}});
+        }
+        if (!dcs.length) continue;
+
+        const checks = [];
+        for (const dc of dcs) {
+            const v = dc.values;
+            if (dc.checkId === 'answer_match') {
+                const mode = v.match_mode || 'exact';
+                checks.push({type: 'answer_match', expected: v.expected || '', match_type: v.match_type || 'string',
+                             match_mode: mode,
+                             description: `Answer ${mode === 'includes' ? 'includes' : mode === 'fuzzy' ? '\u2248' : '='} "${v.expected}"`});
+            } else if (dc.checkId === 'page_visited') {
+                checks.push({type: 'grounding', required_urls: [v.url || ''],
+                             description: `Visited ${v.url}`});
+            } else if (dc.checkId === 'action_performed') {
+                const parts = (v.request || '').split('|||');
+                const method = parts[0] || 'GET';
+                const path = parts[1] || '';
+                const paramKey = parts[2] || '';
+                const paramVal = parts[3] || '';
+                const shortPath = path.replace('/sites/', '');
+                const desc_str = `${method} ${shortPath}` + (paramKey ? ` (${paramKey}=${paramVal.slice(0,15)})` : '');
+                checks.push({type: 'action_performed', method, path, param_key: paramKey, param_value: paramVal,
+                             description: desc_str});
+            } else if (dc.checkId === 'api_succeeded') {
+                if (v.api_call) {
+                    const [method, path] = v.api_call.split('|||');
+                    checks.push({type: 'state_query', endpoint: path, method: method || 'GET',
+                                 params: {}, check: 'not_empty',
+                                 description: `${method} ${path} succeeded`});
+                }
+            } else if (dc.checkId === 'response_contains') {
+                if (v.api_call) {
+                    const [method, path] = v.api_call.split('|||');
+                    checks.push({type: 'state_query', endpoint: path, method: method || 'GET',
+                                 params: {}, check: 'contains', expected: v.text || '',
+                                 description: `Response contains "${v.text}"`});
+                }
+            } else if (dc.checkId === 'count_equals') {
+                if (v.api_call) {
+                    const [method, path] = v.api_call.split('|||');
+                    checks.push({type: 'count_equals', endpoint: path, method: method || 'GET',
+                                 params: {}, expected: parseInt(v.count) || 0,
+                                 description: `Count = ${v.count}`});
+                }
+            } else if (dc.checkId === 'record_exists') {
+                if (v.collection && v.field) {
+                    const [siteId, coll] = v.collection.split('|||');
+                    const ep = `/_admin/data/${siteId}/${coll}`;
+                    checks.push({type: 'record_exists', endpoint: ep,
+                                 params: {[v.field]: v.expected || ''},
+                                 description: `${coll}.${v.field} = "${v.expected}" exists`});
+                }
+            } else if (dc.checkId === 'record_absent') {
+                if (v.collection && v.field) {
+                    const [siteId, coll] = v.collection.split('|||');
+                    const ep = `/_admin/data/${siteId}/${coll}`;
+                    checks.push({type: 'record_absent', endpoint: ep,
+                                 params: {[v.field]: v.expected || ''},
+                                 description: `${coll}.${v.field} = "${v.expected}" absent`});
+                }
+            } else if (dc.checkId === 'field_equals') {
+                if (v.collection && v.field) {
+                    const [siteId, coll] = v.collection.split('|||');
+                    const ep = `/_admin/data/${siteId}/${coll}`;
+                    const params = v.record_id ? {id: v.record_id} : {};
+                    checks.push({type: 'field_equals', endpoint: ep, params: params,
+                                 field: v.field, expected: v.expected || '',
+                                 description: `${coll}[${v.record_id || '?'}].${v.field} = "${v.expected}"`});
+                }
+            }
+        }
+        if (checks.length) configs.push({macro, span, checks});
+    }
+    return configs;
+}
+
+async function testVerifiers() {
+    verifierConfigs = collectVerifierConfigs();
+    if (!verifierConfigs.length) {
+        document.getElementById('verifier-status').textContent = 'No checks configured \u2014 drag checks from the palette into macros';
+        return;
+    }
+    const status = document.getElementById('verifier-status');
+    status.textContent = 'Testing...';
+    status.style.color = '#64748b';
+    document.getElementById('task-verdict').innerHTML = '';
+
+    try {
+        const r = await fetch('/annotate/api/run_verifiers', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({eval: selectedVerifiers.map(v=>v.config), eval_logic: 'all',
-                agent_answer: document.getElementById('final-answer').value, navigation_trace: trajectory})
+            body: JSON.stringify({
+                configs: verifierConfigs,
+                trajectory: trajectory,
+                expected_answer: document.getElementById('final-answer').value,
+            })
         });
         const d = await r.json();
-        selectedVerifiers.forEach((v, i) => {
-            const ind = document.getElementById('ind-' + v.id);
-            if (ind && d.results[i]) ind.className = 'indicator ' + (d.results[i].passed ? 'pass' : 'fail');
-        });
-        res.innerHTML = (d.passed ? '<span style="color:#16a34a;font-weight:600">ALL PASS</span>' : '<span style="color:#ef4444;font-weight:600">FAILED</span>') + '<br>' +
-            d.results.map(r => `${r.passed?'<span style="color:#16a34a">&#10003;</span>':'<span style="color:#ef4444">&#10007;</span>'} ${r.detail}`).join('<br>');
-    } catch(e) { res.innerHTML = `<span style="color:#ef4444">${e.message}</span>`; }
+
+        // Update per-check results inline
+        for (const res of (d.results || [])) {
+            const dcs = droppedChecks[res.macro] || [];
+            for (let i = 0; i < dcs.length && i < (res.checks||[]).length; i++) {
+                dcs[i].result = res.checks[i].pass;
+                dcs[i].resultDetail = res.checks[i].reason || res.checks[i].description || '';
+            }
+            refreshDropZone(res.macro);
+
+            // Update macro card header with pass/fail
+            const macroId = res.macro.replace(/[^a-zA-Z0-9]/g, '_');
+            const header = document.querySelector(`#drop-${macroId}`)?.parentElement?.querySelector('.vb-card-header');
+            if (header) {
+                let badge = header.querySelector('.macro-verdict');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'macro-verdict';
+                    badge.style.cssText = 'font-size:.7rem;padding:.1rem .3rem;border-radius:.2rem;margin-left:.3rem';
+                    header.appendChild(badge);
+                }
+                badge.textContent = res.pass ? '\u2705 PASS' : '\u274C FAIL';
+                badge.style.background = res.pass ? '#d1fae5' : '#fecdd3';
+                badge.style.color = res.pass ? '#065f46' : '#9f1239';
+            }
+        }
+
+        // Task-level verdict
+        const allMacrosPass = (d.results || []).every(r => r.pass);
+        const totalChecks = (d.results || []).reduce((sum, r) => sum + (r.checks||[]).length, 0);
+        const passedChecks = (d.results || []).reduce((sum, r) => sum + (r.checks||[]).filter(c=>c.pass).length, 0);
+
+        status.textContent = allMacrosPass ? 'Task: PASS' : 'Task: FAIL';
+        status.style.color = allMacrosPass ? '#16a34a' : '#ef4444';
+
+        document.getElementById('task-verdict').innerHTML = `
+            <div style="padding:.5rem .6rem;border-radius:.4rem;background:${allMacrosPass?'#f0fdf4':'#fef2f2'};border:1px solid ${allMacrosPass?'#bbf7d0':'#fecaca'};font-size:.82rem">
+                <div style="font-weight:700;color:${allMacrosPass?'#16a34a':'#dc2626'};margin-bottom:.2rem">
+                    ${allMacrosPass ? '\u2705 Task PASSED' : '\u274C Task FAILED'} \u2014 ${passedChecks}/${totalChecks} checks passed across ${(d.results||[]).length} macro(s)
+                </div>
+                ${(d.results||[]).map(r => {
+                    const c = getMacroColor(r.macro);
+                    return `<div style="font-size:.75rem;color:${r.pass?'#16a34a':'#dc2626'}">
+                        ${r.pass?'\u2713':'\u2717'} <span style="color:${c.fg};font-weight:600">${r.macro}</span>: ${(r.checks||[]).filter(c=>c.pass).length}/${(r.checks||[]).length} checks
+                    </div>`;
+                }).join('')}
+            </div>`;
+
+        // Show validate button after testing
+        document.getElementById('agent-btn').style.display = '';
+        document.getElementById('agent-results').innerHTML = '';
+    } catch(e) {
+        status.textContent = 'Error: ' + e.message;
+        status.style.color = '#ef4444';
+    }
 }
 
+// --- Perturbation validation ---
+async function runAgentValidation() {
+    const configs = collectVerifierConfigs();
+    const status = document.getElementById('verifier-status');
+    const btn = document.getElementById('agent-btn');
+
+    if (agentRunning) {
+        status.textContent = 'Agent still running in background...';
+        status.style.color = '#64748b';
+        return;
+    }
+
+    // Clear previous agent results
+    agentResult = null;
+    document.getElementById('agent-results').innerHTML = '';
+
+    status.textContent = 'Running agent on this task...';
+    status.style.color = '#64748b';
+    btn.disabled = true;
+
+    try {
+        const r = await fetch('/annotate/api/agent_validate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                configs: configs,
+                instruction: document.getElementById('instruction').value,
+                sites: currentPrompt ? currentPrompt.sites : [],
+            })
+        });
+        const d = await r.json();
+        agentResult = d;
+        renderAgentResults(d);
+    } catch(e) {
+        status.textContent = 'Agent error: ' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function renderAgentResults(d) {
+    const el = document.getElementById('agent-results');
+    const status = document.getElementById('verifier-status');
+
+    if (d.error) {
+        status.textContent = 'Agent error: ' + d.error;
+        status.style.color = '#ef4444';
+        return;
+    }
+
+    const agentPassed = d.agent_passed;
+    status.textContent = agentPassed ? 'Agent also passed — task is solvable' : 'Agent failed — check verifier or task difficulty';
+    status.style.color = agentPassed ? '#16a34a' : '#d97706';
+
+    let html = `<div style="border:1px solid ${agentPassed?'#bbf7d0':'#fcd34d'};border-radius:.4rem;overflow:hidden;margin-top:.3rem">
+        <div style="background:${agentPassed?'#f0fdf4':'#fffbeb'};padding:.4rem .6rem;font-size:.78rem;font-weight:600;color:${agentPassed?'#065f46':'#92400e'}">
+            Agent Validation: ${agentPassed ? 'Agent solved the task independently' : 'Agent could not solve the task'}
+        </div>
+        <div style="padding:.4rem .6rem;font-size:.75rem">
+            <div style="margin-bottom:.3rem"><b>Agent answer:</b> <code style="background:#f1f5f9;padding:.1rem .3rem;border-radius:.2rem">${escHtml(d.agent_answer || '(none)')}</code></div>
+            <div style="margin-bottom:.3rem;color:#64748b"><b>Browser steps:</b> ${d.agent_steps || 0} &nbsp; <b>Server requests:</b> ${d.request_count || 0}</div>
+            ${(d.agent_errors||[]).length ? '<div style="margin-bottom:.3rem;color:#ef4444;font-size:.72rem"><b>Errors:</b> ' + d.agent_errors.map(e => escHtml(e)).join(', ') + '</div>' : ''}
+        </div>`;
+
+    // Per-check results
+    html += '<div style="padding:.2rem .6rem .4rem">';
+    for (const res of (d.agent_results || [])) {
+        const c = getMacroColor(res.macro);
+        const macroLabel = (macroDescriptions[res.macro]||{}).description || res.macro;
+        html += `<div style="margin-bottom:.3rem">
+            <span style="font-weight:600;color:${res.pass?'#16a34a':'#ef4444'}">${res.pass?'\u2713':'\u2717'}</span>
+            <span style="font-weight:500">${escHtml(macroLabel)}</span>`;
+        for (const ch of (res.checks || [])) {
+            html += `<div style="font-size:.7rem;color:${ch.pass?'#16a34a':'#ef4444'};padding-left:1.2rem">
+                ${ch.pass?'\u2713':'\u2717'} ${escHtml(ch.description || '')} — ${escHtml(ch.reason || '')}
+            </div>`;
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // Agent reasoning (collapsed)
+    if (d.agent_response) {
+        html += `<details style="padding:.3rem .6rem;border-top:1px solid #e2e8f0">
+            <summary style="font-size:.72rem;color:#64748b;cursor:pointer">Agent reasoning</summary>
+            <pre style="font-size:.65rem;color:#475569;white-space:pre-wrap;max-height:200px;overflow-y:auto;margin-top:.2rem">${escHtml(d.agent_response)}</pre>
+        </details>`;
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+// (old toggleVerifier/fetchUserState/fetchInteractionLog/testAllVerifiers removed)
+// Verifiers are now built by Claude via /api/build_verifiers
 // --- Submit ---
 async function submitTask() {
     const instruction = document.getElementById('instruction').value;
-    const annotator = document.getElementById('annotator-name').value;
+    const annotator = getAnnotatorName();
     if (!currentPrompt || !currentPrompt.sites.length || !instruction || !annotator) {
         alert('Fill in instruction and your name');
         return;
     }
     if (trajectory.length === 0) { alert('Record a trajectory first (Step 2)'); return; }
 
-    selectedVerifiers.forEach(v => {
-        const el = document.querySelector(`[data-vid="${v.id}"]`);
-        if (el) el.querySelectorAll('[data-f]').forEach(inp => { v.config[inp.dataset.f] = inp.value; });
-    });
-
     const enabledMacros = getEnabledMacros();
+
+    // Fetch server logs to save alongside trajectory
+    let serverLog = [], beaconLog = [];
+    try {
+        const logR = await fetch('/_admin/log'); if (logR.ok) serverLog = (await logR.json()).entries || [];
+        const beacR = await fetch('/_admin/beacon'); if (beacR.ok) beaconLog = (await beacR.json()).entries || [];
+    } catch(e) {}
 
     try {
         const r = await fetch('/annotate/api/tasks', {
@@ -1048,16 +2410,56 @@ async function submitTask() {
                 instruction,
                 expected_answer: document.getElementById('final-answer').value,
                 macros: enabledMacros,
-                eval: selectedVerifiers.map(v => v.config),
-                eval_logic: 'all',
+                macro_spans: macroSpans,
+                macros_not_applicable: macrosNotApplicable,
+                qa_answers: qaAnswers,
+                answer_type: document.getElementById('answer-type').value,
+                alternatives: document.getElementById('alternatives').value,
+                expected_outcome: (document.getElementById('expected-outcome') || {}).value || '',
                 trajectory,
+                server_log: serverLog,
+                beacon_log: beaconLog,
+                agent_result: agentResult || null,
                 annotator,
             })
         });
         const d = await r.json();
-        document.getElementById('status').innerHTML = d.task_id
-            ? `<span style="color:#16a34a;font-weight:600">Saved: ${d.task_id}</span>`
-            : `<span style="color:#ef4444">${d.error}</span>`;
+        if (d.task_id) {
+            document.getElementById('status').innerHTML = `<span style="color:#16a34a;font-weight:600">Saved: ${d.task_id} \u2014 loading next task...</span>`;
+            // Reset and load new prompt
+            setTimeout(() => {
+                trajectory = [];
+                actionCounter = 0;
+                macroSpans = {};
+                macrosNotApplicable = {};
+                macrosSkipped = {};
+                qaAnswers = {};
+                droppedChecks = {};
+                cachedApiCalls = null;
+                cachedRequestLog = null;
+                agentResult = null;
+                agentRunning = false;
+                rewindPoint = null;
+                document.getElementById('instruction').value = '';
+                document.getElementById('final-answer').value = '';
+                document.getElementById('alternatives').value = '';
+                const outcomeEl = document.getElementById('expected-outcome');
+                if (outcomeEl) outcomeEl.value = '';
+                document.getElementById('instruction-banner').style.display = 'none';
+                document.getElementById('action-sidebar').classList.remove('visible');
+                document.getElementById('task-verdict').innerHTML = '';
+                document.getElementById('agent-results').innerHTML = '';
+                document.getElementById('agent-btn').style.display = 'none';
+                const badge2 = document.getElementById('agent-status-badge');
+                if (badge2) { badge2.style.display = 'none'; badge2.textContent = ''; }
+                // Clear server request log for clean slate
+                fetch('/_admin/log/clear', {method: 'POST'}).catch(() => {});
+                reshufflePrompt();
+                goStep(1);
+            }, 1000);
+        } else {
+            document.getElementById('status').innerHTML = `<span style="color:#ef4444">${d.error}</span>`;
+        }
     } catch(e) { document.getElementById('status').innerHTML = `<span style="color:#ef4444">${e.message}</span>`; }
 }
 </script>

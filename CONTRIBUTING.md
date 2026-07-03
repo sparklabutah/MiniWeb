@@ -70,7 +70,7 @@
 | weather | Dynamic info / feeds | | yes | | |
 | wikis | Search & reference | | yes | | |
 
-**72/72 desc** · **72/72 built** · **72/72 tasks+verifiers** · **2/72 browser-evaluated**
+**65/65 desc** · **65/65 built** · **65/65 tasks+verifiers** · **2/65 browser-evaluated**
 
 
 ## Getting Started (CHPC Quick Start)
@@ -97,7 +97,7 @@ ssh -L 8080:localhost:8080 <your-uid>@<chpc-node>
 # Then open http://localhost:8080
 ```
 
-All 72 built sites will be immediately available — no data download or generation needed.
+All 65 built sites will be immediately available — no data download or generation needed.
 
 ### Manual Setup (Non-CHPC)
 
@@ -154,13 +154,13 @@ If the site is already in `MiniWeb_macro_assignment.xlsx`, it was pre-scaffolded
 
 ### Step 2: Add Data
 
-Place raw data files in `sites/my-site/data/` in their **original format**.
+Place raw data files in `data_sources/<site-name>/` in their **original format**. Data is ingested into SQLite at build time by `scripts/build_db.py`.
 
 **Rules:**
-- Never rewrite or restructure the data — `routes.py` will have an interpreter
-- For large datasets (>100MB), the interpreter uses `config/config.json` to control sampling (`num_data_points: -1` = all, `1000` = sample 1000)
-- For external data (e.g., shared WebShop), store the path in `config/config.json`
-- For sites that synthesize data (banking, blogs, etc.), skip this step
+- Never rewrite or restructure the raw data — write an ingestor in `build_db.py` if needed
+- For large datasets, configure `--max-raw` to control row limits at build time
+- For sites that synthesize data (banking, blogs, etc.), the synthetic JSON lives alongside raw data in the same table
+- Define tables in `sites/my-site/schema.py`
 
 ### Step 3: Write the Description
 
@@ -189,18 +189,17 @@ in sites/<site-id>/doc/README.md.
 Use sites/academic-paper-db/ as the reference pattern.
 
 Generate all files:
-- routes.py — Flask blueprint with data interpreter, HTML + API routes
+- schema.py — SQLite table definitions
+- routes.py — Flask blueprint with SQL queries via app/db.py
 - templates/<site-id>/*.html — UI modeled after <real-world site>
-- data_sources/<site-id>/*.json — synthesized data (written to shared data_sources path)
-- data_sources/<site-id>/.pristine/ — pristine copies of mutable JSON files
 - tasks.json — 20 tasks (6 easy, 8 medium, 6 hard) covering all target macros
 - verifiers.py — per-task HTTP verification functions
 - macro_verifiers.py — per-macro verification functions
 - reference_solutions.py — per-task solutions via Flask test client
 
 Rules:
-1. Never rewrite raw data — write an interpreter in routes.py
-2. Read config/config.json for num_data_points and random_seed
+1. All data access via app/db.py (query, get_item, execute)
+2. All filtering/sorting/pagination in SQL — never load full tables
 3. Blueprint name must match site_id in site.json
 4. Tasks must be realistic user interactions
 5. Use placehold.co for placeholder images (not picsum.photos)
@@ -267,10 +266,8 @@ Include in PR: `sites/<id>/` directory (with `data/.pristine/`), and validation 
 
 - [ ] `site.json` — correct id, name, description, tags
 - [ ] `doc/desc` — site description written
-- [ ] `config/config.json` — num_data_points, random_seed, any external paths
-- [ ] `data/` — raw data in original format (never rewritten)
-- [ ] `data/.pristine/` — pristine copies of all mutable JSON files
-- [ ] `routes.py` — Flask blueprint with data interpreter
+- [ ] `schema.py` — SQLite table definitions with NOT NULL defaults
+- [ ] `routes.py` — Flask blueprint using `app/db.py` (no full-table loads)
 - [ ] `templates/<site-id>/` — all HTML templates
 - [ ] `tasks.json` — 20 tasks (6 easy, 8 medium, 6 hard)
 - [ ] `verifiers.py` — one verify function per task
@@ -305,25 +302,34 @@ Include in PR: `sites/<id>/` directory (with `data/.pristine/`), and validation 
 ```
 MiniWeb/
 ├── run.py                      # Flask entry point
-├── app/                        # Core app (portal, static)
+├── miniweb.db                  # SQLite database (~18GB, symlink to shared)
+├── CLAUDE.md                   # Development rules (read before coding)
+├── app/                        # Core app
+│   ├── __init__.py             # Flask factory, admin API, 2FA
+│   ├── db.py                   # Database access (query, get_item, execute, search)
+│   ├── events.py               # Cross-site event bus (emit/on pattern)
+│   ├── bridges.py              # Backward-compatible event wrappers
+│   ├── handlers/               # Event handlers (banking, email, calendar, IM, cloud, passwords)
+│   ├── portal/                 # Browser chrome + new tab page with search
+│   └── static/                 # Shared CSS
 ├── sites/                      # Benchmark sites (auto-discovered)
-│   ├── _template/              # Scaffold starter
-│   ├── academic-paper-db/      # Gold-standard reference (20 tasks, 21 macros)
+│   ├── academic-paper-db/      # Gold-standard reference
 │   └── <site-id>/              # Each site has:
-│       ├── site.json, routes.py, __init__.py
-│       ├── doc/                # Site description (user-written)
-│       ├── config/config.json  # Site config (num_data_points, random_seed, etc.)
-│       ├── data/               # Raw data (original format, never rewritten)
-│       ├── data/.pristine/     # Reset baseline
-│       ├── templates/<id>/*.html
-│       ├── tasks.json, verifiers.py, macro_verifiers.py, reference_solutions.py
-│       └── results/            # Evaluation output (gitignored)
-├── specs/                      # Site generation specs
-├── scripts/                    # Generation & validation tools
+│       ├── site.json           # Metadata (name, description, category)
+│       ├── schema.py           # SQLite table definitions
+│       ├── routes.py           # Flask blueprint with SQL queries
+│       ├── templates/<id>/     # Jinja2 HTML templates
+│       ├── tasks.json          # 20 benchmark tasks
+│       ├── verifiers.py        # Task success verification
+│       ├── macro_verifiers.py  # Per-macro verification
+│       └── reference_solutions.py
+├── scripts/                    # Build & maintenance tools
+│   ├── build_db.py             # Build miniweb.db from raw data
+│   ├── build_fts.py            # Build FTS5 search indexes
+│   └── setup_chpc.sh           # One-time CHPC contributor setup
 ├── evaluation/                 # Browser-agent eval harness
-├── macros/                     # Macro research pipeline
+├── annotation/                 # Human annotation interface
 ├── docs/                       # Documentation
-├── AGENTS.md                   # Agent guidance & eval harness
 └── CONTRIBUTING.md             # This file
 ```
 

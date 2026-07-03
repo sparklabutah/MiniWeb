@@ -89,13 +89,9 @@ def index():
 
     # Fetch notes with SQL-level filtering
     if q:
-        # Use LIKE for text search at SQL level
-        rows = db.execute(
-            "SELECT * FROM handwritten_notes_whiteboards_notes "
-            + ("WHERE owner_id = ? AND (title LIKE ? OR content LIKE ? OR tags LIKE ?) " if user else "WHERE title LIKE ? OR content LIKE ? OR tags LIKE ? ")
-            + "ORDER BY updated_at DESC LIMIT 50",
-            ((user["id"], f"%{q}%", f"%{q}%", f"%{q}%") if user else (f"%{q}%", f"%{q}%", f"%{q}%")),
-        )
+        # Use FTS5/BM25 for text search
+        search_where = {"owner_id": user["id"]} if user else None
+        rows = db.search(SITE, "notes", q, where=search_where, limit=50)
     else:
         rows = db.query(SITE, "notes", where=where if where else None, sort=sort_col, limit=50)
 
@@ -285,6 +281,41 @@ def note_delete_submit(note_id):
     return redirect(url_for("handwritten-notes-whiteboards.index"))
 
 
+@blueprint.route("/note/<int:note_id>/invite", methods=["POST"])
+def form_invite_to_note(note_id):
+    """Invite a user to collaborate on a note via email."""
+    _email = request.form.get("email", "").strip()
+    return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=note_id))
+
+
+@blueprint.route("/upload-image", methods=["POST"])
+def form_upload_image():
+    """Upload an image and create a new note from it."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("handwritten-notes-whiteboards.login_page"))
+    f = request.files.get("file")
+    title = f.filename if f and f.filename else "Uploaded Image"
+    now = _now_iso()
+    max_row = db.execute(
+        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
+        fetch="one",
+    )
+    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_note = {
+        "id": new_id, "title": title,
+        "content": f"[image uploaded: {title}]",
+        "owner_id": user["id"], "created_at": now, "updated_at": now,
+        "tags": "image", "notebook_id": 0, "is_pinned": False,
+        "color": "#FFFACD", "drawing_data": "",
+    }
+    db.save_item(SITE, "notes", new_id, new_note)
+    emit("file_created", user_id=user["id"], filename=title,
+         file_type="note", source_site="handwritten-notes-whiteboards",
+         source_id=new_id)
+    return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=new_id))
+
+
 @blueprint.route("/login", methods=["GET"])
 def login_page():
     return render_template(
@@ -304,6 +335,7 @@ def login_submit():
             error="Invalid username or password",
         )
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="handwritten-notes-whiteboards", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("handwritten-notes-whiteboards.index"))
 
 
@@ -364,18 +396,9 @@ def api_notes_list():
         where["is_pinned"] = 1 if is_pinned.lower() in ("true", "1", "yes") else 0
 
     if q:
-        # Text search with SQL LIKE
-        clauses = ["title LIKE ?", "content LIKE ?", "tags LIKE ?"]
-        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
-        if owner_id:
-            clauses.insert(0, "owner_id = ?")
-            params.insert(0, owner_id)
-        sql = (
-            "SELECT * FROM handwritten_notes_whiteboards_notes WHERE "
-            + (" AND ".join(clauses[:1]) + " AND (" + " OR ".join(clauses[1:]) + ")" if owner_id else "(" + " OR ".join(clauses) + ")")
-            + f" ORDER BY updated_at DESC LIMIT {limit} OFFSET {offset}"
-        )
-        notes = db.execute(sql, tuple(params))
+        # Use FTS5/BM25 for text search
+        search_where = {"owner_id": owner_id} if owner_id else None
+        notes = db.search(SITE, "notes", q, where=search_where, limit=limit, offset=offset)
     else:
         notes = db.query(SITE, "notes", where=where if where else None,
                          sort="-updated_at", limit=limit, offset=offset)
@@ -647,17 +670,8 @@ def api_search():
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify({"query": q, "notes": [], "whiteboards": []})
-    notes = db.execute(
-        "SELECT * FROM handwritten_notes_whiteboards_notes "
-        "WHERE title LIKE ? OR content LIKE ? OR tags LIKE ? "
-        "ORDER BY updated_at DESC LIMIT 50",
-        (f"%{q}%", f"%{q}%", f"%{q}%"),
-    )
-    whiteboards = db.execute(
-        "SELECT * FROM handwritten_notes_whiteboards_whiteboards "
-        "WHERE title LIKE ? ORDER BY updated_at DESC LIMIT 20",
-        (f"%{q}%",),
-    )
+    notes = db.search(SITE, "notes", q, limit=50)
+    whiteboards = db.search(SITE, "whiteboards", q, limit=20)
     return jsonify({"query": q, "notes": notes, "whiteboards": whiteboards})
 
 
@@ -733,12 +747,7 @@ def api_notes_semantic():
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
-    notes = db.execute(
-        "SELECT * FROM handwritten_notes_whiteboards_notes "
-        "WHERE title LIKE ? OR content LIKE ? OR tags LIKE ? "
-        "ORDER BY updated_at DESC LIMIT 50",
-        (f"%{q}%", f"%{q}%", f"%{q}%"),
-    )
+    notes = db.search(SITE, "notes", q, limit=50)
     return jsonify(notes)
 
 
@@ -1096,12 +1105,7 @@ def api_notes_submit_query():
     query = data.get("query", "").strip()
     if not query:
         return jsonify({"error": "query is required"}), 400
-    results = db.execute(
-        "SELECT * FROM handwritten_notes_whiteboards_notes "
-        "WHERE title LIKE ? OR content LIKE ? OR tags LIKE ? "
-        "ORDER BY updated_at DESC LIMIT 50",
-        (f"%{query}%", f"%{query}%", f"%{query}%"),
-    )
+    results = db.search(SITE, "notes", query, limit=50)
     return jsonify({"query": query, "result_count": len(results), "results": results})
 
 
@@ -1110,3 +1114,4 @@ def api_users_list():
     users = _load_users()
     safe = [{k: v for k, v in u.items() if k != "password"} for u in users]
     return jsonify(safe)
+

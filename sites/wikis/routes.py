@@ -15,6 +15,7 @@ from flask import (
 )
 
 from app import db
+from app.events import emit
 
 SITE = "wikis"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -95,16 +96,17 @@ def _interpret_wiki_article(raw, idx):
     }
 
 
-def _load_raw_wiki():
+def _load_raw_wiki(limit=200):
     """Load real Wikipedia articles from the wikis_articles table.
 
     Returns a list of page dicts in the same shape as the overlay pages.
     Returns an empty list when the table is empty (graceful fallback).
+    Capped at `limit` rows to avoid multi-second loads (50K rows x full content).
     """
     try:
         from app.db import _get_conn, _deserialize_row
         conn = _get_conn()
-        rows = conn.execute("SELECT * FROM wikis_articles LIMIT 5000").fetchall()
+        rows = conn.execute("SELECT * FROM wikis_articles LIMIT ?", (limit,)).fetchall()
     except Exception:
         return []
 
@@ -121,19 +123,66 @@ def _load_raw_wiki():
     return pages
 
 
+def _raw_wiki_count():
+    """Return count of raw Wikipedia articles (fast, no content loading)."""
+    try:
+        from app.db import _get_conn
+        conn = _get_conn()
+        return conn.execute("SELECT COUNT(*) FROM wikis_articles").fetchone()[0]
+    except Exception:
+        return 0
+
+
+def _find_raw_wiki_by_slug(slug):
+    """Find a single raw Wikipedia article by slug without loading all articles.
+
+    Searches by title since slugs are derived from titles/paths.
+    """
+    try:
+        from app.db import _get_conn, _deserialize_row
+        conn = _get_conn()
+        # Try path-based match first (ZIM articles use path like "A/Article_Name")
+        # Convert slug back to path-like: replace - with _
+        path_guess = "A/" + slug.replace("-", "_")
+        rows = conn.execute(
+            "SELECT * FROM wikis_articles WHERE path = ? LIMIT 1",
+            (path_guess,)).fetchall()
+        if not rows:
+            # Try title LIKE match
+            title_guess = slug.replace("-", " ")
+            rows = conn.execute(
+                "SELECT * FROM wikis_articles WHERE LOWER(title) LIKE ? LIMIT 1",
+                (f"%{title_guess}%",)).fetchall()
+        if rows:
+            raw = _deserialize_row(rows[0])
+            if isinstance(raw.get("categories"), str):
+                try:
+                    raw["categories"] = json.loads(raw["categories"])
+                except (json.JSONDecodeError, TypeError):
+                    raw["categories"] = []
+            return _interpret_wiki_article(raw, raw.get("row_id", 1))
+    except Exception:
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
 
-def _load_pages():
+def _load_pages(include_raw=True, raw_limit=200):
     """Load merged page list: raw Wikipedia base + overlay Lakeport pages.
 
     Overlay pages (IDs 1-30) always take precedence.  Raw Wikipedia articles
     use IDs starting at 100 000.  The merged list is returned for read
     operations; write operations only touch the overlay collection.
+
+    Set include_raw=False to skip the (slow) raw Wikipedia load.
     """
     overlay_pages = db.query(SITE, "pages")
-    raw_pages = _load_raw_wiki()
+    if not include_raw:
+        return overlay_pages
+    raw_pages = _load_raw_wiki(limit=raw_limit)
 
     if not raw_pages:
         return overlay_pages
@@ -168,38 +217,34 @@ def _save_revisions(revisions):
 
 
 def _load_categories():
-    """Load categories: overlay categories + any extra Wikipedia categories.
+    """Load categories: overlay categories + Wikipedia category.
 
-    Wikipedia category entries are synthesised from the raw page data so they
-    appear in category listings and navigation without modifying the overlay
-    collection.
+    Uses SQL COUNT for overlay page counts (fast) and adds a single
+    'Wikipedia' meta-category for the raw article count.
     """
     overlay_cats = db.query(SITE, "categories")
-    overlay_names = {c["name"] for c in overlay_cats}
 
-    # Gather categories introduced by raw Wikipedia pages
-    all_pages = _load_pages()
-    cat_counts = {}
-    for p in all_pages:
-        cat = p.get("category", "")
-        if cat:
-            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+    # Count overlay pages per category via SQL
+    table = db.get_table_name(SITE, "pages")
+    try:
+        cat_rows = db.execute(
+            f"SELECT category, COUNT(*) as cnt FROM [{table}] GROUP BY category")
+        cat_counts = {r["category"]: r["cnt"] for r in cat_rows}
+    except Exception:
+        cat_counts = {}
 
-    # Update counts for existing overlay categories
     for c in overlay_cats:
         c["page_count"] = cat_counts.get(c["name"], 0)
 
-    # Add new categories that only exist in the raw data
-    next_id = max((c["id"] for c in overlay_cats), default=0) + 1
-    for cat_name, count in sorted(cat_counts.items()):
-        if cat_name not in overlay_names:
-            overlay_cats.append({
-                "id": 1000 + next_id,
-                "name": cat_name,
-                "description": f"Articles about {cat_name} from Wikipedia.",
-                "page_count": count,
-            })
-            next_id += 1
+    # Add Wikipedia meta-category for raw articles
+    raw_count = _raw_wiki_count()
+    if raw_count > 0:
+        overlay_cats.append({
+            "id": 1009,
+            "name": "Wikipedia",
+            "description": "Articles about Wikipedia from Wikipedia.",
+            "page_count": raw_count,
+        })
 
     return overlay_cats
 
@@ -222,18 +267,26 @@ def _get_user(user_id):
 
 
 def _get_page_by_slug(slug):
-    pages = _load_pages()
-    return next((p for p in pages if p["slug"] == slug), None)
+    """Find a page by slug: checks overlay pages first (fast), then raw wiki."""
+    # Try overlay first (small table, fast)
+    overlay = db.query(SITE, "pages")
+    page = next((p for p in overlay if p["slug"] == slug), None)
+    if page:
+        return page
+    # Fall back to raw Wikipedia article lookup (targeted, not full scan)
+    return _find_raw_wiki_by_slug(slug)
 
 
 def _recount_categories():
-    """Recompute page_count for each category (overlay collection only)."""
-    overlay_pages = db.query(SITE, "pages")
+    """Recompute page_count for each category (overlay collection only, via SQL)."""
+    table = db.get_table_name(SITE, "pages")
+    try:
+        cat_rows = db.execute(
+            f"SELECT category, COUNT(*) as cnt FROM [{table}] GROUP BY category")
+        counts = {r["category"]: r["cnt"] for r in cat_rows}
+    except Exception:
+        counts = {}
     categories = db.query(SITE, "categories")
-    counts = {}
-    for p in overlay_pages:
-        cat = p.get("category", "")
-        counts[cat] = counts.get(cat, 0) + 1
     for c in categories:
         c["page_count"] = counts.get(c["name"], 0)
     _save_categories(categories)
@@ -264,7 +317,8 @@ def _search_pages(pages, query):
 
 @blueprint.route("/")
 def index():
-    pages = _load_pages()
+    # Use overlay pages only for the main page (fast); raw articles are for search
+    pages = _load_overlay_pages()
     categories = _load_categories()
     user = _get_user(session.get("user_id")) if "user_id" in session else None
     # Sort by views descending for main page
@@ -281,16 +335,16 @@ def wiki_page(slug):
     page = _get_page_by_slug(slug)
     if not page:
         abort(404)
-    pages = _load_pages()
+    overlay_pages = _load_overlay_pages()
     revisions = _load_revisions()
     page_revisions = [r for r in revisions if r["page_id"] == page["id"]]
     page_revisions.sort(key=lambda r: r["timestamp"], reverse=True)
     users = _load_users()
     author = next((u for u in users if u["id"] == page["author_id"]), None)
-    # Resolve linked pages
+    # Resolve linked pages (overlay only -- linked pages are always overlay slugs)
     linked = []
     for lp_slug in page.get("linked_pages", []):
-        lp = next((p for p in pages if p["slug"] == lp_slug), None)
+        lp = next((p for p in overlay_pages if p["slug"] == lp_slug), None)
         if lp:
             linked.append(lp)
     user = _get_user(session.get("user_id")) if "user_id" in session else None
@@ -394,13 +448,12 @@ def create_page_submit():
         slug = title.lower().replace(" ", "-")
         slug = "".join(c for c in slug if c.isalnum() or c == "-")
 
-    # Check slug uniqueness across ALL pages (overlay + raw)
-    all_pages = _load_pages()
-    if any(p["slug"] == slug for p in all_pages):
+    # Check slug uniqueness: overlay first, then raw
+    if _get_page_by_slug(slug):
         return "A page with that slug already exists", 400
 
-    # Use a safe ID that won't collide with raw IDs (100000+)
-    new_id = max((p["id"] for p in all_pages), default=0) + 1
+    overlay_pages = _load_overlay_pages()
+    new_id = max((p["id"] for p in overlay_pages), default=0) + 1
     editor_id = session.get("user_id", 1)
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -452,7 +505,13 @@ def category_page(cat_id):
     cat = next((c for c in categories if c["id"] == cat_id), None)
     if not cat:
         abort(404)
-    pages = _load_pages()
+    # Use SQL filtering for overlay pages; for Wikipedia category, use raw data
+    if cat["name"] == "Wikipedia":
+        pages = _load_raw_wiki(limit=50)
+    else:
+        # Overlay pages filtered by category via SQL
+        cat_pages = db.query(SITE, "pages", where={"category": cat["name"]}, sort="title")
+        pages = cat_pages
     cat_pages = [p for p in pages if p["category"] == cat["name"]]
     cat_pages.sort(key=lambda p: p["title"])
     user = _get_user(session.get("user_id")) if "user_id" in session else None
@@ -464,7 +523,7 @@ def category_page(cat_id):
 def recent_changes():
     revisions = _load_revisions()
     revisions_sorted = sorted(revisions, key=lambda r: r["timestamp"], reverse=True)
-    pages = _load_pages()
+    pages = _load_overlay_pages()  # revisions are only for overlay pages
     users = _load_users()
     page_map = {p["id"]: p for p in pages}
     user_map = {u["id"]: u for u in users}
@@ -532,6 +591,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("wikis/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="wikis", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("wikis.index"))
 
 
@@ -547,23 +607,34 @@ def logout():
 
 @blueprint.route("/api/pages")
 def api_pages():
-    pages = _load_pages()
+    # Prefer overlay-only for filtered/sorted queries (fast); include raw only for search
     q = request.args.get("q", "").strip()
     category = request.args.get("category", "").strip()
-    sort = request.args.get("sort", "title").strip()
+    sort_field = request.args.get("sort", "title").strip()
     limit = request.args.get("limit", type=int)
+    include_raw = request.args.get("include_raw", "false").lower() == "true"
 
     if q:
+        # Search needs all pages including raw
+        pages = _load_pages(include_raw=True, raw_limit=200)
         pages = _search_pages(pages, q)
-    if category:
-        pages = [p for p in pages if p["category"] == category]
-    if sort == "title":
+    elif category and category != "Wikipedia":
+        # Overlay categories: use SQL filter
+        pages = db.query(SITE, "pages", where={"category": category})
+    elif category == "Wikipedia":
+        pages = _load_raw_wiki(limit=50)
+    elif include_raw:
+        pages = _load_pages(include_raw=True, raw_limit=200)
+    else:
+        pages = _load_overlay_pages()
+
+    if sort_field == "title":
         pages.sort(key=lambda p: p["title"])
-    elif sort == "views":
+    elif sort_field == "views":
         pages.sort(key=lambda p: -p["views"])
-    elif sort == "updated":
+    elif sort_field == "updated":
         pages.sort(key=lambda p: p["updated_at"], reverse=True)
-    elif sort == "created":
+    elif sort_field == "created":
         pages.sort(key=lambda p: p["created_at"], reverse=True)
     if limit:
         pages = pages[:limit]
@@ -653,12 +724,12 @@ def api_page_create():
         slug = title.lower().replace(" ", "-")
         slug = "".join(c for c in slug if c.isalnum() or c == "-")
 
-    # Check slug uniqueness across ALL pages (overlay + raw)
-    all_pages = _load_pages()
-    if any(p["slug"] == slug for p in all_pages):
+    # Check slug uniqueness: overlay first, then raw
+    if _get_page_by_slug(slug):
         return jsonify({"error": "slug already exists"}), 400
 
-    new_id = max((p["id"] for p in all_pages), default=0) + 1
+    overlay_pages = _load_overlay_pages()
+    new_id = max((p["id"] for p in overlay_pages), default=0) + 1
     editor_id = data.get("author_id", session.get("user_id", 1))
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -727,7 +798,7 @@ def api_recent_changes():
     limit = request.args.get("limit", type=int)
     if limit:
         revisions_sorted = revisions_sorted[:limit]
-    pages = _load_pages()
+    pages = _load_overlay_pages()  # revisions only reference overlay pages
     users = _load_users()
     page_map = {p["id"]: p for p in pages}
     user_map = {u["id"]: u for u in users}
@@ -775,16 +846,22 @@ def api_search():
 
 @blueprint.route("/api/semantic-search")
 def api_semantic_search():
-    """FTS5-powered search with BM25 ranking (replaces Python-side scoring)."""
+    """FTS5-powered search with BM25 ranking (replaces Python-side scoring).
+
+    Uses OR logic so articles matching any of the query terms are returned,
+    ranked by BM25 relevance score.  Also searches overlay pages.
+    """
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
     limit = request.args.get("limit", 30, type=int)
+    results = []
     try:
         from app.db import _get_conn, _deserialize_row
         conn = _get_conn()
         terms = q.strip().split()
-        fts_query = " ".join(f'"{t}"*' for t in terms if t)
+        # Use OR so any matching term contributes — more "semantic"-like
+        fts_query = " OR ".join(f'"{t}"*' for t in terms if t)
         rows = conn.execute(
             "SELECT a.* FROM wikis_articles a "
             "JOIN fts_wikis_articles fts ON a.row_id = fts.rowid "
@@ -792,20 +869,27 @@ def api_semantic_search():
             (fts_query, limit)).fetchall()
         results = [_interpret_wiki_article(_deserialize_row(r), r['row_id']) for r in rows]
     except Exception:
-        results = []
-    return jsonify(results)
+        pass
+    # Also search overlay pages (Lakeport-specific content) with Python-side scoring
+    overlay = _search_pages(_load_overlay_pages(), q)
+    seen = {r["title"] for r in results}
+    for p in overlay:
+        if p["title"] not in seen:
+            results.insert(0, p)
+            seen.add(p["title"])
+    return jsonify(results[:limit])
 
 
 @blueprint.route("/compare")
 def compare_page():
     """Side-by-side comparison of two wiki pages selected via dropdowns."""
-    pages = _load_pages()
+    pages = _load_overlay_pages()  # dropdown only shows overlay pages
     categories = _load_categories()
     user = _get_user(session.get("user_id")) if "user_id" in session else None
     slug1 = request.args.get("page1", "").strip()
     slug2 = request.args.get("page2", "").strip()
-    page1 = next((p for p in pages if p["slug"] == slug1), None) if slug1 else None
-    page2 = next((p for p in pages if p["slug"] == slug2), None) if slug2 else None
+    page1 = _get_page_by_slug(slug1) if slug1 else None
+    page2 = _get_page_by_slug(slug2) if slug2 else None
     return render_template("wikis/compare.html",
                            pages=pages, page1=page1, page2=page2,
                            slug1=slug1, slug2=slug2,
@@ -821,10 +905,9 @@ def api_compare():
     slugs = [s.strip() for s in slugs_param.split(",") if s.strip()]
     if len(slugs) < 2:
         return jsonify({"error": "Need exactly 2 slugs separated by comma"}), 400
-    pages = _load_pages()
     results = []
     for s in slugs[:2]:
-        p = next((p for p in pages if p["slug"] == s), None)
+        p = _get_page_by_slug(s)
         if p:
             results.append(p)
     return jsonify(results)
@@ -888,37 +971,60 @@ def api_category_pages(cat_id):
     cat = next((c for c in categories if c["id"] == cat_id), None)
     if not cat:
         abort(404)
-    pages = _load_pages()
-    cat_pages = [p for p in pages if p["category"] == cat["name"]]
+    if cat["name"] == "Wikipedia":
+        cat_pages = _load_raw_wiki(limit=50)
+    else:
+        cat_pages = db.query(SITE, "pages", where={"category": cat["name"]})
     cat_pages.sort(key=lambda p: p["title"])
     return jsonify(cat_pages)
 
 
 @blueprint.route("/api/stats")
 def api_stats():
-    pages = _load_pages()
+    overlay_pages = _load_overlay_pages()
+    raw_count = _raw_wiki_count()
     revisions = _load_revisions()
     categories = _load_categories()
     users = _load_users()
-    total_views = sum(p["views"] for p in pages)
+    # Use overlay pages for view-based stats (raw pages have views=0)
+    overlay_views = sum(p["views"] for p in overlay_pages)
+    total_views = overlay_views
+    total_pages = len(overlay_pages) + raw_count
     # Compute most-edited page
     edit_counts = Counter(r["page_id"] for r in revisions)
     most_edited_id = edit_counts.most_common(1)[0][0] if edit_counts else None
     most_edited_page = None
     if most_edited_id:
-        me = next((p for p in pages if p["id"] == most_edited_id), None)
+        me = next((p for p in overlay_pages if p["id"] == most_edited_id), None)
         if me:
             most_edited_page = me["title"]
     return jsonify({
-        "total_pages": len(pages),
+        "total_pages": total_pages,
         "total_revisions": len(revisions),
         "total_categories": len(categories),
         "total_users": len(users),
         "total_views": total_views,
-        "most_viewed": sorted(pages, key=lambda p: -p["views"])[0]["title"] if pages else None,
+        "most_viewed": sorted(overlay_pages, key=lambda p: -p["views"])[0]["title"] if overlay_pages else None,
         "most_edited_page": most_edited_page,
         "latest_revision": max(revisions, key=lambda r: r["timestamp"])["timestamp"] if revisions else None,
     })
+
+
+@blueprint.route("/api/contributors")
+def api_contributors():
+    """Return contributor list with edit counts (no passwords)."""
+    users = _load_users()
+    contributors = []
+    for u in sorted(users, key=lambda x: -x.get("edit_count", 0)):
+        contributors.append({
+            "id": u["id"],
+            "username": u["username"],
+            "display_name": u["display_name"],
+            "role": u.get("role", "editor"),
+            "edit_count": u.get("edit_count", 0),
+            "joined": u.get("joined", ""),
+        })
+    return jsonify(contributors)
 
 
 @blueprint.route("/api/login", methods=["POST"])

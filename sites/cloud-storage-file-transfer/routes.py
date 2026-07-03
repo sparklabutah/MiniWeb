@@ -14,6 +14,8 @@ from flask import (
     request, session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "cloud-storage-file-transfer"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -24,6 +26,9 @@ OPEN_IN_URLS = {
     "spreadsheets-slides": "/sites/spreadsheets-slides/spreadsheet/{source_id}",
     "handwritten-notes-whiteboards": "/sites/handwritten-notes-whiteboards/note/{source_id}",
     "code-editor-execution": "/sites/code-editor-execution/editor?snippet_id={source_id}",
+    "design-creative": "/sites/design-creative/project/{source_id}",
+    "insurance-loans": "/sites/insurance-loans/",
+    "tax-filing-dmv-permits": "/sites/tax-filing-dmv-permits/",
 }
 # Presentations use a different URL pattern than spreadsheets
 OPEN_IN_PRESENTATION_URL = "/sites/spreadsheets-slides/presentation/{source_id}"
@@ -33,6 +38,9 @@ OPEN_IN_LABELS = {
     "spreadsheets-slides": "SheetDeck",
     "handwritten-notes-whiteboards": "NotePad",
     "code-editor-execution": "CodeRunner",
+    "design-creative": "CanvasStudio",
+    "insurance-loans": "Cascadia Insurance",
+    "tax-filing-dmv-permits": "Tax Filing",
 }
 
 blueprint = Blueprint(
@@ -201,6 +209,15 @@ def index():
     if type_filter:
         visible = [f for f in visible if f["type"] == type_filter]
 
+    # Date range filtering
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    if date_from:
+        visible = [f for f in visible if f.get("modified_at", "") >= date_from]
+    if date_to:
+        date_to_full = date_to + "T23:59:59Z" if len(date_to) == 10 else date_to
+        visible = [f for f in visible if f.get("modified_at", "") <= date_to_full]
+
     # Sorting
     if sort == "name":
         visible.sort(key=lambda f: f["name"].lower())
@@ -211,8 +228,8 @@ def index():
     elif view != "recent":  # recent already sorted
         visible.sort(key=lambda f: f.get("modified_at", ""), reverse=True)
 
-    # Root folders (parent_id == null) — only for drive view
-    root_folders = [f for f in folders if f["parent_id"] is None] if view == "drive" else []
+    # Root folders (parent_id == null or 0) — only for drive view
+    root_folders = [f for f in folders if not f["parent_id"]] if view == "drive" else []
 
     return render_template(
         "cloud-storage-file-transfer/index.html",
@@ -331,6 +348,7 @@ def login_submit():
     user = next((u for u in users if u["username"] == username and u["password"] == password), None)
     if user:
         session["user_id"] = user["id"]
+        emit("signup", user_id=user["id"], site_name="cloud-storage-file-transfer", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
         return redirect(url_for("cloud-storage-file-transfer.index"))
     return render_template("cloud-storage-file-transfer/login.html",
                            error="Invalid username or password.")
@@ -603,6 +621,9 @@ def api_shares_create():
 
     shares.append(new_share)
     _save_shares(shares)
+    _add_email(new_share.get("shared_with", 1) or 1, "noreply@cloud-storage.lakeport.local",
+               "A file was shared with you",
+               "A file has been shared with you on MeridianCloud. Log in to view it.")
 
     # Also update the file's shared_with list if sharing with a user
     if new_share["shared_with"] is not None:
@@ -720,7 +741,9 @@ def api_search_semantic():
     scored = [(f, _semantic_score(q, f)) for f in active]
     scored = [(f, s) for f, s in scored if s > 0]
     scored.sort(key=lambda x: -x[1])
-    return jsonify([f for f, _ in scored])
+    # Limit to top 10 most relevant results to avoid returning all files
+    top_results = scored[:10]
+    return jsonify([f for f, _ in top_results])
 
 
 @blueprint.route("/api/storage-usage")
@@ -854,6 +877,27 @@ def form_file_delete(file_id):
         file["modified_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         _save_files(files)
         return redirect(url_for("cloud-storage-file-transfer.index"))
+
+
+@blueprint.route("/file/<int:file_id>/invite", methods=["POST"])
+def form_invite_to_file(file_id):
+    """Invite a user to access a file via form POST."""
+    email = request.form.get("email", "").strip()
+    if email:
+        shares = _load_shares()
+        new_id = max((s["id"] for s in shares), default=0) + 1
+        shares.append({
+            "id": new_id,
+            "file_id": file_id,
+            "shared_with": None,
+            "shared_by": session.get("user_id", 1),
+            "permission": "view",
+            "link": "",
+            "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "invited_email": email,
+        })
+        _save_shares(shares)
+    return redirect(url_for("cloud-storage-file-transfer.file_detail", file_id=file_id))
 
 
 @blueprint.route("/file/<int:file_id>/star", methods=["POST"])
@@ -1253,7 +1297,6 @@ def api_login():
         return jsonify({"error": "Invalid credentials"}), 401
     session["user_id"] = user["id"]
     return jsonify({"user_id": user["id"], "username": user["username"], "name": user["name"]})
-
 
 @blueprint.route("/api/users/<int:user_id>")
 def api_user_get(user_id):

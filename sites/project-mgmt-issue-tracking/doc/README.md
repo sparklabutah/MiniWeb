@@ -2,7 +2,7 @@
 
 **Category**: Productivity
 **Reviewer**: Reaz
-**Number of macros**: 25
+**Number of macros**: 21
 
 ## Data Source
 
@@ -44,7 +44,7 @@ All data is loaded by default (num_data_points=-1). The dataset is small (40 iss
 
 ## Target Macros
 
-navigate_by_semantic, navigate_by_dropdown, navigate_from_table, navigate_by_route, search_by_query, filter_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_from_table, extract_by_route, create_from_free_text, submit_by_query, edit_by_query, edit_by_dropdown, edit_by_form, delete_from_table, post_from_free_text, select_by_dropdown, select_from_table, export_by_dropdown, follow_by_toggle
+navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_from_table, extract_by_route, create_from_free_text, submit_by_query, edit_by_query, edit_by_dropdown, edit_by_form, delete_from_table, post_from_free_text, export_by_dropdown, follow_by_toggle
 
 ## Temporal Dynamics
 

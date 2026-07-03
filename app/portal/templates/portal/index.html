@@ -27,6 +27,7 @@
         </button>
         <div id="url-bar-wrapper">
             <input id="url-bar" type="text" placeholder="Search MiniWeb or type a URL..." autocomplete="off" spellcheck="false">
+            <button id="url-go-btn" onclick="navigateTo(document.getElementById('url-bar').value)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#5f6368;font-size:14px;padding:2px 6px;border-radius:4px;" title="Go">&#10132;</button>
         </div>
     </div>
 
@@ -59,6 +60,45 @@ const MAX_TABS = 10;
 let tabs = [];
 let activeTabId = null;
 let tabIdCounter = 0;
+
+// Build domain <-> path mappings from site metadata
+const DOMAIN_TO_PATH = {};
+const PATH_TO_DOMAIN = {};
+SITES.forEach(s => {
+    if (s.domain) {
+        DOMAIN_TO_PATH[s.domain] = s.path;
+        PATH_TO_DOMAIN[s.id] = s.domain;
+    }
+});
+
+function pathToDisplayUrl(path) {
+    // Convert /sites/banking/dashboard?x=1 -> securebank.com/dashboard?x=1
+    const m = path.match(/^\/sites\/([^/]+)(\/.*)?$/);
+    if (m) {
+        const siteId = m[1];
+        const rest = m[2] || '/';
+        const domain = PATH_TO_DOMAIN[siteId];
+        if (domain) return domain + rest;
+    }
+    return path;
+}
+
+function displayUrlToPath(url) {
+    // Convert https://securebank.com/dashboard -> /sites/banking/dashboard
+    let u = url.trim();
+    // Strip protocol
+    u = u.replace(/^https?:\/\//, '');
+    // Try matching domain
+    for (const [domain, sitePath] of Object.entries(DOMAIN_TO_PATH)) {
+        if (u === domain || u.startsWith(domain + '/')) {
+            const rest = u.slice(domain.length) || '/';
+            return sitePath.replace(/\/$/, '') + rest;
+        }
+    }
+    // If it starts with / it's already a path
+    if (url.startsWith('/')) return url;
+    return null;
+}
 
 const CATEGORY_ORDER = [
     "Communication", "Productivity", "Shopping & Transactional", "Financial",
@@ -148,6 +188,7 @@ function createIframe(tab, url) {
 }
 
 function switchTab(tabId) {
+    const prevTab = tabs.find(t => t.id === activeTabId);
     activeTabId = tabId;
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
@@ -165,6 +206,21 @@ function switchTab(tabId) {
     }
     updateNavButtons();
     tab.tabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    // Post tab switch action to parent (annotation page)
+    if (prevTab && prevTab.id !== tabId) {
+        try {
+            window.top.postMessage({
+                mw: 'action',
+                action: 'tab_switch',
+                target: "tab '" + tab.title + "'",
+                selector: '',
+                from_tab: prevTab.title,
+                to_tab: tab.title,
+                url: tab.url || '',
+                timestamp: new Date().toISOString(),
+            }, '*');
+        } catch(e) {}
+    }
 }
 
 function closeTab(tabId) {
@@ -246,20 +302,59 @@ function refresh() {
 }
 
 function navigateTo(input) {
-    const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab) return;
-    let url = input.trim();
-    if (!url) return;
+    try {
+        const tab = tabs.find(t => t.id === activeTabId);
+        if (!tab) { createTab(); return; }
+        let url = input.trim();
+        if (!url) return;
 
-    if (url.startsWith('/')) { loadUrlInTab(tab, url); return; }
+        // Strip protocol for matching
+        const bare = url.replace(/^https?:\/\//, '');
 
-    const lower = url.toLowerCase();
-    const matched = SITES.find(s =>
-        s.id === lower || s.name.toLowerCase() === lower ||
-        s.id.includes(lower) || s.name.toLowerCase().includes(lower)
-    );
-    if (matched) { loadUrlInTab(tab, matched.path); return; }
-    showSearchResults(url);
+        // Special case: snplnk.io/CODE -> resolve short link
+        const snplnk = bare.match(/^snplnk\.io\/([A-Za-z0-9_-]+)/);
+        if (snplnk) {
+            fetch('/sites/url-shorteners-qr/api/resolve/' + snplnk[1])
+                .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+                .then(data => {
+                    if (data.original_url && data.original_url.startsWith('/')) {
+                        loadUrlInTab(tab, data.original_url);
+                    } else {
+                        loadUrlInTab(tab, '/sites/url-shorteners-qr/s/' + snplnk[1]);
+                    }
+                })
+                .catch(() => loadUrlInTab(tab, '/sites/url-shorteners-qr/s/' + snplnk[1]));
+            return;
+        }
+
+        // Try resolving simulated domain URL (with or without https://)
+        for (const [domain, sitePath] of Object.entries(DOMAIN_TO_PATH)) {
+            if (bare === domain || bare.startsWith(domain + '/')) {
+                const rest = bare.slice(domain.length) || '/';
+                loadUrlInTab(tab, sitePath.replace(/\/$/, '') + rest);
+                return;
+            }
+        }
+
+        // Direct path
+        if (url.startsWith('/')) { loadUrlInTab(tab, url); return; }
+
+        // Fuzzy match by site name, id, or domain
+        const lower = bare.toLowerCase();
+        const matched = SITES.find(s =>
+            s.id === lower || s.name.toLowerCase() === lower ||
+            (s.domain && s.domain.toLowerCase() === lower)
+        ) || SITES.find(s =>
+            s.id.includes(lower) || s.name.toLowerCase().includes(lower) ||
+            (s.domain && s.domain.toLowerCase().includes(lower))
+        );
+        if (matched) { loadUrlInTab(tab, matched.path); return; }
+
+        // Fall back to search
+        showSearchResults(url);
+    } catch (err) {
+        console.error('navigateTo error:', err);
+    }
 }
 
 function loadUrlInTab(tab, url) {
@@ -272,7 +367,7 @@ function loadUrlInTab(tab, url) {
     }
     tab.url = url;
     pushHistory(tab, url);
-    document.getElementById('url-bar').value = url;
+    document.getElementById('url-bar').value = pathToDisplayUrl(url);
 
     const siteMatch = url.match(/^\/sites\/([^/]+)/);
     if (siteMatch) {
@@ -321,7 +416,7 @@ function startUrlSync(tab) {
                 tab.url = currentUrl;
                 pushHistory(tab, currentUrl);
                 if (activeTabId === tab.id) {
-                    document.getElementById('url-bar').value = currentUrl;
+                    document.getElementById('url-bar').value = pathToDisplayUrl(currentUrl);
                 }
             }
 
@@ -339,12 +434,13 @@ function syncUrlBar(tab) {
     try {
         if (tab.iframeEl) {
             const loc = tab.iframeEl.contentWindow.location;
-            document.getElementById('url-bar').value = loc.pathname + loc.search;
+            const raw = loc.pathname + loc.search;
+            document.getElementById('url-bar').value = pathToDisplayUrl(raw);
         } else {
             document.getElementById('url-bar').value = '';
         }
     } catch (e) {
-        document.getElementById('url-bar').value = tab.url || '';
+        document.getElementById('url-bar').value = pathToDisplayUrl(tab.url || '');
     }
 }
 
@@ -536,12 +632,26 @@ function doWebSearch(query) {
 
 document.addEventListener('DOMContentLoaded', () => {
     buildCategories();
-    createTab();
+
+    // Support ?open=site1,site2 to pre-open tabs
+    const openParam = new URLSearchParams(window.location.search).get('open');
+    if (openParam) {
+        openParam.split(',').filter(Boolean).forEach(siteId => createTab(siteId.trim()));
+    } else {
+        createTab();
+    }
 
     document.getElementById('new-tab-btn').addEventListener('click', () => createTab());
     document.getElementById('btn-back').addEventListener('click', goBack);
     document.getElementById('btn-forward').addEventListener('click', goForward);
     document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+    // Listen for rewind navigation commands from parent (annotation interface)
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'navigate' && e.data.url) {
+            navigateTo(e.data.url);
+        }
+    });
 
     const urlBar = document.getElementById('url-bar');
     urlBar.addEventListener('keydown', (e) => {

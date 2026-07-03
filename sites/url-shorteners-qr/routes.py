@@ -21,8 +21,8 @@ from collections import Counter
 from datetime import datetime
 
 from flask import (
-    Blueprint, Response, abort, jsonify, redirect, render_template, request,
-    session, url_for,
+    Blueprint, Response, abort, jsonify, redirect, render_template,
+    render_template_string, request, session, url_for,
 )
 from app import db
 
@@ -650,6 +650,32 @@ def api_link_qr(link_id):
         "qr_enabled": link.get("qr_enabled", True),
         "qr_svg": qr_placeholder,
     })
+
+
+@blueprint.route("/s/<short_code>")
+def redirect_short(short_code):
+    """Redirect a short code to its original URL."""
+    links = _load_links()
+    link = next((l for l in links if l["short_code"] == short_code), None)
+    if not link or not link.get("is_active", True):
+        abort(404)
+    # Record click
+    link["clicks"] = link.get("clicks", 0) + 1
+    _save_links(links)
+    target = link["original_url"]
+    # If it's a relative MiniWeb URL, redirect directly
+    if target.startswith("/"):
+        return redirect(target)
+    # External URLs — show the destination (can't leave MiniWeb)
+    return render_template_string(
+        '<html><body style="font-family:sans-serif;padding:2rem;text-align:center">'
+        '<h2>External Link</h2>'
+        '<p>This short link points to an external website:</p>'
+        '<p style="font-family:monospace;background:#f1f5f9;padding:.5rem 1rem;border-radius:.3rem;display:inline-block;">{{ url }}</p>'
+        '<p style="color:#666;font-size:.85rem;margin-top:1rem;">External sites are not available inside MiniWeb.</p>'
+        '</body></html>',
+        url=target,
+    )
 
 
 @blueprint.route("/api/resolve/<short_code>")

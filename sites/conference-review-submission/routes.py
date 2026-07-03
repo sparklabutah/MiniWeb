@@ -8,10 +8,13 @@ import math
 import pathlib
 import re
 from collections import Counter
+from datetime import datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.db import _deserialize_row
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "conference-review-submission"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -135,27 +138,42 @@ def _interpret_record(raw):
 
 def _db_query_papers(venue_id="", q="", status="", sort="title",
                      score_min=None, score_max=None, limit=25, offset=0):
-    conn = _db_conn()
-    clauses = []
-    params = []
 
-    if venue_id:
-        clauses.append("venue_id = ?")
-        params.append(venue_id)
     if q:
-        clauses.append("(title LIKE ? OR abstract LIKE ?)")
-        params.extend([f"%{q}%", f"%{q}%"])
-    if status == "accepted":
-        clauses.append("accepted = 1")
-    elif status == "rejected":
-        clauses.append("(accepted = 0)")
+        # --- Text search path: use FTS5 via db.search() ---
+        where_eq = {}
+        if venue_id:
+            where_eq["venue_id"] = venue_id
+        rows = db.search(SITE, "papers", q,
+                         where=where_eq if where_eq else None,
+                         limit=max(limit + offset, 500))
+        papers = [_interpret_record(r) for r in rows]
 
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
-    sql = f"SELECT * FROM conference_review_submission_papers {where} LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
+        # Post-filter on status
+        if status == "accepted":
+            papers = [p for p in papers if p["accepted"]]
+        elif status == "rejected":
+            papers = [p for p in papers if not p["accepted"]]
+    else:
+        # --- Non-search path: normal SQL filters ---
+        conn = _db_conn()
+        clauses = []
+        params = []
 
-    rows = conn.execute(sql, params).fetchall()
-    papers = [_interpret_record(_deserialize_row(row)) for row in rows]
+        if venue_id:
+            clauses.append("venue_id = ?")
+            params.append(venue_id)
+        if status == "accepted":
+            clauses.append("accepted = 1")
+        elif status == "rejected":
+            clauses.append("(accepted = 0)")
+
+        where = "WHERE " + " AND ".join(clauses) if clauses else ""
+        sql = f"SELECT * FROM conference_review_submission_papers {where} LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(sql, params).fetchall()
+        papers = [_interpret_record(_deserialize_row(row)) for row in rows]
 
     # Post-filter on computed score fields (small result set)
     if score_min is not None:
@@ -171,6 +189,10 @@ def _db_query_papers(venue_id="", q="", status="", sort="title",
         papers.sort(key=lambda p: p["title"].lower())
     elif sort == "reviews":
         papers.sort(key=lambda p: -p["num_reviews"])
+
+    # Apply offset/limit for the FTS path (non-search path already did it in SQL)
+    if q:
+        papers = papers[offset:offset + limit]
 
     return papers
 
@@ -206,21 +228,14 @@ def _db_count_papers(venue_id="", status=""):
 def _db_search_papers(query, venue_id=""):
     if not query:
         return []
-    conn = _db_conn()
-    clauses = ["(title LIKE ? OR abstract LIKE ?)"]
-    params = [f"%{query}%", f"%{query}%"]
+    where_eq = {}
     if venue_id:
-        clauses.append("venue_id = ?")
-        params.append(venue_id)
-    where = "WHERE " + " AND ".join(clauses)
-    rows = conn.execute(
-        f"SELECT * FROM conference_review_submission_papers {where} LIMIT 500",
-        params,
-    ).fetchall()
-    papers = [_interpret_record(_deserialize_row(r)) for r in rows]
-    scored = [(p, _keyword_score(query, p)) for p in papers]
-    scored.sort(key=lambda x: -x[1])
-    return [p for p, _ in scored]
+        where_eq["venue_id"] = venue_id
+    rows = db.search(SITE, "papers", query,
+                     where=where_eq if where_eq else None,
+                     limit=500)
+    # db.search returns BM25-ranked results; interpret them
+    return [_interpret_record(r) for r in rows]
 
 
 def _db_related_papers(paper, limit=5):
@@ -465,6 +480,9 @@ def review_form(paper_id):
             }
             u["bids"] = bids
             _save_users(users)
+        _add_email(user["id"], "noreply@conference-review.lakeport.local",
+                   "Review submitted",
+                   f'Your review for paper "{paper["title"]}" has been submitted successfully.')
         return redirect(url_for("conference-review-submission.paper_detail", paper_id=paper_id))
 
     return render_template("conference-review-submission/review.html",
@@ -585,6 +603,7 @@ def login_submit():
         return render_template("conference-review-submission/login.html",
                                error="Invalid username or password")
     session[_SESSION_KEY] = user["id"]
+    emit("signup", user_id=user["id"], site_name="conference-review-submission", username=username, password=password, email="")
     return redirect(url_for("conference-review-submission.console"))
 
 
@@ -597,6 +616,16 @@ def logout():
 # ---------------------------------------------------------------------------
 # Form-based mutation routes
 # ---------------------------------------------------------------------------
+
+@blueprint.route("/upload-paper", methods=["POST"])
+def form_upload_paper():
+    """Handle paper PDF upload from the console."""
+    if not _is_logged_in():
+        return redirect(url_for("conference-review-submission.login_page"))
+    # Accept file but just redirect back (no persistent storage needed)
+    _file = request.files.get("file")
+    return redirect(url_for("conference-review-submission.console"))
+
 
 @blueprint.route("/paper/<paper_id>/bid", methods=["POST"])
 def form_bid(paper_id):
@@ -636,6 +665,7 @@ def form_assign(paper_id):
         assigned.append(paper_id)
     reviewer["assigned_papers"] = assigned
     _save_users(users)
+    emit("booking", user_id=reviewer_id, title=f"Review deadline: Paper {paper_id}", start=datetime.now().strftime("%Y-%m-%d"), location="")
     return redirect(url_for("conference-review-submission.paper_detail", paper_id=paper_id))
 
 
@@ -908,7 +938,6 @@ def api_assign(user_id):
     user["assigned_papers"] = assigned
     _save_users(users)
     return jsonify({"action": action, "paper_id": paper_id, "total_assigned": len(assigned)})
-
 
 @blueprint.route("/api/users/<int:user_id>/review", methods=["POST"])
 def api_submit_review(user_id):

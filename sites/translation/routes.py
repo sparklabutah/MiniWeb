@@ -52,51 +52,25 @@ def _get_openai_key():
     return os.environ.get("OPENAI_API_KEY", "")
 
 
-def _call_llm_translate(text, source_lang, target_lang):
-    """Translate text using OpenAI gpt-5.4-nano (same model as AI chatbot)."""
-    key = _get_openai_key()
-    if not key:
-        return None
-    src_name = _LANG_NAMES.get(source_lang, source_lang)
-    tgt_name = _LANG_NAMES.get(target_lang, target_lang)
-    try:
-        import urllib.request
-        payload = json.dumps({
-            "model": "gpt-5.4-nano-2026-03-17",
-            "messages": [
-                {"role": "system", "content": f"You are a translator. Translate the following text from {src_name} to {tgt_name}. Output ONLY the translation, nothing else. No explanations."},
-                {"role": "user", "content": text},
-            ],
-            "max_completion_tokens": 500,
-            "temperature": 0.3,
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=payload,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-            return data["choices"][0]["message"]["content"].strip()
-    except Exception:
-        return None
-
-
 def _translate_text(text, source_lang, target_lang, user_glossary=None):
-    """Translate using LLM. Falls back to echo if API unavailable."""
+    """Translate using Groq/Claude LLM."""
     if not text or not text.strip():
         return ""
     if source_lang == target_lang:
         return text
 
-    # Try LLM translation
-    result = _call_llm_translate(text, source_lang, target_lang)
+    from app.llm import call_llm
+
+    src_name = _LANG_NAMES.get(source_lang, source_lang)
+    tgt_name = _LANG_NAMES.get(target_lang, target_lang)
+    system = f"You are a translator. Translate from {src_name} to {tgt_name}. Output ONLY the translation, nothing else."
+
+    result = call_llm(text, system=system, max_tokens=500, temperature=0.3)
     if result:
         return result
 
-    # Fallback: return original with a note
-    tgt_name = _LANG_NAMES.get(target_lang, target_lang)
-    return f"[{tgt_name} translation unavailable] {text}"
+    # Last resort
+    return f"[{tgt_name}] {text}"
 
 
 def _detect_language(text):
@@ -993,3 +967,4 @@ def api_login():
     session["user_id"] = user["id"]
     return jsonify({"user_id": user["id"], "username": user["username"],
                     "name": user["name"]})
+

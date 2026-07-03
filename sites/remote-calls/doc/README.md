@@ -2,7 +2,7 @@
 
 **Category**: Communication
 **Reviewer**: Farhan
-**Number of macros**: 20
+**Number of macros**: 19
 
 ## Data Source
 
@@ -37,7 +37,7 @@ Data is fully synthetic and small (8 users, 18 meetings, 6 recordings, 25 calls)
 
 ## Target Macros
 
-navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, extract_by_query, extract_from_table, extract_by_route, create_from_free_text, submit_by_query, select_by_dropdown, configure_by_dropdown, play_by_playback, export_by_dropdown, share_by_toggle, invite_by_form, message_from_free_text, book_by_form, cancel_by_form, join_by_code
+navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, extract_by_query, extract_from_table, extract_by_route, submit_by_query, select_by_dropdown, configure_by_dropdown, play_by_playback, export_by_dropdown, share_by_toggle, invite_by_form, message_from_free_text, book_by_form, cancel_by_form, join_by_code
 
 ## Temporal Dynamics
 

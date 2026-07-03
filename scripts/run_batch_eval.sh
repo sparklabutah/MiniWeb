@@ -21,6 +21,8 @@
 #   --parallel N          Sites to eval simultaneously (default: 2)
 #   --site-timeout N      Max seconds per site eval (default: 1800 = 30 min)
 #   --task-timeout N      Max seconds per task (default: 180 = 3 min)
+#   --judge               Use LLM-as-judge instead of verifiers.py
+#   --judge-model MODEL   Model for LLM judge (default: gpt-4.1-nano)
 #   --new-only            Skip sites that already have eval results
 #   --dry-run             Print what would run without executing
 # =============================================================================
@@ -39,6 +41,8 @@ MAX_STEPS=20
 ROUNDS=1
 PORT_START=8090
 PARALLEL=6
+JUDGE=false
+JUDGE_MODEL="gpt-4.1-nano"
 DRY_RUN=false
 NEW_ONLY=false
 SITES=""
@@ -46,18 +50,27 @@ SITE_TIMEOUT=1800     # 30 min per site
 TASK_TIMEOUT=180      # 3 min per task
 DATA_SOURCES="/scratch/general/vast/u1653932/data_sources"
 
+# Helper: check that a flag has a value argument
+require_arg() {
+    if [[ $# -lt 2 || "$2" == --* ]]; then
+        echo "Error: $1 requires a value"; exit 1
+    fi
+}
+
 # Parse args
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --model) MODEL="$2"; shift 2 ;;
-        --workers) WORKERS="$2"; shift 2 ;;
-        --max-steps) MAX_STEPS="$2"; shift 2 ;;
-        --rounds) ROUNDS="$2"; shift 2 ;;
-        --sites) SITES="$2"; shift 2 ;;
-        --port-start) PORT_START="$2"; shift 2 ;;
-        --parallel) PARALLEL="$2"; shift 2 ;;
-        --site-timeout) SITE_TIMEOUT="$2"; shift 2 ;;
-        --task-timeout) TASK_TIMEOUT="$2"; shift 2 ;;
+        --model) require_arg "$@"; MODEL="$2"; shift 2 ;;
+        --workers) require_arg "$@"; WORKERS="$2"; shift 2 ;;
+        --max-steps) require_arg "$@"; MAX_STEPS="$2"; shift 2 ;;
+        --rounds) require_arg "$@"; ROUNDS="$2"; shift 2 ;;
+        --sites) require_arg "$@"; SITES="$2"; shift 2 ;;
+        --port-start) require_arg "$@"; PORT_START="$2"; shift 2 ;;
+        --parallel) require_arg "$@"; PARALLEL="$2"; shift 2 ;;
+        --site-timeout) require_arg "$@"; SITE_TIMEOUT="$2"; shift 2 ;;
+        --task-timeout) require_arg "$@"; TASK_TIMEOUT="$2"; shift 2 ;;
+        --judge) JUDGE=true; shift ;;
+        --judge-model) require_arg "$@"; JUDGE_MODEL="$2"; shift 2 ;;
         --new-only) NEW_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -113,6 +126,7 @@ echo "  Task timeout: ${TASK_TIMEOUT}s per task"
 echo "  Site timeout: ${SITE_TIMEOUT}s per site"
 echo "  Rounds:       $ROUNDS per site"
 echo "  Parallel:     $PARALLEL sites simultaneously"
+echo "  Judge:        $JUDGE (model: $JUDGE_MODEL)"
 echo "  Sites:        $TOTAL"
 echo "  Sites list:   ${SITE_LIST[*]}"
 echo "============================================================"
@@ -216,6 +230,12 @@ run_site_eval() {
     # Kill anything on the port first
     kill_port "$port"
 
+    # Build judge flags
+    local judge_flags=""
+    if [ "$JUDGE" = true ]; then
+        judge_flags="--judge --judge-model $JUDGE_MODEL"
+    fi
+
     # Run with site-level timeout
     timeout --kill-after=30 "$SITE_TIMEOUT" \
         $PYTHON evaluation/run_eval.py \
@@ -224,6 +244,7 @@ run_site_eval() {
             --port "$port" \
             --workers "$WORKERS" \
             --max-steps "$MAX_STEPS" \
+            $judge_flags \
             > "$site_log" 2>&1
 
     local exit_code=$?

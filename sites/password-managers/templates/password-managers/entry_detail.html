@@ -101,7 +101,11 @@
             <div class="title-area">
                 <h2>{{ entry.title }}</h2>
                 {% if entry.url %}
-                <div class="entry-url"><a href="{{ entry.url }}" target="_blank">{{ entry.url }}</a></div>
+                {% if entry.url.startswith('/') %}
+                <div class="entry-url"><a href="{{ entry.url }}">{{ entry.url }}</a></div>
+                {% else %}
+                <div class="entry-url" style="color:#8b92a5;">{{ entry.url }}</div>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -190,6 +194,13 @@
             <span>Created: {{ entry.created_at[:10] if entry.created_at else 'N/A' }}</span>
             <span>Updated: {{ entry.updated_at[:10] if entry.updated_at else 'N/A' }}</span>
             <span>Last used: {{ entry.last_used[:10] if entry.last_used else 'N/A' }}</span>
+        </div>
+
+        <div style="margin-top:1rem;display:flex;gap:.6rem;">
+            <a href="{{ url_for('password-managers.edit_entry_page', entry_id=entry.id) }}" style="padding:.4rem 1rem;background:#1e2235;color:#6c8cff;border:1px solid #2d3348;border-radius:.3rem;font-size:.85rem;text-decoration:none;">Edit</a>
+            <form method="POST" action="{{ url_for('password-managers.form_delete_entry', entry_id=entry.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this entry?')">
+                <button type="submit" style="padding:.4rem 1rem;background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;border-radius:.3rem;font-size:.85rem;cursor:pointer;">Delete</button>
+            </form>
         </div>
 
         {% if audit_log %}

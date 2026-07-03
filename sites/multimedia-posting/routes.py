@@ -27,6 +27,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "multimedia-posting"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -294,19 +295,23 @@ def settings_page():
 
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    users = _load_users()
-    return render_template("multimedia-posting/login.html", users=users, error=None)
+    return render_template("multimedia-posting/login.html", error=None)
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
     if not user:
         return render_template("multimedia-posting/login.html",
-                               users=users, error="User not found")
+                               error="User not found")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("multimedia-posting/login.html", error="Invalid password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="multimedia-posting", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("multimedia-posting.index"))
 
 

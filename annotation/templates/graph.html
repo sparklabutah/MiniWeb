@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Affinity Graph</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: .8rem; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.topbar h1 { font-size: .95rem; color: #0f172a; font-weight: 700; }
+.topbar a { color: #2563eb; text-decoration: none; font-size: .8rem; }
+.topbar a:hover { text-decoration: underline; }
+.btn { padding: .3rem .6rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .75rem; font-weight: 600; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.btn-secondary:hover { background: #e2e8f0; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+canvas { flex: 1; display: block; cursor: grab; background: #fff; }
+canvas.dragging { cursor: grabbing; }
+
+.sidebar { width: 300px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.sidebar h3 { font-size: .85rem; color: #0f172a; padding: .6rem .8rem; border-bottom: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600; }
+.sidebar-body { flex: 1; overflow-y: auto; padding: .5rem; }
+
+.legend { padding: .5rem .8rem; border-bottom: 1px solid #e2e8f0; }
+.legend-item { display: flex; align-items: center; gap: .4rem; font-size: .72rem; color: #64748b; margin-bottom: .2rem; }
+.legend-line { width: 20px; height: 2px; flex-shrink: 0; }
+
+.edge-item { padding: .35rem .5rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: .3rem; font-size: .75rem; }
+.edge-item:hover { background: #f8fafc; }
+.edge-item .src { color: #2563eb; font-weight: 500; }
+.edge-item .arrow { color: #94a3b8; }
+.edge-item .tgt { color: #059669; font-weight: 500; }
+.edge-item .etype { color: #d97706; font-size: .65rem; margin-left: auto; }
+.edge-item .del-btn { color: #ef4444; cursor: pointer; font-size: .8rem; margin-left: .3rem; opacity: .4; }
+.edge-item .del-btn:hover { opacity: 1; }
+
+.add-edge-form { padding: .6rem .8rem; border-top: 1px solid #e2e8f0; background: #f8fafc; flex-shrink: 0; }
+.add-edge-form h4 { font-size: .78rem; color: #0f172a; margin-bottom: .4rem; font-weight: 600; }
+.add-edge-form select, .add-edge-form input { width: 100%; padding: .3rem .4rem; background: #fff; border: 1px solid #cbd5e1; color: #1e293b; border-radius: .3rem; font-size: .78rem; margin-bottom: .3rem; }
+.add-edge-form select:focus, .add-edge-form input:focus { outline: none; border-color: #2563eb; }
+
+.node-info { position: fixed; background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .5rem .7rem; font-size: .78rem; color: #1e293b; pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.1); max-width: 250px; display: none; }
+.node-info .ni-name { font-weight: 700; color: #0f172a; margin-bottom: .2rem; }
+.node-info .ni-cat { color: #64748b; font-size: .7rem; }
+.node-info .ni-edges { margin-top: .3rem; font-size: .7rem; color: #2563eb; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <h1>Site Affinity Graph</h1>
+    <span style="flex:1"></span>
+    <button class="btn btn-secondary" onclick="resetLayout()">Reset Layout</button>
+    <button class="btn btn-primary" id="save-btn" onclick="savePositions()">Save Layout</button>
+    <a href="{{ url_for('annotation.index') }}">Home</a>
+    <a href="{{ url_for('annotation.annotate') }}">Annotate</a>
+</div>
+
+<div class="main">
+    <canvas id="graph-canvas"></canvas>
+    <div class="sidebar">
+        <div class="legend">
+            <div class="legend-item"><div class="legend-line" style="background:#ef4444"></div> purchase</div>
+            <div class="legend-item"><div class="legend-line" style="background:#f59e0b"></div> payment</div>
+            <div class="legend-item"><div class="legend-line" style="background:#3b82f6"></div> booking</div>
+            <div class="legend-item"><div class="legend-line" style="background:#10b981"></div> signup</div>
+            <div class="legend-item"><div class="legend-line" style="background:#8b5cf6"></div> file_created</div>
+            <div class="legend-item"><div class="legend-line" style="background:#ec4899"></div> message</div>
+            <div class="legend-item"><div class="legend-line" style="background:#06b6d4"></div> trade</div>
+            <div class="legend-item"><div class="legend-line" style="background:#94a3b8"></div> other</div>
+        </div>
+        <h3>Edges (<span id="edge-count">0</span>)</h3>
+        <div class="sidebar-body" id="edge-list"></div>
+        <div class="add-edge-form">
+            <h4>Add Edge</h4>
+            <select id="edge-src"><option value="">Source site...</option></select>
+            <select id="edge-tgt"><option value="">Target site...</option></select>
+            <input type="text" id="edge-type" placeholder="Event type (e.g. purchase, booking)">
+            <button class="btn btn-primary" style="width:100%" onclick="addEdge()">Add Edge</button>
+        </div>
+    </div>
+</div>
+
+<div class="node-info" id="node-info">
+    <div class="ni-name" id="ni-name"></div>
+    <div class="ni-cat" id="ni-cat"></div>
+    <div class="ni-edges" id="ni-edges"></div>
+</div>
+
+<script>
+const SITES = {{ sites | tojson }};
+const EVENT_COLORS = {
+    purchase: '#ef4444', payment: '#f59e0b', booking: '#3b82f6',
+    signup: '#10b981', file_created: '#8b5cf6', message: '#ec4899',
+    trade: '#06b6d4', subscribe: '#d946ef', inquiry: '#84cc16',
+    '2fa_code': '#fb923c',
+};
+const CAT_COLORS = {
+    'Financial': '#dc2626', 'Communication': '#2563eb', 'Shopping & Transactional': '#d97706',
+    'Productivity': '#059669', 'Social Media': '#db2777', 'Streaming & Media': '#7c3aed',
+    'Dynamic Info & Feeds': '#0891b2', 'Search & Reference': '#65a30d',
+    'Static & Informational': '#64748b', 'Editing': '#c026d3', 'Education & LMS': '#ea580c',
+    'Government & Civic': '#475569', 'Health': '#e11d48', 'Maps & Navigation': '#0d9488',
+    'Utilities': '#7c3aed', 'Other': '#78716c',
+};
+
+const canvas = document.getElementById('graph-canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+let nodes = [];
+let edges = [];
+let dragNode = null;
+let hoverNode = null;
+
+SITES.forEach(s => {
+    nodes.push({
+        id: s.id, name: s.name || s.id, category: s.category || '',
+        x: 0, y: 0, vx: 0, vy: 0, radius: 18,
+    });
+});
+
+const srcSel = document.getElementById('edge-src');
+const tgtSel = document.getElementById('edge-tgt');
+nodes.forEach(n => {
+    srcSel.add(new Option(n.name, n.id));
+    tgtSel.add(new Option(n.name, n.id));
+});
+
+// --- Static force layout (runs N iterations, then stops) ---
+function circularLayout() {
+    const cx = W / 2, cy = H / 2;
+    const r = Math.min(W, H) * 0.38;
+    nodes.forEach((n, i) => {
+        const a = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+        n.x = cx + r * Math.cos(a);
+        n.y = cy + r * Math.sin(a);
+        n.vx = 0; n.vy = 0;
+    });
+}
+
+function runForceLayout(iterations) {
+    const k = 0.005, repulse = 8000, damping = 0.85;
+    const cx = W / 2, cy = H / 2;
+    for (let iter = 0; iter < iterations; iter++) {
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                let dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+                let d = Math.sqrt(dx * dx + dy * dy) || 1;
+                let f = repulse / (d * d);
+                nodes[i].vx -= (dx / d) * f; nodes[i].vy -= (dy / d) * f;
+                nodes[j].vx += (dx / d) * f; nodes[j].vy += (dy / d) * f;
+            }
+        }
+        edges.forEach(e => {
+            const src = nodes.find(n => n.id === e.source);
+            const tgt = nodes.find(n => n.id === e.target);
+            if (!src || !tgt) return;
+            let dx = tgt.x - src.x, dy = tgt.y - src.y;
+            let d = Math.sqrt(dx * dx + dy * dy) || 1;
+            let f = k * (d - 200);
+            src.vx += (dx / d) * f; src.vy += (dy / d) * f;
+            tgt.vx -= (dx / d) * f; tgt.vy -= (dy / d) * f;
+        });
+        nodes.forEach(n => {
+            n.vx += (cx - n.x) * 0.0003;
+            n.vy += (cy - n.y) * 0.0003;
+            n.vx *= damping; n.vy *= damping;
+            n.x += n.vx; n.y += n.vy;
+            n.x = Math.max(n.radius + 10, Math.min(W - n.radius - 10, n.x));
+            n.y = Math.max(n.radius + 10, Math.min(H - n.radius - 10, n.y));
+        });
+    }
+    // Zero out velocities so nothing moves
+    nodes.forEach(n => { n.vx = 0; n.vy = 0; });
+}
+
+// --- Draw (called once, or on interaction) ---
+function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Edges
+    edges.forEach(e => {
+        const src = nodes.find(n => n.id === e.source);
+        const tgt = nodes.find(n => n.id === e.target);
+        if (!src || !tgt) return;
+        const color = EVENT_COLORS[e.event_type] || '#94a3b8';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = e.builtin ? 1.5 : 2.5;
+        ctx.setLineDash(e.builtin ? [] : [6, 3]);
+        ctx.globalAlpha = hoverNode && hoverNode !== src && hoverNode !== tgt ? 0.08 : 0.6;
+
+        const dx = tgt.x - src.x, dy = tgt.y - src.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const mx = (src.x + tgt.x) / 2, my = (src.y + tgt.y) / 2;
+        const nx = -dy / d * 15, ny = dx / d * 15;
+        const cpx = mx + nx, cpy = my + ny;
+
+        ctx.beginPath();
+        ctx.moveTo(src.x, src.y);
+        ctx.quadraticCurveTo(cpx, cpy, tgt.x, tgt.y);
+        ctx.stroke();
+
+        // Arrowhead
+        const t = 1 - tgt.radius / d;
+        const ax = src.x + (tgt.x - src.x) * t;
+        const ay = src.y + (tgt.y - src.y) * t;
+        const angle = Math.atan2(tgt.y - cpy, tgt.x - cpx);
+        ctx.globalAlpha = hoverNode && hoverNode !== src && hoverNode !== tgt ? 0.08 : 0.8;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+        ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fill();
+
+        // Edge label
+        if (!hoverNode || hoverNode === src || hoverNode === tgt) {
+            ctx.globalAlpha = 0.5;
+            ctx.font = '9px sans-serif';
+            ctx.fillStyle = '#475569';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.event_type, cpx, cpy - 4);
+        }
+    });
+
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    // Nodes
+    nodes.forEach(n => {
+        const isHover = n === hoverNode;
+        const isDim = hoverNode && !isHover && !edges.some(e =>
+            (e.source === hoverNode.id && e.target === n.id) ||
+            (e.target === hoverNode.id && e.source === n.id)
+        );
+        ctx.globalAlpha = isDim ? 0.15 : 1;
+        const col = CAT_COLORS[n.category] || '#64748b';
+
+        // Shadow for hover
+        if (isHover) { ctx.shadowColor = col; ctx.shadowBlur = 12; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 2; }
+
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+        // Border
+        ctx.strokeStyle = isHover ? '#0f172a' : 'rgba(255,255,255,.6)';
+        ctx.lineWidth = isHover ? 2.5 : 1;
+        ctx.stroke();
+
+        // White text on colored circle
+        ctx.fillStyle = isDim ? 'rgba(255,255,255,.15)' : '#fff';
+        ctx.font = `${isHover ? 'bold 11px' : '10px'} sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // Two-letter abbreviation inside circle
+        const abbr = n.name.split(/[\s-]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        ctx.fillText(abbr, n.x, n.y);
+
+        // Label below
+        ctx.fillStyle = isDim ? 'rgba(0,0,0,.1)' : '#334155';
+        ctx.font = `${isHover ? 'bold ' : ''}10px sans-serif`;
+        ctx.textBaseline = 'top';
+        let label = n.name;
+        if (label.length > 18) label = label.slice(0, 16) + '..';
+        ctx.fillText(label, n.x, n.y + n.radius + 4);
+    });
+
+    ctx.globalAlpha = 1;
+}
+
+// --- Interaction ---
+function getNodeAt(x, y) {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = x - n.x, dy = y - n.y;
+        if (dx * dx + dy * dy <= (n.radius + 4) * (n.radius + 4)) return n;
+    }
+    return null;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
+    if (node) { dragNode = node; canvas.classList.add('dragging'); }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (dragNode) {
+        dragNode.x = x; dragNode.y = y;
+        draw();
+    } else {
+        const node = getNodeAt(x, y);
+        if (node !== hoverNode) {
+            hoverNode = node;
+            showNodeInfo(node, e.clientX, e.clientY);
+            draw();
+        }
+    }
+});
+
+canvas.addEventListener('mouseup', () => { dragNode = null; canvas.classList.remove('dragging'); });
+canvas.addEventListener('mouseleave', () => {
+    if (hoverNode) { hoverNode = null; document.getElementById('node-info').style.display = 'none'; draw(); }
+});
+
+function showNodeInfo(node, mx, my) {
+    const info = document.getElementById('node-info');
+    if (!node) { info.style.display = 'none'; return; }
+    document.getElementById('ni-name').textContent = node.name;
+    document.getElementById('ni-cat').textContent = node.category;
+    const out = edges.filter(e => e.source === node.id).map(e => `\u2192 ${e.target} (${e.event_type})`);
+    const inp = edges.filter(e => e.target === node.id).map(e => `\u2190 ${e.source} (${e.event_type})`);
+    document.getElementById('ni-edges').innerHTML =
+        [...out, ...inp].map(e => `<div>${e}</div>`).join('') || '<div>No connections</div>';
+    info.style.display = 'block';
+    info.style.left = (mx + 15) + 'px';
+    info.style.top = (my - 10) + 'px';
+}
+
+// --- Edge management ---
+function renderEdgeList() {
+    const el = document.getElementById('edge-list');
+    document.getElementById('edge-count').textContent = edges.length;
+    el.innerHTML = edges.map(e =>
+        `<div class="edge-item">
+            <span class="src">${shortName(e.source)}</span>
+            <span class="arrow">\u2192</span>
+            <span class="tgt">${shortName(e.target)}</span>
+            <span class="etype">${e.event_type}</span>
+            ${!e.builtin ? `<span class="del-btn" onclick="deleteEdge(${e.id})" title="Delete">&times;</span>` : ''}
+        </div>`
+    ).join('');
+}
+
+function shortName(id) {
+    const n = nodes.find(n => n.id === id);
+    if (!n) return id;
+    return n.name.length > 14 ? n.name.slice(0, 12) + '..' : n.name;
+}
+
+function addEdge() {
+    const src = document.getElementById('edge-src').value;
+    const tgt = document.getElementById('edge-tgt').value;
+    const etype = document.getElementById('edge-type').value.trim();
+    if (!src || !tgt || !etype) { alert('Select source, target, and type'); return; }
+    if (src === tgt) { alert('Source and target must be different'); return; }
+    fetch('/annotate/api/graph/edges', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ source: src, target: tgt, event_type: etype })
+    }).then(r => r.json()).then(() => loadEdges());
+}
+
+function deleteEdge(id) {
+    fetch(`/annotate/api/graph/edges/${id}`, { method: 'DELETE' })
+        .then(r => r.json()).then(() => loadEdges());
+}
+
+function loadEdges() {
+    fetch('/annotate/api/graph/edges').then(r => r.json()).then(data => {
+        edges = data; renderEdgeList(); draw();
+    });
+}
+
+function savePositions() {
+    const pos = {};
+    nodes.forEach(n => { pos[n.id] = { x: n.x, y: n.y }; });
+    fetch('/annotate/api/graph/positions', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(pos)
+    }).then(() => {
+        const btn = document.getElementById('save-btn');
+        btn.textContent = 'Saved!';
+        setTimeout(() => btn.textContent = 'Save Layout', 1500);
+    });
+}
+
+function resetLayout() {
+    circularLayout();
+    runForceLayout(300);
+    draw();
+}
+
+// --- Init ---
+function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    W = canvas.width = rect.width - 300;
+    H = canvas.height = rect.height;
+}
+
+async function init() {
+    resize();
+    window.addEventListener('resize', () => { resize(); draw(); });
+
+    let edgeData = await fetch('/annotate/api/graph/edges').then(r => r.json());
+    if (edgeData.length === 0) {
+        await fetch('/annotate/api/graph/seed', { method: 'POST' });
+        edgeData = await fetch('/annotate/api/graph/edges').then(r => r.json());
+    }
+    edges = edgeData;
+    renderEdgeList();
+
+    const savedPos = await fetch('/annotate/api/graph/positions').then(r => r.json());
+    if (Object.keys(savedPos).length > 0) {
+        nodes.forEach(n => {
+            if (savedPos[n.id]) { n.x = savedPos[n.id].x; n.y = savedPos[n.id].y; }
+            else { n.x = W / 2 + (Math.random() - 0.5) * W * 0.6; n.y = H / 2 + (Math.random() - 0.5) * H * 0.6; }
+        });
+    } else {
+        circularLayout();
+        runForceLayout(300);
+    }
+
+    draw();
+}
+
+init();
+</script>
+</body>
+</html>

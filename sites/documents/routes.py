@@ -280,6 +280,7 @@ def login_submit():
         return render_template("documents/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="documents", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     next_url = request.form.get("next") or request.args.get("next")
     if next_url:
         return redirect(next_url)
@@ -438,6 +439,31 @@ def form_update_document(doc_id):
         _save_revisions(revisions)
 
     return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/upload", methods=["POST"])
+def form_upload_document():
+    """Upload a file as a new document."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("documents.login_page"))
+    f = request.files.get("file")
+    title = f.filename if f and f.filename else "Uploaded Document"
+    content = f"[Uploaded file: {title}]"
+    docs = _load_documents()
+    new_id = max((d["id"] for d in docs), default=0) + 1
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_doc = {
+        "id": new_id, "title": title, "content": content,
+        "owner_id": user["id"], "folder_id": None,
+        "collaborators": [], "word_count": len(content.split()),
+        "is_starred": False, "is_trashed": False,
+        "created_at": now, "updated_at": now,
+    }
+    docs.append(new_doc)
+    _save_documents(docs)
+    emit("file_created", user_id=user["id"], filename=title, file_type="document", source_site="documents", source_id=new_id)
+    return redirect(url_for("documents.editor", doc_id=new_id))
 
 
 @blueprint.route("/document/create", methods=["POST"])
@@ -891,7 +917,6 @@ def api_stats():
         "unique_owners": len(owner_ids),
         "avg_word_count": round(total_words / len(active), 1) if active else 0,
     })
-
 
 @blueprint.route("/api/search")
 def api_search():

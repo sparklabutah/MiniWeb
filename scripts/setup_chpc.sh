@@ -10,8 +10,18 @@
 set -euo pipefail
 
 SHARED_DATA="/scratch/general/vast/u1653932/data_sources"
+SHARED_DB="$SHARED_DATA/miniweb.db"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONDA_BIN="/scratch/general/vast/u1653932/miniforge3/condabin/conda"
+
+# Use module system for conda (works for all CHPC users)
+if ! command -v conda &>/dev/null; then
+    module load miniforge3 2>/dev/null || true
+fi
+CONDA_BIN="$(command -v conda 2>/dev/null || echo "")"
+if [ -z "$CONDA_BIN" ]; then
+    echo "[ERROR] conda not found. Run: module load miniforge3"
+    exit 1
+fi
 
 echo "============================================================"
 echo "  MiniWeb CHPC Setup"
@@ -28,9 +38,29 @@ else
     echo "       Ask the PI to add you, or shared data will be inaccessible."
 fi
 
-# ── 2. Check shared data access ──────────────────────────────────────────────
+# ── 2. Symlink shared database ────────────────────────────────────────────────
 echo ""
-echo "Checking shared data..."
+echo "Setting up database symlink..."
+if [ -f "$SHARED_DB" ] && [ -r "$SHARED_DB" ]; then
+    size=$(du -sh "$SHARED_DB" 2>/dev/null | cut -f1)
+    echo "  [OK] Shared DB exists ($size)"
+    if [ -L "$REPO_ROOT/miniweb.db" ]; then
+        echo "  [OK] Symlink already exists: $(readlink "$REPO_ROOT/miniweb.db")"
+    elif [ -f "$REPO_ROOT/miniweb.db" ]; then
+        echo "  [SKIP] $REPO_ROOT/miniweb.db is a regular file (not a symlink)."
+        echo "         Remove it and re-run if you want to use the shared DB."
+    else
+        ln -s "$SHARED_DB" "$REPO_ROOT/miniweb.db"
+        echo "  [OK] Created symlink: miniweb.db -> $SHARED_DB"
+    fi
+else
+    echo "  [WARN] Shared DB not found or not readable: $SHARED_DB"
+    echo "         Ask u1653932 to fix permissions: chmod o+r $SHARED_DB"
+fi
+
+# ── 3. Check shared data access ──────────────────────────────────────────────
+echo ""
+echo "Checking shared data sources..."
 ALL_OK=true
 for label_path in \
     "arXiv metadata:$SHARED_DATA/arxiv/arxiv-metadata-oai-snapshot.json" \
@@ -50,21 +80,22 @@ done
 if [ "$ALL_OK" = false ]; then
     echo ""
     echo "Some data files are missing or unreadable."
-    echo "Ask u1653932 to fix permissions: chmod -R g+rX $SHARED_DATA/"
+    echo "Ask u1653932 to fix permissions: chmod -R o+rX $SHARED_DATA/"
 fi
 
-# ── 3. Create conda environment ──────────────────────────────────────────────
+# ── 4. Create conda environment ──────────────────────────────────────────────
 echo ""
 if $CONDA_BIN info --envs 2>/dev/null | grep -q miniweb-eval; then
     echo "[OK] Conda env 'miniweb-eval' already exists."
 else
-    echo "Creating conda env 'miniweb-eval' from environment.yml..."
+    echo "Creating conda env 'miniweb-eval' (Python 3.11 + requirements.txt)..."
     echo "(This may take a few minutes.)"
-    $CONDA_BIN env create -f "$REPO_ROOT/environment.yml"
+    $CONDA_BIN create -n miniweb-eval python=3.11 -y
+    $CONDA_BIN run -n miniweb-eval pip install -r "$REPO_ROOT/requirements.txt"
     echo "[OK] Conda env created."
 fi
 
-# ── 4. Create .env ───────────────────────────────────────────────────────────
+# ── 5. Create .env ───────────────────────────────────────────────────────────
 echo ""
 if [ -f "$REPO_ROOT/.env" ]; then
     echo "[OK] .env already exists."
@@ -74,7 +105,7 @@ else
     echo "     Edit it to add your API keys: nano $REPO_ROOT/.env"
 fi
 
-# ── 5. Smoke test ────────────────────────────────────────────────────────────
+# ── 6. Smoke test ────────────────────────────────────────────────────────────
 echo ""
 echo "Running smoke test..."
 if $CONDA_BIN run -n miniweb-eval python -B -c \

@@ -9,9 +9,10 @@ import uuid
 from datetime import datetime
 
 from flask import (
-    Blueprint, abort, jsonify, redirect, render_template, request, session, url_for,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "instant-messaging"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -280,31 +281,41 @@ def contacts_page():
 
 @blueprint.route("/login")
 def login_page():
-    users = _get_users()
-    return render_template(
-        "instant-messaging/login.html",
-        users=users,
-    )
+    return render_template("instant-messaging/login.html")
+
+
+@blueprint.route("/add-contact", methods=["POST"])
+def form_add_contact():
+    """Add/invite a contact via form POST."""
+    _email = request.form.get("email", "").strip()
+    return redirect(url_for("instant-messaging.contacts_page"))
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
-    user_id = request.form.get("user_id", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     users = _get_users()
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = next((u for u in users if u.get("username") == username or u.get("display_name") == username or u.get("phone") == username), None)
     if not user:
-        return render_template(
-            "instant-messaging/login.html",
-            users=users,
-            error="Invalid user selection.",
-        )
-    session["im_user_id"] = user_id
+        return render_template("instant-messaging/login.html", error="User not found.")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("instant-messaging/login.html", error="Invalid password.")
+    session["im_user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="instant-messaging", username=username, password=password, email="")
     return redirect(url_for("instant-messaging.index"))
 
 
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
+
+
+@blueprint.route("/logout")
+def logout():
+    session.pop("im_user_id", None)
+    return redirect(url_for("instant-messaging.index"))
 
 @blueprint.route("/api/conversations", methods=["GET"])
 def api_conversations_list():
@@ -966,6 +977,17 @@ def api_delete_message(msg_id):
     return jsonify({"message_id": msg_id, "action": "deleted"})
 
 
+@blueprint.route("/conversation/<conv_id>/message/<msg_id>/delete", methods=["POST"])
+def form_delete_message(conversation_id=None, conv_id=None, message_id=None, msg_id=None):
+    """Delete a message via form POST and redirect back to conversation."""
+    cid = conv_id or conversation_id
+    mid = msg_id or message_id
+    messages = _get_messages()
+    messages = [m for m in messages if m["id"] != mid]
+    db.save_collection(SITE, "messages", messages)
+    return redirect(url_for("instant-messaging.conversation_view", conv_id=cid))
+
+
 # ---------------------------------------------------------------------------
 # API: upload_by_upload — upload a media attachment to a conversation
 # ---------------------------------------------------------------------------
@@ -1141,3 +1163,31 @@ def api_semantic_search():
         "conversations": matching_convs,
         "total": len(matching_contacts) + len(matching_convs),
     })
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export conversations or messages as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    data_type = request.args.get("type", "conversations").lower()
+
+    if data_type == "messages":
+        data = _get_messages()
+    else:
+        data = _get_conversations()
+
+    if fmt == "csv":
+        if not data:
+            return Response("", mimetype="text/csv")
+        keys = list(data[0].keys())
+        lines = [",".join(keys)]
+        for row in data:
+            vals = []
+            for k in keys:
+                v = str(row.get(k, "")).replace('"', '""')
+                vals.append(f'"{v}"')
+            lines.append(",".join(vals))
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
+    return jsonify(data)
+

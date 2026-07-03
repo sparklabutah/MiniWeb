@@ -8,6 +8,8 @@ from datetime import datetime
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "blogs"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -291,6 +293,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("blogs/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="blogs", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("blogs.dashboard"))
 
 
@@ -351,6 +354,9 @@ def form_create_post():
     }
 
     db.save_item(SITE, "posts", new_id, new_post)
+    _add_email(author["id"], "noreply@blogs.lakeport.local",
+               "Your post has been published",
+               f'Your post "{title}" has been published on TumblrVibe.')
     return redirect(url_for("blogs.post_detail", post_id=new_id))
 
 
@@ -562,6 +568,17 @@ def api_search():
     q = request.args.get("q", "").strip()
     limit = request.args.get("limit", 50, type=int)
     results = db.search(SITE, "posts", q, limit=limit)
+    # Fall back to LIKE search if FTS returns 0 results (FTS index may
+    # not cover all columns, or query syntax may mismatch).
+    if not results and q:
+        like_param = f"%{q}%"
+        results = db.execute(
+            "SELECT * FROM [blogs_posts] WHERE "
+            "([title] LIKE ? OR [body] LIKE ? OR [author_username] LIKE ? "
+            "OR [category] LIKE ? OR [tags] LIKE ?) "
+            "ORDER BY [date] DESC LIMIT ?",
+            (like_param, like_param, like_param, like_param, like_param, limit),
+        )
     return jsonify(results)
 
 

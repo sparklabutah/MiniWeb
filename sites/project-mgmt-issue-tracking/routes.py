@@ -16,6 +16,8 @@ from flask import (
 )
 
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "project-mgmt-issue-tracking"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -33,11 +35,36 @@ blueprint = Blueprint(
 # ---------------------------------------------------------------------------
 
 def _load_projects():
-    return db.query(SITE, "projects")
+    return [_ensure_project_key(_remap_key(p)) for p in db.query(SITE, "projects")]
+
+
+_PROJECT_PREFIXES = {1: "MF", 2: "MV", 3: "ML", 4: "IT", 5: "WR"}
+
+
+def _remap_key(item):
+    """Remap 'key_' -> 'key' since 'key' is a SQL reserved word."""
+    if "key_" in item:
+        item["key"] = item.pop("key_")
+    return item
+
+
+def _ensure_project_key(project):
+    """Ensure project has its prefix key (MF, MV, etc.)."""
+    if not project.get("key"):
+        project["key"] = _PROJECT_PREFIXES.get(project["id"], "UNK")
+    return project
+
+
+def _ensure_issue_key(issue):
+    """Ensure issue has a key like MF-101."""
+    if not issue.get("key"):
+        prefix = _PROJECT_PREFIXES.get(issue.get("project_id", 0), "UNK")
+        issue["key"] = f"{prefix}-{100 + issue['id']}"
+    return issue
 
 
 def _load_issues():
-    return db.query(SITE, "issues")
+    return [_ensure_issue_key(_remap_key(i)) for i in db.query(SITE, "issues")]
 
 
 def _save_issues(issues):
@@ -65,7 +92,8 @@ def _get_user(user_id):
 
 
 def _get_project(project_id):
-    return db.get_item(SITE, "projects", project_id)
+    p = db.get_item(SITE, "projects", project_id)
+    return _ensure_project_key(_remap_key(p)) if p else None
 
 
 def _next_issue_id():
@@ -306,6 +334,8 @@ def project_board(project_id):
 def issue_detail(issue_id):
     """Single issue detail page with comments."""
     issue = db.get_item(SITE, "issues", issue_id)
+    if issue:
+        _ensure_issue_key(_remap_key(issue))
     if not issue:
         abort(404)
     issue_comments = db.query(SITE, "comments", where={"issue_id": issue_id}, sort="created_at")
@@ -485,6 +515,7 @@ def login_submit():
         return render_template("project-mgmt-issue-tracking/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="project-mgmt-issue-tracking", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("project-mgmt-issue-tracking.index"))
 
 
@@ -531,6 +562,9 @@ def form_create_issue():
     issues = _load_issues()
     issues.append(issue)
     _save_issues(issues)
+    if issue.get("assignee_id"):
+        emit("booking", user_id=issue["assignee_id"], title=f"Issue assigned: {issue['title'][:40]}", start=datetime.now().strftime("%Y-%m-%d"), location="")
+        emit("message", from_user_id=issue["reporter_id"], to_user_id=issue["assignee_id"], text=f"You've been assigned: {issue['key']} - {issue['title']}", source_site="project-mgmt")
     return redirect(url_for("project-mgmt-issue-tracking.issue_detail",
                             issue_id=issue["id"]))
 
@@ -566,6 +600,10 @@ def form_edit_issue(issue_id):
 
     issue["updated_at"] = datetime.now().isoformat()
     _save_issues(issues)
+    if issue.get("assignee_id"):
+        _add_email(issue["assignee_id"], "noreply@project-mgmt.lakeport.local",
+                   "Issue assigned to you",
+                   f'Issue "{issue["title"]}" ({issue["key"]}) has been assigned to you.')
     return redirect(url_for("project-mgmt-issue-tracking.issue_detail",
                             issue_id=issue_id))
 
@@ -681,6 +719,8 @@ def api_issues():
 @blueprint.route("/api/issues/<int:issue_id>", methods=["GET"])
 def api_issue(issue_id):
     issue = db.get_item(SITE, "issues", issue_id)
+    if issue:
+        _ensure_issue_key(_remap_key(issue))
     if not issue:
         abort(404)
     return jsonify(issue)
@@ -895,10 +935,27 @@ def api_search_issues():
 @blueprint.route("/api/issues/by-key/<key>")
 def api_issue_by_key(key):
     """Lookup an issue by its project key (e.g., MF-101)."""
-    results = db.query(SITE, "issues", where={"key": key.upper()}, limit=1)
-    if not results:
-        abort(404)
-    return jsonify(results[0])
+    key = key.upper()
+    # First try stored key_ column
+    results = db.query(SITE, "issues", where={"key_": key}, limit=1)
+    if results:
+        issue = _ensure_issue_key(_remap_key(results[0]))
+        return jsonify(issue)
+    # Fallback: parse computed key PREFIX-NNN where NNN = 100 + id
+    parts = key.split("-")
+    if len(parts) == 2:
+        prefix_to_project = {v: k for k, v in _PROJECT_PREFIXES.items()}
+        project_id = prefix_to_project.get(parts[0])
+        try:
+            issue_id = int(parts[1]) - 100
+        except ValueError:
+            issue_id = None
+        if project_id and issue_id:
+            issue = db.get_item(SITE, "issues", issue_id)
+            if issue and issue.get("project_id") == project_id:
+                _ensure_issue_key(_remap_key(issue))
+                return jsonify(issue)
+    abort(404)
 
 
 # ---------------------------------------------------------------------------

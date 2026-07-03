@@ -21,6 +21,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "news"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -222,35 +223,14 @@ def search_page():
     q = request.args.get("q", "").strip()
     results = []
     if q:
-        table = db.get_table_name(SITE, "articles")
-        ql = f"%{q}%"
-        rows = db.execute(
-            f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? OR [author] LIKE ? OR [tags] LIKE ? ORDER BY [date] DESC LIMIT 50",
-            (ql, ql, ql, ql), fetch="all"
-        )
+        rows = db.search(SITE, "articles", q, limit=50)
         for a in rows:
             if isinstance(a.get("tags"), str):
                 try:
                     a["tags"] = json.loads(a["tags"])
                 except (json.JSONDecodeError, TypeError):
                     a["tags"] = []
-        # Score results for relevance ordering
-        scored = []
-        q_lower = q.lower()
-        for a in rows:
-            score = 0
-            if q_lower in a["title"].lower():
-                score += 3
-            if q_lower in a.get("body", "").lower():
-                score += 1
-            if q_lower in a.get("author", "").lower():
-                score += 2
-            if any(q_lower in t for t in a.get("tags", [])):
-                score += 2
-            if score > 0:
-                scored.append((score, a))
-        scored.sort(key=lambda x: (-x[0], x[1].get("date") or ""))
-        results = [a for _, a in scored]
+        results = rows
 
     bookmarked_ids = set()
     if user:
@@ -309,6 +289,7 @@ def login_submit():
                                error="Invalid username or password",
                                categories=categories)
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="news", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     next_url = request.args.get("next") or request.form.get("next") or url_for("news.index")
     return redirect(next_url)
 
@@ -448,30 +429,13 @@ def api_articles():
     sql_sort = sort_map.get(sort_by, "-date")
 
     if search:
-        table = db.get_table_name(SITE, "articles")
-        sl = f"%{search}%"
-        clauses = []
-        params = []
-        if where_f:
-            for col, val in where_f.items():
-                clauses.append(f"[{col}] = ?")
-                params.append(val)
-        clauses.append(f"([title] LIKE ? OR [body] LIKE ? OR [author] LIKE ? OR [tags] LIKE ?)")
-        params.extend([sl, sl, sl, sl])
+        search_where = dict(where_f) if where_f else {}
+        articles = db.search(SITE, "articles", search, where=search_where or None, limit=100)
+        # Apply date range filters on the (already limited) result set
         if date_from:
-            clauses.append("[date] >= ?")
-            params.append(date_from)
+            articles = [a for a in articles if a.get("date", "") >= date_from]
         if date_to:
-            clauses.append("[date] <= ?")
-            params.append(date_to)
-        desc = sql_sort.startswith("-")
-        col = sql_sort.lstrip("-")
-        direction = "DESC" if desc else "ASC"
-        where_sql = " AND ".join(clauses)
-        articles = db.execute(
-            f"SELECT * FROM [{table}] WHERE {where_sql} ORDER BY [{col}] {direction} LIMIT 100",
-            tuple(params), fetch="all"
-        )
+            articles = [a for a in articles if a.get("date", "") <= date_to]
         for a in articles:
             if isinstance(a.get("tags"), str):
                 try:
@@ -511,19 +475,7 @@ def api_semantic_search():
     if not q:
         return jsonify([])
 
-    table = db.get_table_name(SITE, "articles")
-    terms = q.lower().split()
-    like_clauses = []
-    params = []
-    for t in terms:
-        like_clauses.append("([title] LIKE ? OR [body] LIKE ? OR [tags] LIKE ?)")
-        tl = f"%{t}%"
-        params.extend([tl, tl, tl])
-    where_sql = " OR ".join(like_clauses) if like_clauses else "1=1"
-    rows = db.execute(
-        f"SELECT * FROM [{table}] WHERE {where_sql} LIMIT 100",
-        tuple(params), fetch="all"
-    )
+    rows = db.search(SITE, "articles", q, limit=100)
     for a in rows:
         if isinstance(a.get("tags"), str):
             try:
@@ -631,13 +583,7 @@ def api_search():
     if not q:
         return jsonify([])
 
-    table = db.get_table_name(SITE, "articles")
-    ql = f"%{q}%"
-    rows = db.execute(
-        f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? OR [author] LIKE ? OR [tags] LIKE ? ORDER BY [date] DESC LIMIT 50",
-        (ql, ql, ql, ql), fetch="all"
-    )
-    q_lower = q.lower()
+    rows = db.search(SITE, "articles", q, limit=50)
     results = []
     for a in rows:
         if isinstance(a.get("tags"), str):
@@ -645,19 +591,8 @@ def api_search():
                 a["tags"] = json.loads(a["tags"])
             except (json.JSONDecodeError, TypeError):
                 a["tags"] = []
-        score = 0
-        if q_lower in a["title"].lower():
-            score += 3
-        if q_lower in a.get("body", "").lower():
-            score += 1
-        if q_lower in a.get("author", "").lower():
-            score += 2
-        if any(q_lower in t for t in a.get("tags", [])):
-            score += 2
-        if score > 0:
-            results.append({"score": score, "article": a})
+        results.append({"score": 1, "article": a})
 
-    results.sort(key=lambda x: -x["score"])
     return jsonify(results)
 
 

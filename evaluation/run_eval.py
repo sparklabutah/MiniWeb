@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
 
-from agents import AgentResult, BrowserUseAgent
+from agents import AgentResult, BrowserUseAgent, MockAgent, ChatClaude
 from server import start_server, stop_server, wait_for_server
 from tasks import TASK_TIMEOUT, filter_tasks, load_tasks, run_task
 
@@ -71,10 +71,21 @@ AGENT_FACTORIES = {
         ).ChatOpenAI(model="gpt-5.4"),
         **kw,
     ),
+    "gpt-5.5": lambda **kw: _make_browser_use_agent(
+        lambda: __import__(
+            "browser_use.llm.openai.chat", fromlist=["ChatOpenAI"]
+        ).ChatOpenAI(model="gpt-5.5"),
+        **kw,
+    ),
     "claude": lambda **kw: _make_browser_use_agent(
         lambda: __import__(
             "browser_use.llm.anthropic.chat", fromlist=["ChatAnthropic"]
         ).ChatAnthropic(model="claude-sonnet-4-6-20250514"),
+        **kw,
+    ),
+    "mock": lambda **kw: MockAgent(**kw),
+    "claude-cli": lambda **kw: _make_browser_use_agent(
+        lambda: ChatClaude(model="claude-cli"),
         **kw,
     ),
 }
@@ -106,6 +117,8 @@ async def worker(
     use_vision: bool,
     max_steps: int,
     headless: bool,
+    use_judge: bool = False,
+    judge_model: str = "gpt-4.1-nano",
 ):
     tag = f"{DIM}[W{worker_id}]{RESET}"
 
@@ -140,6 +153,8 @@ async def worker(
                     server_url=server_url,
                     site_id=site_id,
                     task_dir=task_dir,
+                    use_judge=use_judge,
+                    judge_model=judge_model,
                 )
                 badge = (
                     f"{BG_GREEN}{WHITE}{BOLD} PASS {RESET}"
@@ -288,6 +303,8 @@ async def run_eval(args):
                 use_vision=args.use_vision,
                 max_steps=args.max_steps,
                 headless=not args.no_headless,
+                use_judge=args.judge,
+                judge_model=args.judge_model,
             )
 
         worker_coros = [staggered_worker(i, i * STAGGER_DELAY) for i in range(num_workers)]
@@ -373,6 +390,14 @@ def main():
     parser.add_argument(
         "--repetitions", type=int, default=1,
         help="Attempt each task N times; report per-task pass rate",
+    )
+    parser.add_argument(
+        "--judge", action="store_true",
+        help="Use LLM-as-judge instead of verifiers.py for evaluation",
+    )
+    parser.add_argument(
+        "--judge-model", default="claude-cli",
+        help="Model for LLM judge (default: claude-cli, or an OpenAI model name)",
     )
     args = parser.parse_args()
     asyncio.run(run_eval(args))

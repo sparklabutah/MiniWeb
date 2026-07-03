@@ -596,7 +596,11 @@ def login_submit():
     if not user:
         return render_template("tax-filing-dmv-permits/login.html",
                                error="Invalid username or password")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("tax-filing-dmv-permits/login.html", error="Invalid password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="tax-filing-dmv-permits", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("tax-filing-dmv-permits.index"))
 
 
@@ -934,6 +938,8 @@ def api_tax_filing_update(filing_id):
         filing["signed"] = data["signed"]
         filing["signed_date"] = datetime.now().strftime("%Y-%m-%d")
     _save_filings(filings)
+    if data.get("status") == "filed" or data.get("signed"):
+        emit("file_created", user_id=filing.get("user_id", 1), filename=f"Tax Return {filing.get('tax_year', '')}", file_type="document", source_site="tax-filing-dmv-permits", source_id=str(filing_id))
     return jsonify(filing)
 
 
@@ -1383,6 +1389,8 @@ def api_book_appointment():
         return jsonify({"error": "Date is required"}), 400
 
     appt_id = f"APT-{date.replace('-', '')}-{hash(date + time_slot) % 9999:04d}"
+    user, _ = _get_browsing_user()
+    emit("booking", user_id=user["id"], title=f"DMV Appt: {service}", start=date, location=location)
     return jsonify({
         "status": "booked",
         "appointment_id": appt_id,
@@ -1436,6 +1444,24 @@ def api_sign_document():
         "filing_id": filing_id,
         "signed_date": filing["signed_date"],
     })
+
+
+@blueprint.route("/api/login", methods=["POST"])
+def api_login():
+    """API login endpoint."""
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user:
+        return jsonify({"error": "Invalid credentials"}), 401
+    # Match the form login behavior: default password is "password"
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return jsonify({"error": "Invalid credentials"}), 401
+    session["user_id"] = user["id"]
+    return jsonify({"user_id": user["id"], "username": user["username"]})
 
 
 @blueprint.route("/api/users")

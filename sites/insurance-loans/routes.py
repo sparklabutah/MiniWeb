@@ -12,6 +12,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "insurance-loans"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -116,7 +117,11 @@ def login_submit():
     if not user:
         return render_template("insurance-loans/login.html",
                                error="Invalid username or password")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("insurance-loans/login.html", error="Invalid password")
     session["il_user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="insurance-loans", username=username, password=request.form.get("password", ""), email="")
     return redirect(url_for("insurance-loans.index"))
 
 
@@ -611,6 +616,9 @@ def api_loan_pay(loan_id):
                    account_type=account_type)
     except Exception:
         pass  # bridge failure should never block the main flow
+
+    if loan.get("next_payment_due"):
+        emit("booking", user_id=loan["user_id"], title=f"Loan payment due: {loan['loan_number']}", start=loan["next_payment_due"], location="")
 
     return jsonify({
         "status": loan["status"],

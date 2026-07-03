@@ -1,6 +1,6 @@
 # MiniWeb
 
-A web platform for benchmarking browser-agent AI systems. One Flask process serves 66 realistic websites — banking, forums, e-commerce, email, and more — each backed by real-world data (arxiv, reddit, StackExchange, Wikipedia) totaling 11M+ records in SQLite. Agents receive natural-language instructions and interact with rendered HTML; verifiers check backend state to score success.
+A web platform for benchmarking browser-agent AI systems. One Flask process serves 65 realistic websites — banking, forums, e-commerce, email, and more — each backed by real-world data (arxiv, reddit, StackExchange, Wikipedia) totaling 11M+ records in SQLite. Agents receive natural-language instructions and interact with rendered HTML; verifiers check backend state to score success.
 
 ## Quick Start (CHPC)
 
@@ -18,27 +18,22 @@ conda activate miniweb-eval
 pip install -r requirements.txt
 ```
 
-### 2. Set up the database
+### 2. One-time setup (CHPC shortcut)
 
-The database (`miniweb.db`, ~18GB) lives in `data_sources/` with a symlink in the project root.
-If you're on the same CHPC allocation, the symlink already points to the shared DB:
+If you're in the `kmarino` group on CHPC, run the setup script — it creates the conda env, symlinks the shared database (~18GB), and prepares `.env`:
 
 ```bash
-# Verify the DB exists
-ls -lh miniweb.db  # should be a symlink to data_sources/miniweb.db
-
-# If not, create the symlink
-ln -s /scratch/general/vast/u1653932/data_sources/miniweb.db miniweb.db
+bash scripts/setup_chpc.sh
 ```
 
-To rebuild from scratch (requires raw data in `data_sources/`):
-```bash
-# On a compute node (large datasets need RAM + I/O):
-srun --ntasks=1 --mem=32G --time=2:00:00 --account=kmarino --partition=notchpeak \
-    python scripts/build_db.py --force
+Or set up manually:
 
-# Build FTS5 search indexes (can run separately):
-python scripts/build_fts.py
+```bash
+# Symlink the shared database (read-only, no download needed)
+ln -s /scratch/general/vast/u1653932/data_sources/miniweb.db miniweb.db
+
+# Or set via environment variable
+export MINIWEB_DB=/scratch/general/vast/u1653932/data_sources/miniweb.db
 ```
 
 ### 3. Set up API keys (optional)
@@ -51,6 +46,7 @@ echo 'OPENAI_API_KEY=sk-your-key-here' > .env
 ### 4. Run the app
 
 ```bash
+conda activate miniweb-eval
 python run.py
 # Open http://localhost:8080
 ```
@@ -66,16 +62,16 @@ conda activate miniweb-eval
 python run.py
 ```
 
-### 5. Compute node scripts (optional)
+### 5. Rebuilding the database (optional)
 
+Only needed if you want to rebuild from raw data sources:
 ```bash
-# Extract 1M Wikipedia articles from the 95GB ZIM file
-srun --ntasks=1 --mem=16G --time=2:00:00 --account=kmarino --partition=notchpeak \
-    python scripts/extract_wiki_sample.py
+# On a compute node (large datasets need RAM + I/O):
+srun --ntasks=1 --mem=32G --time=2:00:00 --account=kmarino --partition=notchpeak \
+    python scripts/build_db.py --force
 
-# Pre-compute all routes between map locations (walking/driving/transit)
-srun --ntasks=1 --mem=8G --time=8:00:00 --account=kmarino --partition=notchpeak \
-    python scripts/precompute_all_routes.py --skip-existing
+# Build FTS5 search indexes (can run separately):
+python scripts/build_fts.py
 ```
 
 ## Project Structure

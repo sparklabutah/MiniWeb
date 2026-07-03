@@ -207,6 +207,9 @@ def login_submit():
     if not user:
         return render_template("health-portals/login.html",
                                error="Invalid username or password")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("health-portals/login.html", error="Invalid password")
     session["health_user_id"] = user["id"]
     return redirect(url_for("health-portals.index"))
 
@@ -557,8 +560,9 @@ def pay_bill_submit(bill_id):
     bill["date_patient_paid"] = datetime.now().strftime("%Y-%m-%d")
     bill["payment_method"] = f"card ending {card_number[-4:]}"
     _save_billing(billing)
-    bill["provider_name"] = _get_provider_name(bill["provider_id"])
     amount = bill.get("patient_responsibility") or bill.get("patient_copay", 0)
+    emit("payment", user_id=user["id"], recipient="Lakeport Medical Center", amount=float(amount), category="Medical")
+    bill["provider_name"] = _get_provider_name(bill["provider_id"])
     return render_template("health-portals/pay.html",
                            user=user, logged_in=logged_in,
                            bill=bill, amount=amount, error=None, success=True)
@@ -734,6 +738,12 @@ def api_records_list():
     user, _ = _get_browsing_user()
     records = _load_records()
     patient_records = [r for r in records if r["patient_id"] == user["id"]]
+
+    # Filter by record_type if provided
+    record_type = request.args.get("record_type")
+    if record_type:
+        patient_records = [r for r in patient_records if r.get("record_type") == record_type]
+
     patient_records.sort(key=lambda r: r["date"], reverse=True)
     return jsonify(patient_records)
 
@@ -886,6 +896,8 @@ def api_billing_pay(bill_id):
     bill["payment_status"] = "paid_in_full"
     bill["date_patient_paid"] = datetime.now().strftime("%Y-%m-%d")
     _save_billing(billing)
+    pay_amount = bill.get("patient_responsibility") or bill.get("patient_copay", 0)
+    emit("payment", user_id=user["id"], recipient="Lakeport Medical Center", amount=float(pay_amount), category="Medical")
     return jsonify({"message": "Payment processed successfully", "bill": bill})
 
 

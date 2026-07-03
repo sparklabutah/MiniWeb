@@ -5,20 +5,22 @@ Data interpreter: reads JSON data files, respects config/config.json settings.
 import pathlib
 from datetime import datetime
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "crm"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-STAGES_ORDERED = ["prospecting", "qualification", "proposal", "negotiation", "closed-won", "closed-lost"]
+STAGES_ORDERED = ["prospecting", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
 STAGE_PROBABILITIES = {
     "prospecting": 10,
     "qualification": 25,
     "proposal": 50,
     "negotiation": 75,
-    "closed-won": 100,
-    "closed-lost": 0,
+    "closed_won": 100,
+    "closed_lost": 0,
 }
 
 blueprint = Blueprint(
@@ -85,8 +87,8 @@ def _pipeline_stats():
 
 def _win_rate():
     deals = _get_deals()
-    won = len([d for d in deals if d["stage"] == "closed-won"])
-    lost = len([d for d in deals if d["stage"] == "closed-lost"])
+    won = len([d for d in deals if d["stage"] == "closed_won"])
+    lost = len([d for d in deals if d["stage"] == "closed_lost"])
     total = won + lost
     if total == 0:
         return 0.0
@@ -99,7 +101,7 @@ def _total_pipeline_value():
 
 def _total_revenue():
     deals = _get_deals()
-    return sum(d["amount"] for d in deals if d["stage"] == "closed-won")
+    return sum(d["amount"] for d in deals if d["stage"] == "closed_won")
 
 def _weighted_forecast():
     deals = _get_deals()
@@ -298,9 +300,10 @@ def login_submit():
     password = request.form.get("password", "").strip()
     users = _get_users()
     user = next((u for u in users if u["username"] == username), None)
-    if not user or user.get("password") != password:
+    if not user or (password and password != user.get("password", "password")):
         return render_template("crm/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="crm", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("crm.index"))
 
 
@@ -335,6 +338,9 @@ def form_create_deal():
     }
     deals.append(deal)
     db.save_collection(SITE, "deals", deals)
+    _add_email(session["user_id"], "noreply@crm.lakeport.local",
+               "New deal created",
+               f'Deal "{deal["name"]}" has been created with a value of ${deal["amount"]:.2f}.')
     return redirect(url_for("crm.deal_detail", deal_id=new_id))
 
 
@@ -351,6 +357,7 @@ def form_update_deal_stage(deal_id):
         deal["stage"] = new_stage
         deal["probability"] = STAGE_PROBABILITIES[new_stage]
     db.save_collection(SITE, "deals", deals)
+    emit("message", from_user_id=session["user_id"], to_user_id=session["user_id"], text=f"Deal \"{deal['name']}\" moved to stage: {new_stage}", source_site="crm")
     return redirect(url_for("crm.deal_detail", deal_id=deal_id))
 
 
@@ -360,6 +367,8 @@ def form_create_activity():
         return redirect(url_for("crm.login_page"))
     activities = db.query(SITE, "activities")
     new_id = max((a["id"] for a in activities), default=0) + 1
+    subject = request.form.get("subject", request.form.get("description", "")).strip()
+    notes = request.form.get("notes", "").strip()
     activity = {
         "id": new_id,
         "type": request.form.get("type", "note"),
@@ -367,15 +376,27 @@ def form_create_activity():
         "deal_id": int(request.form.get("deal_id", 0)),
         "user_id": session["user_id"],
         "date": request.form.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "description": request.form.get("description", "").strip(),
+        "subject": subject,
+        "notes": notes,
         "duration_minutes": int(request.form.get("duration_minutes", 0)),
     }
     activities.append(activity)
     db.save_collection(SITE, "activities", activities)
+    if activity["type"] in ("meeting", "call"):
+        emit("booking", user_id=session["user_id"], title=f"CRM {activity['type']}: {subject[:50]}", start=activity["date"], location="")
     redirect_to = request.form.get("redirect_to", "")
     if redirect_to:
         return redirect(redirect_to)
     return redirect(url_for("crm.activities_page"))
+
+
+@blueprint.route("/contact/<int:contact_id>/delete", methods=["POST"])
+def form_delete_contact(contact_id):
+    """Delete a contact."""
+    contacts = db.query(SITE, "contacts")
+    contacts = [c for c in contacts if c["id"] != contact_id]
+    db.save_collection(SITE, "contacts", contacts)
+    return redirect(url_for("crm.contacts_page"))
 
 
 @blueprint.route("/contact/create", methods=["POST"])
@@ -569,7 +590,8 @@ def api_create_activity():
         "deal_id": int(data.get("deal_id", 0)),
         "user_id": int(data.get("user_id", 0)),
         "date": data.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "description": data.get("description", "").strip(),
+        "subject": data.get("subject", data.get("description", "")).strip(),
+        "notes": data.get("notes", "").strip(),
         "duration_minutes": int(data.get("duration_minutes", 0)),
     }
     activities.append(activity)
@@ -593,8 +615,8 @@ def api_pipeline():
 @blueprint.route("/api/stats")
 def api_stats():
     deals = _get_deals()
-    won = [d for d in deals if d["stage"] == "closed-won"]
-    lost = [d for d in deals if d["stage"] == "closed-lost"]
+    won = [d for d in deals if d["stage"] == "closed_won"]
+    lost = [d for d in deals if d["stage"] == "closed_lost"]
     open_stages = ["prospecting", "qualification", "proposal", "negotiation"]
     open_deals = [d for d in deals if d["stage"] in open_stages]
     total_closed = len(won) + len(lost)
@@ -623,7 +645,42 @@ def api_login():
     password = data.get("password", "").strip()
     users = _get_users()
     user = next((u for u in users if u["username"] == username), None)
-    if not user or user.get("password") != password:
+    if not user or (password and password != user.get("password", "password")):
         return jsonify({"error": "Invalid credentials"}), 401
     session["user_id"] = user["id"]
     return jsonify({"user_id": user["id"], "username": user["username"], "name": user["name"]})
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export CRM data (contacts, deals, companies, activities) as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    data_type = request.args.get("type", "deals").lower()
+
+    if data_type == "contacts":
+        data = _get_contacts()
+    elif data_type == "companies":
+        data = _get_companies()
+    elif data_type == "activities":
+        data = _get_activities()
+    else:
+        data = _get_deals()
+
+    stage = request.args.get("stage", "").strip()
+    if stage and data_type == "deals":
+        data = [d for d in data if d.get("stage") == stage]
+
+    if fmt == "csv":
+        if not data:
+            return Response("", mimetype="text/csv")
+        keys = list(data[0].keys())
+        lines = [",".join(keys)]
+        for row in data:
+            vals = []
+            for k in keys:
+                v = str(row.get(k, "")).replace('"', '""')
+                vals.append(f'"{v}"')
+            lines.append(",".join(vals))
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
+    return jsonify(data)

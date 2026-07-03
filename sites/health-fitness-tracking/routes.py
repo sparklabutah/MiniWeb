@@ -36,6 +36,7 @@ from flask import (
     url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "health-fitness-tracking"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -411,7 +412,11 @@ def login_submit():
     if not user:
         return render_template("health-fitness-tracking/login.html",
                                error="Invalid username or password")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("health-fitness-tracking/login.html", error="Invalid password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="health-fitness-tracking", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("health-fitness-tracking.index"))
 
 
@@ -515,6 +520,7 @@ def api_workouts_create():
 
     workouts.append(workout)
     db.save_collection(SITE, "workouts", workouts)
+    emit("booking", user_id=workout["user_id"], title=f"Workout: {workout['type']}", start=workout["date"], location=workout.get("location", ""))
     return jsonify(workout), 201
 
 

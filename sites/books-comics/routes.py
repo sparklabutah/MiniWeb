@@ -785,7 +785,7 @@ def api_cart_get(user_id):
     user = _get_user(user_id)
     if not user:
         abort(404)
-    books = _get_books()
+    books = _query_books(limit=2000)
     cart_ids = user.get("cart", [])
     cart_items = [b for b in books if b["id"] in cart_ids]
     safe = [{k: v for k, v in b.items() if k != "chapters"} for b in cart_items]
@@ -808,7 +808,7 @@ def api_checkout(user_id):
     cart = user.get("cart", [])
     if not cart:
         return jsonify({"error": "Cart is empty"}), 400
-    books = _get_books()
+    books = _query_books(limit=2000)
     cart_items = [b for b in books if b["id"] in cart]
     total = sum(b["price"] for b in cart_items)
     # Move cart items to reading list

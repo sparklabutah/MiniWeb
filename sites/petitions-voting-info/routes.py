@@ -20,6 +20,8 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "petitions-voting-info"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -334,6 +336,7 @@ def login_submit():
                                error="Password is required",
                                logged_in=False)
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="petitions-voting-info", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("petitions-voting-info.index"))
 
 
@@ -444,6 +447,8 @@ def api_petitions_create():
     }
     petitions.append(new_petition)
     db.save_collection(SITE, "petitions", petitions)
+    if deadline:
+        emit("booking", user_id=user["id"], title=f"Petition deadline: {title[:40]}", start=deadline, location="")
     return jsonify(new_petition), 201
 
 
@@ -530,6 +535,9 @@ def api_petition_sign(petition_id):
     }
     signatures.append(new_sig)
     db.save_collection(SITE, "signatures", signatures)
+    _add_email(user["id"], "noreply@petitions.lakeport.local",
+               "Signature confirmed",
+               f'Your signature on "{petition["title"]}" has been recorded. Thank you for your support.')
 
     # Update petition signature count
     petition["signatures_current"] += 1

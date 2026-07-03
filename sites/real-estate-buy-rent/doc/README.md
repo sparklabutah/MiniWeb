@@ -2,7 +2,7 @@
 
 **Category**: Shopping & transactional
 **Reviewer**: Farhan
-**Number of macros**: 25
+**Number of macros**: 22
 
 ## Data Source
 
@@ -11,7 +11,7 @@
 
 ## Target Macros
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, search_by_proximity, filter_by_query, filter_by_dropdown, filter_by_checkbox, filter_by_slider, sort_by_ranking, extract_by_dropdown, extract_from_table, extract_by_route, extract_by_ranking, extract_by_extremum, compute_by_slider, compare_by_dropdown, submit_by_query, select_by_ranking, select_by_extremum, follow_by_toggle, save_by_toggle, apply_by_form, book_by_form, route_by_query
+navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_query, filter_by_dropdown, filter_by_checkbox, filter_by_slider, sort_by_ranking, extract_by_dropdown, extract_from_table, extract_by_route, extract_by_ranking, extract_by_extremum, compute_by_slider, compare_by_dropdown, submit_by_query, select_by_ranking, select_by_extremum, follow_by_toggle, save_by_toggle, book_by_form
 
 ## Site Description
 

@@ -187,6 +187,7 @@
     function toggleShareMenu() {
         document.getElementById('share-menu').classList.toggle('show');
         document.getElementById('more-menu').classList.remove('show');
+        fetch(`${baseUrl}api/posts/${postId}/share`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method:'link'})});
     }
 
     function toggleMoreMenu() {
@@ -199,9 +200,18 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ method: method })
-        }).then(r => r.json()).then(() => {
+        }).then(r => r.json()).then(data => {
             document.getElementById('share-menu').classList.remove('show');
-            alert('Shared via ' + method);
+            if (method === 'link') {
+                navigator.clipboard.writeText(window.location.href)
+                    .then(() => alert('Link copied to clipboard!'))
+                    .catch(() => alert('Share link: ' + window.location.href));
+            } else if (method === 'embed') {
+                var embed = '<iframe src="' + window.location.href + '" width="400" height="500"></iframe>';
+                navigator.clipboard.writeText(embed)
+                    .then(() => alert('Embed code copied!'))
+                    .catch(() => alert('Embed: ' + embed));
+            } else { alert('Shared via ' + method); }
         });
     }
 

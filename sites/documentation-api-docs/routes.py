@@ -334,6 +334,17 @@ def api_docs_search():
     return jsonify(results)
 
 
+@blueprint.route("/api/search")
+def api_search():
+    """Search docs by query string. Returns matching docs ranked by relevance."""
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    results = _search_docs(q)
+    # Return at most 50 results
+    return jsonify(results[:50])
+
+
 @blueprint.route("/api/sections")
 def api_sections():
     sections = _get_sections()
@@ -421,3 +432,4 @@ def api_bookmark(user_id):
         action = "bookmarked"
     _save_users(users)
     return jsonify({"action": action, "doc_id": doc_id, "total_bookmarks": len(bookmarks)})
+

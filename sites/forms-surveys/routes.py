@@ -25,6 +25,8 @@ from flask import (
 )
 
 from app import db, DATA_SOURCES_DIR
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "forms-surveys"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -502,6 +504,9 @@ def submit_response_form(form_id):
     form["responses_count"] = len([r for r in responses if r["form_id"] == form_id])
     _save_forms(forms)
 
+    _add_email(user["id"] if user else 1, "noreply@forms-surveys.lakeport.local",
+               "Form submission received",
+               f'Your response to "{form["title"]}" has been recorded. Thank you for your submission.')
     return redirect(url_for("forms-surveys.respond_success", form_id=form_id))
 
 
@@ -603,6 +608,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("forms-surveys/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="forms-surveys", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("forms-surveys.index"))
 
 
@@ -967,7 +973,7 @@ def api_form_upload(form_id):
     content = uploaded.read()
     attachment["size"] = len(content)
 
-    if "attachments" not in form:
+    if not isinstance(form.get("attachments"), list):
         form["attachments"] = []
     form["attachments"].append(attachment)
     _save_forms(forms)
@@ -1001,7 +1007,7 @@ def api_form_share(form_id):
     method = data.get("method", "link")  # 'link' or 'email'
     recipient = data.get("recipient", "").strip()
 
-    if "shared_with" not in form:
+    if not isinstance(form.get("shared_with"), list):
         form["shared_with"] = []
 
     share_record = {

@@ -198,8 +198,13 @@
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({type: type, id: id, platform: platform})
         }).then(r => r.json()).then(data => {
-            alert("Shared! Link: " + data.share_url);
             document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("open"));
+            if (platform === 'link') {
+                var url = window.location.origin + data.share_url;
+                navigator.clipboard.writeText(url)
+                    .then(() => alert('Link copied to clipboard!'))
+                    .catch(() => alert('Share link: ' + url));
+            } else { alert('Shared via ' + platform); }
         });
     }
     function addToPlaylist(playlistId, trackId) {

@@ -4,110 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - QuickChat</title>
-    <link rel="stylesheet" href="/static/style.css">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; color: #e9edef; min-height: 100vh; }
-        .header { background: #202c33; padding: .6rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3942; }
-        .header h1 { font-size: 1.1rem; font-weight: 600; }
-        .header h1 a { color: #e9edef; text-decoration: none; }
-        .header h1 a span { color: #00a884; }
-        nav { background: #202c33; padding: .4rem 1.2rem; display: flex; gap: 1rem; border-bottom: 1px solid #2a3942; }
-        nav a { color: #8696a0; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .6rem; border-radius: .3rem; transition: all .15s; }
-        nav a:hover { color: #e9edef; background: #2a3942; }
-        nav a.active { color: #00a884; border-bottom: 2px solid #00a884; }
-        .login-container { max-width: 420px; margin: 3rem auto; padding: 2rem; background: #202c33; border-radius: .8rem; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
-        .login-icon { text-align: center; font-size: 3rem; margin-bottom: 1rem; }
-        .login-container h2 { text-align: center; color: #e9edef; margin-bottom: .4rem; font-size: 1.4rem; }
-        .login-container .subtitle { text-align: center; color: #8696a0; font-size: .85rem; margin-bottom: 1.5rem; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; color: #e9edef; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-container { max-width: 400px; width: 100%; padding: 2rem; background: #202c33; border-radius: .8rem; box-shadow: 0 4px 20px rgba(0,0,0,.3); text-align: center; }
+        .login-icon { font-size: 3rem; margin-bottom: .8rem; }
+        h2 { color: #e9edef; margin-bottom: .3rem; font-size: 1.4rem; }
+        .subtitle { color: #8696a0; font-size: .85rem; margin-bottom: 1.5rem; }
         .error { background: rgba(220,38,38,.15); color: #f87171; padding: .6rem .8rem; border-radius: .4rem; font-size: .83rem; margin-bottom: 1rem; border: 1px solid rgba(220,38,38,.3); }
-        .form-group { margin-bottom: 1.2rem; }
+        .form-group { margin-bottom: 1rem; text-align: left; }
         .form-group label { display: block; font-size: .82rem; color: #8696a0; font-weight: 600; margin-bottom: .4rem; }
-        .form-group select { width: 100%; padding: .65rem .8rem; background: #2a3942; border: 1.5px solid #3b4a54; border-radius: .4rem; color: #e9edef; font-size: .9rem; outline: none; appearance: none; cursor: pointer; }
-        .form-group select:focus { border-color: #00a884; box-shadow: 0 0 0 3px rgba(0,168,132,.15); }
-        .form-group select option { background: #2a3942; color: #e9edef; }
-        .user-preview { background: #111b21; border-radius: .5rem; padding: 1rem; margin-bottom: 1.2rem; display: none; }
-        .user-preview.show { display: flex; align-items: center; gap: .8rem; }
-        .preview-avatar { width: 48px; height: 48px; border-radius: 50%; background: #2a3942; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 600; color: #aebac1; }
-        .preview-info { flex: 1; }
-        .preview-name { font-size: .95rem; font-weight: 500; }
-        .preview-about { font-size: .78rem; color: #8696a0; margin-top: .1rem; }
-        .preview-phone { font-size: .75rem; color: #8696a0; }
-        .btn-login { width: 100%; padding: .7rem; background: #00a884; color: #fff; border: none; border-radius: .4rem; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+        .form-group input { width: 100%; padding: .65rem .8rem; background: #2a3942; border: 1.5px solid #3b4a54; border-radius: .4rem; color: #e9edef; font-size: .9rem; outline: none; }
+        .form-group input:focus { border-color: #00a884; box-shadow: 0 0 0 3px rgba(0,168,132,.15); }
+        .form-group input::placeholder { color: #8696a0; }
+        .btn-login { width: 100%; padding: .7rem; background: #00a884; color: #fff; border: none; border-radius: .4rem; font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
         .btn-login:hover { background: #00c897; }
-        .btn-login:disabled { background: #3b4a54; color: #8696a0; cursor: not-allowed; }
-        .secure-note { text-align: center; margin-top: 1.2rem; font-size: .75rem; color: #8696a0; }
+        .secure-note { margin-top: 1.2rem; font-size: .75rem; color: #8696a0; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('instant-messaging.index') }}">Quick<span>Chat</span></a></h1>
-    </div>
-
-    <nav>
-        <a href="{{ url_for('instant-messaging.index') }}">Chats</a>
-        <a href="{{ url_for('instant-messaging.contacts_page') }}">Contacts</a>
-        <a href="{{ url_for('instant-messaging.login_page') }}" class="active">Login</a>
-    </nav>
-
     <form class="login-container" method="post" action="{{ url_for('instant-messaging.login_submit') }}">
         <div class="login-icon">&#128172;</div>
-        <h2>Sign in to QuickChat</h2>
-        <p class="subtitle">Select your account to continue</p>
+        <h2>Quick<span style="color:#00a884">Chat</span></h2>
+        <p class="subtitle">Sign in to your account</p>
 
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
 
         <div class="form-group">
-            <label for="user_id">Select Account</label>
-            <select name="user_id" id="user_id" onchange="showPreview()">
-                <option value="">-- Choose a user --</option>
-                {% for user in users %}
-                <option value="{{ user.id }}"
-                        data-name="{{ user.display_name }}"
-                        data-about="{{ user.about }}"
-                        data-phone="{{ user.phone }}"
-                        data-status="{{ user.status }}">
-                    {{ user.display_name }} ({{ user.phone }})
-                </option>
-                {% endfor %}
-            </select>
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" placeholder="Enter username" required autofocus>
         </div>
-
-        <div class="user-preview" id="userPreview">
-            <div class="preview-avatar" id="previewAvatar"></div>
-            <div class="preview-info">
-                <div class="preview-name" id="previewName"></div>
-                <div class="preview-about" id="previewAbout"></div>
-                <div class="preview-phone" id="previewPhone"></div>
-            </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" placeholder="Enter password" required>
         </div>
-
-        <button type="submit" class="btn-login" id="loginBtn" disabled>Sign In</button>
+        <button type="submit" class="btn-login">Sign In</button>
         <div class="secure-note">End-to-end encrypted messaging</div>
     </form>
-
-    <script>
-        function showPreview() {
-            const select = document.getElementById('user_id');
-            const opt = select.options[select.selectedIndex];
-            const preview = document.getElementById('userPreview');
-            const btn = document.getElementById('loginBtn');
-
-            if (!opt.value) {
-                preview.classList.remove('show');
-                btn.disabled = true;
-                return;
-            }
-
-            document.getElementById('previewAvatar').textContent = (opt.dataset.name || '?')[0];
-            document.getElementById('previewName').textContent = opt.dataset.name;
-            document.getElementById('previewAbout').textContent = opt.dataset.about || '';
-            document.getElementById('previewPhone').textContent = opt.dataset.phone;
-            preview.classList.add('show');
-            btn.disabled = false;
-        }
-    </script>
 </body>
 </html>

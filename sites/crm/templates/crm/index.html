@@ -51,8 +51,8 @@
         .funnel-segment.qualification { background: #1B96FF; }
         .funnel-segment.proposal      { background: #DD7A01; }
         .funnel-segment.negotiation   { background: #8B6FD0; }
-        .funnel-segment.closed-won    { background: #2E844A; }
-        .funnel-segment.closed-lost   { background: #C23934; }
+        .funnel-segment.closed_won    { background: #2E844A; }
+        .funnel-segment.closed_lost   { background: #C23934; }
 
         .funnel-stages { display: flex; gap: 2px; }
         .funnel-stage-card { flex: 1; background: #f9fafb; border: 1px solid #e8ecf1; border-radius: 8px; padding: .65rem .8rem; text-align: center; transition: border-color .15s; cursor: pointer; text-decoration: none; color: inherit; }
@@ -64,8 +64,8 @@
         .funnel-stage-card.qualification .fs-name { color: #0073E6; }
         .funnel-stage-card.proposal      .fs-name { color: #DD7A01; }
         .funnel-stage-card.negotiation   .fs-name { color: #7C3AED; }
-        .funnel-stage-card.closed-won    .fs-name { color: #2E844A; }
-        .funnel-stage-card.closed-lost   .fs-name { color: #C23934; }
+        .funnel-stage-card.closed_won    .fs-name { color: #2E844A; }
+        .funnel-stage-card.closed_lost   .fs-name { color: #C23934; }
 
         /* ── Kanban ──────────────────────────────────────── */
         .kanban { margin-bottom: 1.5rem; }
@@ -78,8 +78,8 @@
         .kanban-col.qualification .col-title { color: #0073E6; }
         .kanban-col.proposal      .col-title { color: #DD7A01; }
         .kanban-col.negotiation   .col-title { color: #7C3AED; }
-        .kanban-col.closed-won    .col-title { color: #2E844A; }
-        .kanban-col.closed-lost   .col-title { color: #C23934; }
+        .kanban-col.closed_won    .col-title { color: #2E844A; }
+        .kanban-col.closed_lost   .col-title { color: #C23934; }
 
         .deal-card { background: #fff; border-radius: 8px; padding: .75rem .85rem; margin-bottom: .5rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); border: 1px solid #e8ecf1; transition: box-shadow .15s, border-color .15s; }
         .deal-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); border-color: #0073E6; }
@@ -147,6 +147,19 @@
 
     <!-- ── Dashboard ───────────────────────────────────────── -->
     <div class="dashboard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div></div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <select onchange="location.href='?sort='+this.value" style="padding:.35rem .7rem;border:1px solid #e8ecf1;border-radius:6px;font-size:.82rem;background:#fff;color:#6b7c93;">
+                    <option value="">Sort Deals</option>
+                    <option value="amount_desc" {{ 'selected' if request.args.get('sort') == 'amount_desc' }}>Amount (High-Low)</option>
+                    <option value="amount_asc" {{ 'selected' if request.args.get('sort') == 'amount_asc' }}>Amount (Low-High)</option>
+                    <option value="close_date" {{ 'selected' if request.args.get('sort') == 'close_date' }}>Close Date</option>
+                    <option value="name" {{ 'selected' if request.args.get('sort') == 'name' }}>Name A-Z</option>
+                </select>
+                <a href="{{ url_for('crm.api_export', format='csv', type='deals') }}" style="padding:.35rem .9rem;background:#0073E6;color:#fff;border-radius:6px;text-decoration:none;font-size:.82rem;font-weight:600;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
+            </div>
+        </div>
 
         <!-- Key Metrics -->
         <div class="metrics">
@@ -223,7 +236,7 @@
                                 <span class="col-count">{{ stage_counts[s] }}</span>
                             </div>
                             {% if stage_counts[s] > 0 %}
-                            <div class="deal-card{% if s == 'closed-won' %} won{% elif s == 'closed-lost' %} lost{% endif %}">
+                            <div class="deal-card{% if s == 'closed_won' %} won{% elif s == 'closed_lost' %} lost{% endif %}">
                                 <div class="dc-top">
                                     <span class="dc-name"><a href="{{ url_for('crm.deals_page', stage=s) }}">{{ stage_counts[s] }} deal{{ 's' if stage_counts[s] != 1 else '' }}</a></span>
                                     <span class="dc-amount">${{ "{:,.0f}".format(stage_values[s]) }}</span>

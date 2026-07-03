@@ -13,6 +13,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "team-chat-workspace"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -424,26 +425,26 @@ def search_view():
 @blueprint.route("/login")
 def login_page():
     """Login page."""
-    return render_template(
-        "team-chat-workspace/login.html",
-        users=_users(),
-    )
+    return render_template("team-chat-workspace/login.html")
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     """Handle login form submission."""
-    user_id = request.form.get("user_id")
-    if not user_id:
-        return redirect(url_for("team-chat-workspace.login_page"))
-
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    if not username:
+        return render_template("team-chat-workspace/login.html", error="Username required")
     users = _users()
-    for u in users:
-        if str(u.get("root_user_id")) == user_id:
-            session["user_id"] = u["root_user_id"]
-            return redirect(url_for("team-chat-workspace.index"))
-
-    return redirect(url_for("team-chat-workspace.login_page"))
+    user = next((u for u in users if u.get("username") == username or u.get("display_name") == username), None)
+    if not user:
+        return render_template("team-chat-workspace/login.html", error="User not found")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("team-chat-workspace/login.html", error="Invalid password")
+    session["user_id"] = user["root_user_id"]
+    emit("signup", user_id=user["root_user_id"], site_name="team-chat-workspace", username=username, password=password, email="")
+    return redirect(url_for("team-chat-workspace.index"))
 
 
 @blueprint.route("/logout")
@@ -572,6 +573,8 @@ def api_channel_send_message(channel_id):
     }
     all_msgs.append(new_msg)
     db.save_collection(SITE, "messages", all_msgs)
+    if any(kw in data["text"].lower() for kw in ("meeting", "standup", "sync", "call at", "let's meet")):
+        emit("booking", user_id=new_msg["user_id"], title=f"Meeting: {data['text'][:40]}", start=datetime.now().strftime("%Y-%m-%d"), location="")
     return jsonify(new_msg), 201
 
 
@@ -864,6 +867,21 @@ def api_message_edit(message_id):
     return jsonify(msg)
 
 
+@blueprint.route("/message/<message_id>/delete", methods=["POST"])
+def form_delete_message(message_id):
+    """Delete a message via form POST and redirect back."""
+    msgs = _messages()
+    msg = next((m for m in msgs if m["id"] == message_id), None)
+    channel_id = msg["channel_id"] if msg else "ch-general"
+    msgs = [m for m in msgs if m["id"] != message_id]
+    db.save_collection(SITE, "messages", msgs)
+    # Also remove related reactions
+    reactions = _reactions()
+    reactions = [r for r in reactions if r["message_id"] != message_id]
+    db.save_collection(SITE, "reactions", reactions)
+    return redirect(url_for("team-chat-workspace.channel_view", channel_id=channel_id))
+
+
 @blueprint.route("/api/messages/<message_id>", methods=["DELETE"])
 def api_message_delete(message_id):
     """DELETE a message (delete_from_table macro)."""
@@ -913,6 +931,10 @@ def api_upload():
     }
     all_msgs.append(new_msg)
     db.save_collection(SITE, "messages", all_msgs)
+
+    # If this is a form submission (not API), redirect back to channel
+    if request.content_type and "multipart/form-data" in request.content_type:
+        return redirect(url_for("team-chat-workspace.channel_view", channel_id=channel_id))
 
     return jsonify({
         "status": "uploaded",
@@ -1038,6 +1060,13 @@ def api_member_block(member_id):
     return jsonify({"action": action, "member_id": member_id})
 
 
+@blueprint.route("/channel/<channel_id>/invite", methods=["POST"])
+def form_channel_invite(channel_id):
+    """Invite a member to a channel via form POST."""
+    _email = request.form.get("email", "").strip()
+    return redirect(url_for("team-chat-workspace.channel_view", channel_id=channel_id))
+
+
 @blueprint.route("/api/channels/<channel_id>/invite", methods=["POST"])
 def api_channel_invite(channel_id):
     """Invite a member to a channel (invite_by_form macro)."""
@@ -1126,3 +1155,33 @@ def api_user_follow(user_id):
     me["following"] = following
     db.save_collection(SITE, "users", users)
     return jsonify({"action": action, "user_id": user_id})
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export channels or messages as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    data_type = request.args.get("type", "channels").lower()
+
+    if data_type == "messages":
+        data = _messages()
+    elif data_type == "members":
+        data = _users()
+    else:
+        data = _channels()
+
+    if fmt == "csv":
+        if not data:
+            return Response("", mimetype="text/csv")
+        keys = list(data[0].keys())
+        lines = [",".join(keys)]
+        for row in data:
+            vals = []
+            for k in keys:
+                v = str(row.get(k, "")).replace('"', '""')
+                vals.append(f'"{v}"')
+            lines.append(",".join(vals))
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
+    return jsonify(data)
+

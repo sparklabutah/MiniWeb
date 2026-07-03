@@ -581,11 +581,18 @@ def orders_page():
     status_filter = request.args.get("status", "").strip()
     if status_filter:
         user_orders = [o for o in user_orders if o["status"] == status_filter]
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    if date_from:
+        user_orders = [o for o in user_orders if o["created_at"] >= date_from]
+    if date_to:
+        user_orders = [o for o in user_orders if o["created_at"] <= date_to + "T23:59:59"]
     user_orders.sort(key=lambda o: o["created_at"], reverse=True)
 
     return render_template("brokerage/orders.html",
                            user=user, orders=user_orders,
                            status_filter=status_filter,
+                           date_from=date_from, date_to=date_to,
                            sim_time=_get_sim_clock())
 
 
@@ -671,6 +678,7 @@ def login_submit():
         return render_template("brokerage/login.html",
                                error="Invalid username or password", user=None, sim_time=_get_sim_clock())
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="brokerage", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("brokerage.portfolio_page"))
 
 
@@ -793,6 +801,7 @@ def trade_submit():
         _save_portfolios(portfolios)
 
         emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=current_price, account_type=account_type)
+        emit("message", from_user_id=user_id, to_user_id=user_id, text=f"Trade executed: {side.upper()} {quantity} {symbol} @ ${current_price}", source_site="brokerage")
 
     return redirect(url_for("brokerage.orders_page"))
 

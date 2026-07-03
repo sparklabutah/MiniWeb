@@ -59,8 +59,9 @@ def _max_id(collection, id_col="id"):
 
 def _keyword_score(query, product):
     terms = query.lower().split()
-    text = (product["name"] + " " + product.get("description", "") + " " +
-            product["category"] + " " + product.get("brand", "")).lower()
+    parts = [str(product["name"]), str(product.get("description", "")),
+             str(product["category"]), str(product.get("brand", ""))]
+    text = " ".join(parts).lower()
     return sum(1 for t in terms if t in text)
 
 
@@ -74,15 +75,58 @@ def _search_products(products, query, semantic=False):
         scored.sort(key=lambda x: -x[1])
         return [p for p, _ in scored]
     else:
-        return [p for p in products if q in p["name"].lower() or
-                q in p.get("description", "").lower() or
-                q in p["category"].lower() or
-                q in p.get("brand", "").lower()]
+        return [p for p in products if q in str(p["name"]).lower() or
+                q in str(p.get("description", "")).lower() or
+                q in str(p["category"]).lower() or
+                q in str(p.get("brand", "")).lower()]
 
 
 def _build_product_query(q="", cat="", status="", condition="",
                          min_price=None, max_price=None, sort="ending_soon", limit=50):
-    """Query products with filters pushed to SQL."""
+    """Query products with filters pushed to SQL.  Uses FTS for text search."""
+
+    sort_map = {
+        "ending_soon": "[auction_end] ASC",
+        "price_low": "[current_price] ASC",
+        "price_high": "[current_price] DESC",
+        "most_bids": "[num_bids] DESC",
+        "newest": "[auction_start] DESC",
+    }
+
+    # --- Text search path: use FTS5 via db.search() ---
+    if q:
+        where_eq = {}
+        if cat:
+            where_eq["category"] = cat
+        if status:
+            where_eq["status"] = status
+        if condition:
+            where_eq["condition"] = condition
+        results = db.search(SITE, "products", q,
+                            where=where_eq if where_eq else None,
+                            limit=max(limit, 200))
+        # Post-filter on numeric fields not supported by where=
+        if min_price is not None:
+            results = [p for p in results if (p.get("current_price") or 0) >= min_price]
+        if max_price is not None:
+            results = [p for p in results if (p.get("current_price") or 0) <= max_price]
+        # Sort (FTS returns by relevance; re-sort if user asked for something else)
+        order = sort_map.get(sort)
+        if sort != "relevance" and order:
+            sort_key_map = {
+                "ending_soon": lambda p: p.get("auction_end", ""),
+                "price_low": lambda p: p.get("current_price", 0),
+                "price_high": lambda p: -(p.get("current_price", 0)),
+                "most_bids": lambda p: -(p.get("num_bids", 0)),
+                "newest": lambda p: p.get("auction_start", ""),
+            }
+            key_fn = sort_key_map.get(sort)
+            if key_fn:
+                reverse = sort in ("newest",)
+                results.sort(key=key_fn, reverse=reverse)
+        return results[:limit]
+
+    # --- Non-search path: normal SQL filters ---
     clauses = []
     params = []
     if cat:
@@ -100,20 +144,7 @@ def _build_product_query(q="", cat="", status="", condition="",
     if max_price is not None:
         clauses.append("[current_price] <= ?")
         params.append(max_price)
-    if q:
-        ql = f"%{q.lower()}%"
-        clauses.append(
-            "(LOWER([name]) LIKE ? OR LOWER([description]) LIKE ? "
-            "OR LOWER([category]) LIKE ? OR LOWER([brand]) LIKE ?)")
-        params.extend([ql, ql, ql, ql])
 
-    sort_map = {
-        "ending_soon": "[auction_end] ASC",
-        "price_low": "[current_price] ASC",
-        "price_high": "[current_price] DESC",
-        "most_bids": "[num_bids] DESC",
-        "newest": "[auction_start] DESC",
-    }
     order = sort_map.get(sort, "[auction_end] ASC")
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     sql = f"SELECT * FROM [{_PRODUCTS_TABLE}]{where} ORDER BY {order} LIMIT ?"

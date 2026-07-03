@@ -25,6 +25,8 @@ from flask import (
     request, session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "software-marketplace"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -681,6 +683,8 @@ def checkout_page():
             all_cart = [c for c in all_cart if c["user_id"] != session["user_id"]]
             db.save_collection(SITE, "cart", all_cart)
 
+            emit("purchase", user_id=session["user_id"], amount=final_total, merchant="App Store", item=f"{len(purchased_app_ids)} app(s)")
+
             return render_template(
                 "software-marketplace/checkout_success.html",
                 purchased_app_ids=purchased_app_ids,
@@ -763,6 +767,7 @@ def login_submit():
         return render_template("software-marketplace/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="software-marketplace", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("software-marketplace.index"))
 
 
@@ -798,6 +803,9 @@ def form_install(app_id):
             "installed_date": datetime.datetime.now().strftime("%Y-%m-%d"),
         })
         db.save_collection(SITE, "installed", installed)
+        _add_email(session["user_id"], "noreply@software-marketplace.lakeport.local",
+                   "Purchase confirmed",
+                   f'"{app["name"]}" has been installed successfully.')
 
     return redirect(url_for("software-marketplace.app_detail", app_id=app_id))
 
@@ -971,7 +979,12 @@ def api_apps():
 
 @blueprint.route("/api/apps/semantic")
 def api_semantic_search():
-    """Semantic search over app descriptions (search_by_semantic)."""
+    """Semantic search over app descriptions (search_by_semantic).
+
+    Uses keyword-overlap: each word is searched with OR logic so
+    multi-word queries like 'social media chat messaging' return
+    results matching any of those terms.
+    """
     q = request.args.get("q", "").strip()
     limit = request.args.get("limit", 24, type=int)
     offset = request.args.get("offset", 0, type=int)
@@ -979,7 +992,20 @@ def api_semantic_search():
     if not q:
         return jsonify([])
 
-    results = db.search(SITE, "apps", q, limit=min(limit, 100), offset=offset)
+    # For semantic search, try each term individually and merge results
+    terms = q.split()
+    if len(terms) <= 1:
+        results = db.search(SITE, "apps", q, limit=min(limit, 100), offset=offset)
+    else:
+        seen_ids = set()
+        results = []
+        for term in terms:
+            hits = db.search(SITE, "apps", term, limit=100)
+            for hit in hits:
+                if hit["id"] not in seen_ids:
+                    seen_ids.add(hit["id"])
+                    results.append(hit)
+        results = results[offset:offset + min(limit, 100)]
     return jsonify(results)
 
 
@@ -1439,6 +1465,8 @@ def api_checkout():
     all_cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
     all_cart = [c for c in all_cart if c["user_id"] != user_id]
     db.save_collection(SITE, "cart", all_cart)
+
+    emit("purchase", user_id=user_id, amount=final_total, merchant="App Store", item=f"{len(purchased)} app(s)")
 
     return jsonify({
         "action": "purchased",

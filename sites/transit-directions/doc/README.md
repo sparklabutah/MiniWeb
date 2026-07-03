@@ -2,7 +2,7 @@
 
 **Category**: Maps & navigation
 **Reviewer**: Kenny
-**Number of macros**: 20
+**Number of macros**: 15
 
 ## Data Source
 
@@ -34,7 +34,7 @@ All files are JSON. Routes have numeric IDs and string route_numbers (e.g., "1",
 
 ## Target Macros
 
-navigate_by_dropdown, search_by_query, search_by_proximity, route_by_query, route_by_radio, route_by_route, route_by_date_range, filter_by_radio, sort_by_dropdown, extract_by_query, extract_by_dropdown, extract_from_table, compute_by_dropdown, compute_by_extremum, compare_from_table, select_by_dropdown, select_by_ranking, select_by_extremum, export_by_dropdown, share_by_dropdown
+navigate_by_dropdown, search_by_query, search_by_proximity, sort_by_dropdown, extract_by_query, extract_by_dropdown, extract_from_table, compute_by_dropdown, compute_by_extremum, compare_from_table, select_by_dropdown, select_by_ranking, select_by_extremum, export_by_dropdown, share_by_dropdown
 
 ## Temporal Dynamics
 

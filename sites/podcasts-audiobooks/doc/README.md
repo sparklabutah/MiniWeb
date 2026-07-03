@@ -2,7 +2,7 @@
 
 **Category**: Streaming & media
 **Reviewer**: Reaz
-**Number of macros**: 21
+**Number of macros**: 19
 
 ## Data Source
 
@@ -37,7 +37,7 @@ All data is loaded by default (num_data_points=-1). 12 podcasts, 82 episodes, 15
 
 ## Target Macros
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, sort_by_ranking, extract_by_query, submit_by_query, select_by_dropdown, play_by_dropdown, play_by_date_range, play_by_playback, export_by_dropdown, post_from_free_text, react_by_toggle, rate_by_slider, follow_by_dropdown, follow_by_toggle, subscribe_by_toggle, save_by_toggle
+navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, sort_by_ranking, extract_by_query, submit_by_query, select_by_dropdown, play_by_dropdown, export_by_dropdown, post_from_free_text, react_by_toggle, rate_by_slider, follow_by_dropdown, follow_by_toggle, subscribe_by_toggle, save_by_toggle
 
 ## Temporal Dynamics
 

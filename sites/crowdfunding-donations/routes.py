@@ -11,6 +11,8 @@ from datetime import datetime
 from flask import (Blueprint, Response, abort, jsonify, redirect,
                    render_template, request, session, url_for)
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "crowdfunding-donations"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -217,6 +219,7 @@ def login_submit():
         return render_template("crowdfunding-donations/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="crowdfunding-donations", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     if request.is_json:
         return jsonify({"user_id": user["id"], "username": user["username"]})
     next_url = request.form.get("next", "") or request.args.get("next", "")
@@ -315,6 +318,10 @@ def form_pledge(campaign_id):
             "tier_id": tier_id
         })
         _save_users(users)
+
+    _add_email(user_id, "noreply@crowdfunding.lakeport.local",
+               "Pledge confirmed",
+               f'Your pledge of ${amount:.2f} to "{campaign["title"]}" has been confirmed. Thank you for your support!')
 
     if is_json:
         # API path: direct payment bridge call (no 2FA)

@@ -70,7 +70,7 @@ def api_search():
                     "url": s["path"],
                     "title": s["name"],
                     "snippet": s.get("description", ""),
-                    "domain": s["id"] + ".lakeport.local",
+                    "domain": s.get("domain", s["id"] + ".lakeport.local"),
                     "is_miniweb": True,
                 })
 

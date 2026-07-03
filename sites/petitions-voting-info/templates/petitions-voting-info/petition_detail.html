@@ -149,9 +149,14 @@
                 }).then(function(r){return r.json();}).then(function(d){
                     var el = document.getElementById('action-result');
                     if (d.share_url) {
-                        el.innerHTML = 'Shared via ' + d.method + '!';
+                        if (d.method === 'link') {
+                            navigator.clipboard.writeText(window.location.href)
+                                .then(function() { el.innerHTML = 'Link copied to clipboard!'; })
+                                .catch(function() { el.innerHTML = 'Share link: ' + window.location.href; });
+                        } else {
+                            el.innerHTML = 'Shared via ' + d.method + '!';
+                        }
                         el.style.color = '#065f46';
-                        if (d.method === 'link') { navigator.clipboard && navigator.clipboard.writeText(window.location.href); }
                     }
                 });
                 this.value = '';

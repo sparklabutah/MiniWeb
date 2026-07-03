@@ -64,6 +64,13 @@
     <nav>
         <a href="{{ url_for('instant-messaging.index') }}" class="active">Chats</a>
         <a href="{{ url_for('instant-messaging.contacts_page') }}">Contacts</a>
+        <span style="flex:1;"></span>
+        <select onchange="location.href='?sort='+this.value" style="padding:.3rem .5rem;background:#202c33;border:1px solid #2a3942;border-radius:.3rem;color:#e9edef;font-size:.82rem;">
+            <option value="recent">Sort: Recent</option>
+            <option value="name">Sort: Name</option>
+            <option value="unread">Sort: Unread</option>
+        </select>
+        <a href="{{ url_for('instant-messaging.api_export', format='csv', type='conversations') }}" style="padding:.3rem .6rem;background:#00a884;color:#111b21;border-radius:.3rem;text-decoration:none;font-size:.82rem;font-weight:600;margin-left:.5rem;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
     </nav>
 
     <div class="app-container">
@@ -72,6 +79,12 @@
                 <div class="search-box">
                     <span class="search-icon">&#128269;</span>
                     <input type="text" id="searchInput" placeholder="Search or start new chat" oninput="filterConversations()">
+                </div>
+                <div style="display:flex;gap:4px;padding:4px 8px;align-items:center;">
+                    <label style="font-size:.72rem;color:#8696a0;">From:</label>
+                    <input type="date" id="dateFrom" onchange="filterConversations()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    <label style="font-size:.72rem;color:#8696a0;">To:</label>
+                    <input type="date" id="dateTo" onchange="filterConversations()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
                 </div>
             </div>
             <div class="conversation-list" id="conversationList">
@@ -117,6 +130,7 @@
                 const preview = (item.querySelector('.conv-preview') || {}).textContent || '';
                 item.style.display = (name.includes(q) || preview.toLowerCase().includes(q)) ? '' : 'none';
             });
+            fetch('{{ url_for("instant-messaging.api_conversations_list") }}' + (q ? '?q=' + encodeURIComponent(q) : ''));
         }
     </script>
 </body>

@@ -122,6 +122,19 @@
                     <span class="cat-badge">{{ post.category }}</span>
                     <span>{{ post.notes_count }} notes</span>
                     <span>{{ post.shared_count }} shares</span>
+                    <button onclick="shareBlogPost()" style="background:#0f3460;color:#fff;border:none;padding:.3rem .6rem;border-radius:.3rem;cursor:pointer;font-size:.8rem;margin-left:.5rem;">Share</button>
+                    <span id="share-result" style="font-size:.8rem;color:#a0ffa0;margin-left:.3rem;"></span>
+                    <script>
+                    function shareBlogPost() {
+                        fetch('{{ url_for("blogs.api_share_post", post_id=post.id) }}', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+                        }).then(function(r){return r.json();}).then(function(d) {
+                            navigator.clipboard.writeText(window.location.href)
+                                .then(function() { document.getElementById('share-result').textContent = 'Link copied!'; })
+                                .catch(function() { document.getElementById('share-result').textContent = d.share_url || window.location.href; });
+                        });
+                    }
+                    </script>
                 </div>
 
                 <!-- Action buttons -->

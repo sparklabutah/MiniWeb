@@ -400,24 +400,9 @@ def ask_submit():
 
 @blueprint.route("/tags")
 def tags_page():
-    table = db.get_table_name(SITE, "questions")
-    tag_rows = db.execute(
-        f"SELECT [tags] FROM [{table}] WHERE [tags] IS NOT NULL AND [tags] != ''",
-        fetch="all"
-    )
-    tag_counts = Counter()
-    for row in tag_rows:
-        raw = row.get("tags", "")
-        if isinstance(raw, list):
-            for t in raw:
-                tag_counts[t] += 1
-        elif isinstance(raw, str) and raw.startswith("["):
-            try:
-                for t in json.loads(raw):
-                    tag_counts[t] += 1
-            except (json.JSONDecodeError, TypeError):
-                pass
-    tags_sorted = tag_counts.most_common()
+    # Use pre-built tags_meta table instead of scanning all questions
+    tag_rows = db.query(SITE, "tags_meta", sort="-count", limit=500)
+    tags_sorted = [(r["tag"], r["count"]) for r in tag_rows]
     current_user = _get_logged_in_user()
     return render_template(
         "qa-knowledge/tags.html",
@@ -1094,24 +1079,9 @@ def api_answer_vote(aid):
 
 @blueprint.route("/api/tags")
 def api_tags():
-    table = db.get_table_name(SITE, "questions")
-    tag_rows = db.execute(
-        f"SELECT [tags] FROM [{table}] WHERE [tags] IS NOT NULL AND [tags] != ''",
-        fetch="all"
-    )
-    tag_counts = Counter()
-    for row in tag_rows:
-        raw = row.get("tags", "")
-        if isinstance(raw, list):
-            for t in raw:
-                tag_counts[t] += 1
-        elif isinstance(raw, str) and raw.startswith("["):
-            try:
-                for t in json.loads(raw):
-                    tag_counts[t] += 1
-            except (json.JSONDecodeError, TypeError):
-                pass
-    result = [{"name": t, "count": c} for t, c in tag_counts.most_common()]
+    # Use pre-built tags_meta table instead of scanning all questions
+    tag_rows = db.query(SITE, "tags_meta", sort="-count", limit=500)
+    result = [{"name": r["tag"], "count": r["count"]} for r in tag_rows]
     return jsonify(result)
 
 
@@ -1338,8 +1308,10 @@ def api_register():
     if any(u["se_username"] == username for u in users):
         return jsonify({"error": "Username already taken"}), 409
 
+    new_uid = _next_user_id(users)
     new_user = {
-        "root_user_id": _next_user_id(users),
+        "row_id": max((u.get("row_id", 0) for u in users), default=0) + 1,
+        "root_user_id": new_uid,
         "se_username": username,
         "se_display_name": display_name,
         "password": password,
@@ -1352,12 +1324,12 @@ def api_register():
         "followed_tags": [],
         "reports": [],
     }
-    users.append(new_user)
-    _save_users(users)
-    emit("signup", user_id=new_user["root_user_id"], site_name="qa-knowledge",
+    # Use save_item to avoid session_overlay conflicts
+    db.save_item(SITE, "users", new_user["row_id"], new_user)
+    emit("signup", user_id=new_uid, site_name="qa-knowledge",
          username=username, password=password, email="")
-    session["qa_user_id"] = new_user["root_user_id"]
-    return jsonify({"user_id": new_user["root_user_id"],
+    session["qa_user_id"] = new_uid
+    return jsonify({"user_id": new_uid,
                     "username": new_user["se_username"]}), 201
 
 

@@ -89,6 +89,80 @@ SITE_CATEGORIES = {
 }
 
 
+SITE_DOMAINS = {
+    "academic-paper-db": "scholarbase.edu",
+    "agency-portals": "lakeport.gov",
+    "ai-chatbots": "chatbotshub.ai",
+    "auctions-p2p-marketplaces": "bidmarket.com",
+    "banking": "securebank.com",
+    "blogs": "tumblevibe.com",
+    "books-comics": "readshelf.com",
+    "brokerage": "tradepulse.com",
+    "business-company": "apexdynamics.com",
+    "calendar-todo": "calflow.app",
+    "cloud-dev-consoles": "meridiancloud.dev",
+    "cloud-storage-file-transfer": "meridiancloud.com",
+    "code-editor-execution": "codeforge.dev",
+    "comparison-aggregators": "comparewise.com",
+    "conference-review-submission": "peerportal.org",
+    "converters-calculators": "convertall.tools",
+    "course-sites-classrooms": "learnhub.edu",
+    "crm": "salesflow.io",
+    "crowdfunding-donations": "fundspark.com",
+    "dating": "sparkconnect.app",
+    "design-creative": "canvastudio.design",
+    "dictionaries-language-tools": "wordwise.com",
+    "documentation-api-docs": "devdocs.io",
+    "documents": "meridianflow.com",
+    "e-commerce": "shopwave.com",
+    "email": "lakeportmail.com",
+    "flights-hotels": "skylodge.travel",
+    "forms-surveys": "formstack.io",
+    "forums": "lakeforum.com",
+    "handwritten-notes-whiteboards": "notecraft.app",
+    "health-fitness-tracking": "fitpulse.health",
+    "health-portals": "lakeportmedical.org",
+    "instant-messaging": "quickchat.app",
+    "insurance-loans": "cascadiainsure.com",
+    "job-sites": "jobscout.careers",
+    "live": "livestream.tv",
+    "map-services": "cascadiamaps.com",
+    "multimedia-posting": "pixshare.social",
+    "music": "soundwave.fm",
+    "news": "lakeporttimes.com",
+    "password-managers": "vaultguard.security",
+    "personal-portfolio": "alexrivera.dev",
+    "petitions-voting-info": "civicvoice.org",
+    "podcasts-audiobooks": "podstream.fm",
+    "project-homepages": "flownet.dev",
+    "project-mgmt-issue-tracking": "taskflow.pm",
+    "qa-knowledge": "askoverflow.com",
+    "rating-review": "ratespot.com",
+    "real-estate-buy-rent": "lakeportrealty.com",
+    "remote-calls": "meetwave.app",
+    "software-marketplace": "appvault.store",
+    "sports-esports": "lakeportsports.com",
+    "spreadsheets-slides": "sheetdeck.app",
+    "tax-filing-dmv-permits": "lakeportgov.org",
+    "team-chat-workspace": "meridianchat.work",
+    "ticketing-events": "eventpass.live",
+    "transit-directions": "lakeporttransit.org",
+    "translation": "linguabridge.app",
+    "university-academic": "meridianstate.edu",
+    "url-shorteners-qr": "snplnk.io",
+    "version-control": "codehost.dev",
+    "video": "streamtube.tv",
+    "visual-how-to-guides": "stepvista.com",
+    "weather": "lakeportweather.com",
+    "wikis": "lakeportwiki.org",
+}
+
+
+def get_site_domain(site_id):
+    """Return the simulated domain for a site."""
+    return SITE_DOMAINS.get(site_id, f"{site_id}.lakeport.local")
+
+
 def discover_sites():
     """Scan sites/*/site.json and return only implemented sites."""
     sites = []
@@ -100,6 +174,7 @@ def discover_sites():
         meta = json.loads(site_json.read_text())
         meta["path"] = f"/sites/{meta['id']}/"
         meta["category"] = SITE_CATEGORIES.get(meta["id"], "Other")
+        meta["domain"] = SITE_DOMAINS.get(meta["id"], f"{meta['id']}.lakeport.local")
         sites.append(meta)
     return sites
 
@@ -379,7 +454,60 @@ def create_app():
         from flask import jsonify
         sid = session.get("_id", id(session))
         _request_logs.pop(sid, None)
+        _action_beacons.pop(sid, None)
         return jsonify({"status": "cleared"})
+
+    # ── Action beacon — UI-level action log from recorder.js ──────────
+    _action_beacons = {}  # session_id -> [entries]
+
+    @app.route("/_admin/beacon", methods=["POST"])
+    def _admin_beacon():
+        """Receive UI action beacons from recorder.js.
+
+        Every click, type, select, submit, navigation fires a beacon here.
+        Works identically for human annotators and browser-use agents.
+        """
+        sid = session.get("_id", id(session))
+        if sid not in _action_beacons:
+            _action_beacons[sid] = []
+
+        data = request.get_json(silent=True) or {}
+        if not data.get("action"):
+            return "", 204
+
+        entry = {
+            "action": data.get("action", ""),
+            "target": data.get("target", ""),
+            "selector": data.get("selector", ""),
+            "url": data.get("url", ""),
+            "timestamp": data.get("timestamp", ""),
+            "x": data.get("x"),
+            "y": data.get("y"),
+            "value": data.get("value"),
+            "text": data.get("text"),
+            "option_text": data.get("option_text"),
+            "href": data.get("href"),
+            "key": data.get("key"),
+            "checked": data.get("checked"),
+            "formData": data.get("formData"),
+        }
+        # Strip None values
+        entry = {k: v for k, v in entry.items() if v is not None}
+        _action_beacons[sid].append(entry)
+
+        # Cap at 1000
+        if len(_action_beacons[sid]) > 1000:
+            _action_beacons[sid] = _action_beacons[sid][-1000:]
+
+        return "", 204
+
+    @app.route("/_admin/beacon")
+    def _admin_beacon_get():
+        """Read the action beacon log for the current session."""
+        from flask import jsonify
+        sid = session.get("_id", id(session))
+        return jsonify({"count": len(_action_beacons.get(sid, [])),
+                        "entries": _action_beacons.get(sid, [])})
 
     @app.route("/_admin/session")
     def _admin_session():
@@ -391,6 +519,8 @@ def create_app():
     @app.route("/_reset_data", methods=["POST"])
     def _reset_data():
         db.reset_session()
+        from flask import session as flask_session
+        flask_session.clear()
         return {"status": "reset"}
 
     @app.route("/_overlay_stats")
@@ -422,19 +552,21 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
 });
 })()</script>"""
 
+    _RECORDER_SCRIPT = b'<script src="/static/recorder.js"></script>'
+
     @app.after_request
-    def _inject_broken_img_handler(response):
+    def _inject_site_scripts(response):
         if (request.path.startswith("/sites/")
                 and response.content_type
                 and "text/html" in response.content_type
                 and response.status_code == 200):
             data = response.get_data()
+            inject = _BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT
             idx = data.rfind(b"</body>")
             if idx != -1:
-                response.set_data(data[:idx] + _BROKEN_IMG_SCRIPT + b"\n" + data[idx:])
+                response.set_data(data[:idx] + inject + b"\n" + data[idx:])
             else:
-                # No </body> tag — append to end
-                response.set_data(data + _BROKEN_IMG_SCRIPT)
+                response.set_data(data + inject)
         return response
 
     # Register cross-site event handlers (must be after all imports settle)

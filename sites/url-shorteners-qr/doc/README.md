@@ -2,7 +2,7 @@
 
 **Category**: Utilities
 **Reviewer**: Kenny
-**Number of macros**: 15
+**Number of macros**: 13
 
 ## Data Source
 
@@ -31,7 +31,7 @@ All records loaded by default (`num_data_points: -1`). 4 users, 12 links, 30 cli
 
 ## Target Macros
 
-navigate_by_query, navigate_by_route, search_by_query, filter_by_date_range, extract_by_query, extract_from_table, edit_by_query, edit_by_date_range, delete_from_table, configure_by_dropdown, export_by_dropdown, share_by_dropdown, create_by_query, create_from_free_text, create_by_toggle
+navigate_by_query, navigate_by_route, search_by_query, filter_by_date_range, extract_by_query, extract_from_table, edit_by_query, delete_from_table, configure_by_dropdown, export_by_dropdown, share_by_dropdown, create_by_query, create_from_free_text
 
 ## Temporal Dynamics
 

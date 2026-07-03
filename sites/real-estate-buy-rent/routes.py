@@ -385,6 +385,9 @@ def submit_inquiry(listing_id):
         "status": "pending",
     })
     _save_inquiries(inquiries)
+    listing = db.get_item(SITE, "listings", listing_id)
+    if listing:
+        emit("booking", user_id=session["user_id"], title=f"Property viewing: {listing.get('address', 'Listing')}", start=datetime.now().strftime("%Y-%m-%d"), location=listing.get("address", ""))
     return redirect(url_for("real-estate-buy-rent.listing_detail", listing_id=listing_id))
 
 

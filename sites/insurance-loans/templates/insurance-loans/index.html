@@ -990,6 +990,15 @@
     </div>
 
     <div class="main-content">
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;align-items:center;margin-bottom:1rem;">
+            <select onchange="location.href='?sort='+this.value" style="padding:.4rem .7rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.82rem;background:#fff;color:#475569;">
+                <option value="">Sort Loans</option>
+                <option value="balance_desc" {{ 'selected' if request.args.get('sort') == 'balance_desc' }}>Balance (High-Low)</option>
+                <option value="balance_asc" {{ 'selected' if request.args.get('sort') == 'balance_asc' }}>Balance (Low-High)</option>
+                <option value="rate" {{ 'selected' if request.args.get('sort') == 'rate' }}>Interest Rate</option>
+            </select>
+            <a href="{{ url_for('insurance-loans.api_export', format='csv', type='policies') }}" style="padding:.4rem .9rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:.82rem;font-weight:600;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
+        </div>
 
         <!-- ============================================================
              QUICK ACTIONS
@@ -1213,6 +1222,13 @@
                     View All <span>&rarr;</span>
                 </a>
             </div>
+            <form method="get" action="{{ url_for('insurance-loans.index') }}" style="display:flex;gap:8px;align-items:center;margin-bottom:.8rem;flex-wrap:wrap;">
+                <label style="font-size:.82rem;color:#6b7280;">From:</label>
+                <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;">
+                <label style="font-size:.82rem;color:#6b7280;">To:</label>
+                <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.82rem;">
+                <button type="submit" style="padding:4px 14px;background:#1e40af;color:#fff;border:none;border-radius:6px;font-size:.82rem;cursor:pointer;">Filter</button>
+            </form>
             <div class="payment-table-head">
                 <span class="pt-date">Date</span>
                 <span class="pt-type">Type</span>

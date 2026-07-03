@@ -114,7 +114,25 @@
             {% endfor %}
         </div>
 
-        <div class="result-count">{{ locations|length }} places found</div>
+        <form method="get" action="{{ url_for('map-services.index') }}" style="display:flex;align-items:center;gap:10px;padding:6px 0;flex-wrap:wrap;">
+            {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+            {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+            <label style="font-size:.82rem;color:#70757a;white-space:nowrap;">Min Rating: <span id="rating-slider-val">{{ min_rating if min_rating is not none else 'Any' }}</span></label>
+            <input type="range" name="min_rating" min="0" max="5" step="0.5" value="{{ min_rating if min_rating is not none else 0 }}" oninput="document.getElementById('rating-slider-val').textContent=this.value=='0'?'Any':this.value" style="width:120px;accent-color:#4285f4;">
+            <button type="submit" style="padding:4px 14px;background:#4285f4;color:#fff;border:none;border-radius:16px;font-size:.82rem;cursor:pointer;">Apply</button>
+        </form>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 16px;font-size:12px;">
+            <span class="result-count" style="padding:0;border:none;">{{ locations|length }} places found</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <select onchange="location.href='?sort='+this.value+'&category={{ selected_category }}&q={{ search_query }}'" style="padding:3px 8px;border:1px solid #dadce0;border-radius:16px;font-size:12px;background:#fff;color:#3c4043;">
+                    <option value="">Default</option>
+                    <option value="rating" {{ 'selected' if request.args.get('sort') == 'rating' }}>Rating</option>
+                    <option value="name" {{ 'selected' if request.args.get('sort') == 'name' }}>Name A-Z</option>
+                </select>
+                <a href="{{ url_for('map-services.api_export', format='csv') }}" style="padding:3px 10px;background:#4285f4;color:#fff;border-radius:16px;text-decoration:none;font-size:12px;font-weight:500;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
+            </div>
+        </div>
 
         <div class="results">
             {% if locations %}

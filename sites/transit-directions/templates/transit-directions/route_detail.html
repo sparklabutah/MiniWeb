@@ -56,17 +56,17 @@
         <div class="subtitle">Public Transit for Lakeport and the Region</div>
     </div>
     <div class="nav">
-        <a href="/">Home</a>
-        <a href="/routes" class="active">Routes</a>
-        <a href="/stops">Stops</a>
+        <a href="{{ url_for('transit-directions.index') }}">Home</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}" class="active">Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}">Stops</a>
         <a href="/sites/map-services/directions?mode=transit">Trip Planner</a>
-        <a href="/fares">Fares</a>
-        <a href="/login">Sign In</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}">Fares</a>
+        <a href="{{ url_for('transit-directions.login') }}">Sign In</a>
     </div>
 
     <div class="container">
         <div class="breadcrumb">
-            <a href="/">Home</a> &rsaquo; <a href="/routes">Routes</a> &rsaquo; Route {{ route.route_number }}
+            <a href="{{ url_for('transit-directions.index') }}">Home</a> &rsaquo; <a href="{{ url_for('transit-directions.routes_list') }}">Routes</a> &rsaquo; Route {{ route.route_number }}
         </div>
 
         <div class="route-header">
@@ -126,7 +126,7 @@
             <div class="stops-timeline">
                 {% for stop in route_stops %}
                 <div class="stop-item">
-                    <a href="/stop/{{ stop.id }}">{{ stop.name }}</a>
+                    <a href="{{ url_for('transit-directions.stop_detail', stop_id=stop.id) }}">{{ stop.name }}</a>
                     <div class="stop-meta">
                         Stop {{ stop.stop_code }} &bull; Zone {{ stop.zone }}
                         {% if stop.amenities|length > 0 %} &bull; {{ stop.amenities | join(', ') }}{% endif %}

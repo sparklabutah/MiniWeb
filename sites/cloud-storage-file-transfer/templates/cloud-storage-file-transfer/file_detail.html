@@ -108,11 +108,11 @@
                 </div>
             </div>
             <div class="file-actions">
-                <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star">
+                <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star" onclick="var b=this;fetch('/sites/cloud-storage-file-transfer/api/files/{{ file.id }}/star', {method:'POST'}).then(()=>{var s=b.classList.toggle('starred');b.innerHTML=s?'&#9733;':'&#9734;'})">
                     {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
                 </button>
-                <button class="btn btn-outline btn-sm">&#128279; Share</button>
-                <button class="btn btn-outline btn-sm">&#8595; Download</button>
+                <button class="btn btn-outline btn-sm" onclick="var b=this;navigator.clipboard.writeText(window.location.href);b.innerHTML='&#128279; Copied!';setTimeout(()=>b.innerHTML='&#128279; Share',2000)">&#128279; Share</button>
+                <button class="btn btn-outline btn-sm" onclick="var b=this;b.innerHTML='&#8595; Downloading...';setTimeout(()=>b.innerHTML='&#8595; Download',2000)">&#8595; Download</button>
                 <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:inline;" onsubmit="return confirm('Move this file to trash?');">
                     <button type="submit" class="btn btn-outline btn-sm" style="color:#d93025;">&#128465; Delete</button>
                 </form>
@@ -171,6 +171,10 @@
                 {% else %}
                 <p style="color:#80868b;font-size:0.85rem;padding:1rem 0;text-align:center;">Not shared with anyone</p>
                 {% endif %}
+                <form method="POST" action="{{ url_for('cloud-storage-file-transfer.form_invite_to_file', file_id=file.id) }}" style="display:flex;gap:.4rem;margin-top:.8rem;border-top:1px solid #f1f3f4;padding-top:.8rem;">
+                    <input type="email" name="email" placeholder="Enter email to invite" required style="flex:1;padding:.4rem .6rem;border:1px solid #dadce0;border-radius:4px;font-size:.85rem;">
+                    <button type="submit" class="btn btn-primary btn-sm">Invite</button>
+                </form>
             </div>
 
             {% if transfers %}

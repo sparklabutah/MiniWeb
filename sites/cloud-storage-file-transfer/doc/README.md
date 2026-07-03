@@ -2,7 +2,7 @@
 
 **Category**: Productivity
 **Reviewer**: Reaz
-**Number of macros**: 25
+**Number of macros**: 23
 
 ## Data Source
 
@@ -42,7 +42,7 @@ GitLab-derived synthetic dataset representing a software engineering team's clou
 
 ## Target Macros
 
-navigate_from_table, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_semantic, extract_by_dropdown, extract_by_route, compute_by_slider, create_from_free_text, edit_by_dropdown, edit_by_form, edit_by_drag, delete_from_table, configure_by_toggle, export_by_dropdown, upload_from_table, upload_by_route, share_by_query, share_by_dropdown, save_by_toggle, invite_by_form, authenticate_by_form
+navigate_from_table, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_semantic, extract_by_dropdown, extract_by_route, compute_by_slider, create_from_free_text, edit_by_dropdown, edit_by_form, delete_from_table, configure_by_toggle, export_by_dropdown, upload_by_route, share_by_query, share_by_dropdown, save_by_toggle, invite_by_form, authenticate_by_form
 
 ## Temporal Dynamics
 

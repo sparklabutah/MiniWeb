@@ -175,25 +175,35 @@
             fetch(`${BASE}api/comments/${cid}`, {method: 'DELETE'}).then(() => location.reload());
         }
         function savePost() {
+            var btn = document.querySelector('.post-actions button[onclick="savePost()"]');
             fetch(`${BASE}api/posts/${POST_ID}/save`, {method: 'POST'})
-                .then(r => r.json()).then(d => alert(d.action || d.error));
+                .then(r => r.json()).then(d => {
+                    if (btn) { btn.textContent = d.action === 'saved' ? 'Saved' : 'Save'; btn.style.fontWeight = d.action === 'saved' ? 'bold' : ''; }
+                });
         }
         function toggleShareMenu() {
             document.getElementById('share-menu').classList.toggle('open');
+            
         }
         function sharePost(method) {
             document.getElementById('share-menu').classList.remove('open');
             fetch(`${BASE}api/posts/${POST_ID}/share`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({method: method})
-            }).then(r => r.json()).then(d => alert('Shared via ' + method));
+            }).then(r => r.json()).then(d => {
+                if (method === 'copy_link' && d.share_url) {
+                    navigator.clipboard.writeText(window.location.origin + d.share_url)
+                        .then(() => alert('Link copied to clipboard!'))
+                        .catch(() => alert('Share link: ' + d.share_url));
+                } else { alert('Shared via ' + method); }
+            });
         }
         function deletePost() {
             if (!confirm('Delete this post?')) return;
             fetch(`${BASE}api/posts/${POST_ID}`, {method: 'DELETE'})
                 .then(() => window.location.href = '{{ url_for("forums.index") }}');
         }
-        function showEditPost() { document.getElementById('edit-post-form').style.display = 'block'; }
+        function showEditPost() { document.getElementById('edit-post-form').style.display = 'block';  }
         function saveEditPost() {
             const body = document.getElementById('edit-post-body').value.trim();
             fetch(`${BASE}api/posts/${POST_ID}`, {

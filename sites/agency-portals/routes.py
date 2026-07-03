@@ -9,6 +9,7 @@ import random
 from flask import (Blueprint, Response, abort, jsonify, render_template,
                    request, session, redirect, url_for)
 from app import db
+from app.events import emit
 
 
 def _send_confirmation_email(user_id, subject, body):
@@ -320,6 +321,7 @@ def login_submit():
         return render_template("agency-portals/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="agency-portals", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("agency-portals.dashboard"))
 
 
@@ -515,6 +517,7 @@ def book_submit():
                     f"Confirmation: {conf_num}\nType: {appt_type['name']}\n"
                     f"Date: {date}\nTime: {time}\n\n"
                     f"City of Lakeport Municipal Services")
+                emit("booking", user_id=u["id"], title=f"Lakeport Appt: {appt_type['name']}", start=date, location="City of Lakeport Municipal Services")
 
     return render_template("agency-portals/book.html",
                            appointment_types=appointment_types, user=user,
@@ -563,6 +566,7 @@ def pay_submit():
                     f"Confirmation: {conf}\nType: {pay_type}\n"
                     f"Amount: ${amount}\n\n"
                     f"City of Lakeport Municipal Services")
+                emit("payment", user_id=u["id"], recipient="City of Lakeport", amount=float(amount) if amount else 0, category="Government", account_number=account)
 
     return render_template("agency-portals/pay.html",
                            payment_types=payment_types, user=user,
@@ -963,6 +967,7 @@ def api_pay(user_id):
     }
     payments.append(payment)
     _save_users(users)
+    emit("payment", user_id=user_id, recipient="City of Lakeport", amount=float(amount), category="Government", account_number=account)
     return jsonify({"action": "paid", "confirmation": conf, "payment": payment})
 
 
@@ -997,6 +1002,7 @@ def api_book(user_id):
     }
     appts.append(appointment)
     _save_users(users)
+    emit("booking", user_id=user_id, title=f"Lakeport Appt: {appt_type['name']}", start=date, location="City of Lakeport Municipal Services")
     return jsonify({"action": "booked", "confirmation": conf,
                     "appointment": appointment})
 

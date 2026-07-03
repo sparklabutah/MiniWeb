@@ -67,6 +67,8 @@ async def run_task(
     server_url: str,
     site_id: str,
     task_dir: Path,
+    use_judge: bool = False,
+    judge_model: str = "gpt-4.1-nano",
 ) -> dict:
     """Run a single task: execute the agent, then verify. Returns result dict."""
     task_id = task["task_id"]
@@ -78,14 +80,28 @@ async def run_task(
         task_dir=task_dir,
     )
 
-    # Verify
-    try:
-        verifier_mod = load_verifier(site_id)
-        passed, verifier_message = run_verifier(
-            verifier_mod, task["verifier"], server_url,
+    # Verify — use judge or traditional verifier
+    if use_judge:
+        from judge import judge_task
+        rubric = task.get("rubric", "Check that the agent completed the task correctly.")
+        verdict = judge_task(
+            instruction=task["instruction"],
+            trajectory=result.history if hasattr(result, "history") else [],
+            expected_answer=task.get("expected_answer") or "",
+            rubric=rubric,
+            agent_answer=result.final_result or "",
+            model=judge_model,
         )
-    except Exception as e:
-        passed, verifier_message = False, f"Verifier load error: {e}"
+        passed = verdict["pass"]
+        verifier_message = f"Judge ({verdict['score']:.1f}): {verdict['reasoning']}"
+    else:
+        try:
+            verifier_mod = load_verifier(site_id)
+            passed, verifier_message = run_verifier(
+                verifier_mod, task["verifier"], server_url,
+            )
+        except Exception as e:
+            passed, verifier_message = False, f"Verifier load error: {e}"
 
     task_result = {
         "task_id": task_id,

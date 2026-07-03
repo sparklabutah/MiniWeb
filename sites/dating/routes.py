@@ -6,9 +6,11 @@ and messaging logic through Flask routes.
 import pathlib
 from datetime import datetime
 
-from flask import (Blueprint, abort, jsonify, redirect, render_template,
+from flask import (Blueprint, Response, abort, jsonify, redirect, render_template,
                    request, session, url_for)
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "dating"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -292,6 +294,7 @@ def login_submit():
         return render_template("dating/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="dating", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("dating.index"))
 
 
@@ -396,12 +399,18 @@ def form_send_message(match_id):
         "read": False
     })
     _save_messages(messages)
+    _add_email(other_id, "noreply@dating.lakeport.local",
+               "You have a new message",
+               f"You have received a new message from your match. Log in to read it.")
 
     try:
         from app.bridges import on_message
         on_message(from_user_id=user["id"], to_user_id=other_id, text=content, source_site="Dating")
     except Exception:
         pass
+
+    if any(kw in content.lower() for kw in ("meet", "date", "dinner", "coffee", "drinks", "tonight", "tomorrow")):
+        emit("booking", user_id=user["id"], title="Date planned", start=datetime.now().strftime("%Y-%m-%d"), location="")
 
     return redirect(url_for("dating.conversation", match_id=match_id))
 
@@ -614,6 +623,26 @@ def api_messages(match_id):
     return jsonify(match_msgs)
 
 
+@blueprint.route("/api/messages", methods=["GET"])
+def api_messages_list():
+    """Get messages for the logged-in user (or by user_id query param)."""
+    user = _get_current_user()
+    user_id = request.args.get("user_id", type=int)
+    if user_id is None:
+        if not user:
+            return jsonify({"error": "Not authenticated"}), 401
+        user_id = user["id"]
+
+    messages = _load_messages()
+    # Return messages where the user is the sender or is in a match they belong to
+    matches = _load_matches()
+    user_match_ids = {m["id"] for m in matches
+                      if m["user1_id"] == user_id or m["user2_id"] == user_id}
+    user_msgs = [msg for msg in messages if msg["match_id"] in user_match_ids]
+    user_msgs.sort(key=lambda x: x["timestamp"], reverse=True)
+    return jsonify(user_msgs)
+
+
 @blueprint.route("/api/messages", methods=["POST"])
 def api_send_message():
     user = _get_current_user()
@@ -774,3 +803,32 @@ def api_stats():
         "verified_users": sum(1 for u in users if u.get("verified")),
         "avg_age": round(sum(u["age"] for u in users) / len(users), 1) if users else 0,
     })
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export profiles or matches as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    data_type = request.args.get("type", "profiles").lower()
+
+    if data_type == "matches":
+        data = _load_matches()
+    elif data_type == "messages":
+        data = _load_messages()
+    else:
+        data = [_safe_user(u) for u in _load_users()]
+
+    if fmt == "csv":
+        if not data:
+            return Response("", mimetype="text/csv")
+        keys = list(data[0].keys())
+        lines = [",".join(keys)]
+        for row in data:
+            vals = []
+            for k in keys:
+                v = str(row.get(k, "")).replace('"', '""')
+                vals.append(f'"{v}"')
+            lines.append(",".join(vals))
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
+    return jsonify(data)

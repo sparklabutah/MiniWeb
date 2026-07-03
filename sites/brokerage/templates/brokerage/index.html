@@ -115,6 +115,7 @@
         <div class="rh-card">
             <div class="rh-card-header" style="flex-wrap:wrap;gap:12px;">
                 <h2>All Securities</h2>
+                <a href="{{ url_for('brokerage.api_export', format='csv', type='stock') }}" style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;color:#fff;background:#00C805;text-decoration:none;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
                 <form method="GET" action="{{ url_for('brokerage.index') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                     <input type="hidden" name="q" value="{{ q }}">
                     <select name="sector" onchange="this.form.submit()" style="padding:6px 12px;border-radius:20px;font-size:13px;">
@@ -137,6 +138,11 @@
                         <option value="change_asc" {% if sort == 'change_asc' %}selected{% endif %}>Top Losers</option>
                         <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A-Z</option>
                     </select>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;color:#6F7782;white-space:nowrap;">Max Price: <span id="price-max-val">{{ price_max if price_max else 'Any' }}</span></label>
+                        <input type="range" name="price_max" min="0" max="5000" step="50" value="{{ price_max if price_max else 5000 }}" oninput="document.getElementById('price-max-val').textContent=this.value=='5000'?'Any':'$'+this.value" style="width:120px;accent-color:#00C805;">
+                    </div>
+                    <button type="submit" style="padding:6px 16px;border-radius:20px;font-size:13px;background:#00C805;color:#fff;border:none;cursor:pointer;">Apply</button>
                 </form>
             </div>
             <div style="overflow-x:auto;">

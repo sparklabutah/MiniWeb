@@ -121,6 +121,11 @@
                     {% if p.id == meeting.host_id %}<span class="role">(Host)</span>{% endif %}
                 </div>
                 {% endfor %}
+
+                <form method="POST" action="{{ url_for('remote-calls.form_invite_to_meeting', meeting_id=meeting.id) }}" style="display:flex;gap:.5rem;margin-top:1rem;align-items:center;">
+                    <input type="email" name="email" placeholder="Invite by email" required style="flex:1;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;">
+                    <button type="submit" class="btn btn-primary">Invite</button>
+                </form>
             </div>
         </div>
 
@@ -140,6 +145,7 @@
 
         <div class="actions">
             <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Back to Meetings</a>
+            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Link Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
             {% if meeting.status == 'scheduled' %}
             <button class="btn btn-danger" onclick="cancelMeeting('{{ meeting.id }}')">Cancel Meeting</button>
             {% endif %}

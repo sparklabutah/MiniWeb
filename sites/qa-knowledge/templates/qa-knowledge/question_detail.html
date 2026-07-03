@@ -96,15 +96,31 @@
                     </div>
                     <div class="actions">
                         <!-- share_by_dropdown -->
-                        <form method="post" action="{{ url_for('qa-knowledge.form_share_question', qid=question.id) }}">
-                            <select name="platform">
-                                <option value="link">Copy Link</option>
-                                <option value="twitter">Twitter</option>
-                                <option value="facebook">Facebook</option>
-                                <option value="linkedin">LinkedIn</option>
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-outline">Share</button>
-                        </form>
+                        <select id="share-platform" style="padding:.3rem;border:1px solid #d1d5db;border-radius:.25rem;font-size:.85rem;">
+                            <option value="link">Copy Link</option>
+                            <option value="twitter">Twitter</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="linkedin">LinkedIn</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline" onclick="shareQuestion()">Share</button>
+                        <span id="share-result" style="font-size:.8rem;color:#16a34a;margin-left:.3rem;"></span>
+                        <script>
+                        function shareQuestion() {
+                            var platform = document.getElementById('share-platform').value;
+                            fetch('{{ url_for("qa-knowledge.api_share_question", qid=question.id) }}', {
+                                method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({method: platform})
+                            }).then(function(r){return r.json();}).then(function(d) {
+                                if (platform === 'link') {
+                                    navigator.clipboard.writeText(window.location.href)
+                                        .then(function() { document.getElementById('share-result').textContent = 'Link copied!'; })
+                                        .catch(function() { document.getElementById('share-result').textContent = window.location.href; });
+                                } else {
+                                    document.getElementById('share-result').textContent = 'Shared via ' + platform;
+                                }
+                            });
+                        }
+                        </script>
                         <a href="{{ url_for('qa-knowledge.edit_question_page', qid=question.id) }}" class="btn btn-sm btn-outline">Edit</a>
                         <!-- save_by_toggle -->
                         {% if current_user %}

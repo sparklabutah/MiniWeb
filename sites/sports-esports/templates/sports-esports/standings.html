@@ -56,6 +56,19 @@
     <div class="container">
         <div class="page-title">League Standings</div>
 
+        <div style="background:#fff;border-radius:.75rem;padding:.8rem 1.25rem;margin-bottom:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:.85rem;color:#64748b;font-weight:600;white-space:nowrap;">Min Wins: <span id="wins-slider-val">0</span></label>
+            <input type="range" id="wins-slider" min="0" max="50" step="1" value="0" oninput="document.getElementById('wins-slider-val').textContent=this.value;filterStandings(parseInt(this.value))" style="width:200px;accent-color:#00d4aa;">
+        </div>
+
+        <script>
+        function filterStandings(minWins) {
+            document.querySelectorAll('tr[data-wins]').forEach(function(row) {
+                row.style.display = parseInt(row.getAttribute('data-wins')) >= minWins ? '' : 'none';
+            });
+        }
+        </script>
+
         {% for league in leagues %}
         <div class="league-section">
             <div class="league-title">
@@ -75,7 +88,7 @@
                 </thead>
                 <tbody>
                     {% for team in standings[league.id] %}
-                    <tr>
+                    <tr data-wins="{{ team.wins }}">
                         <td class="rank {% if team.standing == 1 %}rank-1{% elif team.standing == 2 %}rank-2{% elif team.standing == 3 %}rank-3{% endif %}">{{ team.standing }}</td>
                         <td>
                             <div class="team-cell">

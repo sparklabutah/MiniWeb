@@ -172,8 +172,7 @@ def index():
         sort_col = "-started_at"
 
     if q:
-        # Text search at SQL level
-        streams = db.search(SITE, "streams", q, where=where, limit=50)
+        streams = db.search(SITE, "streams", q, where=where or None, limit=50)
     else:
         streams = db.query(SITE, "streams", where=where, sort=sort_col, limit=50)
 
@@ -540,7 +539,7 @@ def api_streams():
         sort_col = "-duration_minutes"
 
     if q:
-        streams = db.search(SITE, "streams", q, where=where, limit=50)
+        streams = db.search(SITE, "streams", q, where=where or None, limit=50)
     else:
         streams = db.query(SITE, "streams", where=where, sort=sort_col, limit=50)
 
@@ -551,7 +550,10 @@ def api_streams():
 def api_streams_search():
     """search_by_query: keyword search across stream titles, categories, tags."""
     q = request.args.get("q", "").strip()
-    return jsonify(db.search(SITE, "streams", q, limit=50))
+    if not q:
+        return jsonify([])
+    rows = db.search(SITE, "streams", q, limit=50)
+    return jsonify(rows)
 
 
 @blueprint.route("/api/streams/semantic", methods=["GET"])
@@ -1225,3 +1227,4 @@ def api_stats():
         "total_chat_messages": total_chat,
         "categories": categories,
     })
+

@@ -409,6 +409,7 @@ def login_page():
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
     if user is None:
@@ -419,6 +420,9 @@ def login_submit():
             error="Invalid username.",
             user=None,
         )
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("project-homepages/login.html", error="Invalid password")
     session["user_id"] = user["id"]
     return render_template(
         "project-homepages/login.html",

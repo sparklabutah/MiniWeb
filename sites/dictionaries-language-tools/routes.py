@@ -914,6 +914,32 @@ def api_add_to_vocab(user_id):
     return jsonify({"action": action, "word": word, "list_name": list_name, "list_size": len(words)})
 
 
+@blueprint.route("/api/search")
+def api_search():
+    """Search dictionary entries. Query params: q (required), limit (default 50)."""
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    limit = request.args.get("limit", 50, type=int)
+    limit = min(limit, 50)
+    results = _db_search_words_scored(q, limit=limit)
+    out = []
+    for e in results:
+        out.append({
+            "id": e["id"],
+            "word": e["word"],
+            "pos": e["pos"],
+            "pos_code": e["pos_code"],
+            "num_definitions": e["num_definitions"],
+            "first_letter": e["first_letter"],
+            "has_pronunciation": len(e["ipa"]) > 0,
+            "has_etymology": len(e["etymology"]) > 0,
+            "first_definition": e["definitions"][0]["gloss"] if e["definitions"] else "",
+            "synonyms": e["synonyms"][:5],
+        })
+    return jsonify(out)
+
+
 @blueprint.route("/api/login", methods=["POST"])
 def api_login():
     """API login."""

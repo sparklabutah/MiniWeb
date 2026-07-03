@@ -170,6 +170,16 @@
     </nav>
 
     <div class="container">
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;align-items:center;margin-bottom:.5rem;">
+            <select onchange="location.href='?sort='+this.value" style="padding:.35rem .6rem;border:1px solid #ddd;border-radius:.3rem;font-size:.82rem;background:#fff;color:#555;">
+                <option value="date" {{ 'selected' if request.args.get('sort', 'date') == 'date' }}>Sort: Date</option>
+                <option value="calories" {{ 'selected' if request.args.get('sort') == 'calories' }}>Sort: Calories</option>
+                <option value="duration" {{ 'selected' if request.args.get('sort') == 'duration' }}>Sort: Duration</option>
+                <option value="type" {{ 'selected' if request.args.get('sort') == 'type' }}>Sort: Type</option>
+                <option value="heart_rate" {{ 'selected' if request.args.get('sort') == 'heart_rate' }}>Sort: Heart Rate</option>
+            </select>
+            <a href="{{ url_for('health-fitness-tracking.api_export', format='csv', data_type='workouts') }}" style="padding:.35rem .8rem;background:#0073e6;color:#fff;border-radius:.3rem;text-decoration:none;font-size:.82rem;font-weight:600;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
+        </div>
         <!-- Date navigation -->
         {% set prev_dt = view_date %}
         {% set next_dt = view_date %}
@@ -390,6 +400,7 @@
         function toggleMeal(header) {
             const body = header.nextElementSibling;
             body.style.display = body.style.display === 'none' ? '' : 'none';
+            fetch('{{ url_for("health-fitness-tracking.api_track", action="toggleMeal") }}', {method: 'POST'});
         }
 
         /* Food modal */

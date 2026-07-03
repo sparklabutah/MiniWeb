@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from flask import (
-    Blueprint, abort, jsonify, redirect, render_template, request,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request,
     session, url_for,
 )
 from app import db
@@ -294,11 +294,6 @@ def index():
     date_from = request.args.get("date_from")
     date_to = request.args.get("date_to")
 
-    # Build SQL WHERE clause for filtered post query
-    # Subreddit values are stored without "r/" prefix in the DB.
-    if subreddit_filter and subreddit_filter.startswith("r/"):
-        subreddit_filter = subreddit_filter[2:]
-
     # For date range filters and sorting, use db.execute for more control
     table = db.get_table_name(SITE, "posts")
     if table:
@@ -306,8 +301,12 @@ def index():
         params = []
         clauses = []
         if subreddit_filter:
-            clauses.append("[subreddit] = ?")
-            params.append(subreddit_filter)
+            # Try both with and without r/ prefix to match DB data
+            clauses.append("([subreddit] = ? OR [subreddit] = ?)")
+            if subreddit_filter.startswith("r/"):
+                params.extend([subreddit_filter, subreddit_filter[2:]])
+            else:
+                params.extend([subreddit_filter, f"r/{subreddit_filter}"])
         if date_from:
             clauses.append("[created_utc] >= ?")
             params.append(date_from)
@@ -430,13 +429,7 @@ def search_page():
     sort = request.args.get("sort", "top")
     results = []
     if q:
-        table = db.get_table_name(SITE, "posts")
-        if table:
-            sort_col = "score" if sort == "top" else "created_utc"
-            results = db.execute(
-                f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? ORDER BY [{sort_col}] DESC LIMIT 50",
-                (f"%{q}%", f"%{q}%")
-            )
+        results = db.search(SITE, "posts", q, limit=50)
     return render_template("forums/search.html", query=q, results=results, sort=sort)
 
 
@@ -543,11 +536,12 @@ def api_list_posts():
     params = []
     clauses = []
     if sub:
-        # Strip r/ prefix if present -- DB stores bare names
+        # Try both with and without r/ prefix to match DB data
+        clauses.append("([subreddit] = ? OR [subreddit] = ?)")
         if sub.startswith("r/"):
-            sub = sub[2:]
-        clauses.append("[subreddit] = ?")
-        params.append(sub)
+            params.extend([sub, sub[2:]])
+        else:
+            params.extend([sub, f"r/{sub}"])
     if user:
         clauses.append("[author] = ?")
         params.append(user)
@@ -787,7 +781,24 @@ def api_list_subreddits():
     if not posts_table:
         return jsonify([])
 
-    # Aggregate post stats per subreddit in SQL
+    # Use the pre-computed subreddits table if available
+    subs_table = db.get_table_name(SITE, "subreddits")
+    if subs_table:
+        subs = db.execute(
+            f"SELECT [name], [post_count], [title], [description] "
+            f"FROM [{subs_table}] ORDER BY [post_count] DESC"
+        )
+        result = []
+        for row in subs:
+            result.append({
+                "name": row["name"],
+                "post_count": row["post_count"],
+                "title": row.get("title", ""),
+                "description": row.get("description", ""),
+            })
+        return jsonify(result)
+
+    # Fallback: aggregate post stats per subreddit in SQL (no per-sub comment JOINs)
     sub_stats = db.execute(
         f"SELECT [subreddit], COUNT(*) as post_count, "
         f"COALESCE(SUM([score]), 0) as total_score, "
@@ -797,24 +808,11 @@ def api_list_subreddits():
 
     result = []
     for row in sub_stats:
-        sub_name = row["subreddit"]
-        # Count comments for this subreddit via a join-equivalent
-        comment_count = 0
-        if comments_table:
-            cc = db.execute(
-                f"SELECT COUNT(*) as cnt FROM [{comments_table}] c "
-                f"INNER JOIN [{posts_table}] p ON c.[post_id] = p.[id] "
-                f"WHERE p.[subreddit] = ?",
-                (sub_name,),
-                fetch="one"
-            )
-            comment_count = cc["cnt"] if cc else 0
         result.append({
-            "name": sub_name,
+            "name": row["subreddit"],
             "post_count": row["post_count"],
             "total_score": row["total_score"],
             "unique_authors": row["unique_authors"],
-            "comment_count": comment_count,
         })
     return jsonify(result)
 
@@ -838,18 +836,15 @@ def api_subreddit_stats(subreddit_name):
     if not stats_row or stats_row["post_count"] == 0:
         return jsonify({"error": "Subreddit not found"}), 404
 
+    # Count comments using a subquery on post IDs (avoids full table JOIN)
     comment_count = 0
-    comment_authors_count = 0
     if comments_table:
         cc = db.execute(
-            f"SELECT COUNT(*) as cnt, COUNT(DISTINCT c.[author]) as authors "
-            f"FROM [{comments_table}] c INNER JOIN [{posts_table}] p ON c.[post_id] = p.[id] "
-            f"WHERE p.[subreddit] = ?",
+            f"SELECT COUNT(*) as cnt FROM [{comments_table}] "
+            f"WHERE [post_id] IN (SELECT [id] FROM [{posts_table}] WHERE [subreddit] = ? LIMIT 10000)",
             (sub,), fetch="one"
         )
-        if cc:
-            comment_count = cc["cnt"]
-            comment_authors_count = cc["authors"]
+        comment_count = cc["cnt"] if cc else 0
 
     # Get flairs via SQL
     flair_rows = db.execute(
@@ -865,7 +860,7 @@ def api_subreddit_stats(subreddit_name):
         "post_count": stats_row["post_count"],
         "comment_count": comment_count,
         "total_score": stats_row["total_score"],
-        "unique_authors": stats_row["post_authors"] + comment_authors_count,
+        "unique_authors": stats_row["post_authors"],
         "top_flairs": top_flairs,
         "avg_score": round(stats_row["total_score"] / stats_row["post_count"], 1),
     })
@@ -882,15 +877,7 @@ def api_search():
     if not q:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
     sort = request.args.get("sort", "top")
-    table = db.get_table_name(SITE, "posts")
-    if not table:
-        return jsonify({"query": q, "count": 0, "posts": []})
-    sort_col = "score" if sort == "top" else "created_utc"
-    results = db.execute(
-        f"SELECT * FROM [{table}] WHERE [title] LIKE ? OR [body] LIKE ? "
-        f"ORDER BY [{sort_col}] DESC LIMIT 50",
-        (f"%{q}%", f"%{q}%")
-    )
+    results = db.search(SITE, "posts", q, limit=50)
     return jsonify({"query": q, "count": len(results), "posts": results})
 
 
@@ -900,30 +887,7 @@ def api_search_semantic():
     q = (request.args.get("q") or "").strip().lower()
     if not q:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
-    # Use SQL LIKE to pre-filter candidates, then score in Python
-    query_tokens = q.split()
-    table = db.get_table_name(SITE, "posts")
-    if not table:
-        return jsonify({"query": q, "count": 0, "posts": []})
-    # Build OR clause for each token
-    like_clauses = []
-    params = []
-    for token in query_tokens[:5]:  # limit to 5 terms
-        like_clauses.append("([title] LIKE ? OR [body] LIKE ? OR [subreddit] LIKE ?)")
-        params.extend([f"%{token}%", f"%{token}%", f"%{token}%"])
-    if not like_clauses:
-        return jsonify({"query": q, "count": 0, "posts": []})
-    sql = f"SELECT * FROM [{table}] WHERE {' OR '.join(like_clauses)} LIMIT 200"
-    candidates = db.execute(sql, tuple(params))
-    # Score and rank
-    scored = []
-    for p in candidates:
-        text = f"{p.get('title', '')} {p.get('body', '')} {p.get('subreddit', '')} {p.get('flair', '')}"
-        s = _semantic_score(query_tokens, text)
-        if s > 0:
-            scored.append((s, p))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    results = [p for _, p in scored[:50]]
+    results = db.search(SITE, "posts", q, limit=50)
     return jsonify({"query": q, "count": len(results), "posts": results})
 
 
@@ -1245,3 +1209,23 @@ def api_stats():
         "subreddits": subreddits,
         "top_posts": top_posts,
     })
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export posts as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    subreddit = request.args.get("subreddit", "").strip()
+    sort = request.args.get("sort", "score")
+
+    sort_col = "score" if sort in ("top", "score") else "created_utc"
+    where = {"subreddit": subreddit} if subreddit else None
+    posts = _load_posts(where=where, sort=f"-{sort_col}", limit=500)
+
+    if fmt == "csv":
+        lines = ["id,title,author,subreddit,score,num_comments,created_utc"]
+        for p in posts:
+            title = str(p.get("title", "")).replace('"', '""')
+            lines.append(f'{p.get("id", "")},"{title}","{p.get("author", "")}","{p.get("subreddit", "")}",{p.get("score", 0)},{p.get("num_comments", 0)},"{p.get("created_utc", "")}"')
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=posts.csv"})
+    return jsonify(posts)

@@ -577,7 +577,7 @@
                             </button>
                         </form>
                         <div class="dropdown-divider"></div>
-                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;">
+                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;" onsubmit="return confirm('Move to trash?')">
                             <button type="submit" class="dropdown-item" style="color:#c5221f;">
                                 <span class="di-icon">&#128465;</span> Move to trash
                             </button>
@@ -625,6 +625,7 @@
             if (m.id !== 'ctxMenu' + fileId) m.classList.remove('open');
         });
         document.getElementById('ctxMenu' + fileId).classList.toggle('open');
+        fetch('{{ url_for("cloud-storage-file-transfer.api_track", action="toggleCtxMenu") }}', {method: 'POST'});
     }
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.ctx-menu-btn') && !e.target.closest('.dropdown-menu')) {

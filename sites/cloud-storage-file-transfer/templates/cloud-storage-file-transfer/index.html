@@ -604,6 +604,17 @@
                 <option value="created" {% if sort == 'created' %}selected{% endif %}>Date created</option>
             </select>
 
+            <form method="get" action="{{ url_for('cloud-storage-file-transfer.index') }}" style="display:flex;gap:6px;align-items:center;">
+                {% if type_filter %}<input type="hidden" name="type" value="{{ type_filter }}">{% endif %}
+                {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+                {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+                <label style="font-size:.82rem;color:#5f6368;white-space:nowrap;">From:</label>
+                <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:4px 8px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;">
+                <label style="font-size:.82rem;color:#5f6368;white-space:nowrap;">To:</label>
+                <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" style="padding:4px 8px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;">
+                <button type="submit" style="padding:4px 12px;background:#1a73e8;color:#fff;border:none;border-radius:4px;font-size:.82rem;cursor:pointer;">Filter</button>
+            </form>
+
             <div class="view-toggle">
                 <button id="viewGridBtn" class="active" onclick="setView('grid')" title="Grid view">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z"/></svg>
@@ -762,7 +773,7 @@
                             </button>
                         </form>
                         <div class="dropdown-divider"></div>
-                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;">
+                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;" onsubmit="return confirm('Move to trash?')">
                             <button type="submit" class="dropdown-item" style="color:#c5221f;">
                                 <span class="di-icon">&#128465;</span> Move to trash
                             </button>
@@ -863,6 +874,7 @@
     function toggleNewMenu() {
         var dd = document.getElementById('newDropdown');
         dd.classList.toggle('open');
+        fetch('{{ url_for("cloud-storage-file-transfer.api_track", action="toggleNewMenu") }}', {method: 'POST'});
     }
 
     /* ── Context menu (3-dot on list rows) ────────────────────── */
@@ -874,6 +886,7 @@
         });
         var menu = document.getElementById('ctxMenu' + fileId);
         menu.classList.toggle('open');
+        fetch('{{ url_for("cloud-storage-file-transfer.api_track", action="toggleCtxMenu") }}', {method: 'POST'});
     }
 
     /* ── Modals ───────────────────────────────────────────────── */

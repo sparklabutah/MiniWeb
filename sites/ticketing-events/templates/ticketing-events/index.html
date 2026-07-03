@@ -123,8 +123,8 @@
                     <input type="number" id="filterPriceMin" min="0" step="1" placeholder="$0" style="width:80px;">
                 </div>
                 <div class="filter-group">
-                    <label>Max Price</label>
-                    <input type="number" id="filterPriceMax" min="0" step="1" placeholder="Any" style="width:80px;">
+                    <label>Max Price: <span id="priceMaxLabel">Any</span></label>
+                    <input type="range" id="filterPriceMax" min="0" max="500" step="10" value="500" oninput="document.getElementById('priceMaxLabel').textContent=this.value=='500'?'Any':'$'+this.value" style="width:120px;">
                 </div>
                 <div class="filter-group">
                     <label>Status</label>
@@ -141,7 +141,8 @@
 
         <div class="sort-bar">
             <span class="count" id="eventCount">{{ events|length }} events</span>
-            <div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <a href="{{ url_for('ticketing-events.api_export', format='csv') }}" style="padding:.4rem .8rem;background:#d63031;color:#fff;border-radius:.3rem;text-decoration:none;font-size:.85rem;font-weight:600;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
                 <label for="sortSelect" style="font-size:.85rem; color:#666;">Sort by: </label>
                 <select id="sortSelect" onchange="applyFilters()">
                     <option value="date">Date (Soonest)</option>
@@ -248,7 +249,7 @@
             if (dateFrom) params.set('date_from', dateFrom);
             if (dateTo) params.set('date_to', dateTo);
             if (priceMin) params.set('price_min', priceMin);
-            if (priceMax) params.set('price_max', priceMax);
+            if (priceMax && priceMax !== '500') params.set('price_max', priceMax);
             if (status) params.set('status', status);
             if (sort) params.set('sort', sort);
 

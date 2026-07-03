@@ -73,6 +73,13 @@
                 <a href="{{ url_for('forums.index', sort='hot') }}" class="{{ 'active' if sort == 'hot' }}">Hot</a>
                 <a href="{{ url_for('forums.index', sort='new') }}" class="{{ 'active' if sort == 'new' }}">New</a>
                 <a href="{{ url_for('forums.index', sort='top') }}" class="{{ 'active' if sort == 'top' }}">Top</a>
+                <select onchange="location.href='?sort='+this.value" style="padding:4px 8px;border:1px solid #edeff1;border-radius:4px;font-size:13px;background:#fff;color:#878a8c;margin-left:8px;">
+                    <option value="hot" {{ 'selected' if sort == 'hot' }}>Hot</option>
+                    <option value="new" {{ 'selected' if sort == 'new' }}>New</option>
+                    <option value="top" {{ 'selected' if sort == 'top' }}>Top</option>
+                </select>
+                <span style="flex:1;"></span>
+                <a href="{{ url_for('forums.api_export', format='csv') }}" style="padding:6px 12px;border-radius:20px;font-size:14px;font-weight:700;color:#fff;background:#0079d3;text-decoration:none;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
             </div>
             <form class="filter-bar" method="GET" action="{{ url_for('forums.index') }}">
                 <input type="hidden" name="sort" value="{{ sort }}">
@@ -154,17 +161,24 @@
             });
         }
         function savePost(postId) {
+            var btn = event.target;
             fetch(`{{ url_for('forums.index') }}api/posts/${postId}/save`, {method: 'POST'})
-                .then(r => r.json()).then(data => alert(data.action || data.error));
+                .then(r => r.json()).then(data => {
+                    btn.textContent = data.action === 'saved' ? 'Saved' : 'Save';
+                    if (data.action === 'saved') { btn.style.fontWeight = 'bold'; } else { btn.style.fontWeight = ''; }
+                });
         }
         function sharePost(postId) {
+            var btn = event.target;
             fetch(`{{ url_for('forums.index') }}api/posts/${postId}/share`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({method: 'copy_link'})
             }).then(r => r.json()).then(data => {
                 if (data.share_url) {
-                    navigator.clipboard.writeText(window.location.origin + data.share_url).then(() => alert('Link copied!')).catch(() => alert('Share URL: ' + data.share_url));
+                    navigator.clipboard.writeText(window.location.origin + data.share_url)
+                        .then(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Share', 2000); })
+                        .catch(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Share', 2000); });
                 }
             });
         }

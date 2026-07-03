@@ -170,32 +170,36 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
     derived fields (year, os_family, price, battery_mah) from raw strings,
     we do text-level filtering where feasible and post-filter the rest.
     """
-    conn = _db_conn()
-    clauses = []
-    params = []
 
-    # Text search — search brand, name, os, chipset
     if q:
-        clauses.append(
-            "(name LIKE ? OR brand LIKE ? OR os LIKE ? OR chipset LIKE ?)"
-        )
-        params.extend([f"%{q}%"] * 4)
+        # --- Text search path: use FTS5 via db.search() ---
+        where_eq = {}
+        if brand:
+            where_eq["brand"] = brand
+        rows = db.search(SITE, "phones", q,
+                         where=where_eq if where_eq else None,
+                         limit=max(limit, 5000))
+    else:
+        # --- Non-search path: normal SQL filters ---
+        conn = _db_conn()
+        clauses = []
+        params = []
 
-    # Brand filter — exact match
-    if brand:
-        clauses.append("brand = ?")
-        params.append(brand)
+        # Brand filter — exact match
+        if brand:
+            clauses.append("brand = ?")
+            params.append(brand)
 
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
-    sql = f"SELECT * FROM comparison_aggregators_phones {where} LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
+        where = "WHERE " + " AND ".join(clauses) if clauses else ""
+        sql = f"SELECT * FROM comparison_aggregators_phones {where} LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
-    rows = conn.execute(sql, params).fetchall()
+        raw_rows = conn.execute(sql, params).fetchall()
+        rows = [_deserialize_row(row) for row in raw_rows]
 
     # Interpret all rows, then apply post-filters that need computed fields
     phones = []
-    for i, row in enumerate(rows):
-        raw = _deserialize_row(row)
+    for i, raw in enumerate(rows):
         phone = _interpret_record(raw, offset + i + 1)
         phones.append(phone)
 
@@ -213,8 +217,9 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
     if year_to is not None:
         phones = [p for p in phones if p["year"] is not None and p["year"] <= year_to]
 
-    # Sort
-    phones = _sort_phones(phones, sort)
+    # Sort (when q is present, FTS already ranked by relevance; user can override)
+    if not q or sort != "newest":
+        phones = _sort_phones(phones, sort)
 
     # Re-assign sequential IDs after filtering/sorting
     for i, p in enumerate(phones, 1):

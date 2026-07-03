@@ -14,6 +14,8 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "version-control"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -684,14 +686,10 @@ def repos_page():
         order = "last_activity_at DESC"
 
     if search:
-        sql = "SELECT * FROM version_control_projects_raw WHERE name LIKE ? OR description LIKE ?"
-        like = f"%{search}%"
-        params = [like, like]
-        count_sql = "SELECT COUNT(*) FROM version_control_projects_raw WHERE name LIKE ? OR description LIKE ?"
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += f" ORDER BY {order} LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        repos = db.execute(sql, tuple(params))
+        # Use FTS for search results; count via a generous search
+        all_matches = db.search(SITE, "projects_raw", search, limit=10000)
+        total = len(all_matches)
+        repos = db.search(SITE, "projects_raw", search, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "projects_raw")
         repos = db.query(SITE, "projects_raw", sort=f"-{'star_count' if sort_by == 'stars' else ('last_activity_at' if sort_by == 'updated' else 'name')}",
@@ -872,11 +870,7 @@ def explore_page():
         sort_col = "-last_activity_at"
 
     if search:
-        sql = "SELECT * FROM version_control_projects_raw WHERE name LIKE ? OR description LIKE ?"
-        like = f"%{search}%"
-        params = [like, like]
-        sql += f" ORDER BY {order} LIMIT 30"
-        repos = db.execute(sql, tuple(params))
+        repos = db.search(SITE, "projects_raw", search, limit=30)
     else:
         repos = db.query(SITE, "projects_raw", sort=sort_col, limit=30)
 
@@ -923,10 +917,11 @@ def login_submit():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
     user = _user_by_username(username)
-    if user:
+    if user and (not password or password == user.get("password", "password")):
         session["vc_user_id"] = user["root_user_id"]
         session["vc_username"] = user["username"]
         session["vc_name"] = user["name"]
+        emit("signup", user_id=user["root_user_id"], site_name="version-control", username=username, password=password, email="")
         return redirect(url_for("version-control.index"))
     return render_template("version-control/login.html", error="Invalid username or password.")
 
@@ -963,23 +958,9 @@ def issues_page():
         where["project_name"] = project_filter
 
     if search:
-        # Use raw SQL for LIKE search
-        sql = (
-            "SELECT * FROM version_control_issues_raw WHERE title LIKE ?"
-        )
-        params = [f"%{search}%"]
-        if state_filter == "open":
-            sql += " AND state_id = 1"
-        elif state_filter == "closed":
-            sql += " AND state_id = 2"
-        if project_filter:
-            sql += " AND project_name = ?"
-            params.append(project_filter)
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        issues = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "issues_raw", search, where=where or None, limit=10000)
+        total = len(all_matches)
+        issues = db.search(SITE, "issues_raw", search, where=where or None, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "issues_raw", where=where)
         issues = db.query(SITE, "issues_raw", where=where,
@@ -1029,24 +1010,9 @@ def merge_requests_page():
         where["project_name"] = project_filter
 
     if search:
-        sql = (
-            "SELECT * FROM version_control_merge_requests_raw WHERE title LIKE ?"
-        )
-        params = [f"%{search}%"]
-        if state_filter == "open":
-            sql += " AND state_id = 1"
-        elif state_filter == "merged":
-            sql += " AND state_id = 3"
-        elif state_filter == "closed":
-            sql += " AND state_id = 2"
-        if project_filter:
-            sql += " AND project_name = ?"
-            params.append(project_filter)
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        mrs = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "merge_requests_raw", search, where=where or None, limit=10000)
+        total = len(all_matches)
+        mrs = db.search(SITE, "merge_requests_raw", search, where=where or None, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "merge_requests_raw", where=where)
         mrs = db.query(SITE, "merge_requests_raw", where=where,
@@ -1090,16 +1056,9 @@ def projects_page():
         sort_col = "-last_activity_at"
 
     if search:
-        sql = "SELECT * FROM version_control_projects_raw WHERE name LIKE ?"
-        params = [f"%{search}%"]
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        order = "star_count DESC" if sort_by == "stars" else (
-            "name ASC" if sort_by == "name" else "last_activity_at DESC"
-        )
-        sql += f" ORDER BY {order} LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        projects = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "projects_raw", search, limit=10000)
+        total = len(all_matches)
+        projects = db.search(SITE, "projects_raw", search, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "projects_raw")
         projects = db.query(SITE, "projects_raw", sort=sort_col,
@@ -1211,17 +1170,9 @@ def members_page():
     search = request.args.get("q", "")
 
     if search:
-        sql = (
-            "SELECT * FROM version_control_users_raw "
-            "WHERE username LIKE ? OR name LIKE ? OR email LIKE ?"
-        )
-        like = f"%{search}%"
-        params = [like, like, like]
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY sign_in_count DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        members = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "users_raw", search, limit=10000)
+        total = len(all_matches)
+        members = db.search(SITE, "users_raw", search, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "users_raw")
         members = db.query(SITE, "users_raw", sort="-sign_in_count",
@@ -1263,16 +1214,9 @@ def api_issues_raw():
         where["author_id"] = author_id
 
     if search:
-        sql = "SELECT * FROM version_control_issues_raw WHERE title LIKE ?"
-        params = [f"%{search}%"]
-        for col, val in where.items():
-            sql += f" AND [{col}] = ?"
-            params.append(val)
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        issues = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "issues_raw", search, where=where or None, limit=10000)
+        total = len(all_matches)
+        issues = db.search(SITE, "issues_raw", search, where=where or None, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "issues_raw", where=where)
         issues = db.query(SITE, "issues_raw", where=where,
@@ -1318,16 +1262,9 @@ def api_merge_requests_raw():
         where["author_id"] = author_id
 
     if search:
-        sql = "SELECT * FROM version_control_merge_requests_raw WHERE title LIKE ?"
-        params = [f"%{search}%"]
-        for col, val in where.items():
-            sql += f" AND [{col}] = ?"
-            params.append(val)
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        mrs = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "merge_requests_raw", search, where=where or None, limit=10000)
+        total = len(all_matches)
+        mrs = db.search(SITE, "merge_requests_raw", search, where=where or None, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "merge_requests_raw", where=where)
         mrs = db.query(SITE, "merge_requests_raw", where=where,
@@ -1362,13 +1299,9 @@ def api_projects_raw():
     search = request.args.get("q", "")
 
     if search:
-        sql = "SELECT * FROM version_control_projects_raw WHERE name LIKE ?"
-        params = [f"%{search}%"]
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY last_activity_at DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        projects = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "projects_raw", search, limit=10000)
+        total = len(all_matches)
+        projects = db.search(SITE, "projects_raw", search, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "projects_raw")
         projects = db.query(SITE, "projects_raw",
@@ -1388,17 +1321,9 @@ def api_members_raw():
     search = request.args.get("q", "")
 
     if search:
-        sql = (
-            "SELECT * FROM version_control_users_raw "
-            "WHERE username LIKE ? OR name LIKE ?"
-        )
-        like = f"%{search}%"
-        params = [like, like]
-        count_sql = sql.replace("SELECT *", "SELECT COUNT(*)")
-        total = db.execute(count_sql, tuple(params), fetch="val") or 0
-        sql += " ORDER BY sign_in_count DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        members = db.execute(sql, tuple(params))
+        all_matches = db.search(SITE, "users_raw", search, limit=10000)
+        total = len(all_matches)
+        members = db.search(SITE, "users_raw", search, limit=per_page, offset=offset)
     else:
         total = db.count(SITE, "users_raw")
         members = db.query(SITE, "users_raw", sort="-sign_in_count",
@@ -2078,6 +2003,10 @@ def api_merge_requests_create(repo_id):
         "description": data.get("description", ""),
     }
     mrs.append(new_mr)
+    _add_email(session.get("user_id", 1), "noreply@version-control.lakeport.local",
+               "Pull request created",
+               f'Merge request "{new_mr["title"]}" has been created targeting {new_mr["target_branch"]}.')
+    emit("message", from_user_id=1, to_user_id=1, text=f"New MR: {new_mr['title']} ({new_mr['source_branch']} -> {new_mr['target_branch']})", source_site="version-control")
     return jsonify(new_mr), 201
 
 
@@ -2285,3 +2214,87 @@ def api_repo_file_content(repo_id):
         return jsonify({"error": f"File not found: {path}"}), 404
 
     return jsonify({"repo": repo["name"], "path": path, "content": contents[path]})
+
+
+# ---------------------------------------------------------------------------
+# Name-based API routes (lookup by name/username instead of integer ID)
+# ---------------------------------------------------------------------------
+
+def _repo_by_name(name):
+    """Look up a repository by name (case-insensitive)."""
+    repos = _load_repos()
+    for r in repos:
+        if r["name"].lower() == name.lower():
+            return r
+    return None
+
+
+@blueprint.route("/api/repos/by-name/<name>", methods=["GET"])
+def api_repo_by_name(name):
+    """Get a single repo by name with files, commits, readme, issues."""
+    users = _load_users()
+    repo = _repo_by_name(name)
+    if not repo:
+        return jsonify({"error": "Repository not found"}), 404
+    enriched = _enrich_repo(repo, users)
+    enriched["files"] = _FILE_TREES.get(repo["name"], [])
+    enriched["commits"] = _COMMIT_HISTORIES.get(repo["name"], [])
+    enriched["readme"] = _READMES.get(repo["name"], "")
+    enriched["issues"] = _ISSUES.get(repo["id"], [])
+    return jsonify(enriched)
+
+
+@blueprint.route("/api/users/by-username/<username>", methods=["GET"])
+def api_user_by_username(username):
+    """Get a user by username with their repos."""
+    user = _user_by_username(username)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    repos = _load_repos()
+    user_repos = [r for r in repos if r.get("creator_id") == user["root_user_id"]]
+    result = dict(user)
+    result["repos"] = user_repos
+    return jsonify(result)
+
+
+@blueprint.route("/api/repos/by-name/<name>/tree", methods=["GET"])
+def api_repo_tree_by_name(name):
+    """List files in a repo by name."""
+    repo = _repo_by_name(name)
+    if not repo:
+        return jsonify({"error": "Repository not found"}), 404
+    files = _FILE_TREES.get(repo["name"], [])
+    include_content = request.args.get("content", "") == "true"
+    if include_content:
+        contents = _FILE_CONTENTS.get(repo["name"], {})
+        return jsonify({"repo": repo["name"], "files": files, "content": contents})
+    return jsonify({"repo": repo["name"], "files": files})
+
+
+@blueprint.route("/api/repos/by-name/<name>/issues", methods=["GET"])
+def api_repo_issues_by_name(name):
+    """List issues for a repo by name."""
+    repo = _repo_by_name(name)
+    if not repo:
+        return jsonify({"error": "Repository not found"}), 404
+    issues = _ISSUES.get(repo["id"], [])
+    state = request.args.get("state", "")
+    if state:
+        issues = [i for i in issues if i["state"] == state]
+    return jsonify({"repo": repo["name"], "issues": issues, "total": len(issues)})
+
+
+@blueprint.route("/api/export", methods=["GET"])
+def api_export():
+    """Export repos or activity as JSON or CSV.
+
+    Query params:
+        type: 'repos' (default) or 'activity'
+        format: 'json' (default) or 'csv'
+        language: filter repos by language (optional)
+        repo: filter activity by repo name (optional)
+    """
+    export_type = request.args.get("type", "repos").strip()
+    if export_type == "activity":
+        return api_export_activity()
+    return api_export_repos()

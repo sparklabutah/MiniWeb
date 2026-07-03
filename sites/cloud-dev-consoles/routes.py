@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, Response, abort, jsonify, render_template, request, session
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "cloud-dev-consoles"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -541,6 +543,18 @@ def instance_detail(instance_id):
                            live=live, user=user)
 
 
+@blueprint.route("/instance/<instance_id>/delete", methods=["POST"])
+def form_delete_instance(instance_id):
+    """Delete (terminate) an instance."""
+    instances = _get_instances()
+    instance = next((i for i in instances if i["id"] == instance_id), None)
+    if not instance:
+        abort(404)
+    instance["status"] = "terminated"
+    db.save_collection(SITE, "instances", instances)
+    return redirect(url_for("cloud-dev-consoles.instances_page"))
+
+
 @blueprint.route("/databases")
 def databases_page():
     databases = _get_databases()
@@ -879,6 +893,7 @@ def login_submit():
         return render_template("cloud-dev-consoles/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="cloud-dev-consoles", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return render_template("cloud-dev-consoles/dashboard.html", user=user,
                            recent_services=user.get("recent_services", []),
                            saved_queries=user.get("saved_queries", []))
@@ -1408,6 +1423,9 @@ def api_create_alert():
     }
     alerts.append(new_alert)
     _save_alerts(alerts)
+    _add_email(session.get("user_id", 1), "noreply@cloud-dev-consoles.lakeport.local",
+               "Deployment notification",
+               f'Alert "{name}" has been created for resource "{resource_name}". Severity: {severity}.')
     return jsonify(new_alert)
 
 

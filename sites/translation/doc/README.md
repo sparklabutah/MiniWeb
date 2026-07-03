@@ -2,7 +2,7 @@
 
 **Category**: Utilities
 **Reviewer**: Kenny
-**Number of macros**: 10
+**Number of macros**: 7
 
 ## Data Source
 
@@ -23,7 +23,7 @@ Rule-based machine translation using built-in word-swap dictionaries for 9 langu
 
 ## Target Macros
 
-navigate_by_route, extract_by_query, extract_by_semantic, select_by_dropdown, configure_by_toggle, play_by_playback, export_by_dropdown, upload_by_upload, submit_by_image, translate_by_query
+navigate_by_route, extract_by_query, extract_by_semantic, configure_by_toggle, export_by_dropdown, upload_by_upload, translate_by_query
 
 ## Temporal Dynamics
 

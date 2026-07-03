@@ -2,7 +2,7 @@
 
 **Category**: Education / university
 **Reviewer**: Minh
-**Number of macros**: 18
+**Number of macros**: 16
 
 ## Data Source
 
@@ -32,7 +32,7 @@ All files are JSON. Courses have id, code, title, credits, level, description, p
 
 ## Target Macros (18)
 
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, search_by_route, filter_by_dropdown, filter_by_route, extract_by_query, extract_by_checkbox, extract_from_table, extract_by_route, extract_by_date_range, compare_from_table, submit_by_query, apply_by_form, export_by_dropdown, subscribe_by_toggle
+navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, extract_by_query, extract_by_checkbox, extract_from_table, extract_by_route, extract_by_date_range, compare_from_table, submit_by_query, apply_by_form, export_by_dropdown, subscribe_by_toggle
 
 ## Macro-to-Route Mapping
 

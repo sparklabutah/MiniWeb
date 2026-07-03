@@ -8,18 +8,39 @@ from app.events import on
 
 
 def _add_banking_transaction(user_id, description, amount, category="Shopping",
-                             reference="", account_type="checking"):
-    """Add a debit transaction and update account balance."""
-    # Find the user's account by type
-    if account_type == "credit":
-        type_filter = "type IN ('credit_card', 'Credit Card')"
-    else:
-        type_filter = "type IN ('checking', 'Checking')"
+                             reference="", account_type="checking",
+                             account_number=""):
+    """Add a debit transaction and update account balance.
 
-    acct = db.execute(
-        f"SELECT * FROM banking_accounts WHERE user_id = ? AND {type_filter} LIMIT 1",
-        (user_id,), fetch="one",
-    )
+    If account_number is provided, validates and uses that specific account.
+    Otherwise falls back to the user's first account of account_type.
+    """
+    acct = None
+
+    # Try to find by account number first
+    if account_number:
+        acct = db.execute(
+            "SELECT * FROM banking_accounts WHERE account_number = ? AND user_id = ? LIMIT 1",
+            (account_number, user_id), fetch="one",
+        )
+        # Also try without user_id filter (for cross-user payments)
+        if not acct:
+            acct = db.execute(
+                "SELECT * FROM banking_accounts WHERE account_number = ? LIMIT 1",
+                (account_number,), fetch="one",
+            )
+
+    # Fall back to account type
+    if not acct:
+        if account_type == "credit":
+            type_filter = "type IN ('credit_card', 'Credit Card')"
+        else:
+            type_filter = "type IN ('checking', 'Checking')"
+        acct = db.execute(
+            f"SELECT * FROM banking_accounts WHERE user_id = ? AND {type_filter} LIMIT 1",
+            (user_id,), fetch="one",
+        )
+
     account_id = acct["id"] if acct else 1
 
     if acct:
@@ -48,23 +69,23 @@ def _add_banking_transaction(user_id, description, amount, category="Shopping",
 
 @on("purchase")
 def handle_purchase(user_id, amount, merchant, item="", order_id="",
-                    account_type="checking", **kwargs):
+                    account_type="checking", account_number="", **kwargs):
     ref = order_id or f"ORD-{uuid.uuid4().hex[:8].upper()}"
     desc = f"{merchant} — {item}" if item else merchant
-    _add_banking_transaction(user_id, desc, amount, "Shopping", ref, account_type)
+    _add_banking_transaction(user_id, desc, amount, "Shopping", ref, account_type, account_number)
 
 
 @on("payment")
 def handle_payment(user_id, amount, recipient, category="Payment",
-                   reference="", account_type="checking", **kwargs):
-    _add_banking_transaction(user_id, recipient, amount, category, reference, account_type)
+                   reference="", account_type="checking", account_number="", **kwargs):
+    _add_banking_transaction(user_id, recipient, amount, category, reference, account_type, account_number)
 
 
 @on("trade")
 def handle_trade(user_id, symbol, side, quantity, price,
-                 account_type="checking", **kwargs):
+                 account_type="checking", account_number="", **kwargs):
     if side.lower() == "buy":
         total = round(quantity * price, 2)
         _add_banking_transaction(
             user_id, f"Buy {quantity} {symbol} @ ${price}",
-            total, "Investment", f"TRADE-{symbol}", account_type)
+            total, "Investment", f"TRADE-{symbol}", account_type, account_number)

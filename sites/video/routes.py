@@ -21,6 +21,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "video"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -490,6 +491,7 @@ def login():
         user = next((u for u in users if u["username"] == username), None)
         if user and user.get("password", username) == password:
             session["user_id"] = user["id"]
+            emit("signup", user_id=user["id"], site_name="video", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
             session["username"] = user["username"]
             session["display_name"] = user["display_name"]
             return redirect(url_for("video.index"))

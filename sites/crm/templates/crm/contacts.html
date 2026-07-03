@@ -62,7 +62,7 @@
         <div class="result-count">{{ contacts|length }} contact{{ 's' if contacts|length != 1 else '' }} found</div>
         <table>
             <thead>
-                <tr><th>Name</th><th>Title</th><th>Company</th><th>Email</th><th>Phone</th><th>Created</th></tr>
+                <tr><th>Name</th><th>Title</th><th>Company</th><th>Email</th><th>Phone</th><th>Created</th><th>Actions</th></tr>
             </thead>
             <tbody>
             {% for c in contacts %}
@@ -73,6 +73,11 @@
                     <td>{{ c.email }}</td>
                     <td>{{ c.phone }}</td>
                     <td>{{ c.created_date }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('crm.form_delete_contact', contact_id=c.id) }}" style="display:inline" onsubmit="return confirm('Delete contact {{ c.name }}?')">
+                            <button type="submit" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
+                        </form>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>

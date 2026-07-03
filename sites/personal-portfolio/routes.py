@@ -365,6 +365,9 @@ def login_submit():
     if not user:
         return render_template("personal-portfolio/login.html",
                                error="Invalid username or password")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("personal-portfolio/login.html", error="Invalid password")
     session["user_id"] = user["id"]
     return redirect(url_for("personal-portfolio.index"))
 

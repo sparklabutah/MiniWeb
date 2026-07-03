@@ -12,6 +12,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "banking"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -140,6 +141,7 @@ def login_submit():
         return render_template("banking/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="banking", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     accounts = _load_accounts(user_id=user["id"])
     cc_user = _cc_get_user_for_banking(user)
     return render_template("banking/dashboard.html", user=user, accounts=accounts,
@@ -217,43 +219,6 @@ def transactions_page():
     page = request.args.get("page", 1, type=int)
     per_page = 30
 
-    # Build SQL query with all filters
-    clauses = ["[user_id] = ?"]
-    params = [uid]
-
-    if q:
-        ql = f"%{q}%"
-        clauses.append("([description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ?)")
-        params.extend([ql, ql, ql])
-    if category:
-        clauses.append("[category] = ?")
-        params.append(category)
-    if tx_type:
-        clauses.append("[type] = ?")
-        params.append(tx_type)
-    if date_from:
-        clauses.append("[date] >= ?")
-        params.append(date_from)
-    if date_to:
-        clauses.append("[date] <= ?")
-        params.append(date_to)
-    if min_amount:
-        try:
-            mn = float(min_amount)
-            clauses.append("[amount] >= ?")
-            params.append(mn)
-        except ValueError:
-            pass
-    if max_amount:
-        try:
-            mx = float(max_amount)
-            clauses.append("[amount] <= ?")
-            params.append(mx)
-        except ValueError:
-            pass
-
-    where_sql = " AND ".join(clauses)
-
     # Sort
     sort_map = {
         "date": "[date] DESC",
@@ -263,18 +228,94 @@ def transactions_page():
     }
     order_sql = sort_map.get(sort, "[date] DESC")
 
-    # Count
-    total_count = db.execute(
-        f"SELECT COUNT(*) FROM [banking_transactions] WHERE {where_sql}",
-        tuple(params), fetch="val") or 0
-    total_pages = max(1, (total_count + per_page - 1) // per_page)
-    page = max(1, min(page, total_pages))
-    offset = (page - 1) * per_page
+    if q:
+        # Use FTS for text search, then post-filter
+        results = db.search(SITE, "transactions", q,
+                            where={"user_id": uid}, limit=500)
+        # Apply remaining filters on the small result set
+        if category:
+            results = [t for t in results if t.get("category") == category]
+        if tx_type:
+            results = [t for t in results if t.get("type") == tx_type]
+        if date_from:
+            results = [t for t in results if t.get("date", "") >= date_from]
+        if date_to:
+            results = [t for t in results if t.get("date", "") <= date_to]
+        if min_amount:
+            try:
+                mn = float(min_amount)
+                results = [t for t in results if (t.get("amount") or 0) >= mn]
+            except ValueError:
+                pass
+        if max_amount:
+            try:
+                mx = float(max_amount)
+                results = [t for t in results if (t.get("amount") or 0) <= mx]
+            except ValueError:
+                pass
 
-    # Fetch page
-    txns_page = db.execute(
-        f"SELECT * FROM [banking_transactions] WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",
-        tuple(params) + (per_page, offset))
+        # Sort (FTS returns by relevance; re-sort if needed)
+        sort_key_map = {
+            "date": (lambda t: t.get("date", ""), True),
+            "amount_asc": (lambda t: t.get("amount", 0), False),
+            "amount_desc": (lambda t: t.get("amount", 0), True),
+            "description": (lambda t: t.get("description", "").lower(), False),
+        }
+        if sort in sort_key_map:
+            key_fn, rev = sort_key_map[sort]
+            results.sort(key=key_fn, reverse=rev)
+
+        total_count = len(results)
+        total_pages = max(1, (total_count + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+        txns_page = results[offset:offset + per_page]
+    else:
+        # Build SQL query with non-search filters
+        clauses = ["[user_id] = ?"]
+        params = [uid]
+
+        if category:
+            clauses.append("[category] = ?")
+            params.append(category)
+        if tx_type:
+            clauses.append("[type] = ?")
+            params.append(tx_type)
+        if date_from:
+            clauses.append("[date] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[date] <= ?")
+            params.append(date_to)
+        if min_amount:
+            try:
+                mn = float(min_amount)
+                clauses.append("[amount] >= ?")
+                params.append(mn)
+            except ValueError:
+                pass
+        if max_amount:
+            try:
+                mx = float(max_amount)
+                clauses.append("[amount] <= ?")
+                params.append(mx)
+            except ValueError:
+                pass
+
+        where_sql = " AND ".join(clauses)
+
+        # Count
+        total_count = db.execute(
+            f"SELECT COUNT(*) FROM [banking_transactions] WHERE {where_sql}",
+            tuple(params), fetch="val") or 0
+        total_pages = max(1, (total_count + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+
+        # Fetch page
+        txns_page = db.execute(
+            f"SELECT * FROM [banking_transactions] WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",
+            tuple(params) + (per_page, offset))
 
     # Categories for filter dropdown (small query)
     cat_rows = db.execute(
@@ -730,45 +771,6 @@ def api_transactions():
     max_amount = request.args.get("max_amount", "").strip()
     limit = request.args.get("limit", type=int)
 
-    clauses = []
-    params = []
-    if user_id:
-        clauses.append("[user_id] = ?")
-        params.append(user_id)
-    if account_id:
-        clauses.append("[account_id] = ?")
-        params.append(account_id)
-    if q:
-        ql = f"%{q}%"
-        clauses.append("([description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ?)")
-        params.extend([ql, ql, ql])
-    if category:
-        clauses.append("[category] = ?")
-        params.append(category)
-    if tx_type:
-        clauses.append("[type] = ?")
-        params.append(tx_type)
-    if date_from:
-        clauses.append("[date] >= ?")
-        params.append(date_from)
-    if date_to:
-        clauses.append("[date] <= ?")
-        params.append(date_to)
-    if min_amount:
-        try:
-            mn = float(min_amount)
-            clauses.append("[amount] >= ?")
-            params.append(mn)
-        except ValueError:
-            pass
-    if max_amount:
-        try:
-            mx = float(max_amount)
-            clauses.append("[amount] <= ?")
-            params.append(mx)
-        except ValueError:
-            pass
-
     sort_map = {
         "date": "[date] DESC",
         "amount_asc": "[amount] ASC",
@@ -777,11 +779,88 @@ def api_transactions():
     }
     order_sql = sort_map.get(sort, "[date] DESC")
 
-    where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
-    limit_sql = f" LIMIT {limit}" if limit else ""
-    txns = db.execute(
-        f"SELECT * FROM [banking_transactions]{where_sql} ORDER BY {order_sql}{limit_sql}",
-        tuple(params))
+    if q:
+        # Use FTS for text search, then post-filter
+        where_eq = {}
+        if user_id:
+            where_eq["user_id"] = user_id
+        if account_id:
+            where_eq["account_id"] = account_id
+        if category:
+            where_eq["category"] = category
+        if tx_type:
+            where_eq["type"] = tx_type
+        results = db.search(SITE, "transactions", q,
+                            where=where_eq if where_eq else None,
+                            limit=limit or 500)
+        if date_from:
+            results = [t for t in results if t.get("date", "") >= date_from]
+        if date_to:
+            results = [t for t in results if t.get("date", "") <= date_to]
+        if min_amount:
+            try:
+                mn = float(min_amount)
+                results = [t for t in results if (t.get("amount") or 0) >= mn]
+            except ValueError:
+                pass
+        if max_amount:
+            try:
+                mx = float(max_amount)
+                results = [t for t in results if (t.get("amount") or 0) <= mx]
+            except ValueError:
+                pass
+        # Re-sort if user asked for non-relevance ordering
+        sort_key_map = {
+            "date": (lambda t: t.get("date", ""), True),
+            "amount_asc": (lambda t: t.get("amount", 0), False),
+            "amount_desc": (lambda t: t.get("amount", 0), True),
+            "description": (lambda t: t.get("description", "").lower(), False),
+        }
+        if sort in sort_key_map:
+            key_fn, rev = sort_key_map[sort]
+            results.sort(key=key_fn, reverse=rev)
+        txns = results
+    else:
+        clauses = []
+        params = []
+        if user_id:
+            clauses.append("[user_id] = ?")
+            params.append(user_id)
+        if account_id:
+            clauses.append("[account_id] = ?")
+            params.append(account_id)
+        if category:
+            clauses.append("[category] = ?")
+            params.append(category)
+        if tx_type:
+            clauses.append("[type] = ?")
+            params.append(tx_type)
+        if date_from:
+            clauses.append("[date] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[date] <= ?")
+            params.append(date_to)
+        if min_amount:
+            try:
+                mn = float(min_amount)
+                clauses.append("[amount] >= ?")
+                params.append(mn)
+            except ValueError:
+                pass
+        if max_amount:
+            try:
+                mx = float(max_amount)
+                clauses.append("[amount] <= ?")
+                params.append(mx)
+            except ValueError:
+                pass
+
+        where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
+        limit_sql = f" LIMIT {limit}" if limit else ""
+        txns = db.execute(
+            f"SELECT * FROM [banking_transactions]{where_sql} ORDER BY {order_sql}{limit_sql}",
+            tuple(params))
     return jsonify(txns)
 
 
@@ -789,10 +868,7 @@ def api_transactions():
 def api_transactions_search():
     q = request.args.get("q", "").strip()
     if q:
-        ql = f"%{q}%"
-        txns = db.execute(
-            "SELECT * FROM [banking_transactions] WHERE [description] LIKE ? OR [category] LIKE ? OR [reference] LIKE ? ORDER BY [date] DESC",
-            (ql, ql, ql))
+        txns = db.search(SITE, "transactions", q, limit=50)
     else:
         txns = _load_transactions(limit=50)
     return jsonify(txns)
@@ -800,18 +876,11 @@ def api_transactions_search():
 
 @blueprint.route("/api/transactions/semantic")
 def api_transactions_semantic():
-
     q = request.args.get("q", "").strip()
-    txns = _load_transactions()
     if q:
-        scored = []
-        for t in txns:
-            text = f"{t['description']} {t['category']} {t['type']} {t['reference']}"
-            s = _keyword_score(q, text)
-            if s > 0:
-                scored.append((t, s))
-        scored.sort(key=lambda x: -x[1])
-        txns = [t for t, _ in scored]
+        txns = db.search(SITE, "transactions", q, limit=50)
+    else:
+        txns = _load_transactions(limit=50)
     return jsonify(txns)
 
 
@@ -1311,40 +1380,59 @@ def cc_transactions():
     page = request.args.get("page", 1, type=int)
     per_page = 20
 
-    clauses = ["[user_id] = ?"]
-    params = [uid]
-    if category:
-        clauses.append("[category] = ?")
-        params.append(category)
-    if status:
-        clauses.append("[status] = ?")
-        params.append(status)
-    if date_from:
-        clauses.append("[date] >= ?")
-        params.append(date_from)
-    if date_to:
-        clauses.append("[date] <= ?")
-        params.append(date_to)
     if search:
-        sl = f"%{search}%"
-        clauses.append("([merchant] LIKE ? OR [category] LIKE ?)")
-        params.extend([sl, sl])
+        # Use FTS for text search, then post-filter
+        where_eq = {"user_id": uid}
+        if category:
+            where_eq["category"] = category
+        if status:
+            where_eq["status"] = status
+        results = db.search(SITE, "cc_transactions", search,
+                            where=where_eq, limit=500)
+        if date_from:
+            results = [t for t in results if t.get("date", "") >= date_from]
+        if date_to:
+            results = [t for t in results if t.get("date", "") <= date_to]
+        # Sort by date desc
+        results.sort(key=lambda t: t.get("date", ""), reverse=True)
 
-    where_sql = " AND ".join(clauses)
-    total_count = db.execute(
-        f"SELECT COUNT(*) FROM [banking_cc_transactions] WHERE {where_sql}",
-        tuple(params), fetch="val") or 0
-    total_amount_val = db.execute(
-        f"SELECT COALESCE(SUM([amount]), 0) FROM [banking_cc_transactions] WHERE {where_sql}",
-        tuple(params), fetch="val") or 0
-    total_amount = total_amount_val
+        total_count = len(results)
+        total_amount = sum(t.get("amount", 0) for t in results)
+        total_pages = max(1, (total_count + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+        page_txns = results[offset:offset + per_page]
+    else:
+        clauses = ["[user_id] = ?"]
+        params = [uid]
+        if category:
+            clauses.append("[category] = ?")
+            params.append(category)
+        if status:
+            clauses.append("[status] = ?")
+            params.append(status)
+        if date_from:
+            clauses.append("[date] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[date] <= ?")
+            params.append(date_to)
 
-    total_pages = max(1, (total_count + per_page - 1) // per_page)
-    page = max(1, min(page, total_pages))
-    offset = (page - 1) * per_page
-    page_txns = db.execute(
-        f"SELECT * FROM [banking_cc_transactions] WHERE {where_sql} ORDER BY [date] DESC LIMIT ? OFFSET ?",
-        tuple(params) + (per_page, offset))
+        where_sql = " AND ".join(clauses)
+        total_count = db.execute(
+            f"SELECT COUNT(*) FROM [banking_cc_transactions] WHERE {where_sql}",
+            tuple(params), fetch="val") or 0
+        total_amount_val = db.execute(
+            f"SELECT COALESCE(SUM([amount]), 0) FROM [banking_cc_transactions] WHERE {where_sql}",
+            tuple(params), fetch="val") or 0
+        total_amount = total_amount_val
+
+        total_pages = max(1, (total_count + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+        page_txns = db.execute(
+            f"SELECT * FROM [banking_cc_transactions] WHERE {where_sql} ORDER BY [date] DESC LIMIT ? OFFSET ?",
+            tuple(params) + (per_page, offset))
 
     cat_rows = db.execute(
         "SELECT DISTINCT [category] FROM [banking_cc_transactions] WHERE [user_id] = ? ORDER BY [category]",
@@ -1499,27 +1587,6 @@ def api_cc_transactions():
     disputed = request.args.get("disputed", "").strip()
     sort = request.args.get("sort", "date_desc").strip()
 
-    clauses = []
-    params = []
-    if uid:
-        clauses.append("[user_id] = ?")
-        params.append(uid)
-    if category:
-        clauses.append("[category] = ?")
-        params.append(category)
-    if status:
-        clauses.append("[status] = ?")
-        params.append(status)
-    if date_from:
-        clauses.append("[date] >= ?")
-        params.append(date_from)
-    if date_to:
-        clauses.append("[date] <= ?")
-        params.append(date_to)
-    if merchant:
-        clauses.append("[merchant] LIKE ?")
-        params.append(f"%{merchant}%")
-
     sort_map = {
         "date_asc": "[date] ASC",
         "date_desc": "[date] DESC",
@@ -1529,10 +1596,56 @@ def api_cc_transactions():
     }
     order_sql = sort_map.get(sort, "[date] DESC")
 
-    where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
-    results = db.execute(
-        f"SELECT * FROM [banking_cc_transactions]{where_sql} ORDER BY {order_sql}",
-        tuple(params))
+    if merchant:
+        # Use FTS for merchant text search, then post-filter
+        where_eq = {}
+        if uid:
+            where_eq["user_id"] = uid
+        if category:
+            where_eq["category"] = category
+        if status:
+            where_eq["status"] = status
+        results = db.search(SITE, "cc_transactions", merchant,
+                            where=where_eq if where_eq else None,
+                            limit=500)
+        if date_from:
+            results = [t for t in results if t.get("date", "") >= date_from]
+        if date_to:
+            results = [t for t in results if t.get("date", "") <= date_to]
+        # Re-sort
+        sort_key_map = {
+            "date_asc": (lambda t: t.get("date", ""), False),
+            "date_desc": (lambda t: t.get("date", ""), True),
+            "amount_asc": (lambda t: t.get("amount", 0), False),
+            "amount_desc": (lambda t: t.get("amount", 0), True),
+            "merchant": (lambda t: t.get("merchant", "").lower(), False),
+        }
+        if sort in sort_key_map:
+            key_fn, rev = sort_key_map[sort]
+            results.sort(key=key_fn, reverse=rev)
+    else:
+        clauses = []
+        params = []
+        if uid:
+            clauses.append("[user_id] = ?")
+            params.append(uid)
+        if category:
+            clauses.append("[category] = ?")
+            params.append(category)
+        if status:
+            clauses.append("[status] = ?")
+            params.append(status)
+        if date_from:
+            clauses.append("[date] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[date] <= ?")
+            params.append(date_to)
+
+        where_sql = " WHERE " + " AND ".join(clauses) if clauses else ""
+        results = db.execute(
+            f"SELECT * FROM [banking_cc_transactions]{where_sql} ORDER BY {order_sql}",
+            tuple(params))
     return jsonify(results)
 
 

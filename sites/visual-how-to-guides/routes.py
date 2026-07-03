@@ -307,11 +307,16 @@ def guide_step(guide_id, step_num):
     )
 
 
-@blueprint.route("/category/<int:category_id>")
+@blueprint.route("/category/<category_id>")
 def category_page(category_id):
-    """View guides in a specific category."""
+    """View guides in a specific category (by ID or name)."""
     categories = _load_categories()
-    category = next((c for c in categories if c["id"] == category_id), None)
+    # Support both numeric ID and category name
+    try:
+        cat_id = int(category_id)
+        category = next((c for c in categories if c["id"] == cat_id), None)
+    except (ValueError, TypeError):
+        category = next((c for c in categories if c["name"].lower() == category_id.lower()), None)
     if category is None:
         abort(404)
 

@@ -25,6 +25,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "map-services"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -71,8 +72,11 @@ def _get_categories_from_db():
 def _semantic_score(query, loc):
     """Simple keyword-overlap relevance score for semantic search."""
     terms = query.lower().split()
+    hours = loc.get("hours", "")
+    if not isinstance(hours, str):
+        hours = str(hours)
     text = (loc["name"] + " " + loc["address"] + " " + loc["category"] +
-            " " + loc.get("hours", "")).lower()
+            " " + hours).lower()
     return sum(1 for t in terms if t in text)
 
 
@@ -156,7 +160,9 @@ def index():
 
     # open_now filter requires Python (checking for "closed" in hours text)
     if open_now == "1":
-        locations = [l for l in locations if l.get("hours") and "closed" not in l["hours"].lower()]
+        def _hours_to_str(h):
+            return str(h) if not isinstance(h, str) else h
+        locations = [l for l in locations if l.get("hours") and "closed" not in _hours_to_str(l["hours"]).lower()]
 
     # Also search saved places if user is logged in and has a query
     user = _current_user()
@@ -299,13 +305,18 @@ def login_page():
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     # users table is small (<20 rows)
     users = db.query(SITE, "users")
     user = next((u for u in users if u["username"] == username), None)
     if user is None:
         return render_template("map-services/login.html",
                                error="Invalid username. Please try again.")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("map-services/login.html", error="Invalid password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="map-services", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("map-services.index"))
 
 
@@ -434,11 +445,15 @@ def api_login():
     """Authenticate by username (no password for this map service)."""
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
     # users table is small
     users = db.query(SITE, "users")
     user = next((u for u in users if u["username"] == username), None)
     if not user:
         return jsonify({"error": "Invalid username"}), 401
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return jsonify({"error": "Invalid password"}), 401
     session["user_id"] = user["id"]
     return jsonify({"user_id": user["id"], "username": user["username"]})
 
@@ -492,7 +507,9 @@ def api_locations_list():
 
     # Python-side filters that cannot be expressed in simple SQL
     if open_now == "1":
-        locations = [l for l in locations if l.get("hours") and "closed" not in l["hours"].lower()]
+        def _hours_to_str(h):
+            return str(h) if not isinstance(h, str) else h
+        locations = [l for l in locations if l.get("hours") and "closed" not in _hours_to_str(l["hours"]).lower()]
     if lat is not None and lng is not None and radius is not None:
         locations = [l for l in locations
                      if _haversine(lat, lng, l["lat"], l["lng"]) <= radius]
@@ -1023,8 +1040,8 @@ def api_export():
         for loc in locations:
             name = loc["name"].replace('"', '""')
             addr = loc["address"].replace('"', '""')
-            phone = (loc.get("phone") or "").replace('"', '""')
-            hours = loc.get("hours", "").replace('"', '""')
+            phone = str(loc.get("phone") or "").replace('"', '""')
+            hours = str(loc.get("hours") or "").replace('"', '""')
             lines.append(f'{loc["id"]},"{name}","{loc["category"]}","{addr}",'
                          f'{loc["lat"]},{loc["lng"]},"{phone}","{hours}",{loc["rating"]}')
         return Response("\n".join(lines), mimetype="text/csv",

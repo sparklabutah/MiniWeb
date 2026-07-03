@@ -22,6 +22,8 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "job-sites"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -187,24 +189,52 @@ def _semantic_score(query, job):
     return _keyword_score(query, _job_search_text(job))
 
 
-def _parse_min_salary(salary_range):
-    """Extract the minimum salary integer from a string like '$155,000 - $185,000'."""
+def _parse_salary_num(s):
+    """Parse a salary string like '$59K', '$155,000', '99K', '185000' to int.
+
+    Returns 0 for unparseable values.
+    """
     try:
-        low = salary_range.replace("$", "").replace(",", "").split("-")[0].strip()
-        return int(low)
+        if not s or not s.strip():
+            return 0
+        s = s.strip().replace("$", "").replace(",", "").strip()
+        if not s or not s[0].isdigit():
+            return 0
+        if s.upper().endswith("K"):
+            return int(float(s[:-1]) * 1000)
+        elif s.upper().endswith("M"):
+            return int(float(s[:-1]) * 1000000)
+        return int(float(s))
     except (ValueError, IndexError, AttributeError):
         return 0
+
+
+def _split_salary_range(salary_range):
+    """Split a salary range string into (low_str, high_str).
+
+    Handles formats: '$59K-$99K', '$155,000 - $185,000', '$100K'.
+    Uses regex to split on ' - ' or '-' between dollar amounts,
+    avoiding incorrect splits on negative numbers.
+    """
+    if not salary_range or not salary_range.strip():
+        return "", ""
+    # Split on ' - ' first (spaced dash), then bare '-' between amounts
+    parts = re.split(r'\s*-\s*(?=\$|\d)', salary_range, maxsplit=1)
+    if len(parts) >= 2:
+        return parts[0].strip(), parts[1].strip()
+    return parts[0].strip(), parts[0].strip()
+
+
+def _parse_min_salary(salary_range):
+    """Extract the minimum salary integer from a range like '$59K-$99K' or '$155,000 - $185,000'."""
+    low, _ = _split_salary_range(salary_range)
+    return _parse_salary_num(low)
 
 
 def _parse_max_salary(salary_range):
     """Extract the maximum salary integer from a salary range string."""
-    try:
-        parts = salary_range.replace("$", "").replace(",", "").split("-")
-        if len(parts) >= 2:
-            return int(parts[1].strip())
-        return _parse_min_salary(salary_range)
-    except (ValueError, IndexError, AttributeError):
-        return 0
+    _, high = _split_salary_range(salary_range)
+    return _parse_salary_num(high)
 
 
 # ---------------------------------------------------------------------------
@@ -222,19 +252,23 @@ def _search_and_filter_jobs(q="", location="", job_type="", company="",
     if q:
         jobs = [j for j in jobs if _keyword_score(q, _job_search_text(j)) > 0]
     if job_type:
-        jobs = [j for j in jobs if j.get("job_type", "").lower() == job_type.lower()]
+        jobs = [j for j in jobs if j.get("work_type", j.get("job_type", "")).lower() == job_type.lower()]
     if location:
         jobs = [j for j in jobs if location.lower() in j["location"].lower()]
     if company:
         jobs = [j for j in jobs if j["company"].lower() == company.lower()]
     if salary_min is not None:
-        jobs = [j for j in jobs if _parse_min_salary(j.get("salary_range", "")) >= salary_min]
+        jobs = [j for j in jobs
+                if _parse_min_salary(j.get("salary_range", "")) >= salary_min
+                and _parse_min_salary(j.get("salary_range", "")) > 0]
     if salary_max is not None:
-        jobs = [j for j in jobs if _parse_max_salary(j.get("salary_range", "")) <= salary_max]
+        jobs = [j for j in jobs
+                if _parse_min_salary(j.get("salary_range", "")) <= salary_max
+                and _parse_min_salary(j.get("salary_range", "")) > 0]
     if date_from:
-        jobs = [j for j in jobs if j.get("posted_date", "") >= date_from]
+        jobs = [j for j in jobs if j.get("job_posting_date", j.get("posted_date", "")) >= date_from]
     if date_to:
-        jobs = [j for j in jobs if j.get("posted_date", "") <= date_to]
+        jobs = [j for j in jobs if j.get("job_posting_date", j.get("posted_date", "")) <= date_to]
     if tags:
         tag_list = [t.strip().lower() for t in tags.split(",")]
         jobs = [
@@ -244,7 +278,7 @@ def _search_and_filter_jobs(q="", location="", job_type="", company="",
 
     # sort_by_ranking
     if sort == "date":
-        jobs.sort(key=lambda j: j.get("posted_date", ""), reverse=True)
+        jobs.sort(key=lambda j: j.get("job_posting_date", j.get("posted_date", "")), reverse=True)
     elif sort == "salary_desc":
         jobs.sort(key=lambda j: _parse_min_salary(j.get("salary_range", "")), reverse=True)
     elif sort == "salary_asc":
@@ -476,12 +510,35 @@ def apply_form_page(job_id):
     }
     applications.append(new_app)
     db.save_collection(SITE, "applications", applications)
+    _add_email(user["id"], "noreply@job-sites.lakeport.local",
+               "Application submitted",
+               f'Your application to "{job["job_title"]}" at {job["company"]} has been submitted.')
 
     return render_template(
         "job-sites/apply.html",
         user=user, logged_in=logged_in, job=job, success=True, error=None,
         application=new_app,
     )
+
+
+@blueprint.route("/upload-resume", methods=["POST"])
+def form_upload_resume():
+    """Upload resume via HTML form on profile page."""
+    user, logged_in = _get_browsing_user()
+    resume = request.files.get("resume")
+    if resume and resume.filename:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        safe_name = re.sub(r'[^\w.\-]', '_', resume.filename)
+        filename = f"{user['id']}_{safe_name}"
+        resume.save(str(UPLOAD_DIR / filename))
+        users = _load_users()
+        u = next((u for u in users if u["id"] == user["id"]), None)
+        if u:
+            u.setdefault("profile", {})["resume_uploaded"] = True
+            u["profile"]["resume_last_updated"] = datetime.now().strftime("%Y-%m-%d")
+            u["profile"]["resume_filename"] = filename
+            _save_users(users)
+    return redirect(url_for("job-sites.profile_page"))
 
 
 @blueprint.route("/profile")
@@ -506,12 +563,17 @@ def login_page():
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
     if not user:
         return render_template("job-sites/login.html",
                                error="Account not found. Please check your email or username.")
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("job-sites/login.html", error="Invalid password")
     session["job_sites_user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="job-sites", username=username, password=request.form.get("password", ""), email="")
     return redirect(url_for("job-sites.index"))
 
 
@@ -575,7 +637,7 @@ def api_jobs_semantic():
 
     # Additional filters on semantic results
     if job_type:
-        results = [j for j in results if j.get("job_type", "").lower() == job_type.lower()]
+        results = [j for j in results if j.get("work_type", j.get("job_type", "")).lower() == job_type.lower()]
     if location:
         results = [j for j in results if location.lower() in j["location"].lower()]
 
@@ -667,6 +729,7 @@ def api_apply(job_id):
     }
     applications.append(new_app)
     db.save_collection(SITE, "applications", applications)
+    emit("booking", user_id=user["id"], title=f"Applied: {job['job_title']} at {job['company']}", start=now, location=job.get("location", ""))
     return jsonify(new_app), 201
 
 
@@ -991,7 +1054,6 @@ def api_stats():
         "companies_applied": list(set(a["company"] for a in apps)),
         "followed_companies": user.get("followed_companies", []),
     })
-
 
 @blueprint.route("/api/users/<int:user_id>")
 def api_user(user_id):

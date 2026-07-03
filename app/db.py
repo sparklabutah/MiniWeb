@@ -676,26 +676,31 @@ def search(
 
     # Try FTS5 first
     try:
-        sql_parts = [f"SELECT t.* FROM [{table}] t"]
-        sql_parts.append(f"JOIN [{fts_table}] fts ON t.[{pk_col}] = fts.rowid")
-        params = []
+        # Check if FTS index is populated; skip to LIKE fallback if empty
+        fts_count = conn.execute(
+            f"SELECT COUNT(*) FROM [{fts_table}]"
+        ).fetchone()[0]
+        if fts_count > 0:
+            sql_parts = [f"SELECT t.* FROM [{table}] t"]
+            sql_parts.append(f"JOIN [{fts_table}] fts ON t.[{pk_col}] = fts.rowid")
+            params = []
 
-        where_clauses = [f"[{fts_table}] MATCH ?"]
-        params.append(fts_query)
+            where_clauses = [f"[{fts_table}] MATCH ?"]
+            params.append(fts_query)
 
-        if where:
-            for col, val in where.items():
-                where_clauses.append(f"t.[{col}] = ?")
-                params.append(val)
+            if where:
+                for col, val in where.items():
+                    where_clauses.append(f"t.[{col}] = ?")
+                    params.append(val)
 
-        sql_parts.append("WHERE " + " AND ".join(where_clauses))
-        sql_parts.append("ORDER BY fts.rank")
-        sql_parts.append(f"LIMIT ? OFFSET ?")
-        params.extend([limit, offset])
+            sql_parts.append("WHERE " + " AND ".join(where_clauses))
+            sql_parts.append("ORDER BY fts.rank")
+            sql_parts.append(f"LIMIT ? OFFSET ?")
+            params.extend([limit, offset])
 
-        sql = " ".join(sql_parts)
-        rows = conn.execute(sql, params).fetchall()
-        return [_deserialize_row(r) for r in rows]
+            sql = " ".join(sql_parts)
+            rows = conn.execute(sql, params).fetchall()
+            return [_deserialize_row(r) for r in rows]
     except sqlite3.OperationalError:
         pass
 

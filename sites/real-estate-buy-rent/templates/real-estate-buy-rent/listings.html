@@ -106,12 +106,21 @@
                 <label>Min $:
                     <input type="number" name="price_min" value="{{ price_min if price_min else '' }}" min="0" placeholder="0">
                 </label>
-                <label>Max $:
-                    <input type="number" name="price_max" value="{{ price_max if price_max else '' }}" min="0" placeholder="Any">
+                <label style="display:flex;align-items:center;gap:4px;">Max $: <span id="price-max-val">{{ "${:,}".format(price_max) if price_max else 'Any' }}</span>
+                    <input type="range" name="price_max" min="0" max="2000000" step="50000" value="{{ price_max if price_max else 2000000 }}" oninput="document.getElementById('price-max-val').textContent=this.value=='2000000'?'Any':'$'+parseInt(this.value).toLocaleString()" style="width:120px;">
                 </label>
                 <label>Min Sqft:
                     <input type="number" name="sqft_min" value="{{ sqft_min if sqft_min else '' }}" min="0" placeholder="0">
                 </label>
+                <div style="display:flex;gap:.6rem;align-items:center;">
+                    <span style="font-size:.82rem;color:#666;">Features:</span>
+                    {% for feat in ['garage', 'pool', 'basement', 'fireplace'] %}
+                    <label style="font-size:.82rem;display:flex;align-items:center;gap:.2rem;cursor:pointer;">
+                        <input type="checkbox" name="features" value="{{ feat }}" {% if feat in request.args.getlist('features') %}checked{% endif %} style="accent-color:#0d47a1;">
+                        {{ feat|capitalize }}
+                    </label>
+                    {% endfor %}
+                </div>
                 <label>Sort:
                     <select name="sort">
                         <option value="date" {{ 'selected' if sort == 'date' }}>Newest</option>

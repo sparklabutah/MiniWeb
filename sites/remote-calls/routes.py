@@ -528,6 +528,12 @@ def settings_page():
 # API routes
 # ---------------------------------------------------------------------------
 
+
+@blueprint.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return redirect(url_for("remote-calls.index"))
+
 @blueprint.route("/api/meetings", methods=["GET"])
 def api_meetings_list():
     meetings = _load_meetings()
@@ -917,6 +923,22 @@ def api_meeting_share_toggle(meeting_id):
 # Invite participant API  (invite_by_form)
 # ---------------------------------------------------------------------------
 
+@blueprint.route("/meeting/<meeting_id>/invite", methods=["POST"])
+def form_invite_to_meeting(meeting_id):
+    """Invite a participant via form POST and redirect back."""
+    email = request.form.get("email", "").strip()
+    if email:
+        meetings = _load_meetings()
+        meeting = next((m for m in meetings if m["id"] == meeting_id), None)
+        if meeting:
+            users = _load_users()
+            found = next((u for u in users if u.get("email") == email), None)
+            if found and found["id"] not in meeting.get("participants", []):
+                meeting.setdefault("participants", []).append(found["id"])
+                db.save_collection(SITE, "meetings", meetings)
+    return redirect(url_for("remote-calls.meeting_detail", meeting_id=meeting_id))
+
+
 @blueprint.route("/api/meetings/<meeting_id>/invite", methods=["POST"])
 def api_meeting_invite(meeting_id):
     """Invite a participant to a meeting."""
@@ -1199,3 +1221,4 @@ def api_login():
 def api_users_list():
     users = _load_users()
     return jsonify({"users": users, "count": len(users)})
+

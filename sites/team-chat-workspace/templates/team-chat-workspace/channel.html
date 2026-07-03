@@ -135,12 +135,21 @@
         </div>
 
         <div class="content">
-            <div class="channel-header">
-                <h2><span class="hash">#</span> {{ active_channel.name }}</h2>
-                {% if active_channel.topic %}
-                <div class="ch-topic">{{ active_channel.topic }}</div>
-                {% endif %}
-                <div class="ch-meta">{{ active_channel.member_count }} members &middot; {{ active_channel.description }}</div>
+            <div class="channel-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                <div>
+                    <h2><span class="hash">#</span> {{ active_channel.name }}</h2>
+                    {% if active_channel.topic %}
+                    <div class="ch-topic">{{ active_channel.topic }}</div>
+                    {% endif %}
+                    <div class="ch-meta">{{ active_channel.member_count }} members &middot; {{ active_channel.description }}</div>
+                </div>
+                <div style="display:flex;gap:.4rem;align-items:center;">
+                    <form method="POST" action="{{ url_for('team-chat-workspace.form_channel_invite', channel_id=active_channel.id) }}" style="display:flex;gap:.3rem;align-items:center;">
+                        <input type="text" name="email" placeholder="Invite member" style="padding:.3rem .5rem;background:#383838;color:#d1d2d3;border:1px solid #4a4a4a;border-radius:4px;font-size:.78rem;width:130px;">
+                        <button type="submit" style="background:#2b6cb0;color:#fff;border:none;padding:.35rem .6rem;border-radius:4px;font-size:.78rem;cursor:pointer;">Invite</button>
+                    </form>
+                    <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" style="background:#383838;color:#ababad;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">Share</button>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -179,6 +188,11 @@
                                     <span class="msg-time">{{ msg.timestamp[11:16] }}</span>
                                 </div>
                                 <div class="msg-text">{{ msg.text }}</div>
+                                {% if current_user and msg.user_id == current_user.id %}
+                                <form method="POST" action="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="display:inline;" onsubmit="return confirm('Delete this message?')">
+                                    <button type="submit" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Delete message">&#10005; delete</button>
+                                </form>
+                                {% endif %}
                                 {% if msg.reactions %}
                                 <div class="reactions">
                                     {% for rxn in msg.reactions %}
@@ -209,6 +223,11 @@
             </div>
 
             <div class="message-input-area">
+                <form method="POST" enctype="multipart/form-data" action="{{ url_for('team-chat-workspace.api_upload') }}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem;">
+                    <input type="hidden" name="channel_id" value="{{ active_channel.id }}">
+                    <input type="file" name="file" style="font-size:.8rem;flex:1;">
+                    <button type="submit" style="padding:.3rem .7rem;font-size:.8rem;background:#2b6cb0;color:#fff;border:none;border-radius:.3rem;cursor:pointer;">Upload</button>
+                </form>
                 <form id="send-form" onsubmit="return sendMessage(event)">
                     <textarea id="msg-input" placeholder="Message #{{ active_channel.name }}" rows="1"></textarea>
                     <button type="submit">Send</button>

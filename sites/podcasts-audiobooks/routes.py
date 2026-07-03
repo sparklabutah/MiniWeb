@@ -26,6 +26,7 @@ from flask import (
 )
 
 from app import db
+from app.events import emit
 
 SITE = "podcasts-audiobooks"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -480,6 +481,7 @@ def login_submit():
     if not user or user.get("password") != password:
         return render_template("podcasts-audiobooks/login.html", error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="podcasts-audiobooks", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("podcasts-audiobooks.library_page"))
 
 

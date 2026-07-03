@@ -16,12 +16,15 @@ import csv
 import io
 import json
 import pathlib
+from datetime import datetime
 
 from flask import (
     Blueprint, Response, abort, jsonify, render_template, request, session,
     redirect, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "university-academic"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -247,7 +250,8 @@ def courses_search_by_route(query):
 def course_detail(course_id):
     """Single course detail page (navigate_by_route, extract_by_route)."""
     courses = _courses()
-    course = next((c for c in courses if c["id"] == course_id), None)
+    course_id_lower = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == course_id_lower), None)
     if not course:
         abort(404)
     # Find the instructor's faculty profile if it exists
@@ -319,6 +323,31 @@ def departments_page():
         "university-academic/departments.html",
         department=department,
         research_areas=research_areas,
+    )
+
+
+@blueprint.route("/research")
+def research_page():
+    """List of research areas/groups with faculty and course counts."""
+    dept_data = _departments()
+    research_areas = dept_data.get("research_areas", [])
+    faculty = _faculty()
+    courses = _courses()
+    # Enrich each area with faculty and course counts
+    for area in research_areas:
+        slug = area.get("slug", "")
+        area["_faculty_count"] = sum(
+            1 for f in faculty
+            if slug in f.get("research_areas", [])
+            or any(slug in ra for ra in f.get("research_areas", []))
+        )
+        area["_course_count"] = sum(
+            1 for c in courses if c.get("research_area") == slug
+        )
+    return render_template(
+        "university-academic/research.html",
+        research_areas=research_areas,
+        department=dept_data.get("department", {}),
     )
 
 
@@ -503,6 +532,10 @@ def apply_submit():
             apps.append(app_entry)
             _save_users(users)
 
+    _add_email(1, "noreply@university-academic.lakeport.local",
+               "Application received",
+               f'Your application to the {program} program at Meridian State University has been received.')
+    emit("booking", user_id=1, title=f"Application submitted: {program}", start=datetime.now().strftime("%Y-%m-%d"), location="Meridian State University")
     courses = _courses()
     programs = _research_areas()
     return render_template(
@@ -589,6 +622,7 @@ def login_submit():
     user = next((u for u in users if u["net_id"] == username), None)
     if user:
         session["ua_user"] = username
+        emit("signup", user_id=1, site_name="university-academic", username=username, password=request.form.get("password", ""), email="")
         return redirect(url_for("university-academic.index"))
     # Fallback: accept any non-empty credentials for demo
     session["ua_user"] = username
@@ -635,7 +669,8 @@ def api_courses():
 def api_course_detail(course_id):
     """GET single course by id (extract_by_route)."""
     courses = _courses()
-    course = next((c for c in courses if c["id"] == course_id), None)
+    course_id_lower = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == course_id_lower), None)
     if not course:
         abort(404)
     return jsonify(course)

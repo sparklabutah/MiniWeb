@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 from app import db
+from app.handlers.email_handler import _add_email
 
 SITE = "calendar-todo"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -52,8 +53,10 @@ def _load_events(user_id=None, category=None, status=None):
     if status:
         where["status"] = status
     events = db.query(SITE, "events", where=where if where else None)
-    # Ensure string fields are never None (SQLite NULLs)
+    # Map DB column 'end_' back to 'end' (reserved word escaping)
     for e in events:
+        if "end_" in e and "end" not in e:
+            e["end"] = e.pop("end_")
         for field in ("start", "end", "title", "description", "category",
                        "calendar", "location", "priority", "status", "color"):
             if e.get(field) is None:
@@ -429,6 +432,9 @@ def form_create_event():
     events = _load_events()
     events.append(event)
     _save_events(events)
+    _add_email(user_id, "noreply@calendar-todo.lakeport.local",
+               "New event created",
+               f'Your event "{title}" has been created and added to your calendar.')
     return redirect(url_for("calendar-todo.index"))
 
 

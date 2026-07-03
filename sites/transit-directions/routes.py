@@ -19,7 +19,7 @@ import pathlib
 from datetime import datetime
 
 from flask import (
-    Blueprint, Response, abort, jsonify, render_template, request, session,
+    Blueprint, Response, abort, jsonify, redirect, render_template, request, session,
     url_for,
 )
 from app import db
@@ -44,7 +44,34 @@ def _load_routes():
 
 
 def _load_stops():
-    return db.query(SITE, "stops")
+    stops = db.query(SITE, "stops")
+    # Populate routes_served if empty by cross-referencing route major_stops
+    routes = db.query(SITE, "routes_transit")
+    # Build a mapping from major-stop names to route numbers
+    # Use fuzzy matching: a stop is served by a route if the stop name
+    # shares a significant street/place token with any of the route's major_stops.
+    _noise = {"st", "ave", "blvd", "dr", "rd", "ln", "way", "ct", "&", "the",
+              "and", "block", "stop", "only", "drop", "off", "east", "west",
+              "north", "south", "transit", "center"}
+    def _tokens(name):
+        return {t for t in name.lower().replace("(", " ").replace(")", " ").split()
+                if t not in _noise and len(t) > 1}
+
+    for stop in stops:
+        if not stop.get("routes_served"):
+            served = []
+            stoks = _tokens(stop["name"])
+            for route in routes:
+                for ms in route.get("major_stops", []):
+                    mtoks = _tokens(ms)
+                    # Match if the stop shares at least one significant token
+                    # with a major stop AND both are on the same street/area
+                    overlap = stoks & mtoks
+                    if len(overlap) >= 1:
+                        served.append(route["route_number"])
+                        break
+            stop["routes_served"] = sorted(set(served))
+    return stops
 
 
 def _load_schedules():
@@ -537,6 +564,12 @@ def login():
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
+
+
+@blueprint.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return redirect(url_for("transit-directions.index"))
 
 @blueprint.route("/api/routes", methods=["GET"])
 def api_routes_list():

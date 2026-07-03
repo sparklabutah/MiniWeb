@@ -955,6 +955,25 @@ def api_entry_upload_icon(entry_id):
 # Form-based entry creation (create_by_dropdown — HTML form with vault select)
 # ---------------------------------------------------------------------------
 
+@blueprint.route("/entry/<entry_id>/delete", methods=["POST"])
+def form_delete_entry(entry_id):
+    """Delete a password entry via form POST."""
+    entries = _load_entries()
+    entry = next((e for e in entries if e["id"] == entry_id), None)
+    vault_id = entry["vault_id"] if entry else "vault_001"
+    entries = [e for e in entries if e["id"] != entry_id]
+    db.save_collection(SITE, "entries", entries)
+    return redirect(url_for("password-managers.vault_detail", vault_id=vault_id))
+
+
+@blueprint.route("/import", methods=["POST"])
+def form_import():
+    """Import passwords from an uploaded CSV/JSON file."""
+    _f = request.files.get("file")
+    # Accept upload but just redirect back (placeholder)
+    return redirect(url_for("password-managers.index"))
+
+
 @blueprint.route("/new-entry", methods=["GET"])
 def new_entry_page():
     """Page with form to create a new entry (vault selected via dropdown)."""
@@ -1107,3 +1126,4 @@ def api_user(user_id):
         abort(404)
     safe = {k: v for k, v in user.items() if k not in ("master_password", "two_factor_codes", "two_factor_backup_code")}
     return jsonify(safe)
+

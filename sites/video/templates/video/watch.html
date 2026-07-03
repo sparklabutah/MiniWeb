@@ -112,7 +112,7 @@
             <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
         </div>
         <div class="nav-center">
-            <form class="search-form" action="/search" method="get">
+            <form class="search-form" action="{{ url_for("video.search") }}" method="get">
                 <input type="text" name="q" placeholder="Search" aria-label="Search">
                 <button type="submit">Search</button>
             </form>
@@ -156,8 +156,8 @@
                     <form method="post" action="/watch/{{ video.id }}/save">
                         <button type="submit" class="action-btn" title="Save">&#128278; Save</button>
                     </form>
-                    <button class="action-btn" title="Share" onclick="document.getElementById('share-menu').style.display = document.getElementById('share-menu').style.display === 'none' ? 'block' : 'none'">&#8599; Share</button>
-                    <button class="action-btn" title="Report" onclick="document.getElementById('report-section').style.display = document.getElementById('report-section').style.display === 'none' ? 'block' : 'none'">&#9873; Report</button>
+                    <button class="action-btn" title="Share" onclick="document.getElementById('share-menu').style.display = document.getElementById('share-menu').style.display === 'none' ? 'block' : 'none'; fetch('/sites/video/api/videos/{{ video.id }}/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:'link'})})">&#8599; Share</button>
+                    <button class="action-btn" title="Report" onclick="document.getElementById('report-section').style.display = document.getElementById('report-section').style.display === 'none' ? 'block' : 'none'; fetch('/sites/video/api/videos/{{ video.id }}/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:'other',details:'toggle'})})">&#9873; Report</button>
                 </div>
             </div>
 
@@ -165,12 +165,12 @@
             <div id="share-menu" style="display:none; background:#272727; border-radius:12px; padding:16px; margin-bottom:16px;">
                 <p style="font-size:14px; margin-bottom:8px; font-weight:500;">Share this video</p>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <a href="#" class="action-btn">Copy Link</a>
-                    <a href="#" class="action-btn">Twitter</a>
-                    <a href="#" class="action-btn">Facebook</a>
-                    <a href="#" class="action-btn">Reddit</a>
-                    <a href="#" class="action-btn">Email</a>
-                    <a href="#" class="action-btn">Embed</a>
+                    <button class="action-btn" onclick="shareVideo('link')">Copy Link</button>
+                    <button class="action-btn" onclick="shareVideo('twitter')">Twitter</button>
+                    <button class="action-btn" onclick="shareVideo('facebook')">Facebook</button>
+                    <button class="action-btn" onclick="shareVideo('reddit')">Reddit</button>
+                    <button class="action-btn" onclick="shareVideo('email')">Email</button>
+                    <button class="action-btn" onclick="shareVideo('embed')">Embed</button>
                 </div>
             </div>
 
@@ -312,5 +312,29 @@
             {% endfor %}
         </div>
     </div>
+<script>
+function shareVideo(platform) {
+    var videoId = {{ video.id }};
+    fetch('/sites/video/api/videos/' + videoId + '/share', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({platform: platform})
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        document.getElementById('share-menu').style.display = 'none';
+        if (platform === 'link') {
+            navigator.clipboard.writeText(window.location.href)
+                .then(function() { alert('Link copied to clipboard!'); })
+                .catch(function() { alert('Share link: ' + window.location.href); });
+        } else if (platform === 'embed') {
+            var embed = '<iframe src="' + window.location.href + '" width="640" height="360"></iframe>';
+            navigator.clipboard.writeText(embed)
+                .then(function() { alert('Embed code copied!'); })
+                .catch(function() { alert('Embed: ' + embed); });
+        } else {
+            alert('Shared via ' + platform);
+        }
+    });
+}
+</script>
 </body>
 </html>

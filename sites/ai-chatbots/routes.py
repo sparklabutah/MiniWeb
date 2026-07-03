@@ -27,6 +27,7 @@ def _get_openai_key():
     return os.environ.get("OPENAI_API_KEY", "")
 
 from app import db
+from app.events import emit
 
 SITE = "ai-chatbots"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -160,45 +161,20 @@ _GENERIC_RESPONSES = [
 ]
 
 
-def _call_openai(user_message, bot_name="Assistant", conversation_history=None):
-    """Call OpenAI gpt-5.4-nano-2026-03-17 API. Returns response text or None on failure."""
-    key = _get_openai_key()
-    if not key:
-        return None
-    try:
-        import urllib.request
-        messages = [{"role": "system", "content": f"You are a helpful AI assistant. Keep responses concise (2-3 paragraphs max)."}]
-        if conversation_history:
-            for msg in conversation_history[-10:]:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-        messages.append({"role": "user", "content": user_message})
-
-        payload = json.dumps({
-            "model": "gpt-5.4-nano-2026-03-17",
-            "messages": messages,
-            "max_completion_tokens": 500,
-            "temperature": 0.7,
-        }).encode()
-
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-            return data["choices"][0]["message"]["content"]
-    except Exception as e:
-        return None
-
-
 def _generate_response(user_message, bot_name="Assistant", conversation_history=None):
-    """Generate response using OpenAI API (gpt-5.4-nano-2026-03-17), with rule-based fallback."""
-    # Try OpenAI API first
-    api_response = _call_openai(user_message, bot_name, conversation_history)
+    """Generate response using Groq/Claude, with rule-based fallback."""
+    from app.llm import call_llm
+
+    # Build conversation context
+    hist_text = ""
+    if conversation_history:
+        for msg in conversation_history[-6:]:
+            hist_text += f"[{msg['role'].upper()}] {msg['content']}\n\n"
+
+    prompt = f"{hist_text}[USER] {user_message}" if hist_text else user_message
+    system = f"You are {bot_name}, a helpful AI assistant. Keep responses concise (2-3 paragraphs max)."
+
+    api_response = call_llm(prompt, system=system, max_tokens=500, temperature=0.7)
     if api_response:
         return api_response
 
@@ -430,6 +406,7 @@ def login_submit():
         return render_template("ai-chatbots/login.html",
                                error="Invalid username or password", config=config)
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="ai-chatbots", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     user_convs = [c for c in _load_conversations(user_id=user["id"]) if not c.get("archived")]
     return render_template("ai-chatbots/index.html",
                            config=config, user=user,

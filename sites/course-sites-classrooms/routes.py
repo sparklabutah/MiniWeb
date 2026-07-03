@@ -12,6 +12,8 @@ from flask import (
     render_template, request, session, url_for,
 )
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "course-sites-classrooms"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -315,6 +317,7 @@ def login_submit():
         return render_template(f"{BP}/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="course-sites-classrooms", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for(f"{BP}.index"))
 
 
@@ -351,6 +354,12 @@ def form_submit_assignment(course_id, assignment_id):
         "feedback": ""
     })
     _save_submissions(submissions)
+    _add_email(user["id"], "noreply@course-sites.lakeport.local",
+               "Assignment submitted",
+               f"Your assignment for course {course_id} has been submitted successfully.")
+    assignment = next((a for a in _get_assignments() if a["id"] == assignment_id), None)
+    if assignment:
+        emit("booking", user_id=user["id"], title=f"Due: {assignment.get('title', 'Assignment')}", start=assignment.get("due_date", ""), location="")
     return redirect(url_for(f"{BP}.assignment_detail",
                             course_id=course_id, assignment_id=assignment_id))
 

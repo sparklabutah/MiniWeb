@@ -10,6 +10,8 @@ from collections import Counter
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.db import _deserialize_row
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "academic-paper-db"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -100,13 +102,14 @@ _TABLE = "academic_paper_db_papers"
 def _query_papers(q="", cat="", checked_cats=None, date_from=None, date_to=None,
                   sort="date", limit=50, offset=0):
     """Query papers with filters pushed to SQL on real columns."""
+
     conn = db.get_conn()
     clauses = []
     params = []
 
     if q:
         clauses.append("(title LIKE ? OR abstract LIKE ? OR authors_parsed LIKE ?)")
-        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+        params.extend([f"%{q}%"] * 3)
     if cat:
         clauses.append("categories LIKE ?")
         params.append(f"%{cat}%")
@@ -122,16 +125,6 @@ def _query_papers(q="", cat="", checked_cats=None, date_from=None, date_to=None,
         params.append(f"{date_to + 1}-")
 
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-
-    if q and sort == "relevance":
-        # Text search with relevance sort: fetch batch, sort in Python
-        fetch_limit = min(500, limit + offset + 200)
-        sql = f"SELECT rowid, * FROM [{_TABLE}]{where} LIMIT ?"
-        params.append(fetch_limit)
-        rows = conn.execute(sql, params).fetchall()
-        results = [_interpret_record(_deserialize_row(r), r["rowid"]) for r in rows]
-        results.sort(key=lambda p: -_keyword_score(q, p))
-        return results[offset:offset + limit]
 
     # Normal path: ORDER BY in SQL
     if sort == "title":
@@ -172,16 +165,25 @@ def _count_papers_db(q="", cat=""):
         if _total_papers_cache is None:
             _total_papers_cache = conn.execute(f"SELECT COUNT(*) FROM [{_TABLE}]").fetchone()[0]
         return _total_papers_cache
+    if q:
+        clauses = ["(title LIKE ? OR abstract LIKE ? OR authors_parsed LIKE ?)"]
+        params = [f"%{q}%"] * 3
+        if cat:
+            clauses.append("categories LIKE ?")
+            params.append(f"%{cat}%")
+        where = " WHERE " + " AND ".join(clauses)
+        cap = 500
+        return conn.execute(
+            f"SELECT COUNT(*) FROM (SELECT 1 FROM [{_TABLE}]{where} LIMIT ?)",
+            params + [cap],
+        ).fetchone()[0]
+    # Category-only count
     clauses = []
     params = []
-    if q:
-        clauses.append("(title LIKE ? OR abstract LIKE ? OR authors_parsed LIKE ?)")
-        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
     if cat:
         clauses.append("categories LIKE ?")
         params.append(f"%{cat}%")
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
-    # Cap count queries for performance
     cap = 500
     return conn.execute(
         f"SELECT COUNT(*) FROM (SELECT 1 FROM [{_TABLE}]{where} LIMIT ?)",
@@ -369,6 +371,7 @@ def login_submit():
         return render_template("academic-paper-db/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="academic-paper-db", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("academic-paper-db.dashboard"))
 
 
@@ -407,6 +410,9 @@ def form_save_paper(paper_id):
         saved.remove(paper_id)
     else:
         saved.append(paper_id)
+        _add_email(session["user_id"], "noreply@academic-paper-db.lakeport.local",
+                   "Paper saved to your library",
+                   f"Paper #{paper_id} has been saved to your library. You can view your saved papers from the dashboard.")
     _save_users(users)
     return redirect(url_for("academic-paper-db.paper_detail", paper_id=paper_id))
 

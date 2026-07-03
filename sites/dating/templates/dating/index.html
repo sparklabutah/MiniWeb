@@ -82,10 +82,26 @@
             <div class="filter-row" style="margin-top:0.5rem">
                 <label>Interest:</label>
                 <input type="text" name="interest" placeholder="e.g. hiking" value="{{ request.args.get('interest', '') }}">
+                <label>Joined From:</label>
+                <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:0.35rem 0.5rem;border:1px solid #ddd;border-radius:0.4rem;font-size:0.85rem;">
+                <label>To:</label>
+                <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" style="padding:0.35rem 0.5rem;border:1px solid #ddd;border-radius:0.4rem;font-size:0.85rem;">
             </div>
         </form>
 
-        <div class="profile-count">{{ profiles|length }} profile{{ 's' if profiles|length != 1 }} to discover</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div class="profile-count" style="margin-bottom:0;">{{ profiles|length }} profile{{ 's' if profiles|length != 1 }} to discover</div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <select onchange="location.href='?sort='+this.value" style="padding:.3rem .5rem;border:1px solid #ddd;border-radius:.4rem;font-size:.82rem;background:#fff;">
+                    <option value="">Sort by</option>
+                    <option value="age_asc">Age (Low-High)</option>
+                    <option value="age_desc">Age (High-Low)</option>
+                    <option value="name">Name A-Z</option>
+                    <option value="newest">Newest</option>
+                </select>
+                <a href="{{ url_for('dating.api_export', format='csv', type='profiles') }}" style="padding:.3rem .8rem;background:#e8475f;color:#fff;border-radius:.4rem;text-decoration:none;font-size:.82rem;font-weight:600;" onclick="var b=this;b.textContent='Exporting...';setTimeout(function(){b.textContent='Export CSV'},2000)">Export CSV</a>
+            </div>
+        </div>
 
         {% if current_profile %}
         <div class="profile-card" data-profile-id="{{ current_profile.id }}">

@@ -9,36 +9,34 @@
         .login-card { background: #222529; border-radius: 8px; padding: 2.5rem; width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
         .login-card h1 { color: #fff; font-size: 1.5rem; margin-bottom: .5rem; text-align: center; }
         .login-card .subtitle { color: #ababad; font-size: .9rem; margin-bottom: 2rem; text-align: center; }
-        .user-list { list-style: none; }
-        .user-list li { margin-bottom: .5rem; }
-        .user-list li button { width: 100%; padding: .8rem 1rem; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 6px; color: #d1d2d3; font-size: .95rem; cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; }
-        .user-list li button:hover { background: #1264a3; border-color: #1264a3; color: #fff; }
-        .avatar { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
-        .avatar-0 { background: #e04e4e; } .avatar-1 { background: #e07b2e; } .avatar-2 { background: #d4a72c; }
-        .avatar-3 { background: #2ea854; } .avatar-4 { background: #1d9bd1; } .avatar-5 { background: #7b68ee; }
-        .user-info .name { font-weight: 600; } .user-info .role { font-size: .8rem; color: #8b8b8d; }
+        .error { background: rgba(220,38,38,.15); color: #f87171; padding: .6rem .8rem; border-radius: .4rem; font-size: .83rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .82rem; color: #ababad; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 6px; color: #d1d2d3; font-size: .95rem; outline: none; }
+        .form-group input:focus { border-color: #1264a3; }
+        .form-group input::placeholder { color: #8b8b8d; }
+        .btn-login { width: 100%; padding: .8rem; background: #1264a3; color: #fff; border: none; border-radius: 6px; font-size: .95rem; font-weight: 600; cursor: pointer; }
+        .btn-login:hover { background: #0e5a94; }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h1>Meridian Chat</h1>
-        <p class="subtitle">Select your account to sign in</p>
-        <ul class="user-list">
-            {% for u in users %}
-            <li>
-                <form method="post" action="{{ url_for('team-chat-workspace.login_submit') }}" style="display:inline;width:100%;">
-                    <input type="hidden" name="user_id" value="{{ u.root_user_id }}">
-                    <button type="submit">
-                        <div class="avatar avatar-{{ loop.index0 % 6 }}">{{ u.display_name[:1] }}</div>
-                        <div class="user-info">
-                            <div class="name">{{ u.display_name }}</div>
-                            <div class="role">{{ u.title }} - {{ u.department }}</div>
-                        </div>
-                    </button>
-                </form>
-            </li>
-            {% endfor %}
-        </ul>
+        <p class="subtitle">Sign in to your workspace</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('team-chat-workspace.login_submit') }}">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" placeholder="Enter username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" placeholder="Enter password" required>
+            </div>
+            <button type="submit" class="btn-login">Sign In</button>
+        </form>
     </div>
 </body>
 </html>

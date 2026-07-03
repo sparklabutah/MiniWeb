@@ -2,7 +2,7 @@
 
 **Category**: Dynamic info / feeds
 **Reviewer**: Minh
-**Number of macros**: 23
+**Number of macros**: 20
 
 ## Data Source
 
@@ -39,12 +39,7 @@ player directories, and fan engagement features. Key UI elements:
 
 ## Target Macros
 
-navigate_by_dropdown, navigate_by_route, navigate_by_ranking, search_by_query,
-search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking,
-extract_by_query, extract_from_table, extract_by_route, extract_by_extremum,
-extract_by_slider, compute_from_table, compare_by_dropdown, verify_by_slider,
-play_by_playback, post_from_free_text, react_by_toggle, follow_by_dropdown,
-follow_by_toggle, subscribe_by_toggle, save_by_toggle
+navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_query, extract_from_table, extract_by_route, extract_by_extremum, extract_by_slider, compute_from_table, compare_by_dropdown, play_by_playback, post_from_free_text, react_by_toggle, follow_by_toggle, subscribe_by_toggle, save_by_toggle
 
 ## Temporal Dynamics
 

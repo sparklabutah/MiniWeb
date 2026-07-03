@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MiniWeb — Verifier Builder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+.top-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: 1rem; }
+.top-bar h1 { font-size: 1rem; font-weight: 700; }
+.top-bar a { color: #2563eb; font-size: .85rem; text-decoration: none; }
+.container { display: flex; height: calc(100vh - 45px); }
+.sidebar { width: 320px; background: #fff; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: .8rem; }
+.main { flex: 1; overflow-y: auto; padding: 1rem; }
+
+.task-card { padding: .5rem; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .4rem; cursor: pointer; font-size: .78rem; }
+.task-card:hover { background: #f1f5f9; }
+.task-card.active { border-color: #2563eb; background: #eff6ff; }
+.task-card .tc-id { font-weight: 600; color: #2563eb; }
+.task-card .tc-inst { color: #475569; margin-top: .2rem; }
+.task-card .tc-meta { color: #94a3b8; font-size: .68rem; margin-top: .15rem; }
+
+.section { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .8rem; margin-bottom: .8rem; }
+.section h3 { font-size: .9rem; margin-bottom: .4rem; }
+.section .hint { font-size: .78rem; color: #64748b; margin-bottom: .5rem; }
+label { display: block; font-size: .75rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: .2rem; margin-top: .5rem; }
+.mono { font-family: monospace; font-size: .75rem; background: #f1f5f9; padding: .3rem .5rem; border-radius: .25rem; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+.badge { display: inline-block; font-size: .65rem; padding: .1rem .4rem; border-radius: 1rem; font-weight: 600; }
+.badge-pass { background: #dcfce7; color: #166534; }
+.badge-fail { background: #fef2f2; color: #991b1b; }
+.badge-pending { background: #fef3c7; color: #92400e; }
+
+.traj-entry { font-size: .72rem; padding: .15rem .3rem; border-left: 2px solid #e2e8f0; margin: .1rem 0 .1rem .5rem; }
+.traj-entry.action { border-left-color: #2563eb; }
+.traj-entry.network { border-left-color: #16a34a; font-family: monospace; color: #64748b; }
+.traj-entry .method { font-weight: 700; }
+.traj-entry .status-ok { color: #16a34a; } .traj-entry .status-err { color: #ef4444; }
+
+.btn { padding: .4rem .8rem; border-radius: .3rem; border: none; cursor: pointer; font-size: .8rem; font-weight: 500; }
+.btn-primary { background: #2563eb; color: #fff; } .btn-primary:hover { background: #1d4ed8; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+    <h1>Verifier Builder</h1>
+    <a href="/annotate/">← Annotator</a>
+    <a href="/annotate/review">Review</a>
+    <span style="flex:1"></span>
+    <span style="font-size:.75rem;color:#94a3b8">{{ tasks|length }} tasks available</span>
+</div>
+
+<div class="container">
+    <div class="sidebar">
+        <div style="margin-bottom:.5rem">
+            <input type="text" id="task-search" placeholder="Search tasks..." style="width:100%;padding:.3rem .5rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem" oninput="filterTasks(this.value)">
+        </div>
+        <div id="task-list">
+            {% for t in tasks %}
+            <div class="task-card{% if task and t.task_id == task.task_id %} active{% endif %}"
+                 onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}'">
+                <div class="tc-id">{{ t.task_id }}</div>
+                <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
+                <div class="tc-meta">{{ t.annotator|default('?') }} · {{ t.sites[0].id if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="main">
+        {% if not task %}
+        <div class="section">
+            <h3>Select a task from the sidebar</h3>
+            <p class="hint">Pick a completed annotation task to build verifiers for it.</p>
+        </div>
+        {% else %}
+        <!-- Task info -->
+        <div class="section">
+            <h3>{{ task.task_id }}</h3>
+            <label>Instruction</label>
+            <div style="font-size:.85rem;line-height:1.4;margin-bottom:.4rem">{{ task.instruction }}</div>
+
+            <div style="display:flex;gap:1rem;flex-wrap:wrap">
+                <div>
+                    <label>Sites</label>
+                    <span>{% for s in task.sites %}{{ s.id if s is mapping else s }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                </div>
+                <div>
+                    <label>Macros</label>
+                    <span>{% for m in task.macros %}{{ (macro_descriptions.get(m, {}).get('description', m))[:30] }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                </div>
+                <div>
+                    <label>Expected Answer</label>
+                    <code style="background:#f1f5f9;padding:.1rem .3rem;border-radius:.2rem">{{ task.expected_answer or '(none)' }}</code>
+                </div>
+            </div>
+
+            {% if task.expected_outcome %}
+            <label>Expected Outcome (annotator's notes)</label>
+            <div class="mono">{{ task.expected_outcome }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Trajectory -->
+        <div class="section">
+            <h3>Annotator Trajectory ({{ task.trajectory|length }} entries)</h3>
+            <div style="max-height:300px;overflow-y:auto">
+                {% for e in task.trajectory %}
+                {% if e.type == 'action' %}
+                <div class="traj-entry action">
+                    <strong>{{ e.action }}</strong> {{ e.target[:60] if e.target else '' }}
+                    {% if e.text %}<em>"{{ e.text[:30] }}"</em>{% endif %}
+                    {% if e.option_text %}<em>"{{ e.option_text }}"</em>{% endif %}
+                    {% if e.href %}<span style="color:#94a3b8">→ {{ e.href[:40] }}</span>{% endif %}
+                </div>
+                {% elif e.type == 'network' %}
+                <div class="traj-entry network">
+                    <span class="method">{{ e.method }}</span> {{ (e.url or '')[:50] }}
+                    <span class="{{ 'status-ok' if e.status and e.status < 400 else 'status-err' }}">{{ e.status }}</span>
+                    <span style="color:#94a3b8">{{ e.duration or 0 }}ms</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Agent attempt (if available) -->
+        {% if task.get('agent_result') %}
+        <div class="section">
+            <h3>Agent Attempt
+                <span class="badge {{ 'badge-pass' if task.agent_result.agent_passed else 'badge-fail' }}">
+                    {{ 'PASS' if task.agent_result.agent_passed else 'FAIL' }}
+                </span>
+            </h3>
+            <div style="font-size:.78rem;margin-bottom:.3rem">
+                <strong>Answer:</strong> <code>{{ task.agent_result.agent_answer or '(none)' }}</code>
+                · <strong>Steps:</strong> {{ task.agent_result.agent_steps or 0 }}
+                · <strong>Requests:</strong> {{ task.agent_result.request_count or 0 }}
+            </div>
+            {% if task.agent_result.agent_errors %}
+            <div style="color:#ef4444;font-size:.72rem">Errors: {{ task.agent_result.agent_errors|join(', ') }}</div>
+            {% endif %}
+            {% if task.agent_result.agent_response %}
+            <details style="margin-top:.3rem">
+                <summary style="font-size:.72rem;color:#64748b;cursor:pointer">Agent reasoning</summary>
+                <div class="mono" style="margin-top:.2rem">{{ task.agent_result.agent_response }}</div>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Verifier builder placeholder -->
+        <div class="section">
+            <h3>Verifier Builder <span class="badge badge-pending">Coming Soon</span></h3>
+            <p class="hint">Build verification checks against the logged trajectory and server data. This will be wired to the existing CHECK_CATALOG system.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function filterTasks(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.task-card').forEach(c => {
+        c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+</script>
+</body>
+</html>

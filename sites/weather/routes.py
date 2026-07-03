@@ -21,6 +21,7 @@ from flask import (
     url_for,
 )
 from app import db
+from app.handlers.email_handler import _add_email
 
 SITE = "weather"
 
@@ -549,14 +550,11 @@ def api_search():
     Query params:
         q -- query string (searches location names, case-insensitive)
     """
-    q = request.args.get("q", "").strip().lower()
+    q = request.args.get("q", "").strip()
     if not q:
         return jsonify({"results": []})
-    table = db.get_table_name(SITE, "locations")
-    results = db.execute(
-        f"SELECT * FROM [{table}] WHERE LOWER([name]) LIKE ?",
-        (f"%{q}%",))
-    return jsonify({"query": q, "results": results})
+    results = db.search(SITE, "locations", q, limit=50)
+    return jsonify({"query": q.lower(), "results": results})
 
 
 # ---------------------------------------------------------------------------
@@ -600,12 +598,39 @@ def api_compare():
     """Compare current weather between two locations.
 
     Query params:
-        locations -- comma-separated location names (exactly 2)
+        location1 -- first location name (e.g. 'Seattle, WA')
+        location2 -- second location name (e.g. 'Portland, OR')
+        locations -- pipe-separated location names (legacy, e.g. 'Seattle, WA|Portland, OR')
     """
-    loc_str = request.args.get("locations", "")
-    names = [n.strip() for n in loc_str.split(",") if n.strip()]
+    loc1 = request.args.get("location1", "").strip()
+    loc2 = request.args.get("location2", "").strip()
+    if loc1 and loc2:
+        names = [loc1, loc2]
+    else:
+        loc_str = request.args.get("locations", "")
+        # Support pipe-separated names to avoid conflict with commas in city names
+        if "|" in loc_str:
+            names = [n.strip() for n in loc_str.split("|") if n.strip()]
+        else:
+            names = [n.strip() for n in loc_str.split(",") if n.strip()]
+            # Try to reassemble "City, ST" pairs from comma-split tokens
+            if len(names) >= 4:
+                reassembled = []
+                i = 0
+                while i < len(names) - 1:
+                    # If the next token looks like a state abbreviation (2-3 chars),
+                    # join it with the previous token
+                    if len(names[i + 1]) <= 3 and names[i + 1].replace(".", "").isalpha():
+                        reassembled.append(f"{names[i]}, {names[i + 1]}")
+                        i += 2
+                    else:
+                        reassembled.append(names[i])
+                        i += 1
+                if i < len(names):
+                    reassembled.append(names[i])
+                names = reassembled
     if len(names) < 2:
-        return jsonify({"error": "Provide at least 2 comma-separated location names"}), 400
+        return jsonify({"error": "Provide at least 2 location names via location1&location2 or locations=Name1|Name2"}), 400
     current = db.query(SITE, "current", limit=1)[0]
     results = []
     for name in names[:5]:  # max 5
@@ -788,6 +813,10 @@ def api_subscribe(uid):
         action = "subscribed"
     u["subscriptions"] = subs
     db.save_item(SITE, "users", uid, u)
+    if action == "subscribed":
+        _add_email(uid, "noreply@weather.lakeport.local",
+                   "Weather alert configured",
+                   f'You have subscribed to "{alert_type}" weather alerts for Lakeport, WA.')
     return jsonify({"action": action, "alert_type": alert_type,
                     "subscriptions": subs})
 
@@ -893,13 +922,10 @@ def api_save_location(uid):
     if not user or user["id"] != uid:
         return jsonify({"error": "Authentication required"}), 401
     data = request.get_json(silent=True) or {}
-    query = data.get("query", "").strip().lower()
+    query = data.get("query", "").strip()
     if not query:
         return jsonify({"error": "query is required"}), 400
-    table = db.get_table_name(SITE, "locations")
-    matches = db.execute(
-        f"SELECT * FROM [{table}] WHERE LOWER([name]) LIKE ? LIMIT 1",
-        (f"%{query}%",))
+    matches = db.search(SITE, "locations", query, limit=1)
     if not matches:
         return jsonify({"error": f"No location matching '{query}'"}), 404
     loc = matches[0]

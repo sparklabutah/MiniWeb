@@ -7,7 +7,7 @@ import json
 import math
 import pathlib
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 from app import db
 
@@ -645,3 +645,30 @@ def api_get_history(user_id):
     if not user:
         abort(404)
     return jsonify(user.get("history", []))
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export conversion history as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    user_id = request.args.get("user_id", type=int)
+
+    users = _load_users()
+    if user_id:
+        users = [u for u in users if u["id"] == user_id]
+
+    all_history = []
+    for u in users:
+        for entry in u.get("history", []):
+            row = dict(entry)
+            row["user_id"] = u["id"]
+            row["user_name"] = u.get("name", "")
+            all_history.append(row)
+
+    if fmt == "csv":
+        lines = ["user_id,user_name,tool,from_value,from_unit,to_unit,result"]
+        for h in all_history:
+            lines.append(f'{h["user_id"]},"{h.get("user_name", "")}","{h.get("tool", "")}","{h.get("from_value", "")}","{h.get("from_unit", "")}","{h.get("to_unit", "")}","{h.get("result", "")}"')
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=conversions.csv"})
+    return jsonify(all_history)

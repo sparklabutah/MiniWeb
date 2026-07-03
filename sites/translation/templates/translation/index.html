@@ -180,18 +180,29 @@ function clearInput() {
 
 function copyTranslation() {
     var text = document.getElementById('outputText').textContent;
-    if (text && text !== 'Translation') navigator.clipboard.writeText(text);
+    if (text && text !== 'Translation') {
+        navigator.clipboard.writeText(text);
+        var btn = document.querySelector('[onclick="copyTranslation()"]');
+        var orig = btn.innerHTML;
+        btn.textContent = 'Copied!';
+        setTimeout(function(){ btn.innerHTML = orig; }, 1500);
+    }
 }
 
 function saveTranslation() {
     var src = document.getElementById('sourceText').value;
     var out = document.getElementById('outputText').textContent;
     if (!src || out === 'Translation') return;
+    var btn = document.querySelector('[onclick="saveTranslation()"]');
     fetch('{{ url_for("translation.api_saved_create") }}', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({source_text: src, translated_text: out,
             source_lang: document.getElementById('source-lang').value,
             target_lang: document.getElementById('target-lang').value})
+    }).then(function(){
+        btn.innerHTML = '&#9733;';
+        btn.style.color = '#f59e0b';
+        setTimeout(function(){ btn.innerHTML = '&#9734;'; btn.style.color = ''; }, 2000);
     });
 }
 

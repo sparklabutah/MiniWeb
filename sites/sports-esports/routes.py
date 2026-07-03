@@ -12,6 +12,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "sports-esports"
 SITE_DIR = pathlib.Path(__file__).resolve().parent

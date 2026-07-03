@@ -212,6 +212,7 @@ def login_submit():
         return render_template("spreadsheets-slides/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="spreadsheets-slides", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     next_url = request.form.get("next") or request.args.get("next")
     if next_url:
         return redirect(next_url)
@@ -1814,3 +1815,4 @@ def api_export_all():
                         headers={"Content-Disposition": "attachment; filename=sheetdeck_export.csv"})
 
     return jsonify(files)
+

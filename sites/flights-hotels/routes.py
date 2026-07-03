@@ -14,6 +14,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from app.events import emit
 
 SITE = "flights-hotels"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -457,6 +458,7 @@ def login_submit():
         return render_template("flights-hotels/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="flights-hotels", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("flights-hotels.index"))
 
 
@@ -480,6 +482,7 @@ def api_flights():
     max_price = request.args.get("max_price", "").strip()
     min_price = request.args.get("min_price", "").strip()
     max_stops = request.args.get("max_stops", "").strip()
+    q = request.args.get("q", "").strip()
     sort = request.args.get("sort", "price").strip()
     limit = request.args.get("limit", type=int) or 50
 
@@ -487,33 +490,51 @@ def api_flights():
     if not flights_table:
         return jsonify([])
 
-    sql = f"SELECT * FROM [{flights_table}]"
+    _orig = "COALESCE(NULLIF([origin],''), [airport_1])"
+    _dest = "COALESCE(NULLIF([destination],''), [airport_2])"
+    _price = "COALESCE(NULLIF([price],0), [fare])"
+    _airline = "COALESCE(NULLIF([airline],''), [carrier_lg])"
+
+    sql = (f"SELECT *, {_orig} as eff_origin, {_dest} as eff_dest, "
+           f"{_price} as eff_price, {_airline} as eff_airline "
+           f"FROM [{flights_table}]")
     params = []
     clauses = []
+    # Always filter to rows that have at least an origin
+    clauses.append(f"({_orig}) != ''")
+    if q:
+        clauses.append(
+            f"({_orig} LIKE ? "
+            f"OR {_dest} LIKE ? "
+            f"OR COALESCE(NULLIF([origin_city],''), [city1]) LIKE ? "
+            f"OR COALESCE(NULLIF([dest_city],''), [city2]) LIKE ? "
+            f"OR {_airline} LIKE ? "
+            f"OR [flight_number] LIKE ?)")
+        params.extend([f"%{q}%"] * 6)
     if origin:
-        clauses.append("[origin] = ?")
+        clauses.append(f"({_orig}) = ?")
         params.append(origin)
     if destination:
-        clauses.append("[destination] = ?")
+        clauses.append(f"({_dest}) = ?")
         params.append(destination)
     if date:
         clauses.append("[date] = ?")
         params.append(date)
     if airline:
-        clauses.append("[airline] = ?")
+        clauses.append(f"({_airline}) = ?")
         params.append(airline)
     if flight_class:
         clauses.append("[class] = ?")
         params.append(flight_class)
     if max_price:
         try:
-            clauses.append("[price] <= ?")
+            clauses.append(f"({_price}) <= ?")
             params.append(float(max_price))
         except ValueError:
             pass
     if min_price:
         try:
-            clauses.append("[price] >= ?")
+            clauses.append(f"({_price}) >= ?")
             params.append(float(min_price))
         except ValueError:
             pass
@@ -523,15 +544,15 @@ def api_flights():
             params.append(int(max_stops))
         except ValueError:
             pass
-    if clauses:
-        sql += " WHERE " + " AND ".join(clauses)
+    sql += " WHERE " + " AND ".join(clauses)
 
     sort_map = {
-        "price": "[price] ASC", "price_desc": "[price] DESC",
+        "price": f"({_price}) ASC",
+        "price_desc": f"({_price}) DESC",
         "duration": "[duration_minutes] ASC", "departure": "[departure_time] ASC",
         "date": "[date] ASC, [departure_time] ASC",
     }
-    sql += f" ORDER BY {sort_map.get(sort, '[price] ASC')} LIMIT ?"
+    sql += f" ORDER BY {sort_map.get(sort, f'({_price}) ASC')} LIMIT ?"
     params.append(limit)
 
     flights = db.execute(sql, tuple(params))
@@ -564,11 +585,16 @@ def api_hotels():
     if not hotels_table:
         return jsonify([])
 
+    _name = "COALESCE(NULLIF([name],''), [hotelname])"
+    _city = "COALESCE(NULLIF([city],''), [cityname])"
+
     sql = f"SELECT * FROM [{hotels_table}]"
     params = []
     clauses = []
+    # Always filter to rows that have at least a name
+    clauses.append(f"({_name}) != ''")
     if city:
-        clauses.append("[city] = ?")
+        clauses.append(f"({_city}) = ?")
         params.append(city)
     if min_rating:
         try:
@@ -598,14 +624,16 @@ def api_hotels():
         clauses.append("[amenities] LIKE ?")
         params.append(f"%{amenity}%")
     if q:
-        clauses.append("([name] LIKE ? OR [description] LIKE ? OR [city] LIKE ?)")
+        clauses.append(
+            f"({_name} LIKE ? "
+            f"OR [description] LIKE ? "
+            f"OR {_city} LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
-    if clauses:
-        sql += " WHERE " + " AND ".join(clauses)
+    sql += " WHERE " + " AND ".join(clauses)
 
     sort_map = {
         "price": "[price_per_night] ASC", "price_desc": "[price_per_night] DESC",
-        "rating": "[rating] DESC", "stars": "[stars] DESC", "name": "[name] ASC",
+        "rating": "[rating] DESC", "stars": "[stars] DESC", "name": f"({_name}) ASC",
     }
     sql += f" ORDER BY {sort_map.get(sort, '[price_per_night] ASC')} LIMIT ?"
     params.append(limit)
@@ -738,13 +766,21 @@ def api_stats():
     # Flight stats via SQL aggregation
     flight_stats = {"total": 0, "average_price": 0, "by_airline": {}, "top_routes": {}}
     if flights_table:
-        agg = db.execute(f"SELECT COUNT(*) as cnt, AVG([price]) as avg_price FROM [{flights_table}]", fetch="one")
+        agg = db.execute(
+            f"SELECT COUNT(*) as cnt, "
+            f"AVG(COALESCE(NULLIF([price],0), [fare])) as avg_price "
+            f"FROM [{flights_table}]", fetch="one")
         if agg:
             flight_stats["total"] = agg["cnt"]
             flight_stats["average_price"] = round(agg["avg_price"] or 0, 2)
-        airline_rows = db.execute(f"SELECT [airline], COUNT(*) as cnt FROM [{flights_table}] GROUP BY [airline] ORDER BY cnt DESC")
-        flight_stats["by_airline"] = {r["airline"]: r["cnt"] for r in airline_rows}
-        route_rows = db.execute(f"SELECT [origin] || '-' || [destination] as route, COUNT(*) as cnt FROM [{flights_table}] GROUP BY route ORDER BY cnt DESC LIMIT 10")
+        airline_rows = db.execute(
+            f"SELECT COALESCE(NULLIF([airline],''), [carrier_lg]) as eff_airline, COUNT(*) as cnt "
+            f"FROM [{flights_table}] GROUP BY eff_airline ORDER BY cnt DESC")
+        flight_stats["by_airline"] = {r["eff_airline"]: r["cnt"] for r in airline_rows}
+        route_rows = db.execute(
+            f"SELECT COALESCE(NULLIF([origin],''), [airport_1]) || '-' || "
+            f"COALESCE(NULLIF([destination],''), [airport_2]) as route, COUNT(*) as cnt "
+            f"FROM [{flights_table}] GROUP BY route ORDER BY cnt DESC LIMIT 10")
         flight_stats["top_routes"] = {r["route"]: r["cnt"] for r in route_rows}
 
     # Hotel stats via SQL aggregation
@@ -755,8 +791,10 @@ def api_stats():
             hotel_stats["total"] = agg["cnt"]
             hotel_stats["average_price_per_night"] = round(agg["avg_price"] or 0, 2)
             hotel_stats["average_rating"] = round(agg["avg_rating"] or 0, 2)
-        city_rows = db.execute(f"SELECT [city], COUNT(*) as cnt FROM [{hotels_table}] GROUP BY [city] ORDER BY cnt DESC")
-        hotel_stats["by_city"] = {r["city"]: r["cnt"] for r in city_rows}
+        city_rows = db.execute(
+            f"SELECT COALESCE(NULLIF([city],''), [cityname]) as eff_city, COUNT(*) as cnt "
+            f"FROM [{hotels_table}] GROUP BY eff_city ORDER BY cnt DESC LIMIT 50")
+        hotel_stats["by_city"] = {r["eff_city"]: r["cnt"] for r in city_rows}
 
     # Booking stats (small table, OK to load)
     bookings = _load_bookings()
@@ -837,6 +875,8 @@ def book_flight(flight_id):
     except Exception:
         pass  # bridge failure should never block the main flow
 
+    emit("message", from_user_id=user["id"], to_user_id=user["id"], text=f"Flight booked: {flight['flight_number']} {flight['origin']}-{flight['destination']} on {flight['date']}", source_site="flights-hotels")
+
     # 2FA: send verification code before completing the payment
     from app.events import request_2fa
     verify_url = request_2fa("payment",
@@ -890,6 +930,8 @@ def book_hotel(hotel_id):
                    confirmation_id=str(new_id))
     except Exception:
         pass  # bridge failure should never block the main flow
+
+    emit("message", from_user_id=user["id"], to_user_id=user["id"], text=f"Hotel booked: {hotel['name']} in {hotel['city']}", source_site="flights-hotels")
 
     # 2FA: send verification code before completing the payment
     from app.events import request_2fa
@@ -952,19 +994,10 @@ def api_compare():
 @blueprint.route("/api/flights/search")
 def api_flights_search():
     """Full-text search across flight fields: airline, origin_city, dest_city, flight_number."""
-    q = request.args.get("q", "").strip().lower()
+    q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
-    flights_table = db.get_table_name(SITE, "flights")
-    if not flights_table:
-        return jsonify([])
-    results = db.execute(
-        f"SELECT * FROM [{flights_table}] WHERE "
-        f"[airline] LIKE ? OR [origin_city] LIKE ? OR [dest_city] LIKE ? "
-        f"OR [flight_number] LIKE ? OR [origin] LIKE ? OR [destination] LIKE ? "
-        f"ORDER BY [price] ASC LIMIT 50",
-        (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")
-    )
+    results = db.search(SITE, "flights", q, limit=50)
     for f in results:
         _fix_amenities(f)
     return jsonify(results)
@@ -977,18 +1010,10 @@ def api_flights_search():
 @blueprint.route("/api/hotels/search")
 def api_hotels_search():
     """Full-text search across hotel fields."""
-    q = request.args.get("q", "").strip().lower()
+    q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
-    hotels_table = db.get_table_name(SITE, "hotels")
-    if not hotels_table:
-        return jsonify([])
-    results = db.execute(
-        f"SELECT * FROM [{hotels_table}] WHERE "
-        f"[name] LIKE ? OR [city] LIKE ? OR [description] LIKE ? OR [address] LIKE ? "
-        f"ORDER BY [price_per_night] ASC LIMIT 50",
-        (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")
-    )
+    results = db.search(SITE, "hotels", q, limit=50)
     for h in results:
         _fix_amenities(h)
     return jsonify(results)

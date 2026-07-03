@@ -2,7 +2,7 @@
 
 **Category**: Editing
 **Reviewer**: Reaz
-**Number of macros**: 16
+**Number of macros**: 11
 
 ## Data Source
 
@@ -34,7 +34,7 @@ JSON files served from `data_sources/spreadsheets-slides/`:
 
 ## Target Macros
 
-navigate_by_semantic, navigate_from_table, navigate_by_route, extract_by_code, extract_from_table, extract_by_slider, compute_by_query, compute_by_extremum, compute_by_slider, create_from_free_text, submit_from_table, edit_by_query, edit_by_form, delete_from_table, select_from_table, export_by_dropdown
+navigate_by_semantic, navigate_by_route, extract_from_table, compute_by_query, compute_by_extremum, compute_by_slider, create_from_free_text, edit_by_query, edit_by_form, delete_from_table, export_by_dropdown
 
 ## Temporal Dynamics
 

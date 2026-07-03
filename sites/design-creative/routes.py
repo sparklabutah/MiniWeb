@@ -10,6 +10,8 @@ from datetime import datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
+from app.events import emit
+from app.handlers.email_handler import _add_email
 
 SITE = "design-creative"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -225,6 +227,7 @@ def login_submit():
         return render_template("design-creative/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="design-creative", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     return redirect(url_for("design-creative.projects_page"))
 
 
@@ -276,6 +279,9 @@ def form_create_project():
         user.setdefault("projects", []).append(new_id)
         _save_users(users)
 
+    _add_email(session["user_id"], "noreply@design-creative.lakeport.local",
+               "Design shared",
+               f'Your design "{title}" has been created and is ready to edit.')
     return redirect(url_for("design-creative.editor", project_id=new_id))
 
 
@@ -296,6 +302,8 @@ def form_update_project(project_id):
         project["status"] = status
     project["modified_date"] = datetime.now().strftime("%Y-%m-%d")
     _save_projects(projects)
+    if status == "completed":
+        emit("file_created", user_id=session["user_id"], filename=project["title"], file_type="document", source_site="design-creative", source_id=str(project_id))
     return redirect(url_for("design-creative.project_detail", project_id=project_id))
 
 
@@ -328,6 +336,13 @@ def form_duplicate_project(project_id):
         _save_users(users)
 
     return redirect(url_for("design-creative.editor", project_id=new_id))
+
+
+@blueprint.route("/project/<int:project_id>/invite", methods=["POST"])
+def form_invite(project_id):
+    """Invite a collaborator to a project via email."""
+    _email = request.form.get("email", "").strip()
+    return redirect(url_for("design-creative.project_detail", project_id=project_id))
 
 
 @blueprint.route("/template/<int:template_id>/favorite", methods=["POST"])

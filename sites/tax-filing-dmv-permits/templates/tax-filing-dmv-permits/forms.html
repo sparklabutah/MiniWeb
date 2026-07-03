@@ -115,7 +115,7 @@
                         <div class="form-meta">Last revised: {{ form.revised }} &bull; {{ form.pages }} page{{ 's' if form.pages != 1 }}</div>
                     </div>
                     <div class="form-actions">
-                        <a href="{{ url_for('tax-filing-dmv-permits.form_pdf', form_id=form.id) }}" class="btn-download">&#128196; PDF</a>
+                        <a href="{{ url_for('tax-filing-dmv-permits.form_pdf', form_id=form.id) }}" class="btn-download" onclick="var b=this;b.innerHTML='Downloading...';setTimeout(function(){b.innerHTML='&#128196; PDF'},2000)">&#128196; PDF</a>
                         {% if form.has_instructions %}
                         <a href="{{ url_for('tax-filing-dmv-permits.form_pdf', form_id=form.id, instructions='1') }}" class="btn-inst">Instructions</a>
                         {% endif %}
@@ -136,6 +136,7 @@
     function filterForms() {
         var cat = document.getElementById('categoryFilter').value.toLowerCase();
         var q = document.getElementById('searchInput').value.toLowerCase();
+        fetch('{{ url_for("tax-filing-dmv-permits.api_forms") }}?category=' + encodeURIComponent(cat) + '&q=' + encodeURIComponent(q));
         document.querySelectorAll('.form-item').forEach(function(item) {
             var itemCat = item.getAttribute('data-category');
             var searchText = item.getAttribute('data-search');

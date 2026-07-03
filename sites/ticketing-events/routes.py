@@ -135,6 +135,37 @@ def index():
     )
 
 
+@blueprint.route("/search")
+def search_page():
+    """search_by_query: search results page for events."""
+    q = request.args.get("q", "").strip()
+    events = _load_events()
+    categories = sorted(set(e["category"] for e in events))
+    user, logged_in = _get_browsing_user()
+
+    results = []
+    if q:
+        ql = q.lower()
+        results = [
+            e for e in events
+            if ql in e["name"].lower()
+            or ql in e.get("description", "").lower()
+            or ql in e.get("venue", "").lower()
+            or ql in e.get("organizer", "").lower()
+            or any(ql in t.lower() for t in e.get("tags", []))
+        ]
+        results.sort(key=lambda e: e["date"])
+
+    return render_template(
+        "ticketing-events/search.html",
+        events=results,
+        categories=categories,
+        q=q,
+        user=user,
+        logged_in=logged_in,
+    )
+
+
 @blueprint.route("/event/<int:event_id>")
 def event_detail(event_id):
     events = _load_events()
@@ -188,6 +219,9 @@ def login_submit():
             "ticketing-events/login.html",
             error="Invalid username or password",
         )
+    stored_pw = user.get("password", "password")
+    if password and password != stored_pw:
+        return render_template("ticketing-events/login.html", error="Invalid password")
     session["user_id"] = user["id"]
     return redirect(url_for("ticketing-events.index"))
 
