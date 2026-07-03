@@ -912,13 +912,14 @@ function startArrowDrag(e, fromMacro) {
     _arrowDrag = { from: fromMacro, startX: e.clientX - rect.left, startY: e.clientY - rect.top };
 
     const svg = document.getElementById('macro-arrows');
-    let tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    tempLine.id = 'temp-arrow';
-    tempLine.setAttribute('stroke', '#2563eb');
-    tempLine.setAttribute('stroke-width', '2');
-    tempLine.setAttribute('stroke-dasharray', '4');
-    tempLine.setAttribute('marker-end', 'url(#arrowhead)');
-    svg.appendChild(tempLine);
+    let tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tempPath.id = 'temp-arrow';
+    tempPath.setAttribute('stroke', '#2563eb');
+    tempPath.setAttribute('stroke-width', '2.5');
+    tempPath.setAttribute('stroke-dasharray', '6 3');
+    tempPath.setAttribute('fill', 'none');
+    tempPath.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(tempPath);
 
     // Highlight potential targets
     document.querySelectorAll('.macro-node').forEach(n => {
@@ -928,15 +929,15 @@ function startArrowDrag(e, fromMacro) {
     function onMove(ev) {
         const x = ev.clientX - rect.left;
         const y = ev.clientY - rect.top;
-        tempLine.setAttribute('x1', _arrowDrag.startX);
-        tempLine.setAttribute('y1', _arrowDrag.startY);
-        tempLine.setAttribute('x2', x);
-        tempLine.setAttribute('y2', y);
+        const sx = _arrowDrag.startX, sy = _arrowDrag.startY;
+        const dx = Math.abs(x - sx);
+        const cp = Math.max(50, dx * 0.4);
+        tempPath.setAttribute('d', `M ${sx} ${sy} C ${sx+cp} ${sy}, ${x-cp} ${y}, ${x} ${y}`);
     }
     function onUp(ev) {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        tempLine.remove();
+        tempPath.remove();
         document.querySelectorAll('.arrow-target').forEach(n => n.classList.remove('arrow-target'));
 
         // Find which node we dropped on
@@ -960,15 +961,20 @@ function _drawArrows() {
     const svg = document.getElementById('macro-arrows');
     if (!svg) return;
 
-    // Ensure arrowhead marker exists
+    // Ensure arrowhead marker exists (larger, more visible)
     if (!svg.querySelector('#arrowhead')) {
-        svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
-        </marker></defs>`;
+        svg.innerHTML = `<defs>
+            <marker id="arrowhead" markerWidth="14" markerHeight="10" refX="12" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 0 0 L 14 5 L 0 10 L 3 5 Z" fill="#2563eb"/>
+            </marker>
+            <marker id="arrowhead-hover" markerWidth="14" markerHeight="10" refX="12" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 0 0 L 14 5 L 0 10 L 3 5 Z" fill="#ef4444"/>
+            </marker>
+        </defs>`;
     }
 
     // Remove old arrows (keep defs)
-    svg.querySelectorAll('line.edge-line, text.edge-delete').forEach(el => el.remove());
+    svg.querySelectorAll('.edge-path').forEach(el => el.remove());
 
     for (let i = 0; i < macroEdges.length; i++) {
         const edge = macroEdges[i];
@@ -976,7 +982,6 @@ function _drawArrows() {
         const toPos = macroPositions[edge.to];
         if (!fromPos || !toPos) continue;
 
-        // Calculate center of each node
         const fromNode = document.querySelector(`.macro-node[data-macro="${edge.from}"]`);
         const toNode = document.querySelector(`.macro-node[data-macro="${edge.to}"]`);
         const fw = fromNode ? fromNode.offsetWidth : 150;
@@ -984,27 +989,61 @@ function _drawArrows() {
         const tw = toNode ? toNode.offsetWidth : 150;
         const th = toNode ? toNode.offsetHeight : 60;
 
-        const x1 = fromPos.x + fw / 2;
+        // Connect from right edge of source to left edge of target (UE style)
+        const x1 = fromPos.x + fw;
         const y1 = fromPos.y + fh / 2;
-        const x2 = toPos.x + tw / 2;
+        const x2 = toPos.x;
         const y2 = toPos.y + th / 2;
 
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.className.baseVal = 'edge-line';
-        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', '#2563eb');
-        line.setAttribute('stroke-width', '2');
-        line.setAttribute('marker-end', 'url(#arrowhead)');
-        line.style.pointerEvents = 'stroke';
-        line.style.cursor = 'pointer';
+        // Bezier curve — horizontal tangents like UE Blueprint wires
+        const dx = Math.abs(x2 - x1);
+        const cpOffset = Math.max(50, dx * 0.4);
+        const cp1x = x1 + cpOffset;
+        const cp1y = y1;
+        const cp2x = x2 - cpOffset;
+        const cp2y = y2;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.className.baseVal = 'edge-path';
+        path.setAttribute('d', `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
+        path.setAttribute('stroke', '#2563eb');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('marker-end', 'url(#arrowhead)');
+        path.style.pointerEvents = 'stroke';
+        path.style.cursor = 'pointer';
+        path.style.transition = 'stroke 0.15s';
+
+        // Wider invisible hit area for easier clicking
+        const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hitArea.className.baseVal = 'edge-path';
+        hitArea.setAttribute('d', `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
+        hitArea.setAttribute('stroke', 'transparent');
+        hitArea.setAttribute('stroke-width', '12');
+        hitArea.setAttribute('fill', 'none');
+        hitArea.style.pointerEvents = 'stroke';
+        hitArea.style.cursor = 'pointer';
+
         const idx = i;
-        line.addEventListener('contextmenu', function(ev) {
+        function onHover() { path.setAttribute('stroke', '#ef4444'); path.setAttribute('marker-end', 'url(#arrowhead-hover)'); }
+        function onLeave() { path.setAttribute('stroke', '#2563eb'); path.setAttribute('marker-end', 'url(#arrowhead)'); }
+        hitArea.addEventListener('mouseenter', onHover);
+        hitArea.addEventListener('mouseleave', onLeave);
+        hitArea.addEventListener('contextmenu', function(ev) {
             ev.preventDefault();
             macroEdges.splice(idx, 1);
             _drawArrows();
         });
-        svg.appendChild(line);
+        hitArea.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            if (confirm('Delete this connection?')) {
+                macroEdges.splice(idx, 1);
+                _drawArrows();
+            }
+        });
+
+        svg.appendChild(path);
+        svg.appendChild(hitArea);
     }
 }
 
