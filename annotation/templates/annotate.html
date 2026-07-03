@@ -231,6 +231,8 @@ textarea#instruction:focus {
 .macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .55rem; padding: .05rem .2rem; cursor: pointer; color: #94a3b8; }
 .macro-node .mn-btns button:hover { color: #2563eb; border-color: #93c5fd; }
 .macro-node .mn-btns button.active { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+#macro-graph.expanded { min-height: 500px !important; }
+#macro-graph.expanded #macro-nodes { min-height: 500px; }
 .macro-locs { padding: .1rem 0 0 0; margin: 0; list-style: none; }
 .macro-locs li { font-size: .6rem; color: #94a3b8; line-height: 1.2; }
 .macro-locs li b { color: #64748b; }
@@ -346,33 +348,17 @@ textarea#instruction:focus {
                     <span id="login-status" style="font-size:.72rem;color:#16a34a;margin-left:auto;"></span>
                 </div>
 
-                <!-- Macros section — freeform node graph -->
-                <label>Macros <span style="font-weight:400;text-transform:none;color:#94a3b8">(drag to arrange, click+drag between nodes to draw arrows)</span></label>
-                <div id="macro-graph" style="position:relative;min-height:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem">
-                    <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
-                    <div id="macro-nodes" style="position:relative;z-index:2;min-height:200px"></div>
-                </div>
-                <div style="font-size:.65rem;color:#94a3b8;margin-bottom:.3rem">
-                    Drag nodes to position. Drag from the <strong>arrow handle</strong> (&#x27A1;) on a node to another node to draw a dependency arrow.
-                    Right-click an arrow to delete it.
-                </div>
-
-                <!-- Controls -->
-                <div style="display:flex;gap:.4rem;margin-top:.6rem">
+                <!-- Instruction + Macros — side by side when expanded -->
+                <label>Instruction</label>
+                <textarea id="instruction" rows="3" placeholder="Write the task instruction here..." style="font-size:.88rem"></textarea>
+                <div style="display:flex;gap:.4rem;margin-top:.3rem;align-items:center;margin-bottom:.5rem">
+                    <button class="btn btn-secondary btn-sm" onclick="refineInstruction()" id="refine-btn">Refine with AI</button>
+                    <span id="refine-status" style="font-size:.72rem;color:#94a3b8"></span>
+                    <span style="flex:1"></span>
                     <button class="btn btn-secondary btn-sm" onclick="reshufflePrompt()">Reshuffle</button>
                     <button class="btn btn-danger btn-sm" onclick="openSkipModal()">Skip</button>
                 </div>
-
-                <!-- Task suggestions from existing validated tasks -->
-                <div id="task-suggestions" style="margin-bottom:.5rem"></div>
-
-                <label>Instruction</label>
-                <textarea id="instruction" rows="4" placeholder="Pick a suggestion above, or write your own task here."></textarea>
-                <div style="display:flex;gap:.4rem;margin-top:.3rem;align-items:center">
-                    <button class="btn btn-secondary btn-sm" onclick="refineInstruction()" id="refine-btn">Refine with AI</button>
-                    <span id="refine-status" style="font-size:.72rem;color:#94a3b8"></span>
-                </div>
-                <div id="refined-box" style="display:none;margin-top:.4rem">
+                <div id="refined-box" style="display:none;margin-bottom:.5rem">
                     <div style="font-size:.72rem;color:#16a34a;font-weight:600;margin-bottom:.2rem">Refined version:</div>
                     <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.4rem;padding:.5rem .6rem;font-size:.85rem;line-height:1.5;color:#0f172a;cursor:pointer" onclick="acceptRefinement()" title="Click to use this version"></div>
                     <div style="display:flex;gap:.3rem;margin-top:.3rem">
@@ -380,6 +366,22 @@ textarea#instruction:focus {
                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
                     </div>
                 </div>
+
+                <!-- Macros — expandable node graph -->
+                <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+                    <label style="margin:0">Macros</label>
+                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .4rem;margin-left:auto" title="Expand macro graph">&#x26F6; Expand</button>
+                </div>
+                <div id="macro-graph" style="position:relative;min-height:180px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem;transition:min-height .2s">
+                    <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
+                    <div id="macro-nodes" style="position:relative;z-index:2;min-height:180px"></div>
+                </div>
+                <div style="font-size:.6rem;color:#94a3b8;margin-bottom:.4rem">
+                    Drag nodes to position. &#x27A1; to draw arrows. Right-click arrow to delete.
+                </div>
+
+                <!-- Task suggestions from existing validated tasks -->
+                <div id="task-suggestions" style="margin-bottom:.5rem"></div>
 
                 <div class="nav-btns">
                     <button class="btn btn-primary" onclick="startRecording()">Start Recording &rarr;</button>
@@ -1005,6 +1007,16 @@ function _drawArrows() {
 
 // Keep old name as alias for compatibility
 function updateChainDisplay() { _drawArrows(); }
+
+function toggleGraphExpand() {
+    const graph = document.getElementById('macro-graph');
+    const btn = document.getElementById('graph-expand-btn');
+    graph.classList.toggle('expanded');
+    const isExpanded = graph.classList.contains('expanded');
+    btn.innerHTML = isExpanded ? '&#x26F6; Collapse' : '&#x26F6; Expand';
+    _resizeGraph();
+    _drawArrows();
+}
 
 function toggleSkip(name) {
     if (name in macrosSkipped) {
