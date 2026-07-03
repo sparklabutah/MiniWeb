@@ -58,8 +58,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 .left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .left-panel iframe { flex: 1; border: none; background: #fff; }
-.right-panel { width: 520px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: auto; flex-shrink: 0; resize: horizontal; min-width: 380px; max-width: 900px; direction: rtl; }
-.right-panel > * { direction: ltr; }
+.right-panel { width: 520px; background: #fff; border-left: none; display: flex; flex-direction: column; overflow: auto; flex-shrink: 0; }
+.panel-resizer { width: 5px; background: #e2e8f0; cursor: col-resize; flex-shrink: 0; transition: background .15s; }
+.panel-resizer:hover, .panel-resizer.active { background: #2563eb; }
 
 .steps-bar { display: flex; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
 .steps-bar .step { flex: 1; padding: .5rem .2rem; text-align: center; font-size: .7rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
@@ -321,7 +322,8 @@ textarea#instruction:focus {
         <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/?open={{ prompt.sites | map(attribute='id') | join(',') }}{% else %}/{% endif %}" allow="clipboard-write"></iframe>
     </div>
 
-    <div class="right-panel">
+    <div class="panel-resizer" id="panel-resizer"></div>
+    <div class="right-panel" id="right-panel">
         <div class="steps-bar">
             <div class="step active" onclick="goStep(1)"><span class="num">1</span> Task</div>
             <div class="step" onclick="goStep(2)"><span class="num">2</span> Record</div>
@@ -374,7 +376,7 @@ textarea#instruction:focus {
                     <label style="margin:0">Macros</label>
                     <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .4rem;margin-left:auto" title="Expand macro graph">&#x26F6; Expand</button>
                 </div>
-                <div id="macro-graph" style="position:relative;min-height:180px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:hidden;margin-bottom:.3rem">
+                <div id="macro-graph" style="position:relative;min-height:180px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:auto;margin-bottom:.3rem">
                     <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">&#x2715; Close</button>
                     <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
                     <div id="macro-nodes" style="position:relative;z-index:2;min-height:180px"></div>
@@ -1049,6 +1051,34 @@ function _drawArrows() {
 
 // Keep old name as alias for compatibility
 function updateChainDisplay() { _drawArrows(); }
+
+// --- Panel resizer ---
+(function() {
+    const resizer = document.getElementById('panel-resizer');
+    const panel = document.getElementById('right-panel');
+    if (!resizer || !panel) return;
+    let startX, startW;
+    resizer.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        startX = e.clientX;
+        startW = panel.offsetWidth;
+        resizer.classList.add('active');
+        function onMove(ev) {
+            const dx = startX - ev.clientX;
+            const newW = Math.max(350, Math.min(window.innerWidth * 0.7, startW + dx));
+            panel.style.width = newW + 'px';
+        }
+        function onUp() {
+            resizer.classList.remove('active');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            // Re-render macro graph for new width
+            renderMacroList();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
 
 function toggleGraphExpand() {
     const graph = document.getElementById('macro-graph');
