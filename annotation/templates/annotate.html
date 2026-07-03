@@ -838,32 +838,47 @@ function renderMacroList() {
 
         node.innerHTML = html;
 
-        // Make node draggable
-        node.addEventListener('mousedown', function(e) {
-            if (e.target.classList.contains('mn-arrow-handle') || e.target.tagName === 'BUTTON') return;
-            e.preventDefault();
-            const startX = e.clientX - pos.x;
-            const startY = e.clientY - pos.y;
-            node.classList.add('dragging');
+        // Make node draggable — works from any part of the node
+        (function(nodeEl, macro, position) {
+            let isDrag = false;
+            let offsetX = 0, offsetY = 0;
 
-            function onMove(ev) {
+            nodeEl.addEventListener('mousedown', function(e) {
+                // Skip arrow handle and buttons
+                const t = e.target;
+                if (t.closest('.mn-arrow-handle') || t.closest('button') || t.tagName === 'INPUT') return;
+                e.preventDefault();
+                e.stopPropagation();
+
                 const rect = graphEl.getBoundingClientRect();
-                pos.x = Math.max(0, ev.clientX - rect.left - startX);
-                pos.y = Math.max(0, ev.clientY - rect.top - startY);
-                node.style.left = pos.x + 'px';
-                node.style.top = pos.y + 'px';
-                macroPositions[m] = {x: pos.x, y: pos.y};
-                _drawArrows();
-            }
-            function onUp() {
-                node.classList.remove('dragging');
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-                _resizeGraph();
-            }
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        });
+                offsetX = e.clientX - rect.left - position.x;
+                offsetY = e.clientY - rect.top - position.y;
+                isDrag = true;
+                nodeEl.classList.add('dragging');
+                nodeEl.style.zIndex = '20';
+
+                function onMove(ev) {
+                    if (!isDrag) return;
+                    const r = graphEl.getBoundingClientRect();
+                    position.x = Math.max(0, ev.clientX - r.left - offsetX);
+                    position.y = Math.max(0, ev.clientY - r.top - offsetY);
+                    nodeEl.style.left = position.x + 'px';
+                    nodeEl.style.top = position.y + 'px';
+                    macroPositions[macro] = {x: position.x, y: position.y};
+                    _drawArrows();
+                }
+                function onUp() {
+                    isDrag = false;
+                    nodeEl.classList.remove('dragging');
+                    nodeEl.style.zIndex = '2';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    _resizeGraph();
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        })(node, m, pos);
 
         container.appendChild(node);
     });
