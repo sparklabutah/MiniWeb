@@ -39,9 +39,35 @@
                     <span class="template-type {{ t.type }}">{{ t.type|capitalize }}</span>
                     <span class="template-cat">{{ t.category }}</span>
                 </div>
+                <button class="use-tpl-btn" data-id="{{ t.id }}" data-name="{{ t.name }}" data-type="{{ t.type }}" style="margin-top:.5rem;background:#0f9d58;color:#fff;border:none;padding:.4rem .8rem;border-radius:4px;cursor:pointer;font-size:.8rem;width:100%">Use Template</button>
             </div>
             {% endfor %}
         </div>
     </div>
+<script>
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.use-tpl-btn');
+    if (!btn) return;
+    btn.textContent = 'Creating...';
+    btn.disabled = true;
+    var endpoint = btn.dataset.type === 'presentation'
+        ? '/sites/spreadsheets-slides/api/presentations'
+        : '/sites/spreadsheets-slides/api/spreadsheets';
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            title: btn.dataset.name + ' (copy)',
+            template_id: btn.dataset.id,
+            owner_id: 1
+        })
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        btn.textContent = 'Created!';
+        setTimeout(function() { window.location.href = '/sites/spreadsheets-slides/'; }, 800);
+    })
+    .catch(function() { btn.textContent = 'Error'; btn.disabled = false; });
+});
+</script>
 </body>
 </html>
