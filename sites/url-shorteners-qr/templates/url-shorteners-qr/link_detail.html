@@ -77,9 +77,7 @@
                 <form method="post" action="{{ url_for('url-shorteners-qr.toggle_link', link_id=link.id) }}" style="display:inline;">
                     <button type="submit" class="btn btn-warning">{{ 'Deactivate' if link.is_active else 'Activate' }}</button>
                 </form>
-                <form method="post" action="{{ url_for('url-shorteners-qr.delete_link_form', link_id=link.id) }}" style="display:inline;" onsubmit="return confirm('Delete this link?')">
-                    <button type="submit" class="btn btn-danger">Delete</button>
-                </form>
+                <button class="btn btn-danger" onclick="if(confirm('Delete this link?')){fetch('{{ url_for('url-shorteners-qr.delete_link_form', link_id=link.id) }}',{method:'POST'}).then(()=>{this.textContent='Deleted';this.disabled=true;setTimeout(()=>location.href='{{ url_for('url-shorteners-qr.links_page') }}',500)})}">Delete</button>
             </div>
         </div>
 
