@@ -375,8 +375,12 @@ textarea#instruction:focus {
                 <!-- Macro graph fills remaining space -->
                 <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.2rem;flex-shrink:0">
                     <label style="margin:0;font-size:.72rem">Macros</label>
-                    <span style="font-size:.58rem;color:#94a3b8">drag nodes · &#x27A1; draw arrows · click arrow to delete</span>
-                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem;margin-left:auto">&#x26F6; Fullscreen</button>
+                    <div style="position:relative;margin-left:.3rem">
+                        <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.68rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:130px">
+                        <div id="macro-search-results" style="display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
+                    </div>
+                    <span style="font-size:.55rem;color:#94a3b8;flex:1">drag · &#x27A1; arrows · click to delete</span>
+                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem">&#x26F6; Fullscreen</button>
                 </div>
                 <div id="macro-graph" style="position:relative;flex:1;min-height:120px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:auto">
                     <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">&#x2715; Close</button>
@@ -1083,6 +1087,56 @@ function updateChainDisplay() { _drawArrows(); }
         document.addEventListener('mouseup', onUp);
     });
 })();
+
+function showMacroSearch(q) {
+    const results = document.getElementById('macro-search-results');
+    if (!q || q.length < 2) { results.style.display = 'none'; return; }
+    q = q.toLowerCase();
+
+    // Search all macros from macroDescriptions
+    const matches = [];
+    for (const [key, desc] of Object.entries(macroDescriptions)) {
+        if (selectedMacros.includes(key)) continue;  // already added
+        const text = (desc.description || '') + ' ' + key;
+        if (text.toLowerCase().includes(q)) {
+            matches.push({key, desc: desc.description || key});
+        }
+    }
+
+    if (!matches.length) {
+        results.innerHTML = '<div style="padding:.4rem .5rem;color:#94a3b8">No matching macros</div>';
+        results.style.display = 'block';
+        return;
+    }
+
+    results.innerHTML = matches.slice(0, 10).map(m =>
+        `<div style="padding:.3rem .5rem;cursor:pointer;border-bottom:1px solid #f1f5f9"
+              onmousedown="addMacroFromSearch('${m.key}')"
+              onmouseenter="this.style.background='#eff6ff'"
+              onmouseleave="this.style.background=''">
+            <div style="font-weight:500;color:#1e293b">${escHtml(m.desc)}</div>
+            <div style="font-size:.6rem;color:#94a3b8">${m.key}</div>
+        </div>`
+    ).join('');
+    results.style.display = 'block';
+}
+
+function addMacroFromSearch(macroKey) {
+    if (!selectedMacros.includes(macroKey)) {
+        selectedMacros.push(macroKey);
+        renderMacroList();
+    }
+    document.getElementById('macro-search').value = '';
+    document.getElementById('macro-search-results').style.display = 'none';
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#macro-search') && !e.target.closest('#macro-search-results')) {
+        const r = document.getElementById('macro-search-results');
+        if (r) r.style.display = 'none';
+    }
+});
 
 function toggleGraphExpand() {
     const graph = document.getElementById('macro-graph');
