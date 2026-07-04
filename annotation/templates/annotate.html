@@ -453,6 +453,7 @@ textarea#instruction:focus {
                 <div id="macro-search-results" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 16px rgba(0,0,0,.18);max-height:220px;overflow-y:auto;z-index:9999;width:300px;font-size:.75rem"></div>
             </div>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Combine into instruction</button>
+            <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem" onclick="macroEdges=[];_drawArrows()">Clear arrows</button>
             <span style="flex:1"></span>
             <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
         </div>
@@ -983,8 +984,11 @@ function _drawArrows() {
         </defs>`;
     }
 
-    // Remove old arrows (keep defs)
+    // Remove old arrows and delete buttons
     svg.querySelectorAll('.edge-path').forEach(el => el.remove());
+    document.querySelectorAll('.edge-delete-btn').forEach(el => el.remove());
+
+    const nodesContainer = document.getElementById('macro-nodes');
 
     for (let i = 0; i < macroEdges.length; i++) {
         const edge = macroEdges[i];
@@ -999,61 +1003,40 @@ function _drawArrows() {
         const tw = toNode ? toNode.offsetWidth : 150;
         const th = toNode ? toNode.offsetHeight : 60;
 
-        // Connect from right edge of source to left edge of target (UE style)
         const x1 = fromPos.x + fw;
         const y1 = fromPos.y + fh / 2;
         const x2 = toPos.x;
         const y2 = toPos.y + th / 2;
 
-        // Bezier curve — horizontal tangents like UE Blueprint wires
         const dx = Math.abs(x2 - x1);
         const cpOffset = Math.max(50, dx * 0.4);
-        const cp1x = x1 + cpOffset;
-        const cp1y = y1;
-        const cp2x = x2 - cpOffset;
-        const cp2y = y2;
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.className.baseVal = 'edge-path';
-        path.setAttribute('d', `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
+        path.setAttribute('d', `M ${x1} ${y1} C ${x1+cpOffset} ${y1}, ${x2-cpOffset} ${y2}, ${x2} ${y2}`);
         path.setAttribute('stroke', '#2563eb');
         path.setAttribute('stroke-width', '2.5');
         path.setAttribute('fill', 'none');
         path.setAttribute('marker-end', 'url(#arrowhead)');
-        path.style.pointerEvents = 'stroke';
-        path.style.cursor = 'pointer';
-        path.style.transition = 'stroke 0.15s';
+        svg.appendChild(path);
 
-        // Wider invisible hit area for easier clicking
-        const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        hitArea.className.baseVal = 'edge-path';
-        hitArea.setAttribute('d', `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
-        hitArea.setAttribute('stroke', 'transparent');
-        hitArea.setAttribute('stroke-width', '12');
-        hitArea.setAttribute('fill', 'none');
-        hitArea.style.pointerEvents = 'stroke';
-        hitArea.style.cursor = 'pointer';
-
+        // HTML delete button at midpoint — easy to click
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'edge-delete-btn';
+        delBtn.textContent = '×';
+        delBtn.title = 'Delete this connection';
+        delBtn.style.cssText = 'position:absolute;left:' + (midX - 10) + 'px;top:' + (midY - 10) + 'px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:14px;line-height:18px;text-align:center;cursor:pointer;z-index:5;opacity:0.7;padding:0;';
         const idx = i;
-        function onHover() { path.setAttribute('stroke', '#ef4444'); path.setAttribute('marker-end', 'url(#arrowhead-hover)'); }
-        function onLeave() { path.setAttribute('stroke', '#2563eb'); path.setAttribute('marker-end', 'url(#arrowhead)'); }
-        hitArea.addEventListener('mouseenter', onHover);
-        hitArea.addEventListener('mouseleave', onLeave);
-        hitArea.addEventListener('contextmenu', function(ev) {
-            ev.preventDefault();
+        delBtn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
             macroEdges.splice(idx, 1);
             _drawArrows();
         });
-        hitArea.addEventListener('click', function(ev) {
-            ev.preventDefault();
-            if (confirm('Delete this connection?')) {
-                macroEdges.splice(idx, 1);
-                _drawArrows();
-            }
-        });
-
-        svg.appendChild(path);
-        svg.appendChild(hitArea);
+        delBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; path.setAttribute('stroke', '#ef4444'); });
+        delBtn.addEventListener('mouseleave', function() { this.style.opacity = '0.7'; path.setAttribute('stroke', '#2563eb'); });
+        nodesContainer.appendChild(delBtn);
     }
 }
 
