@@ -808,6 +808,7 @@ def api_create_task():
         "expected_outcome": data.get("expected_outcome", ""),
         "macro_edges": data.get("macro_edges", []),
         "macro_positions": data.get("macro_positions", {}),
+        "macro_subtasks": data.get("macro_subtasks", {}),
         "macro_spans": data.get("macro_spans", {}),
         "trajectory": data.get("trajectory", []),
         "server_log": data.get("server_log", []),

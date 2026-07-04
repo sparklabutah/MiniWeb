@@ -57,12 +57,17 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans
 /* Range selection hint */
 .range-hint { font-size: .72rem; color: #2563eb; padding: .3rem .5rem; background: #eff6ff; border-radius: .3rem; margin-bottom: .3rem; text-align: center; }
 
-.left-panel { flex: 1 1 0; min-width: 200px; display: flex; flex-direction: column; overflow: hidden; }
+.main-layout { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.top-row { display: flex; flex: 1; min-height: 0; }
+.left-panel { flex: 1 1 0; min-width: 300px; display: flex; flex-direction: column; overflow: hidden; }
 .left-panel iframe { flex: 1; border: none; background: #fff; }
-.right-panel { width: 520px; flex: 0 0 520px; background: #fff; border-left: none; display: flex; flex-direction: column; overflow: auto; }
+.right-panel { width: 380px; flex: 0 0 380px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: auto; }
 .panel-resizer { width: 6px; background: #e2e8f0; cursor: col-resize; flex-shrink: 0; transition: background .15s; position: relative; z-index: 50; }
 .panel-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px; z-index: 51; }
 .panel-resizer:hover, .panel-resizer.active { background: #2563eb; }
+.bottom-track { height: 220px; min-height: 120px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.track-resizer { height: 5px; background: #e2e8f0; cursor: row-resize; flex-shrink: 0; transition: background .15s; }
+.track-resizer:hover, .track-resizer.active { background: #2563eb; }
 
 .steps-bar { display: flex; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
 .steps-bar .step { flex: 1; padding: .5rem .2rem; text-align: center; font-size: .7rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
@@ -203,7 +208,9 @@ textarea#instruction:focus {
 /* API Reference panel */
 
 /* Macro items with tooltips */
-.macro-node { position: absolute; display: flex; flex-direction: column; gap: .2rem; padding: .5rem .7rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .5rem; font-size: .82rem; cursor: grab; min-width: 150px; max-width: 240px; box-shadow: 0 1px 4px rgba(0,0,0,.08); user-select: none; z-index: 2; }
+.macro-node { position: absolute; display: flex; flex-direction: column; gap: .15rem; padding: .4rem .6rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .5rem; font-size: .8rem; cursor: grab; min-width: 160px; max-width: 260px; box-shadow: 0 1px 4px rgba(0,0,0,.08); user-select: none; z-index: 2; }
+.macro-node .mn-subtask { width: 100%; font-size: .72rem; padding: .2rem .3rem; border: 1px solid #e2e8f0; border-radius: .25rem; resize: none; font-family: inherit; cursor: text; }
+.macro-node .mn-subtask:focus { border-color: #93c5fd; outline: none; }
 .macro-node:hover { border-color: #93c5fd; box-shadow: 0 2px 6px rgba(37,99,235,.15); }
 .macro-node.dragging { opacity: .5; cursor: grabbing; z-index: 10; }
 .macro-node.arrow-target { border-color: #2563eb; background: #eff6ff; }
@@ -281,31 +288,33 @@ textarea#instruction:focus {
     <span id="instruction-banner-text"></span>
 </div>
 
-<div class="split">
-    <div class="action-sidebar" id="action-sidebar">
-        <div class="action-sidebar-header">
-            <span class="rec-dot" id="sidebar-rec-dot"></span>
-            <h3>Actions</h3>
-            <span style="margin-left:auto;font-size:.7rem;color:#64748b" id="action-count">0</span>
-        </div>
-        <div class="action-sidebar-body" id="action-timeline"></div>
-        <div class="action-sidebar-footer">
-            <div id="range-controls" style="display:none">
-                <div class="range-hint" id="range-hint">Select start action</div>
-                <div id="range-macro-chips" class="macro-chips" style="margin-top:.3rem"></div>
+<div class="main-layout">
+    <!-- Top row: browser + right panel -->
+    <div class="top-row">
+        <div class="action-sidebar" id="action-sidebar">
+            <div class="action-sidebar-header">
+                <span class="rec-dot" id="sidebar-rec-dot"></span>
+                <h3>Actions</h3>
+                <span style="margin-left:auto;font-size:.7rem;color:#64748b" id="action-count">0</span>
             </div>
-            <div style="display:flex;gap:.3rem;margin-top:.3rem">
-                <button class="btn btn-sm btn-secondary" onclick="startRangeSelect()" id="range-btn" title="Select a range of actions for a macro">Tag Range</button>
-                <button class="btn btn-sm btn-secondary" onclick="clearAllTags()" title="Clear all macro tags">Clear Tags</button>
+            <div class="action-sidebar-body" id="action-timeline"></div>
+            <div class="action-sidebar-footer">
+                <div id="range-controls" style="display:none">
+                    <div class="range-hint" id="range-hint">Select start action</div>
+                    <div id="range-macro-chips" class="macro-chips" style="margin-top:.3rem"></div>
+                </div>
+                <div style="display:flex;gap:.3rem;margin-top:.3rem">
+                    <button class="btn btn-sm btn-secondary" onclick="startRangeSelect()" id="range-btn" title="Select a range of actions for a macro">Tag Range</button>
+                    <button class="btn btn-sm btn-secondary" onclick="clearAllTags()" title="Clear all macro tags">Clear Tags</button>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="left-panel">
-        <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/?open={{ prompt.sites | map(attribute='id') | join(',') }}{% else %}/{% endif %}" allow="clipboard-write"></iframe>
-    </div>
+        <div class="left-panel">
+            <iframe id="site-iframe" src="{% if prompt and prompt.sites %}/?open={{ prompt.sites | map(attribute='id') | join(',') }}{% else %}/{% endif %}" allow="clipboard-write"></iframe>
+        </div>
 
-    <div class="panel-resizer" id="panel-resizer"></div>
-    <div class="right-panel" id="right-panel">
+        <div class="panel-resizer" id="panel-resizer"></div>
+        <div class="right-panel" id="right-panel">
         <div class="steps-bar">
             <div class="step active" onclick="goStep(1)"><span class="num">1</span> Design</div>
             <div class="step" onclick="goStep(2)"><span class="num">2</span> Record</div>
@@ -327,7 +336,7 @@ textarea#instruction:focus {
                     </span>
                 </div>
 
-                <!-- Sites + options row -->
+                <!-- Sites + options -->
                 <div style="flex-shrink:0;display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
                     <div id="site-labels" style="font-size:.78rem;color:#1e293b;font-weight:600"></div>
                     <span style="flex:1"></span>
@@ -340,42 +349,23 @@ textarea#instruction:focus {
                         Single site
                     </label>
                     <span id="login-status" style="font-size:.65rem;color:#16a34a;"></span>
-                    <button class="btn btn-secondary" style="font-size:.6rem;padding:.15rem .4rem" onclick="reshufflePrompt()">↻ New prompt</button>
-                    <button class="btn btn-danger" style="font-size:.6rem;padding:.15rem .4rem" onclick="openSkipModal()">Skip</button>
+                    <button class="btn btn-secondary" style="font-size:.62rem;padding:.15rem .4rem" onclick="reshufflePrompt()">↻ New</button>
+                    <button class="btn btn-danger" style="font-size:.62rem;padding:.15rem .4rem" onclick="openSkipModal()">Skip</button>
                 </div>
 
-                <!-- Macro graph — main workspace -->
-                <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.2rem;flex-shrink:0">
-                    <span style="font-size:.72rem;font-weight:600;color:#1e293b">② Macro Graph</span>
-                    <div style="position:relative;margin-left:.3rem">
-                        <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.68rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:130px">
-                        <div id="macro-search-results" style="display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
+                <!-- Instruction (output from macro subtasks, editable) -->
+                <label style="font-size:.72rem">Task Instruction <span style="font-weight:400;color:#94a3b8">(auto-generated from macro subtasks, editable)</span></label>
+                <textarea id="instruction" rows="3" placeholder="Write subtasks on each macro node below, then click '✨ Combine' to auto-generate this instruction. Or write directly." style="font-size:.85rem;margin-bottom:.3rem;width:100%;flex-shrink:0"></textarea>
+                <div id="refined-box" style="display:none;margin-bottom:.3rem;flex-shrink:0">
+                    <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#0f172a;cursor:pointer" onclick="acceptRefinement()"></div>
+                    <div style="display:flex;gap:.3rem;margin-top:.2rem">
+                        <button class="btn btn-success btn-sm" onclick="acceptRefinement()">Use this</button>
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep mine</button>
                     </div>
-                    <span style="flex:1"></span>
-                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem">⛶ Fullscreen</button>
                 </div>
-                <div id="macro-graph" style="position:relative;flex:1;min-height:120px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:auto">
-                    <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">&#x2715; Close</button>
-                    <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
-                    <div id="macro-nodes" style="position:relative;z-index:2;min-height:120px"></div>
-                </div>
-                <!-- Instruction + Record — bottom of step 1 -->
-                <div style="flex-shrink:0;padding-top:.5rem;border-top:1px solid #e2e8f0;margin-top:.3rem">
-                    <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.3rem">
-                        <span style="font-size:.72rem;font-weight:600;color:#1e293b">③ Write Instruction</span>
-                        <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem;margin-left:auto" onclick="refineInstruction()" id="refine-btn">✨ Refine with AI</button>
-                        <span id="refine-status" style="font-size:.65rem;color:#94a3b8"></span>
-                    </div>
-                    <textarea id="instruction" rows="2" placeholder="Tell the agent what to do, like you'd ask an assistant: 'Can you find me the cheapest flight to Portland and book it?'" style="font-size:.85rem;margin-bottom:.3rem;width:100%"></textarea>
-                    <div id="refined-box" style="display:none;margin-bottom:.3rem">
-                        <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#0f172a;cursor:pointer" onclick="acceptRefinement()"></div>
-                        <div style="display:flex;gap:.3rem;margin-top:.2rem">
-                            <button class="btn btn-success btn-sm" onclick="acceptRefinement()">Use refined</button>
-                            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.55rem;font-size:.88rem;font-weight:600">Start Recording &rarr;</button>
-                </div>
+                <span id="refine-status" style="font-size:.65rem;color:#94a3b8;flex-shrink:0"></span>
+                <span style="flex:1"></span>
+                <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.55rem;font-size:.88rem;font-weight:600;flex-shrink:0" id="refine-btn">Start Recording &rarr;</button>
             </div>
 
             <!-- STEP 2: Record trajectory -->
@@ -450,7 +440,28 @@ textarea#instruction:focus {
             <span class="status" id="status">Ready</span>
         </div>
     </div>
-</div>
+    </div><!-- /top-row -->
+
+    <!-- Bottom: macro track editor (full width, resizable) -->
+    <div class="track-resizer" id="track-resizer"></div>
+    <div class="bottom-track" id="bottom-track">
+        <div style="display:flex;align-items:center;gap:.4rem;padding:.3rem .6rem;flex-shrink:0;border-bottom:1px solid #e2e8f0;background:#fff">
+            <span style="font-size:.78rem;font-weight:600;color:#1e293b">Macro Graph</span>
+            <div style="position:relative">
+                <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.72rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:140px">
+                <div id="macro-search-results" style="display:none;position:absolute;bottom:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 -4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
+            </div>
+            <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Combine into instruction</button>
+            <span style="flex:1"></span>
+            <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
+        </div>
+        <div id="macro-graph" style="position:relative;flex:1;background:#f8fafc;overflow:auto">
+            <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">✕ Close</button>
+            <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
+            <div id="macro-nodes" style="position:relative;z-index:2;min-height:100%"></div>
+        </div>
+    </div>
+</div><!-- /main-layout -->
 
 <!-- Skip Modal -->
 <div id="skip-modal" class="skip-overlay" style="display:none">
@@ -763,6 +774,7 @@ function isQAMacro(macro) { return QA_VERBS.has(macro.split('_')[0]); }
 // Macro graph state
 let macroPositions = {};  // {macro: {x, y}}
 let macroEdges = [];      // [{from, to}]
+let macroSubtasks = {};   // {macro: "subtask text"}
 let _arrowDrag = null;    // {from: macroName, startX, startY}
 
 function renderMacroList() {
@@ -812,7 +824,15 @@ function renderMacroList() {
             <button class="${isNA ? 'active' : ''}" onclick="event.stopPropagation();toggleNA('${m}')" style="${isNA ? 'background:#fecaca;border-color:#f87171;color:#dc2626' : ''}">${isNA ? 'N/A \u2713' : 'N/A'}</button>
         </div>`;
 
-        // UI locations
+        // Subtask input
+        if (!excluded) {
+            const saved = macroSubtasks[m] || '';
+            html += `<textarea class="mn-subtask" rows="1" placeholder="What to do for this step..."
+                onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
+                oninput="macroSubtasks['${m}']=this.value">${escHtml(saved)}</textarea>`;
+        }
+
+        // UI locations (collapsed)
         if (!excluded) {
             const locs = _getLocationsForMacro(m);
             if (locs.length) {
@@ -1121,6 +1141,97 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// --- Generate instruction from macro subtasks ---
+function generateInstruction() {
+    const enabledMacros = getEnabledMacros();
+    const subtasks = [];
+    // Follow edge order if possible, otherwise use enabledMacros order
+    const ordered = _topologicalSort(enabledMacros, macroEdges);
+    for (const m of ordered) {
+        const text = (macroSubtasks[m] || '').trim();
+        const desc = (macroDescriptions[m]||{}).description || m;
+        if (text) subtasks.push(text);
+        else subtasks.push(desc);
+    }
+    if (!subtasks.length) { alert('Add subtask descriptions to the macro nodes first'); return; }
+
+    const sites = currentPrompt ? currentPrompt.sites.map(s => s.name || s.id).join(', ') : '';
+    const prompt = 'Combine these subtasks into one natural instruction, as if a person is asking their assistant:\n\n' +
+        subtasks.map((s, i) => (i+1) + '. ' + s).join('\n') +
+        (sites ? '\n\nSites: ' + sites : '') +
+        '\n\nOutput ONLY the combined instruction. Keep it conversational.';
+
+    document.getElementById('refine-status').textContent = 'Generating...';
+    fetch('/annotate/api/refine', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({instruction: prompt, sites: [], macros: []})
+    }).then(r => r.json()).then(d => {
+        document.getElementById('refine-status').textContent = '';
+        if (d.refined) {
+            document.getElementById('instruction').value = d.refined;
+        }
+    }).catch(() => { document.getElementById('refine-status').textContent = 'Error'; });
+}
+
+function _topologicalSort(macros, edges) {
+    // Simple topological sort for macro ordering
+    const inDeg = {};
+    const adj = {};
+    for (const m of macros) { inDeg[m] = 0; adj[m] = []; }
+    for (const e of edges) {
+        if (e.from in adj && e.to in inDeg) {
+            adj[e.from].push(e.to);
+            inDeg[e.to]++;
+        }
+    }
+    const queue = macros.filter(m => inDeg[m] === 0);
+    const result = [];
+    while (queue.length) {
+        const n = queue.shift();
+        result.push(n);
+        for (const next of (adj[n] || [])) {
+            inDeg[next]--;
+            if (inDeg[next] === 0) queue.push(next);
+        }
+    }
+    // Add any remaining (cycles)
+    for (const m of macros) { if (!result.includes(m)) result.push(m); }
+    return result;
+}
+
+// --- Track resizer (bottom panel) ---
+(function() {
+    const resizer = document.getElementById('track-resizer');
+    const track = document.getElementById('bottom-track');
+    if (!resizer || !track) return;
+    let startY, startH;
+    resizer.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        startY = e.clientY;
+        startH = track.offsetHeight;
+        resizer.classList.add('active');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = 'none');
+        function onMove(ev) {
+            const dy = startY - ev.clientY;
+            const newH = Math.max(100, Math.min(window.innerHeight * 0.6, startH + dy));
+            track.style.height = newH + 'px';
+        }
+        function onUp() {
+            resizer.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = '');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            renderMacroList();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
+
 function toggleGraphExpand() {
     const graph = document.getElementById('macro-graph');
     const btn = document.getElementById('graph-expand-btn');
@@ -1206,7 +1317,7 @@ function reshufflePrompt() {
             // Clear stale data from previous task
             trajectory = [];
             actionCounter = 0;
-            macroSpans = {}; macroEdges = []; macroPositions = {};
+            macroSpans = {}; macroEdges = []; macroPositions = {}; macroSubtasks = {};
             cachedApiCalls = null;
             cachedRequestLog = null;
             agentResult = null;
@@ -1520,7 +1631,7 @@ function removeSpan(macroName) {
 }
 
 function clearAllTags() {
-    macroSpans = {}; macroEdges = []; macroPositions = {};
+    macroSpans = {}; macroEdges = []; macroPositions = {}; macroSubtasks = {};
     renderTimeline();
     renderMacroSpanSummary();
 }
@@ -2595,6 +2706,7 @@ async function submitTask() {
                 macro_spans: macroSpans,
                 macro_edges: macroEdges,
                 macro_positions: macroPositions,
+                macro_subtasks: macroSubtasks,
                 macros_not_applicable: macrosNotApplicable,
                 qa_answers: qaAnswers,
                 answer_type: document.getElementById('answer-type').value,
@@ -2614,7 +2726,7 @@ async function submitTask() {
             setTimeout(() => {
                 trajectory = [];
                 actionCounter = 0;
-                macroSpans = {}; macroEdges = []; macroPositions = {};
+                macroSpans = {}; macroEdges = []; macroPositions = {}; macroSubtasks = {};
                 macrosNotApplicable = {};
                 macrosSkipped = {};
                 qaAnswers = {};
