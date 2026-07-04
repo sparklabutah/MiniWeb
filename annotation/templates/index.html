@@ -79,22 +79,42 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
     </div>
 
     <div class="grid-section">
-        <h2>Task Coverage Grid (Sites x Macros)</h2>
-        <div class="cell-grid">
-            <div class="header-cell"></div>
-            <div class="header-cell">1 macro</div>
-            <div class="header-cell">2 macros</div>
-            <div class="header-cell">3 macros</div>
-            <div class="header-cell">4 macros</div>
-            {% for n in [1, 2, 3] %}
-            <div class="row-label">{{ n }} site{{ 's' if n > 1 }}</div>
-            {% for m in [1, 2, 3, 4] %}
-            {% set count = cell_counts.get((n, m), 0) %}
-            <div class="cell {{ 'good' if count >= 100 else ('med' if count >= 30 else 'low') }}">{{ count }}</div>
-            {% endfor %}
-            {% endfor %}
+        <h2>Task Coverage</h2>
+        <div style="display:flex;gap:2rem;flex-wrap:wrap">
+            <!-- Sites x Macros grid -->
+            <div>
+                <h3 style="font-size:.85rem;color:#475569;margin-bottom:.4rem">Sites × Macros</h3>
+                {% set max_macros = [] %}
+                {% for key in cell_counts %}{% if key[1] not in max_macros %}{% if max_macros.append(key[1]) %}{% endif %}{% endif %}{% endfor %}
+                {% set macro_cols = [1, 2, 3, 4] %}
+                <div class="cell-grid" style="grid-template-columns: auto repeat({{ macro_cols|length }}, 1fr);">
+                    <div class="header-cell"></div>
+                    {% for m in macro_cols %}
+                    <div class="header-cell">{{ m }}m</div>
+                    {% endfor %}
+                    {% for n in [1, 2, 3] %}
+                    <div class="row-label">{{ n }}s</div>
+                    {% for m in macro_cols %}
+                    {% set count = cell_counts.get((n, m), 0) %}
+                    <div class="cell {{ 'good' if count >= 50 else ('med' if count >= 10 else ('low' if count > 0 else '')) }}">{{ count or '·' }}</div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Summary stats -->
+            <div>
+                <h3 style="font-size:.85rem;color:#475569;margin-bottom:.4rem">Summary</h3>
+                <div style="font-size:.82rem;color:#475569;line-height:1.8">
+                    <div><strong>{{ task_count }}</strong> total tasks</div>
+                    <div><strong>{{ sites|length }}</strong> sites</div>
+                    <div><strong>{{ macros|length }}</strong> unique macros</div>
+                    {% set covered = [] %}
+                    {% for m in macros %}{% if coverage.get(m, 0) > 0 %}{% if covered.append(m) %}{% endif %}{% endif %}{% endfor %}
+                    <div><strong>{{ covered|length }}</strong>/{{ macros|length }} macros covered</div>
+                </div>
+            </div>
         </div>
-        <div style="font-size: .75rem; color: #94a3b8; margin-top: .5rem;">Target: ~333 tasks per cell (4000+ total)</div>
     </div>
 
     <div class="sites-section">

@@ -2334,21 +2334,4 @@ def api_get_reviews(site_id):
     return jsonify([])
 
 
-@annotation_bp.route("/dashboard")
-def dashboard():
-    tasks = []
-    macros = _load_macros()
-    coverage = _get_macro_coverage()
-    site_counts = {}
-    cell_counts = _get_cell_counts()
-
-    diff_counts = {"easy": 0, "medium": 0, "hard": 0}
-    for t in tasks:
-        d = t.get("difficulty", "").lower()
-        if d in diff_counts:
-            diff_counts[d] += 1
-
-    return render_template("dashboard.html",
-                           tasks=tasks, macros=macros, coverage=coverage,
-                           site_counts=site_counts, cell_counts=cell_counts,
-                           diff_counts=diff_counts)
+    # Dashboard removed — use index page and verify page instead
