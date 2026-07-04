@@ -803,9 +803,16 @@ def api_create_task():
         "num_sites": len(sites_list),
         "num_macros": len(data.get("macros", [])),
         "expected_answer": data.get("expected_answer"),
-        "eval": data.get("eval", []),
-        "eval_logic": data.get("eval_logic", "all"),
+        "answer_type": data.get("answer_type", "string"),
+        "alternatives": data.get("alternatives", ""),
+        "expected_outcome": data.get("expected_outcome", ""),
+        "macro_edges": data.get("macro_edges", []),
+        "macro_positions": data.get("macro_positions", {}),
+        "macro_spans": data.get("macro_spans", {}),
         "trajectory": data.get("trajectory", []),
+        "server_log": data.get("server_log", []),
+        "beacon_log": data.get("beacon_log", []),
+        "agent_result": data.get("agent_result"),
         "annotator": data.get("annotator", "anonymous"),
     }
     task_id = _save_task(task)
