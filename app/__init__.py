@@ -518,10 +518,18 @@ def create_app():
 
     @app.route("/_reset_data", methods=["POST"])
     def _reset_data():
-        db.reset_session()
-        from flask import session as flask_session
-        flask_session.clear()
-        return {"status": "reset"}
+        """Reset session overlay (revert site data to pristine) and clear session."""
+        # Get current session ID before clearing
+        sid = session.get("_data_overlay_sid", "")
+        # Clear the overlay for this session
+        if sid:
+            db.reset_session(sid)
+        # Clear Flask session (user_id, login state, etc.)
+        session.clear()
+        # Also clear request logs and beacons
+        _request_logs.pop(sid, None) if sid else None
+        _action_beacons.pop(sid, None) if sid else None
+        return {"status": "reset", "cleared_sid": sid}
 
     @app.route("/_overlay_stats")
     def _overlay_stats():
