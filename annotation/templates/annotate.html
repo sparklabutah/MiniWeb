@@ -2567,6 +2567,15 @@ async function submitTask() {
 
     const enabledMacros = getEnabledMacros();
 
+    // Check that all enabled macros have been tagged in the trajectory
+    const untagged = enabledMacros.filter(m => !(m in macroSpans));
+    if (untagged.length > 0) {
+        const names = untagged.map(m => (macroDescriptions[m]||{}).description || m);
+        alert('Tag all macros before submitting.\n\nUntagged:\n• ' + names.join('\n• ') +
+              '\n\nGo to Step 2, select action ranges, and assign them to macros.');
+        return;
+    }
+
     // Fetch server logs to save alongside trajectory
     let serverLog = [], beaconLog = [];
     try {
