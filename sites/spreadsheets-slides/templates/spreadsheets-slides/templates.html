@@ -64,7 +64,14 @@ document.addEventListener('click', function(e) {
     }).then(function(r) { return r.json(); })
     .then(function(d) {
         btn.textContent = 'Created!';
-        setTimeout(function() { window.location.href = '/sites/spreadsheets-slides/'; }, 800);
+        if (d.id) {
+            var path = btn.dataset.type === 'presentation'
+                ? '/sites/spreadsheets-slides/presentation/' + d.id
+                : '/sites/spreadsheets-slides/spreadsheet/' + d.id;
+            setTimeout(function() { window.location.href = path; }, 500);
+        } else {
+            setTimeout(function() { window.location.href = '/sites/spreadsheets-slides/'; }, 500);
+        }
     })
     .catch(function() { btn.textContent = 'Error'; btn.disabled = false; });
 });

@@ -81,7 +81,7 @@
             <h3>Or start from a template</h3>
             <div class="template-grid">
                 {% for t in templates %}
-                <div class="template-card">
+                <div class="template-card use-tpl" data-name="{{ t.name }}" data-type="{{ t.type }}" data-id="{{ t.id }}">
                     <div class="template-name">{{ t.name }}</div>
                     <div class="template-cat">{{ t.category }}</div>
                     <span class="template-type {{ t.type }}">{{ t.type|capitalize }}</span>
@@ -91,5 +91,32 @@
         </div>
         {% endif %}
     </div>
+<script>
+document.addEventListener('click', function(e) {
+    var card = e.target.closest('.use-tpl');
+    if (!card) return;
+    card.style.opacity = '0.5';
+    card.style.pointerEvents = 'none';
+    var endpoint = card.dataset.type === 'presentation'
+        ? '/sites/spreadsheets-slides/api/presentations'
+        : '/sites/spreadsheets-slides/api/spreadsheets';
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: card.dataset.name + ' (copy)', owner_id: 1})
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.id) {
+            var path = card.dataset.type === 'presentation'
+                ? '/sites/spreadsheets-slides/presentation/' + d.id
+                : '/sites/spreadsheets-slides/spreadsheet/' + d.id;
+            window.location.href = path;
+        } else {
+            window.location.href = '/sites/spreadsheets-slides/';
+        }
+    })
+    .catch(function() { card.style.opacity = '1'; card.style.pointerEvents = ''; });
+});
+</script>
 </body>
 </html>
