@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Annotate</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; background: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
 .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: .8rem; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 .topbar h1 { font-size: .95rem; color: #0f172a; font-weight: 700; }
@@ -200,45 +201,25 @@ textarea#instruction:focus {
 .nav-btns { display: flex; gap: .4rem; margin-top: .8rem; justify-content: flex-end; }
 
 /* API Reference panel */
-.api-ref { border-top: 1px solid #e2e8f0; flex-shrink: 0; max-height: 220px; display: flex; flex-direction: column; }
-.api-ref-header { padding: .4rem .8rem; background: #f1f5f9; cursor: pointer; display: flex; align-items: center; gap: .4rem; user-select: none; }
-.api-ref-header:hover { background: #e2e8f0; }
-.api-ref-header h4 { font-size: .78rem; color: #475569; font-weight: 600; flex: 1; }
-.api-ref-header .toggle { font-size: .7rem; color: #94a3b8; }
-.api-ref-body { overflow-y: auto; flex: 1; }
-.api-ref.collapsed .api-ref-body { display: none; }
-.api-ref.collapsed { max-height: none; }
-.api-route { padding: .35rem .8rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
-.api-route:hover { background: #eff6ff; }
-.api-route-top { display: flex; align-items: baseline; gap: .4rem; font-family: 'SF Mono', Menlo, monospace; font-size: .72rem; }
-.api-route .method { font-weight: 700; width: 42px; flex-shrink: 0; }
-.api-route .method.get { color: #16a34a; }
-.api-route .method.post { color: #2563eb; }
-.api-route .method.put { color: #d97706; }
-.api-route .method.delete { color: #ef4444; }
-.api-route .path { color: #0f172a; }
-.api-route .params { color: #94a3b8; font-size: .68rem; }
-.api-route .desc { font-size: .7rem; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin-top: .1rem; padding-left: 46px; }
-.api-route .returns { font-size: .65rem; color: #94a3b8; font-family: 'SF Mono', Menlo, monospace; padding-left: 46px; }
 
 /* Macro items with tooltips */
-.macro-node { position: absolute; display: flex; flex-direction: column; gap: .2rem; padding: .4rem .6rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .4rem; font-size: .75rem; cursor: grab; min-width: 140px; max-width: 220px; box-shadow: 0 1px 3px rgba(0,0,0,.08); user-select: none; z-index: 2; }
+.macro-node { position: absolute; display: flex; flex-direction: column; gap: .2rem; padding: .5rem .7rem; background: #fff; border: 1.5px solid #e2e8f0; border-radius: .5rem; font-size: .82rem; cursor: grab; min-width: 150px; max-width: 240px; box-shadow: 0 1px 4px rgba(0,0,0,.08); user-select: none; z-index: 2; }
 .macro-node:hover { border-color: #93c5fd; box-shadow: 0 2px 6px rgba(37,99,235,.15); }
 .macro-node.dragging { opacity: .5; cursor: grabbing; z-index: 10; }
 .macro-node.arrow-target { border-color: #2563eb; background: #eff6ff; }
 .macro-node .mn-header { display: flex; align-items: center; gap: .3rem; }
-.macro-node .mn-name { font-weight: 600; color: #1e293b; font-size: .72rem; flex: 1; }
+.macro-node .mn-name { font-weight: 600; color: #1e293b; font-size: .78rem; flex: 1; }
 .macro-node .mn-arrow-handle { cursor: crosshair; color: #93c5fd; font-size: .8rem; padding: .1rem .2rem; border-radius: .2rem; }
 .macro-node .mn-arrow-handle:hover { background: #dbeafe; color: #2563eb; }
 .macro-node .mn-btns { display: flex; gap: .15rem; }
-.macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .55rem; padding: .05rem .2rem; cursor: pointer; color: #94a3b8; }
+.macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .68rem; padding: .1rem .3rem; cursor: pointer; color: #94a3b8; }
 .macro-node .mn-btns button:hover { color: #2563eb; border-color: #93c5fd; }
 .macro-node .mn-btns button.active { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
 #macro-graph.expanded { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; z-index: 9999; border-radius: 0; border: none; min-height: 100vh !important; background: #fff; }
 #macro-graph.expanded #macro-nodes { min-height: 100vh; }
 #macro-graph.expanded #graph-close-btn { display: block !important; }
 .macro-locs { padding: .1rem 0 0 0; margin: 0; list-style: none; }
-.macro-locs li { font-size: .6rem; color: #94a3b8; line-height: 1.2; }
+.macro-locs li { font-size: .7rem; color: #94a3b8; line-height: 1.3; }
 .macro-locs li b { color: #64748b; }
 .macro-locs { width: 100%; padding: .15rem 0 0 1.4rem; margin: 0; list-style: none; }
 .macro-locs li { font-size: .65rem; color: #64748b; line-height: 1.35; padding: .05rem 0; }
@@ -337,17 +318,13 @@ textarea#instruction:focus {
             <!-- STEP 1: Design a Task -->
             <div class="step-panel active" id="step-1" style="display:flex;flex-direction:column;height:100%">
                 <!-- Workflow guide -->
-                <div style="flex-shrink:0;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.4rem;padding:.5rem .7rem;margin-bottom:.5rem">
-                    <div style="font-size:.75rem;color:#1e40af;line-height:1.5">
-                        <strong>Workflow:</strong>
-                        <span style="opacity:.7">①</span> Explore the site on the left freely
-                        <span style="color:#bfdbfe">→</span>
-                        <span style="opacity:.7">②</span> Arrange the macro graph below (add more if needed)
-                        <span style="color:#bfdbfe">→</span>
-                        <span style="opacity:.7">③</span> Write what you want done in the instruction box
-                        <span style="color:#bfdbfe">→</span>
-                        <span style="opacity:.7">④</span> Click <strong>Start Recording</strong> and do the task
-                    </div>
+                <div style="flex-shrink:0;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;padding:.4rem .6rem;margin-bottom:.4rem">
+                    <span style="font-size:.78rem;color:#1e40af">
+                        <strong>① Explore</strong> the site freely →
+                        <strong>② Design</strong> macro graph →
+                        <strong>③ Write</strong> instruction →
+                        hit Record when ready
+                    </span>
                 </div>
 
                 <!-- Sites + options row -->
@@ -374,7 +351,7 @@ textarea#instruction:focus {
                         <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.68rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:130px">
                         <div id="macro-search-results" style="display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
                     </div>
-                    <span style="font-size:.52rem;color:#94a3b8;flex:1">drag nodes · ➡ draw arrows · click arrow to delete</span>
+                    <span style="flex:1"></span>
                     <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem">⛶ Fullscreen</button>
                 </div>
                 <div id="macro-graph" style="position:relative;flex:1;min-height:120px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:auto">
@@ -397,15 +374,14 @@ textarea#instruction:focus {
                             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
                         </div>
                     </div>
-                    <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.6rem;font-size:.9rem">④ Start Recording — Do the task now &rarr;</button>
+                    <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.55rem;font-size:.88rem;font-weight:600">Start Recording &rarr;</button>
                 </div>
-                <div id="task-suggestions"></div>
             </div>
 
             <!-- STEP 2: Record trajectory -->
             <div class="step-panel" id="step-2">
-                <h3 style="color:#ef4444">🔴 Recording — Solve the task now</h3>
-                <p class="hint">Do exactly what the instruction says on the site to the left. Every click, type, and navigation is being captured.</p>
+                <h3><span style="display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:.4rem;animation:pulse 1s infinite"></span>Recording</h3>
+                <p class="hint">Do the task on the left. All actions are being captured.</p>
 
                 <div style="display:flex;gap:.3rem;margin-bottom:.5rem;align-items:center">
                     <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">Recording...</button>
@@ -469,13 +445,6 @@ textarea#instruction:focus {
             <button id="agent-btn" style="display:none"></button>
         </div>
 
-        <div id="api-ref-panel" class="api-ref collapsed">
-            <div class="api-ref-header" onclick="toggleApiRef()">
-                <h4 id="api-ref-title">API Reference</h4>
-                <span class="toggle" id="api-ref-toggle">Show</span>
-            </div>
-            <div class="api-ref-body" id="api-ref-body"></div>
-        </div>
 
         <div class="bottom-bar">
             <span class="status" id="status">Ready</span>
@@ -1303,103 +1272,8 @@ async function confirmSkip() {
 }
 
 // --- API Reference ---
-function toggleApiRef() {
-    const panel = document.getElementById('api-ref-panel');
-    const toggle = document.getElementById('api-ref-toggle');
-    panel.classList.toggle('collapsed');
-    toggle.textContent = panel.classList.contains('collapsed') ? 'Show' : 'Hide';
-}
-
 let siteDataFiles = [];
-
-function loadApiRef(siteId) {
-    // Load admin data files and site API routes in parallel
-    Promise.all([
-        fetch('/_admin/files/' + siteId).then(r => r.json()),
-        fetch('/annotate/api/routes/' + siteId).then(r => r.json()),
-    ]).then(([files, routes]) => {
-        siteDataFiles = files;
-        const title = document.getElementById('api-ref-title');
-        const body = document.getElementById('api-ref-body');
-        let html = '';
-
-        // Section 1: Verification endpoints (admin)
-        html += `<div style="padding:.35rem .8rem;font-size:.7rem;font-weight:700;color:#15803d;background:#f0fdf4;border-bottom:1px solid #bbf7d0;text-transform:uppercase;letter-spacing:.04em">Verification Endpoints</div>`;
-
-        // User state
-        html += `<div class="api-route" onclick="copyRoute('/_admin/user/${siteId}/1')" title="Click to copy">
-            <div class="api-route-top">
-                <span class="method get">GET</span>
-                <span class="path">/_admin/user/${siteId}/{user_id}</span>
-            </div>
-            <div class="desc">All data for a user: profile, cart, saved items, orders, transactions, etc.</div>
-        </div>`;
-
-        // Interaction log
-        html += `<div class="api-route" onclick="copyRoute('/_admin/log')" title="Click to copy">
-            <div class="api-route-top">
-                <span class="method get">GET</span>
-                <span class="path">/_admin/log</span>
-                <span class="params">?method=POST &middot; ?path=transfer &middot; ?last=10</span>
-            </div>
-            <div class="desc">Request history: every API call the agent made this session (method, path, body, response)</div>
-        </div>`;
-
-        // Session state
-        html += `<div class="api-route" onclick="copyRoute('/_admin/session')" title="Click to copy">
-            <div class="api-route-top">
-                <span class="method get">GET</span>
-                <span class="path">/_admin/session</span>
-            </div>
-            <div class="desc">Current session state (logged-in user, verified status, settings)</div>
-        </div>`;
-
-        // Data files
-        if (files.length) {
-            html += files.map(f => {
-                const name = f.replace('.json', '');
-                const path = `/_admin/data/${siteId}/${name}`;
-                return `<div class="api-route" onclick="copyRoute('${path}')" title="Click to copy">
-                    <div class="api-route-top">
-                        <span class="method get">GET</span>
-                        <span class="path">/_admin/data/${siteId}/${name}</span>
-                        <span class="params">?key=val &middot; ?_id=N &middot; ?_count=1</span>
-                    </div>
-                    <div class="desc">Raw ${name} data with filtering</div>
-                </div>`;
-            }).join('');
-        }
-
-        // Section 2: Site API endpoints
-        if (routes.length) {
-            html += `<div style="padding:.35rem .8rem;font-size:.7rem;font-weight:700;color:#1e40af;background:#eff6ff;border-bottom:1px solid #bfdbfe;text-transform:uppercase;letter-spacing:.04em">Site API (${routes.length} endpoints)</div>`;
-            html += routes.map(r => {
-                const extra = r.params.length ? '?' + r.params.join(', ?') :
-                              r.body_fields.length ? '{' + r.body_fields.join(', ') + '}' : '';
-                const returns = r.returns && r.returns.length ? 'Returns: ' + r.returns.join(', ') : '';
-                const fullPath = '/sites/' + siteId + r.path;
-                return `<div class="api-route" onclick="copyRoute('${fullPath}')" title="Click to copy">
-                    <div class="api-route-top">
-                        <span class="method ${r.method.toLowerCase()}">${r.method}</span>
-                        <span class="path">${r.path}</span>
-                        <span class="params">${extra}</span>
-                    </div>
-                    <div class="desc">${r.description}</div>
-                    ${returns ? '<div class="returns">' + returns + '</div>' : ''}
-                </div>`;
-            }).join('');
-        }
-
-        title.textContent = `API Reference for ${siteId}`;
-        body.innerHTML = html;
-    }).catch(() => {});
-}
-
-function copyRoute(path) {
-    navigator.clipboard.writeText(path).then(() => {
-        document.getElementById('status').textContent = 'Copied: ' + path;
-    }).catch(() => {});
-}
+function loadApiRef() {} // removed — no-op for compat
 
 // --- Recording via postMessage from recorder.js ---
 let actionCounter = 0;
