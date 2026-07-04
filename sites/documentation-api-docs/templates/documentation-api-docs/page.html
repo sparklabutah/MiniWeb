@@ -38,6 +38,8 @@
         .doc-content h3 { font-size: 1.05rem; color: #0a2540; margin: 1.5rem 0 .5rem; }
         .doc-content p { margin-bottom: 1rem; }
         .doc-content pre { background: #1a1f36; color: #e3e8ee; padding: 1rem 1.2rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: .85rem; line-height: 1.5; position: relative; }
+        .doc-content pre .copy-code { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,.15); border: none; color: #adbdcc; padding: .25rem .5rem; border-radius: 4px; cursor: pointer; font-size: .72rem; }
+        .doc-content pre .copy-code:hover { background: rgba(255,255,255,.3); color: #fff; }
         .doc-content code { font-family: 'SFMono-Regular', Menlo, Monaco, monospace; font-size: .85em; }
         .doc-content p code, .doc-content li code { background: #f0f0ff; color: #635bff; padding: .1rem .35rem; border-radius: 3px; }
         .doc-content pre code { background: none; color: inherit; padding: 0; }
@@ -197,6 +199,23 @@
         html = html.replace(/\n\n/g, '</p><p>');
 
         el.innerHTML = html;
+
+        // Add copy buttons to all code blocks
+        el.querySelectorAll('pre').forEach(function(pre) {
+            var btn = document.createElement('button');
+            btn.className = 'copy-code';
+            btn.textContent = 'Copy';
+            btn.addEventListener('click', function() {
+                var code = pre.querySelector('code');
+                var text = code ? code.textContent : pre.textContent;
+                navigator.clipboard.writeText(text).then(function() {
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                });
+                fetch('/sites/documentation-api-docs/api/track/copy_code', {method: 'POST'}).catch(function(){});
+            });
+            pre.appendChild(btn);
+        });
     })();
     </script>
 </body>
