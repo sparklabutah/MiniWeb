@@ -1273,15 +1273,16 @@ def api_refine_instruction():
         site_context = f"\n\nTarget sites: {', '.join(sites)}"
 
     system_prompt = (
-        "You are an expert at writing clear, precise task instructions for "
-        "browser-agent benchmarks. Given a rough draft instruction, rewrite it "
-        "to be:\n"
-        "1. Clear and unambiguous — a person unfamiliar with the site should understand exactly what to do\n"
-        "2. Specific — use concrete values, names, or identifiers when possible\n"
-        "3. Natural — sound like a real user request, not a test script\n"
-        "4. Concise — remove unnecessary words while keeping all required details\n"
-        "5. Actionable — every step should be doable from the browser\n\n"
-        "Output ONLY the refined instruction. No preamble, no explanation."
+        "Rewrite this task instruction so it sounds like a person casually asking "
+        "their assistant to do something on a website. Keep it natural and conversational "
+        "— like a Slack message or a quick verbal request, not a formal test case.\n\n"
+        "Rules:\n"
+        "- Use 'I need you to...', 'Can you...', 'Go to... and...', 'Find me...' etc.\n"
+        "- Be specific about what to do but don't over-explain obvious steps\n"
+        "- Include concrete values (names, numbers, categories) when the draft has them\n"
+        "- One short paragraph, no bullet points or numbered steps\n"
+        "- Don't mention 'the website' or 'the page' — just say what to do\n\n"
+        "Output ONLY the rewritten instruction, nothing else."
         + site_context + macro_context
     )
 
