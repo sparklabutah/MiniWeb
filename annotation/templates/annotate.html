@@ -449,7 +449,7 @@ textarea#instruction:focus {
             <span style="font-size:.78rem;font-weight:600;color:#1e293b">Macro Graph</span>
             <div style="position:relative">
                 <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.72rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:140px">
-                <div id="macro-search-results" style="display:none;position:absolute;bottom:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 -4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
+                <div id="macro-search-results" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 16px rgba(0,0,0,.18);max-height:220px;overflow-y:auto;z-index:9999;width:300px;font-size:.75rem"></div>
             </div>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Combine into instruction</button>
             <span style="flex:1"></span>
@@ -1113,14 +1113,20 @@ function showMacroSearch(q) {
     }
 
     results.innerHTML = matches.slice(0, 10).map(m =>
-        `<div style="padding:.3rem .5rem;cursor:pointer;border-bottom:1px solid #f1f5f9"
+        `<div style="padding:.4rem .6rem;cursor:pointer;border-bottom:1px solid #f1f5f9"
               onmousedown="addMacroFromSearch('${m.key}')"
               onmouseenter="this.style.background='#eff6ff'"
               onmouseleave="this.style.background=''">
             <div style="font-weight:500;color:#1e293b">${escHtml(m.desc)}</div>
-            <div style="font-size:.6rem;color:#94a3b8">${m.key}</div>
+            <div style="font-size:.65rem;color:#94a3b8">${m.key}</div>
         </div>`
     ).join('');
+    // Position fixed dropdown above the input
+    const input = document.getElementById('macro-search');
+    const rect = input.getBoundingClientRect();
+    results.style.left = rect.left + 'px';
+    results.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    results.style.top = 'auto';
     results.style.display = 'block';
 }
 
