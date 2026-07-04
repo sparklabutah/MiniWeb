@@ -1191,13 +1191,15 @@ function toggleMacroCheck(name, checked) {
 }
 
 function getEnabledMacros() {
-    const items = document.querySelectorAll('.macro-item');
+    // Check both old (.macro-item) and new (.macro-node) classes
+    const items = document.querySelectorAll('.macro-node, .macro-item');
     const enabled = [];
     items.forEach(item => {
-        const cb = item.querySelector('input[type="checkbox"]');
-        if (cb && cb.checked) {
-            enabled.push(item.dataset.macro);
-        }
+        const macro = item.dataset.macro;
+        if (!macro) return;
+        // In the node graph, all visible nodes are enabled unless skipped/NA
+        if (macro in macrosNotApplicable || macro in macrosSkipped) return;
+        enabled.push(macro);
     });
     return enabled;
 }
