@@ -40,7 +40,15 @@ blueprint = Blueprint(
 # ---------------------------------------------------------------------------
 
 def _get_user(user_id):
-    return db.get_item(SITE, "users", user_id)
+    user = db.get_item(SITE, "users", user_id)
+    if not user:
+        # Try numeric ID → ls-u-NNN format
+        try:
+            padded = f"ls-u-{int(user_id):03d}"
+            user = db.get_item(SITE, "users", padded)
+        except (ValueError, TypeError):
+            pass
+    return user
 
 
 def _get_user_by_username(username):
