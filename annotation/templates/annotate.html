@@ -222,9 +222,10 @@ textarea#instruction:focus {
 .macro-node .mn-btns button { background: none; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .68rem; padding: .1rem .3rem; cursor: pointer; color: #94a3b8; }
 .macro-node .mn-btns button:hover { color: #2563eb; border-color: #93c5fd; }
 .macro-node .mn-btns button.active { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
-#macro-graph.expanded { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; z-index: 9999; border-radius: 0; border: none; min-height: 100vh !important; background: #fff; }
-#macro-graph.expanded #macro-nodes { min-height: 100vh; }
-#macro-graph.expanded #graph-close-btn { display: block !important; }
+.bottom-track.expanded { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; z-index: 9999; border-radius: 0; border: none; }
+.bottom-track.expanded #graph-close-btn { display: block !important; }
+.bottom-track.expanded #macro-graph { flex: 1; }
+.bottom-track.expanded .track-instruction { display: flex !important; }
 .macro-locs { padding: .1rem 0 0 0; margin: 0; list-style: none; }
 .macro-locs li { font-size: .7rem; color: #94a3b8; line-height: 1.3; }
 .macro-locs li b { color: #64748b; }
@@ -454,6 +455,11 @@ textarea#instruction:focus {
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Combine into instruction</button>
             <span style="flex:1"></span>
             <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
+        </div>
+        <!-- Instruction panel (visible in fullscreen mode) -->
+        <div class="track-instruction" style="display:none;flex-direction:column;gap:.3rem;padding:.5rem .8rem;background:#fff;border-bottom:1px solid #e2e8f0;flex-shrink:0">
+            <label style="font-size:.72rem;font-weight:600;color:#475569;margin:0">Task Instruction</label>
+            <textarea id="track-instruction" rows="2" placeholder="Auto-generated from subtasks, or write directly..." style="font-size:.85rem;width:100%;border:1px solid #e2e8f0;border-radius:.3rem;padding:.3rem .5rem" oninput="document.getElementById('instruction').value=this.value"></textarea>
         </div>
         <div id="macro-graph" style="position:relative;flex:1;background:#f8fafc;overflow:auto">
             <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">✕ Close</button>
@@ -1175,6 +1181,8 @@ function generateInstruction() {
         document.getElementById('refine-status').textContent = '';
         if (d.refined) {
             document.getElementById('instruction').value = d.refined;
+            var ti = document.getElementById('track-instruction');
+            if (ti) ti.value = d.refined;
         }
     }).catch(() => { document.getElementById('refine-status').textContent = 'Error'; });
 }
@@ -1239,13 +1247,20 @@ function _topologicalSort(macros, edges) {
 })();
 
 function toggleGraphExpand() {
-    const graph = document.getElementById('macro-graph');
+    const track = document.getElementById('bottom-track');
     const btn = document.getElementById('graph-expand-btn');
-    graph.classList.toggle('expanded');
-    const isExpanded = graph.classList.contains('expanded');
-    btn.innerHTML = isExpanded ? '&#x26F6; Collapse' : '&#x26F6; Expand';
-    _resizeGraph();
-    _drawArrows();
+    track.classList.toggle('expanded');
+    const isExpanded = track.classList.contains('expanded');
+    btn.innerHTML = isExpanded ? '&#x26F6; Collapse' : '&#x26F6; Fullscreen';
+    // Sync instruction text between main and track textareas
+    const mainInst = document.getElementById('instruction');
+    const trackInst = document.getElementById('track-instruction');
+    if (isExpanded && mainInst && trackInst) {
+        trackInst.value = mainInst.value;
+    } else if (!isExpanded && mainInst && trackInst) {
+        mainInst.value = trackInst.value;
+    }
+    setTimeout(function() { _resizeGraph(); _drawArrows(); }, 50);
 }
 
 function toggleSkip(name) {
