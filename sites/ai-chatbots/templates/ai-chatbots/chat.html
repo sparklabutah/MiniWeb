@@ -14,9 +14,18 @@
             <input type="hidden" name="share_with" value="public">
             <button type="submit" class="btn-small" title="Share conversation">Share</button>
         </form>
-        <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=current_conv.id) }}" style="display:inline;" onsubmit="return confirm('Delete this conversation?');">
-            <button type="submit" class="btn-small btn-danger" title="Delete conversation">Delete</button>
-        </form>
+        <button class="btn-small btn-danger" title="Delete conversation" id="delete-conv-btn" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=current_conv.id) }}">Delete</button>
+        <script>
+        document.getElementById('delete-conv-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+            fetch(btn.getAttribute('data-url'), {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("ai-chatbots.chat_page") }}'; })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+        });
+        </script>
         {% endif %}
         <div class="bot-selector">
             <select id="bot-select" onchange="switchBot(this.value)">

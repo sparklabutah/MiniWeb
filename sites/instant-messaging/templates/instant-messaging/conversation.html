@@ -178,9 +178,7 @@
                                 <span class="msg-time">{{ msg.time_display.split(', ')[-1] if ', ' in msg.time_display else msg.time_display }}</span>
                                 {% if msg.is_current_user %}
                                     <span class="msg-read" style="color:{% if msg.read %}#53bdeb{% else %}#8696a0{% endif %}">&#10003;&#10003;</span>
-                                    <form method="POST" action="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="display:inline;margin-left:.3rem;" onsubmit="return confirm('Delete this message?')">
-                                        <button type="submit" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;" title="Delete">&#10005;</button>
-                                    </form>
+                                    <button class="im-msg-delete-btn" data-url="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete">&#10005;</button>
                                 {% endif %}
                             </div>
                         </div>
@@ -240,6 +238,17 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.im-msg-delete-btn');
+            if (!btn) return;
+            btn.textContent = '...';
+            btn.disabled = true;
+            fetch(btn.getAttribute('data-url'), {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() { btn.innerHTML = '&#10005;'; btn.disabled = false; });
+        });
     </script>
 </body>
 </html>

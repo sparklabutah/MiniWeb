@@ -466,9 +466,7 @@
                     <a href="{{ url_for('ai-chatbots.chat_page', conv_id=conv.id) }}" class="conv-item {% if current_conv is defined and current_conv and current_conv.id == conv.id %}active{% endif %}" style="flex:1;min-width:0;">
                         {{ conv.title }}
                     </a>
-                    <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}" style="flex-shrink:0;" onsubmit="return confirm('Delete this conversation?');">
-                        <button type="submit" class="conv-delete-btn" title="Delete conversation" style="background:none;border:none;color:#8e8ea0;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;">&times;</button>
-                    </form>
+                    <button class="conv-delete-btn sidebar-conv-delete-btn" title="Delete conversation" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}" style="background:none;border:none;color:#8e8ea0;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;">&times;</button>
                 </div>
                 {% endfor %}
             {% endif %}
@@ -500,5 +498,17 @@
         </div>
         {% block bottom %}{% endblock %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.sidebar-conv-delete-btn');
+        if (!btn) return;
+        btn.textContent = '...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { btn.innerHTML = '&times;'; btn.disabled = false; });
+    });
+    </script>
 </body>
 </html>

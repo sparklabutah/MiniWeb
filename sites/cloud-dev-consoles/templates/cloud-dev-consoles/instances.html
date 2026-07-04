@@ -107,14 +107,24 @@
                     <td>{{ inst.region }}</td>
                     <td>${{ "%.2f"|format(inst.monthly_cost) }}</td>
                     <td>
-                        <form method="POST" action="{{ url_for('cloud-dev-consoles.form_delete_instance', instance_id=inst.id) }}" style="display:inline" onsubmit="return confirm('Delete instance {{ inst.name }}?')">
-                            <button type="submit" style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
-                        </form>
+                        <button class="inst-delete-btn" data-url="{{ url_for('cloud-dev-consoles.form_delete_instance', instance_id=inst.id) }}" style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.inst-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

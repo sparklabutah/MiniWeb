@@ -83,10 +83,7 @@
                     <td>{{ p.account_number }}</td>
                     <td>{{ p.category }}</td>
                     <td>
-                        <form method="post" action="{{ url_for('banking.delete_payee_submit') }}" style="display:inline" onsubmit="return confirm('Remove this payee?')">
-                            <input type="hidden" name="payee_id" value="{{ p.id }}">
-                            <button type="submit" class="btn-delete">Remove</button>
-                        </form>
+                        <button class="btn-delete payee-delete-btn" data-url="{{ url_for('banking.delete_payee_submit') }}" data-payee-id="{{ p.id }}">Remove</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -94,5 +91,19 @@
         </table>
     </div>
 
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.payee-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Removing...';
+        btn.disabled = true;
+        var formData = new FormData();
+        formData.append('payee_id', btn.getAttribute('data-payee-id'));
+        fetch(btn.getAttribute('data-url'), {method: 'POST', body: formData})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Remove'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

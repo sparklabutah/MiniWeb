@@ -112,9 +112,18 @@
     <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
         <h3 style="font-size:15px; margin-bottom:12px; color:#ef4444;">Danger Zone</h3>
         <p style="font-size:13px; color:#8e8ea0; margin-bottom:12px;">Delete all your conversations. This cannot be undone.</p>
-        <form method="post" action="{{ url_for('ai-chatbots.form_delete_all_conversations') }}" onsubmit="return confirm('Delete ALL your conversations?');">
-            <button type="submit" class="btn-small btn-danger">Delete All Conversations</button>
-        </form>
+        <button class="btn-small btn-danger" id="delete-all-convos-btn">Delete All Conversations</button>
+        <script>
+        document.getElementById('delete-all-convos-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+            fetch('{{ url_for("ai-chatbots.form_delete_all_conversations") }}', {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete All Conversations'; btn.disabled = false; }, 2000); });
+        });
+        </script>
     </div>
 </div>
 

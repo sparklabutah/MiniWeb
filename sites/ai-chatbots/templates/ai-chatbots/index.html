@@ -51,9 +51,7 @@
                 <td>{{ conv.messages|length }}</td>
                 <td>{{ conv.updated_at[:10] }}</td>
                 <td>
-                    <form method="post" action="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}" style="display:inline;" onsubmit="return confirm('Delete this conversation?');">
-                        <button type="submit" class="btn-small">Delete</button>
-                    </form>
+                    <button class="btn-small aichat-delete-btn" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}">Delete</button>
                 </td>
             </tr>
             {% endfor %}
@@ -63,5 +61,18 @@
     <p style="color:#8e8ea0;">No conversations yet. Start chatting!</p>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.aichat-delete-btn');
+    if (!btn) return;
+    btn.textContent = 'Deleting...';
+    btn.disabled = true;
+    fetch(btn.getAttribute('data-url'), {method: 'POST'})
+        .then(function(r) { return r.ok ? r : Promise.reject(); })
+        .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+        .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+});
+</script>
 
 {% endblock %}

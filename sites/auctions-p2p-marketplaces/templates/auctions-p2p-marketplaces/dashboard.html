@@ -62,9 +62,7 @@
                     <td>{{ p.status }}</td>
                     <td>
                         <a href="{{ url_for('auctions-p2p-marketplaces.edit_listing_page', listing_id=p.id) }}">Edit</a>
-                        <form method="post" action="{{ url_for('auctions-p2p-marketplaces.delete_listing_form', listing_id=p.id) }}" style="display:inline;margin-left:.5rem" onsubmit="return confirm('Delete this item?')">
-                            <button type="submit" class="btn btn-danger">Delete</button>
-                        </form>
+                        <button class="btn btn-danger auction-delete-btn" data-url="{{ url_for('auctions-p2p-marketplaces.delete_listing_form', listing_id=p.id) }}" style="margin-left:.5rem">Delete</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -121,7 +119,7 @@
                     <td>{{ m.subject[:30] }}</td>
                     <td>{% if m.sender_id == user.id %}To: #{{ m.receiver_id }}{% else %}From: #{{ m.sender_id }}{% endif %}</td>
                     <td>{{ m.timestamp[:10] }}</td>
-                    <td><form method="post" action="{{ url_for('auctions-p2p-marketplaces.delete_message_form', msg_id=m.id) }}" style="display:inline" onsubmit="return confirm('Delete this item?')"><button type="submit" class="btn btn-danger">Delete</button></form></td>
+                    <td><button class="btn btn-danger auction-delete-btn" data-url="{{ url_for('auctions-p2p-marketplaces.delete_message_form', msg_id=m.id) }}">Delete</button></td>
                 </tr>
                 {% endfor %}
             </table>
@@ -138,6 +136,16 @@
         document.getElementById('tab-' + name).classList.add('active');
         event.target.classList.add('active');
     }
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.auction-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+    });
     </script>
 </body>
 </html>

@@ -74,14 +74,24 @@
                     <td>{{ c.phone }}</td>
                     <td>{{ c.created_date }}</td>
                     <td>
-                        <form method="POST" action="{{ url_for('crm.form_delete_contact', contact_id=c.id) }}" style="display:inline" onsubmit="return confirm('Delete contact {{ c.name }}?')">
-                            <button type="submit" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
-                        </form>
+                        <button class="crm-contact-delete-btn" data-url="{{ url_for('crm.form_delete_contact', contact_id=c.id) }}" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
                     </td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.crm-contact-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

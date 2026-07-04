@@ -60,9 +60,7 @@
                 <span class="tool-name">{{ conv.tool }}</span>:
                 <span class="conversion">{{ conv.from_value }} {{ conv.from_unit }} = {{ conv.result }} {{ conv.to_unit }}</span>
             </div>
-            <form method="post" action="{{ url_for('converters-calculators.form_remove_saved', idx=loop.index0) }}" style="display:inline" onsubmit="return confirm('Remove this saved conversion?')">
-                <button type="submit" class="btn-remove">Remove</button>
-            </form>
+            <button class="btn-remove conv-remove-btn" data-url="{{ url_for('converters-calculators.form_remove_saved', idx=loop.index0) }}">Remove</button>
         </div>
         {% endfor %}
         {% else %}
@@ -83,5 +81,17 @@
         <p class="empty">No conversion history yet.</p>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.conv-remove-btn');
+        if (!btn) return;
+        btn.textContent = 'Removing...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Remove'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

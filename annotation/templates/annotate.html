@@ -336,65 +336,76 @@ textarea#instruction:focus {
 
             <!-- STEP 1: Design a Task -->
             <div class="step-panel active" id="step-1" style="display:flex;flex-direction:column;height:100%">
-                <!-- Top section: compact controls -->
-                <div style="flex-shrink:0">
-                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
-                        <h3 style="margin:0;font-size:.9rem">Task</h3>
-                        <div id="site-labels" style="font-size:.78rem;color:#64748b"></div>
-                        <span style="flex:1"></span>
-                        <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.72rem;text-transform:none;letter-spacing:0;font-weight:500;color:#475569;">
-                            <input type="checkbox" id="auto-login-toggle" checked onchange="handleLoginToggle(this.checked)" style="accent-color:#2563eb;width:14px;height:14px;">
-                            Logged in
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.72rem;text-transform:none;letter-spacing:0;font-weight:500;color:#475569;">
-                            <input type="checkbox" id="single-site-toggle" onchange="reshufflePrompt()" style="accent-color:#2563eb;width:14px;height:14px;">
-                            Single site
-                        </label>
-                        <span id="login-status" style="font-size:.68rem;color:#16a34a;"></span>
+                <!-- Workflow guide -->
+                <div style="flex-shrink:0;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.4rem;padding:.5rem .7rem;margin-bottom:.5rem">
+                    <div style="font-size:.75rem;color:#1e40af;line-height:1.5">
+                        <strong>Workflow:</strong>
+                        <span style="opacity:.7">①</span> Explore the site on the left freely
+                        <span style="color:#bfdbfe">→</span>
+                        <span style="opacity:.7">②</span> Arrange the macro graph below (add more if needed)
+                        <span style="color:#bfdbfe">→</span>
+                        <span style="opacity:.7">③</span> Write what you want done in the instruction box
+                        <span style="color:#bfdbfe">→</span>
+                        <span style="opacity:.7">④</span> Click <strong>Start Recording</strong> and do the task
                     </div>
-
-                    <textarea id="instruction" rows="2" placeholder="Write the task instruction here..." style="font-size:.85rem;margin-bottom:.3rem"></textarea>
-                    <div style="display:flex;gap:.3rem;align-items:center;margin-bottom:.4rem">
-                        <button class="btn btn-secondary btn-sm" onclick="refineInstruction()" id="refine-btn">Refine with AI</button>
-                        <span id="refine-status" style="font-size:.68rem;color:#94a3b8"></span>
-                        <span style="flex:1"></span>
-                        <button class="btn btn-secondary btn-sm" onclick="reshufflePrompt()">Reshuffle</button>
-                        <button class="btn btn-danger btn-sm" onclick="openSkipModal()">Skip</button>
-                    </div>
-                    <div id="refined-box" style="display:none;margin-bottom:.4rem">
-                        <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#0f172a;cursor:pointer" onclick="acceptRefinement()"></div>
-                        <div style="display:flex;gap:.3rem;margin-top:.2rem">
-                            <button class="btn btn-success btn-sm" onclick="acceptRefinement()">Use refined</button>
-                            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
-                        </div>
-                    </div>
-                    <div id="task-suggestions"></div>
                 </div>
 
-                <!-- Macro graph fills remaining space -->
+                <!-- Sites + options row -->
+                <div style="flex-shrink:0;display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+                    <div id="site-labels" style="font-size:.78rem;color:#1e293b;font-weight:600"></div>
+                    <span style="flex:1"></span>
+                    <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
+                        <input type="checkbox" id="auto-login-toggle" checked onchange="handleLoginToggle(this.checked)" style="accent-color:#2563eb;width:13px;height:13px;">
+                        Logged in
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
+                        <input type="checkbox" id="single-site-toggle" onchange="reshufflePrompt()" style="accent-color:#2563eb;width:13px;height:13px;">
+                        Single site
+                    </label>
+                    <span id="login-status" style="font-size:.65rem;color:#16a34a;"></span>
+                    <button class="btn btn-secondary" style="font-size:.6rem;padding:.15rem .4rem" onclick="reshufflePrompt()">↻ New prompt</button>
+                    <button class="btn btn-danger" style="font-size:.6rem;padding:.15rem .4rem" onclick="openSkipModal()">Skip</button>
+                </div>
+
+                <!-- Macro graph — main workspace -->
                 <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.2rem;flex-shrink:0">
-                    <label style="margin:0;font-size:.72rem">Macros</label>
+                    <span style="font-size:.72rem;font-weight:600;color:#1e293b">② Macro Graph</span>
                     <div style="position:relative;margin-left:.3rem">
                         <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.68rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:130px">
                         <div id="macro-search-results" style="display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:100;width:280px;font-size:.72rem"></div>
                     </div>
-                    <span style="font-size:.55rem;color:#94a3b8;flex:1">drag · &#x27A1; arrows · click to delete</span>
-                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem">&#x26F6; Fullscreen</button>
+                    <span style="font-size:.52rem;color:#94a3b8;flex:1">drag nodes · ➡ draw arrows · click arrow to delete</span>
+                    <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.55rem;padding:.1rem .3rem">⛶ Fullscreen</button>
                 </div>
                 <div id="macro-graph" style="position:relative;flex:1;min-height:120px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.4rem;overflow:auto">
                     <button id="graph-close-btn" onclick="toggleGraphExpand()" style="display:none;position:fixed;top:12px;right:16px;z-index:10000;background:#1e293b;color:#fff;border:none;border-radius:.4rem;padding:.4rem .8rem;font-size:.85rem;cursor:pointer">&#x2715; Close</button>
                     <svg id="macro-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1"></svg>
                     <div id="macro-nodes" style="position:relative;z-index:2;min-height:120px"></div>
                 </div>
-                <div style="flex-shrink:0;padding-top:.4rem">
-                    <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.5rem">Start Recording &rarr;</button>
+                <!-- Instruction + Record — bottom of step 1 -->
+                <div style="flex-shrink:0;padding-top:.5rem;border-top:1px solid #e2e8f0;margin-top:.3rem">
+                    <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.3rem">
+                        <span style="font-size:.72rem;font-weight:600;color:#1e293b">③ Write Instruction</span>
+                        <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem;margin-left:auto" onclick="refineInstruction()" id="refine-btn">✨ Refine with AI</button>
+                        <span id="refine-status" style="font-size:.65rem;color:#94a3b8"></span>
+                    </div>
+                    <textarea id="instruction" rows="2" placeholder="Tell the agent what to do, like you'd ask an assistant: 'Can you find me the cheapest flight to Portland and book it?'" style="font-size:.85rem;margin-bottom:.3rem;width:100%"></textarea>
+                    <div id="refined-box" style="display:none;margin-bottom:.3rem">
+                        <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#0f172a;cursor:pointer" onclick="acceptRefinement()"></div>
+                        <div style="display:flex;gap:.3rem;margin-top:.2rem">
+                            <button class="btn btn-success btn-sm" onclick="acceptRefinement()">Use refined</button>
+                            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('refined-box').style.display='none'">Keep original</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="startRecording()" style="width:100%;padding:.6rem;font-size:.9rem">④ Start Recording — Do the task now &rarr;</button>
                 </div>
+                <div id="task-suggestions"></div>
             </div>
 
             <!-- STEP 2: Record trajectory -->
             <div class="step-panel" id="step-2">
-                <h3>Step 2: Solve the Task</h3>
-                <p class="hint">Navigate the site on the left. Actions appear in the sidebar. After recording, tag action ranges with macros.</p>
+                <h3 style="color:#ef4444">🔴 Recording — Solve the task now</h3>
+                <p class="hint">Do exactly what the instruction says on the site to the left. Every click, type, and navigation is being captured.</p>
 
                 <div style="display:flex;gap:.3rem;margin-bottom:.5rem;align-items:center">
                     <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">Recording...</button>
