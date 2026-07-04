@@ -147,10 +147,33 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         </div>
         {% endif %}
 
-        <!-- Verifier builder placeholder -->
+        <!-- Macros for this task -->
+        <div class="section">
+            <h3>Macros ({{ task.macros|length }})</h3>
+            {% for m in task.macros %}
+            <div style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
+                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}</div>
+                <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
+                {% if task.macro_spans and task.macro_spans.get(m) %}
+                <div style="font-size:.68rem;color:#2563eb;margin-top:.1rem">Tagged actions: {{ task.macro_spans[m]|join(' → ') }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if task.macro_edges %}
+            <label>Macro Dependencies</label>
+            <div style="font-size:.75rem;color:#475569">
+                {% for edge in task.macro_edges %}
+                <div>{{ macro_descriptions.get(edge.get('from',''), {}).get('description', edge.get('from','')) }} → {{ macro_descriptions.get(edge.get('to',''), {}).get('description', edge.get('to','')) }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Verifier builder -->
         <div class="section">
             <h3>Verifier Builder <span class="badge badge-pending">Coming Soon</span></h3>
-            <p class="hint">Build verification checks against the logged trajectory and server data. This will be wired to the existing CHECK_CATALOG system.</p>
+            <p class="hint">Drag-and-drop verification checks will be wired here. For now, review the trajectory and macros above.</p>
         </div>
         {% endif %}
     </div>
