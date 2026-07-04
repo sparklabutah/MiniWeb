@@ -77,7 +77,24 @@
                 <form method="post" action="{{ url_for('url-shorteners-qr.toggle_link', link_id=link.id) }}" style="display:inline;">
                     <button type="submit" class="btn btn-warning">{{ 'Deactivate' if link.is_active else 'Activate' }}</button>
                 </form>
-                <button class="btn btn-danger" onclick="if(confirm('Delete this link?')){fetch('{{ url_for('url-shorteners-qr.delete_link_form', link_id=link.id) }}',{method:'POST'}).then(()=>{this.textContent='Deleted';this.disabled=true;setTimeout(()=>location.href='{{ url_for('url-shorteners-qr.links_page') }}',500)})}">Delete</button>
+                <button class="btn btn-danger" id="delete-btn">Delete</button>
+                <script>
+                document.getElementById('delete-btn').addEventListener('click', function() {
+                    var btn = this;
+                    btn.textContent = 'Deleting...';
+                    btn.disabled = true;
+                    fetch('{{ url_for("url-shorteners-qr.api_link_delete", link_id=link.id) }}', {method: 'DELETE'})
+                        .then(function(r) { return r.json(); })
+                        .then(function() {
+                            btn.textContent = 'Deleted!';
+                            window.location.href = '{{ url_for("url-shorteners-qr.links_page") }}';
+                        })
+                        .catch(function() {
+                            btn.textContent = 'Error';
+                            setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000);
+                        });
+                });
+                </script>
             </div>
         </div>
 
