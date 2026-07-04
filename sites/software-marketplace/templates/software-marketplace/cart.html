@@ -63,9 +63,7 @@
                 <div class="item-price {% if item.app.price == 0 %}free{% endif %}">
                     {% if item.app.price == 0 %}Free{% else %}${{ "%.2f"|format(item.app.price) }}{% endif %}
                 </div>
-                <form method="post" action="{{ url_for('software-marketplace.form_remove_from_cart', app_id=item.app.id) }}" style="display:inline;" onsubmit="return confirm('Remove from cart?')">
-                    <button type="submit" class="remove-btn">Remove</button>
-                </form>
+                <button class="remove-btn cart-remove-btn" data-url="{{ url_for('software-marketplace.form_remove_from_cart', app_id=item.app.id) }}">Remove</button>
             </div>
             {% endfor %}
 
@@ -87,5 +85,17 @@
             </div>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.cart-remove-btn');
+        if (!btn) return;
+        btn.textContent = 'Removing...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Remove'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

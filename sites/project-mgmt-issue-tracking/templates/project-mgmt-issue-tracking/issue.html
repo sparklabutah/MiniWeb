@@ -121,9 +121,18 @@
                             <option value="closed">Closed</option>
                         </select>
                     </form>
-                    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_delete_issue', issue_id=issue.id) }}" onsubmit="return confirm('Delete this issue?')">
-                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                    </form>
+                    <button class="btn btn-danger btn-sm" id="delete-issue-btn">Delete</button>
+                    <script>
+                    document.getElementById('delete-issue-btn').addEventListener('click', function() {
+                        var btn = this;
+                        btn.textContent = 'Deleting...';
+                        btn.disabled = true;
+                        fetch('{{ url_for("project-mgmt-issue-tracking.form_delete_issue", issue_id=issue.id) }}', {method: 'POST'})
+                            .then(function(r) { return r.ok ? r : Promise.reject(); })
+                            .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("project-mgmt-issue-tracking.board_page") }}'; })
+                            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+                    });
+                    </script>
                 </div>
 
                 <!-- Edit section -->

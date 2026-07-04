@@ -482,9 +482,7 @@
                 </span>
                 <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}" class="fc-file-name" title="{{ file.name }}">{{ file.name }}</a>
                 <div class="fc-actions">
-                    <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:inline;" title="Delete permanently" onsubmit="return confirm('Permanently delete this file?')">
-                        <button type="submit" class="trash-btn trash-btn-delete">&#128465;</button>
-                    </form>
+                    <button class="trash-btn trash-btn-delete csft-perm-delete-btn" data-url="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" title="Delete permanently">&#128465;</button>
                 </div>
             </div>
         </div>
@@ -531,9 +529,7 @@
                 <td class="fl-meta">{{ format_size(file.size_bytes) }}</td>
                 <td>
                     <div style="display:flex;gap:4px;">
-                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:inline;" title="Delete permanently" onsubmit="return confirm('Permanently delete this file?')">
-                            <button type="submit" class="trash-btn trash-btn-delete">&#128465; Delete</button>
-                        </form>
+                        <button class="trash-btn trash-btn-delete csft-perm-delete-btn" data-url="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" title="Delete permanently">&#128465; Delete</button>
                     </div>
                 </td>
             </tr>
@@ -587,6 +583,17 @@
                 if (txt) txt.textContent = 'Storage info unavailable';
             });
     })();
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.csft-perm-delete-btn');
+        if (!btn) return;
+        btn.textContent = '...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { btn.innerHTML = '&#128465;'; btn.disabled = false; });
+    });
 </script>
 
 </body>

@@ -261,11 +261,19 @@
             <button type="submit" class="tool-btn" style="font-size:.75rem;">Invite</button>
         </form>
 
-        <form method="post" action="{{ url_for('handwritten-notes-whiteboards.note_delete_submit', note_id=note.id) }}" style="display:inline;" onsubmit="return confirm('Delete this note permanently?');">
-            <button type="submit" class="tool-btn danger" title="Delete note">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            </button>
-        </form>
+        <button class="tool-btn danger" title="Delete note" id="delete-note-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+        <script>
+        document.getElementById('delete-note-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.disabled = true;
+            fetch('{{ url_for("handwritten-notes-whiteboards.note_delete_submit", note_id=note.id) }}', {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.href = '{{ url_for("handwritten-notes-whiteboards.index") }}'; })
+                .catch(function() { btn.disabled = false; });
+        });
+        </script>
         {% endif %}
     </div>
 

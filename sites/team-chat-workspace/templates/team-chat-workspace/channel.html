@@ -189,9 +189,7 @@
                                 </div>
                                 <div class="msg-text">{{ msg.text }}</div>
                                 {% if current_user and msg.user_id == current_user.id %}
-                                <form method="POST" action="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="display:inline;" onsubmit="return confirm('Delete this message?')">
-                                    <button type="submit" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Delete message">&#10005; delete</button>
-                                </form>
+                                <button class="msg-delete-btn" data-url="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Delete message">&#10005; delete</button>
                                 {% endif %}
                                 {% if msg.reactions %}
                                 <div class="reactions">
@@ -237,6 +235,16 @@
     </div>
 
     <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.msg-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'error'; setTimeout(function() { btn.textContent = '\u2715 delete'; btn.disabled = false; }, 2000); });
+    });
     function sendMessage(e) {
         e.preventDefault();
         var text = document.getElementById('msg-input').value.trim();

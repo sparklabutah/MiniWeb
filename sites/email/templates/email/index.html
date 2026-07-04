@@ -139,9 +139,7 @@
                         </span>
                         <span class="email-date">{{ e.date_display }}</span>
                     </a>
-                    <form method="post" action="{{ url_for('email.form_delete', email_id=e.id) }}" style="display:inline;margin:0;padding:0" onclick="event.stopPropagation()" onsubmit="return confirm('Delete this email?')">
-                        <button type="submit" class="email-delete" style="background:none;border:none;cursor:pointer;color:#dadce0;font-size:.9rem;padding:2px 6px;flex-shrink:0;" title="Delete" onmouseover="this.style.color='#d93025'" onmouseout="this.style.color='#dadce0'">&#128465;</button>
-                    </form>
+                    <button class="email-delete-btn" data-url="{{ url_for('email.form_delete', email_id=e.id) }}" style="background:none;border:none;cursor:pointer;color:#dadce0;font-size:.9rem;padding:2px 6px;flex-shrink:0;" title="Delete" onclick="event.stopPropagation()" onmouseover="this.style.color='#d93025'" onmouseout="this.style.color='#dadce0'">&#128465;</button>
                 </div>
                 {% endfor %}
                 {% else %}
@@ -197,6 +195,17 @@
             cb.addEventListener('change', updateBulk);
         });
     })();
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.email-delete-btn');
+        if (!btn) return;
+        e.stopPropagation();
+        btn.textContent = '...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { btn.innerHTML = '&#128465;'; btn.disabled = false; });
+    });
     </script>
 </body>
 </html>

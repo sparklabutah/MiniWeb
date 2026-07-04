@@ -75,9 +75,7 @@
                 <form method="post" action="{{ url_for('documents.form_restore_document', doc_id=doc.id) }}" style="display:inline">
                     <button type="submit" class="btn btn-restore">Restore</button>
                 </form>
-                <form method="post" action="{{ url_for('documents.form_delete_document', doc_id=doc.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this document?')">
-                    <button type="submit" class="btn btn-delete">Delete forever</button>
-                </form>
+                <button class="btn btn-delete doc-perm-delete-btn" data-url="{{ url_for('documents.form_delete_document', doc_id=doc.id) }}">Delete forever</button>
             </div>
             {% endif %}
         </div>
@@ -89,5 +87,17 @@
         </div>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.doc-perm-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete forever'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

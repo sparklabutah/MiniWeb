@@ -83,10 +83,7 @@
                                     {% endfor %}
                                 </select>
                             </form>
-                            <form method="POST" action="{{ url_for('e-commerce.form_remove_from_cart') }}" style="display:inline;" onsubmit="return confirm('Remove from cart?')">
-                                <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                                <button type="submit" class="btn-remove">Delete</button>
-                            </form>
+                            <button class="btn-remove cart-remove-btn" data-url="{{ url_for('e-commerce.form_remove_from_cart') }}" data-product-id="{{ item.product.id }}">Delete</button>
                         </div>
                     </div>
                     <div class="subtotal">${{ "%.2f"|format(item.subtotal) }}</div>
@@ -121,5 +118,19 @@
         </div>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.cart-remove-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        var formData = new FormData();
+        formData.append('product_id', btn.getAttribute('data-product-id'));
+        fetch(btn.getAttribute('data-url'), {method: 'POST', body: formData})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

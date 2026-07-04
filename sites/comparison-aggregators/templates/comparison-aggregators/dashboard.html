@@ -89,9 +89,7 @@
                         {% if p.battery_size %}<span>{{ p.battery_size }}</span>{% endif %}
                     </div>
                     <div class="card-actions">
-                        <form method="post" action="{{ url_for('comparison-aggregators.form_remove_favorite', phone_id=p.id) }}" onsubmit="return confirm('Remove this item?')">
-                            <button class="btn-sm btn-remove" type="submit">Remove</button>
-                        </form>
+                        <button class="btn-sm btn-remove fav-remove-btn" data-url="{{ url_for('comparison-aggregators.form_remove_favorite', phone_id=p.id) }}">Remove</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -122,9 +120,7 @@
                         {% if p.battery_size %}<span>{{ p.battery_size }}</span>{% endif %}
                     </div>
                     <div class="card-actions">
-                        <form method="post" action="{{ url_for('comparison-aggregators.form_remove_compare', phone_id=p.id) }}" onsubmit="return confirm('Remove this item?')">
-                            <button class="btn-sm btn-remove" type="submit">Remove</button>
-                        </form>
+                        <button class="btn-sm btn-remove compare-remove-btn" data-url="{{ url_for('comparison-aggregators.form_remove_compare', phone_id=p.id) }}">Remove</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -139,5 +135,17 @@
             {% endif %}
         </div>
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.fav-remove-btn, .compare-remove-btn');
+        if (!btn) return;
+        btn.textContent = 'Removing...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Remove'; btn.disabled = false; }, 2000); });
+    });
+    </script>
 </body>
 </html>

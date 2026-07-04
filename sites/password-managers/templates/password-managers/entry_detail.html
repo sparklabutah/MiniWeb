@@ -198,9 +198,18 @@
 
         <div style="margin-top:1rem;display:flex;gap:.6rem;">
             <a href="{{ url_for('password-managers.edit_entry_page', entry_id=entry.id) }}" style="padding:.4rem 1rem;background:#1e2235;color:#6c8cff;border:1px solid #2d3348;border-radius:.3rem;font-size:.85rem;text-decoration:none;">Edit</a>
-            <form method="POST" action="{{ url_for('password-managers.form_delete_entry', entry_id=entry.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this entry?')">
-                <button type="submit" style="padding:.4rem 1rem;background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;border-radius:.3rem;font-size:.85rem;cursor:pointer;">Delete</button>
-            </form>
+            <button id="delete-entry-btn" style="padding:.4rem 1rem;background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;border-radius:.3rem;font-size:.85rem;cursor:pointer;">Delete</button>
+            <script>
+            document.getElementById('delete-entry-btn').addEventListener('click', function() {
+                var btn = this;
+                btn.textContent = 'Deleting...';
+                btn.disabled = true;
+                fetch('{{ url_for("password-managers.form_delete_entry", entry_id=entry.id) }}', {method: 'POST'})
+                    .then(function(r) { return r.ok ? r : Promise.reject(); })
+                    .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("password-managers.index") }}'; })
+                    .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+            });
+            </script>
         </div>
 
         {% if audit_log %}

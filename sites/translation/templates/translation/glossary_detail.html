@@ -29,9 +29,18 @@
         </table>
 
         {% if logged_in %}
-        <form method="POST" action="{{ url_for('translation.delete_glossary_form', glossary_id=glossary.id) }}" onsubmit="return confirm('Delete this glossary?')">
-            <button type="submit" style="color:red">Delete Glossary</button>
-        </form>
+        <button id="delete-glossary-btn" style="color:red">Delete Glossary</button>
+        <script>
+        document.getElementById('delete-glossary-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+            fetch('{{ url_for("translation.delete_glossary_form", glossary_id=glossary.id) }}', {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("translation.glossaries_page") }}'; })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete Glossary'; btn.disabled = false; }, 2000); });
+        });
+        </script>
         {% endif %}
     </div>
 </body>

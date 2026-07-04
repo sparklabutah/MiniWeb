@@ -576,11 +576,9 @@
                             </button>
                         </form>
                         <div class="dropdown-divider"></div>
-                        <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="display:contents;" onsubmit="return confirm('Move to trash?')">
-                            <button type="submit" class="dropdown-item" style="color:#c5221f;">
-                                <span class="di-icon">&#128465;</span> Move to trash
-                            </button>
-                        </form>
+                        <button class="dropdown-item csft-trash-btn" data-url="{{ url_for('cloud-storage-file-transfer.form_file_delete', file_id=file.id) }}" style="color:#c5221f;">
+                            <span class="di-icon">&#128465;</span> Move to trash
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -647,6 +645,17 @@
                 if (txt) txt.textContent = 'Storage info unavailable';
             });
     })();
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.csft-trash-btn');
+        if (!btn) return;
+        btn.textContent = 'Moving...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { btn.innerHTML = '<span class="di-icon">&#128465;</span> Move to trash'; btn.disabled = false; });
+    });
 </script>
 
 </body>
