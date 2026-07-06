@@ -307,6 +307,8 @@ textarea#instruction:focus {
                 <div style="display:flex;gap:.3rem;margin-top:.3rem">
                     <button class="btn btn-sm btn-secondary" onclick="startRangeSelect()" id="range-btn" title="Select a range of actions for a macro">Tag Range</button>
                     <button class="btn btn-sm btn-secondary" onclick="clearAllTags()" title="Clear all macro tags">Clear Tags</button>
+                    <button class="btn btn-sm btn-secondary" onclick="suggestTagsAI()" id="suggest-tags-btn" title="Let AI suggest macro tags" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">Suggest Tags</button>
+                    <span id="suggest-tags-status" style="font-size:.6rem;color:#94a3b8"></span>
                 </div>
             </div>
         </div>
@@ -593,7 +595,7 @@ function resetSession() {
         .then(r => r.json())
         .then(() => {
             const iframe = document.getElementById('site-iframe');
-            if (iframe) iframe.src = iframe.src;
+            if (iframe) _reloadIframe(iframe);
             alert('Session reset to pristine state.');
         })
         .catch(() => alert('Reset failed.'));
@@ -650,11 +652,13 @@ function initAnnotation() {
         if (currentPrompt.sites.length > 0) {
             loadApiRef(currentPrompt.sites[0].id);
         }
-        // Auto-login if toggle is checked
+        // Auto-login if toggle is checked, otherwise ensure logged out + reload iframe
         const toggle = document.getElementById('auto-login-toggle');
-        if (toggle && toggle.checked) {
-            autoLoginSites();
-        }
+        const ready = (toggle && toggle.checked) ? autoLoginSites() : _logoutSites();
+        ready.then(() => {
+            const iframe = document.getElementById('site-iframe');
+            if (iframe) _reloadIframe(iframe);
+        });
     }
 }
 
@@ -683,12 +687,19 @@ async function handleLoginToggle(checked) {
     const iframe = document.getElementById('site-iframe');
     if (checked) {
         await autoLoginSites();
-        if (iframe) iframe.src = iframe.src;
     } else {
-        await _resetSessionSilent();
+        await _logoutSites();
         statusEl.textContent = 'Logged out';
-        if (iframe) iframe.src = iframe.src;
     }
+    if (iframe) _reloadIframe(iframe);
+}
+
+async function _logoutSites() {
+    return fetch('/annotate/api/auto_logout', { method: 'POST' }).then(r => r.json()).catch(() => {});
+}
+
+function _reloadIframe(iframe) {
+    iframe.src = iframe.src;
 }
 
 async function refineInstruction() {
@@ -768,6 +779,18 @@ function goStep(n) {
     // if (n === 2 && !agentRunning && !agentResult) {
     //     startBackgroundAgent();
     // }
+    // Prefill expected outcome with macro labels when entering step 3
+    if (n === 3) {
+        const outcomeEl = document.getElementById('expected-outcome');
+        if (outcomeEl && !outcomeEl.value.trim()) {
+            const enabled = getEnabledMacros();
+            const lines = enabled.map(m => {
+                const label = (macroDescriptions[m] || {}).description || m;
+                return `${label}: `;
+            });
+            outcomeEl.value = lines.join('\n');
+        }
+    }
 }
 
 // --- Macro list with checkboxes, tooltips, reorder ---
@@ -837,6 +860,16 @@ function renderMacroList() {
             html += `<textarea class="mn-subtask" rows="1" placeholder="What to do for this step..."
                 onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
                 oninput="macroSubtasks['${m}']=this.value">${escHtml(saved)}</textarea>`;
+        }
+
+        // QA answer input (for extract/compute/compare/verify macros)
+        if (!excluded && isQA) {
+            const savedAns = qaAnswers[m] || '';
+            html += `<input type="text" class="mn-qa-answer" placeholder="Expected answer..."
+                value="${escHtml(savedAns)}"
+                onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
+                oninput="qaAnswers['${m}']=this.value"
+                style="width:100%;padding:.25rem .4rem;font-size:.72rem;border:1px solid #93c5fd;border-radius:.25rem;background:#eff6ff;margin-top:.2rem">`;
         }
 
         // UI locations (collapsed)
@@ -1266,6 +1299,29 @@ function toggleNA(name) {
         delete macrosSkipped[name];  // can't be both
     }
     renderMacroList();
+    // If all macros are now NA, offer to report and move on
+    const enabled = getEnabledMacros();
+    if (enabled.length === 0 && selectedMacros.length > 0) {
+        _reportAllNA();
+    }
+}
+
+async function _reportAllNA() {
+    const annotator = getAnnotatorName() || 'anonymous';
+    const sites = currentPrompt ? currentPrompt.sites.map(s => s.id) : [];
+    try {
+        await fetch('/annotate/api/report', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                sites, macros: [], reason: 'all_na',
+                details: 'All macros marked N/A',
+                annotator,
+                macros_not_applicable: macrosNotApplicable,
+            })
+        });
+    } catch(e) {}
+    document.getElementById('status').textContent = 'All macros N/A — reported. Loading new prompt...';
+    setTimeout(() => reshufflePrompt(), 1000);
 }
 
 function toggleMacroCheck(name, checked) {
@@ -1334,22 +1390,22 @@ function reshufflePrompt() {
             // Clear server-side request log
             fetch('/_admin/log/clear', {method: 'POST'}).catch(() => {});
 
-            // Reload portal iframe with new site tabs
-            if (prompt.sites.length > 0) {
-                const siteIds = prompt.sites.map(s => s.id).join(',');
-                document.getElementById('site-iframe').src = '/?open=' + siteIds;
-                loadApiRef(prompt.sites[0].id);
-            }
-
             renderSiteLabels();
             renderMacroList();
             updateChainDisplay();
             renderTagPalette();
             document.getElementById('instruction').value = '';
             document.getElementById('status').textContent = 'New prompt loaded';
-            // Re-login if toggle is checked
+            // Set login state BEFORE loading iframe so it renders correctly
             const toggle = document.getElementById('auto-login-toggle');
-            if (toggle && toggle.checked) { autoLoginSites(); }
+            const sessionReady = (toggle && toggle.checked) ? autoLoginSites() : _logoutSites();
+            sessionReady.then(() => {
+                if (prompt.sites.length > 0) {
+                    const siteIds = prompt.sites.map(s => s.id).join(',');
+                    document.getElementById('site-iframe').src = '/?open=' + siteIds;
+                    loadApiRef(prompt.sites[0].id);
+                }
+            });
         })
         .catch(e => {
             document.getElementById('status').textContent = 'Error: ' + e.message;
@@ -1378,6 +1434,7 @@ async function confirmSkip() {
             body: JSON.stringify({
                 sites, macros, reason, details, annotator,
                 instruction: document.getElementById('instruction').value,
+                macros_not_applicable: macrosNotApplicable,
             })
         });
     } catch(e) {}
@@ -1441,6 +1498,8 @@ function pollServerLog() {
     }).catch(() => {});
 }
 
+var startingUrl = '';
+
 function startRecording() {
     trajectory = [];
     actionCounter = 0;
@@ -1460,6 +1519,18 @@ function startRecording() {
     renderMacroSpanSummary();
     recording = true;
     lastUrl = '';
+    // Capture starting URL from the iframe — this is where the task begins
+    try {
+        const iframe = document.getElementById('site-iframe');
+        const innerFrame = iframe.contentWindow.document.querySelector('iframe');
+        if (innerFrame) {
+            startingUrl = innerFrame.contentWindow.location.href;
+        } else {
+            startingUrl = iframe.contentWindow.location.href;
+        }
+    } catch(e) {
+        startingUrl = '';
+    }
     // Start polling server log
     if (logPollTimer) clearInterval(logPollTimer);
     logPollTimer = setInterval(pollServerLog, 1500);
@@ -1638,6 +1709,65 @@ function clearAllTags() {
     macroSpans = {}; macroEdges = []; macroPositions = {}; macroSubtasks = {};
     renderTimeline();
     renderMacroSpanSummary();
+}
+
+function suggestTagsAI() {
+    var actions = trajectory.filter(function(e) { return e.type === 'action'; });
+    var macros = getEnabledMacros();
+    if (!actions.length || !macros.length) { alert('Record actions and enable macros first'); return; }
+
+    var btn = document.getElementById('suggest-tags-btn');
+    var status = document.getElementById('suggest-tags-status');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    status.textContent = '';
+
+    // Build compact action list
+    // Actions are 1-indexed in the UI
+    var actionList = actions.map(function(a, i) {
+        var verb = a.action || '';
+        var target = (a.target || '').slice(0, 50);
+        var val = a.text || a.value || '';
+        return (i + 1) + '. ' + verb + ' ' + target + (val ? ' "' + String(val).slice(0, 25) + '"' : '');
+    });
+
+    var instruction = document.getElementById('instruction').value || '';
+
+    fetch('/annotate/api/suggest_tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            task_id: '_live',
+            annotator: getAnnotatorName() || 'anonymous',
+            _inline: true,
+            instruction: instruction,
+            macros: macros,
+            actions: actionList,
+        })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags';
+        if (d.suggested_spans) {
+            // Apply suggestions (don't overwrite existing tags)
+            var applied = 0;
+            for (var macro in d.suggested_spans) {
+                if (!macroSpans[macro]) {
+                    macroSpans[macro] = d.suggested_spans[macro];
+                    applied++;
+                }
+            }
+            renderTimeline();
+            renderMacroSpanSummary();
+            status.textContent = applied + ' tags suggested' + (applied > 0 ? ' (applied to untagged macros)' : '');
+            setTimeout(function() { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = d.error || 'Failed';
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags';
+        status.textContent = 'Error';
+    });
 }
 
 function renderRangeMacroChips() {
@@ -2683,7 +2813,8 @@ async function submitTask() {
     const enabledMacros = getEnabledMacros();
 
     // Check that all enabled macros have been tagged in the trajectory
-    const untagged = enabledMacros.filter(m => !(m in macroSpans));
+    // QA macros with an answer don't need a span
+    const untagged = enabledMacros.filter(m => !(m in macroSpans) && !(isQAMacro(m) && qaAnswers[m]));
     if (untagged.length > 0) {
         const names = untagged.map(m => (macroDescriptions[m]||{}).description || m);
         alert('Tag all macros before submitting.\n\nUntagged:\n• ' + names.join('\n• ') +
@@ -2716,6 +2847,8 @@ async function submitTask() {
                 answer_type: document.getElementById('answer-type').value,
                 alternatives: document.getElementById('alternatives').value,
                 expected_outcome: (document.getElementById('expected-outcome') || {}).value || '',
+                starting_url: startingUrl,
+                requires_login: document.getElementById('auto-login-toggle').checked,
                 trajectory,
                 server_log: serverLog,
                 beacon_log: beaconLog,

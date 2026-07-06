@@ -9,18 +9,36 @@ The annotation blueprint is registered in the main MiniWeb app.
 """
 
 import json
+import os
 import random
 import uuid
 import pickle
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request, session
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from annotation.macro_locations import MACRO_LOCATIONS
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITES_DIR = PROJECT_ROOT / "sites"
+
+# Annotator credentials: override via MINIWEB_ANNOTATORS env var
+# Format: "user1:pass1,user2:pass2,..."
+_DEFAULT_ANNOTATORS = {"minh": "miniweb", "annotator2": "miniweb", "annotator3": "miniweb", "annotator4": "miniweb"}
+
+def _load_annotator_credentials():
+    env = os.environ.get("MINIWEB_ANNOTATORS", "")
+    if env:
+        creds = {}
+        for pair in env.split(","):
+            if ":" in pair:
+                user, pw = pair.split(":", 1)
+                creds[user.strip()] = pw.strip()
+        return creds if creds else _DEFAULT_ANNOTATORS
+    return _DEFAULT_ANNOTATORS
+
+ANNOTATOR_CREDENTIALS = _load_annotator_credentials()
 
 annotation_bp = Blueprint(
     "annotation",
@@ -38,18 +56,11 @@ annotation_bp = Blueprint(
 _MACRO_DESCRIPTIONS = {
     # Navigation
     "navigate_by_route": {"verb": "navigate", "modality": "route", "description": "Go to a specific page by clicking a link or menu item", "example": "Click 'Dashboard' in the sidebar to go to the dashboard page"},
-    "navigate_by_dropdown": {"verb": "navigate", "modality": "dropdown", "description": "Navigate to a section by selecting from a dropdown menu", "example": "Select 'Accounts' from the navigation dropdown"},
     "navigate_by_semantic": {"verb": "navigate", "modality": "semantic", "description": "Navigate to a page described in natural language", "example": "Find and go to the page that shows your recent orders"},
-    "navigate_by_ranking": {"verb": "navigate", "modality": "ranking", "description": "Navigate to an item based on its rank position", "example": "Click on the 3rd most popular article"},
     "navigate_by_date_range": {"verb": "navigate", "modality": "date range", "description": "Navigate to content within a specific date range", "example": "Go to events for next week using the calendar picker"},
     "navigate_by_pan_zoom": {"verb": "navigate", "modality": "pan/zoom", "description": "Navigate a visual interface by panning or zooming", "example": "Zoom into the downtown area on the map"},
     "navigate_by_query": {"verb": "navigate", "modality": "query", "description": "Navigate by entering a query in a search/address bar", "example": "Type a URL slug in the address bar to go to that page"},
     "navigate_from_table": {"verb": "navigate", "modality": "table", "description": "Click a row in a table to navigate to its detail page", "example": "Click a file name in the file list to open it"},
-    "navigate_by_link": {"verb": "navigate", "modality": "link", "description": "Navigate by clicking an inline hyperlink", "example": "Click the author's name link to visit their profile"},
-    "navigate_by_sidebar": {"verb": "navigate", "modality": "sidebar", "description": "Navigate using a sidebar menu or tree", "example": "Click 'Getting Started' in the docs sidebar to open that section"},
-    "navigate_console": {"verb": "navigate", "modality": "console", "description": "Navigate to an admin or management console", "example": "Go to the admin console to manage submissions"},
-    "browse_by_letter": {"verb": "browse", "modality": "letter", "description": "Browse items alphabetically by clicking a letter", "example": "Click 'M' to browse all words starting with M"},
-    "login_by_form": {"verb": "login", "modality": "form", "description": "Log in by entering credentials in a login form", "example": "Enter username and password then click Sign In"},
     # Search
     "search_by_query": {"verb": "search", "modality": "query", "description": "Search using a text query in a search box", "example": "Type 'machine learning' in the search bar and press Enter"},
     "search_by_semantic": {"verb": "search", "modality": "semantic", "description": "Search using natural language or meaning-based query", "example": "Search for 'papers about image recognition' to find relevant results"},
@@ -58,7 +69,6 @@ _MACRO_DESCRIPTIONS = {
     "search_by_code": {"verb": "search", "modality": "code", "description": "Search using a code, ID, or reference number", "example": "Enter permit number 'LP-2024-001' to find the permit"},
     "search_by_dropdown": {"verb": "search", "modality": "dropdown", "description": "Search by selecting a category from a dropdown", "example": "Select 'Inbox' from the folder dropdown to search within inbox"},
     "search_by_proximity": {"verb": "search", "modality": "proximity", "description": "Search for items near a location", "example": "Search for restaurants within 5 miles of downtown"},
-    "search_by_image": {"verb": "search", "modality": "image", "description": "Search using an image as input", "example": "Upload a photo to find similar items"},
     "search_by_date_range": {"verb": "search", "modality": "date range", "description": "Search by specifying a date range", "example": "Search for flights departing between June 1 and June 15"},
     "search_by_pan_zoom": {"verb": "search", "modality": "pan/zoom", "description": "Search by panning or zooming on a map", "example": "Zoom into the downtown area to find nearby restaurants"},
     # Filter
@@ -73,16 +83,6 @@ _MACRO_DESCRIPTIONS = {
     "filter_by_chip": {"verb": "filter", "modality": "chip", "description": "Filter by clicking tag chips", "example": "Click the 'Vegan' chip to filter menu items"},
     "filter_by_route": {"verb": "filter", "modality": "route", "description": "Filter by navigating to a filtered URL", "example": "Go to /flights?class=business to see business class flights"},
     "filter_by_proximity": {"verb": "filter", "modality": "proximity", "description": "Filter by geographic proximity", "example": "Filter to show only results within 10 miles"},
-    "filter_by_tag": {"verb": "filter", "modality": "tag", "description": "Filter by selecting tags or labels", "example": "Click the 'REST API' tag to show only REST endpoints"},
-    "filter_by_starred": {"verb": "filter", "modality": "starred", "description": "Filter to show only starred or favorited items", "example": "Toggle 'Starred' to show only your starred documents"},
-    "filter_by_folder": {"verb": "filter", "modality": "folder", "description": "Filter items by their folder location", "example": "Click the 'Reports' folder to show only files in that folder"},
-    "filter_by_department": {"verb": "filter", "modality": "department", "description": "Filter by department or organizational unit", "example": "Select 'Computer Science' to show only CS courses"},
-    "filter_by_method": {"verb": "filter", "modality": "method", "description": "Filter by HTTP method or operation type", "example": "Select 'POST' to show only POST endpoints"},
-    "filter_by_owner": {"verb": "filter", "modality": "owner", "description": "Filter items by their owner or creator", "example": "Filter to show only documents you own"},
-    "filter_by_pos": {"verb": "filter", "modality": "part of speech", "description": "Filter by part of speech (noun, verb, etc.)", "example": "Select 'Noun' to show only noun definitions"},
-    "filter_by_range": {"verb": "filter", "modality": "range", "description": "Filter by a numeric range", "example": "Set age range to 25-35 to filter profiles"},
-    "filter_by_score_range": {"verb": "filter", "modality": "score range", "description": "Filter by a score or rating range", "example": "Filter to show papers with review scores between 7 and 10"},
-    "filter_by_trashed": {"verb": "filter", "modality": "trashed", "description": "Filter to show items in the trash", "example": "Open the Trash folder to see deleted files"},
     # Sort
     "sort_by_ranking": {"verb": "sort", "modality": "ranking", "description": "Sort items by a ranking criterion", "example": "Click 'Price: Low to High' to sort by ascending price"},
     "sort_by_date_range": {"verb": "sort", "modality": "date range", "description": "Sort items by date", "example": "Sort by 'Newest first' to see most recent items"},
@@ -90,7 +90,8 @@ _MACRO_DESCRIPTIONS = {
     "sort_by_slider": {"verb": "sort", "modality": "slider", "description": "Sort by adjusting a slider value", "example": "Adjust the relevance slider to re-rank results"},
     "sort_by_toggle": {"verb": "sort", "modality": "toggle", "description": "Toggle sort direction (ascending/descending)", "example": "Click the column header to toggle ascending/descending"},
     "sort_by_extremum": {"verb": "sort", "modality": "extremum", "description": "Sort to find the min/max value", "example": "Sort by price descending to find the most expensive item"},
-    "sort_by_title": {"verb": "sort", "modality": "title", "description": "Sort items alphabetically by title or name", "example": "Click 'Name' column header to sort files A-Z"},
+    "sort_by_proximity": {"verb": "sort", "modality": "proximity", "description": "Sort by geographic distance or proximity", "example": "Sort transit stops by distance from your location"},
+    "sort_by_proximity": {"verb": "sort", "modality": "proximity", "description": "Sort by geographic distance or proximity", "example": "Sort transit stops by distance from your location"},
     # Extract
     "extract_by_query": {"verb": "extract", "modality": "query", "description": "Find and extract specific information from the page", "example": "What is the total balance shown on the dashboard?"},
     "extract_by_semantic": {"verb": "extract", "modality": "semantic", "description": "Extract information described in natural language", "example": "Find the author who published the most papers in 2023"},
@@ -106,48 +107,19 @@ _MACRO_DESCRIPTIONS = {
     "extract_by_image": {"verb": "extract", "modality": "image", "description": "Extract information from an image", "example": "What text is written on the whiteboard in the image?"},
     "extract_by_checkbox": {"verb": "extract", "modality": "checkbox", "description": "Extract info after applying checkbox filters", "example": "Check 'Active' and report how many users are shown"},
     "extract_from_free_text": {"verb": "extract", "modality": "free text", "description": "Extract info from unstructured text content", "example": "Read the article and identify the main conclusion"},
-    "extract_by_api": {"verb": "extract", "modality": "API", "description": "Extract data by calling an API endpoint", "example": "Call the /api/stats endpoint and report the total count"},
-    "extract_by_field": {"verb": "extract", "modality": "field", "description": "Extract a specific field value from a record", "example": "What is the user's email address shown on their profile?"},
-    "extract_from_changelog": {"verb": "extract", "modality": "changelog", "description": "Extract information from a changelog or version history", "example": "What was changed in version 2.3.0?"},
-    "extract_from_config": {"verb": "extract", "modality": "config", "description": "Extract a value from settings or configuration", "example": "What is the current grading scale in the course settings?"},
-    "extract_from_dashboard": {"verb": "extract", "modality": "dashboard", "description": "Extract a metric or value from a dashboard", "example": "What is the total number of API calls shown on the dashboard?"},
-    "extract_from_list": {"verb": "extract", "modality": "list", "description": "Extract information from a list of items", "example": "How many submissions are in the pending review list?"},
-    "extract_from_page": {"verb": "extract", "modality": "page", "description": "Extract information from a specific page", "example": "Go to the about page and report the company founding year"},
-    "extract_from_results": {"verb": "extract", "modality": "results", "description": "Extract information from search or query results", "example": "How many results are returned for the search query?"},
-    "extract_from_stats": {"verb": "extract", "modality": "stats", "description": "Extract a value from a statistics or analytics view", "example": "What is the average review score shown in the stats panel?"},
-    "extract_word_of_the_day": {"verb": "extract", "modality": "featured", "description": "Extract the featured or highlighted item", "example": "What is today's Word of the Day?"},
     # Compute
     "compute_by_dropdown": {"verb": "compute", "modality": "dropdown", "description": "Compute a value after selecting options", "example": "Select 'USD to EUR' and compute the conversion of $500"},
     "compute_by_extremum": {"verb": "compute", "modality": "extremum", "description": "Compute a min/max across items", "example": "Find the highest-rated restaurant with more than 50 reviews"},
     "compute_by_slider": {"verb": "compute", "modality": "slider", "description": "Compute result by adjusting slider inputs", "example": "Set the loan calculator to $200K, 5%, 30yr and report monthly payment"},
     "compute_by_query": {"verb": "compute", "modality": "query", "description": "Compute an answer from queried data", "example": "Calculate the total cost of items in the cart"},
-    "compute_by_checkbox": {"verb": "compute", "modality": "checkbox", "description": "Compute a value from checked selections", "example": "Check items to compare and compute the average price"},
     "compute_from_table": {"verb": "compute", "modality": "table", "description": "Compute from tabular data", "example": "Sum the values in the 'Amount' column"},
-    "compute_by_route": {"verb": "compute", "modality": "route", "description": "Compute from data on a specific route", "example": "Go to analytics page and calculate year-over-year growth"},
-    "compute_from_api": {"verb": "compute", "modality": "API", "description": "Compute a value from API response data", "example": "Call the stats endpoint and compute the acceptance rate"},
-    "compute_from_list": {"verb": "compute", "modality": "list", "description": "Compute a value from a list of items", "example": "Sum the prices of all items in the shopping cart"},
-    "compute_from_stats": {"verb": "compute", "modality": "stats", "description": "Compute a derived value from displayed statistics", "example": "Calculate the pass rate from the shown pass/fail counts"},
-    "compute_from_submissions": {"verb": "compute", "modality": "submissions", "description": "Compute from student or user submissions", "example": "Calculate the average score across all submitted assignments"},
-    "compute_stats": {"verb": "compute", "modality": "aggregate", "description": "Compute aggregate statistics from data", "example": "Calculate the total storage used across all documents"},
-    "compute_grade_weighted": {"verb": "compute", "modality": "weighted", "description": "Compute a weighted grade or score", "example": "Calculate the weighted final grade (40% midterm, 60% final)"},
-    "compute_grade_letter": {"verb": "compute", "modality": "letter grade", "description": "Convert a numeric score to a letter grade", "example": "What letter grade does a score of 87 correspond to?"},
-    "compute_class_average": {"verb": "compute", "modality": "class average", "description": "Compute the average across a class or group", "example": "What is the class average on Assignment 3?"},
-    "calculate_by_aggregation": {"verb": "calculate", "modality": "aggregation", "description": "Calculate by aggregating multiple values", "example": "Calculate the average age of all matched profiles"},
-    "calculate_by_form": {"verb": "calculate", "modality": "form", "description": "Calculate a result by entering values into a form", "example": "Enter 100 USD and calculate the equivalent in EUR"},
-    # Count
-    "count_by_api": {"verb": "count", "modality": "API", "description": "Count items using an API endpoint", "example": "How many endpoints are documented in the API reference?"},
-    "count_by_route": {"verb": "count", "modality": "route", "description": "Count items visible on a specific page", "example": "How many courses are listed on the department page?"},
-    "count_by_section": {"verb": "count", "modality": "section", "description": "Count items within a specific section", "example": "How many methods are in the Authentication section?"},
-    "count_by_user": {"verb": "count", "modality": "user", "description": "Count items belonging to a specific user", "example": "How many assignments has student John submitted?"},
-    "count_nested_items": {"verb": "count", "modality": "nested", "description": "Count items nested inside a parent item", "example": "How many lessons are in Module 3?"},
-    # Compare
+    "compute_by_route": {"verb": "compute", "modality": "route", "description": "Compute from data on a specific route", "example": "Go to analytics page and calculate year-over-year growth"},    # Compare
     "compare_by_dropdown": {"verb": "compare", "modality": "dropdown", "description": "Compare items selected from dropdowns", "example": "Compare iPhone 15 vs Samsung S24 specs side by side"},
     "compare_from_table": {"verb": "compare", "modality": "table", "description": "Compare items listed in a table", "example": "Which of the top 3 hotels has the best price-to-rating ratio?"},
     "compare_by_slider": {"verb": "compare", "modality": "slider", "description": "Compare values at different slider positions", "example": "Compare monthly payments at 4% vs 5% interest rate"},
     "compare_by_date_range": {"verb": "compare", "modality": "date range", "description": "Compare data across different time periods", "example": "Compare Q1 vs Q2 sales figures"},
     "compare_by_route": {"verb": "compare", "modality": "route", "description": "Compare items on different pages", "example": "Compare two product detail pages"},
     "compare_by_query": {"verb": "compare", "modality": "query", "description": "Compare results for different queries", "example": "Compare the weather forecast for Monday vs Friday"},
-    "compare_categories": {"verb": "compare", "modality": "categories", "description": "Compare data across different categories", "example": "Compare average grades between CS and Math departments"},
     # Verify
     "verify_by_slider": {"verb": "verify", "modality": "slider", "description": "Verify a value matches expected range", "example": "Verify the portfolio return shown matches the 12-month chart"},
     "verify_by_dropdown": {"verb": "verify", "modality": "dropdown", "description": "Verify data after selecting an option", "example": "Select 'Completed' filter and verify all shown orders are completed"},
@@ -155,49 +127,33 @@ _MACRO_DESCRIPTIONS = {
     "verify_from_free_text": {"verb": "verify", "modality": "free text", "description": "Verify a claim by reading page content", "example": "Verify that the article mentions the source study by name"},
     "verify_identity_by_code": {"verb": "verify identity", "modality": "code", "description": "Verify identity using a code or OTP", "example": "Enter the verification code sent to your email"},
     # Create / Submit
-    "create_from_free_text": {"verb": "create", "modality": "free text", "description": "Create new content by typing free-form text", "example": "Write a new blog post with title and body"},
+    "create_by_form": {"verb": "create", "modality": "free text", "description": "Create new content by typing free-form text", "example": "Write a new blog post with title and body"},
     "create_by_dropdown": {"verb": "create", "modality": "dropdown", "description": "Create something by selecting from dropdowns", "example": "Create a new playlist by selecting genre and mood"},
     "create_by_toggle": {"verb": "create", "modality": "toggle", "description": "Create by toggling options", "example": "Create a new alert by toggling notification preferences"},
     "create_by_checkbox": {"verb": "create", "modality": "checkbox", "description": "Create by checking options", "example": "Create a workout plan by checking desired exercises"},
     "create_by_drag": {"verb": "create", "modality": "drag", "description": "Create by dragging elements", "example": "Drag blocks onto the canvas to build a design"},
     "create_by_radio": {"verb": "create", "modality": "radio", "description": "Create by selecting radio options", "example": "Create a new poll by selecting question type"},
     "create_by_code": {"verb": "create", "modality": "code", "description": "Create by writing code", "example": "Write a Python function in the code editor"},
-    "create_by_image": {"verb": "create", "modality": "image", "description": "Create from an uploaded image", "example": "Upload a logo to create a new brand asset"},
     "create_from_table": {"verb": "create", "modality": "table", "description": "Create by adding a row to a table", "example": "Add a new contact by filling in the table row"},
     "create_by_timestamp": {"verb": "create", "modality": "timestamp", "description": "Create a clip or bookmark at a specific timestamp", "example": "Create a clip starting at 1:30 in the stream"},
-    "create_by_form": {"verb": "create", "modality": "form", "description": "Create new content by filling out a form", "example": "Fill in the profile form with name, bio, and interests"},
     "create_by_query": {"verb": "create", "modality": "query", "description": "Create by entering text into an input", "example": "Enter a URL to create a short link"},
-    "create_by_api": {"verb": "create", "modality": "API", "description": "Create a new item via an API call", "example": "Use the API to create a new document"},
-    "create_discussion": {"verb": "create", "modality": "discussion", "description": "Create a new discussion thread", "example": "Start a new discussion topic in the course forum"},
-    "submit_by_query": {"verb": "submit", "modality": "query", "description": "Submit data via a search or query interface", "example": "Submit your answer in the search box"},
     "submit_by_form": {"verb": "submit", "modality": "form", "description": "Submit a filled-out form", "example": "Fill in the contact form and click Submit"},
     "submit_by_route": {"verb": "submit", "modality": "route", "description": "Submit by navigating to a submission URL", "example": "Navigate to /submit to finalize your entry"},
     "submit_by_dropdown": {"verb": "submit", "modality": "dropdown", "description": "Submit by selecting and confirming from dropdown", "example": "Select the recipient and submit the transfer"},
-    "submit_by_radio": {"verb": "submit", "modality": "radio", "description": "Submit by selecting a radio option and confirming", "example": "Select the answer choice and submit the quiz"},
     "submit_by_ranking": {"verb": "submit", "modality": "ranking", "description": "Submit a ranking of items", "example": "Rank the candidates and submit your vote"},
     "submit_by_slider": {"verb": "submit", "modality": "slider", "description": "Submit after setting slider values", "example": "Set the bid amount with the slider and submit"},
     "submit_by_date_range": {"verb": "submit", "modality": "date range", "description": "Submit with a date range selection", "example": "Select vacation dates and submit the request"},
-    "submit_by_image": {"verb": "submit", "modality": "image", "description": "Submit an image for processing", "example": "Upload a document photo for OCR processing"},
-    "submit_from_table": {"verb": "submit", "modality": "table", "description": "Submit data entered in a table", "example": "Fill in the spreadsheet cells and submit"},
-    "submit_form": {"verb": "submit", "modality": "form", "description": "Submit a general-purpose form", "example": "Fill in the required fields and click Submit"},
-    "submit_review": {"verb": "submit", "modality": "review", "description": "Submit a peer review or evaluation", "example": "Write your review comments, assign scores, and submit"},
-    "input_by_form": {"verb": "input", "modality": "form", "description": "Enter data into form fields", "example": "Type the conversion value into the input field"},
-    "assign_by_form": {"verb": "assign", "modality": "form", "description": "Assign a resource or role via a form", "example": "Select a reviewer from the dropdown and assign them to the paper"},
     # Edit
     "edit_by_form": {"verb": "edit", "modality": "form", "description": "Edit existing data through a form", "example": "Edit your profile name and bio in the settings form"},
     "edit_by_query": {"verb": "edit", "modality": "query", "description": "Edit by entering new values", "example": "Change the document title by typing a new name"},
     "edit_by_dropdown": {"verb": "edit", "modality": "dropdown", "description": "Edit by selecting a new value from dropdown", "example": "Change the issue priority from 'Low' to 'High'"},
     "edit_by_toggle": {"verb": "edit", "modality": "toggle", "description": "Edit a setting by toggling it", "example": "Toggle 'Public' to make the repository private"},
-    "edit_by_slider": {"verb": "edit", "modality": "slider", "description": "Edit a value using a slider", "example": "Adjust the volume slider to 75%"},
     "edit_by_drag": {"verb": "edit", "modality": "drag", "description": "Edit by dragging elements to new positions", "example": "Drag the task card from 'To Do' to 'In Progress'"},
     "edit_by_ranking": {"verb": "edit", "modality": "ranking", "description": "Edit the order/ranking of items", "example": "Reorder the playlist by dragging songs"},
     "edit_by_date_range": {"verb": "edit", "modality": "date range", "description": "Edit by changing a date range", "example": "Change the event date to next Friday"},
     "edit_by_image": {"verb": "edit", "modality": "image", "description": "Edit an image or visual content", "example": "Crop the profile photo and save"},
-    "edit_by_api": {"verb": "edit", "modality": "API", "description": "Edit data via an API call", "example": "Use the API to rename the document"},
-    "update_by_form": {"verb": "update", "modality": "form", "description": "Update existing data through a form", "example": "Update your profile preferences and save changes"},
     # Delete
     "delete_from_table": {"verb": "delete", "modality": "table", "description": "Delete an item from a list or table", "example": "Click the trash icon to delete the 3rd email"},
-    "delete_by_form": {"verb": "delete", "modality": "form", "description": "Delete an item via a confirmation form or button", "example": "Click Delete and confirm in the dialog"},
     # Select / Configure
     "select_by_dropdown": {"verb": "select", "modality": "dropdown", "description": "Select an option from a dropdown", "example": "Select 'Dark mode' from the theme dropdown"},
     "select_from_table": {"verb": "select", "modality": "table", "description": "Select items from a table", "example": "Click checkboxes to select 3 files for download"},
@@ -208,19 +164,14 @@ _MACRO_DESCRIPTIONS = {
     "select_by_extremum": {"verb": "select", "modality": "extremum", "description": "Select the min or max item", "example": "Select the cheapest available flight"},
     "select_by_date_range": {"verb": "select", "modality": "date range", "description": "Select a date range", "example": "Select check-in and check-out dates"},
     "select_by_query": {"verb": "select", "modality": "query", "description": "Select by entering a search query", "example": "Type a city name to select it as destination"},
-    "select_by_route": {"verb": "select", "modality": "route", "description": "Select by navigating to a route", "example": "Click on the album cover to select it for playback"},
     "configure_by_dropdown": {"verb": "configure", "modality": "dropdown", "description": "Configure a setting using a dropdown", "example": "Set the language to 'Spanish' from the dropdown"},
     "configure_by_slider": {"verb": "configure", "modality": "slider", "description": "Configure a setting with a slider", "example": "Set the password length to 16 characters"},
     "configure_by_toggle": {"verb": "configure", "modality": "toggle", "description": "Configure by toggling a switch", "example": "Enable two-factor authentication"},
     "configure_by_radio": {"verb": "configure", "modality": "radio", "description": "Configure by selecting a radio option", "example": "Set notifications to 'Email only'"},
     "configure_by_query": {"verb": "configure", "modality": "query", "description": "Configure by entering a value", "example": "Set the custom domain to 'mysite.com'"},
     "configure_by_chip": {"verb": "configure", "modality": "chip", "description": "Configure by selecting chips", "example": "Select interest chips: 'Tech', 'Sports', 'Music'"},
-    "configure_by_checkbox": {"verb": "configure", "modality": "checkbox", "description": "Configure by checking boxes", "example": "Check the notification types you want to receive"},
     "configure_by_date_range": {"verb": "configure", "modality": "date range", "description": "Configure a date-based setting", "example": "Set the recurring event to every Monday"},
     "configure_by_route": {"verb": "configure", "modality": "route", "description": "Configure settings by navigating to a settings page", "example": "Go to Settings > Playback to configure video quality"},
-    "toggle_by_api": {"verb": "toggle", "modality": "API", "description": "Toggle a boolean state via an API action", "example": "Toggle the item's active status on or off"},
-    "list_by_api": {"verb": "list", "modality": "API", "description": "List items by querying an API endpoint", "example": "Retrieve the list of all API endpoints from the docs"},
-    "list_by_route": {"verb": "list", "modality": "route", "description": "List items by navigating to a listing page", "example": "Go to the courses page to see all available courses"},
     # Media
     "play_by_playback": {"verb": "play", "modality": "playback", "description": "Play media content using playback controls", "example": "Click the play button to start the podcast episode"},
     "play_by_dropdown": {"verb": "play", "modality": "dropdown", "description": "Play media selected from a dropdown", "example": "Select a track from the queue dropdown and play it"},
@@ -234,7 +185,6 @@ _MACRO_DESCRIPTIONS = {
     "upload_by_query": {"verb": "upload", "modality": "query", "description": "Upload by entering a URL or path", "example": "Paste the image URL to upload it"},
     "upload_by_route": {"verb": "upload", "modality": "route", "description": "Upload by navigating to upload page", "example": "Go to /upload and drag files into the drop zone"},
     "upload_by_image": {"verb": "upload", "modality": "image", "description": "Upload an image file", "example": "Upload a profile photo from your computer"},
-    "upload_from_table": {"verb": "upload", "modality": "table", "description": "Upload files listed in a table", "example": "Select files from the table and click Upload"},
     "copy_by_route": {"verb": "copy", "modality": "route", "description": "Copy content by clicking a copy button", "example": "Click the copy icon next to the API key"},
     # Social
     "follow_by_toggle": {"verb": "follow", "modality": "toggle", "description": "Follow/unfollow by clicking a toggle button", "example": "Click 'Follow' to start following the author"},
@@ -243,19 +193,13 @@ _MACRO_DESCRIPTIONS = {
     "subscribe_by_toggle": {"verb": "subscribe", "modality": "toggle", "description": "Subscribe/unsubscribe with a toggle", "example": "Toggle the Subscribe button for the newsletter"},
     "save_by_toggle": {"verb": "save", "modality": "toggle", "description": "Save/unsave an item with a toggle", "example": "Click the bookmark icon to save the article"},
     "save_by_query": {"verb": "save", "modality": "query", "description": "Save by entering and confirming", "example": "Name your saved search and click Save"},
-    "save_word": {"verb": "save", "modality": "word", "description": "Save a word to your personal word list", "example": "Click 'Save' to add 'ephemeral' to your vocabulary list"},
-    "star_by_toggle": {"verb": "star", "modality": "toggle", "description": "Star or unstar an item", "example": "Click the star icon to mark the document as important"},
-    "bookmark_by_toggle": {"verb": "bookmark", "modality": "toggle", "description": "Bookmark or unbookmark a page or item", "example": "Click the bookmark icon to save this API reference page"},
-    "add_to_vocab_list": {"verb": "add", "modality": "vocabulary", "description": "Add a word to a vocabulary or study list", "example": "Add 'ubiquitous' to your custom word list"},
     "react_by_toggle": {"verb": "react", "modality": "toggle", "description": "React to content (like, upvote, etc.)", "example": "Click the heart icon to like the post"},
-    "react_by_chip": {"verb": "react", "modality": "chip", "description": "React by selecting an emoji chip", "example": "Click the thumbs-up emoji reaction"},
     "react_by_gesture": {"verb": "react", "modality": "gesture", "description": "React with a gesture (swipe, double-tap)", "example": "Swipe right to like the profile"},
     "rate_by_slider": {"verb": "rate", "modality": "slider", "description": "Rate something using a star/slider rating", "example": "Set the review rating to 4 out of 5 stars"},
     "share_by_dropdown": {"verb": "share", "modality": "dropdown", "description": "Share via a method selected from dropdown", "example": "Select 'Copy link' from the share dropdown"},
     "share_by_toggle": {"verb": "share", "modality": "toggle", "description": "Toggle sharing on/off", "example": "Enable link sharing for the document"},
     "share_by_query": {"verb": "share", "modality": "query", "description": "Share by entering a recipient", "example": "Type an email address to share the file"},
     "share_by_route": {"verb": "share", "modality": "route", "description": "Share by navigating to a share page", "example": "Go to the share page and copy the public link"},
-    "share_by_form": {"verb": "share", "modality": "form", "description": "Share by filling out a sharing form", "example": "Enter collaborator emails and set permissions to share the document"},
     "report_by_form": {"verb": "report", "modality": "form", "description": "Report content by filling out a form", "example": "Select a reason and submit the report"},
     "block_by_toggle": {"verb": "block", "modality": "toggle", "description": "Block/unblock a user", "example": "Click Block to prevent the user from messaging you"},
     "block_by_dropdown": {"verb": "block", "modality": "dropdown", "description": "Block via user dropdown menu", "example": "Select 'Block user' from the three-dot menu"},
@@ -265,12 +209,9 @@ _MACRO_DESCRIPTIONS = {
     "join_by_route": {"verb": "join", "modality": "route", "description": "Join by navigating to a join page", "example": "Go to the meeting link to join the call"},
     "join_by_code": {"verb": "join", "modality": "code", "description": "Join by entering an invite code", "example": "Enter the meeting code to join the video call"},
     "message_from_free_text": {"verb": "message", "modality": "free text", "description": "Send a message by typing text", "example": "Type a message and click Send"},
-    "message_by_query": {"verb": "message", "modality": "query", "description": "Send a message by query", "example": "Search for a user and send them a direct message"},
     "post_from_free_text": {"verb": "post", "modality": "free text", "description": "Create a post by writing text", "example": "Write a comment and click Post"},
     "post_by_route": {"verb": "post", "modality": "route", "description": "Post by navigating to a post page", "example": "Go to /submit to create a new post"},
     "post_by_query": {"verb": "post", "modality": "query", "description": "Post content via a query", "example": "Enter the post title and submit"},
-    "reply_to_discussion": {"verb": "reply", "modality": "discussion", "description": "Reply to an existing discussion thread", "example": "Write a reply to the student's question in the forum"},
-    "rank_by_grade": {"verb": "rank", "modality": "grade", "description": "Rank items by their grade or score", "example": "Rank students by their final exam scores"},
     # Transact
     "add_by_button": {"verb": "add", "modality": "button", "description": "Add an item by clicking a button", "example": "Click 'Add to Cart' on the product page"},
     "add_by_dropdown": {"verb": "add", "modality": "dropdown", "description": "Add by selecting from a dropdown", "example": "Select a track and add it to the playlist"},
@@ -280,7 +221,6 @@ _MACRO_DESCRIPTIONS = {
     "pay_by_dropdown": {"verb": "pay", "modality": "dropdown", "description": "Pay using a method from dropdown", "example": "Select 'Credit Card' and confirm payment"},
     "book_by_form": {"verb": "book", "modality": "form", "description": "Book/reserve by filling out a form", "example": "Select date, party size, and book the restaurant"},
     "book_by_date_range": {"verb": "book", "modality": "date range", "description": "Book by selecting dates", "example": "Select check-in and check-out dates for the hotel"},
-    "book_by_query": {"verb": "book", "modality": "query", "description": "Book by entering details", "example": "Enter destination and dates to book the flight"},
     "cancel_by_form": {"verb": "cancel", "modality": "form", "description": "Cancel a booking or order via form", "example": "Select a reason and confirm the cancellation"},
     "redeem_by_code": {"verb": "redeem", "modality": "code", "description": "Redeem a promo code or coupon", "example": "Enter code 'SAVE20' and click Apply"},
     "redeem_by_dropdown": {"verb": "redeem", "modality": "dropdown", "description": "Redeem a reward from dropdown", "example": "Select '500 points for $5 off' and redeem"},
@@ -295,12 +235,10 @@ _MACRO_DESCRIPTIONS = {
     "route_by_query": {"verb": "route", "modality": "query", "description": "Get directions by entering origin and destination", "example": "Enter 'Home to Airport' to get driving directions"},
     "route_by_radio": {"verb": "route", "modality": "radio", "description": "Select route type via radio buttons", "example": "Select 'Walking' to get walking directions"},
     "route_by_route": {"verb": "route", "modality": "route", "description": "View a pre-computed route", "example": "Click on Route #3 to see its details"},
-    "route_by_date_range": {"verb": "route", "modality": "date range", "description": "Plan a route for a specific time", "example": "Set departure time to 8:00 AM for transit directions"},
     # Translate
     "translate_by_query": {"verb": "translate", "modality": "query", "description": "Translate text by entering it", "example": "Type 'Hello, how are you?' and translate to Spanish"},
     "translate_by_dropdown": {"verb": "translate", "modality": "dropdown", "description": "Translate by selecting source/target language", "example": "Select English → French from the language dropdowns"},
     "translate_by_slider": {"verb": "translate", "modality": "slider", "description": "Adjust translation settings with slider", "example": "Set the formality slider to 'Formal'"},
-    "translate_by_image": {"verb": "translate", "modality": "image", "description": "Translate text in an image", "example": "Upload a photo of a sign to translate it"},
     # Sign
     "sign_by_query": {"verb": "sign", "modality": "query", "description": "Sign a document by entering signature", "example": "Type your full name to e-sign the document"},
     "sign_by_signature": {"verb": "sign", "modality": "signature", "description": "Sign by drawing a signature", "example": "Draw your signature in the signature box"},
@@ -350,25 +288,28 @@ def _load_sites():
 
 
 def _load_macros():
+    """Collect all unique macros across all sites from MACRO_LOCATIONS."""
     macros = set()
-    for tasks_file in SITES_DIR.glob("*/tasks.json"):
-        try:
-            for t in json.loads(tasks_file.read_text()):
-                for m in t.get("macros", []):
-                    macros.add(m)
-        except (json.JSONDecodeError, OSError):
-            pass
+    for site_macros in MACRO_LOCATIONS.values():
+        macros.update(site_macros.keys())
     return sorted(macros)
 
 
 def _load_site_macros(site_id):
-    """Load supported macros for a site from its doc/README.md Target Macros spec.
+    """Load supported macros for a site.
 
-    Falls back to MACRO_LOCATIONS, then tasks.json.
+    MACRO_LOCATIONS is the audited source of truth — it lists only macros
+    whose UI elements have been verified to exist on each site.
+    Falls back to README, then tasks.json for sites not yet audited.
     """
-    import re as _re
+    # MACRO_LOCATIONS is the audited source of truth
+    if site_id in MACRO_LOCATIONS:
+        macros = list(MACRO_LOCATIONS[site_id].keys())
+        if macros:
+            return sorted(set(macros))
 
-    # Try README spec first (source of truth)
+    # Fallback to README spec for sites not yet in MACRO_LOCATIONS
+    import re as _re
     readme = SITES_DIR / site_id / "doc" / "README.md"
     if readme.exists():
         try:
@@ -391,12 +332,6 @@ def _load_site_macros(site_id):
         except OSError:
             pass
 
-    # Fallback to MACRO_LOCATIONS
-    if site_id in MACRO_LOCATIONS:
-        macros = list(MACRO_LOCATIONS[site_id].keys())
-        if macros:
-            return sorted(set(macros))
-
     # Fallback to tasks.json
     tasks_file = SITES_DIR / site_id / "tasks.json"
     macros = set()
@@ -410,9 +345,41 @@ def _load_site_macros(site_id):
     return sorted(macros)
 
 
+_NA_FILE = SITES_DIR.parent / "annotation" / "na_reports.json"
+
+
+def _load_na_reports():
+    """Load NA reports from disk."""
+    if _NA_FILE.exists():
+        try:
+            return json.loads(_NA_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def _save_na_report(sites, macro, annotator):
+    """Append a single NA report."""
+    reports = _load_na_reports()
+    reports.append({
+        "sites": sites,
+        "macro": macro,
+        "annotator": annotator,
+        "timestamp": datetime.now().isoformat(),
+    })
+    _NA_FILE.write_text(json.dumps(reports, indent=2))
+
+
 def _get_na_macros(site_ids):
     """Get macros marked N/A for these sites (threshold: 2+ reports)."""
-    return set()
+    from collections import Counter
+    reports = _load_na_reports()
+    site_set = set(site_ids)
+    counts = Counter()
+    for r in reports:
+        if site_set & set(r.get("sites", [])):
+            counts[r["macro"]] += 1
+    return {m for m, c in counts.items() if c >= 2}
 
 
 def _get_macro_coverage():
@@ -467,7 +434,7 @@ _EDGE_MACRO_HINTS = {
     "signup": ["register_by_form", "authenticate_by_form"],
     "credential": ["authenticate_by_form"],
     "notification": ["extract_by_route"],
-    "file_created": ["create_from_free_text", "upload_by_upload"],
+    "file_created": ["create_by_form", "upload_by_upload"],
     "message": ["message_from_free_text"],
     "translate": ["translate_by_query", "translate_by_dropdown"],
     "share": ["share_by_dropdown", "share_by_toggle"],
@@ -500,19 +467,26 @@ def _generate_prompt(sites, coverage, force_single=False):
     # Load graph
     outgoing, incoming = _load_graph_edges()
 
-    # 1. Pick cell — freeform macros, 1-3 sites, 1-4 macros
+    # 1. Pick cell — 1-5 macros for single-site, 2-6 for multi-site
     cell_counts = _get_cell_counts()
     if force_single:
         cells = [(1, m) for m in [1, 2, 3]]
     else:
-        cells = [(n, m) for n in [1, 2, 3] for m in [1, 2, 3, 4] if m >= n]
+        cells = [(n, m) for n in [1, 2, 3] for m in [1, 2, 3, 4, 5, 6] if m >= n]
     cell_weights = [1.0 / (cell_counts.get((n, m), 0) + 1) for n, m in cells]
     total = sum(cell_weights)
     cell_weights = [w / total for w in cell_weights]
     n_sites, n_macros = rng.choices(cells, weights=cell_weights, k=1)[0]
 
     # 2. Pick sites — graph-aware for multi-site tasks
-    site_weights = [1.0 / (s.get("annotated_count", 0) + 1) for s in site_pool]
+    # Strongly prefer unvisited sites (10x boost), then under-covered
+    site_weights = []
+    for s in site_pool:
+        count = s.get("annotated_count", 0)
+        if count == 0:
+            site_weights.append(10.0)  # unvisited sites get strong priority
+        else:
+            site_weights.append(1.0 / (count + 1))
 
     # Pick seed site (weighted by under-coverage)
     total = sum(site_weights)
@@ -649,11 +623,14 @@ def _generate_prompt(sites, coverage, force_single=False):
     if not macro_pool:
         return None
 
-    # Weight: under-covered macros get higher weight; edge-implied macros get a boost
+    # Weight: under-covered macros get higher weight; difficulty category boost;
+    # edge-implied macros get a boost
+    from annotation.macro_difficulty import get_macro_weight
     edge_macro_set = set(edge_macros)
     macro_weights = []
     for m in macro_pool:
         w = 1.0 / (coverage.get(m, 0) + 1)
+        w *= get_macro_weight(m)  # difficulty-based boost
         if m in edge_macro_set:
             w *= 3.0  # boost edge-implied macros
         macro_weights.append(w)
@@ -703,6 +680,42 @@ def _generate_prompt(sites, coverage, force_single=False):
         "num_macros": len(sampled_macros),
         "edges": edge_types_used,
     }
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+_AUTH_EXEMPT = {"/annotate/login", "/annotate/api/auto_login", "/annotate/api/auto_logout"}
+
+@annotation_bp.before_request
+def _require_annotator_login():
+    if request.path in _AUTH_EXEMPT:
+        return None
+    if session.get("annotator_authenticated"):
+        return None
+    return redirect(url_for("annotation.annotator_login"))
+
+
+@annotation_bp.route("/login", methods=["GET", "POST"])
+def annotator_login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        if username in ANNOTATOR_CREDENTIALS and ANNOTATOR_CREDENTIALS[username] == password:
+            session["annotator_authenticated"] = True
+            session["annotator_name"] = username
+            return redirect(url_for("annotation.index"))
+        error = "Invalid credentials"
+    return render_template("annotate_login.html", error=error)
+
+
+@annotation_bp.route("/logout")
+def annotator_logout():
+    session.pop("annotator_authenticated", None)
+    session.pop("annotator_name", None)
+    return redirect(url_for("annotation.annotator_login"))
 
 
 # ---------------------------------------------------------------------------
@@ -787,6 +800,37 @@ def api_list_tasks():
     return jsonify(list_tasks(annotator))
 
 
+@annotation_bp.route("/api/screenshot/<annotator>/<task_id>/<path:filename>")
+def api_screenshot(annotator, task_id, filename):
+    """Serve a screenshot file from the task's directory."""
+    from flask import send_from_directory
+    from annotation.storage import ANNOTATIONS_DIR
+    task_dir = ANNOTATIONS_DIR / annotator / task_id
+    return send_from_directory(str(task_dir), filename)
+
+
+@annotation_bp.route("/api/update_task_field", methods=["POST"])
+def api_update_task_field():
+    """Update a single field on a saved task."""
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    annotator = data.get("annotator", "anonymous")
+    field = data.get("field")
+    value = data.get("value")
+    if not task_id or not field:
+        return jsonify({"error": "task_id and field required"}), 400
+
+    from annotation.storage import ANNOTATIONS_DIR
+    task_file = ANNOTATIONS_DIR / annotator / task_id / "task.json"
+    if not task_file.exists():
+        return jsonify({"error": "Task not found"}), 404
+
+    task_data = json.loads(task_file.read_text())
+    task_data[field] = value
+    task_file.write_text(json.dumps(task_data, indent=2, default=str))
+    return jsonify({"status": "ok", "field": field})
+
+
 @annotation_bp.route("/api/tasks", methods=["POST"])
 def api_create_task():
     data = request.get_json(silent=True) or {}
@@ -820,8 +864,11 @@ def api_create_task():
 
     # Record N/A macros for future sampling improvement
     na_macros = data.get("macros_not_applicable", {})
-    if na_macros:
-        None
+    sites_list = data.get("sites", [])
+    site_ids = [s["id"] if isinstance(s, dict) else s for s in sites_list]
+    annotator = data.get("annotator", "anonymous")
+    for macro in na_macros:
+        _save_na_report(site_ids, macro, annotator)
 
     return jsonify({"task_id": task_id, "status": "saved"})
 
@@ -925,19 +972,22 @@ def api_auto_login():
 
     from app import db
 
-    # Set generic user_id to 1 (Alex Rivera's ID on most sites)
-    session["user_id"] = 1
+    # Clear the no-autologin flag so before_request auto-login works normally
+    session.pop("_no_autologin", None)
 
     # Site-specific session keys for sites that don't use the generic "user_id"
     SITE_SESSION_KEYS = {
-        "conference-review-submission": "_conf_user_id",
+        "conference-review-submission": "conf_review_uid",
         "health-portals": "health_user_id",
         "insurance-loans": "il_user_id",
         "instant-messaging": "im_user_id",
         "job-sites": "job_sites_user_id",
+        "live": "live_user_id",
         "qa-knowledge": "qa_user_id",
         "university-academic": "ua_user",
         "version-control": "vc_user_id",
+        "video": "user_id",  # also needs username + display_name
+        "weather": "weather_user_id",
         "team-chat-workspace": "user_id",  # uses root_user_id
     }
 
@@ -962,6 +1012,9 @@ def api_auto_login():
 
             uid = user.get("id", user.get("root_user_id", 1))
 
+            # Always set generic user_id to the site's user ID
+            session["user_id"] = uid
+
             # Set site-specific session key
             if site_id in SITE_SESSION_KEYS:
                 key = SITE_SESSION_KEYS[site_id]
@@ -973,6 +1026,10 @@ def api_auto_login():
                     session["vc_name"] = user.get("name", "")
                 elif site_id == "team-chat-workspace":
                     session[key] = user.get("root_user_id", uid)
+                elif site_id == "video":
+                    session[key] = uid
+                    session["username"] = user.get("username", "")
+                    session["display_name"] = user.get("display_name", user.get("name", ""))
                 else:
                     session[key] = uid
 
@@ -982,6 +1039,26 @@ def api_auto_login():
             traceback.print_exc()
 
     return jsonify({"logged_in": logged_in})
+
+
+@annotation_bp.route("/api/auto_logout", methods=["POST"])
+def api_auto_logout():
+    """Clear all login-related session keys so sites render as logged out."""
+    # All known login session keys
+    login_keys = [
+        "user_id", "conf_review_uid", "health_user_id", "health_pending_verify_id",
+        "il_user_id", "im_user_id", "job_sites_user_id", "live_user_id",
+        "qa_user_id", "ua_user", "vc_user_id", "vc_username", "vc_name",
+        "weather_user_id", "username", "display_name",
+    ]
+    cleared = []
+    for key in login_keys:
+        if key in session:
+            session.pop(key)
+            cleared.append(key)
+    # Prevent the before_request auto-login from re-setting user_id
+    session["_no_autologin"] = True
+    return jsonify({"cleared": cleared})
 
 
 @annotation_bp.route("/api/reset_tasks", methods=["POST"])
@@ -1029,11 +1106,19 @@ def api_get_task(task_id):
 
 @annotation_bp.route("/api/report", methods=["POST"])
 def api_report():
-    """Save a skip report."""
+    """Save a skip report and record any NA macros."""
     data = request.get_json(silent=True) or {}
-    data["timestamp"] = datetime.now().isoformat()
-    report_id = 0
-    return jsonify({"status": "reported", "id": report_id})
+    sites = data.get("sites", [])
+    annotator = data.get("annotator", "anonymous")
+
+    # Persist NA macro reports
+    na_macros = data.get("macros_not_applicable", {})
+    saved_na = 0
+    for macro, _site_info in na_macros.items():
+        _save_na_report(sites, macro, annotator)
+        saved_na += 1
+
+    return jsonify({"status": "reported", "na_saved": saved_na})
 
 
 @annotation_bp.route("/api/routes/<site_id>")
@@ -1304,6 +1389,108 @@ def _call_llm(system_prompt, user_prompt):
     """Call LLM via shared Groq/Claude helper."""
     from app.llm import call_llm
     return call_llm(user_prompt, system=system_prompt, max_tokens=500, temperature=0.4)
+
+
+@annotation_bp.route("/api/make_ambiguous", methods=["POST"])
+def api_make_ambiguous():
+    """Rewrite an instruction to be more ambiguous using LLM."""
+    data = request.get_json(silent=True) or {}
+    instruction = data.get("instruction", "").strip()
+    if not instruction:
+        return jsonify({"error": "No instruction provided"}), 400
+
+    system_prompt = (
+        "You are rewriting a web task instruction to make it more ambiguous and natural.\n\n"
+        "Rules:\n"
+        "- Remove explicit navigation steps ('go to X page', 'click on Y')\n"
+        "- Remove site names and UI element names where possible\n"
+        "- Keep the GOAL the same but describe it like a busy person would\n"
+        "- Use casual, short phrasing — how someone would ask a coworker\n"
+        "- Keep specific values (dollar amounts, names, IDs, dates) — those are the task parameters\n"
+        "- Remove polite filler ('Can you...', 'I need you to...', 'Could you please...')\n"
+        "- Make it 1-2 sentences max\n"
+        "- The agent should have to figure out WHERE and HOW, not just WHAT\n\n"
+        "Output ONLY the rewritten instruction, nothing else."
+    )
+
+    result = _call_llm(system_prompt, instruction)
+    if result:
+        return jsonify({"ambiguous": result})
+    return jsonify({"error": "LLM unavailable"}), 503
+
+
+@annotation_bp.route("/api/suggest_tags", methods=["POST"])
+def api_suggest_tags():
+    """Use LLM to suggest macro span tags for a trajectory."""
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    annotator = data.get("annotator", "anonymous")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+
+    # Support inline mode (from annotate UI) or saved task mode (from verify UI)
+    if data.get("_inline"):
+        macros = data.get("macros", [])
+        actions = data.get("actions", [])
+        instruction = data.get("instruction", "")
+    else:
+        from annotation.storage import load_task
+        task = load_task(annotator, task_id)
+        if not task:
+            return jsonify({"error": "Task not found"}), 404
+
+        macros = task.get("macros", [])
+        trajectory = task.get("trajectory", [])
+        instruction = task.get("instruction", "")
+
+        # Build a compact action list for the LLM
+        actions = []
+        for i, e in enumerate(trajectory):
+            if e.get("type") == "action":
+                verb = e.get("action", "")
+                target = (e.get("target", ""))[:60]
+                val = e.get("text", e.get("value", ""))
+                val_str = f' "{str(val)[:30]}"' if val else ""
+                actions.append(f"{len(actions) + 1}. {verb} {target}{val_str}")
+
+    if not actions or not macros:
+        return jsonify({"error": "No actions or macros to tag"}), 400
+
+    system_prompt = (
+        "You are tagging a web interaction trajectory with macro labels.\n\n"
+        "Each macro is a primitive skill (like filter_by_slider, create_by_form, etc.).\n"
+        "A span is [start_index, end_index] (inclusive, 1-indexed) indicating which actions belong to that macro.\n"
+        "Actions are numbered starting from 1.\n\n"
+        "Rules:\n"
+        "- Every macro must get exactly one span\n"
+        "- Spans can overlap if a macro encompasses sub-macros (e.g., extract_by_extremum covers the full flow)\n"
+        "- Navigation actions (clicking nav links) at the start should be untagged\n"
+        "- Include the submit/confirm action at the end of form-based macros\n"
+        "- For QA macros (extract/compute) with no visible actions, use the span where the answer is visible\n\n"
+        "Output ONLY a JSON object mapping macro names to [start, end] spans. Example:\n"
+        '{"filter_by_dropdown": [1, 5], "extract_by_route": [6, 10]}'
+    )
+
+    user_prompt = (
+        f"Task instruction: {instruction}\n\n"
+        f"Macros to tag: {macros}\n\n"
+        f"Action trajectory:\n" + "\n".join(actions)
+    )
+
+    result = _call_llm(system_prompt, user_prompt)
+    if not result:
+        return jsonify({"error": "LLM unavailable"}), 503
+
+    try:
+        # Parse JSON from response
+        import re
+        json_match = re.search(r'\{[^}]+\}', result)
+        if json_match:
+            spans = json.loads(json_match.group())
+            return jsonify({"suggested_spans": spans})
+        return jsonify({"error": "Could not parse LLM response", "raw": result}), 500
+    except Exception as e:
+        return jsonify({"error": str(e), "raw": result}), 500
 
 
 @annotation_bp.route("/api/build_verifiers", methods=["POST"])

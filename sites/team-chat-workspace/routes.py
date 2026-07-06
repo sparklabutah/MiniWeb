@@ -134,6 +134,8 @@ def _format_timestamp(ts_str):
 @blueprint.route("/")
 def index():
     """Channel list + default channel view (general)."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     channels = _channels()
     user_map = _user_map()
     current_user = _current_user()
@@ -174,6 +176,8 @@ def index():
 @blueprint.route("/channel/<channel_id>")
 def channel_view(channel_id):
     """View a specific channel with its messages."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     channels = _channels()
     channel_map = _channel_map()
     channel = channel_map.get(channel_id)
@@ -229,6 +233,8 @@ def channel_view(channel_id):
 @blueprint.route("/threads")
 def threads_view():
     """View all threads across channels."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     channels = _channels()
     channel_map = _channel_map()
     user_map = _user_map()
@@ -277,6 +283,8 @@ def threads_view():
 
 @blueprint.route("/thread/<thread_id>")
 def thread_detail(thread_id):
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     """View a specific thread with all replies."""
     channels = _channels()
     channel_map = _channel_map()
@@ -316,6 +324,8 @@ def thread_detail(thread_id):
 @blueprint.route("/members")
 def members_view():
     """Member directory."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     channels = _channels()
     users = _users()
     current_user = _current_user()
@@ -354,6 +364,8 @@ def members_view():
 @blueprint.route("/search")
 def search_view():
     """Search messages across all channels."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
     channels = _channels()
     channel_map = _channel_map()
     user_map = _user_map()

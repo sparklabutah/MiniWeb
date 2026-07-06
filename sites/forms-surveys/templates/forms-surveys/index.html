@@ -387,8 +387,10 @@
             padding: .65rem 1.25rem;
             border-top: 1px solid var(--gray-100);
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
+            gap: .4rem;
             background: var(--gray-50);
         }
         .form-card-meta {
@@ -411,6 +413,7 @@
             display: flex;
             gap: .35rem;
             align-items: center;
+            flex-wrap: wrap;
         }
         .badge {
             display: inline-flex;
@@ -445,21 +448,20 @@
         }
         .forms-list .form-card {
             border-radius: 0;
-            flex-direction: row;
-            align-items: center;
+            flex-direction: column;
             border-bottom: none;
         }
         .forms-list .form-card:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
         .forms-list .form-card:last-child { border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-bottom: 1px solid var(--gray-200); }
         .forms-list .form-card:only-child { border-radius: var(--radius-lg); border-bottom: 1px solid var(--gray-200); }
         .forms-list .form-card-banner {
-            width: 6px; height: auto; align-self: stretch; min-height: 72px;
+            height: 4px;
         }
         .forms-list .form-card-body {
             flex-direction: row;
             align-items: center;
             gap: 1rem;
-            padding: .85rem 1rem;
+            padding: .65rem 1rem;
             flex: 1;
         }
         .forms-list .form-card-title {
@@ -474,9 +476,8 @@
             flex: 1;
         }
         .forms-list .form-card-footer {
-            border-top: none;
-            border-left: 1px solid var(--gray-100);
-            background: transparent;
+            border-top: 1px solid var(--gray-100);
+            background: var(--gray-50);
             padding: .85rem 1rem;
             flex-shrink: 0;
         }
@@ -568,7 +569,7 @@
             .main { padding: 1rem; }
             .forms-grid { grid-template-columns: 1fr; }
             .filter-tabs { overflow-x: auto; }
-            .forms-list .form-card-body { flex-direction: column; align-items: flex-start; gap: .3rem; }
+            .forms-list .form-card-body { flex-direction: column; align-items: stretch; gap: .3rem; }
             .forms-list .form-card-title { min-width: 0; max-width: none; }
         }
     </style>
@@ -696,6 +697,7 @@
                             Results
                         </a>
                         <button class="btn-action" onclick="event.preventDefault();event.stopPropagation();navigator.clipboard.writeText(window.location.origin+'/sites/forms-surveys/form/'+encodeURIComponent('{{ form.id }}')+'/respond');this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" title="Copy share link">Share</button>
+                        <button class="btn-action" style="color:#dc2626" onclick="event.preventDefault();event.stopPropagation();if(confirm('Delete this form and all its responses?')){var x=new XMLHttpRequest();x.open('POST','{{ url_for('forms-surveys.form_delete', form_id=form.id) }}');x.onload=function(){location.reload()};x.send()}" title="Delete form">Delete</button>
                     </div>
                 </div>
             </a>

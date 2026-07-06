@@ -119,7 +119,7 @@ MACRO_LOCATIONS = {
         "verify_by_toggle": [
             "Verify identity page -> code verification form"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Services' page -> search and apply for a service"
         ],
         "apply_by_form": [
@@ -131,9 +131,6 @@ MACRO_LOCATIONS = {
         "select_by_dropdown": [
             "'Schedule Appointment' page -> appointment type and time dropdowns",
             "'Pay Online' page -> payment type dropdown"
-        ],
-        "export_by_dropdown": [
-            "'Services' page -> 'Export CSV' link in header"
         ],
         "book_by_form": [
             "'Schedule Appointment' page -> appointment form with type, date, time"
@@ -171,10 +168,10 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Chat page -> conversation messages display"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'+ New Chat' button in sidebar starts a new conversation"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Chat page -> message input field and send"
         ],
         "edit_by_query": [
@@ -196,7 +193,7 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "'Settings' page -> file upload for knowledge base import"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Chat page -> 'Share' button for conversation"
         ],
         "save_by_toggle": [
@@ -248,10 +245,10 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "'Compare' page -> comparison table of selected listings"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Sell' page -> listing form (title, description, price, category)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Listing detail -> bid amount input and bid button"
         ],
         "edit_by_form": [
@@ -352,10 +349,10 @@ MACRO_LOCATIONS = {
         "verify_by_slider": [
             "'Transfer Funds' page -> amount slider synced with amount input"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Payees' page -> Add Payee form (name, account, routing fields)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Transfer Funds' page -> search payee field"
         ],
         "edit_by_form": [
@@ -417,7 +414,7 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Post detail page -> full post content, author, comments"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Compose' page -> create post form (title, body, category)"
         ],
         "submit_by_route": [
@@ -550,7 +547,7 @@ MACRO_LOCATIONS = {
         "verify_by_slider": [
             "'Portfolio' page -> portfolio value and P&L data display"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Trade' page -> 'Symbol' dropdown search"
         ],
         "select_by_dropdown": [
@@ -618,11 +615,8 @@ MACRO_LOCATIONS = {
             "Job detail page -> description and requirements",
             "Team member page -> bio, role, contact"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Contact' page -> contact form with subject dropdown, name, email, message"
-        ],
-        "export_by_dropdown": [
-            "'Featured Products' section -> 'Export CSV' link; 'Our Services' -> 'Export CSV' link"
         ],
         "subscribe_by_toggle": [
             "'Subscribe to Our Newsletter' section -> email input and 'Subscribe' button"
@@ -661,13 +655,13 @@ MACRO_LOCATIONS = {
         "extract_by_date_range": [
             "Day/Week view -> events filtered by the selected date window"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'New Event' form -> 'Add title', start/end times, Category, Calendar, Priority, Location"
         ],
         "create_by_dropdown": [
             "'New Event' form -> 'Category' dropdown, 'Calendar' dropdown, 'Priority' dropdown"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'New Event' form -> title input at top of the form"
         ],
         "submit_by_date_range": [
@@ -685,7 +679,7 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "Calendar header -> 'CSV', 'ICS', 'JSON' export links"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Event detail page -> 'Share' button (copies link)"
         ],
         "invite_by_form": [
@@ -760,10 +754,10 @@ MACRO_LOCATIONS = {
         "verify_by_dropdown": [
             "'Services' page -> 'Status' dropdown showing service health"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Instances' page -> instance list with filters; 'Functions' page -> functions list"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Services' page -> search field with filter dropdowns and 'Apply' button"
         ],
         "edit_by_form": [
@@ -825,7 +819,7 @@ MACRO_LOCATIONS = {
         "compute_by_slider": [
             "Upload modal -> 'Size in bytes' input field"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'New folder' button -> folder name input ('Untitled folder' placeholder)"
         ],
         "edit_by_dropdown": [
@@ -850,7 +844,7 @@ MACRO_LOCATIONS = {
         "share_by_query": [
             "File detail page -> 'Share' button for sharing with other users"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "File detail page -> 'Share' button with permission controls"
         ],
         "save_by_toggle": [
@@ -1006,10 +1000,10 @@ MACRO_LOCATIONS = {
         "verify_by_slider": [
             "Venue page -> score Min/Max filter inputs for verifying score thresholds"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Review page -> title input, recommendation/confidence dropdowns, comments textarea"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Venue page -> search field to find papers, then paper page -> bid form"
         ],
         "submit_by_form": [
@@ -1078,7 +1072,7 @@ MACRO_LOCATIONS = {
         "compute_by_slider": [
             "Converter page -> numeric input for live conversion"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Converter/Calculator -> save conversion result form"
         ],
         "translate_by_dropdown": [
@@ -1116,10 +1110,10 @@ MACRO_LOCATIONS = {
         "extract_by_date_range": [
             "Assignment page -> due dates and submission form"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Discussions page -> new discussion form (title and body textarea)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Assignment page -> submission form with textarea and 'Submit' button"
         ],
         "submit_by_form": [
@@ -1210,13 +1204,13 @@ MACRO_LOCATIONS = {
         "compute_by_dropdown": [
             "'Deals' page -> stage filter dropdown for viewing deals by pipeline stage"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Activities' page -> create activity form (type dropdown, description, date)"
         ],
         "create_by_dropdown": [
             "'Activities' page -> activity type dropdown (call, meeting, email, note, task)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Activities' page -> create activity form with contact, deal, type, date, and description"
         ],
         "edit_by_form": [
@@ -1278,10 +1272,10 @@ MACRO_LOCATIONS = {
         "verify_by_slider": [
             "Campaign detail page -> funding progress bar (current vs goal)"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Start a Project' page -> campaign form (title, description, goal, category, dates)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Campaign detail page -> pledge form with tier selection and custom amount input"
         ],
         "select_by_radio": [
@@ -1366,7 +1360,7 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "Profiles page -> browse all profiles with filter controls"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Edit Profile' page -> 'Bio' textarea"
         ],
         "submit_by_route": [
@@ -1405,9 +1399,6 @@ MACRO_LOCATIONS = {
         "subscribe_by_toggle": [
             "'Edit Profile' page -> preference dropdowns for 'Looking for' and 'Gender Preference'"
         ],
-        "export_by_dropdown": [
-            "'Spark' page -> 'Export CSV' link in header"
-        ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
@@ -1442,7 +1433,7 @@ MACRO_LOCATIONS = {
         "extract_by_image": [
             "Editor page -> canvas area with 'Search assets...' input"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'My Projects' page -> 'Create Project' form with name input"
         ],
         "create_from_table": [
@@ -1487,7 +1478,7 @@ MACRO_LOCATIONS = {
         "follow_by_toggle": [
             "Template page -> 'Favorite' toggle for tracking designs"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Project page -> 'Copy Link' button for sharing via link"
         ],
         "save_by_toggle": [
@@ -1597,7 +1588,7 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "'DocEdit' page -> 'Upload File' button in sidebar"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Editor page -> share form with user dropdown and permission dropdown (view/edit/admin)"
         ],
         "save_by_toggle": [
@@ -1728,10 +1719,10 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Message detail page -> full email body, headers, attachments"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Compose' page -> 'To', 'Cc', 'Subject' fields and body textarea"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Compose' page -> 'Recipients (e.g. user@example.com)' field"
         ],
         "edit_by_form": [
@@ -1759,9 +1750,6 @@ MACRO_LOCATIONS = {
         ],
         "block_by_dropdown": [
             "Message detail -> action buttons (Star, Delete, Mark read/unread, Move, Label)"
-        ],
-        "export_by_dropdown": [
-            "'WebMail' page -> 'Export CSV' link in toolbar next to sort dropdown"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -1823,7 +1811,7 @@ MACRO_LOCATIONS = {
         "verify_from_free_text": [
             "Flight/Hotel detail -> booking form with 'Travelers' and account type"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Flight/Hotel detail -> 'Book Now' button with travelers and account selection"
         ],
         "select_by_ranking": [
@@ -1879,10 +1867,10 @@ MACRO_LOCATIONS = {
             "Form detail page -> form fields and responses count",
             "Results page -> per-field statistics table (Summary and Individual tabs)"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Blank form' page -> form builder (title, description, dynamic field rows)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Respond page -> dynamic form fields (text, radio, checkbox, select, textarea) and 'Submit' button"
         ],
         "submit_by_dropdown": [
@@ -1912,7 +1900,7 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "Form builder -> field type dropdown includes various input types"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "'FormFlow' page -> 'Share' button on each form card (copies URL, shows 'Copied!')"
         ]
     },
@@ -1951,7 +1939,7 @@ MACRO_LOCATIONS = {
             "Post detail page -> full post content and comments thread",
             "User profile page -> user posts, karma, activity"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Create a post' page -> 'Community' dropdown, 'Title' input, 'Body' textarea"
         ],
         "submit_by_form": [
@@ -1994,9 +1982,6 @@ MACRO_LOCATIONS = {
         "message_from_free_text": [
             "'Messages' page -> compose message form (recipient, subject, body)"
         ],
-        "export_by_dropdown": [
-            "'ForumHub' page -> 'Export CSV' link next to sort tabs"
-        ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
@@ -2018,7 +2003,7 @@ MACRO_LOCATIONS = {
         "search_by_semantic": [
             "'NoteCanvas' page -> search field with tag and sort filters"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "New note page -> title input and text editor textarea"
         ],
         "create_by_radio": [
@@ -2030,7 +2015,7 @@ MACRO_LOCATIONS = {
         "create_by_drag": [
             "Note page -> drawing canvas with pen/eraser tools and brush size slider"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Note page -> title input and content textarea for composing notes"
         ],
         "edit_by_form": [
@@ -2106,13 +2091,13 @@ MACRO_LOCATIONS = {
         "verify_by_slider": [
             "'Goals' page -> goal progress bars and target achievements"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'+ Add Exercise' page -> log workout form with date, type, duration, calories, notes"
         ],
         "create_by_checkbox": [
             "'+ Add Exercise' page -> workout type dropdown with exercise options"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Food Diary' page -> 'Search foods...' input with 'Servings' field and 'Log Food' button"
         ],
         "edit_by_form": [
@@ -2176,7 +2161,7 @@ MACRO_LOCATIONS = {
         "compare_by_date_range": [
             "'Appointments' page -> 'From' and 'To' date fields for date range filtering"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Schedule Appointment' page -> provider dropdown, date/time inputs, type, and notes"
         ],
         "submit_by_route": [
@@ -2248,7 +2233,7 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Chat view -> messages for selected conversation"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Chat panel -> 'Type a message' input with 'Send' button"
         ],
         "edit_by_form": [
@@ -2269,7 +2254,7 @@ MACRO_LOCATIONS = {
         "join_by_route": [
             "Chat panel -> group conversation with participant list"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Chat panel -> 'Share' button in header (copies link, shows 'Copied!')"
         ],
         "save_by_toggle": [
@@ -2286,9 +2271,6 @@ MACRO_LOCATIONS = {
         ],
         "message_from_free_text": [
             "Chat panel -> message text input and send"
-        ],
-        "export_by_dropdown": [
-            "'QuickChat' page -> 'Export CSV' link next to search bar"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -2439,10 +2421,10 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Job detail page -> full description, requirements, salary, company info"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Job Alerts' page -> create alert form with name, query, location, salary inputs"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Apply page -> application form with resume upload and cover letter textarea"
         ],
         "upload_by_upload": [
@@ -2499,7 +2481,7 @@ MACRO_LOCATIONS = {
         "follow_by_toggle": [
             "Channel page -> 'Follow'/'Unfollow' button"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Stream page -> 'Share' button below player (copies link, shows 'Copied!')"
         ],
         "report_by_form": [
@@ -2568,10 +2550,10 @@ MACRO_LOCATIONS = {
         "compare_by_route": [
             "Compare page -> select two places via form, then comparison table"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Place detail page -> review form with rating dropdown and text textarea"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Place detail page -> review form with rating and text fields"
         ],
         "post_from_free_text": [
@@ -2605,9 +2587,6 @@ MACRO_LOCATIONS = {
         "route_by_route": [
             "'Get Directions' page -> route display with waypoints"
         ],
-        "export_by_dropdown": [
-            "'CascadiaMaps' page -> 'Export CSV' link next to sort dropdown"
-        ]
     },
     "multimedia-posting": {
         "navigate_by_route": [
@@ -2638,7 +2617,7 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Post detail page -> caption, comments, likes, media"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'+ Create' page -> type dropdown, caption textarea, tags, location, file upload"
         ],
         "edit_by_form": [
@@ -2721,7 +2700,7 @@ MACRO_LOCATIONS = {
         "extract_by_query": [
             "Search returns matching artists, albums, and tracks"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Create Playlist page -> name, description, visibility checkbox"
         ],
         "select_by_dropdown": [
@@ -2850,13 +2829,13 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Entry detail page -> credentials, notes, tags, audit history"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "New Entry page -> form with title, username, password, URL, notes, tags"
         ],
         "create_by_dropdown": [
             "New Entry page -> vault dropdown and category dropdown"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "New Entry page -> form with all credential fields and dropdowns"
         ],
         "edit_by_form": [
@@ -2880,7 +2859,7 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "'VaultGuard' home -> 'Import' button accepting .csv, .json files"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Entry detail page -> share controls"
         ],
         "authenticate_by_code": [
@@ -2911,7 +2890,7 @@ MACRO_LOCATIONS = {
             "Project detail page -> project info, tech stack, collaborators",
             "'AlexDev' home -> portfolio sections (Projects, Skills, Resume, Blog, Contact)"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Alex Rivera' page -> contact form with 'Name', 'Email', 'Subject', 'Message' and 'Send Message' button"
         ],
         "sort_by_ranking": [
@@ -2963,10 +2942,10 @@ MACRO_LOCATIONS = {
         "verify_by_dropdown": [
             "'Voter Info' page -> precinct dropdown to check registration status"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Start a Petition' page -> title, description, goal, category dropdown"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Petition detail page -> signature input and comment textarea, 'Sign Petition' button"
         ],
         "sign_by_signature": [
@@ -3014,7 +2993,7 @@ MACRO_LOCATIONS = {
         "extract_by_query": [
             "Search returns matching podcasts, episodes, and audiobooks"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Podcast/Audiobook detail -> review form with rating slider and review textarea"
         ],
         "select_by_dropdown": [
@@ -3114,10 +3093,10 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Issue detail page -> description, metadata, comments, status history"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'+ New Issue' page -> project dropdown, title input, description textarea, type, priority, assignee, sprint, story points"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'+ New Issue' page -> form with title, project/type/priority/assignee dropdowns, description, labels"
         ],
         "edit_by_query": [
@@ -3168,10 +3147,10 @@ MACRO_LOCATIONS = {
             "Question detail page -> full question, answers, votes, comments",
             "User profile page -> reputation, activity, tags"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Ask Question' page -> title input, body textarea, tag input"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Question detail -> answer textarea ('Write your answer here...') and post button"
         ],
         "edit_by_form": [
@@ -3332,7 +3311,7 @@ MACRO_LOCATIONS = {
         "compare_by_dropdown": [
             "Listings page -> filtered listing cards for property comparison"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "Listing detail page -> inquiry form (name, email, phone, message textarea)"
         ],
         "select_by_ranking": [
@@ -3382,7 +3361,7 @@ MACRO_LOCATIONS = {
             "Meeting detail page -> participants, recording, chat, share link",
             "Recording detail page -> playback, duration, views, transcript"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Schedule a Meeting' page -> 'Meeting Title' input, datetime, participant checkboxes, duration/type dropdowns"
         ],
         "select_by_dropdown": [
@@ -3401,7 +3380,7 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "'Schedule a Meeting' page -> file attachment input"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Meeting detail page -> 'Share' button (copies link, shows 'Link Copied!')"
         ],
         "invite_by_form": [
@@ -3566,7 +3545,7 @@ MACRO_LOCATIONS = {
         "compute_by_slider": [
             "Spreadsheet view -> data rows with numeric values for filtering"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'+ New' -> Create Spreadsheet or Create Presentation form with title input"
         ],
         "edit_by_query": [
@@ -3581,7 +3560,7 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "Spreadsheet/presentation view -> data export controls"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Spreadsheet page -> 'Share' button in toolbar (copies link, shows 'Copied!')",
             "Presentation page -> 'Share' button in toolbar"
         ]
@@ -3641,7 +3620,7 @@ MACRO_LOCATIONS = {
         "verify_by_toggle": [
             "'City of Lakeport' home -> document status and verification controls"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'City of Lakeport' home -> filing submission and permit application forms"
         ],
         "submit_by_form": [
@@ -3717,10 +3696,10 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Thread detail page -> full thread with replies"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Meridian Chat' page -> channel creation controls"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Meridian Chat' page -> message input area for composing messages"
         ],
         "edit_by_form": [
@@ -3744,7 +3723,7 @@ MACRO_LOCATIONS = {
         "join_by_toggle": [
             "'Meridian Chat' page -> channel join/leave controls"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "Channel page -> 'Share' button in header (copies link, shows 'Copied!')"
         ],
         "save_by_toggle": [
@@ -3759,9 +3738,6 @@ MACRO_LOCATIONS = {
         "message_from_free_text": [
             "Channel page -> message text input and 'Send' button",
             "Thread detail -> reply input and send"
-        ],
-        "export_by_dropdown": [
-            "'Meridian Chat' page -> 'Export CSV' link in sidebar"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -3806,7 +3782,7 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "Compare page -> compare two events with side-by-side table"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'LakeportEvents' page -> event booking with ticket selection"
         ],
         "select_by_slider": [
@@ -3820,9 +3796,6 @@ MACRO_LOCATIONS = {
         ],
         "configure_by_slider": [
             "'LakeportEvents' page -> notification and reminder settings"
-        ],
-        "export_by_dropdown": [
-            "'LakeportEvents' page -> 'Export CSV' link above event grid"
         ],
         "save_by_toggle": [
             "'LakeportEvents' page -> event card save/bookmark toggle"
@@ -3895,7 +3868,7 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "'Lakeport Transit Authority' page -> route and fare data export controls"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "'Lakeport Transit Authority' page -> trip plan sharing options"
         ]
     },
@@ -3966,7 +3939,7 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "Compare page -> select two courses via dropdowns, then side-by-side table"
         ],
-        "submit_by_query": [
+        "submit_by_form": [
             "'Contact' page -> contact form (subject, message textarea)"
         ],
         "apply_by_form": [
@@ -4012,13 +3985,13 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "'SnapLink' page -> link data export options"
         ],
-        "share_by_dropdown": [
+        "share_by_toggle": [
             "'SnapLink' page -> link sharing controls"
         ],
         "create_by_query": [
             "'Shorten a URL' form -> 'Paste your long URL here...' input, 'Title', 'Custom short code', 'Expiry', 'Tags' fields, 'Generate QR Code' checkbox, and 'Shorten URL' button"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'Shorten a URL' form -> URL input and optional custom code, then create short link"
         ]
     },
@@ -4062,7 +4035,7 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "'MeridianGit' page -> branch and commit comparison tools"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "'New repository' page -> name, description, owner dropdown, default_branch dropdown"
         ],
         "submit_by_form": [
@@ -4082,9 +4055,6 @@ MACRO_LOCATIONS = {
         ],
         "post_from_free_text": [
             "'MeridianGit' page -> comment forms on issues and merge requests"
-        ],
-        "export_by_dropdown": [
-            "'Dashboard' page -> 'Export CSV' link in repositories header"
         ],
         "follow_by_toggle": [
             "Repo detail -> 'Star'/'Unstar' button"
@@ -4303,7 +4273,7 @@ MACRO_LOCATIONS = {
         "verify_from_free_text": [
             "'LakeportWiki' page -> article content for fact verification"
         ],
-        "create_from_free_text": [
+        "create_by_form": [
             "Create page -> title, content textarea, category dropdown"
         ],
         "edit_by_dropdown": [

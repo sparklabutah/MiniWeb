@@ -115,15 +115,19 @@ def index():
         results.sort(key=lambda c: (0 if c["status"] == "active" else 1, -c["backer_count"]))
 
     user = None
+    saved_ids = []
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        if user:
+            saved_ids = user.get("saved_campaigns", [])
 
     for c in results:
         c["funding_pct"] = _funding_pct(c)
 
     return render_template("crowdfunding-donations/index.html",
                            campaigns=results, categories=_categories_list,
-                           q=q, cat=cat, status_filter=status, sort=sort, user=user)
+                           q=q, cat=cat, status_filter=status, sort=sort,
+                           user=user, saved_ids=saved_ids)
 
 
 @blueprint.route("/campaign/<int:campaign_id>")
@@ -134,15 +138,24 @@ def campaign_detail(campaign_id):
     campaign["funding_pct"] = _funding_pct(campaign)
     creator = _get_user(campaign["creator_id"])
     user = None
+    is_saved = False
+    is_following = False
+    is_subscribed = False
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        if user:
+            is_saved = campaign_id in user.get("saved_campaigns", [])
+            is_following = campaign["creator_id"] in user.get("followed_creators", [])
+            is_subscribed = campaign_id in user.get("subscribed_campaigns", [])
     related = [c for c in _get_campaigns()
                if c["category"] == campaign["category"] and c["id"] != campaign_id][:4]
     for r in related:
         r["funding_pct"] = _funding_pct(r)
     return render_template("crowdfunding-donations/campaign.html",
                            campaign=campaign, creator=creator,
-                           related=related, user=user)
+                           related=related, user=user,
+                           is_saved=is_saved, is_following=is_following,
+                           is_subscribed=is_subscribed)
 
 
 @blueprint.route("/category/<cat_name>")
@@ -152,11 +165,15 @@ def category_page(cat_name):
     for c in filtered:
         c["funding_pct"] = _funding_pct(c)
     user = None
+    saved_ids = []
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        if user:
+            saved_ids = user.get("saved_campaigns", [])
     return render_template("crowdfunding-donations/category.html",
                            campaigns=filtered, category=cat_name,
-                           categories=_categories_list, user=user)
+                           categories=_categories_list, user=user,
+                           saved_ids=saved_ids)
 
 
 @blueprint.route("/create", methods=["GET"])
@@ -191,15 +208,22 @@ def dashboard():
                 "tier_id": b["tier_id"],
                 "funding_pct": _funding_pct(camp),
             })
+    saved = []
+    for sid in user.get("saved_campaigns", []):
+        c = next((c for c in campaigns if c["id"] == sid), None)
+        if c:
+            c["funding_pct"] = _funding_pct(c)
+            saved.append(c)
     return render_template("crowdfunding-donations/dashboard.html",
                            user=user, created_campaigns=created,
-                           backed_campaigns=backed_details)
+                           backed_campaigns=backed_details,
+                           saved_campaigns=saved)
 
 
 @blueprint.route("/login", methods=["GET"])
 def login_page():
     return render_template("crowdfunding-donations/login.html", error=None,
-                           next_url=request.args.get("next", ""))
+                           next_url=request.args.get("next", ""), tab="login")
 
 
 @blueprint.route("/login", methods=["POST"])
@@ -217,7 +241,7 @@ def login_submit():
         if request.is_json:
             return jsonify({"error": "Invalid credentials"}), 401
         return render_template("crowdfunding-donations/login.html",
-                               error="Invalid username or password")
+                               error="Invalid username or password", tab="login")
     session["user_id"] = user["id"]
     emit("signup", user_id=user["id"], site_name="crowdfunding-donations", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
     if request.is_json:
@@ -714,3 +738,151 @@ def api_login():
         return jsonify({"error": "Invalid credentials"}), 401
     session["user_id"] = user["id"]
     return jsonify({"user_id": user["id"], "username": user["username"]})
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/register", methods=["GET"])
+def register_page():
+    return render_template("crowdfunding-donations/login.html", error=None,
+                           next_url=request.args.get("next", ""), tab="register")
+
+
+@blueprint.route("/register", methods=["POST"])
+def register_submit():
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        name = data.get("name", "").strip()
+        email = data.get("email", "").strip()
+        username = data.get("username", "").strip()
+        password = data.get("password", "").strip()
+    else:
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
+    if not name or not username or not password:
+        err = "Name, username, and password are required"
+        if request.is_json:
+            return jsonify({"error": err}), 400
+        return render_template("crowdfunding-donations/login.html",
+                               error=err, tab="register")
+
+    users = _load_users()
+    if any(u["username"] == username for u in users):
+        err = "Username already taken"
+        if request.is_json:
+            return jsonify({"error": err}), 409
+        return render_template("crowdfunding-donations/login.html",
+                               error=err, tab="register")
+
+    new_id = max((u["id"] for u in users), default=0) + 1
+    new_user = {
+        "id": new_id, "root_user_id": new_id,
+        "username": username, "password": password,
+        "name": name, "email": email or f"{username}@fundspark.com",
+        "backed_campaigns": [], "created_campaigns": [],
+        "saved_campaigns": [], "followed_creators": [],
+        "subscribed_campaigns": [],
+    }
+    users.append(new_user)
+    _save_users(users)
+    session["user_id"] = new_id
+    emit("signup", user_id=new_id, site_name="crowdfunding-donations",
+         username=username, password=password, email=new_user["email"])
+
+    if request.is_json:
+        return jsonify({"user_id": new_id, "username": username}), 201
+    next_url = request.form.get("next", "") or request.args.get("next", "")
+    return redirect(next_url or url_for("crowdfunding-donations.dashboard"))
+
+
+# ---------------------------------------------------------------------------
+# Save / bookmark campaigns
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/campaign/<int:campaign_id>/save", methods=["POST"])
+def form_save_campaign(campaign_id):
+    if "user_id" not in session:
+        if request.is_json:
+            return jsonify({"error": "Authentication required"}), 401
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        if request.is_json:
+            return jsonify({"error": "User not found"}), 404
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    saved = user.setdefault("saved_campaigns", [])
+    if campaign_id in saved:
+        saved.remove(campaign_id)
+        action = "unsaved"
+    else:
+        saved.append(campaign_id)
+        action = "saved"
+    _save_users(users)
+    if request.is_json:
+        return jsonify({"action": action, "campaign_id": campaign_id})
+    return redirect(request.referrer or url_for("crowdfunding-donations.index"))
+
+
+# ---------------------------------------------------------------------------
+# Follow / unfollow creators
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/creator/<int:creator_id>/follow", methods=["POST"])
+def form_follow_creator(creator_id):
+    if "user_id" not in session:
+        if request.is_json:
+            return jsonify({"error": "Authentication required"}), 401
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        if request.is_json:
+            return jsonify({"error": "User not found"}), 404
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    followed = user.setdefault("followed_creators", [])
+    if creator_id in followed:
+        followed.remove(creator_id)
+        action = "unfollowed"
+    else:
+        followed.append(creator_id)
+        action = "followed"
+    _save_users(users)
+    if request.is_json:
+        return jsonify({"action": action, "creator_id": creator_id})
+    return redirect(request.referrer or url_for("crowdfunding-donations.index"))
+
+
+# ---------------------------------------------------------------------------
+# Subscribe / unsubscribe to campaign updates
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/campaign/<int:campaign_id>/subscribe", methods=["POST"])
+def form_subscribe_campaign(campaign_id):
+    if "user_id" not in session:
+        if request.is_json:
+            return jsonify({"error": "Authentication required"}), 401
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        if request.is_json:
+            return jsonify({"error": "User not found"}), 404
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    subs = user.setdefault("subscribed_campaigns", [])
+    if campaign_id in subs:
+        subs.remove(campaign_id)
+        action = "unsubscribed"
+    else:
+        subs.append(campaign_id)
+        action = "subscribed"
+    _save_users(users)
+    if request.is_json:
+        return jsonify({"action": action, "campaign_id": campaign_id})
+    return redirect(request.referrer or url_for("crowdfunding-donations.campaign_detail",
+                                                 campaign_id=campaign_id))

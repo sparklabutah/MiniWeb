@@ -134,7 +134,20 @@
             try { navigator.sendBeacon('/_admin/beacon', new Blob([beacon], {type: 'application/json'})); }
             catch(e) { /* sendBeacon not available, silently skip */ }
         }
+        // Post observation after every action (debounced to avoid flooding)
+        clearTimeout(_obsTimer);
+        _obsTimer = setTimeout(function() {
+            post({
+                mw: 'observation',
+                url: location.pathname + location.search,
+                title: document.title || '',
+                timestamp: new Date().toISOString(),
+                snapshot: captureSnapshot(),
+                axtree: captureAxtree(),
+            });
+        }, 300);
     }
+    var _obsTimer = null;
 
     // ── Network interception ────────────────────────────────────────────
     // Wraps fetch() and XMLHttpRequest to log all HTTP traffic
@@ -387,12 +400,91 @@
 
     // ── Initial page load ───────────────────────────────────────────────
 
+    function captureSnapshot() {
+        try {
+            var html = document.documentElement.outerHTML;
+            if (html.length > 200000) {
+                html = html.slice(0, 200000) + '<!-- truncated -->';
+            }
+            return html;
+        } catch(e) {
+            return '';
+        }
+    }
+
+    function buildAxtree(el, depth) {
+        if (!el || depth > 6) return null;
+        var tag = el.tagName ? el.tagName.toLowerCase() : '';
+        if (!tag || tag === 'script' || tag === 'style' || tag === 'noscript') return null;
+        var role = el.getAttribute('role') || '';
+        var ariaLabel = el.getAttribute('aria-label') || '';
+        var name = el.getAttribute('name') || '';
+        var text = '';
+        // Get direct text content (not children's)
+        for (var i = 0; i < el.childNodes.length; i++) {
+            if (el.childNodes[i].nodeType === 3) {
+                var t = el.childNodes[i].textContent.trim();
+                if (t) text += (text ? ' ' : '') + t;
+            }
+        }
+        if (text.length > 100) text = text.slice(0, 97) + '...';
+        var label = ariaLabel || el.title || '';
+        var node = {};
+        // Determine role
+        if (role) node.role = role;
+        else if (tag === 'a') node.role = 'link';
+        else if (tag === 'button' || (tag === 'input' && el.type === 'submit')) node.role = 'button';
+        else if (tag === 'input') node.role = 'input-' + (el.type || 'text');
+        else if (tag === 'select') node.role = 'select';
+        else if (tag === 'textarea') node.role = 'textarea';
+        else if (tag === 'img') node.role = 'img';
+        else if (/^h[1-6]$/.test(tag)) node.role = 'heading';
+        else if (tag === 'nav') node.role = 'navigation';
+        else if (tag === 'form') node.role = 'form';
+        else if (tag === 'table') node.role = 'table';
+        else node.role = tag;
+
+        if (text) node.text = text;
+        if (label) node.label = label;
+        if (tag === 'a' && el.href) node.href = el.getAttribute('href');
+        if (tag === 'input' || tag === 'textarea') node.value = (el.value || '').slice(0, 50);
+        if (tag === 'select') node.value = el.value || '';
+
+        // Children
+        var kids = [];
+        for (var j = 0; j < el.children.length; j++) {
+            var child = buildAxtree(el.children[j], depth + 1);
+            if (child) kids.push(child);
+        }
+        if (kids.length) node.children = kids;
+
+        // Skip empty container divs/spans
+        if (!text && !label && !role && !node.value && (tag === 'div' || tag === 'span')) {
+            if (kids.length === 0) return null;
+            if (kids.length === 1) return kids[0];
+        }
+        return node;
+    }
+
+    function captureAxtree() {
+        try {
+            var tree = buildAxtree(document.body, 0);
+            var str = JSON.stringify(tree);
+            if (str.length > 100000) str = str.slice(0, 100000) + '...';
+            return str;
+        } catch(e) {
+            return '';
+        }
+    }
+
     function postPageLoad() {
         post({
             mw: 'observation',
             url: location.pathname + location.search,
             title: document.title || '',
             timestamp: new Date().toISOString(),
+            snapshot: captureSnapshot(),
+            axtree: captureAxtree(),
         });
     }
 

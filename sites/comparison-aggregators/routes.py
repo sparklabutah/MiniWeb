@@ -221,10 +221,6 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
     if not q or sort != "newest":
         phones = _sort_phones(phones, sort)
 
-    # Re-assign sequential IDs after filtering/sorting
-    for i, p in enumerate(phones, 1):
-        p["id"] = i
-
     return phones
 
 
@@ -460,30 +456,60 @@ def phone_detail(phone_id):
 @blueprint.route("/brand/<path:brand_name>")
 def brand_page(brand_name):
     sort = request.args.get("sort", "newest").strip()
-
     filtered = _db_query_phones(brand=brand_name, sort=sort)
-
+    user = _get_user(session["user_id"]) if "user_id" in session else None
     return render_template("comparison-aggregators/brand.html",
                            phones=filtered, brand_name=brand_name,
-                           brands=_get_brands(), sort=sort)
+                           brands=_get_brands(), sort=sort, user=user)
 
 
 @blueprint.route("/compare")
 def compare_page():
     ids_str = request.args.get("ids", "")
     selected = []
+
     if ids_str:
+        # Explicit IDs from URL
         ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
         for pid in ids:
             phone = _db_get_phone_by_item_id(pid)
             if phone:
                 phone["id"] = pid
                 selected.append(phone)
+    elif "user_id" in session:
+        # Load from user's saved compare list
+        user = _get_user(session["user_id"])
+        if user:
+            for pid in user.get("compare_lists", []):
+                phone = _db_get_phone_by_item_id(pid)
+                if phone:
+                    phone["id"] = pid
+                    selected.append(phone)
 
     phones = _db_query_phones(limit=500)
+    user = _get_user(session["user_id"]) if "user_id" in session else None
 
     return render_template("comparison-aggregators/compare.html",
-                           phones=phones, selected=selected)
+                           phones=phones, selected=selected, user=user)
+
+
+@blueprint.route("/favorites")
+def favorites_page():
+    if "user_id" not in session:
+        return redirect(url_for("comparison-aggregators.login_page"))
+    user = _get_user(session["user_id"])
+    if not user:
+        return redirect(url_for("comparison-aggregators.login_page"))
+
+    fav_phones = []
+    for pid in user.get("favorites", []):
+        phone = _db_get_phone_by_item_id(pid)
+        if phone:
+            phone["id"] = pid
+            fav_phones.append(phone)
+
+    return render_template("comparison-aggregators/favorites.html",
+                           phones=fav_phones, user=user)
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -571,6 +597,9 @@ def form_add_compare(phone_id):
     else:
         cl.append(phone_id)
     _save_users(users)
+    redirect_to = request.form.get("redirect_to", "")
+    if redirect_to:
+        return redirect(redirect_to)
     return redirect(url_for("comparison-aggregators.phone_detail", phone_id=phone_id))
 
 

@@ -53,24 +53,146 @@ def _get_openai_key():
 
 
 def _translate_text(text, source_lang, target_lang, user_glossary=None):
-    """Translate using Groq/Claude LLM."""
+    """Deterministic word-by-word translation using built-in dictionaries.
+
+    Replaces each known word with its target-language equivalent, preserving
+    punctuation and unknown words. User glossary entries take priority.
+    """
     if not text or not text.strip():
         return ""
     if source_lang == target_lang:
         return text
 
-    from app.llm import call_llm
+    # Build lookup: user glossary overrides built-in dict
+    lookup = dict(_DICTIONARIES.get(f"{source_lang}->{target_lang}", {}))
+    if user_glossary and user_glossary.get("entries"):
+        for entry in user_glossary["entries"]:
+            lookup[entry["source"].lower()] = entry["target"]
 
-    src_name = _LANG_NAMES.get(source_lang, source_lang)
-    tgt_name = _LANG_NAMES.get(target_lang, target_lang)
-    system = f"You are a translator. Translate from {src_name} to {tgt_name}. Output ONLY the translation, nothing else."
+    if not lookup:
+        tgt_name = _LANG_NAMES.get(target_lang, target_lang)
+        return f"[{tgt_name}] {text}"
 
-    result = call_llm(text, system=system, max_tokens=500, temperature=0.3)
-    if result:
-        return result
+    import re
+    tokens = re.findall(r"[\w']+|[^\w\s]|\s+", text)
+    result = []
+    for token in tokens:
+        low = token.lower()
+        if low in lookup:
+            replacement = lookup[low]
+            # Preserve original capitalization
+            if token[0].isupper() and token[1:].islower() if len(token) > 1 else token.isupper():
+                replacement = replacement[0].upper() + replacement[1:] if replacement else replacement
+            elif token.isupper():
+                replacement = replacement.upper()
+            result.append(replacement)
+        else:
+            result.append(token)
+    return "".join(result)
 
-    # Last resort
-    return f"[{tgt_name}] {text}"
+
+# Built-in word dictionaries (en->target)
+_DICTIONARIES = {
+    "en->es": {
+        # Common words
+        "the": "el", "a": "un", "an": "un", "is": "es", "are": "son", "was": "fue",
+        "were": "fueron", "be": "ser", "been": "sido", "being": "siendo",
+        "have": "tener", "has": "tiene", "had": "tenía", "having": "teniendo",
+        "do": "hacer", "does": "hace", "did": "hizo", "will": "va a",
+        "would": "haría", "could": "podría", "should": "debería",
+        "may": "puede", "might": "podría", "must": "debe", "shall": "deberá",
+        "can": "puede", "need": "necesitar", "want": "querer",
+        "i": "yo", "you": "tú", "he": "él", "she": "ella", "it": "ello",
+        "we": "nosotros", "they": "ellos", "me": "me", "him": "lo", "her": "la",
+        "us": "nos", "them": "los", "my": "mi", "your": "tu", "his": "su",
+        "its": "su", "our": "nuestro", "their": "su",
+        "this": "este", "that": "ese", "these": "estos", "those": "esos",
+        "and": "y", "but": "pero", "or": "o", "not": "no", "if": "si",
+        "then": "entonces", "than": "que", "so": "así", "because": "porque",
+        "when": "cuando", "where": "donde", "how": "cómo", "what": "qué",
+        "who": "quién", "which": "cuál", "all": "todo", "each": "cada",
+        "every": "cada", "both": "ambos", "few": "pocos", "more": "más",
+        "most": "mayoría", "other": "otro", "some": "algunos", "such": "tal",
+        "no": "no", "only": "solo", "same": "mismo", "very": "muy",
+        "just": "solo", "also": "también", "now": "ahora", "here": "aquí",
+        "there": "allí", "still": "todavía", "already": "ya",
+        "about": "sobre", "after": "después", "again": "otra vez",
+        "against": "contra", "at": "en", "before": "antes", "between": "entre",
+        "by": "por", "down": "abajo", "during": "durante", "for": "para",
+        "from": "de", "in": "en", "into": "en", "of": "de", "on": "en",
+        "out": "fuera", "over": "sobre", "through": "a través", "to": "a",
+        "under": "bajo", "up": "arriba", "with": "con", "without": "sin",
+        # Nouns
+        "pipeline": "tubería", "update": "actualización", "target": "objetivo",
+        "week": "semana", "deals": "tratos", "deal": "trato",
+        "stages": "etapas", "stage": "etapa", "final": "final",
+        "opportunity": "oportunidad", "access": "acceso", "early": "temprano",
+        "reports": "informes", "report": "informe", "custom": "personalizado",
+        "compliance": "cumplimiento", "roadmap": "hoja de ruta",
+        "quarter": "trimestre", "year": "año", "month": "mes", "day": "día",
+        "time": "tiempo", "work": "trabajo", "people": "personas",
+        "way": "camino", "world": "mundo", "life": "vida",
+        "hand": "mano", "part": "parte", "place": "lugar", "case": "caso",
+        "group": "grupo", "company": "empresa", "system": "sistema",
+        "program": "programa", "question": "pregunta", "number": "número",
+        "night": "noche", "point": "punto", "home": "hogar", "water": "agua",
+        "room": "habitación", "mother": "madre", "area": "área",
+        "money": "dinero", "story": "historia", "fact": "hecho",
+        "price": "precio", "payment": "pago", "account": "cuenta",
+        "order": "pedido", "product": "producto", "service": "servicio",
+        "customer": "cliente", "market": "mercado", "team": "equipo",
+        "name": "nombre", "email": "correo", "message": "mensaje",
+        "file": "archivo", "page": "página", "search": "búsqueda",
+        "data": "datos", "user": "usuario", "password": "contraseña",
+        "hello": "hola", "goodbye": "adiós", "please": "por favor",
+        "thank": "gracias", "thanks": "gracias", "yes": "sí",
+        "good": "bueno", "great": "genial", "new": "nuevo", "old": "viejo",
+        "big": "grande", "small": "pequeño", "long": "largo", "short": "corto",
+        "high": "alto", "low": "bajo", "left": "izquierda", "right": "derecha",
+        "think": "creo", "know": "saber", "get": "obtener", "go": "ir",
+        "come": "venir", "make": "hacer", "take": "tomar", "see": "ver",
+        "say": "decir", "give": "dar", "find": "encontrar", "tell": "decir",
+        "ask": "preguntar", "use": "usar", "try": "intentar",
+        "leave": "dejar", "call": "llamar", "keep": "mantener",
+        "let": "dejar", "begin": "comenzar", "show": "mostrar",
+        "hear": "escuchar", "play": "jugar", "run": "correr",
+        "move": "mover", "live": "vivir", "believe": "creer",
+        "close": "cerrar", "scheduled": "programado",
+        "one": "uno", "two": "dos", "three": "tres",
+        # Business terms
+        "meeting": "reunión", "project": "proyecto", "budget": "presupuesto",
+        "deadline": "fecha límite", "review": "revisión", "approval": "aprobación",
+        "schedule": "horario", "conference": "conferencia",
+    },
+    "en->fr": {
+        "the": "le", "a": "un", "is": "est", "are": "sont", "was": "était",
+        "have": "avoir", "has": "a", "and": "et", "but": "mais", "or": "ou",
+        "not": "pas", "i": "je", "you": "vous", "he": "il", "she": "elle",
+        "we": "nous", "they": "ils", "my": "mon", "your": "votre",
+        "this": "ce", "that": "ce", "with": "avec", "for": "pour",
+        "from": "de", "in": "dans", "on": "sur", "at": "à", "to": "à",
+        "of": "de", "hello": "bonjour", "goodbye": "au revoir",
+        "please": "s'il vous plaît", "thank": "merci", "thanks": "merci",
+        "yes": "oui", "no": "non", "good": "bon", "great": "formidable",
+        "pipeline": "pipeline", "update": "mise à jour", "target": "objectif",
+        "week": "semaine", "deal": "accord", "deals": "accords",
+        "meeting": "réunion", "project": "projet", "report": "rapport",
+    },
+    "en->de": {
+        "the": "der", "a": "ein", "is": "ist", "are": "sind", "was": "war",
+        "have": "haben", "has": "hat", "and": "und", "but": "aber", "or": "oder",
+        "not": "nicht", "i": "ich", "you": "du", "he": "er", "she": "sie",
+        "we": "wir", "they": "sie", "my": "mein", "your": "dein",
+        "this": "dies", "that": "das", "with": "mit", "for": "für",
+        "from": "von", "in": "in", "on": "auf", "at": "bei", "to": "zu",
+        "of": "von", "hello": "hallo", "goodbye": "auf Wiedersehen",
+        "please": "bitte", "thank": "danke", "thanks": "danke",
+        "yes": "ja", "no": "nein", "good": "gut",
+        "pipeline": "Pipeline", "update": "Aktualisierung", "target": "Ziel",
+        "week": "Woche", "deal": "Geschäft", "deals": "Geschäfte",
+        "meeting": "Besprechung", "project": "Projekt", "report": "Bericht",
+    },
+}
 
 
 def _detect_language(text):

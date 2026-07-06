@@ -367,10 +367,28 @@ def post_detail(post_id):
 @blueprint.route("/user/<username>")
 def user_profile(username):
     user = _get_user_by_username(username)
-    if not user:
-        abort(404)
     user_posts = _load_posts(where={"author": username}, sort="-created_utc", limit=50)
     user_comments = _load_comments(where={"author": username}, sort="-created_utc", limit=50)
+    if not user:
+        # Author exists in posts/comments but not in users table — synthesize a profile
+        if not user_posts and not user_comments:
+            abort(404)
+        earliest = None
+        for p in user_posts:
+            if p.get("created_utc") and (earliest is None or p["created_utc"] < earliest):
+                earliest = p["created_utc"]
+        for c in user_comments:
+            if c.get("created_utc") and (earliest is None or c["created_utc"] < earliest):
+                earliest = c["created_utc"]
+        user = {
+            "username": username,
+            "cake_day": (earliest or "")[:10],
+            "karma": 0,
+            "subscribed_subreddits": [],
+            "biography": "",
+            "blocked_users": [],
+            "followed_users": [],
+        }
     # Enrich comments with parent post info
     for c in user_comments:
         parent_post = _get_post(c["post_id"])
@@ -1005,10 +1023,13 @@ def api_follow_user(username):
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
+    # Verify username exists as a post/comment author or registered user
+    has_posts = db.count(SITE, "posts", where={"author": username})
+    if not has_posts:
+        target = _get_user_by_username(username)
+        if not target:
+            return jsonify({"error": "User not found"}), 404
     users = _load_users()
-    target = next((u for u in users if u["username"] == username), None)
-    if not target:
-        return jsonify({"error": "User not found"}), 404
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
     followed = me.get("followed_users", [])
     if username in followed:
@@ -1121,10 +1142,13 @@ def api_block_user(username):
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
+    # Verify username exists as a post/comment author or registered user
+    has_posts = db.count(SITE, "posts", where={"author": username})
+    if not has_posts:
+        target = _get_user_by_username(username)
+        if not target:
+            return jsonify({"error": "User not found"}), 404
     users = _load_users()
-    target = next((u for u in users if u["username"] == username), None)
-    if not target:
-        return jsonify({"error": "User not found"}), 404
     me = next((u for u in users if u["root_user_id"] == user["root_user_id"]), None)
     blocked = me.get("blocked_users", [])
     if username in blocked:

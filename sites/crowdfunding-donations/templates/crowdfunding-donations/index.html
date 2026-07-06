@@ -75,6 +75,9 @@
         .card-badge.funded { background: rgba(255,255,255,.9); color: #065f46; }
         .card-badge.expired { background: rgba(0,0,0,.5); color: #ccc; }
         .card-badge.cancelled { background: rgba(239,68,68,.8); color: #fff; }
+        .card-save { position: absolute; top: .6rem; left: .6rem; z-index: 3; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); color: #fff; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .15s; }
+        .card-save:hover { background: rgba(0,0,0,.55); transform: scale(1.1); }
+        .card-save.saved { background: rgba(43,222,115,.85); color: #fff; }
 
         .card-body { padding: 1rem 1rem 1.15rem; }
         .card-title { font-size: .95rem; font-weight: 700; margin-bottom: .15rem; line-height: 1.3; }
@@ -173,6 +176,11 @@
                 <div class="deco deco-2"></div>
                 <span class="cat-label">{{ c.category }}</span>
             </div>
+            {% if user %}
+            <form method="post" action="{{ url_for('crowdfunding-donations.form_save_campaign', campaign_id=c.id) }}" onclick="event.stopPropagation()" style="position:absolute;top:0;left:0;z-index:3">
+                <button type="submit" class="card-save {{ 'saved' if c.id in saved_ids }}" title="{{ 'Unsave' if c.id in saved_ids else 'Save' }}">{{ '\u2605' if c.id in saved_ids else '\u2606' }}</button>
+            </form>
+            {% endif %}
             <span class="card-badge {{ c.status }}">{{ c.status|capitalize }}</span>
             <div class="card-body">
                 <h3 class="card-title">

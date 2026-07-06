@@ -158,6 +158,19 @@
         .breadcrumb a { color: #2bde73; font-weight: 500; }
         .breadcrumb a:hover { text-decoration: underline; }
 
+        /* ---------- Action buttons ---------- */
+        .action-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+        .action-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .85rem; border-radius: 20px; font-size: .78rem; font-weight: 600; border: 1.5px solid #e0e0e0; background: #fff; color: #555; cursor: pointer; transition: all .15s; }
+        .action-btn:hover { border-color: #2bde73; color: #282828; }
+        .action-btn.active { background: #2bde73; color: #fff; border-color: #2bde73; }
+        .action-btn.active:hover { background: #25c766; }
+        .share-dropdown { position: relative; display: inline-block; }
+        .share-menu { display: none; position: absolute; top: 100%; left: 0; margin-top: .3rem; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.1); min-width: 220px; z-index: 20; padding: .4rem 0; }
+        .share-menu.open { display: block; }
+        .share-menu-item { display: block; width: 100%; padding: .55rem 1rem; font-size: .82rem; color: #555; background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
+        .share-menu-item:hover { background: #f5f5f5; color: #282828; }
+        .share-copied { font-size: .72rem; color: #2bde73; font-weight: 600; padding: .3rem 1rem; }
+
         /* ---------- Footer ---------- */
         .footer { text-align: center; padding: 2rem; font-size: .78rem; color: #bbb; border-top: 1px solid #eee; margin-top: 1rem; }
     </style>
@@ -213,8 +226,37 @@
                     <div class="creator-name">{{ creator.name if creator else 'Unknown Creator' }}</div>
                     <div class="creator-label">Project Creator</div>
                 </div>
+                {% if user and creator and user.id != creator.id %}
+                <form method="post" action="{{ url_for('crowdfunding-donations.form_follow_creator', creator_id=campaign.creator_id) }}">
+                    <button type="submit" class="action-btn {{ 'active' if is_following }}">{{ 'Following' if is_following else 'Follow' }}</button>
+                </form>
+                {% endif %}
                 <span class="status-pill {{ campaign.status }}">{{ campaign.status }}</span>
                 <span class="model-pill">{{ campaign.funding_model }}</span>
+            </div>
+
+            <!-- Action row: save, share, subscribe -->
+            <div style="margin-bottom:1.25rem">
+                <div class="action-row">
+                    {% if user %}
+                    <form method="post" action="{{ url_for('crowdfunding-donations.form_save_campaign', campaign_id=campaign.id) }}">
+                        <button type="submit" class="action-btn {{ 'active' if is_saved }}">{{ '\u2605 Saved' if is_saved else '\u2606 Save' }}</button>
+                    </form>
+                    <form method="post" action="{{ url_for('crowdfunding-donations.form_subscribe_campaign', campaign_id=campaign.id) }}">
+                        <button type="submit" class="action-btn {{ 'active' if is_subscribed }}">{{ '\u2714 Subscribed' if is_subscribed else '\u2709 Subscribe to Updates' }}</button>
+                    </form>
+                    {% endif %}
+                    <div class="share-dropdown">
+                        <button class="action-btn" onclick="toggleShareMenu()" type="button">&#x1F517; Share</button>
+                        <div class="share-menu" id="share-menu">
+                            <button class="share-menu-item" onclick="copyLink()">Copy link</button>
+                            <button class="share-menu-item" onclick="shareTwitter()">Share on Twitter</button>
+                            <button class="share-menu-item" onclick="shareFacebook()">Share on Facebook</button>
+                            <button class="share-menu-item" onclick="shareEmail()">Share via Email</button>
+                            <div class="share-copied" id="share-copied" style="display:none">Link copied!</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Story -->
@@ -375,5 +417,31 @@
 
 <div class="footer">FundSpark &middot; Crowdfunding Platform &middot; <a href="/" style="color:#2bde73">MiniWeb Home</a></div>
 
+<script>
+function toggleShareMenu() {
+    document.getElementById('share-menu').classList.toggle('open');
+}
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const el = document.getElementById('share-copied');
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 2000);
+    });
+}
+function shareTwitter() {
+    window.open('https://twitter.com/intent/tweet?url=' + encodeURIComponent(window.location.href) + '&text=' + encodeURIComponent('{{ campaign.title }}'), '_blank');
+}
+function shareFacebook() {
+    window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(window.location.href), '_blank');
+}
+function shareEmail() {
+    window.location.href = 'mailto:?subject=' + encodeURIComponent('Check out: {{ campaign.title }}') + '&body=' + encodeURIComponent(window.location.href);
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.share-dropdown')) {
+        document.getElementById('share-menu').classList.remove('open');
+    }
+});
+</script>
 </body>
 </html>

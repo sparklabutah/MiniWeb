@@ -214,7 +214,7 @@ def create_app():
         static_folder="static",
         static_url_path="/static",
     )
-    app.secret_key = "miniweb-dev-key-change-in-production"
+    app.secret_key = os.environ.get("SECRET_KEY", "miniweb-dev-key-change-in-production")
 
     # Initialize SQLite database (per-site tables).
     # All sites use db.query() / db.save_item() for data access.
@@ -269,7 +269,7 @@ def create_app():
     if not os.environ.get("MINIWEB_NO_AUTOLOGIN"):
         @app.before_request
         def _auto_login():
-            if request.path.startswith("/sites/") and "user_id" not in session:
+            if request.path.startswith("/sites/") and "user_id" not in session and not session.get("_no_autologin"):
                 session["user_id"] = 1
 
     # -----------------------------------------------------------------
@@ -561,6 +561,8 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
 })()</script>"""
 
     _RECORDER_SCRIPT = b'<script src="/static/recorder.js"></script>'
+    _FILE_PICKER_SCRIPT = b'<script src="/static/file-picker.js"></script>'
+    _EXPORT_FEEDBACK_SCRIPT = b'<script src="/static/export-feedback.js"></script>'
 
     @app.after_request
     def _inject_site_scripts(response):
@@ -569,7 +571,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
                 and "text/html" in response.content_type
                 and response.status_code == 200):
             data = response.get_data()
-            inject = _BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT
+            inject = _BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_PICKER_SCRIPT + b"\n" + _EXPORT_FEEDBACK_SCRIPT
             idx = data.rfind(b"</body>")
             if idx != -1:
                 response.set_data(data[:idx] + inject + b"\n" + data[idx:])

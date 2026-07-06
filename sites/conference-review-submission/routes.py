@@ -467,6 +467,12 @@ def review_form(paper_id):
         comments = request.form.get("comments", "").strip()
         title = request.form.get("title", "").strip()
 
+        # Handle optional file attachment
+        attachment_name = None
+        uploaded = request.files.get("file")
+        if uploaded and uploaded.filename:
+            attachment_name = uploaded.filename
+
         users = _load_users()
         u = next((u for u in users if u["id"] == user["id"]), None)
         if u:
@@ -477,6 +483,7 @@ def review_form(paper_id):
                 "comments": comments,
                 "title": title,
                 "reviewer": user["name"],
+                "attachment": attachment_name,
             }
             u["bids"] = bids
             _save_users(users)

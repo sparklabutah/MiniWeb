@@ -75,8 +75,22 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         <!-- Task info -->
         <div class="section">
             <h3>{{ task.task_id }}</h3>
-            <label>Instruction</label>
+            <label>Instruction (original)</label>
             <div style="font-size:.85rem;line-height:1.4;margin-bottom:.4rem">{{ task.instruction }}</div>
+
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <label style="margin:0">Instruction (ambiguous) <span style="font-weight:400;text-transform:none;color:#94a3b8">— shorter, less hand-holdy</span></label>
+                <button onclick="generateAmbiguous()" id="ambig-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
+                    Suggest with AI
+                </button>
+                <span id="ambig-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            <textarea id="instruction-ambiguous" rows="2"
+                style="width:100%;font-size:.85rem;padding:.4rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;margin-bottom:.5rem;font-family:inherit"
+                placeholder="Write a more ambiguous version of the instruction..."
+                onchange="saveAmbiguous('{{ task.task_id }}', '{{ task.annotator|default('anonymous') }}', this.value)"
+            >{{ task.instruction_ambiguous or '' }}</textarea>
 
             <div style="display:flex;gap:1rem;flex-wrap:wrap">
                 <div>
@@ -99,26 +113,30 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
             {% endif %}
         </div>
 
-        <!-- Trajectory -->
+        <!-- Trajectory Playback -->
         <div class="section">
-            <h3>Annotator Trajectory ({{ task.trajectory|length }} entries)</h3>
-            <div style="max-height:300px;overflow-y:auto">
-                {% for e in task.trajectory %}
-                {% if e.type == 'action' %}
-                <div class="traj-entry action">
-                    <strong>{{ e.action }}</strong> {{ e.target[:60] if e.target else '' }}
-                    {% if e.text %}<em>"{{ e.text[:30] }}"</em>{% endif %}
-                    {% if e.option_text %}<em>"{{ e.option_text }}"</em>{% endif %}
-                    {% if e.href %}<span style="color:#94a3b8">→ {{ e.href[:40] }}</span>{% endif %}
+            <h3>Trajectory Playback</h3>
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+                <button onclick="playbackStep(-1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&larr; Prev</button>
+                <span id="playback-counter" style="font-size:.8rem;color:#64748b;min-width:80px;text-align:center">0 / 0</span>
+                <button onclick="playbackStep(1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">Next &rarr;</button>
+                <button onclick="playbackAuto()" id="playback-auto-btn" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&#9654; Play</button>
+            </div>
+            <div style="display:flex;gap:.75rem;height:400px">
+                <iframe id="playback-iframe" style="flex:2;border:1px solid #e2e8f0;border-radius:.3rem" src="about:blank"></iframe>
+                <div style="flex:1;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.3rem;padding:.5rem;background:#f8fafc">
+                    {% set action_idx = namespace(n=0) %}
+                    {% for e in task.trajectory %}
+                    {% if e.type == 'action' %}
+                    <div class="traj-entry action" id="traj-{{ action_idx.n }}" onclick="playbackGo({{ action_idx.n }})" style="cursor:pointer;padding:.3rem .4rem;border-radius:.25rem;margin-bottom:.15rem;font-size:.75rem">
+                        <span style="color:#94a3b8;font-size:.65rem">{{ action_idx.n + 1 }}.</span>
+                        <strong>{{ e.action }}</strong> {{ (e.target or '')[:40] }}
+                        {% if e.text %}<em>"{{ (e.text or '')[:20] }}"</em>{% endif %}
+                    </div>
+                    {% set action_idx.n = action_idx.n + 1 %}
+                    {% endif %}
+                    {% endfor %}
                 </div>
-                {% elif e.type == 'network' %}
-                <div class="traj-entry network">
-                    <span class="method">{{ e.method }}</span> {{ (e.url or '')[:50] }}
-                    <span class="{{ 'status-ok' if e.status and e.status < 400 else 'status-err' }}">{{ e.status }}</span>
-                    <span style="color:#94a3b8">{{ e.duration or 0 }}ms</span>
-                </div>
-                {% endif %}
-                {% endfor %}
             </div>
         </div>
 
@@ -149,9 +167,16 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 
         <!-- Macros for this task -->
         <div class="section">
-            <h3>Macros ({{ task.macros|length }})</h3>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <h3 style="margin:0">Macros ({{ task.macros|length }})</h3>
+                <button onclick="suggestTags()" id="suggest-tags-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest Tags with AI
+                </button>
+                <span id="suggest-tags-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
             {% for m in task.macros %}
-            <div style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
+            <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
                 <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}</div>
                 <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
                 {% if task.macro_spans and task.macro_spans.get(m) %}
@@ -180,10 +205,219 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 </div>
 
 <script>
+// --- Trajectory Playback ---
+var _trajData = {{ task.trajectory | tojson if task else '[]' }};
+// Build action list with paired observation (the observation right after each action)
+var _steps = [];
+for (var _i = 0; _i < _trajData.length; _i++) {
+    if (_trajData[_i].type === 'action') {
+        var obs = (_i + 1 < _trajData.length && _trajData[_i + 1].type === 'observation') ? _trajData[_i + 1] : null;
+        _steps.push({ action: _trajData[_i], observation: obs });
+    }
+}
+var _playIdx = -1;
+var _playTimer = null;
+
+document.getElementById('playback-counter').textContent = '0 / ' + _steps.length;
+
+function playbackStep(dir) {
+    playbackGo(_playIdx + dir);
+}
+
+function playbackGo(idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= _steps.length) idx = _steps.length - 1;
+    if (_steps.length === 0) return;
+    _playIdx = idx;
+    var step = _steps[idx];
+
+    document.getElementById('playback-counter').textContent = (idx + 1) + ' / ' + _steps.length;
+
+    // Highlight in sidebar
+    document.querySelectorAll('[id^="traj-"]').forEach(function(el) {
+        el.style.background = '';
+        el.style.fontWeight = '';
+    });
+    var el = document.getElementById('traj-' + idx);
+    if (el) {
+        el.style.background = '#dbeafe';
+        el.style.fontWeight = '600';
+        el.scrollIntoView({ block: 'nearest' });
+    }
+
+    var iframe = document.getElementById('playback-iframe');
+    var obs = step.observation;
+    var action = step.action;
+
+    if (obs && obs.screenshot) {
+        // Show screenshot image
+        var taskId = {{ task.task_id | tojson if task else '""' }};
+        var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+        var imgUrl = '/annotate/api/screenshot/' + annotator + '/' + taskId + '/' + obs.screenshot;
+        iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;display:flex;align-items:center;justify-content:center;height:100vh"><img src="' + imgUrl + '" style="max-width:100%;max-height:100%;object-fit:contain"></body></html>';
+    } else if (obs && obs.snapshot) {
+        iframe.srcdoc = obs.snapshot;
+        if (action.selector) {
+            setTimeout(function() {
+                try {
+                    var doc = iframe.contentDocument || iframe.contentWindow.document;
+                    var target = doc.querySelector(action.selector);
+                    if (target) {
+                        target.scrollIntoView({ block: 'center' });
+                        target.style.outline = '3px solid #ef4444';
+                        target.style.outlineOffset = '2px';
+                    }
+                } catch(e) {}
+            }, 200);
+        }
+    } else {
+        iframe.srcdoc = '<html><body style="margin:0;padding:2rem;font-family:sans-serif;color:#64748b"><p>No snapshot for this step</p><p><strong>' + (action.action || '') + '</strong> ' + (action.target || '') + '</p><p>URL: ' + (action.url || '') + '</p></body></html>';
+    }
+}
+
+function playbackAuto() {
+    var btn = document.getElementById('playback-auto-btn');
+    if (_playTimer) {
+        clearInterval(_playTimer);
+        _playTimer = null;
+        btn.textContent = '\u25b6 Play';
+        return;
+    }
+    btn.textContent = '\u23f8 Pause';
+    if (_playIdx < 0) _playIdx = 0;
+    playbackGo(_playIdx);
+    _playTimer = setInterval(function() {
+        _playIdx++;
+        if (_playIdx >= _trajAll.length) {
+            clearInterval(_playTimer);
+            _playTimer = null;
+            btn.textContent = '\u25b6 Play';
+            return;
+        }
+        playbackGo(_playIdx);
+    }, 2000);
+}
+
 function filterTasks(q) {
     q = q.toLowerCase();
     document.querySelectorAll('.task-card').forEach(c => {
         c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function generateAmbiguous() {
+    var original = {{ task.instruction | tojson if task else '""' }};
+    if (!original) return;
+    var btn = document.getElementById('ambig-btn');
+    var status = document.getElementById('ambig-status');
+    var textarea = document.getElementById('instruction-ambiguous');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.textContent = '';
+    fetch('/annotate/api/make_ambiguous', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({instruction: original})
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest with AI';
+        if (d.ambiguous) {
+            textarea.value = d.ambiguous;
+            textarea.style.borderColor = '#86efac';
+            status.textContent = 'AI suggestion loaded — edit and save';
+            setTimeout(function() { textarea.style.borderColor = '#cbd5e1'; }, 2000);
+            // Auto-save
+            saveAmbiguous('{{ task.task_id if task else '' }}', '{{ task.annotator|default('anonymous') if task else '' }}', d.ambiguous);
+        } else {
+            status.textContent = d.error || 'Failed';
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest with AI';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+function suggestTags() {
+    var taskId = {{ task.task_id | tojson if task else '""' }};
+    var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+    if (!taskId) return;
+    var btn = document.getElementById('suggest-tags-btn');
+    var status = document.getElementById('suggest-tags-status');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    status.textContent = '';
+    fetch('/annotate/api/suggest_tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator})
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags with AI';
+        if (d.suggested_spans) {
+            // Show suggestions inline
+            var spans = d.suggested_spans;
+            var macroEls = document.querySelectorAll('[data-macro-name]');
+            for (var macro in spans) {
+                var span = spans[macro];
+                var el = document.querySelector('[data-macro-name="' + macro + '"]');
+                if (el) {
+                    var existing = el.querySelector('.ai-suggestion');
+                    if (existing) existing.remove();
+                    var div = document.createElement('div');
+                    div.className = 'ai-suggestion';
+                    div.style.cssText = 'font-size:.68rem;color:#16a34a;margin-top:.2rem;background:#f0fdf4;padding:.2rem .4rem;border-radius:.2rem';
+                    div.innerHTML = 'AI suggestion: actions ' + span[0] + ' → ' + span[1] +
+                        ' <button onclick="applyTagSuggestion(\'' + macro + '\',' + JSON.stringify(span) + ')" style="font-size:.6rem;padding:.1rem .3rem;background:#16a34a;color:#fff;border:none;border-radius:.2rem;cursor:pointer;margin-left:.3rem">Apply</button>';
+                    el.appendChild(div);
+                }
+            }
+            // Also show for macros not in DOM yet
+            var allMacros = Object.keys(spans);
+            var shown = document.querySelectorAll('[data-macro-name]');
+            var shownNames = [];
+            shown.forEach(function(e) { shownNames.push(e.getAttribute('data-macro-name')); });
+            var missing = allMacros.filter(function(m) { return shownNames.indexOf(m) === -1; });
+            if (missing.length) {
+                status.textContent = 'Also suggested: ' + missing.map(function(m) { return m + ' [' + spans[m] + ']'; }).join(', ');
+            } else {
+                status.textContent = 'Suggestions shown below each macro';
+            }
+        } else {
+            status.textContent = d.error || 'Failed';
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags with AI';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+function applyTagSuggestion(macro, span) {
+    var taskId = {{ task.task_id | tojson if task else '""' }};
+    var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+    // Load current macro_spans, update, save
+    fetch('/annotate/api/update_task_field', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'macro_spans', value: null})
+    }).then(function(r) { return r.json(); }).then(function() {
+        // Reload to reflect changes
+        location.reload();
+    });
+}
+
+function saveAmbiguous(taskId, annotator, value) {
+    fetch('/annotate/api/update_task_field', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'instruction_ambiguous', value: value})
+    }).then(r => r.json()).then(d => {
+        if (d.status === 'ok') {
+            var el = document.getElementById('instruction-ambiguous');
+            if (el) el.style.borderColor = '#86efac';
+            setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500);
+        }
     });
 }
 </script>

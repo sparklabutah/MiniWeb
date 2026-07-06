@@ -34,9 +34,6 @@
                     <select id="method"><option value="credit_card">Credit Card</option><option value="ach_debit">ACH Debit</option><option value="check">Check</option></select>
                 </div>
                 <div class="form-group"><label for="card_last_four">Card/Account Last 4</label><input type="text" id="card_last_four" maxlength="4" placeholder="1234"></div>
-                <div class="form-group"><label for="account_type">Pay with:</label>
-                    <select id="account_type"><option value="checking">Checking Account</option><option value="credit">Credit Card</option></select>
-                </div>
                 <button type="submit" class="submit-btn">Submit Payment</button>
             </form>
         </div>
@@ -44,14 +41,15 @@
     <script>
     function submitPayment(e) {
         e.preventDefault();
+        var method = document.getElementById('method').value;
         var data = {
             user_id: {{ user.id }}, payer_name: '{{ user.display_name }}',
             type: document.getElementById('pay_type').value,
             amount: parseFloat(document.getElementById('amount').value),
-            method: document.getElementById('method').value,
+            method: method,
             card_last_four: document.getElementById('card_last_four').value,
             account_last_four: document.getElementById('card_last_four').value,
-            account_type: document.getElementById('account_type').value,
+            account_type: method === 'credit_card' ? 'credit' : 'checking',
         };
         fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/payments', {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)

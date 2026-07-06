@@ -105,6 +105,24 @@
     {% else %}
         <div class="empty">You haven't backed any campaigns yet.</div>
     {% endif %}
+
+    <div class="section-title" style="margin-top:2rem">Saved Campaigns <span class="section-count">{{ saved_campaigns|length }}</span></div>
+    {% if saved_campaigns %}
+        {% for c in saved_campaigns %}
+        <div class="campaign-card">
+            <h3><a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=c.id) }}">{{ c.title }}</a></h3>
+            <div class="card-stats">
+                <span class="raised">${{ '{:,.0f}'.format(c.raised_amount) }}</span>
+                <span>of ${{ '{:,.0f}'.format(c.goal_amount) }}</span>
+                <span>{{ c.backer_count }} backers</span>
+                <span class="status-pill {{ c.status }}">{{ c.status }}</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width: {{ [c.funding_pct, 100]|min }}%"></div></div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty">No saved campaigns. Browse and bookmark campaigns you're interested in.</div>
+    {% endif %}
 </div>
 
 <div class="footer">FundSpark &middot; <a href="/" style="color:#2bde73">MiniWeb Home</a></div>

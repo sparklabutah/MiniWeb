@@ -56,8 +56,8 @@
             </div>
             {% if current_user and current_user.username != profile_user.username %}
             <div class="actions">
-                <button onclick="followUser('{{ profile_user.username }}')">Follow</button>
-                <button onclick="blockUser('{{ profile_user.username }}')">Block</button>
+                <button onclick="followUser('{{ profile_user.username }}')">{% if profile_user.username in current_user.get('followed_users', []) %}Following{% else %}Follow{% endif %}</button>
+                <button onclick="blockUser('{{ profile_user.username }}')" {% if profile_user.username in current_user.get('blocked_users', []) %}style="background:#fee2e2"{% endif %}>{% if profile_user.username in current_user.get('blocked_users', []) %}Blocked{% else %}Block{% endif %}</button>
                 <button onclick="messageUser('{{ profile_user.username }}')">Message</button>
             </div>
             {% endif %}
@@ -106,17 +106,19 @@
             var btn = event.target;
             fetch(`${BASE}api/users/${username}/follow`, {method: 'POST'})
                 .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
                     btn.textContent = d.action === 'followed' ? 'Following' : 'Follow';
                     btn.style.background = d.action === 'followed' ? '#dbeafe' : '';
-                });
+                }).catch(() => { btn.textContent = 'Error'; });
         }
         function blockUser(username) {
             var btn = event.target;
             fetch(`${BASE}api/users/${username}/block`, {method: 'POST'})
                 .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
                     btn.textContent = d.action === 'blocked' ? 'Blocked' : 'Block';
                     btn.style.background = d.action === 'blocked' ? '#fee2e2' : '';
-                });
+                }).catch(() => { btn.textContent = 'Error'; });
         }
         function messageUser(username) {
             const subject = prompt('Subject:') || '';

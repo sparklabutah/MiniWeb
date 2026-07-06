@@ -68,6 +68,9 @@
         .card-pct { font-size: .78rem; font-weight: 600; color: #2bde73; }
         .card-backers { font-size: .72rem; color: #999; }
 
+        .card-save { position: absolute; top: .6rem; left: .6rem; z-index: 3; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); color: #fff; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .15s; }
+        .card-save:hover { background: rgba(0,0,0,.55); transform: scale(1.1); }
+        .card-save.saved { background: rgba(43,222,115,.85); color: #fff; }
         .empty { text-align: center; padding: 4rem 2rem; color: #999; font-size: .95rem; }
         .footer { text-align: center; padding: 2rem; font-size: .78rem; color: #bbb; border-top: 1px solid #eee; }
     </style>
@@ -108,6 +111,11 @@
     <div class="grid">
         {% for c in campaigns %}
         <div class="card" onclick="window.location='{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=c.id) }}'">
+            {% if user %}
+            <form method="post" action="{{ url_for('crowdfunding-donations.form_save_campaign', campaign_id=c.id) }}" onclick="event.stopPropagation()" style="position:absolute;top:0;left:0;z-index:3">
+                <button type="submit" class="card-save {{ 'saved' if c.id in saved_ids }}" title="{{ 'Unsave' if c.id in saved_ids else 'Save' }}">{{ '\u2605' if c.id in saved_ids else '\u2606' }}</button>
+            </form>
+            {% endif %}
             <div class="card-img">
                 <div class="gradient-bg {{ c.category }}"></div>
                 <div class="deco deco-1"></div>

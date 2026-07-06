@@ -83,6 +83,15 @@ def index():
     claims = db.query(SITE, "claims", where={"user_id": user["id"]})
     payments = db.query(SITE, "payments", where={"user_id": user["id"]}, sort="-payment_date", limit=5)
 
+    # Sort loans if requested
+    sort = request.args.get("sort", "").strip()
+    if sort == "balance_desc":
+        loans.sort(key=lambda l: l.get("current_balance", 0), reverse=True)
+    elif sort == "balance_asc":
+        loans.sort(key=lambda l: l.get("current_balance", 0))
+    elif sort == "rate":
+        loans.sort(key=lambda l: l.get("interest_rate", 0), reverse=True)
+
     active_policies = [p for p in policies if p["status"] == "active"]
     active_loans = [l for l in loans if l["status"] == "active"]
     open_claims = [c for c in claims if c["status"] in ("open", "in_review")]

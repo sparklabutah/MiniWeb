@@ -15,7 +15,7 @@ from pathlib import Path
 
 ANNOTATIONS_DIR = Path(
     os.environ.get("MINIWEB_ANNOTATIONS_DIR",
-                   "/scratch/general/vast/u1653932/data_sources/annotations")
+                   os.path.join(os.path.dirname(__file__), "..", "data", "annotations"))
 )
 
 

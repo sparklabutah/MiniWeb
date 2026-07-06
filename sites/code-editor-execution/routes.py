@@ -180,11 +180,14 @@ def editor():
     snippet = None
     if snippet_id:
         snippet = _get_snippet(snippet_id)
-    font_size = request.args.get("font_size", "14")
-    tab_size = request.args.get("tab_size", "4")
     user = None
+    user_settings = {}
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        if user:
+            user_settings = user.get("settings", {})
+    font_size = request.args.get("font_size") or user_settings.get("font_size", 14)
+    tab_size = request.args.get("tab_size") or user_settings.get("tab_size", 4)
     return render_template("code-editor-execution/editor.html",
                            snippet=snippet, font_size=font_size,
                            tab_size=tab_size, user=user)

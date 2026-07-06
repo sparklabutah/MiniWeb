@@ -697,6 +697,21 @@ def api_form_update(form_id):
     return jsonify(form)
 
 
+@blueprint.route("/form/<int:form_id>/delete", methods=["POST"])
+def form_delete(form_id):
+    """Delete a form via POST (for HTML button)."""
+    forms = _load_forms()
+    form = next((f for f in forms if f["id"] == form_id), None)
+    if not form:
+        abort(404)
+    forms = [f for f in forms if f["id"] != form_id]
+    _save_forms(forms)
+    responses = _load_responses()
+    responses = [r for r in responses if r["form_id"] != form_id]
+    _save_responses(responses)
+    return redirect(url_for("forms-surveys.index"))
+
+
 @blueprint.route("/api/forms/<int:form_id>", methods=["DELETE"])
 def api_form_delete(form_id):
     forms = _load_forms()

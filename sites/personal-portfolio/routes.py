@@ -211,10 +211,19 @@ def index():
     profile = _load_profile()
     projects = _load_projects()
     featured = [p for p in projects if p.get("featured")]
+
+    sort = request.args.get("sort", "newest").strip()
+    if sort == "title":
+        featured.sort(key=lambda p: p.get("title", "").lower())
+    elif sort == "status":
+        featured.sort(key=lambda p: p.get("status", ""))
+    else:  # newest
+        featured.sort(key=lambda p: p.get("date", p.get("created_at", "")), reverse=True)
+
     user, logged_in = _get_browsing_user()
     return render_template("personal-portfolio/index.html",
                            profile=profile, featured_projects=featured,
-                           user=user, logged_in=logged_in)
+                           sort=sort, user=user, logged_in=logged_in)
 
 
 @blueprint.route("/projects")

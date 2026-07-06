@@ -102,6 +102,8 @@ def _get_last_message_for_conv(conv_id, messages):
 
 @blueprint.route("/")
 def index():
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
     conversations = _get_conversations()
     messages = _get_messages()
     users_map = _user_map()
@@ -151,6 +153,8 @@ def index():
 
 @blueprint.route("/conversation/<conv_id>")
 def conversation_page(conv_id):
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
     conversations = _get_conversations()
     all_messages = _get_messages()
     media_list = _get_media()
@@ -240,6 +244,8 @@ def conversation_page(conv_id):
 
 @blueprint.route("/contacts")
 def contacts_page():
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
     users = _get_users()
     conversations = _get_conversations()
     users_map = _user_map()
@@ -315,7 +321,7 @@ def login_submit():
 @blueprint.route("/logout")
 def logout():
     session.pop("im_user_id", None)
-    return redirect(url_for("instant-messaging.index"))
+    return redirect(url_for("instant-messaging.login_page"))
 
 @blueprint.route("/api/conversations", methods=["GET"])
 def api_conversations_list():
