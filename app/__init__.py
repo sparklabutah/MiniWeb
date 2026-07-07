@@ -533,7 +533,13 @@ def create_app():
         if sid:
             db.reset_session(sid)
         # Clear Flask session (user_id, login state, etc.)
+        # Preserve annotator auth so reset doesn't log out the annotator
+        annotator_auth = session.get("annotator_authenticated")
+        annotator_name = session.get("annotator_name")
         session.clear()
+        if annotator_auth:
+            session["annotator_authenticated"] = annotator_auth
+            session["annotator_name"] = annotator_name
         # Also clear request logs and beacons
         _request_logs.pop(sid, None) if sid else None
         _action_beacons.pop(sid, None) if sid else None
