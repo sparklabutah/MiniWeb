@@ -102,8 +102,18 @@ def request_2fa(event_type, return_url, **event_kwargs):
     transaction in the Flask session, and returns the verification page URL.
 
     The calling site should redirect to the returned URL.
+    If session["_disable_2fa"] is set, skip 2FA and execute immediately.
     """
     from flask import session, url_for
+
+    # Skip 2FA if disabled (annotation mode)
+    if session.get("_disable_2fa"):
+        try:
+            from app.bridges import on_payment
+            on_payment(**{k: v for k, v in event_kwargs.items()})
+        except Exception:
+            pass
+        return return_url  # go straight to the return URL
 
     code = f"{random.randint(100000, 999999)}"
     user_id = event_kwargs.get("user_id", 1)

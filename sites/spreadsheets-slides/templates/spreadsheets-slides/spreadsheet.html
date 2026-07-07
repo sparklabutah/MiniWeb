@@ -120,8 +120,18 @@
         </form>
     </div>
 
-    {% if ss.shared_with %}
     <div class="share-section">
+        <h4>Share via Email</h4>
+        <form style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem" onsubmit="event.preventDefault();var e=this.querySelector('input[name=email]');var msg=document.getElementById('share-msg');msg.textContent='Invite sent to '+e.value;msg.style.display='block';e.value='';setTimeout(function(){msg.style.display='none'},3000)">
+            <input type="email" name="email" placeholder="Enter email address" required style="flex:1;padding:.4rem;border:1px solid #dadce0;border-radius:4px;font-size:.82rem">
+            <select name="permission" style="padding:.4rem;border:1px solid #dadce0;border-radius:4px;font-size:.82rem">
+                <option value="view">View</option>
+                <option value="edit">Edit</option>
+            </select>
+            <button type="submit" style="background:#1a73e8;color:#fff;border:none;padding:.4rem .8rem;border-radius:4px;cursor:pointer;font-size:.82rem">Send Invite</button>
+        </form>
+        <div id="share-msg" style="display:none;font-size:.8rem;color:#1a73e8;margin-bottom:.4rem"></div>
+        {% if ss.shared_with %}
         <h4>Shared with</h4>
         <div class="shared-users">
             {% for uid in ss.shared_with %}
@@ -130,8 +140,8 @@
             {% endif %}
             {% endfor %}
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 
     <div class="api-info">
         <details>

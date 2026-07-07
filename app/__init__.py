@@ -536,10 +536,13 @@ def create_app():
         # Preserve annotator auth so reset doesn't log out the annotator
         annotator_auth = session.get("annotator_authenticated")
         annotator_name = session.get("annotator_name")
+        disable_2fa = session.get("_disable_2fa")
         session.clear()
         if annotator_auth:
             session["annotator_authenticated"] = annotator_auth
             session["annotator_name"] = annotator_name
+        if disable_2fa:
+            session["_disable_2fa"] = disable_2fa
         # Also clear request logs and beacons
         _request_logs.pop(sid, None) if sid else None
         _action_beacons.pop(sid, None) if sid else None

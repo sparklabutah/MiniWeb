@@ -2859,9 +2859,6 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "'VaultGuard' home -> 'Import' button accepting .csv, .json files"
         ],
-        "share_by_toggle": [
-            "Entry detail page -> share controls"
-        ],
         "authenticate_by_code": [
             "'Unlock Your Vault' page -> 'Email Address' and 'Master Password' fields"
         ],

@@ -348,6 +348,10 @@ textarea#instruction:focus {
                         Logged in
                     </label>
                     <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
+                        <input type="checkbox" id="disable-2fa-toggle" checked onchange="handle2FAToggle(this.checked)" style="accent-color:#f59e0b;width:13px;height:13px;">
+                        Skip 2FA
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
                         <input type="checkbox" id="single-site-toggle" onchange="reshufflePrompt()" style="accent-color:#2563eb;width:13px;height:13px;">
                         Single site
                     </label>
@@ -696,6 +700,14 @@ async function handleLoginToggle(checked) {
 
 async function _logoutSites() {
     return fetch('/annotate/api/auto_logout', { method: 'POST' }).then(r => r.json()).catch(() => {});
+}
+
+async function handle2FAToggle(disabled) {
+    fetch('/annotate/api/toggle_2fa', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ disable: disabled })
+    }).catch(() => {});
 }
 
 function _reloadIframe(iframe) {

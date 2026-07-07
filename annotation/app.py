@@ -1064,6 +1064,17 @@ def api_auto_logout():
     return jsonify({"cleared": cleared})
 
 
+@annotation_bp.route("/api/toggle_2fa", methods=["POST"])
+def api_toggle_2fa():
+    """Enable or disable 2FA for the current session."""
+    data = request.get_json(silent=True) or {}
+    if data.get("disable"):
+        session["_disable_2fa"] = True
+    else:
+        session.pop("_disable_2fa", None)
+    return jsonify({"disabled": bool(session.get("_disable_2fa"))})
+
+
 @annotation_bp.route("/api/reset_tasks", methods=["POST"])
 def api_reset_tasks():
     """Delete annotation tasks from file storage. Requires annotator name."""
