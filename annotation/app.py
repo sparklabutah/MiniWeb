@@ -694,6 +694,9 @@ def _require_annotator_login():
         return None
     if session.get("annotator_authenticated"):
         return None
+    # API routes get JSON 401, HTML routes get redirect
+    if request.path.startswith("/annotate/api/"):
+        return jsonify({"error": "Not authenticated"}), 401
     return redirect(url_for("annotation.annotator_login"))
 
 

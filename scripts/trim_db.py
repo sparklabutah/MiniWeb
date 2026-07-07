@@ -24,7 +24,7 @@ TRIM_TARGETS = [
     ("qa_knowledge_answers", 100_000, None),  # handled specially: keep answers for kept questions
     ("forums_posts", 50_000, "score DESC"),
     ("forums_comments", 100_000, None),  # keep for kept posts
-    ("forums_reddit_users", 50_000, "karma DESC"),
+    ("forums_reddit_users", 50_000, "RANDOM()"),
     ("academic_paper_db_papers", 100_000, "update_date DESC"),
     ("flights_hotels_flights", 50_000, "RANDOM()"),
     ("flights_hotels_hotels", 50_000, "RANDOM()"),

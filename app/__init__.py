@@ -216,6 +216,14 @@ def create_app():
     )
     app.secret_key = os.environ.get("SECRET_KEY", "miniweb-dev-key-change-in-production")
 
+    # Session cookie config for production (behind reverse proxy / HTTPS)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
+        app.config["SESSION_COOKIE_SECURE"] = True
+        app.config["PREFERRED_URL_SCHEME"] = "https"
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # Initialize SQLite database (per-site tables).
     # All sites use db.query() / db.save_item() for data access.
     # Session mutations are isolated in the session_overlay table.
