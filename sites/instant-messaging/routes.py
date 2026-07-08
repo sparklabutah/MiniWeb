@@ -27,6 +27,21 @@ blueprint = Blueprint(
 
 CURRENT_USER_ID = "im-u001"  # Alex Rivera is the logged-in user
 
+
+@blueprint.before_request
+def _auto_login_im():
+    """Default to Alex Rivera, mirroring the global /sites/* auto-login.
+
+    The global before_request in app/__init__.py sets session["user_id"],
+    but this site keys its login on "im_user_id" — so without this hook the
+    site always lands on the login page. Same opt-outs as the global hook.
+    """
+    import os
+    if os.environ.get("MINIWEB_NO_AUTOLOGIN") or session.get("_no_autologin"):
+        return
+    if "im_user_id" not in session and request.endpoint != "instant-messaging.logout":
+        session["im_user_id"] = CURRENT_USER_ID
+
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
