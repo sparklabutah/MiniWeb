@@ -2273,13 +2273,13 @@ MACRO_LOCATIONS = {
             "'StreamHub' page -> 'Sort By' dropdown (Default, Most Viewed, Newest, Oldest, Longest)"
         ],
         "create_by_timestamp": [
-            "Stream page -> 'Send a message...' chat input during live stream"
+            "Stream page -> clip title input + 'Create Clip at current time' button below the player (clips at the current playback timestamp)"
         ],
         "play_by_timestamp": [
-            "Stream page -> live stream display with real-time chat"
+            "Stream page -> seek bar and 'Jump to' mm:ss input below the player (plays from the chosen timestamp)"
         ],
         "play_by_playback": [
-            "Stream page -> stream playback area with chat form"
+            "Stream page -> video player with click-to-play, elapsed counter, and seek bar"
         ],
         "post_from_free_text": [
             "Stream page -> 'Send a message...' chat input"

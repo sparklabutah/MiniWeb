@@ -39,6 +39,14 @@
         .now-playing .np-sub { font-size: .8rem; color: #adadb8; }
         .video-player .elapsed { display: none; position: absolute; bottom: .8rem; right: 1rem; font-size: .75rem; color: #adadb8; font-variant-numeric: tabular-nums; }
         .video-player.playing .elapsed { display: block; }
+        .seek-row { display: flex; align-items: center; gap: .7rem; margin: -0.5rem 0 1rem; }
+        .seek-row .time-readout { font-size: .8rem; color: #adadb8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .seek-row input[type="range"] { flex: 1; accent-color: #9147ff; cursor: pointer; }
+        .jump-row { display: flex; align-items: center; gap: .5rem; margin: -0.4rem 0 1rem; flex-wrap: wrap; }
+        .jump-row label { font-size: .8rem; color: #adadb8; }
+        .jump-row input[type="text"] { width: 90px; background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .35rem .5rem; border-radius: .3rem; font-size: .85rem; }
+        .jump-row input[type="text"]:focus { border-color: #9147ff; outline: none; }
+        .jump-row .clip-feedback { font-size: .75rem; color: #9147ff; }
         .stream-header { margin-bottom: 1rem; }
         .stream-header h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: .5rem; }
         .streamer-bar { display: flex; align-items: center; gap: .7rem; margin-bottom: .8rem; }
@@ -121,6 +129,25 @@
                     <div class="np-sub">{{ streamer.display_name if streamer else 'Unknown' }} &middot; {{ stream.category }}</div>
                 </div>
                 <div class="elapsed" id="elapsed">0:00</div>
+            </div>
+
+            <!-- Seek bar: click/drag to play from any point in the stream -->
+            <div class="seek-row">
+                <span class="time-readout" id="seek-current">0:00</span>
+                <input type="range" id="seek-bar" min="0" max="{{ stream.duration_minutes * 60 }}" value="0" step="1"
+                       oninput="seekTo(parseInt(this.value, 10))" title="Seek">
+                <span class="time-readout" id="seek-total"></span>
+            </div>
+            <div class="jump-row">
+                <label for="jump-input">Jump to</label>
+                <input type="text" id="jump-input" placeholder="mm:ss" autocomplete="off"
+                       onkeydown="if(event.key==='Enter'){jumpToTimestamp();}">
+                <button class="btn btn-sm" onclick="jumpToTimestamp()">Go</button>
+                {% if logged_in %}
+                <input type="text" id="clip-title" placeholder="Clip title" autocomplete="off" style="width:180px;">
+                <button class="btn btn-sm" onclick="createClip()">Create Clip at current time</button>
+                {% endif %}
+                <span class="clip-feedback" id="clip-feedback"></span>
             </div>
 
             <div class="stream-header">
@@ -379,18 +406,87 @@
         /* ---- Playback ---------------------------------------------------- */
         var playing = false;
         var elapsedSec = 0;
+        var totalSec = {{ stream.duration_minutes * 60 }};
         var elapsedEl = document.getElementById('elapsed');
+        var seekBar = document.getElementById('seek-bar');
+
+        function fmtTime(sec) {
+            var m = Math.floor(sec / 60);
+            var s = sec % 60;
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function renderTime() {
+            var t = fmtTime(elapsedSec);
+            elapsedEl.textContent = t;
+            document.getElementById('seek-current').textContent = t;
+            seekBar.value = elapsedSec;
+        }
+        document.getElementById('seek-total').textContent = fmtTime(totalSec);
+
         window.startPlayback = function() {
             if (playing) return;
             playing = true;
             document.getElementById('videoPlayer').classList.add('playing');
             setInterval(function() {
-                elapsedSec++;
-                var m = Math.floor(elapsedSec / 60);
-                var s = elapsedSec % 60;
-                elapsedEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+                if (elapsedSec < totalSec) {
+                    elapsedSec++;
+                    renderTime();
+                }
             }, 1000);
         };
+
+        /* Play from a specific timestamp (seek bar / Jump-to input) */
+        window.seekTo = function(sec) {
+            elapsedSec = Math.max(0, Math.min(totalSec, sec | 0));
+            if (!playing) startPlayback();
+            renderTime();
+        };
+
+        window.jumpToTimestamp = function() {
+            var raw = document.getElementById('jump-input').value.trim();
+            if (!raw) return;
+            var sec = -1;
+            if (/^\d+:\d{1,2}$/.test(raw)) {
+                var parts = raw.split(':');
+                sec = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+            } else if (/^\d+$/.test(raw)) {
+                sec = parseInt(raw, 10);
+            }
+            if (sec >= 0) seekTo(sec);
+        };
+
+        {% if logged_in %}
+        /* Create a clip at the current player timestamp */
+        window.createClip = function() {
+            var title = document.getElementById('clip-title').value.trim();
+            var feedback = document.getElementById('clip-feedback');
+            if (!title) {
+                feedback.textContent = 'Enter a clip title first.';
+                return;
+            }
+            fetch('{{ url_for("live.api_clips_create") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    stream_id: streamId,
+                    title: title,
+                    timestamp_seconds: elapsedSec,
+                    duration_seconds: 30
+                })
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok) {
+                    document.getElementById('clip-title').value = '';
+                    feedback.textContent = 'Clip created at ' + fmtTime(elapsedSec) + ': "' + res.data.title + '"';
+                } else {
+                    feedback.textContent = res.data.error || 'Could not create clip.';
+                }
+            })
+            .catch(function() { feedback.textContent = 'Could not create clip.'; });
+        };
+        {% endif %}
     })();
     </script>
 </body>
