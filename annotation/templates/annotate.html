@@ -281,6 +281,7 @@ textarea#instruction:focus {
     <span style="flex:1"></span>
     <button class="btn btn-secondary btn-sm" onclick="resetSession()" title="Reset all site data to pristine state">Reset Session</button>
     <a href="{{ url_for('annotation.index') }}">Home</a>
+    <a href="{{ url_for('annotation.coverage_page') }}" title="Which macros are already covered per site">Coverage</a>
     <a href="{{ url_for('annotation.verify') }}">Verifiers</a>
 </div>
 
@@ -1685,6 +1686,10 @@ window.addEventListener('message', function(e) {
             url: d.url || '',
             title: d.title || '',
             timestamp: d.timestamp || new Date().toISOString(),
+            // recorder.js sends these with every observation; the verify tab
+            // and rewind/playback read them ("No snapshot for this step" bug)
+            snapshot: d.snapshot || '',
+            axtree: d.axtree || '',
         });
         renderTrajectory();
     }
@@ -1987,7 +1992,7 @@ function rewindTo(actIdx) {
     for (let i = 0; i < trajectory.length; i++) {
         const t = trajectory[i];
         if (t.type === 'observation') {
-            if (t.raw_html) snapshot = t.raw_html;
+            if (t.snapshot) snapshot = t.snapshot;
             if (t.url) targetUrl = t.url;
         }
         if (t.type === 'action') {

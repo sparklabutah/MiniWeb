@@ -1063,6 +1063,44 @@ def api_prompt():
     return jsonify(prompt)
 
 
+@annotation_bp.route("/coverage")
+def coverage_page():
+    """Per-site macro coverage matrix — which macros already have tasks."""
+    return render_template("coverage.html")
+
+
+@annotation_bp.route("/api/coverage_matrix")
+def api_coverage_matrix():
+    """Per-site, per-macro task counts (single-site vs multi-site tasks)."""
+    from annotation.storage import list_tasks
+    single, multi = {}, {}
+    for t in list_tasks():
+        ids = _task_site_ids(t)
+        bucket = single if len(ids) == 1 else multi
+        for sid in ids:
+            site_map = bucket.setdefault(sid, {})
+            for m in t.get("macros", []):
+                site_map[m] = site_map.get(m, 0) + 1
+    matrix = {}
+    for s in _load_sites():
+        sid = s["id"]
+        pool = sorted((set(_load_site_macros(sid)) - _get_na_macros([sid])) - {"navigate_by_route"})
+        macros = {}
+        for m in pool:
+            macros[m] = {
+                "single": single.get(sid, {}).get(m, 0),
+                "multi": multi.get(sid, {}).get(m, 0),
+            }
+        covered = sum(1 for m in pool if macros[m]["single"] > 0)
+        matrix[sid] = {
+            "name": s.get("name", sid),
+            "macros": macros,
+            "covered": covered,
+            "total": len(pool),
+        }
+    return jsonify(matrix)
+
+
 @annotation_bp.route("/api/site_floors")
 def api_site_floors():
     """Per-site coverage floor: covered/total macros via single-site tasks."""

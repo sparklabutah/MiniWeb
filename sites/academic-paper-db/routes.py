@@ -117,14 +117,29 @@ def _query_papers(q="", cat="", checked_cats=None, date_from=None, date_to=None,
         cat_clauses = ["categories LIKE ?" for _ in checked_cats]
         clauses.append(f"({' OR '.join(cat_clauses)})")
         params.extend(f"%{c}%" for c in checked_cats)
+    # Publication year lives in the arXiv id prefix (YYMM.xxxxx — every row
+    # in this dataset is new-style), which matches the year shown to users
+    # (_extract_year from versions[0].created). update_date is arXiv's
+    # last-modified date and is ~always recent, so filtering on it is a no-op.
+    _year_expr = "(2000 + CAST(substr(id, 1, 2) AS INTEGER))"
     if date_from:
-        clauses.append("update_date >= ?")
-        params.append(f"{date_from}-")
+        clauses.append(f"{_year_expr} >= ?")
+        params.append(int(date_from))
     if date_to:
-        clauses.append("update_date <= ?")
-        params.append(f"{date_to + 1}-")
+        clauses.append(f"{_year_expr} <= ?")
+        params.append(int(date_to))
 
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+    # Relevance: keyword-overlap ranking over a bounded candidate window
+    # (only meaningful with a query; without one it falls back to date).
+    if sort == "relevance" and q:
+        window = max((offset + limit) * 5, 250)
+        sql = f"SELECT rowid, * FROM [{_TABLE}]{where} ORDER BY update_date DESC LIMIT ?"
+        rows = conn.execute(sql, params + [window]).fetchall()
+        papers = [_interpret_record(_deserialize_row(r), r["rowid"]) for r in rows]
+        papers.sort(key=lambda p: -_keyword_score(q, p))
+        return papers[offset:offset + limit]
 
     # Normal path: ORDER BY in SQL
     if sort == "title":
@@ -262,10 +277,13 @@ def _get_user(user_id):
 # ---------------------------------------------------------------------------
 
 def _keyword_score(query, paper):
+    """Occurrence-weighted relevance: title hits count 3x, author/category 2x."""
     terms = query.lower().split()
-    text = (paper["title"] + " " + paper["abstract"] + " " +
-            " ".join(paper["authors"]) + " " + " ".join(paper["categories"])).lower()
-    return sum(1 for t in terms if t in text)
+    title = paper["title"].lower()
+    abstract = paper["abstract"].lower()
+    other = (" ".join(paper["authors"]) + " " + " ".join(paper["categories"])).lower()
+    return sum(3 * title.count(t) + abstract.count(t) + 2 * other.count(t)
+               for t in terms)
 
 
 def _search_papers(papers, query, semantic=False):
