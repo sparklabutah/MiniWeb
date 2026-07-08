@@ -55,6 +55,10 @@
         <button id="tab-sites" onclick="setView('sites')">By site</button>
     </div>
     <div class="controls">
+        <label>K (sites per macro):
+            <input type="number" id="floor-k" min="1" max="10" style="width:52px;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:.35rem;font-size:.85rem;"
+                   onchange="saveK(this.value)">
+        </label>
         <input type="text" id="search" placeholder="Filter…" oninput="render()">
         <label><input type="checkbox" id="hide-done" onchange="render()"> Hide completed</label>
         <div class="legend" id="site-legend" style="display:none">
@@ -85,7 +89,8 @@
         el.innerHTML = '';
 
         document.getElementById('summary').textContent =
-            `Floor (K=${DATA.k}): ${DATA.macros_done}/${DATA.macros_total} macros at target site coverage`;
+            `Floor (K=${DATA.k}): ${DATA.macros_done}/${DATA.macros_total} macros at target · ${DATA.slots_remaining} tasks remaining`;
+        document.getElementById('floor-k').value = DATA.k;
 
         if (VIEW === 'macros') {
             const rows = Object.entries(DATA.macros)
@@ -137,10 +142,22 @@
         }
     }
 
-    fetch('{{ url_for("annotation.api_coverage_matrix") }}')
-        .then(r => r.json())
-        .then(d => { DATA = d; render(); })
-        .catch(() => { document.getElementById('summary').textContent = 'Failed to load coverage.'; });
+    function loadMatrix() {
+        fetch('{{ url_for("annotation.api_coverage_matrix") }}')
+            .then(r => r.json())
+            .then(d => { DATA = d; render(); })
+            .catch(() => { document.getElementById('summary').textContent = 'Failed to load coverage.'; });
+    }
+
+    function saveK(k) {
+        fetch('{{ url_for("annotation.api_floor_k") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({k: parseInt(k, 10)})
+        }).then(r => r.json()).then(() => loadMatrix());
+    }
+
+    loadMatrix();
     </script>
 </body>
 </html>

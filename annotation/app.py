@@ -388,6 +388,7 @@ def _get_macro_coverage():
     coverage = {}
     for t in list_tasks():
         for m in t.get("macros", []):
+            m = _canon(m)
             coverage[m] = coverage.get(m, 0) + 1
     return coverage
 
@@ -412,13 +413,63 @@ def _get_site_macro_coverage(site_id):
         if _task_site_ids(t) != [site_id]:
             continue
         for m in t.get("macros", []):
+            m = _canon(m)
             coverage[m] = coverage.get(m, 0) + 1
     return coverage
 
 
 # Coverage floor: each macro should be demonstrated on K distinct sites via
 # single-site tasks (or on all its sites, when fewer than K support it).
-FLOOR_K = 3
+# K is adjustable from the coverage page; persisted in floor_config.json.
+_FLOOR_CONFIG_FILE = Path(__file__).parent / "floor_config.json"
+_DEFAULT_FLOOR_K = 3
+
+
+def _get_floor_k():
+    try:
+        k = int(json.loads(_FLOOR_CONFIG_FILE.read_text()).get("k", _DEFAULT_FLOOR_K))
+        return max(1, min(10, k))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return _DEFAULT_FLOOR_K
+
+
+# Retired macro names (merged 2026-07-08) -> canonical. Applied when READING
+# task files so historical annotations keep counting; task files themselves
+# are never rewritten. (filter_by_radio is site-scoped and NOT aliased —
+# it remains a valid macro on other sites.)
+_MACRO_ALIASES = {
+    "add_by_dropdown": "select_by_dropdown",
+    "apply_by_query": "create_by_query",
+    "authenticate_by_code": "verify_identity_by_code",
+    "configure_by_query": "edit_by_query",
+    "configure_by_radio": "select_by_radio",
+    "create_by_radio": "select_by_radio",
+    "route_by_radio": "select_by_radio",
+    "configure_by_route": "configure_by_toggle",
+    "select_by_chip": "filter_by_chip",
+    "filter_by_proximity": "filter_by_dropdown",
+    "filter_by_route": "search_by_route",
+    "follow_by_route": "follow_by_toggle",
+    "invite_by_query": "invite_by_form",
+    "navigate_by_date_range": "filter_by_date_range",
+    "post_by_query": "post_from_free_text",
+    "register_by_query": "register_by_form",
+    "search_by_code": "search_by_query",
+    "search_by_date_range": "filter_by_date_range",
+    "select_by_query": "search_by_query",
+    "select_by_slider": "filter_by_slider",
+    "share_by_query": "invite_by_form",
+    "sign_by_query": "sign_by_signature",
+    "submit_by_dropdown": "submit_by_form",
+    "translate_by_dropdown": "compute_by_dropdown",
+    "upload_by_image": "upload_by_upload",
+    "upload_by_route": "upload_by_upload",
+}
+
+
+def _canon(macro):
+    """Normalize a (possibly retired) macro name to its canonical form."""
+    return _MACRO_ALIASES.get(macro, macro)
 
 
 def _site_macro_pool(site_id):
@@ -437,17 +488,18 @@ def _get_macro_site_coverage():
         if len(ids) != 1:
             continue
         for m in t.get("macros", []):
-            cov.setdefault(m, set()).add(ids[0])
+            cov.setdefault(_canon(m), set()).add(ids[0])
     return cov
 
 
 def _macro_k_targets():
-    """macro -> min(FLOOR_K, number of sites supporting it)."""
+    """macro -> min(configured K, number of sites supporting it)."""
+    k = _get_floor_k()
     supporting = {}
     for sid in MACRO_LOCATIONS:
         for m in _site_macro_pool(sid):
             supporting[m] = supporting.get(m, 0) + 1
-    return {m: min(FLOOR_K, n) for m, n in supporting.items()}
+    return {m: min(k, n) for m, n in supporting.items()}
 
 
 def _get_cell_counts():
@@ -744,7 +796,7 @@ def _generate_site_prompt(site, rng=None):
     """Sampler for an annotator-chosen site: only the macros are random.
 
     Coverage floor (K-site): every macro should be demonstrated on
-    min(FLOOR_K, #supporting sites) distinct sites via single-site tasks.
+    min(K, #supporting sites) distinct sites via single-site tasks.
     While this site can still contribute a new site toward some macro's K
     target, sample exactly ONE such macro (weighted by difficulty) so each
     task fills a floor slot. Once nothing here is floor-needy, fall back to
@@ -766,7 +818,7 @@ def _generate_site_prompt(site, rng=None):
     # is still short of its K-site target globally.
     uncovered = [m for m in macro_pool
                  if site_id not in global_cov.get(m, set())
-                 and len(global_cov.get(m, set())) < k_targets.get(m, FLOOR_K)]
+                 and len(global_cov.get(m, set())) < k_targets.get(m, _get_floor_k())]
 
     def _weighted_pick(candidates, k):
         picks = []
@@ -1116,6 +1168,7 @@ def api_coverage_matrix():
         for sid in ids:
             site_map = bucket.setdefault(sid, {})
             for m in t.get("macros", []):
+                m = _canon(m)
                 site_map[m] = site_map.get(m, 0) + 1
 
     global_cov = _get_macro_site_coverage()
@@ -1129,7 +1182,7 @@ def api_coverage_matrix():
         needy = 0
         for m in pool:
             covered_here = sid in global_cov.get(m, set())
-            k_done = len(global_cov.get(m, set())) >= k_targets.get(m, FLOOR_K)
+            k_done = len(global_cov.get(m, set())) >= k_targets.get(m, _get_floor_k())
             needed = not covered_here and not k_done
             if needed:
                 needy += 1
@@ -1154,13 +1207,30 @@ def api_coverage_matrix():
         for m, k in sorted(k_targets.items())
     }
     done = sum(1 for m, k in k_targets.items() if len(global_cov.get(m, set())) >= k)
+    slots_remaining = sum(max(0, k - len(global_cov.get(m, set())))
+                          for m, k in k_targets.items())
     return jsonify({
-        "k": FLOOR_K,
+        "slots_remaining": slots_remaining,
+        "k": _get_floor_k(),
         "sites": sites,
         "macros": macros_global,
         "macros_done": done,
         "macros_total": len(k_targets),
     })
+
+
+@annotation_bp.route("/api/floor_k", methods=["GET", "POST"])
+def api_floor_k():
+    """Get or set the coverage-floor K (sites per macro)."""
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        try:
+            k = max(1, min(10, int(data.get("k"))))
+        except (TypeError, ValueError):
+            return jsonify({"error": "k must be an integer 1-10"}), 400
+        _FLOOR_CONFIG_FILE.write_text(json.dumps({"k": k}))
+        return jsonify({"k": k})
+    return jsonify({"k": _get_floor_k()})
 
 
 @annotation_bp.route("/api/site_floors")
@@ -1178,7 +1248,7 @@ def api_site_floors():
         pool = _site_macro_pool(sid)
         needy = sum(1 for m in pool
                     if sid not in global_cov.get(m, set())
-                    and len(global_cov.get(m, set())) < k_targets.get(m, FLOOR_K))
+                    and len(global_cov.get(m, set())) < k_targets.get(m, _get_floor_k()))
         floors[sid] = {"covered": len(pool) - needy, "total": len(pool)}
     return jsonify(floors)
 

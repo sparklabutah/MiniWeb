@@ -1,6 +1,7 @@
 # Auto-maintained mapping of macros to verified site UI locations.
 # Audited against site templates/routes on 2026-07-08 (full site-by-site pass);
 # missing UIs were then built and their macro entries restored the same day.
+# Singleton verb-synonym macros merged into canonical names on 2026-07-08.
 
 MACRO_LOCATIONS = {
     "academic-paper-db": {
@@ -525,9 +526,6 @@ MACRO_LOCATIONS = {
         "select_by_dropdown": [
             "'Trade' page -> 'Symbol' dropdown, 'Order Type' dropdown (Market, Limit, Stop Loss), 'Pay With' dropdown"
         ],
-        "configure_by_radio": [
-            "'Trade' page -> Buy/Sell toggle and 'Order Type' dropdown"
-        ],
         "follow_by_toggle": [
             "Ticker detail page -> 'Add to Watchlist'/'Remove' button"
         ],
@@ -548,6 +546,9 @@ MACRO_LOCATIONS = {
         ],
         "verify_identity_by_code": [
             "'Login' page -> 2FA verification code input step shown after credentials"
+        ],
+        "select_by_radio": [
+            "'Trade' page -> Buy/Sell toggle and 'Order Type' dropdown"
         ]
     },
     "business-company": {
@@ -729,9 +730,6 @@ MACRO_LOCATIONS = {
         "select_from_table": [
             "Instance/Service tables -> click row to view details"
         ],
-        "configure_by_query": [
-            "'Metrics' page -> CPU threshold slider with instance filter dropdown"
-        ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
@@ -741,6 +739,9 @@ MACRO_LOCATIONS = {
         ],
         "edit_by_form": [
             "Instance detail page -> 'Edit Configuration' section with name/type/vCPUs/memory/OS fields"
+        ],
+        "edit_by_query": [
+            "'Metrics' page -> CPU threshold slider with instance filter dropdown"
         ]
     },
     "cloud-storage-file-transfer": {
@@ -796,12 +797,6 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "File detail page -> 'Download' button at top of detail view"
         ],
-        "upload_by_route": [
-            "'File upload' button -> file name, type dropdown, size, and upload"
-        ],
-        "share_by_query": [
-            "File detail page -> 'Share' button for sharing with other users"
-        ],
         "share_by_toggle": [
             "File detail page -> 'Share' button with permission controls"
         ],
@@ -810,10 +805,14 @@ MACRO_LOCATIONS = {
             "Starred page -> unstar button"
         ],
         "invite_by_form": [
-            "File detail page -> 'Enter email to invite' input and 'Invite' button"
+            "File detail page -> 'Enter email to invite' input and 'Invite' button",
+            "File detail page -> 'Share' button for sharing with other users"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "upload_by_upload": [
+            "'File upload' button -> file name, type dropdown, size, and upload"
         ]
     },
     "code-editor-execution": {
@@ -986,7 +985,7 @@ MACRO_LOCATIONS = {
         "submit_by_form": [
             "Converter/Calculator -> save conversion result form"
         ],
-        "translate_by_dropdown": [
+        "compute_by_dropdown": [
             "Converter page -> from-unit and to-unit dropdowns (Length, Weight, Temperature, etc.)",
             "Base Converter -> from-base and to-base dropdowns (2-36)"
         ]
@@ -1028,9 +1027,6 @@ MACRO_LOCATIONS = {
         "post_by_route": [
             "Discussions page -> post new discussion thread"
         ],
-        "follow_by_route": [
-            "'EduPortal LMS' page -> 'View & Enroll' link on course cards"
-        ],
         "search_by_query": [
             "'EduPortal LMS' dashboard -> search input with 'Search' button filtering the course catalog by title, code, or department"
         ],
@@ -1044,7 +1040,8 @@ MACRO_LOCATIONS = {
             "Course page -> 'Lecture Player' section with Play/Pause toggle and elapsed-time counter"
         ],
         "follow_by_toggle": [
-            "Course page -> enrollment toggle button ('Enroll in Course' / 'Enrolled — Leave Course') in the course header"
+            "Course page -> enrollment toggle button ('Enroll in Course' / 'Enrolled — Leave Course') in the course header",
+            "'EduPortal LMS' page -> 'View & Enroll' link on course cards"
         ],
         "join_by_toggle": [
             "Course page -> enroll/unenroll toggle button in the course header"
@@ -1218,16 +1215,14 @@ MACRO_LOCATIONS = {
             "Profiles page -> 'Interest' filter input (e.g. hiking) and gender/looking_for dropdowns"
         ],
         "filter_by_dropdown": [
-            "'Spark' page -> 'Looking for' dropdown, sort dropdown (Age, Name, Newest)"
+            "'Spark' page -> 'Looking for' dropdown, sort dropdown (Age, Name, Newest)",
+            "Profiles page -> filter form with gender and looking_for dropdowns"
         ],
         "filter_by_checkbox": [
             "Profiles page -> interest checkboxes (hiking, cooking, reading, etc.)"
         ],
         "filter_by_date_range": [
             "'Spark' page -> 'Joined From' and 'To' date fields in filter bar"
-        ],
-        "filter_by_proximity": [
-            "Profiles page -> filter form with gender and looking_for dropdowns"
         ],
         "sort_by_ranking": [
             "'Spark' page -> sort dropdown (Age Low-High, Age High-Low, Name A-Z, Newest)"
@@ -1280,14 +1275,14 @@ MACRO_LOCATIONS = {
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
-        "register_by_query": [
-            "Login page -> authentication form"
-        ],
         "report_by_form": [
             "Profile detail page -> report form (reason input + 'Report' button) under Like/Pass"
         ],
         "block_by_toggle": [
             "Profile detail page -> Block/Blocked toggle button in the safety-actions row"
+        ],
+        "register_by_form": [
+            "Login page -> authentication form"
         ]
     },
     "design-creative": {
@@ -1306,7 +1301,8 @@ MACRO_LOCATIONS = {
             "'My Projects' page -> sort dropdown (newest, oldest, name, modified)"
         ],
         "filter_by_chip": [
-            "'DesignFlow' page -> category links: 'Social Media', 'Presentation', 'Poster', 'Logo', etc."
+            "'DesignFlow' page -> category links: 'Social Media', 'Presentation', 'Poster', 'Logo', etc.",
+            "'DesignFlow' page -> category links for selecting template types"
         ],
         "sort_by_ranking": [
             "'DesignFlow' page -> 'Sort' dropdown (Most Popular, Name A-Z, Newest)"
@@ -1328,9 +1324,6 @@ MACRO_LOCATIONS = {
         ],
         "select_by_dropdown": [
             "'Project' page -> status dropdown (Draft, Completed)"
-        ],
-        "select_by_chip": [
-            "'DesignFlow' page -> category links for selecting template types"
         ],
         "configure_by_dropdown": [
             "Project page -> status dropdown for project configuration"
@@ -1461,11 +1454,11 @@ MACRO_LOCATIONS = {
             "Editor page -> 'Star'/'Unstar' toggle button in header",
             "'Starred' page -> unstar button"
         ],
-        "invite_by_query": [
-            "Editor page -> share form with user and permission dropdowns"
-        ],
         "translate_by_query": [
             "Editor page -> document content textarea for editing text"
+        ],
+        "invite_by_form": [
+            "Editor page -> share form with user and permission dropdowns"
         ]
     },
     "e-commerce": {
@@ -1622,11 +1615,8 @@ MACRO_LOCATIONS = {
             "'Where do you want to go?' page -> 'From' and 'To' origin/destination dropdowns and search button"
         ],
         "search_by_route": [
-            "'SkyLodge' home -> flight search directs to results page"
-        ],
-        "search_by_date_range": [
-            "Flights tab -> 'Departure Date' input",
-            "Hotels tab -> check-in/check-out date inputs"
+            "'SkyLodge' home -> flight search directs to results page",
+            "'SkyLodge' home -> search form submits to flights or hotels results"
         ],
         "filter_by_dropdown": [
             "Flights tab -> 'Airline', 'Cabin Class' (Economy, Business, First), 'Travelers' dropdowns",
@@ -1635,16 +1625,15 @@ MACRO_LOCATIONS = {
         "filter_by_checkbox": [
             "Flights tab -> 'Stops' checkboxes (Nonstop, 1 Stop)"
         ],
-        "filter_by_route": [
-            "'SkyLodge' home -> search form submits to flights or hotels results"
-        ],
         "filter_by_slider": [
             "Flights tab -> 'Max Price' slider, below the search fields",
-            "Hotels tab -> 'Max Price' slider, below hotel filters"
+            "Hotels tab -> 'Max Price' slider, below hotel filters",
+            "Flights page -> max price input for filtering by maximum price"
         ],
         "filter_by_date_range": [
             "Flights tab -> 'Departure Date' input",
-            "Hotels tab -> check-in date input"
+            "Hotels tab -> check-in date input",
+            "Hotels tab -> check-in/check-out date inputs"
         ],
         "sort_by_ranking": [
             "Flights page -> sort dropdown (price, duration, departure, airline)",
@@ -1674,12 +1663,6 @@ MACRO_LOCATIONS = {
         "select_by_ranking": [
             "Flights page -> sortable flight list for price-based selection"
         ],
-        "select_by_slider": [
-            "Flights page -> max price input for filtering by maximum price"
-        ],
-        "add_by_dropdown": [
-            "Flight/Hotel detail -> 'Travelers'/nights dropdowns in booking form"
-        ],
         "checkout_by_form": [
             "Flight/Hotel detail -> booking form with travelers, account type, submit"
         ],
@@ -1692,6 +1675,9 @@ MACRO_LOCATIONS = {
         ],
         "cancel_by_form": [
             "Booking detail -> 'Cancel Booking' button with confirmation"
+        ],
+        "select_by_dropdown": [
+            "Flight/Hotel detail -> 'Travelers'/nights dropdowns in booking form"
         ]
     },
     "forms-surveys": {
@@ -1719,9 +1705,7 @@ MACRO_LOCATIONS = {
             "'Blank form' page -> form builder (title, description, dynamic field rows)"
         ],
         "submit_by_form": [
-            "Respond page -> dynamic form fields (text, radio, checkbox, select, textarea) and 'Submit' button"
-        ],
-        "submit_by_dropdown": [
+            "Respond page -> dynamic form fields (text, radio, checkbox, select, textarea) and 'Submit' button",
             "Respond page -> dropdown field type in form responses"
         ],
         "submit_by_route": [
@@ -1845,9 +1829,6 @@ MACRO_LOCATIONS = {
         "create_by_form": [
             "New note page -> title input and text editor textarea"
         ],
-        "create_by_radio": [
-            "Note page -> mode buttons: Text, Draw, Text+Draw"
-        ],
         "create_by_toggle": [
             "Note page -> mode toggle buttons in toolbar (Text, Draw, Both)"
         ],
@@ -1883,6 +1864,9 @@ MACRO_LOCATIONS = {
         ],
         "navigate_by_pan_zoom": [
             "Note editor (whiteboard canvas) -> zoom in/out with % readout, four pan arrows, and Reset View in the toolbar"
+        ],
+        "select_by_radio": [
+            "Note page -> mode buttons: Text, Draw, Text+Draw"
         ]
     },
     "health-fitness-tracking": {
@@ -2148,9 +2132,6 @@ MACRO_LOCATIONS = {
         "edit_by_query": [
             "Policy detail page -> management controls"
         ],
-        "sign_by_query": [
-            "Policy Document page -> 'Print / Save as PDF' button"
-        ],
         "select_by_dropdown": [
             "'File Claim' page -> policy number dropdown to select which policy"
         ],
@@ -2172,9 +2153,6 @@ MACRO_LOCATIONS = {
         "submit_by_form": [
             "'File Claim' page -> claim form (policy, type, description, amount, date, submit)"
         ],
-        "apply_by_query": [
-            "'File Claim' page -> claim form with policy dropdown, date, location, type, description"
-        ],
         "compute_from_table": [
             "'Your Policies' page -> policy list with coverage amounts for computing totals"
         ],
@@ -2183,6 +2161,12 @@ MACRO_LOCATIONS = {
         ],
         "configure_by_toggle": [
             "Policy detail page -> 'Policy Settings & Notifications' card with Autopay/Paperless/Email/SMS toggle switches"
+        ],
+        "create_by_query": [
+            "'File Claim' page -> claim form with policy dropdown, date, location, type, description"
+        ],
+        "sign_by_signature": [
+            "Policy Document page -> 'Print / Save as PDF' button"
         ]
     },
     "job-sites": {
@@ -2318,7 +2302,8 @@ MACRO_LOCATIONS = {
             "Search results -> click place to view details"
         ],
         "search_by_query": [
-            "'CascadiaMaps' page -> 'Search CascadiaMaps' field at top"
+            "'CascadiaMaps' page -> 'Search CascadiaMaps' field at top",
+            "'CascadiaMaps' page -> search results with clickable place entries"
         ],
         "search_by_semantic": [
             "'CascadiaMaps' page -> 'Search CascadiaMaps' field with map view"
@@ -2359,9 +2344,6 @@ MACRO_LOCATIONS = {
         "post_from_free_text": [
             "Place detail page -> write review form (rating dropdown, comment textarea)"
         ],
-        "select_by_query": [
-            "'CascadiaMaps' page -> search results with clickable place entries"
-        ],
         "configure_by_dropdown": [
             "'Settings' page -> 'Default Travel Mode' dropdown (Driving, Cycling, Walking, Transit) and 'Distance Units' dropdown"
         ],
@@ -2375,14 +2357,14 @@ MACRO_LOCATIONS = {
         "route_by_query": [
             "'Get Directions' page -> 'Starting point or address' and 'Destination or address' inputs with 'Get Directions' button"
         ],
-        "route_by_radio": [
-            "'Get Directions' page -> 'Mode' buttons: Driving, Cycling, Walking, Transit"
-        ],
         "route_by_route": [
             "'Get Directions' page -> route display with waypoints"
         ],
         "filter_by_toggle": [
             "'CascadiaMaps' page -> 'Open now' toggle pill in the filter bar (green when active)"
+        ],
+        "select_by_radio": [
+            "'Get Directions' page -> 'Mode' buttons: Driving, Cycling, Walking, Transit"
         ]
     },
     "multimedia-posting": {
@@ -2395,9 +2377,6 @@ MACRO_LOCATIONS = {
         ],
         "search_by_semantic": [
             "'Explore' page -> search with sort dropdown"
-        ],
-        "filter_by_radio": [
-            "'Explore' page -> post type filter chips (Photos, Videos, Carousels)"
         ],
         "sort_by_dropdown": [
             "'Explore' page -> sort dropdown (newest, popular, oldest)"
@@ -2417,11 +2396,9 @@ MACRO_LOCATIONS = {
         "edit_by_form": [
             "'+ Create' page -> caption textarea, location, tags, type dropdown"
         ],
-        "post_by_query": [
-            "'+ Create' page -> post creation with file upload, caption, location, tags"
-        ],
         "post_from_free_text": [
-            "Post detail page -> comment textarea"
+            "Post detail page -> comment textarea",
+            "'+ Create' page -> post creation with file upload, caption, location, tags"
         ],
         "select_by_dropdown": [
             "'+ Create' page -> post type dropdown (photo, video, carousel)"
@@ -2467,6 +2444,9 @@ MACRO_LOCATIONS = {
         ],
         "export_by_dropdown": [
             "'Settings' page -> 'Export Your Data' format dropdown (JSON/CSV) with download"
+        ],
+        "filter_by_chip": [
+            "'Explore' page -> post type filter chips (Photos, Videos, Carousels)"
         ]
     },
     "music": {
@@ -2640,16 +2620,12 @@ MACRO_LOCATIONS = {
             "Vault page -> entries list with category and strength filters"
         ],
         "upload_by_upload": [
-            "'VaultGuard' home -> 'Import' button accepting .csv, .json files"
-        ],
-        "authenticate_by_code": [
-            "'Unlock Your Vault' page -> 'Email Address' and 'Master Password' fields"
-        ],
-        "upload_by_image": [
+            "'VaultGuard' home -> 'Import' button accepting .csv, .json files",
             "'New Entry' page -> Icon Image file input on the entry creation form"
         ],
         "verify_identity_by_code": [
-            "'Login' page -> Two-Factor Verification panel (6-digit or backup code input) shown after unlock"
+            "'Login' page -> Two-Factor Verification panel (6-digit or backup code input) shown after unlock",
+            "'Unlock Your Vault' page -> 'Email Address' and 'Master Password' fields"
         ]
     },
     "personal-portfolio": {
@@ -3724,13 +3700,11 @@ MACRO_LOCATIONS = {
             "Top nav -> 'Dashboard', 'Repositories', 'Projects', 'Issues', 'Merge Requests', 'Members' links"
         ],
         "search_by_query": [
-            "'MeridianGit' page -> 'Search or jump to...' field at top"
+            "'MeridianGit' page -> 'Search or jump to...' field at top",
+            "'MeridianGit' page -> code search across repository contents"
         ],
         "search_by_semantic": [
             "'MeridianGit' page -> repository search with keyword matching"
-        ],
-        "search_by_code": [
-            "'MeridianGit' page -> code search across repository contents"
         ],
         "filter_by_dropdown": [
             "'Issues' page -> state dropdown (open, closed), project dropdown",
@@ -3814,9 +3788,6 @@ MACRO_LOCATIONS = {
         "select_by_dropdown": [
             "'+ Upload' page -> category and visibility dropdowns"
         ],
-        "configure_by_route": [
-            "'Settings' page -> default quality, playback speed, autoplay/notifications options"
-        ],
         "play_by_playback": [
             "Watch page -> video player with play/pause/seek controls"
         ],
@@ -3849,6 +3820,9 @@ MACRO_LOCATIONS = {
         ],
         "play_by_date_range": [
             "'StreamHub' page -> 'Play Newest in Range' button linking to the watch page of the most recent upload in the date-filtered list"
+        ],
+        "configure_by_toggle": [
+            "'Settings' page -> default quality, playback speed, autoplay/notifications options"
         ]
     },
     "visual-how-to-guides": {
@@ -3916,9 +3890,6 @@ MACRO_LOCATIONS = {
         "navigate_by_query": [
             "'Current' page -> location search bar (text input + 'Go' button) resolving a named weather station"
         ],
-        "navigate_by_date_range": [
-            "'History' page -> From/To date inputs + 'View Range' button filtering the history table"
-        ],
         "navigate_by_pan_zoom": [
             "'Locations' page -> SVG station map with zoom in/out, arrow-pan, reset buttons and drag-to-pan"
         ],
@@ -3940,6 +3911,9 @@ MACRO_LOCATIONS = {
         ],
         "compare_by_query": [
             "'Current' page -> 'Compare Locations' two-location form + Compare button with side-by-side table"
+        ],
+        "filter_by_date_range": [
+            "'History' page -> From/To date inputs + 'View Range' button filtering the history table"
         ]
     },
     "wikis": {
