@@ -416,6 +416,40 @@ def _get_site_macro_coverage(site_id):
     return coverage
 
 
+# Coverage floor: each macro should be demonstrated on K distinct sites via
+# single-site tasks (or on all its sites, when fewer than K support it).
+FLOOR_K = 3
+
+
+def _site_macro_pool(site_id):
+    """Macros eligible for floor coverage on a site (excl. NA + navigation)."""
+    pool = set(_load_site_macros(site_id)) - _get_na_macros([site_id])
+    pool.discard("navigate_by_route")
+    return pool
+
+
+def _get_macro_site_coverage():
+    """macro -> set of site ids where a SINGLE-SITE task covers it."""
+    from annotation.storage import list_tasks
+    cov = {}
+    for t in list_tasks():
+        ids = _task_site_ids(t)
+        if len(ids) != 1:
+            continue
+        for m in t.get("macros", []):
+            cov.setdefault(m, set()).add(ids[0])
+    return cov
+
+
+def _macro_k_targets():
+    """macro -> min(FLOOR_K, number of sites supporting it)."""
+    supporting = {}
+    for sid in MACRO_LOCATIONS:
+        for m in _site_macro_pool(sid):
+            supporting[m] = supporting.get(m, 0) + 1
+    return {m: min(FLOOR_K, n) for m, n in supporting.items()}
+
+
 def _get_cell_counts():
     """Count existing tasks per (num_sites, num_macros) cell (from file storage)."""
     from annotation.storage import list_tasks
@@ -709,28 +743,30 @@ def _generate_prompt(sites, coverage, force_single=False):
 def _generate_site_prompt(site, rng=None):
     """Sampler for an annotator-chosen site: only the macros are random.
 
-    Coverage floor: every site should have at least one single-site task per
-    supported macro (#macros == #single-macro-single-site tasks). While any
-    macro of the chosen site is still uncovered, sample exactly ONE uncovered
-    macro (weighted by difficulty) so each task fills a floor slot. Once the
-    floor is complete, fall back to 1-3 macros weighted by difficulty and
-    inverse per-site coverage.
+    Coverage floor (K-site): every macro should be demonstrated on
+    min(FLOOR_K, #supporting sites) distinct sites via single-site tasks.
+    While this site can still contribute a new site toward some macro's K
+    target, sample exactly ONE such macro (weighted by difficulty) so each
+    task fills a floor slot. Once nothing here is floor-needy, fall back to
+    1-3 macros weighted by difficulty and inverse per-site coverage.
     """
     rng = rng or random.Random()
     site_id = site["id"]
 
     from annotation.macro_difficulty import get_macro_weight
 
-    macro_pool = set(_load_site_macros(site_id))
-    macro_pool -= _get_na_macros([site_id])
-    # Navigation is implicit — agents start on the target page (see CLAUDE.md)
-    macro_pool.discard("navigate_by_route")
-    macro_pool = sorted(macro_pool)
+    macro_pool = sorted(_site_macro_pool(site_id))
     if not macro_pool:
         return None
 
     site_cov = _get_site_macro_coverage(site_id)
-    uncovered = [m for m in macro_pool if site_cov.get(m, 0) == 0]
+    global_cov = _get_macro_site_coverage()
+    k_targets = _macro_k_targets()
+    # Floor-needy here: this site hasn't covered the macro yet AND the macro
+    # is still short of its K-site target globally.
+    uncovered = [m for m in macro_pool
+                 if site_id not in global_cov.get(m, set())
+                 and len(global_cov.get(m, set())) < k_targets.get(m, FLOOR_K)]
 
     def _weighted_pick(candidates, k):
         picks = []
@@ -1071,7 +1107,7 @@ def coverage_page():
 
 @annotation_bp.route("/api/coverage_matrix")
 def api_coverage_matrix():
-    """Per-site, per-macro task counts (single-site vs multi-site tasks)."""
+    """Per-site and per-macro coverage against the K-site floor."""
     from annotation.storage import list_tasks
     single, multi = {}, {}
     for t in list_tasks():
@@ -1081,46 +1117,69 @@ def api_coverage_matrix():
             site_map = bucket.setdefault(sid, {})
             for m in t.get("macros", []):
                 site_map[m] = site_map.get(m, 0) + 1
-    matrix = {}
+
+    global_cov = _get_macro_site_coverage()
+    k_targets = _macro_k_targets()
+
+    sites = {}
     for s in _load_sites():
         sid = s["id"]
-        pool = sorted((set(_load_site_macros(sid)) - _get_na_macros([sid])) - {"navigate_by_route"})
+        pool = sorted(_site_macro_pool(sid))
         macros = {}
+        needy = 0
         for m in pool:
+            covered_here = sid in global_cov.get(m, set())
+            k_done = len(global_cov.get(m, set())) >= k_targets.get(m, FLOOR_K)
+            needed = not covered_here and not k_done
+            if needed:
+                needy += 1
             macros[m] = {
                 "single": single.get(sid, {}).get(m, 0),
                 "multi": multi.get(sid, {}).get(m, 0),
+                "needed": needed,
             }
-        covered = sum(1 for m in pool if macros[m]["single"] > 0)
-        matrix[sid] = {
+        sites[sid] = {
             "name": s.get("name", sid),
             "macros": macros,
-            "covered": covered,
+            "covered": len(pool) - needy,
             "total": len(pool),
         }
-    return jsonify(matrix)
+
+    # Global per-macro floor progress
+    macros_global = {
+        m: {
+            "k": k,
+            "sites_covered": sorted(global_cov.get(m, set())),
+        }
+        for m, k in sorted(k_targets.items())
+    }
+    done = sum(1 for m, k in k_targets.items() if len(global_cov.get(m, set())) >= k)
+    return jsonify({
+        "k": FLOOR_K,
+        "sites": sites,
+        "macros": macros_global,
+        "macros_done": done,
+        "macros_total": len(k_targets),
+    })
 
 
 @annotation_bp.route("/api/site_floors")
 def api_site_floors():
-    """Per-site coverage floor: covered/total macros via single-site tasks."""
-    from annotation.storage import list_tasks
-    # One pass over tasks: macros covered per site by single-site tasks
-    covered_by_site = {}
-    for t in list_tasks():
-        ids = _task_site_ids(t)
-        if len(ids) != 1:
-            continue
-        covered_by_site.setdefault(ids[0], set()).update(t.get("macros", []))
+    """Per-site K-floor status: how many macros still need THIS site.
+
+    covered/total where total = site's macro pool and covered = macros that
+    are either already demonstrated here or globally at their K-site target.
+    """
+    global_cov = _get_macro_site_coverage()
+    k_targets = _macro_k_targets()
     floors = {}
     for s in _load_sites():
         sid = s["id"]
-        pool = set(_load_site_macros(sid)) - _get_na_macros([sid])
-        pool.discard("navigate_by_route")
-        floors[sid] = {
-            "covered": len(pool & covered_by_site.get(sid, set())),
-            "total": len(pool),
-        }
+        pool = _site_macro_pool(sid)
+        needy = sum(1 for m in pool
+                    if sid not in global_cov.get(m, set())
+                    and len(global_cov.get(m, set())) < k_targets.get(m, FLOOR_K))
+        floors[sid] = {"covered": len(pool) - needy, "total": len(pool)}
     return jsonify(floors)
 
 
