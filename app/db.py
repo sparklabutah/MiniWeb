@@ -755,6 +755,62 @@ def execute(sql: str, params: tuple = (), fetch: str = "all"):
         return [_deserialize_row(r) for r in cursor.fetchall()]
 
 
+def merge_overlay(
+    site: str,
+    collection: str,
+    rows: list,
+    *,
+    match=None,
+    sort: str = None,
+    limit: int = None,
+    sid: str = None,
+) -> list[dict]:
+    """Merge session-overlay mutations into rows fetched via raw execute().
+
+    Raw SQL through execute() reads only the base table, so items created or
+    edited in this session (which live in session_overlay) are invisible to it.
+    Call this on the result to apply the session's deletes/upserts.
+
+    Args:
+        rows: base-table rows from execute()
+        match: optional callable(item) -> bool; overlay upserts must pass it
+               to be merged in (mirror your SQL WHERE clauses here)
+        sort: db.query()-style sort string, e.g. "-created_at"
+        limit: max rows after merge
+
+    Returns:
+        rows with this session's deletes removed and matching upserts merged.
+    """
+    if sid is None:
+        sid = _get_session_id()
+    conn = _get_conn()
+
+    pk_col = get_pk_column(site, collection)
+    replaced = _is_collection_replaced(sid, site, collection, conn)
+    deletes, upserts = _get_overlay(sid, site, collection, conn)
+
+    if replaced:
+        # Session owns the full collection — base rows are superseded
+        results = list(upserts.values())
+    else:
+        if not deletes and not upserts:
+            results = list(rows)
+        else:
+            excluded = deletes | set(upserts.keys())
+            results = [r for r in rows if str(r.get(pk_col)) not in excluded]
+        results.extend(upserts.values())
+
+    if match is not None:
+        # Only overlay items need the predicate for correctness, but applying
+        # it uniformly keeps replaced-collection results consistent too.
+        results = [r for r in results if match(r)]
+
+    results = _apply_sort(results, sort)
+    if limit is not None:
+        results = results[:limit]
+    return results
+
+
 
 
 

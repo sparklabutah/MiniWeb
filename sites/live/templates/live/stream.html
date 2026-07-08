@@ -67,6 +67,8 @@
         .chat-msg .badge { font-size: .6rem; padding: .1rem .3rem; border-radius: .15rem; margin-right: .3rem; font-weight: 700; text-transform: uppercase; }
         .chat-msg .badge.broadcaster { background: #eb0400; color: #fff; }
         .chat-msg .badge.subscriber { background: #9147ff; color: #fff; }
+        .chat-msg.cheer { background: linear-gradient(90deg, rgba(145,71,255,.3), rgba(145,71,255,.08)); border-left: 3px solid #9147ff; }
+        .chat-msg .badge.cheer { background: linear-gradient(90deg, #9147ff, #b47aff); color: #fff; }
         .chat-msg .username { font-weight: 700; color: #9147ff; margin-right: .3rem; }
         .chat-msg .username.broadcaster { color: #eb0400; }
         .chat-msg .text { color: #efeff1; }
@@ -76,6 +78,10 @@
         .chat-input input:focus { border-color: #9147ff; outline: none; }
         .chat-input .login-prompt { color: #737380; font-size: .8rem; text-align: center; }
         .chat-input .login-prompt a { color: #9147ff; }
+        .tip-row { display: flex; gap: .5rem; margin-top: .5rem; align-items: center; }
+        .tip-row select { flex: 1; background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .45rem .5rem; border-radius: .3rem; font-size: .8rem; }
+        .tip-row select:focus { border-color: #9147ff; outline: none; }
+        .tip-feedback { font-size: .75rem; margin-top: .3rem; min-height: 1em; }
         @media (max-width: 800px) {
             .main-layout { grid-template-columns: 1fr; }
             .chat-section { max-height: 400px; }
@@ -162,6 +168,30 @@
                     {% endfor %}
                 </div>
                 {% endif %}
+
+                <div class="report-box" style="background:#18181b;border:1px solid #2f2f35;border-radius:.5rem;padding:.8rem 1rem;margin-top:1rem;">
+                    <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem;">Report Stream</div>
+                    {% if logged_in %}
+                    <form id="reportForm" onsubmit="submitReport(event)" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+                        <select id="reportReason" style="background:#0e0e10;color:#efeff1;border:1px solid #3a3a44;padding:.45rem .5rem;border-radius:.3rem;font-size:.8rem;">
+                            <option value="harassment">Harassment</option>
+                            <option value="spam">Spam</option>
+                            <option value="hate_speech">Hate speech</option>
+                            <option value="nudity">Nudity</option>
+                            <option value="violence">Violence</option>
+                            <option value="misinformation">Misinformation</option>
+                            <option value="copyright">Copyright</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="text" id="reportDescription" placeholder="Describe the issue (optional)"
+                               style="flex:1;min-width:180px;background:#0e0e10;color:#efeff1;border:1px solid #3a3a44;padding:.45rem .7rem;border-radius:.3rem;font-size:.8rem;">
+                        <button type="submit" class="btn btn-sm" style="background:#eb0400;">Report</button>
+                        <div id="reportFeedback" style="width:100%;font-size:.75rem;min-height:1em;"></div>
+                    </form>
+                    {% else %}
+                    <p style="color:#737380;font-size:.8rem;"><a href="{{ url_for('live.login_page') }}" style="color:#9147ff;">Log in</a> to report this stream</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -177,6 +207,16 @@
                     <input type="text" id="chatMessage" placeholder="Send a message" autocomplete="off">
                     <button type="submit" class="btn btn-sm">Chat</button>
                 </form>
+                <div class="tip-row">
+                    <select id="tipAmount" title="Cheer amount (channel points)">
+                        <option value="100">Cheer 100 points</option>
+                        <option value="500">Cheer 500 points</option>
+                        <option value="1000">Cheer 1,000 points</option>
+                        <option value="5000">Cheer 5,000 points</option>
+                    </select>
+                    <button type="button" class="btn btn-sm" onclick="sendTip()">Cheer</button>
+                </div>
+                <div class="tip-feedback" id="tipFeedback"></div>
                 {% else %}
                 <p class="login-prompt"><a href="{{ url_for('live.login_page') }}">Log in</a> to chat</p>
                 {% endif %}
@@ -206,7 +246,7 @@
 
         function appendMsg(msg) {
             var div = document.createElement('div');
-            div.className = 'chat-msg';
+            div.className = 'chat-msg' + (msg.tip_amount ? ' cheer' : '');
             var badges = '';
             var badgeList = msg.badges;
             if (typeof badgeList === 'string') {
@@ -276,6 +316,63 @@
                 }
             })
             .catch(function() {});
+        };
+
+        /* Twitch-bits-style cheer: pay channel points, message rides the chat */
+        window.sendTip = function() {
+            var amount = parseInt(document.getElementById('tipAmount').value, 10);
+            var note = chatInput.value.trim();  /* optional note typed in chat box */
+            var feedback = document.getElementById('tipFeedback');
+            fetch('{{ url_for("live.api_stream_tip", stream_id=stream.id) }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({amount: amount, message: note})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.id) {
+                    chatInput.value = '';
+                    seenIds[res.data.id] = true;
+                    appendMsg(res.data);
+                    feedback.style.color = '#9147ff';
+                    feedback.textContent = 'Cheered ' + amount + ' points! Balance: ' + res.data.remaining_balance;
+                } else {
+                    feedback.style.color = '#eb0400';
+                    feedback.textContent = res.data.error || 'Could not send cheer.';
+                }
+            })
+            .catch(function() {
+                feedback.style.color = '#eb0400';
+                feedback.textContent = 'Could not send cheer.';
+            });
+        };
+
+        /* Report stream form */
+        window.submitReport = function(e) {
+            e.preventDefault();
+            var reason = document.getElementById('reportReason').value;
+            var description = document.getElementById('reportDescription').value.trim();
+            var feedback = document.getElementById('reportFeedback');
+            fetch('{{ url_for("live.api_report") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target_type: 'stream', target_id: streamId, reason: reason, description: description})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok) {
+                    feedback.style.color = '#00e676';
+                    feedback.textContent = 'Report submitted. Thank you.';
+                    document.getElementById('reportDescription').value = '';
+                } else {
+                    feedback.style.color = '#eb0400';
+                    feedback.textContent = res.data.error || 'Could not submit report.';
+                }
+            })
+            .catch(function() {
+                feedback.style.color = '#eb0400';
+                feedback.textContent = 'Could not submit report.';
+            });
         };
         {% endif %}
 

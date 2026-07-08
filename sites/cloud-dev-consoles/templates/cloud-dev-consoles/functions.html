@@ -25,6 +25,34 @@
             <select name="sort"><option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option><option value="invocations" {% if sort == 'invocations' %}selected{% endif %}>Invocations</option><option value="duration" {% if sort == 'duration' %}selected{% endif %}>Duration</option><option value="errors" {% if sort == 'errors' %}selected{% endif %}>Error Rate</option></select>
             <button type="submit">Apply</button>
         </form>
+        <!-- Create function (create_by_form) -->
+        <form class="filters" method="POST" action="{{ url_for('cloud-dev-consoles.form_create_function') }}" id="create-function-form">
+            <strong style="font-size:.85rem;">Create function</strong>
+            <label>Name</label><input type="text" name="name" placeholder="my-new-function" required>
+            <label>Runtime</label>
+            <select name="runtime">
+                <option value="python3.12">python3.12</option>
+                <option value="nodejs20.x">nodejs20.x</option>
+                <option value="go1.x">go1.x</option>
+                <option value="java21">java21</option>
+            </select>
+            <label>Handler</label><input type="text" name="handler" placeholder="index.handler">
+            <label>Memory (MB)</label>
+            <select name="memory_mb">
+                <option value="128">128</option>
+                <option value="256" selected>256</option>
+                <option value="512">512</option>
+                <option value="1024">1024</option>
+            </select>
+            <label>Timeout (s)</label>
+            <select name="timeout_sec">
+                <option value="15">15</option>
+                <option value="30" selected>30</option>
+                <option value="60">60</option>
+                <option value="300">300</option>
+            </select>
+            <button type="submit" style="background:#ff9900;color:#232f3e;font-weight:600;">Create function</button>
+        </form>
         <div class="result-count">{{ functions|length }} functions</div>
         <table id="functions-table">
             <thead><tr><th>Name</th><th>Runtime</th><th>Memory</th><th>Timeout</th><th>Invocations (24h)</th><th>Avg Duration</th><th>Error Rate</th><th>Status</th><th>Cost/mo</th></tr></thead>

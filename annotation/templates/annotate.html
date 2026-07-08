@@ -352,9 +352,12 @@ textarea#instruction:focus {
                         Skip 2FA
                     </label>
                     <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
-                        <input type="checkbox" id="single-site-toggle" onchange="reshufflePrompt()" style="accent-color:#2563eb;width:13px;height:13px;">
+                        <input type="checkbox" id="single-site-toggle" onchange="handleSingleSiteToggle()" style="accent-color:#2563eb;width:13px;height:13px;">
                         Single site
                     </label>
+                    <select id="site-picker" onchange="reshufflePrompt()" style="display:none;font-size:.68rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.3rem;color:#475569;max-width:220px;" title="Choose the site; only macros are sampled. (n/m) = macros covered by single-site tasks.">
+                        <option value="">🎲 Random site</option>
+                    </select>
                     <span id="login-status" style="font-size:.65rem;color:#16a34a;"></span>
                     <button class="btn btn-secondary" style="font-size:.62rem;padding:.15rem .4rem" onclick="reshufflePrompt()">↻ New</button>
                     <button class="btn btn-danger" style="font-size:.62rem;padding:.15rem .4rem" onclick="openSkipModal()">Skip</button>
@@ -598,6 +601,7 @@ function resetSession() {
     fetch('/_reset_data', { method: 'POST' })
         .then(r => r.json())
         .then(() => {
+            _sync2FAToggle();  // re-apply the Skip-2FA checkbox to the fresh session
             const iframe = document.getElementById('site-iframe');
             if (iframe) _reloadIframe(iframe);
             alert('Session reset to pristine state.');
@@ -656,6 +660,11 @@ function initAnnotation() {
         if (currentPrompt.sites.length > 0) {
             loadApiRef(currentPrompt.sites[0].id);
         }
+        // Sync the Skip-2FA checkbox to the session: the box renders checked
+        // by default but the session flag is only set by its change handler,
+        // so a fresh/reset session would otherwise still trigger 2FA until
+        // the box is unchecked and re-checked.
+        _sync2FAToggle();
         // Auto-login if toggle is checked, otherwise ensure logged out + reload iframe
         const toggle = document.getElementById('auto-login-toggle');
         const ready = (toggle && toggle.checked) ? autoLoginSites() : _logoutSites();
@@ -664,6 +673,11 @@ function initAnnotation() {
             if (iframe) _reloadIframe(iframe);
         });
     }
+}
+
+function _sync2FAToggle() {
+    const t = document.getElementById('disable-2fa-toggle');
+    if (t) handle2FAToggle(t.checked);
 }
 
 async function autoLoginSites() {
@@ -1370,10 +1384,45 @@ function getEnabledMacros() {
 // updateChainDisplay defined above as alias to _drawArrows
 
 // --- Reshuffle ---
+function handleSingleSiteToggle() {
+    const checked = document.getElementById('single-site-toggle')?.checked;
+    const picker = document.getElementById('site-picker');
+    if (picker) {
+        picker.style.display = checked ? '' : 'none';
+        if (checked) _populateSitePicker();  // refresh floor counts each time
+    }
+    reshufflePrompt();
+}
+
+async function _populateSitePicker() {
+    const picker = document.getElementById('site-picker');
+    if (!picker) return;
+    try {
+        const [sites, floors] = await Promise.all([
+            fetch('/annotate/api/sites').then(r => r.json()),
+            fetch('/annotate/api/site_floors').then(r => r.json()),
+        ]);
+        const current = picker.value;
+        picker.innerHTML = '<option value="">🎲 Random site</option>';
+        sites.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+        for (const s of sites) {
+            const f = floors[s.id] || {covered: 0, total: 0};
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.name || s.id} (${f.covered}/${f.total})`;
+            picker.appendChild(opt);
+        }
+        picker.value = current;
+    } catch (e) { /* picker stays with Random option */ }
+}
+
 function reshufflePrompt() {
     document.getElementById('status').textContent = 'Loading new prompt...';
     const singleSite = document.getElementById('single-site-toggle')?.checked ? '1' : '';
-    fetch('/annotate/api/prompt' + (singleSite ? '?single=1' : ''))
+    const chosenSite = singleSite ? (document.getElementById('site-picker')?.value || '') : '';
+    const params = chosenSite ? '?site=' + encodeURIComponent(chosenSite)
+                              : (singleSite ? '?single=1' : '');
+    fetch('/annotate/api/prompt' + params)
         .then(r => r.json())
         .then(prompt => {
             if (!prompt || !prompt.sites || !prompt.macros) {
@@ -1407,7 +1456,14 @@ function reshufflePrompt() {
             updateChainDisplay();
             renderTagPalette();
             document.getElementById('instruction').value = '';
-            document.getElementById('status').textContent = 'New prompt loaded';
+            if (prompt.chosen_site && prompt.floor_total !== undefined) {
+                const remaining = prompt.floor_total - prompt.floor_covered;
+                document.getElementById('status').textContent = remaining > 0
+                    ? `New prompt loaded — floor: ${prompt.floor_covered}/${prompt.floor_total} macros covered on this site (${remaining} to go)`
+                    : `New prompt loaded — floor complete for this site (${prompt.floor_total}/${prompt.floor_total}) 🎉`;
+            } else {
+                document.getElementById('status').textContent = 'New prompt loaded';
+            }
             // Set login state BEFORE loading iframe so it renders correctly
             const toggle = document.getElementById('auto-login-toggle');
             const sessionReady = (toggle && toggle.checked) ? autoLoginSites() : _logoutSites();
@@ -2870,6 +2926,8 @@ async function submitTask() {
         });
         const d = await r.json();
         if (d.task_id) {
+            // Refresh floor counts in the site picker (a slot was just filled)
+            if (document.getElementById('single-site-toggle')?.checked) _populateSitePicker();
             document.getElementById('status').innerHTML = `<span style="color:#16a34a;font-weight:600">Saved: ${d.task_id} \u2014 loading next task...</span>`;
             // Reset and load new prompt
             setTimeout(() => {

@@ -31,6 +31,15 @@
         .precip-bar { display: inline-block; height: 6px; background: #42a5f5; border-radius: 3px; vertical-align: middle; margin-left: .3rem; }
 
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+
+        /* Extended details toggle (extract_by_toggle) */
+        .extended-toggle { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; font-size: .85rem; color: #475569; font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 22px; transition: .2s; }
+        .switch .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .slider { background: #1565c0; }
+        .switch input:checked + .slider:before { transform: translateX(20px); }
     </style>
 </head>
 <body>
@@ -59,9 +68,17 @@
     <div class="content">
         <h2 class="section-title">7-Day Forecast &mdash; Lakeport, WA</h2>
 
+        <div class="extended-toggle">
+            <label class="switch">
+                <input type="checkbox" id="extended-switch" onchange="toggleExtended(this.checked)">
+                <span class="slider"></span>
+            </label>
+            <label for="extended-switch">Show extended details (dew point, UV index, sunrise &amp; sunset)</label>
+        </div>
+
         <table class="forecast-table">
             <thead>
-                <tr>
+                <tr id="forecast-head">
                     <th>Day</th>
                     <th>Date</th>
                     <th></th>
@@ -73,7 +90,7 @@
                     <th>Humidity</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="forecast-body">
                 {% for day in forecast %}
                 <tr>
                     <td><strong>{{ day.day }}</strong></td>
@@ -97,5 +114,37 @@
     <div class="footer">
         Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
     </div>
+
+    <script>
+        function removeExtendedCells() {
+            document.querySelectorAll(".ext-col").forEach(function(el) { el.remove(); });
+        }
+
+        function toggleExtended(on) {
+            if (!on) { removeExtendedCells(); return; }
+            fetch("{{ url_for('weather.api_forecast_extended') }}?extended=true")
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    removeExtendedCells();
+                    var head = document.getElementById("forecast-head");
+                    ["Dew Point", "UV", "Sunrise", "Sunset"].forEach(function(label) {
+                        var th = document.createElement("th");
+                        th.className = "ext-col";
+                        th.textContent = label;
+                        head.appendChild(th);
+                    });
+                    var rows = document.getElementById("forecast-body").querySelectorAll("tr");
+                    d.forecast.forEach(function(day, i) {
+                        if (!rows[i]) return;
+                        [day.dew_point_f + "°F", day.uv_index, day.sunrise, day.sunset].forEach(function(val) {
+                            var td = document.createElement("td");
+                            td.className = "ext-col";
+                            td.textContent = val;
+                            rows[i].appendChild(td);
+                        });
+                    });
+                });
+        }
+    </script>
 </body>
 </html>

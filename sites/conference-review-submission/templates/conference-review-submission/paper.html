@@ -166,6 +166,15 @@
                 <div class="label">Avg. Rating</div><div class="value">{{ paper.avg_score if paper.avg_score is not none else 'N/A' }} {% if paper.scored_review_count %}({{ paper.scored_review_count }} rated reviews){% endif %}</div>
                 {% endif %}
                 <div class="label">Total Reviews</div><div class="value">{{ paper.num_reviews }} official review{{ 's' if paper.num_reviews != 1 }}{% if paper.num_meta_reviews > 0 %}, {{ paper.num_meta_reviews }} meta-review{{ 's' if paper.num_meta_reviews != 1 }}{% endif %}</div>
+                {% if user %}
+                <div class="label">Withdraw</div>
+                <div class="value">
+                    <form method="post" action="{{ url_for('conference-review-submission.form_withdraw', paper_id=paper.id) }}"
+                          style="margin:0" onsubmit="return confirm('Withdraw this submission? It will be removed from the venue.')">
+                        <button type="submit" class="btn" id="withdraw-btn" style="color:#c5221f;border-color:#e6b8b5">Withdraw Submission</button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
         </div>
 

@@ -26,6 +26,7 @@
         .toggle input:checked + .slider { background: #0095f6; }
         .toggle input:checked + .slider:before { transform: translateX(20px); }
         .save-msg { text-align: center; color: #00a86b; font-size: 13px; margin-top: 16px; display: none; }
+        .export-select { padding: 8px 12px; border: 1px solid #dbdbdb; border-radius: 6px; font-size: 14px; color: #262626; background: #fff; cursor: pointer; outline: none; }
     </style>
 </head>
 <body>
@@ -99,6 +100,17 @@
                     <span class="slider"></span>
                 </label>
             </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Export Your Data</div>
+                    <div class="setting-desc">Download your posts in the selected format</div>
+                </div>
+                <select id="export-format" class="export-select" onchange="exportData(this)">
+                    <option value="" selected disabled>Export as...</option>
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
             <div id="save-msg" class="save-msg">Settings saved</div>
         </div>
     </div>
@@ -116,6 +128,13 @@
                 if (el) el.checked = val;
             }
         });
+
+    // export_by_dropdown: download account posts in the chosen format
+    function exportData(sel) {
+        if (!sel.value) return;
+        window.location.href = `${baseUrl}api/export?format=${sel.value}{% if logged_in and user %}&user={{ user.id }}{% endif %}`;
+        sel.selectedIndex = 0;
+    }
 
     function updateSetting(key, value) {
         const body = {};

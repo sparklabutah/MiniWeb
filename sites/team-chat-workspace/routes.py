@@ -271,6 +271,16 @@ def threads_view():
     if channel_filter:
         enriched_threads = [t for t in enriched_threads if t["channel_id"] == channel_filter]
 
+    # Date range filter (on parent message timestamp)
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+    if date_from:
+        enriched_threads = [t for t in enriched_threads
+                            if t["parent_message"].get("timestamp", "")[:10] >= date_from]
+    if date_to:
+        enriched_threads = [t for t in enriched_threads
+                            if t["parent_message"].get("timestamp", "")[:10] <= date_to]
+
     return render_template(
         "team-chat-workspace/threads.html",
         channels=channels,
@@ -278,6 +288,8 @@ def threads_view():
         user_map=user_map,
         current_user=current_user,
         channel_filter=channel_filter,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 

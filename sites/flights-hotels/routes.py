@@ -161,10 +161,15 @@ def index():
             f"ORDER BY al LIMIT 100")
         airlines = [r["al"] for r in airline_rows]
     if hotels_table:
+        # Same synthetic->raw fallback as hotels_page(): the synthetic [city]
+        # column is empty for nearly all raw rows, so fall back to cityname+county.
+        # NULLIF on cityname drops junk like ", Thailand" from blank city names.
+        _city = "COALESCE(NULLIF([city],''), NULLIF([cityname],'') || ', ' || [countyname])"
         city_rows = db.execute(
-            f"SELECT DISTINCT [city] FROM [{hotels_table}] WHERE [city] IS NOT NULL AND [city] != '' "
-            f"ORDER BY [city] LIMIT 200")
-        cities = [r["city"] for r in city_rows]
+            f"SELECT DISTINCT {_city} as city FROM [{hotels_table}] "
+            f"WHERE ({_city}) IS NOT NULL AND ({_city}) != '' "
+            f"ORDER BY city LIMIT 200")
+        cities = [r["city"] for r in city_rows if r["city"]]
     return render_template("flights-hotels/index.html",
                            user=user, logged_in=logged_in,
                            airports=airports, cities=cities, airlines=airlines)

@@ -513,6 +513,13 @@ def api_chat_live():
 
     next_offset = offset + len(messages)
 
+    # Never attribute rolling (seeded) chat to the logged-in user: their
+    # username must only appear when they actually typed a message (those
+    # are appended client-side at post time, not via this poller).
+    user = _get_current_user()
+    if user:
+        messages = [m for m in messages if m.get("user_id") != user["id"]]
+
     return jsonify({
         "messages": messages,
         "total": total,
@@ -635,6 +642,63 @@ def api_stream_chat_post(stream_id):
 
     db.save_item(SITE, "chat_messages", new_msg["id"], new_msg)
     return jsonify(new_msg), 201
+
+
+TIP_AMOUNTS = [100, 500, 1000, 5000]
+
+
+@blueprint.route("/api/streams/<stream_id>/tip", methods=["POST"])
+def api_stream_tip(stream_id):
+    """pay_by_dropdown: cheer channel points to the streamer via amount dropdown.
+
+    The tip is paid from the viewer's channel_points_balance (Twitch-bits
+    style) and posts a highlighted message into the stream chat.
+    Body: {amount: int (one of TIP_AMOUNTS), message: str (optional note)}
+    """
+    stream = db.get_item(SITE, "streams", stream_id)
+    if not stream:
+        return jsonify({"error": "Stream not found"}), 404
+
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = int(data.get("amount", 0))
+    except (ValueError, TypeError):
+        amount = 0
+    if amount not in TIP_AMOUNTS:
+        return jsonify({"error": f"amount must be one of {TIP_AMOUNTS}"}), 400
+
+    note = (data.get("message") or "").strip()
+
+    user_obj = _get_user(user["id"])
+    balance = user_obj.get("channel_points_balance", 0) if user_obj else 0
+    if balance < amount:
+        return jsonify({"error": f"Not enough channel points. Need {amount}, have {balance}"}), 400
+
+    # Deduct points (same wallet as channel point rewards)
+    user_obj["channel_points_balance"] = balance - amount
+    db.save_item(SITE, "users", user_obj["id"], user_obj)
+
+    text = f"cheered {amount} points" + (f": {note}" if note else "!")
+    new_msg = {
+        "id": f"chat-{uuid.uuid4().hex[:8]}",
+        "stream_id": stream_id,
+        "user_id": user["id"],
+        "username": user["username"],
+        "message": text,
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+        "is_subscriber": False,
+        "badges": ["cheer"],
+        "tip_amount": amount,
+    }
+    db.save_item(SITE, "chat_messages", new_msg["id"], new_msg)
+
+    result = dict(new_msg)
+    result["remaining_balance"] = balance - amount
+    return jsonify(result), 201
 
 
 @blueprint.route("/api/clips", methods=["GET"])

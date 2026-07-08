@@ -26,6 +26,20 @@
         .goal-target { font-size: .9rem; color: #666; margin-bottom: .3rem; }
         .goal-dates { font-size: .8rem; color: #aaa; margin-bottom: .5rem; }
         .goal-note { font-size: .85rem; color: #0073e6; font-style: italic; padding: .8rem; background: #f0f7ff; border-radius: .3rem; }
+        .goal-verdict { font-size: .8rem; font-weight: 600; margin-top: .5rem; padding: .3rem .6rem; border-radius: .3rem; display: none; }
+        .verdict-met { background: #dcfce7; color: #16a34a; display: block; }
+        .verdict-missed { background: #fee2e2; color: #b91c1c; display: block; }
+        .panel { background: #fff; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .panel h3 { font-size: 1rem; margin-bottom: .3rem; }
+        .panel .panel-desc { font-size: .8rem; color: #888; margin-bottom: 1rem; }
+        .slider-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .8rem; }
+        .slider-row label { flex: 0 0 160px; font-size: .85rem; color: #555; }
+        .slider-row input[type="range"] { flex: 1; accent-color: #0073e6; }
+        .slider-row .slider-value { flex: 0 0 90px; text-align: right; font-size: .85rem; font-weight: 600; color: #0073e6; font-variant-numeric: tabular-nums; }
+        .panel .btn { background: #0073e6; color: #fff; border: none; border-radius: .3rem; padding: .5rem 1.2rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
+        .panel .btn:hover { background: #005bb5; }
+        .panel .result-msg { font-size: .85rem; margin-top: .8rem; }
+        .panel select { padding: .4rem .6rem; border: 1px solid #ddd; border-radius: .3rem; font-size: .85rem; }
         .footer { text-align: center; padding: 2rem; color: #aaa; font-size: .8rem; }
     </style>
 </head>
@@ -43,9 +57,73 @@
         </div>
     </nav>
     <div class="container">
+        <h2>Daily Targets</h2>
+        <div class="panel" id="targets-panel">
+            <div class="panel-desc">Adjust your daily targets with the sliders and save.</div>
+            <div class="slider-row">
+                <label for="cfg-steps">Steps</label>
+                <input type="range" id="cfg-steps" min="2000" max="20000" step="500" value="10000">
+                <span class="slider-value" id="cfg-steps-val">10000</span>
+            </div>
+            <div class="slider-row">
+                <label for="cfg-calories">Calories (kcal)</label>
+                <input type="range" id="cfg-calories" min="1200" max="4000" step="50" value="2200">
+                <span class="slider-value" id="cfg-calories-val">2200</span>
+            </div>
+            <div class="slider-row">
+                <label for="cfg-water">Water (ml)</label>
+                <input type="range" id="cfg-water" min="1000" max="5000" step="100" value="2500">
+                <span class="slider-value" id="cfg-water-val">2500</span>
+            </div>
+            <div class="slider-row">
+                <label for="cfg-sleep">Sleep (hours)</label>
+                <input type="range" id="cfg-sleep" min="5" max="10" step="0.5" value="7.5">
+                <span class="slider-value" id="cfg-sleep-val">7.5</span>
+            </div>
+            <div class="slider-row">
+                <label for="cfg-hr">Heart rate alert (bpm)</label>
+                <input type="range" id="cfg-hr" min="120" max="210" step="5" value="180">
+                <span class="slider-value" id="cfg-hr-val">180</span>
+            </div>
+            <button class="btn" id="save-targets">Save Targets</button>
+            <div class="result-msg" id="targets-result"></div>
+        </div>
+
+        <h2>Days Above Threshold</h2>
+        <div class="panel" id="threshold-panel">
+            <div class="panel-desc">How many days did a metric exceed the threshold?</div>
+            <div class="slider-row">
+                <label for="thr-metric">Metric</label>
+                <select id="thr-metric">
+                    <option value="steps" data-min="0" data-max="25000" data-step="500">Steps</option>
+                    <option value="calories_burned" data-min="0" data-max="1500" data-step="25">Calories burned</option>
+                    <option value="active_minutes" data-min="0" data-max="180" data-step="5">Active minutes</option>
+                    <option value="sleep_hours" data-min="0" data-max="12" data-step="0.5">Sleep hours</option>
+                    <option value="water_ml" data-min="0" data-max="5000" data-step="100">Water (ml)</option>
+                </select>
+            </div>
+            <div class="slider-row">
+                <label for="thr-value">Threshold</label>
+                <input type="range" id="thr-value" min="0" max="25000" step="500" value="10000">
+                <span class="slider-value" id="thr-value-val">10000</span>
+            </div>
+            <button class="btn" id="compute-threshold">Compute</button>
+            <div class="result-msg" id="threshold-result"></div>
+        </div>
+
         <h2>Fitness Goals</h2>
+        <div class="panel" id="verify-panel">
+            <div class="panel-desc">Check each goal against your recent activity, with an adjustable tolerance margin.</div>
+            <div class="slider-row">
+                <label for="verify-tolerance">Tolerance</label>
+                <input type="range" id="verify-tolerance" min="0" max="25" step="1" value="10">
+                <span class="slider-value" id="verify-tolerance-val">10%</span>
+            </div>
+            <button class="btn" id="verify-goals">Verify Goals</button>
+            <div class="result-msg" id="verify-result"></div>
+        </div>
         {% for g in goals %}
-        <div class="goal-card">
+        <div class="goal-card" data-goal-id="{{ g.goal_id }}">
             <div class="goal-header">
                 <div class="goal-category">{{ g.category | replace('_', ' ') }}</div>
                 <span class="goal-status status-{{ g.status }}">{{ g.status }}</span>
@@ -58,11 +136,121 @@
             {% if g.progress_note %}
             <div class="goal-note">{{ g.progress_note }}</div>
             {% endif %}
+            <div class="goal-verdict"></div>
         </div>
         {% else %}
         <div style="text-align:center; color:#999; padding:2rem;">No goals set yet.</div>
         {% endfor %}
     </div>
+    <script>
+    (function() {
+        var uid = {{ user.id if user else 1 }};
+        var settingsUrl = '{{ url_for("health-fitness-tracking.api_user_settings_get", user_id=(user.id if user else 1)) }}';
+
+        // ---- Daily Targets (configure_by_slider) ----
+        var cfg = [
+            ['cfg-steps', 'daily_step_target'],
+            ['cfg-calories', 'daily_calorie_target'],
+            ['cfg-water', 'daily_water_target_ml'],
+            ['cfg-sleep', 'sleep_target_hours'],
+            ['cfg-hr', 'heart_rate_alert_bpm']
+        ];
+        cfg.forEach(function(pair) {
+            var el = document.getElementById(pair[0]);
+            el.addEventListener('input', function() {
+                document.getElementById(pair[0] + '-val').textContent = el.value;
+            });
+        });
+        fetch(settingsUrl).then(function(r) { return r.json(); }).then(function(d) {
+            if (!d.settings) return;
+            cfg.forEach(function(pair) {
+                if (d.settings[pair[1]] !== undefined) {
+                    var el = document.getElementById(pair[0]);
+                    el.value = d.settings[pair[1]];
+                    document.getElementById(pair[0] + '-val').textContent = el.value;
+                }
+            });
+        });
+        document.getElementById('save-targets').addEventListener('click', function() {
+            var body = {};
+            cfg.forEach(function(pair) {
+                body[pair[1]] = parseFloat(document.getElementById(pair[0]).value);
+            });
+            fetch(settingsUrl, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                var el = document.getElementById('targets-result');
+                el.style.color = d.settings ? '#16a34a' : '#b91c1c';
+                el.textContent = d.settings ? 'Targets saved.' : (d.error || 'Error saving targets.');
+            });
+        });
+
+        // ---- Days Above Threshold (compute_by_slider) ----
+        var thrMetric = document.getElementById('thr-metric');
+        var thrValue = document.getElementById('thr-value');
+        function syncThrRange() {
+            var opt = thrMetric.options[thrMetric.selectedIndex];
+            thrValue.min = opt.dataset.min;
+            thrValue.max = opt.dataset.max;
+            thrValue.step = opt.dataset.step;
+            thrValue.value = Math.round((parseFloat(opt.dataset.max)) / 2);
+            document.getElementById('thr-value-val').textContent = thrValue.value;
+        }
+        thrMetric.addEventListener('change', syncThrRange);
+        thrValue.addEventListener('input', function() {
+            document.getElementById('thr-value-val').textContent = thrValue.value;
+        });
+        document.getElementById('compute-threshold').addEventListener('click', function() {
+            var url = '{{ url_for("health-fitness-tracking.api_stats_threshold") }}' +
+                '?metric=' + encodeURIComponent(thrMetric.value) +
+                '&min_value=' + encodeURIComponent(thrValue.value) + '&user_id=' + uid;
+            fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+                var el = document.getElementById('threshold-result');
+                if (d.error) { el.style.color = '#b91c1c'; el.textContent = d.error; return; }
+                el.style.color = '#333';
+                el.textContent = d.days_above + ' of ' + d.total_days + ' days above threshold (' +
+                    d.percentage + '%). Average on those days: ' + d.avg_value + '.';
+            });
+        });
+
+        // ---- Goal verification (verify_by_slider) ----
+        var tolSlider = document.getElementById('verify-tolerance');
+        tolSlider.addEventListener('input', function() {
+            document.getElementById('verify-tolerance-val').textContent = tolSlider.value + '%';
+        });
+        document.getElementById('verify-goals').addEventListener('click', function() {
+            var cards = document.querySelectorAll('.goal-card[data-goal-id]');
+            var tolerance = parseFloat(tolSlider.value) / 100;
+            var done = 0, met = 0;
+            if (!cards.length) return;
+            cards.forEach(function(card) {
+                var url = '{{ url_for("health-fitness-tracking.api_goals_verify") }}' +
+                    '?user_id=' + uid + '&goal_id=' + encodeURIComponent(card.dataset.goalId) +
+                    '&tolerance=' + tolerance;
+                fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+                    var verdict = card.querySelector('.goal-verdict');
+                    done++;
+                    if (d.error || d.met === undefined) {
+                        verdict.className = 'goal-verdict verdict-missed';
+                        verdict.textContent = d.error || 'Could not verify goal.';
+                    } else {
+                        if (d.met) met++;
+                        verdict.className = 'goal-verdict ' + (d.met ? 'verdict-met' : 'verdict-missed');
+                        verdict.textContent = (d.met ? 'On track' : 'Off track') +
+                            (d.actual !== null && d.actual !== undefined ? ' — ' + d.metric_name + ': ' + d.actual + ' vs target ' + d.target : ' — ' + (d.detail || ''));
+                    }
+                    if (done === cards.length) {
+                        var el = document.getElementById('verify-result');
+                        el.style.color = '#333';
+                        el.textContent = met + ' of ' + cards.length + ' goals on track (tolerance ' + tolSlider.value + '%).';
+                    }
+                });
+            });
+        });
+    })();
+    </script>
     <div class="footer">FitTrack &mdash; Your Nutrition & Fitness Dashboard</div>
 </body>
 </html>

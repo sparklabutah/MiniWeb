@@ -3,6 +3,7 @@
 Products populated from webshop data at build time into the products table.
 """
 import pathlib
+from datetime import datetime, timedelta
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
@@ -93,6 +94,27 @@ def _build_product_query(q="", cat="", status="", condition="",
         "newest": "[auction_start] DESC",
     }
 
+    # Predicate mirroring the SQL filters — used to merge session-overlay
+    # items (new/edited listings) into raw execute()/search() results.
+    def _overlay_match(p):
+        if cat and p.get("category") != cat:
+            return False
+        if status and p.get("status") != status:
+            return False
+        if condition and p.get("condition") != condition:
+            return False
+        price = p.get("current_price") or 0
+        if min_price is not None and price < min_price:
+            return False
+        if max_price is not None and price > max_price:
+            return False
+        if q:
+            text = " ".join(str(p.get(f, ""))
+                            for f in ("name", "description", "category", "brand")).lower()
+            if not all(t in text for t in q.lower().split()):
+                return False
+        return True
+
     # --- Text search path: use FTS5 via db.search() ---
     if q:
         where_eq = {}
@@ -105,6 +127,8 @@ def _build_product_query(q="", cat="", status="", condition="",
         results = db.search(SITE, "products", q,
                             where=where_eq if where_eq else None,
                             limit=max(limit, 200))
+        # FTS reads the base table only — merge in this session's listings
+        results = db.merge_overlay(SITE, "products", results, match=_overlay_match)
         # Post-filter on numeric fields not supported by where=
         if min_price is not None:
             results = [p for p in results if (p.get("current_price") or 0) >= min_price]
@@ -145,11 +169,31 @@ def _build_product_query(q="", cat="", status="", condition="",
         clauses.append("[current_price] <= ?")
         params.append(max_price)
 
-    order = sort_map.get(sort, "[auction_end] ASC")
+    now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    if sort == "ending_soon":
+        # Auctions still running sort before already-ended ones
+        order = f"CASE WHEN [auction_end] >= '{now_iso}' THEN 0 ELSE 1 END, [auction_end] ASC"
+    else:
+        order = sort_map.get(sort, "[auction_end] ASC")
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     sql = f"SELECT * FROM [{_PRODUCTS_TABLE}]{where} ORDER BY {order} LIMIT ?"
     params.append(limit)
-    return db.execute(sql, tuple(params))
+    rows = db.execute(sql, tuple(params))
+
+    # Raw SQL reads the base table only — merge in this session's new/edited
+    # listings from the overlay, re-sort, and re-apply the limit.
+    merged = db.merge_overlay(SITE, "products", rows, match=_overlay_match)
+    sort_key_map = {
+        "ending_soon": lambda p: ((p.get("auction_end") or "") < now_iso,
+                                  p.get("auction_end") or ""),
+        "price_low": lambda p: p.get("current_price") or 0,
+        "price_high": lambda p: -(p.get("current_price") or 0),
+        "most_bids": lambda p: -(p.get("num_bids") or 0),
+        "newest": lambda p: p.get("auction_start") or "",
+    }
+    merged.sort(key=sort_key_map.get(sort, sort_key_map["ending_soon"]),
+                reverse=(sort == "newest"))
+    return merged[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -406,8 +450,8 @@ def create_listing_submit():
         "seller_id": user["id"],
         "seller_username": user["username"],
         "seller_rating": user.get("rating", 0),
-        "auction_start": "2026-06-21T12:00:00Z",
-        "auction_end": "2026-06-28T12:00:00Z",
+        "auction_start": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "auction_end": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": "active",
         "winner_id": None,
         "shipping": request.form.get("shipping", "Free Shipping"),
@@ -461,7 +505,7 @@ def place_bid_form(listing_id):
         "listing_id": listing_id,
         "bidder_id": user_id,
         "amount": amount,
-        "timestamp": "2026-06-21T12:00:00Z",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "auto_bid": False,
     }
     # bids PK is row_id, so we need to use save_collection for append
@@ -581,7 +625,7 @@ def send_message_form():
             "receiver_id": receiver_id,
             "subject": subject or "No subject",
             "body": body,
-            "timestamp": "2026-06-21T12:00:00Z",
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "read": False,
         })
 
@@ -621,7 +665,7 @@ def report_listing_form(listing_id):
             "reporter_id": session["user_id"],
             "reason": reason,
             "description": description,
-            "timestamp": "2026-06-21T12:00:00Z",
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "status": "pending",
         })
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
@@ -800,7 +844,7 @@ def api_place_bid(listing_id):
         "listing_id": listing_id,
         "bidder_id": bidder_id,
         "amount": float(amount),
-        "timestamp": "2026-06-21T12:00:00Z",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "auto_bid": False,
     }
     # bids PK is row_id, append via save_collection
@@ -977,7 +1021,7 @@ def api_send_message():
         "receiver_id": receiver_id,
         "subject": subject or "No subject",
         "body": body,
-        "timestamp": "2026-06-21T12:00:00Z",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "read": False,
     }
     db.save_item(SITE, "messages", new_id, new_msg)
@@ -1019,7 +1063,7 @@ def api_report_listing(listing_id):
         "reporter_id": reporter_id,
         "reason": reason,
         "description": description,
-        "timestamp": "2026-06-21T12:00:00Z",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": "pending",
     })
     return jsonify({"success": True, "report_id": new_id})
@@ -1047,7 +1091,7 @@ def api_submit_rating():
         "rated_user_id": rated_user_id,
         "score": int(score),
         "comment": comment,
-        "timestamp": "2026-06-21T12:00:00Z",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
     return jsonify({"success": True, "rating_id": new_id})
 
@@ -1089,8 +1133,8 @@ def api_create_listing():
         "seller_id": seller_id,
         "seller_username": data.get("seller_username", ""),
         "seller_rating": 0,
-        "auction_start": "2026-06-21T12:00:00Z",
-        "auction_end": "2026-06-28T12:00:00Z",
+        "auction_start": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "auction_end": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": "active",
         "winner_id": None,
         "shipping": data.get("shipping", "Free Shipping"),

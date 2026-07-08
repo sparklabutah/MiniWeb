@@ -105,15 +105,26 @@
                     Subtotal ({{ cart_items|length }} item{{ 's' if cart_items|length != 1 else '' }}):
                     <strong>${{ "%.2f"|format(total) }}</strong>
                 </div>
-                <form method="POST" action="{{ url_for('e-commerce.form_checkout') }}">
-                    <label style="display:block;font-size:.85rem;margin-bottom:.6rem;">Pay with:
-                        <select name="account_type" style="width:100%;padding:.4rem;border:1px solid #d5d9d9;border-radius:.3rem;margin-top:.3rem;">
-                            <option value="checking">Checking Account</option>
-                            <option value="credit">Credit Card</option>
-                        </select>
-                    </label>
-                    <button type="submit" class="btn-checkout">Proceed to Checkout</button>
+                <form method="POST" action="{{ url_for('e-commerce.form_apply_promo') }}" class="promo-form" style="margin-bottom:1rem;">
+                    <label for="promo-code-input" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem;">Promo Code</label>
+                    <div style="display:flex;gap:.4rem;">
+                        <input type="text" id="promo-code-input" name="promo_code" placeholder="Enter code"
+                               value="{{ promo_code or '' }}"
+                               style="flex:1;min-width:0;padding:.35rem .5rem;border:1px solid #d5d9d9;border-radius:.3rem;font-size:.85rem;">
+                        <button type="submit" style="padding:.35rem .7rem;background:#f0f0f0;border:1px solid #d5d9d9;border-radius:.3rem;font-size:.85rem;cursor:pointer;">Apply</button>
+                    </div>
+                    {% if promo_error %}
+                    <div style="color:#b12704;font-size:.8rem;margin-top:.3rem;">Invalid promo code.</div>
+                    {% elif promo_code and discount %}
+                    <div style="color:#007600;font-size:.8rem;margin-top:.3rem;">Code {{ promo_code }} applied: -${{ "%.2f"|format(discount) }}</div>
+                    {% endif %}
                 </form>
+                {% if discount %}
+                <div class="total-line" style="font-size:.95rem;">
+                    Total after discount: <strong>${{ "%.2f"|format(total - discount) }}</strong>
+                </div>
+                {% endif %}
+                <a href="{{ url_for('e-commerce.checkout_page') }}" class="btn-checkout" style="text-decoration:none;color:#0f1111;">Proceed to Checkout</a>
             </div>
         </div>
         {% endif %}

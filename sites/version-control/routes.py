@@ -773,6 +773,7 @@ def repo_detail(repo_id):
         readme=readme,
         issues=issues,
         starred=starred,
+        is_raw=is_raw,
     )
 
 

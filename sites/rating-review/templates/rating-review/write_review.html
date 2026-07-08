@@ -58,6 +58,29 @@
                 <button type="button" class="btn-submit" onclick="submitReview()">Submit Review</button>
             </form>
         </div>
+
+        <div class="form-card" style="margin-top:20px;">
+            <h2 style="font-size:18px;margin-bottom:12px;">Report a Problem</h2>
+            <p style="font-size:13px;color:#888;margin-bottom:16px;">See something wrong with this business listing? Let us know.</p>
+            <form id="report-form">
+                <div class="form-group">
+                    <label for="report-reason">Reason</label>
+                    <select name="reason" id="report-reason" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:4px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="Incorrect information">Incorrect information</option>
+                        <option value="Closed or moved">Closed or moved</option>
+                        <option value="Duplicate listing">Duplicate listing</option>
+                        <option value="Inappropriate content">Inappropriate content</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="report-description">Details</label>
+                    <input type="text" name="description" id="report-description" placeholder="Tell us more (optional)">
+                </div>
+                <button type="button" class="btn-submit" style="background:#555;" onclick="submitReport()">Submit Report</button>
+                <span id="report-feedback" style="margin-left:12px;font-size:13px;"></span>
+            </form>
+        </div>
     </div>
     <script>
         let selectedRating = 0;
@@ -85,6 +108,29 @@
                     window.location.href = '{{ url_for("rating-review.business_detail", business_id=business.id) }}';
                 } else {
                     alert(d.error || 'Error submitting review');
+                }
+            });
+        }
+        function submitReport() {
+            const feedback = document.getElementById('report-feedback');
+            fetch('{{ url_for("rating-review.api_report") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    target_type: 'business',
+                    target_id: {{ business.id }},
+                    reason: document.getElementById('report-reason').value,
+                    description: document.getElementById('report-description').value,
+                })
+            }).then(r => r.json().then(d => ({ok: r.ok, data: d})))
+            .then(res => {
+                if (res.ok) {
+                    feedback.style.color = '#2e7d32';
+                    feedback.textContent = 'Report submitted. Thank you!';
+                    document.getElementById('report-description').value = '';
+                } else {
+                    feedback.style.color = '#d32323';
+                    feedback.textContent = res.data.error || 'Error submitting report';
                 }
             });
         }

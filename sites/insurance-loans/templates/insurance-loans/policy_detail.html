@@ -45,6 +45,10 @@
         .action-btn { display: inline-block; padding: .5rem 1.2rem; background: #1a3c5e; color: #fff; text-decoration: none; border-radius: .3rem; font-size: .88rem; font-weight: 500; }
         .action-btn:hover { background: #2b5f8a; }
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+        .cfg-toggle { position: relative; width: 44px; height: 24px; border: none; border-radius: 12px; background: #cbd5e1; cursor: pointer; transition: background .15s; vertical-align: middle; }
+        .cfg-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+        .cfg-toggle[aria-pressed="true"] { background: #2d6a4f; }
+        .cfg-toggle[aria-pressed="true"]::after { left: 23px; }
         .badge-open { background: #fef3c7; color: #92400e; }
         .badge-in_review { background: #dbeafe; color: #1e40af; }
         .badge-closed { background: #f1f5f9; color: #475569; }
@@ -156,6 +160,27 @@
         </div>
         {% endif %}
 
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>Policy Settings &amp; Notifications</h3>
+            <div class="detail-row">
+                <span class="label">Autopay</span>
+                <span class="value"><button type="button" class="cfg-toggle" data-setting="autopay_enabled" aria-pressed="{{ 'true' if policy.autopay_enabled else 'false' }}"></button></span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Paperless Billing</span>
+                <span class="value"><button type="button" class="cfg-toggle" data-setting="paperless_billing" aria-pressed="{{ 'true' if policy.paperless_billing else 'false' }}"></button></span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Email Notifications</span>
+                <span class="value"><button type="button" class="cfg-toggle" data-setting="email_notifications" aria-pressed="{{ 'true' if policy.email_notifications else 'false' }}"></button></span>
+            </div>
+            <div class="detail-row">
+                <span class="label">SMS Alerts</span>
+                <span class="value"><button type="button" class="cfg-toggle" data-setting="sms_alerts" aria-pressed="{{ 'true' if policy.sms_alerts else 'false' }}"></button></span>
+            </div>
+            <div id="cfg-status" style="font-size:.8rem;color:#64748b;margin-top:.6rem;"></div>
+        </div>
+
         {% if claims %}
         <div class="section">
             <h3>Claims on This Policy</h3>
@@ -217,5 +242,31 @@
     </div>
 
     <div class="footer">Cascadia Insurance &amp; Lending</div>
+
+    <script>
+    // configure_by_toggle: persist policy settings via the policy update API
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.cfg-toggle');
+        if (!btn) return;
+        var setting = btn.getAttribute('data-setting');
+        var newVal = btn.getAttribute('aria-pressed') !== 'true';
+        var payload = {};
+        payload[setting] = newVal;
+        fetch('{{ url_for("insurance-loans.api_policy_update", policy_id=policy.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function() {
+            btn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
+            document.getElementById('cfg-status').textContent =
+                setting.replace(/_/g, ' ') + ' ' + (newVal ? 'enabled' : 'disabled') + '.';
+        })
+        .catch(function() {
+            document.getElementById('cfg-status').textContent = 'Could not save setting. Please try again.';
+        });
+    });
+    </script>
 </body>
 </html>

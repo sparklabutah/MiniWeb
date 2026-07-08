@@ -285,6 +285,8 @@ def project_board(project_id):
     assignee = request.args.get("assignee", type=int)
     type_filter = request.args.get("type", "").strip()
     priority_filter = request.args.get("priority", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
 
     filtered = list(p_issues)
     if sprint_id:
@@ -299,6 +301,9 @@ def project_board(project_id):
         filtered = [i for i in filtered if i["type"] == type_filter]
     if priority_filter:
         filtered = [i for i in filtered if i["priority"] == priority_filter]
+    if date_from or date_to:
+        filtered = _filter_issues(filtered, date_from=date_from or None,
+                                  date_to=date_to or None)
 
     # Group by status for board columns
     columns = {}
@@ -327,7 +332,9 @@ def project_board(project_id):
                            q=q,
                            assignee=assignee,
                            type_filter=type_filter,
-                           priority_filter=priority_filter)
+                           priority_filter=priority_filter,
+                           date_from=date_from,
+                           date_to=date_to)
 
 
 @blueprint.route("/issue/<int:issue_id>")

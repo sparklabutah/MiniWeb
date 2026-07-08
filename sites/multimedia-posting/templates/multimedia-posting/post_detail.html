@@ -135,6 +135,9 @@
                         <div id="more-menu" class="action-dropdown-content">
                             <button class="danger" onclick="reportPost()">Report</button>
                             <button class="danger" onclick="blockUser()">Block User</button>
+                            {% if logged_in and user and user.id == post.author_id %}
+                            <button class="danger" id="delete-post-btn" onclick="deletePost()">Delete Post</button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -236,6 +239,16 @@
             .then(data => {
                 document.getElementById('more-menu').classList.remove('show');
                 alert(data.status === 'blocked' ? 'User blocked' : 'User unblocked');
+            });
+    }
+
+    function deletePost() {
+        if (!confirm('Delete this post? This cannot be undone.')) return;
+        fetch(`${baseUrl}api/posts/${postId}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+                window.location.href = baseUrl;
             });
     }
 

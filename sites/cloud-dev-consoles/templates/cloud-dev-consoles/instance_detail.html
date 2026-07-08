@@ -72,6 +72,41 @@
                 <div><div class="detail-label">Tags</div><div class="detail-value">{% for k, v in instance.tags.items() %}<span class="tag">{{ k }}={{ v }}</span>{% endfor %}</div></div>
             </div>
         </div>
+        <!-- Edit instance configuration (edit_by_form) -->
+        <div class="section" id="edit-config-section">
+            <h2>Edit Configuration</h2>
+            <form method="POST" action="{{ url_for('cloud-dev-consoles.form_edit_instance', instance_id=instance.id) }}" id="edit-instance-form"
+                  style="display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end;">
+                <div>
+                    <div class="detail-label">Name</div>
+                    <input type="text" name="name" value="{{ instance.name }}" style="padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem;width:220px;">
+                </div>
+                <div>
+                    <div class="detail-label">Type</div>
+                    <select name="type" style="padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem;">
+                        {% for t in ['t3.medium', 't3.large', 'c5.xlarge', 'c5.2xlarge', 'r6g.xlarge', 'm5.2xlarge'] %}
+                        <option value="{{ t }}" {% if instance.type == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                        {% if instance.type not in ['t3.medium', 't3.large', 'c5.xlarge', 'c5.2xlarge', 'r6g.xlarge', 'm5.2xlarge'] %}
+                        <option value="{{ instance.type }}" selected>{{ instance.type }}</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <div class="detail-label">vCPUs</div>
+                    <input type="number" name="vcpus" value="{{ instance.vcpus }}" min="1" max="128" style="padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem;width:80px;">
+                </div>
+                <div>
+                    <div class="detail-label">Memory (GB)</div>
+                    <input type="number" name="memory_gb" value="{{ instance.memory_gb }}" min="1" max="1024" style="padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem;width:80px;">
+                </div>
+                <div>
+                    <div class="detail-label">OS</div>
+                    <input type="text" name="os" value="{{ instance.os }}" style="padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem;width:180px;">
+                </div>
+                <button type="submit" style="padding:.45rem 1rem;background:#232f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85rem;">Save configuration</button>
+            </form>
+        </div>
         {% if live %}
         <div class="section">
             <h2>Current Status <span style="font-size:.7rem;color:#27ae60;animation:pulse 2s infinite;">LIVE</span></h2>

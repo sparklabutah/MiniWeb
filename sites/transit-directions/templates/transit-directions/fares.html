@@ -48,7 +48,7 @@
     <div class="container">
         <h2 class="page-title">Fares &amp; Passes</h2>
 
-        <form class="filter-bar" method="get" action="/fares">
+        <form class="filter-bar" method="get" action="{{ url_for('transit-directions.fares_page') }}">
             <select name="zone">
                 <option value="">All Zones</option>
                 {% for zone_key, zone_info in fares.fare_zones.items() %}
@@ -71,6 +71,16 @@
                 <option value="annual_pass" {% if current_pass == 'annual_pass' %}selected{% endif %}>Annual Pass</option>
             </select>
             <button type="submit" style="background:#1a237e;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;">Filter</button>
+        </form>
+
+        <!-- Export fare data (export_by_dropdown) -->
+        <form method="get" action="{{ url_for('transit-directions.api_export') }}" id="fare-export-form" style="background:white;border-radius:12px;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#666;">Export fare data:</span>
+            <input type="hidden" name="data" value="fares">
+            <select name="format" id="fare-export-format" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit" style="background:#1a237e;color:white;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:14px;">Export</button>
         </form>
 
         {% set pass_types = [('single_ride', 'Single Ride'), ('day_pass', 'Day Pass'), ('monthly_pass', 'Monthly Pass'), ('annual_pass', 'Annual Pass')] %}

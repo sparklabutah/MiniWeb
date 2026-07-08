@@ -43,6 +43,10 @@
         .cat-header .sort-bar a { padding: .3rem .7rem; border-radius: .3rem; margin-right: .3rem; color: #666; }
         .cat-header .sort-bar a:hover { background: #f0f0f0; text-decoration: none; }
         .cat-header .sort-bar a.active { background: {{ category.color }}; color: #fff; }
+        .cat-header .date-filter { display: flex; gap: .5rem; align-items: center; margin-top: .8rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #666; flex-wrap: wrap; }
+        .cat-header .date-filter input[type="date"] { padding: .35rem .5rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .8rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .cat-header .date-filter button { padding: .35rem .8rem; background: {{ category.color }}; color: #fff; border: none; border-radius: .3rem; font-size: .8rem; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 600; }
+        .cat-header .date-filter a.clear { color: #888; }
 
         /* Article list */
         .article-list .article-item { display: flex; gap: 1rem; background: #fff; border-radius: .4rem; padding: 1.2rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: box-shadow .2s; }
@@ -125,6 +129,17 @@
                 <a href="{{ url_for('news.category_page', slug=category.slug, sort='date') }}" class="{{ 'active' if sort == 'date' else '' }}">Most Recent</a>
                 <a href="{{ url_for('news.category_page', slug=category.slug, sort='popularity') }}" class="{{ 'active' if sort == 'popularity' else '' }}">Most Discussed</a>
             </div>
+            <form class="date-filter" action="{{ url_for('news.category_page', slug=category.slug) }}" method="get">
+                <input type="hidden" name="sort" value="{{ sort }}">
+                <label for="date_from">From</label>
+                <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+                <label for="date_to">To</label>
+                <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+                <button type="submit">Filter by Date</button>
+                {% if date_from or date_to %}
+                <a class="clear" href="{{ url_for('news.category_page', slug=category.slug, sort=sort) }}">Clear</a>
+                {% endif %}
+            </form>
         </div>
 
         <div class="content-layout">

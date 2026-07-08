@@ -325,6 +325,23 @@ def index():
 
         sql += " LIMIT 50"
         posts = db.execute(sql, tuple(params))
+
+        # Raw SQL reads the base table only — merge in this session's posts
+        def _overlay_match(p):
+            if subreddit_filter:
+                sr = subreddit_filter[2:] if subreddit_filter.startswith("r/") else subreddit_filter
+                if p.get("subreddit") not in (sr, f"r/{sr}"):
+                    return False
+            if date_from and (p.get("created_utc") or "") < date_from:
+                return False
+            if date_to and (p.get("created_utc") or "") > date_to:
+                return False
+            return True
+
+        posts = db.merge_overlay(
+            SITE, "posts", posts, match=_overlay_match,
+            sort="-created_utc" if sort == "new" else "-score", limit=50,
+        )
     else:
         posts = []
 

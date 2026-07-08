@@ -78,6 +78,7 @@
                     <button type="submit" class="btn btn-warning">{{ 'Deactivate' if link.is_active else 'Activate' }}</button>
                 </form>
                 <button class="btn btn-danger" id="delete-btn">Delete</button>
+                <button class="btn btn-outline" id="share-toggle-btn" type="button" aria-pressed="false">Sharing: Off</button>
                 <script>
                 document.getElementById('delete-btn').addEventListener('click', function() {
                     var btn = this;
@@ -97,6 +98,55 @@
                 </script>
             </div>
         </div>
+
+        <!-- Sharing panel (share_by_toggle) -->
+        <div class="detail-card" id="share-panel" style="display:none;">
+            <h2 style="font-size:1rem;">Share this link</h2>
+            <div class="meta" id="share-panel-body" style="margin-top:.4rem;">Loading share options...</div>
+        </div>
+
+        <!-- Edit link settings (edit_by_query) -->
+        <div class="detail-card" id="edit-card">
+            <h2 style="font-size:1rem;">Edit Link</h2>
+            <form method="post" action="{{ url_for('url-shorteners-qr.edit_link_form', link_id=link.id) }}" id="edit-link-form" style="margin-top:.6rem;">
+                <div style="display:flex; flex-direction:column; gap:.6rem; max-width:560px;">
+                    <label style="font-size:.8rem;color:#64748b;">Title
+                        <input type="text" name="title" value="{{ link.title }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <label style="font-size:.8rem;color:#64748b;">Destination URL
+                        <input type="text" name="original_url" value="{{ link.original_url }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <label style="font-size:.8rem;color:#64748b;">Tags (comma-separated)
+                        <input type="text" name="tags" value="{{ link.tags|join(', ') }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <div><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+        (function() {
+            var btn = document.getElementById('share-toggle-btn');
+            var panel = document.getElementById('share-panel');
+            var body = document.getElementById('share-panel-body');
+            var on = false;
+            btn.addEventListener('click', function() {
+                on = !on;
+                btn.textContent = on ? 'Sharing: On' : 'Sharing: Off';
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                panel.style.display = on ? 'block' : 'none';
+                if (on) {
+                    fetch('{{ url_for("url-shorteners-qr.api_link_share", link_id=link.id) }}?method=copy')
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            body.innerHTML = 'Short URL: <span class="code">' + d.short_url + '</span>' +
+                                ' &middot; <a href="{{ url_for("url-shorteners-qr.qr_page", link_id=link.id) }}" style="color:#4f46e5;">Share as QR code</a>';
+                        })
+                        .catch(function() { body.textContent = 'Could not load share options.'; });
+                }
+            });
+        })();
+        </script>
 
         <div class="stats-grid">
             <div class="stat-box">

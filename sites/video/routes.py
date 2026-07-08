@@ -195,11 +195,17 @@ def index():
 
     sort = request.args.get("sort", "trending")
     category = request.args.get("category", "")
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
 
     published = [v for v in videos if v.get("status") == "published"]
 
     if category:
         published = [v for v in published if v.get("category") == category]
+    if date_from:
+        published = [v for v in published if v.get("upload_date", "")[:10] >= date_from]
+    if date_to:
+        published = [v for v in published if v.get("upload_date", "")[:10] <= date_to]
 
     if sort == "latest":
         published.sort(key=lambda v: v.get("upload_date", ""), reverse=True)
@@ -222,6 +228,8 @@ def index():
         sort=sort,
         category=category,
         categories=categories,
+        date_from=date_from,
+        date_to=date_to,
         logged_in=_current_user_id() is not None,
     )
 

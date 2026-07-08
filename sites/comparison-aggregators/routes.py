@@ -161,9 +161,32 @@ def _interpret_record(raw, idx):
 # DB query helpers
 # ---------------------------------------------------------------------------
 
+# Feature checkbox filters: key -> (SQL clause on raw columns, label)
+FEATURE_FILTERS = {
+    "nfc": ("nfc LIKE 'Yes%'", "NFC"),
+    "gps": ("gps LIKE 'Yes%'", "GPS"),
+    "dual_sim": ("sim LIKE '%Dual%'", "Dual SIM"),
+    "fingerprint": ("sensors LIKE '%Fingerprint%'", "Fingerprint"),
+}
+
+
+def _phone_has_feature(p, feat):
+    """Check an interpreted phone record for a feature (used on FTS results)."""
+    if feat == "nfc":
+        return p["nfc"].startswith("Yes")
+    if feat == "gps":
+        return p["gps"].startswith("Yes")
+    if feat == "dual_sim":
+        return "dual" in p["sim"].lower()
+    if feat == "fingerprint":
+        return "fingerprint" in p["sensors"].lower()
+    return True
+
+
 def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
                      price_max=None, battery_min=None, year_from=None,
-                     year_to=None, sort="newest", limit=5000, offset=0):
+                     year_to=None, sort="newest", limit=5000, offset=0,
+                     features=None):
     """Query phones from comparison_aggregators_phones with filters.
 
     Returns interpreted phone dicts.  Because _interpret_record computes
@@ -190,6 +213,11 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
             clauses.append("brand = ?")
             params.append(brand)
 
+        # Feature checkbox filters — SQL clauses on raw columns
+        for feat in (features or []):
+            if feat in FEATURE_FILTERS:
+                clauses.append(FEATURE_FILTERS[feat][0])
+
         where = "WHERE " + " AND ".join(clauses) if clauses else ""
         sql = f"SELECT * FROM comparison_aggregators_phones {where} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
@@ -202,6 +230,12 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
     for i, raw in enumerate(rows):
         phone = _interpret_record(raw, offset + i + 1)
         phones.append(phone)
+
+    # Feature filters on the FTS path (SQL path already filtered them)
+    if q and features:
+        for feat in features:
+            if feat in FEATURE_FILTERS:
+                phones = [p for p in phones if _phone_has_feature(p, feat)]
 
     # Post-filter on computed fields
     if os_family:
@@ -419,11 +453,12 @@ def index():
     price_min = request.args.get("price_min", type=float)
     price_max = request.args.get("price_max", type=float)
     battery_min = request.args.get("battery_min", type=float)
+    features = [f for f in request.args.getlist("feature") if f in FEATURE_FILTERS]
 
     results = _db_query_phones(
         q=q, brand=brand or None, os_family=os_fam or None,
         sort=sort, price_min=price_min, price_max=price_max,
-        battery_min=battery_min,
+        battery_min=battery_min, features=features,
     )
 
     user = None
@@ -435,7 +470,9 @@ def index():
                            os_families=os_families,
                            q=q, brand=brand, os_fam=os_fam, sort=sort,
                            price_min=price_min, price_max=price_max,
-                           battery_min=battery_min, user=user)
+                           battery_min=battery_min, user=user,
+                           features=features,
+                           feature_filters=FEATURE_FILTERS)
 
 
 @blueprint.route("/phone/<int:phone_id>")

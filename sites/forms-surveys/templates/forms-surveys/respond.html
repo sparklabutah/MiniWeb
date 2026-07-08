@@ -108,6 +108,25 @@
                     </label>
                     {% endfor %}
                 </div>
+
+                {% elif field.type == 'ranking' %}
+                <div class="ranking-group" data-field-id="{{ field.id }}">
+                    <p style="font-size:.8rem;color:#5f6368;margin-bottom:.5rem;">Rank the items using the up/down buttons (1 = highest).</p>
+                    <ol style="list-style:none;display:flex;flex-direction:column;gap:.4rem;">
+                        {% for opt in field.options %}
+                        <li class="ranking-item" data-value="{{ opt }}"
+                            style="display:flex;align-items:center;gap:.6rem;border:1px solid #dadce0;border-radius:4px;padding:.45rem .7rem;background:#fafafa;font-size:.9rem;">
+                            <span class="rank-pos" style="font-weight:600;color:#673ab7;min-width:1.4em;">{{ loop.index }}</span>
+                            <span style="flex:1;">{{ opt }}</span>
+                            <button type="button" class="rank-move" onclick="moveRankItem(this, -1)" title="Move up"
+                                    style="border:1px solid #dadce0;background:#fff;border-radius:4px;cursor:pointer;padding:.15rem .5rem;color:#673ab7;">&#9650;</button>
+                            <button type="button" class="rank-move" onclick="moveRankItem(this, 1)" title="Move down"
+                                    style="border:1px solid #dadce0;background:#fff;border-radius:4px;cursor:pointer;padding:.15rem .5rem;color:#673ab7;">&#9660;</button>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    <input type="hidden" name="{{ field.id }}" value="{{ field.options|join(',') }}">
+                </div>
                 {% endif %}
             </div>
             {% endfor %}
@@ -118,5 +137,23 @@
             </div>
         </form>
     </div>
+    <script>
+    function moveRankItem(btn, dir) {
+        var li = btn.closest('.ranking-item');
+        var list = li.parentElement;
+        if (dir < 0 && li.previousElementSibling) {
+            list.insertBefore(li, li.previousElementSibling);
+        } else if (dir > 0 && li.nextElementSibling) {
+            list.insertBefore(li.nextElementSibling, li);
+        }
+        var group = li.closest('.ranking-group');
+        var values = [];
+        group.querySelectorAll('.ranking-item').forEach(function (item, idx) {
+            item.querySelector('.rank-pos').textContent = idx + 1;
+            values.push(item.getAttribute('data-value'));
+        });
+        group.querySelector('input[type="hidden"]').value = values.join(',');
+    }
+    </script>
 </body>
 </html>

@@ -15,7 +15,7 @@
     <div class="msg msg-error" style="display:block;">{{ error }}</div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('brokerage.login_submit') }}" style="display:flex;flex-direction:column;gap:16px;">
+    <form method="POST" action="{{ url_for('brokerage.login_submit') }}" id="login-form" style="display:flex;flex-direction:column;gap:16px;">
         <div>
             <label style="font-size:13px;color:#6F7782;display:block;margin-bottom:6px;">Email or Username</label>
             <input type="text" name="username" required style="width:100%;padding:12px 16px;border-radius:8px;">
@@ -26,5 +26,73 @@
         </div>
         <button type="submit" class="rh-btn rh-btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:16px;">Log In</button>
     </form>
+
+    <!-- verify_identity_by_code: 2FA verification step -->
+    <div id="verify-identity-panel" style="display:none;flex-direction:column;gap:16px;">
+        <div style="text-align:center;">
+            <div style="font-size:20px;font-weight:700;margin-bottom:8px;">Verify Your Identity</div>
+            <div style="font-size:13px;color:#6F7782;">Enter the verification code we sent to your device</div>
+        </div>
+        <div class="msg msg-error" id="verify-error" style="display:none;"></div>
+        <div>
+            <label style="font-size:13px;color:#6F7782;display:block;margin-bottom:6px;">Verification Code</label>
+            <input type="text" id="verify-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8"
+                   placeholder="6-digit code" style="width:100%;padding:12px 16px;border-radius:8px;text-align:center;letter-spacing:4px;">
+        </div>
+        <button type="button" id="verify-btn" class="rh-btn rh-btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:16px;">Verify &amp; Log In</button>
+    </div>
+
+    <script>
+    (function() {
+        var form = document.getElementById('login-form');
+        var panel = document.getElementById('verify-identity-panel');
+        var errBox = document.getElementById('verify-error');
+        var pendingUserId = null;
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var username = form.elements['username'].value.trim();
+            var password = form.elements['password'].value;
+            fetch('{{ url_for("brokerage.api_login") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: username, password: password})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok) {
+                    pendingUserId = res.data.user_id;
+                    form.style.display = 'none';
+                    panel.style.display = 'flex';
+                    document.getElementById('verify-code').focus();
+                } else {
+                    // Invalid credentials: let the server render the error as usual.
+                    form.submit();
+                }
+            })
+            .catch(function() { form.submit(); });
+        });
+
+        document.getElementById('verify-btn').addEventListener('click', function() {
+            var code = document.getElementById('verify-code').value.trim();
+            if (!code) { errBox.textContent = 'Please enter your verification code.'; errBox.style.display = 'block'; return; }
+            fetch('{{ url_for("brokerage.api_verify_identity") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: pendingUserId, code: code})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.verified) {
+                    // Complete the standard login flow.
+                    form.submit();
+                } else {
+                    errBox.textContent = res.data.error || 'Invalid verification code.';
+                    errBox.style.display = 'block';
+                }
+            });
+        });
+    })();
+    </script>
 </div>
 {% endblock %}

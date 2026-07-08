@@ -215,7 +215,12 @@ def deals_page():
     deals = _get_deals()
     stage_filter = request.args.get("stage", "").strip()
     owner_filter = request.args.get("owner_id", "").strip()
+    q = request.args.get("q", "").strip()
     results = list(deals)
+    if q:
+        ql = q.lower()
+        results = [d for d in results if ql in d["name"].lower()
+                   or ql in _company_name(d["company_id"]).lower()]
     if stage_filter:
         results = [d for d in results if d["stage"] == stage_filter]
     if owner_filter:
@@ -238,7 +243,7 @@ def deals_page():
     user = _current_user()
     return render_template("crm/deals.html", pipeline=pipeline, stages=STAGES_ORDERED,
                            stage_filter=stage_filter, owner_filter=owner_filter,
-                           users=users, user=user)
+                           q=q, users=users, user=user)
 
 
 @blueprint.route("/deal/<int:deal_id>")
@@ -264,9 +269,15 @@ def activities_page():
     type_filter = request.args.get("type", "").strip()
     contact_filter = request.args.get("contact_id", "").strip()
     deal_filter = request.args.get("deal_id", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
     results = list(activities)
     if type_filter:
         results = [a for a in results if a["type"] == type_filter]
+    if date_from:
+        results = [a for a in results if a["date"] >= date_from]
+    if date_to:
+        results = [a for a in results if a["date"] <= date_to]
     if contact_filter:
         try:
             cid = int(contact_filter)
@@ -286,7 +297,8 @@ def activities_page():
         a["_deal_name"] = next((d["name"] for d in _get_deals() if d["id"] == a["deal_id"]), "Unknown")
     user = _current_user()
     return render_template("crm/activities.html", activities=results,
-                           type_filter=type_filter, user=user)
+                           type_filter=type_filter, date_from=date_from,
+                           date_to=date_to, user=user)
 
 
 @blueprint.route("/login", methods=["GET"])

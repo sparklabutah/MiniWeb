@@ -798,16 +798,14 @@ def api_search_semantic():
 
 def _load_user_state():
     """Load user state (saved businesses, followed users, reports)."""
-    rows = db.query(SITE, "user_state")
-    if rows:
-        return rows[0]
-    default = {"saved": {}, "followed": {}, "reports": []}
-    db.save_collection(SITE, "user_state", [default])
-    return default
+    state = db.get_item(SITE, "user_state", "state")
+    if state:
+        return state
+    return {"saved": {}, "followed": {}, "reports": []}
 
 
 def _save_user_state(state):
-    db.save_collection(SITE, "user_state", [state])
+    db.save_item(SITE, "user_state", "state", state)
 
 
 @blueprint.route("/api/users/<int:user_id>/save", methods=["POST"])

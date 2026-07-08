@@ -130,7 +130,8 @@ function hashColor(str) {
 
 // ---- Tab management ----
 
-function createTab(siteId) {
+function createTab(siteId, opts) {
+    opts = opts || {};
     if (tabs.length >= MAX_TABS) return;
     const id = ++tabIdCounter;
     const tab = {
@@ -155,7 +156,16 @@ function createTab(siteId) {
     tabEl.appendChild(closeBtn);
 
     tabEl.addEventListener('click', () => switchTab(id));
-    document.getElementById('tabs-container').appendChild(tabEl);
+    // Insert next to the currently active tab when requested (e.g. opening a
+    // site from the landing page); otherwise append at the end (+ button).
+    const container = document.getElementById('tabs-container');
+    const activeIdx = tabs.findIndex(t => t.id === activeTabId);
+    if (opts.insertAfterActive && activeIdx !== -1) {
+        const activeEl = tabs[activeIdx].tabEl;
+        container.insertBefore(tabEl, activeEl.nextSibling);
+    } else {
+        container.appendChild(tabEl);
+    }
     tab.tabEl = tabEl;
 
     if (siteId) {
@@ -168,7 +178,12 @@ function createTab(siteId) {
         }
     }
 
-    tabs.push(tab);
+    // Keep the tabs array in the same order as the tab bar DOM.
+    if (opts.insertAfterActive && activeIdx !== -1) {
+        tabs.splice(activeIdx + 1, 0, tab);
+    } else {
+        tabs.push(tab);
+    }
     updateNewTabBtn();
     switchTab(id);
     return tab;
@@ -448,13 +463,9 @@ function syncUrlBar(tab) {
 // ---- Bookmarks by category ----
 
 function openBookmark(siteId) {
-    const tab = tabs.find(t => t.id === activeTabId);
-    if (tab && !tab.iframeEl) {
-        const site = SITES.find(s => s.id === siteId);
-        if (site) loadUrlInTab(tab, site.path);
-    } else {
-        createTab(siteId);
-    }
+    // Always open the clicked site in a new tab, inserted right next to the
+    // tab the user clicked from (instead of replacing it or appending at the end).
+    createTab(siteId, { insertAfterActive: true });
 }
 
 function buildCategories() {

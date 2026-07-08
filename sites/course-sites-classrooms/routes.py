@@ -199,12 +199,19 @@ def _letter_grade(pct):
 def index():
     user = _current_user()
     courses = _get_courses()
+    q = request.args.get("q", "").strip()
+    if q:
+        ql = q.lower()
+        courses = [c for c in courses
+                   if ql in c.get("title", "").lower()
+                   or ql in c.get("code", "").lower()
+                   or ql in c.get("department", "").lower()]
     # Build instructor name map
     users = _get_users()
     instructor_map = {u["id"]: u["name"] for u in users if u["role"] == "instructor"}
     return render_template(f"{BP}/index.html",
                            courses=courses, user=user,
-                           instructor_map=instructor_map)
+                           instructor_map=instructor_map, q=q)
 
 
 @blueprint.route("/course/<int:course_id>")

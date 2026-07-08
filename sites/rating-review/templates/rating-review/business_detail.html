@@ -179,6 +179,9 @@
                         <button onclick="voteHelpful({{ r.id }}, 'useful', this)">Useful ({{ r.useful_count }})</button>
                         <button onclick="voteHelpful({{ r.id }}, 'funny', this)">Funny ({{ r.funny_count }})</button>
                         <button onclick="voteHelpful({{ r.id }}, 'cool', this)">Cool ({{ r.cool_count }})</button>
+                        {% if not user or r.user_id != user.id %}
+                        <button class="follow-user-btn" onclick="toggleFollowUser({{ r.user_id }}, this)">+ Follow {{ r._user.display_name if r._user else 'Reviewer' }}</button>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -274,6 +277,33 @@
             if (data.success) {
                 var key = type + "_count";
                 btn.textContent = type.charAt(0).toUpperCase() + type.slice(1) + " (" + data[key] + ")";
+            }
+        });
+    }
+    function toggleFollowUser(targetUserId, btn) {
+        fetch("{{ url_for('rating-review.index') }}api/users/" + targetUserId + "/follow", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({target_user_id: targetUserId})
+        })
+        .then(r => {
+            if (r.status === 401) {
+                window.location.href = "{{ url_for('rating-review.login') }}?next=" + encodeURIComponent(window.location.href);
+                return null;
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (!data) return;
+            var name = btn.textContent.replace(/^(\+ Follow|✓ Following)\s*/, "");
+            if (data.action === "followed") {
+                btn.textContent = "✓ Following " + name;
+                btn.style.color = "#2e7d32";
+                btn.style.borderColor = "#2e7d32";
+            } else {
+                btn.textContent = "+ Follow " + name;
+                btn.style.color = "#666";
+                btn.style.borderColor = "#ddd";
             }
         });
     }

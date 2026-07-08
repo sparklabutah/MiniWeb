@@ -22,7 +22,11 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
+# CHPC cluster install; fall back to whatever `claude` is on PATH locally
 CLAUDE_CLI = "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
+if not Path(CLAUDE_CLI).exists():
+    import shutil as _shutil
+    CLAUDE_CLI = _shutil.which("claude") or "claude"
 
 
 def _get_api_key():

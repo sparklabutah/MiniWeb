@@ -53,7 +53,25 @@
                 <div>{{ item.name }} (x{{ item.quantity }}) - ${{ "%.2f"|format(item.price * item.quantity) }}</div>
                 {% endfor %}
             </div>
+            {% if o.shipping_address %}
+            <div style="font-size:.82rem;color:#565959;margin-top:.4rem;">
+                Ships to: {{ o.shipping_address.full_name }}, {{ o.shipping_address.street }},
+                {{ o.shipping_address.city }}{{ ', ' + o.shipping_address.state if o.shipping_address.state }} {{ o.shipping_address.zip_code }}
+                &middot; {{ o.shipping_method | replace('_', ' ') | title }} shipping
+                ({{ 'FREE' if not o.shipping_cost else '$%.2f'|format(o.shipping_cost) }})
+            </div>
+            {% endif %}
             <div class="order-total">Total: ${{ "%.2f"|format(o.total) }}</div>
+            {% if o.status not in ('shipped', 'delivered', 'cancelled') %}
+            <form method="POST" action="{{ url_for('e-commerce.form_cancel_order') }}" style="margin-top:.6rem;"
+                  onsubmit="return confirm('Cancel order {{ o.id }}?');">
+                <input type="hidden" name="order_id" value="{{ o.id }}">
+                <button type="submit" class="btn-cancel-order"
+                        style="padding:.35rem .8rem;background:#fff;border:1px solid #d5d9d9;border-radius:.3rem;font-size:.85rem;color:#b12704;cursor:pointer;">
+                    Cancel Order
+                </button>
+            </form>
+            {% endif %}
         </div>
         {% endfor %}
         {% else %}

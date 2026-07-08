@@ -676,6 +676,18 @@ def form_assign(paper_id):
     return redirect(url_for("conference-review-submission.paper_detail", paper_id=paper_id))
 
 
+@blueprint.route("/paper/<paper_id>/withdraw", methods=["POST"])
+def form_withdraw(paper_id):
+    """Withdraw a submission: removes the paper from the venue."""
+    if not _is_logged_in():
+        return redirect(url_for("conference-review-submission.login_page"))
+    paper = _db_get_paper(paper_id)
+    if paper is None:
+        abort(404)
+    db.delete_item(SITE, "papers", paper_id)
+    return redirect(url_for("conference-review-submission.console"))
+
+
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------

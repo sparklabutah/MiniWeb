@@ -11,7 +11,7 @@ import pathlib
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, session
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
@@ -553,6 +553,68 @@ def form_delete_instance(instance_id):
     instance["status"] = "terminated"
     db.save_collection(SITE, "instances", instances)
     return redirect(url_for("cloud-dev-consoles.instances_page"))
+
+
+@blueprint.route("/instances/create", methods=["POST"])
+def form_create_instance():
+    """Launch a new instance from the Instances page form (create_by_form)."""
+    instances = _get_instances()
+    region = request.form.get("region", "us-west-2").strip() or "us-west-2"
+    instances.append({
+        "id": f"i-user{len(instances) + 1:012d}",
+        "name": request.form.get("name", "").strip() or f"new-instance-{len(instances) + 1}",
+        "type": request.form.get("type", "t3.medium").strip() or "t3.medium",
+        "vcpus": request.form.get("vcpus", 2, type=int) or 2,
+        "memory_gb": request.form.get("memory_gb", 4, type=int) or 4,
+        "status": "running", "region": region, "availability_zone": f"{region}a",
+        "private_ip": f"10.0.9.{(len(instances) % 250) + 1}", "public_ip": "",
+        "os": request.form.get("os", "Amazon Linux 2023").strip() or "Amazon Linux 2023",
+        "service_id": "", "monthly_cost": 0.0,
+        "launched": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "tags": {"env": request.form.get("env", "development").strip() or "development"},
+    })
+    db.save_collection(SITE, "instances", instances)
+    return redirect(url_for("cloud-dev-consoles.instances_page"))
+
+
+@blueprint.route("/instance/<instance_id>/edit", methods=["POST"])
+def form_edit_instance(instance_id):
+    """Edit instance configuration from the detail page form (edit_by_form)."""
+    instances = _get_instances()
+    instance = next((i for i in instances if i["id"] == instance_id), None)
+    if not instance:
+        abort(404)
+    for field in ("name", "type", "os"):
+        val = request.form.get(field, "").strip()
+        if val:
+            instance[field] = val
+    for field in ("vcpus", "memory_gb"):
+        val = request.form.get(field, type=int)
+        if val:
+            instance[field] = val
+    db.save_collection(SITE, "instances", instances)
+    return redirect(url_for("cloud-dev-consoles.instance_detail", instance_id=instance_id))
+
+
+@blueprint.route("/functions/create", methods=["POST"])
+def form_create_function():
+    """Create a new function from the Functions page form (create_by_form)."""
+    functions = _get_functions()
+    functions.append({
+        "id": f"fn-user{len(functions) + 1:03d}",
+        "name": request.form.get("name", "").strip() or f"new-function-{len(functions) + 1}",
+        "runtime": request.form.get("runtime", "python3.12").strip() or "python3.12",
+        "memory_mb": request.form.get("memory_mb", 256, type=int) or 256,
+        "timeout_sec": request.form.get("timeout_sec", 30, type=int) or 30,
+        "status": "active",
+        "region": request.form.get("region", "us-west-2").strip() or "us-west-2",
+        "handler": request.form.get("handler", "").strip() or "index.handler",
+        "last_invoked": "", "invocations_24h": 0, "avg_duration_ms": 0,
+        "error_rate": 0.0, "monthly_cost": 0.0,
+        "tags": {"env": request.form.get("env", "development").strip() or "development"},
+    })
+    db.save_collection(SITE, "functions", functions)
+    return redirect(url_for("cloud-dev-consoles.functions_page"))
 
 
 @blueprint.route("/databases")
@@ -1417,7 +1479,7 @@ def api_create_alert():
         "resource_id": "",
         "resource_name": resource_name,
         "condition": condition,
-        "triggered_at": "2026-06-21T12:00:00Z",
+        "triggered_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "acknowledged": False,
         "category": category
     }

@@ -25,6 +25,11 @@
         .badge-paid_in_full { background: #dcfce7; color: #16a34a; }
         .pay-link { color: #0d6e6e; font-weight: 600; text-decoration: none; font-size: .85rem; }
         .pay-link:hover { text-decoration: underline; }
+        .export-bar { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+        .export-bar label { font-size: .8rem; font-weight: 600; color: #1a202c; }
+        .export-bar select { padding: .4rem .6rem; border: 1px solid #e2e8f0; border-radius: .3rem; font-size: .85rem; background: #fff; }
+        .export-bar button { padding: .45rem 1.2rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .85rem; }
+        .export-bar button:hover { background: #0a5c5c; }
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; }
     </style>
 </head>
@@ -41,6 +46,15 @@
     <div class="main">
         <h2>Billing & Payments</h2>
         <div class="total-due">Total Outstanding: <span>${{ "%.2f"|format(total_due) }}</span></div>
+        <form class="export-bar" id="billing-export-form" action="{{ url_for('health-portals.api_export') }}" method="get">
+            <input type="hidden" name="data_type" value="billing">
+            <label for="export-format">Export billing records:</label>
+            <select id="export-format" name="format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit">Export</button>
+        </form>
         <table>
             <thead>
                 <tr>

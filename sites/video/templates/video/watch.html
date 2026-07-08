@@ -150,10 +150,10 @@
                     {{ format_views(video.views) }} views &middot; {{ time_ago(video.upload_date) }}
                 </div>
                 <div class="action-buttons">
-                    <form method="post" action="/api/videos/{{ video.id }}/like" style="display:inline;">
+                    <form method="post" action="{{ url_for('video.api_video_like', video_id=video.id) }}" style="display:inline;">
                         <button type="submit" class="action-btn" title="Like">&#128077; {{ format_views(video.likes) }}</button>
                     </form>
-                    <form method="post" action="/watch/{{ video.id }}/save">
+                    <form method="post" action="{{ url_for('video.form_save_video', video_id=video.id) }}">
                         <button type="submit" class="action-btn" title="Save">&#128278; Save</button>
                     </form>
                     <button class="action-btn" title="Share" onclick="document.getElementById('share-menu').style.display = document.getElementById('share-menu').style.display === 'none' ? 'block' : 'none'; fetch('/sites/video/api/videos/{{ video.id }}/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:'link'})})">&#8599; Share</button>
@@ -208,7 +208,7 @@
             <!-- Report section (hidden by default) -->
             <div id="report-section" class="report-section" style="display:none;">
                 <h3>Report Video</h3>
-                <form method="post" action="/watch/{{ video.id }}/report">
+                <form method="post" action="{{ url_for('video.form_report_video', video_id=video.id) }}">
                     <select name="reason" required>
                         <option value="">Select a reason</option>
                         <option value="spam">Spam or misleading</option>
@@ -229,7 +229,7 @@
                 <div class="comments-header">{{ comment_count }} Comment{{ 's' if comment_count != 1 }}</div>
 
                 {% if logged_in %}
-                <form class="comment-form" method="post" action="/api/videos/{{ video.id }}/comments" enctype="application/x-www-form-urlencoded">
+                <form class="comment-form" method="post" action="{{ url_for('video.api_video_comment_add', video_id=video.id) }}" enctype="application/x-www-form-urlencoded">
                     <div class="cf-avatar">U</div>
                     <div class="comment-form-inner">
                         <input type="text" name="text" placeholder="Add a comment..." required>

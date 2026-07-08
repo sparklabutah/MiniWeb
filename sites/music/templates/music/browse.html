@@ -43,6 +43,16 @@
         .filter-bar label { font-size: .85rem; color: #888; }
         .filter-bar select { padding: .4rem .8rem; border: 1px solid #333; border-radius: .3rem; background: #1a1a1a; color: #e0e0e0; font-size: .85rem; }
         .filter-bar select:focus { border-color: #1db954; outline: none; }
+
+        /* Play by release period (play_by_date_range) */
+        .play-range-bar { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; background: #181818; border-radius: .5rem; padding: .8rem 1rem; margin-bottom: 1.5rem; }
+        .play-range-bar label { font-size: .85rem; color: #888; }
+        .play-range-bar input[type="date"] { padding: .4rem .8rem; border: 1px solid #333; border-radius: .3rem; background: #1a1a1a; color: #e0e0e0; font-size: .85rem; color-scheme: dark; }
+        .play-range-bar input[type="date"]:focus { border-color: #1db954; outline: none; }
+        .btn-play-range { background: #1db954; color: #000; border: none; padding: .45rem 1.2rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; cursor: pointer; }
+        .btn-play-range:hover { background: #1ed760; }
+        .play-range-status { font-size: .85rem; color: #1db954; }
+        .play-range-status.error { color: #e57373; }
     </style>
 </head>
 <body>
@@ -79,6 +89,16 @@
                 <option value="{{ url_for('music.browse', genre=selected_genre, sort='title') }}" {% if request.args.get('sort') == 'title' %}selected{% endif %}>Title (A-Z)</option>
                 <option value="{{ url_for('music.browse', genre=selected_genre, sort='listeners') }}" {% if request.args.get('sort') == 'listeners' %}selected{% endif %}>Most Listeners</option>
             </select>
+        </div>
+
+        <!-- Play tracks released within a period (play_by_date_range) -->
+        <div class="play-range-bar">
+            <label for="play-date-from">Play a release period:</label>
+            <input type="date" id="play-date-from" value="2020-01-01">
+            <label for="play-date-to">to</label>
+            <input type="date" id="play-date-to" value="2024-12-31">
+            <button type="button" class="btn-play-range" onclick="playDateRange()">&#9654; Play</button>
+            <span class="play-range-status" id="play-range-status"></span>
         </div>
 
         <div class="genre-pills">
@@ -118,5 +138,40 @@
         <div class="no-results">No results found for this genre.</div>
         {% endif %}
     </div>
+
+    <script>
+        function playDateRange() {
+            var from = document.getElementById('play-date-from').value;
+            var to = document.getElementById('play-date-to').value;
+            var status = document.getElementById('play-range-status');
+            status.className = 'play-range-status';
+            if (!from || !to) {
+                status.className = 'play-range-status error';
+                status.textContent = 'Pick both dates first.';
+                return;
+            }
+            fetch("{{ url_for('music.api_play_date_range') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({date_from: from, date_to: to})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) {
+                    status.className = 'play-range-status error';
+                    status.textContent = d.error;
+                } else if (!d.queue_length) {
+                    status.className = 'play-range-status error';
+                    status.textContent = 'No tracks released in that period.';
+                } else {
+                    status.textContent = 'Now playing: ' + d.now_playing + ' (' + d.queue_length + ' tracks queued)';
+                }
+            })
+            .catch(function() {
+                status.className = 'play-range-status error';
+                status.textContent = 'Network error';
+            });
+        }
+    </script>
 </body>
 </html>

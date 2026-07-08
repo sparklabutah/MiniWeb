@@ -242,11 +242,16 @@ def agent_detail(agent_id):
         f"AND [status] IN ('sold','rented') ORDER BY [listed_date] DESC LIMIT 50",
         (agent_id,))
     user = None
+    is_following = False
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        follow = db.get_item(SITE, "agent_follows",
+                             f"{session['user_id']}-{agent_id}")
+        is_following = bool(follow)
     return render_template("real-estate-buy-rent/agent_detail.html",
                            agent=agent, active_listings=active,
-                           sold_listings=sold, user=user)
+                           sold_listings=sold, user=user,
+                           is_following=is_following)
 
 
 @blueprint.route("/saved")
@@ -346,6 +351,24 @@ def register_submit():
 def logout():
     session.pop("user_id", None)
     return redirect(url_for("real-estate-buy-rent.index"))
+
+
+@blueprint.route("/agent/<int:agent_id>/follow", methods=["POST"])
+def follow_agent(agent_id):
+    """Toggle following an agent (session-overlay collection)."""
+    if "user_id" not in session:
+        return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    if _get_agent(agent_id) is None:
+        abort(404)
+    key = f"{session['user_id']}-{agent_id}"
+    if db.get_item(SITE, "agent_follows", key):
+        db.delete_item(SITE, "agent_follows", key)
+    else:
+        db.save_item(SITE, "agent_follows", key, {
+            "id": key, "user_id": session["user_id"], "agent_id": agent_id,
+            "followed_date": datetime.now().strftime("%Y-%m-%d"),
+        })
+    return redirect(url_for("real-estate-buy-rent.agent_detail", agent_id=agent_id))
 
 
 @blueprint.route("/listing/<int:listing_id>/save", methods=["POST"])

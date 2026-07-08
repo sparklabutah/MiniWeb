@@ -53,6 +53,12 @@
             {% if user and (permission == 'owner' or permission == 'edit') %}
             <a href="{{ url_for('documents.editor', doc_id=doc.id) }}" class="btn btn-primary">Edit</a>
             {% endif %}
+            {% if user and permission == 'owner' and not doc.is_trashed %}
+            <form action="{{ url_for('documents.form_trash_document', doc_id=doc.id) }}" method="post" style="display:inline;"
+                  onsubmit="return confirm('Move &quot;{{ doc.title }}&quot; to trash?');">
+                <button type="submit" class="btn" style="background:#fce8e6;color:#c5221f;">Delete</button>
+            </form>
+            {% endif %}
             {% if not user %}
             <a href="{{ url_for('documents.login_page') }}" class="btn btn-primary">Sign In</a>
             {% endif %}

@@ -35,9 +35,9 @@ Spans CAN overlap when:
 - A reasoning macro (`extract_by_extremum`) encompasses the entire workflow including sub-macros (`filter_by_date_range`, `select_by_dropdown`)
 - The extract/compute macro covers the same actions as the interaction that produces the data
 
-### QA macros (no action range needed)
+### QA macros (action range should contains the answer)
 
-For these macros, use the **blue answer input** on the macro node instead of tagging actions:
+For these macros, use the **blue answer input** on the macro node:
 - `extract_by_query` — "What is the total balance?"
 - `extract_by_extremum` — "What is the cheapest flight?"
 - `extract_by_ranking` — "What is the #1 trending video?"
@@ -45,7 +45,7 @@ For these macros, use the **blue answer input** on the macro node instead of tag
 - `compare_from_table` — "Which has the better rating?"
 - `verify_from_free_text` — "Is the author mentioned by name?"
 
-Type the expected answer directly. No need to create fake scroll actions.
+Type the expected answer directly. The tagged action range should contain the expected answer. The macro is considered success if the agent answer correctly while staying in this action range.
 
 ## Macro Categories
 

@@ -306,6 +306,26 @@ def index():
         sql = f"SELECT * FROM [{table}] WHERE {where_sql} ORDER BY [{col}] {direction} LIMIT ? OFFSET ?"
         params.extend([per_page, (page - 1) * per_page])
         questions = db.execute(sql, tuple(params), fetch="all")
+
+        # Raw SQL reads the base table only — merge in this session's questions
+        def _overlay_match(item):
+            tags = item.get("tags") or []
+            if isinstance(tags, str):
+                try:
+                    tags = json.loads(tags)
+                except (json.JSONDecodeError, TypeError):
+                    tags = []
+            if sort == "unanswered" and (item.get("answer_count") or 0) != 0:
+                return False
+            if filter_tag and filter_tag not in tags:
+                return False
+            if checked_tags and not any(t in tags for t in checked_tags):
+                return False
+            return True
+
+        questions = db.merge_overlay(SITE, "questions", questions,
+                                     match=_overlay_match, sort=sql_sort,
+                                     limit=per_page)
         # Deserialize tags
         for q in questions:
             if isinstance(q.get("tags"), str):

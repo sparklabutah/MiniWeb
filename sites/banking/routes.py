@@ -228,10 +228,40 @@ def transactions_page():
     }
     order_sql = sort_map.get(sort, "[date] DESC")
 
+    # Predicate mirroring the filters — merges session-overlay transactions
+    # (transfers/payments made this session) into raw SQL/FTS results.
+    def _overlay_match(t):
+        if t.get("user_id") != uid:
+            return False
+        if category and t.get("category") != category:
+            return False
+        if tx_type and t.get("type") != tx_type:
+            return False
+        if date_from and (t.get("date") or "") < date_from:
+            return False
+        if date_to and (t.get("date") or "") > date_to:
+            return False
+        for bound, op in ((min_amount, "ge"), (max_amount, "le")):
+            if bound:
+                try:
+                    b = float(bound)
+                    amt = t.get("amount") or 0
+                    if (op == "ge" and amt < b) or (op == "le" and amt > b):
+                        return False
+                except ValueError:
+                    pass
+        if q:
+            text = " ".join(str(t.get(f, ""))
+                            for f in ("description", "merchant", "category")).lower()
+            if not all(term in text for term in q.lower().split()):
+                return False
+        return True
+
     if q:
         # Use FTS for text search, then post-filter
         results = db.search(SITE, "transactions", q,
                             where={"user_id": uid}, limit=500)
+        results = db.merge_overlay(SITE, "transactions", results, match=_overlay_match)
         # Apply remaining filters on the small result set
         if category:
             results = [t for t in results if t.get("category") == category]
@@ -316,6 +346,18 @@ def transactions_page():
         txns_page = db.execute(
             f"SELECT * FROM [banking_transactions] WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",
             tuple(params) + (per_page, offset))
+
+        # Raw SQL reads the base table only — merge in this session's
+        # transactions (transfers/payments) from the overlay.
+        overlay_sort = {
+            "date": "-date",
+            "amount_asc": "amount",
+            "amount_desc": "-amount",
+            "description": "description",
+        }.get(sort, "-date")
+        txns_page = db.merge_overlay(SITE, "transactions", txns_page,
+                                     match=_overlay_match, sort=overlay_sort,
+                                     limit=per_page)
 
     # Categories for filter dropdown (small query)
     cat_rows = db.execute(

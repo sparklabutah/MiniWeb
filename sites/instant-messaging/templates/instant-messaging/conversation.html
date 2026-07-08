@@ -80,6 +80,21 @@
 
         .badge-group-sm { background: #2a3942; color: #8696a0; font-size: .6rem; padding: .05rem .3rem; border-radius: .4rem; margin-left: .3rem; }
 
+        /* Message actions */
+        .msg-act { background: none; border: none; color: #8696a0; font-size: .7rem; cursor: pointer; padding: 0; margin-left: .3rem; }
+        .msg-act:hover { color: #e9edef; }
+        .msg-act.starred { color: #f4b400; }
+        .msg-act.reported { color: #f15c6d; }
+        .msg-inline-form { display: none; margin-top: .3rem; gap: .3rem; align-items: center; }
+        .msg-inline-form.open { display: flex; }
+        .msg-inline-form input { flex: 1; padding: .3rem .5rem; background: #111b21; border: 1px solid #2a3942; border-radius: .3rem; color: #e9edef; font-size: .78rem; outline: none; min-width: 140px; }
+        .msg-inline-form button { background: #00a884; color: #fff; border: none; padding: .3rem .6rem; border-radius: .3rem; font-size: .72rem; cursor: pointer; }
+        .msg-inline-form button.cancel { background: #2a3942; color: #8696a0; }
+        .attach-btn { color: #8696a0; font-size: 1.2rem; cursor: pointer; padding: .3rem; }
+        .attach-btn:hover { color: #e9edef; }
+        .join-link { background: #2a3942; color: #00a884; text-decoration: none; padding: .4rem .8rem; border-radius: .3rem; font-size: .8rem; margin-left: .5rem; }
+        .join-link:hover { background: #374045; }
+
         @media (max-width: 768px) {
             .sidebar { display: none; }
             .messages-area { padding: 1rem; }
@@ -150,6 +165,9 @@
                     </div>
                 </div>
                 <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" style="margin-left:auto;background:#2a3942;color:#8696a0;border:none;padding:.4rem .8rem;border-radius:.3rem;font-size:.8rem;cursor:pointer;">Share</button>
+                {% if conversation.type == 'group' %}
+                <a class="join-link" href="{{ url_for('instant-messaging.join_group_link', conv_id=conversation.id) }}" title="Join this group via invite link">Join Group</a>
+                {% endif %}
             </div>
 
             <div class="messages-area" id="messagesArea">
@@ -176,17 +194,34 @@
                             <div class="msg-text">{{ msg.text }}</div>
                             <div class="msg-meta">
                                 <span class="msg-time">{{ msg.time_display.split(', ')[-1] if ', ' in msg.time_display else msg.time_display }}</span>
+                                <button class="msg-act im-star-btn {% if msg.starred %}starred{% endif %}" data-url="{{ url_for('instant-messaging.api_star_message', msg_id=msg.id) }}" title="Star message">{% if msg.starred %}&#9733;{% else %}&#9734;{% endif %}</button>
+                                <button class="msg-act im-report-btn {% if msg.reported %}reported{% endif %}" data-msg="{{ msg.id }}" title="Report message">&#9873;</button>
                                 {% if msg.is_current_user %}
+                                    <button class="msg-act im-edit-btn" data-msg="{{ msg.id }}" title="Edit message">&#9998;</button>
                                     <span class="msg-read" style="color:{% if msg.read %}#53bdeb{% else %}#8696a0{% endif %}">&#10003;&#10003;</span>
                                     <button class="im-msg-delete-btn" data-url="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete">&#10005;</button>
                                 {% endif %}
                             </div>
+                            {% if msg.is_current_user %}
+                            <form class="msg-inline-form im-edit-form" id="edit-form-{{ msg.id }}" data-url="{{ url_for('instant-messaging.api_edit_message', msg_id=msg.id) }}">
+                                <input type="text" name="text" value="{{ msg.text }}" required>
+                                <button type="submit">Save</button>
+                                <button type="button" class="cancel">Cancel</button>
+                            </form>
+                            {% endif %}
+                            <form class="msg-inline-form im-report-form" id="report-form-{{ msg.id }}" data-url="{{ url_for('instant-messaging.api_report_message', msg_id=msg.id) }}">
+                                <input type="text" name="reason" placeholder="Reason for report" required>
+                                <button type="submit">Report</button>
+                                <button type="button" class="cancel">Cancel</button>
+                            </form>
                         </div>
                     </div>
                 {% endfor %}
             </div>
 
             <div class="input-area">
+                <label class="attach-btn" for="attachInput" title="Attach a file">&#128206;</label>
+                <input type="file" id="attachInput" style="display:none" onchange="uploadAttachment(this)">
                 <input type="text" id="messageInput" placeholder="Type a message" onkeydown="if(event.key==='Enter')sendMessage()">
                 <button class="send-btn" onclick="sendMessage()" title="Send">&#10148;</button>
             </div>
@@ -248,6 +283,78 @@
                 .then(function(r) { return r.ok ? r : Promise.reject(); })
                 .then(function() { window.location.reload(); })
                 .catch(function() { btn.innerHTML = '&#10005;'; btn.disabled = false; });
+        });
+
+        // upload_by_upload: send a media attachment to this conversation
+        function uploadAttachment(input) {
+            if (!input.files.length) return;
+            var fd = new FormData();
+            fd.append('file', input.files[0]);
+            fetch('{{ url_for("instant-messaging.api_upload_media", conv_id=conversation.id) }}', { method: 'POST', body: fd })
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() { alert('Upload failed'); input.value = ''; });
+        }
+
+        // save_by_toggle: star/unstar a message
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.im-star-btn');
+            if (!btn) return;
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    btn.classList.toggle('starred', d.starred);
+                    btn.innerHTML = d.starred ? '&#9733;' : '&#9734;';
+                });
+        });
+
+        // edit_by_form / report_by_form: toggle inline forms
+        document.addEventListener('click', function(e) {
+            var editBtn = e.target.closest('.im-edit-btn');
+            if (editBtn) {
+                document.getElementById('edit-form-' + editBtn.getAttribute('data-msg')).classList.toggle('open');
+                return;
+            }
+            var reportBtn = e.target.closest('.im-report-btn');
+            if (reportBtn) {
+                document.getElementById('report-form-' + reportBtn.getAttribute('data-msg')).classList.toggle('open');
+                return;
+            }
+            var cancelBtn = e.target.closest('.msg-inline-form button.cancel');
+            if (cancelBtn) cancelBtn.closest('.msg-inline-form').classList.remove('open');
+        });
+
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            if (form.classList.contains('im-edit-form')) {
+                e.preventDefault();
+                var text = form.querySelector('input[name="text"]').value.trim();
+                if (!text) return;
+                fetch(form.getAttribute('data-url'), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.error) { alert(d.error); return; }
+                    form.closest('.msg-bubble').querySelector('.msg-text').textContent = d.new_text;
+                    form.classList.remove('open');
+                });
+            } else if (form.classList.contains('im-report-form')) {
+                e.preventDefault();
+                var reason = form.querySelector('input[name="reason"]').value.trim();
+                if (!reason) return;
+                fetch(form.getAttribute('data-url'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason })
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.error) { alert(d.error); return; }
+                    form.classList.remove('open');
+                    var bubble = form.closest('.msg-bubble');
+                    var rbtn = bubble.querySelector('.im-report-btn');
+                    if (rbtn) rbtn.classList.add('reported');
+                });
+            }
         });
     </script>
 </body>

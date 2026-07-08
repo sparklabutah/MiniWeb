@@ -1021,6 +1021,15 @@ def new_entry_submit():
         "tags": [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()],
     }
 
+    # upload_by_image: optional icon image uploaded with the new entry
+    icon = request.files.get("icon")
+    if icon and icon.filename:
+        ext = os.path.splitext(icon.filename)[1].lower()
+        if ext in (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"):
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            icon.save(str(UPLOAD_DIR / f"{new_id}{ext}"))
+            new_entry["icon_url"] = f"/sites/password-managers/static/uploads/{new_id}{ext}"
+
     entries.append(new_entry)
     db.save_collection(SITE, "entries", entries)
 

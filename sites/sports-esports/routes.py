@@ -272,13 +272,20 @@ def favorites_page():
         for m in all_matches
         if m["home_team_id"] in fav_team_ids or m["away_team_id"] in fav_team_ids
     ]
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    if date_from:
+        fav_matches = [m for m in fav_matches if m["date"] >= date_from]
+    if date_to:
+        fav_matches = [m for m in fav_matches if m["date"] <= date_to]
     fav_matches.sort(key=lambda m: m["date"], reverse=True)
 
     return render_template("sports-esports/favorites.html",
                            user=user, logged_in=logged_in,
                            fav_teams=fav_teams, fav_players=fav_players,
                            fav_matches=fav_matches[:10], fav=fav,
-                           all_teams=teams, all_players=players)
+                           all_teams=teams, all_players=players,
+                           date_from=date_from, date_to=date_to)
 
 
 @blueprint.route("/login", methods=["GET"])

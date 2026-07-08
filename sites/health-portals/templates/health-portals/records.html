@@ -37,6 +37,18 @@
         .badge-referral { background: #f3e8ff; color: #7c3aed; }
         .empty { padding: 3rem; text-align: center; color: #94a3b8; background: #fff; border-radius: .5rem; }
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
+        .search-panel { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 1rem 1.5rem; margin-bottom: 1.2rem; }
+        .search-panel form { display: flex; gap: .5rem; margin-bottom: .6rem; }
+        .search-panel form:last-of-type { margin-bottom: 0; }
+        .search-panel input[type="text"] { flex: 1; padding: .5rem .7rem; border: 1px solid #e2e8f0; border-radius: .3rem; font-size: .85rem; }
+        .search-panel button { padding: .5rem 1.2rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .85rem; }
+        .search-panel button:hover { background: #0a5c5c; }
+        .search-results { margin-top: .8rem; }
+        .search-results .result-item { padding: .6rem .2rem; border-top: 1px solid #f1f5f9; font-size: .85rem; }
+        .search-results .result-item a { color: #0d6e6e; text-decoration: none; font-weight: 600; }
+        .search-results .result-item a:hover { text-decoration: underline; }
+        .search-results .result-meta { font-size: .78rem; color: #64748b; margin-top: .15rem; }
+        .search-results .no-results { padding: .6rem .2rem; color: #94a3b8; font-size: .85rem; border-top: 1px solid #f1f5f9; }
     </style>
 </head>
 <body>
@@ -67,6 +79,18 @@
             <p>View your visit summaries, lab results, and clinical notes</p>
         </div>
 
+        <div class="search-panel">
+            <form id="record-search-form">
+                <input type="text" id="record-search-input" name="q" placeholder="Search records and messages by keyword...">
+                <button type="submit">Search</button>
+            </form>
+            <form id="record-semantic-form">
+                <input type="text" id="record-semantic-input" name="q" placeholder="Ask in your own words, e.g. &quot;knee pain after physical therapy&quot;...">
+                <button type="submit">Smart Search</button>
+            </form>
+            <div class="search-results" id="record-search-results"></div>
+        </div>
+
         {% if records %}
             {% for record in records %}
             <div class="record-card">
@@ -88,5 +112,62 @@
     <div class="footer">
         Lakeport Medical Center &mdash; (555) 800-2200 &mdash; Patient Portal
     </div>
+
+    <script>
+    (function() {
+        var resultsEl = document.getElementById('record-search-results');
+        var recordBase = '{{ url_for("health-portals.record_detail", record_id=999999) }}'.replace('999999', '');
+        var messageBase = '{{ url_for("health-portals.message_detail", msg_id=999999) }}'.replace('999999', '');
+
+        function renderResults(items, emptyMsg) {
+            resultsEl.innerHTML = '';
+            if (!items.length) {
+                var div = document.createElement('div');
+                div.className = 'no-results';
+                div.textContent = emptyMsg;
+                resultsEl.appendChild(div);
+                return;
+            }
+            items.forEach(function(entry) {
+                var rec = entry.item || entry;
+                var type = entry.type || 'record';
+                var div = document.createElement('div');
+                div.className = 'result-item';
+                var a = document.createElement('a');
+                if (type === 'message') {
+                    a.href = messageBase + rec.id;
+                    a.textContent = rec.subject || 'Message #' + rec.id;
+                } else {
+                    a.href = recordBase + rec.id;
+                    a.textContent = (rec.record_type || 'record').replace(/_/g, ' ');
+                }
+                var meta = document.createElement('div');
+                meta.className = 'result-meta';
+                meta.textContent = (rec.date || '') + (rec.summary ? ' — ' + String(rec.summary).slice(0, 120) : (rec.body ? ' — ' + String(rec.body).slice(0, 120) : ''));
+                div.appendChild(a);
+                div.appendChild(meta);
+                resultsEl.appendChild(div);
+            });
+        }
+
+        document.getElementById('record-search-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var q = document.getElementById('record-search-input').value.trim();
+            if (!q) return;
+            fetch('{{ url_for("health-portals.api_search") }}?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(items) { renderResults(items, 'No results found for "' + q + '".'); });
+        });
+
+        document.getElementById('record-semantic-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var q = document.getElementById('record-semantic-input').value.trim();
+            if (!q) return;
+            fetch('{{ url_for("health-portals.api_search_semantic") }}?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(items) { renderResults(items, 'No matching records found for "' + q + '".'); });
+        });
+    })();
+    </script>
 </body>
 </html>

@@ -730,10 +730,13 @@ def api_guides_list():
         results = [g for g in results if DIFFICULTY_LEVEL.get(g["difficulty"], 0) >= diff_min]
     if diff_max is not None:
         results = [g for g in results if DIFFICULTY_LEVEL.get(g["difficulty"], 0) <= diff_max]
+    def _guide_date(g):
+        return g.get("created_at") or g.get("date_published", "")
+
     if date_from:
-        results = [g for g in results if g.get("created_at", "") >= date_from]
+        results = [g for g in results if _guide_date(g) >= date_from]
     if date_to:
-        results = [g for g in results if g.get("created_at", "") <= date_to]
+        results = [g for g in results if _guide_date(g) <= date_to]
 
     if sort == "newest":
         results.sort(key=lambda g: g.get("created_at", ""), reverse=True)

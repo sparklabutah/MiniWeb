@@ -451,8 +451,12 @@ def cart_page():
             })
             total += subtotal
 
+    promo_code = user.get("promo_code", "")
+    discount = round(total * PROMO_CODES.get(promo_code, 0), 2)
     return render_template("e-commerce/cart.html", cart_items=cart_items,
-                           total=round(total, 2), user=user)
+                           total=round(total, 2), user=user,
+                           promo_code=promo_code, discount=discount,
+                           promo_error=request.args.get("promo_error", ""))
 
 
 @blueprint.route("/orders")
@@ -578,6 +582,41 @@ def form_update_cart():
     return redirect(url_for("e-commerce.cart_page"))
 
 
+PROMO_CODES = {"SAVE10": 0.10, "WELCOME5": 0.05, "SHOP20": 0.20}
+
+
+@blueprint.route("/cart/promo", methods=["POST"])
+def form_apply_promo():
+    if "user_id" not in session:
+        return redirect(url_for("e-commerce.login_page"))
+    code = request.form.get("promo_code", "").strip().upper()
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("e-commerce.login_page"))
+    if code in PROMO_CODES:
+        user["promo_code"] = code
+        _save_users(users)
+        return redirect(url_for("e-commerce.cart_page"))
+    return redirect(url_for("e-commerce.cart_page", promo_error="1"))
+
+
+@blueprint.route("/orders/cancel", methods=["POST"])
+def form_cancel_order():
+    if "user_id" not in session:
+        return redirect(url_for("e-commerce.login_page"))
+    order_id = request.form.get("order_id", "")
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("e-commerce.login_page"))
+    for order in user.get("orders", []):
+        if order.get("id") == order_id and order.get("status") not in ("shipped", "delivered", "cancelled"):
+            order["status"] = "cancelled"
+    _save_users(users)
+    return redirect(url_for("e-commerce.orders_page"))
+
+
 @blueprint.route("/wishlist/toggle", methods=["POST"])
 def form_toggle_wishlist():
     if "user_id" not in session:
@@ -604,6 +643,46 @@ def form_toggle_wishlist():
     return redirect(url_for("e-commerce.product_detail", product_id=product_id))
 
 
+SHIPPING_METHODS = [
+    {"id": "standard", "label": "Standard Shipping", "eta": "5-7 business days", "cost": 0.0},
+    {"id": "express", "label": "Express Shipping", "eta": "2 business days", "cost": 9.99},
+    {"id": "overnight", "label": "Overnight Shipping", "eta": "next business day", "cost": 24.99},
+]
+
+
+def _cart_items_and_total(user):
+    """Resolve a user's cart into display items + subtotal."""
+    cart_items = []
+    total = 0.0
+    for item in user.get("cart", []):
+        product = _get_product_by_id(item["product_id"])
+        if product:
+            subtotal = product["price"] * item["quantity"]
+            cart_items.append({
+                "product": product,
+                "quantity": item["quantity"],
+                "subtotal": round(subtotal, 2),
+            })
+            total += subtotal
+    return cart_items, round(total, 2)
+
+
+@blueprint.route("/checkout", methods=["GET"])
+def checkout_page():
+    """Checkout form: shipping address, shipping method, payment method."""
+    if "user_id" not in session:
+        return redirect(url_for("e-commerce.login_page"))
+    user = _get_user(session["user_id"])
+    if not user:
+        return redirect(url_for("e-commerce.login_page"))
+    cart_items, total = _cart_items_and_total(user)
+    if not cart_items:
+        return redirect(url_for("e-commerce.cart_page"))
+    return render_template("e-commerce/checkout.html", user=user,
+                           cart_items=cart_items, total=total,
+                           shipping_methods=SHIPPING_METHODS, form={}, error=None)
+
+
 @blueprint.route("/checkout", methods=["POST"])
 def form_checkout():
     if "user_id" not in session:
@@ -617,6 +696,20 @@ def form_checkout():
     cart = user.get("cart", [])
     if not cart:
         return redirect(url_for("e-commerce.cart_page"))
+
+    # Shipping address + method from the checkout form
+    form = {k: request.form.get(k, "").strip()
+            for k in ("full_name", "street", "city", "state", "zip_code",
+                      "shipping_method", "account_type")}
+    missing = [f for f in ("full_name", "street", "city", "zip_code") if not form[f]]
+    method = next((m for m in SHIPPING_METHODS if m["id"] == form["shipping_method"]),
+                  SHIPPING_METHODS[0])
+    if missing:
+        cart_items, total = _cart_items_and_total(user)
+        return render_template("e-commerce/checkout.html", user=user,
+                               cart_items=cart_items, total=total,
+                               shipping_methods=SHIPPING_METHODS, form=form,
+                               error="Please fill in: " + ", ".join(m.replace("_", " ") for m in missing)), 400
 
     # Build order from cart
     order_items = []
@@ -632,6 +725,7 @@ def form_checkout():
                 "quantity": item["quantity"],
             })
             total += subtotal
+    total += method["cost"]
 
     now = datetime.datetime.now()
     order_id = f"ORD-{now.strftime('%Y%m%d')}-{len(user.get('orders', [])) + 1:03d}"
@@ -641,9 +735,18 @@ def form_checkout():
         "items": order_items,
         "total": round(total, 2),
         "status": "processing",
+        "shipping_address": {
+            "full_name": form["full_name"],
+            "street": form["street"],
+            "city": form["city"],
+            "state": form["state"],
+            "zip_code": form["zip_code"],
+        },
+        "shipping_method": method["id"],
+        "shipping_cost": method["cost"],
     }
 
-    account_type = request.form.get("account_type", "checking")
+    account_type = form["account_type"] or "checking"
 
     user.setdefault("orders", []).append(order)
     user["cart"] = []

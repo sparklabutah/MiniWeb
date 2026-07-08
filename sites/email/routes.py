@@ -561,11 +561,12 @@ def search_page():
     if not user:
         return redirect(url_for("email.login_page"))
     q = request.args.get("q", "").strip()
-    emails = _user_emails(user["id"])
+    folder = request.args.get("folder", "").strip()
+    emails = _user_emails(user["id"], folder=folder or None)
     results = _search_emails(emails, q) if q else []
     counts = _folder_counts(user["id"])
     return render_template("email/search.html", user=user, results=results,
-                           q=q, counts=counts)
+                           q=q, folder=folder, counts=counts)
 
 
 @blueprint.route("/contacts")

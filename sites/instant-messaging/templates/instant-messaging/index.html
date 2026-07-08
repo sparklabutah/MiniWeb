@@ -49,6 +49,9 @@
         .welcome h2 { color: #e9edef; font-size: 1.8rem; font-weight: 300; margin-bottom: .8rem; }
         .welcome p { color: #8696a0; font-size: .9rem; line-height: 1.5; }
         .pinned-indicator { color: #8696a0; font-size: .7rem; margin-left: .3rem; }
+        .pin-toggle { background: none; border: none; cursor: pointer; font-size: .85rem; margin-left: .4rem; padding: .15rem; border-radius: .3rem; filter: grayscale(1); opacity: .45; transition: all .15s; }
+        .pin-toggle:hover { background: #2a3942; opacity: .8; }
+        .pin-toggle.pinned { filter: none; opacity: 1; }
         @media (max-width: 768px) {
             .sidebar { width: 100%; }
             .main-panel { display: none; }
@@ -106,6 +109,7 @@
                     {% elif conv.pinned_count > 0 %}
                     <span class="pinned-indicator" title="{{ conv.pinned_count }} pinned">&#128204;</span>
                     {% endif %}
+                    <button class="pin-toggle {% if conv.pinned_count > 0 %}pinned{% endif %}" data-url="{{ url_for('instant-messaging.api_pin_conversation', conv_id=conv.id) }}" title="{% if conv.pinned_count > 0 %}Unpin conversation{% else %}Pin conversation{% endif %}">&#128204;</button>
                 </a>
                 {% endfor %}
             </div>
@@ -130,6 +134,21 @@
             });
             fetch('{{ url_for("instant-messaging.api_conversations_list") }}' + (q ? '?q=' + encodeURIComponent(q) : ''));
         }
+
+        // follow_by_toggle: pin/unpin a conversation
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.pin-toggle');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var pinned = d.pinned_count > 0;
+                    btn.classList.toggle('pinned', pinned);
+                    btn.title = pinned ? 'Unpin conversation' : 'Pin conversation';
+                });
+        });
     </script>
 </body>
 </html>

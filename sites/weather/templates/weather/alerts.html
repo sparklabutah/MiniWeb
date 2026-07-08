@@ -43,6 +43,25 @@
         .no-alerts .no-icon { font-size: 2.5rem; margin-bottom: .5rem; }
 
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+
+        /* Severity filter toggles (filter_by_toggle) */
+        .severity-filter { background: #fff; border-radius: .5rem; padding: .8rem 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.2rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+        .severity-filter .filter-label { font-size: .85rem; color: #475569; font-weight: 600; }
+        .sev-toggle { border: 1.5px solid #d1d5db; background: #fff; color: #64748b; padding: .35rem .9rem; border-radius: 1rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+        .sev-toggle.active[data-sev="Severe"] { background: #fce4ec; color: #c62828; border-color: #c62828; }
+        .sev-toggle.active[data-sev="Moderate"] { background: #fff3e0; color: #e65100; border-color: #e65100; }
+        .sev-toggle.active[data-sev="Minor"] { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+        .filter-count { font-size: .8rem; color: #64748b; margin-left: auto; }
+
+        /* Subscription toggle (subscribe_by_toggle) */
+        .sub-toggle { display: flex; align-items: center; gap: .6rem; margin-top: .8rem; font-size: .85rem; color: #475569; font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 22px; transition: .2s; }
+        .switch .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .slider { background: #1565c0; }
+        .switch input:checked + .slider:before { transform: translateX(20px); }
+        .sub-login-hint { margin-top: .8rem; font-size: .8rem; color: #64748b; }
     </style>
 </head>
 <body>
@@ -72,8 +91,16 @@
         <h2 class="section-title">Active Weather Alerts &mdash; Lakeport, WA</h2>
 
         {% if alerts %}
+            <div class="severity-filter">
+                <span class="filter-label">Filter by severity:</span>
+                <button type="button" class="sev-toggle active" data-sev="Severe" onclick="toggleSeverity(this)">Severe</button>
+                <button type="button" class="sev-toggle active" data-sev="Moderate" onclick="toggleSeverity(this)">Moderate</button>
+                <button type="button" class="sev-toggle active" data-sev="Minor" onclick="toggleSeverity(this)">Minor</button>
+                <span class="filter-count" id="filter-count">{{ alerts|length }} shown</span>
+            </div>
+
             {% for alert in alerts %}
-            <div class="alert-card alert-{{ alert.severity|lower }}">
+            <div class="alert-card alert-{{ alert.severity|lower }}" data-alert-id="{{ alert.id }}" data-severity="{{ alert.severity }}">
                 <div class="alert-header">
                     <span class="alert-icon">&#9888;&#65039;</span>
                     <span class="alert-title">{{ alert.title }}</span>
@@ -98,6 +125,18 @@
                         <span>{{ area }}</span>
                         {% endfor %}
                     </div>
+                    {% if user %}
+                    <div class="sub-toggle">
+                        <label class="switch">
+                            <input type="checkbox" {% if alert.type in user.get('subscriptions', []) %}checked{% endif %}
+                                   onchange="toggleSubscription('{{ alert.type }}', this)">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Subscribe to {{ alert.type }} alerts</span>
+                    </div>
+                    {% else %}
+                    <div class="sub-login-hint"><a href="{{ url_for('weather.login_page') }}">Sign in</a> to subscribe to {{ alert.type }} alerts.</div>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -113,5 +152,45 @@
     <div class="footer">
         Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
     </div>
+
+    <script>
+        function toggleSeverity(btn) {
+            btn.classList.toggle("active");
+            var active = [];
+            document.querySelectorAll(".sev-toggle.active").forEach(function(b) {
+                active.push(b.dataset.sev);
+            });
+            fetch("{{ url_for('weather.api_alerts_filter') }}?severity=" + encodeURIComponent(active.join(",")))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var visibleIds = {};
+                    d.alerts.forEach(function(a) { visibleIds[a.id] = true; });
+                    document.querySelectorAll(".alert-card").forEach(function(card) {
+                        card.style.display = visibleIds[card.dataset.alertId] ? "" : "none";
+                    });
+                    var count = document.getElementById("filter-count");
+                    if (count) count.textContent = d.count + " shown";
+                });
+        }
+
+        {% if user %}
+        function toggleSubscription(alertType, checkbox) {
+            fetch("{{ url_for('weather.api_subscribe', uid=user.id) }}", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({alert_type: alertType})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) {
+                    checkbox.checked = !checkbox.checked;
+                    return;
+                }
+                checkbox.checked = (d.action === "subscribed");
+            })
+            .catch(function() { checkbox.checked = !checkbox.checked; });
+        }
+        {% endif %}
+    </script>
 </body>
 </html>

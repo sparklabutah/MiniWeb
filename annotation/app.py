@@ -392,6 +392,30 @@ def _get_macro_coverage():
     return coverage
 
 
+def _task_site_ids(task):
+    """Normalize a stored task's sites to a list of site-id strings."""
+    ids = []
+    for s in task.get("sites", []):
+        ids.append(s.get("id") if isinstance(s, dict) else s)
+    return ids
+
+
+def _get_site_macro_coverage(site_id):
+    """Count SINGLE-SITE tasks covering each macro for one site.
+
+    Used for the per-site coverage floor: every site should have at least
+    one single-site task per supported macro.
+    """
+    from annotation.storage import list_tasks
+    coverage = {}
+    for t in list_tasks():
+        if _task_site_ids(t) != [site_id]:
+            continue
+        for m in t.get("macros", []):
+            coverage[m] = coverage.get(m, 0) + 1
+    return coverage
+
+
 def _get_cell_counts():
     """Count existing tasks per (num_sites, num_macros) cell (from file storage)."""
     from annotation.storage import list_tasks
@@ -682,6 +706,72 @@ def _generate_prompt(sites, coverage, force_single=False):
     }
 
 
+def _generate_site_prompt(site, rng=None):
+    """Sampler for an annotator-chosen site: only the macros are random.
+
+    Coverage floor: every site should have at least one single-site task per
+    supported macro (#macros == #single-macro-single-site tasks). While any
+    macro of the chosen site is still uncovered, sample exactly ONE uncovered
+    macro (weighted by difficulty) so each task fills a floor slot. Once the
+    floor is complete, fall back to 1-3 macros weighted by difficulty and
+    inverse per-site coverage.
+    """
+    rng = rng or random.Random()
+    site_id = site["id"]
+
+    from annotation.macro_difficulty import get_macro_weight
+
+    macro_pool = set(_load_site_macros(site_id))
+    macro_pool -= _get_na_macros([site_id])
+    # Navigation is implicit — agents start on the target page (see CLAUDE.md)
+    macro_pool.discard("navigate_by_route")
+    macro_pool = sorted(macro_pool)
+    if not macro_pool:
+        return None
+
+    site_cov = _get_site_macro_coverage(site_id)
+    uncovered = [m for m in macro_pool if site_cov.get(m, 0) == 0]
+
+    def _weighted_pick(candidates, k):
+        picks = []
+        remaining = list(candidates)
+        _QA_VERBS = {"extract", "compute", "count", "compare", "verify",
+                     "calculate", "rank", "list"}
+        has_qa = False
+        for _ in range(min(k, len(remaining))):
+            if has_qa:
+                remaining = [m for m in remaining if m.split("_")[0] not in _QA_VERBS]
+                if not remaining:
+                    break
+            ws = [get_macro_weight(m) / (site_cov.get(m, 0) + 1) for m in remaining]
+            total = sum(ws)
+            pick = rng.choices(remaining, weights=[w / total for w in ws], k=1)[0]
+            picks.append(pick)
+            if pick.split("_")[0] in _QA_VERBS:
+                has_qa = True
+            remaining = [m for m in remaining if m != pick]
+        return picks
+
+    if uncovered:
+        # Floor building: one uncovered macro per task
+        sampled_macros = _weighted_pick(uncovered, 1)
+    else:
+        # Floor complete: sample 1-3 macros, under-covered first
+        n_macros = rng.choice([1, 2, 3])
+        sampled_macros = _weighted_pick(macro_pool, n_macros)
+
+    return {
+        "sites": [{"id": site_id, "name": site.get("name", site_id)}],
+        "macros": sampled_macros,
+        "num_sites": 1,
+        "num_macros": len(sampled_macros),
+        "edges": [],
+        "chosen_site": True,
+        "floor_total": len(macro_pool),
+        "floor_covered": len(macro_pool) - len(uncovered),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
@@ -953,12 +1043,47 @@ def api_cell_counts():
 
 @annotation_bp.route("/api/prompt")
 def api_prompt():
-    """Get a new random prompt (sites + macros)."""
+    """Get a new prompt.
+
+    ?site=<id>  — annotator-chosen site: only macros are sampled, with the
+                  per-site coverage floor prioritized (single-site task base).
+    ?single=1   — random single-site prompt (legacy behavior).
+    (neither)   — graph-aware multi-site sampling.
+    """
     sites = _load_sites()
+    site_id = (request.args.get("site") or "").strip()
+    if site_id:
+        site = next((s for s in sites if s["id"] == site_id), None)
+        if not site:
+            return jsonify({"error": f"unknown site: {site_id}"}), 404
+        return jsonify(_generate_site_prompt(site))
     coverage = _get_macro_coverage()
     single = request.args.get("single") == "1"
     prompt = _generate_prompt(sites, coverage, force_single=single)
     return jsonify(prompt)
+
+
+@annotation_bp.route("/api/site_floors")
+def api_site_floors():
+    """Per-site coverage floor: covered/total macros via single-site tasks."""
+    from annotation.storage import list_tasks
+    # One pass over tasks: macros covered per site by single-site tasks
+    covered_by_site = {}
+    for t in list_tasks():
+        ids = _task_site_ids(t)
+        if len(ids) != 1:
+            continue
+        covered_by_site.setdefault(ids[0], set()).update(t.get("macros", []))
+    floors = {}
+    for s in _load_sites():
+        sid = s["id"]
+        pool = set(_load_site_macros(sid)) - _get_na_macros([sid])
+        pool.discard("navigate_by_route")
+        floors[sid] = {
+            "covered": len(pool & covered_by_site.get(sid, set())),
+            "total": len(pool),
+        }
+    return jsonify(floors)
 
 
 @annotation_bp.route("/api/auto_login", methods=["POST"])

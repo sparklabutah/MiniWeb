@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import pathlib
 import re
 import shutil
 import time
@@ -374,7 +375,10 @@ class MockAgent:
 
 # ── Claude CLI LLM (drop-in for browser-use) ────────────────────────────────
 
+# CHPC cluster install; fall back to whatever `claude` is on PATH locally
 CLAUDE_CLI = "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
+if not pathlib.Path(CLAUDE_CLI).exists():
+    CLAUDE_CLI = shutil.which("claude") or "claude"
 
 
 class ChatClaude:

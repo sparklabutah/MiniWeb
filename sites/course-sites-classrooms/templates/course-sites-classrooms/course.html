@@ -82,6 +82,25 @@
                 {{ course.credits }} credits &middot;
                 <span class="badge">{{ course.department }}</span>
             </div>
+            {% if user %}
+            <div style="margin-top:.7rem;">
+                {% if user.id in course.get('enrolled_students', []) %}
+                <form method="post" action="{{ url_for('course-sites-classrooms.form_unenroll', course_id=course.id) }}" style="display:inline;">
+                    <button type="submit" id="enrollment-toggle"
+                            style="background:#fff;color:#dc2626;border:1px solid #fca5a5;border-radius:.3rem;padding:.45rem 1rem;font-size:.85rem;font-weight:600;cursor:pointer;">
+                        Enrolled &mdash; Leave Course
+                    </button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('course-sites-classrooms.form_enroll', course_id=course.id) }}" style="display:inline;">
+                    <button type="submit" id="enrollment-toggle"
+                            style="background:#1a365d;color:#fff;border:1px solid #1a365d;border-radius:.3rem;padding:.45rem 1rem;font-size:.85rem;font-weight:600;cursor:pointer;">
+                        Enroll in Course
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="tabs">
@@ -98,17 +117,99 @@
         <div class="section">
             <h3>Modules & Lessons</h3>
             {% for module in course.modules %}
+            {% set mi = loop.index0 %}
             <div class="module">
                 <div class="module-title">Module {{ loop.index }}: {{ module.title }}</div>
                 {% for lesson in module.lessons %}
                 <div class="lesson">
+                    {% if lesson.type == 'lecture' %}
+                    <a class="lecture-link" data-key="{{ mi }}-{{ loop.index0 }}"
+                       data-title="{{ lesson.title }}" data-duration="{{ lesson.duration_min }}"
+                       href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}?lecture={{ mi }}-{{ loop.index0 }}#lecture-player"
+                       style="color:#3b82f6;text-decoration:none;">{{ lesson.title }}</a>
+                    {% else %}
                     {{ lesson.title }}
+                    {% endif %}
                     <span class="type-tag type-{{ lesson.type }}">{{ lesson.type }}</span>
                     <span style="font-size:.75rem;color:#94a3b8;">{{ lesson.duration_min }} min</span>
                 </div>
                 {% endfor %}
             </div>
             {% endfor %}
+        </div>
+
+        <div class="section" id="lecture-player">
+            <h3>Lecture Player</h3>
+            <style>
+                #player-box { background: #1e293b; border-radius: .4rem; height: 180px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: .8rem; }
+                #player-box .player-title { color: #e2e8f0; font-size: .95rem; font-weight: 600; text-align: center; padding: 0 1rem; z-index: 2; }
+                #player-box .player-wave { display: none; position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); gap: 4px; align-items: flex-end; height: 44px; }
+                #player-box.playing .player-wave { display: flex; }
+                #player-box .pwave-bar { width: 4px; background: #3b82f6; border-radius: 2px; animation: pwave 1.2s ease-in-out infinite; }
+                #player-box .pwave-bar:nth-child(2) { animation-delay: .15s; }
+                #player-box .pwave-bar:nth-child(3) { animation-delay: .3s; }
+                #player-box .pwave-bar:nth-child(4) { animation-delay: .45s; }
+                #player-box .pwave-bar:nth-child(5) { animation-delay: .6s; }
+                #player-box .pwave-bar:nth-child(6) { animation-delay: .75s; }
+                #player-box .pwave-bar:nth-child(7) { animation-delay: .9s; }
+                @keyframes pwave { 0%,100% { height: 8px; opacity: .5; } 50% { height: 38px; opacity: 1; } }
+                #player-box .player-elapsed { display: none; position: absolute; bottom: .6rem; right: .8rem; font-size: .75rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
+                #player-box.playing .player-elapsed { display: block; }
+            </style>
+            <div id="player-box">
+                <div class="player-title" id="playerTitle">Select a lecture from the modules above to load it here.</div>
+                <div class="player-wave">
+                    <div class="pwave-bar"></div><div class="pwave-bar"></div><div class="pwave-bar"></div>
+                    <div class="pwave-bar"></div><div class="pwave-bar"></div><div class="pwave-bar"></div>
+                    <div class="pwave-bar"></div>
+                </div>
+                <span class="player-elapsed" id="playerElapsed">00:00</span>
+            </div>
+            <button type="button" id="playPauseBtn" class="btn btn-primary" onclick="togglePlayback()"
+                    style="padding:.5rem 1.2rem;border:1px solid #1a365d;border-radius:.3rem;background:#1a365d;color:#fff;cursor:pointer;font-size:.85rem;">
+                &#9654; Play
+            </button>
+            <span id="playerDuration" style="font-size:.8rem;color:#64748b;margin-left:.6rem;"></span>
+            <script>
+                var playerPlaying = false;
+                var playerSeconds = 0;
+                var playerTimer = null;
+
+                function loadLectureFromUrl() {
+                    var params = new URLSearchParams(window.location.search);
+                    var key = params.get('lecture');
+                    if (!key) return;
+                    var link = document.querySelector('.lecture-link[data-key="' + key + '"]');
+                    if (!link) return;
+                    document.getElementById('playerTitle').textContent = 'Lecture: ' + link.dataset.title;
+                    document.getElementById('playerDuration').textContent = link.dataset.duration + ' min lecture';
+                }
+
+                function formatElapsed(s) {
+                    var m = Math.floor(s / 60), r = s % 60;
+                    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+                }
+
+                function togglePlayback() {
+                    var box = document.getElementById('player-box');
+                    var btn = document.getElementById('playPauseBtn');
+                    playerPlaying = !playerPlaying;
+                    if (playerPlaying) {
+                        box.classList.add('playing');
+                        btn.innerHTML = '&#10074;&#10074; Pause';
+                        playerTimer = setInterval(function () {
+                            playerSeconds++;
+                            document.getElementById('playerElapsed').textContent = formatElapsed(playerSeconds);
+                        }, 1000);
+                    } else {
+                        box.classList.remove('playing');
+                        btn.innerHTML = '&#9654; Play';
+                        clearInterval(playerTimer);
+                    }
+                }
+
+                loadLectureFromUrl();
+            </script>
         </div>
 
         <div class="section">

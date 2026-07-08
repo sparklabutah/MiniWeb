@@ -68,6 +68,9 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-sm { padding: .3rem .6rem; font-size: .78rem; }
         .actions { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .btn-watch { background: transparent; color: #3b82f6; border: 1px solid #3b82f6; }
+        .btn-watch:hover { background: #eff6ff; }
+        .btn-watch[aria-pressed="true"] { background: #3b82f6; color: #fff; }
         .transition-form { display: inline; }
         .transition-form select { padding: .3rem .5rem; border: 1px solid #cbd5e1; border-radius: .25rem; font-size: .82rem; }
         .edit-section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
@@ -121,7 +124,29 @@
                             <option value="closed">Closed</option>
                         </select>
                     </form>
+                    <button class="btn btn-watch btn-sm" id="watch-toggle-btn" aria-pressed="false">Watch</button>
                     <button class="btn btn-danger btn-sm" id="delete-issue-btn">Delete</button>
+                    <script>
+                    (function() {
+                        var watchBtn = document.getElementById('watch-toggle-btn');
+                        var currentUserId = {{ user.id if user else 1 }};
+                        function setState(watching) {
+                            watchBtn.setAttribute('aria-pressed', watching ? 'true' : 'false');
+                            watchBtn.textContent = watching ? 'Watching' : 'Watch';
+                        }
+                        fetch('{{ url_for("project-mgmt-issue-tracking.api_issue_watchers", issue_id=issue.id) }}')
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) { setState(data.watchers.indexOf(currentUserId) !== -1); });
+                        watchBtn.addEventListener('click', function() {
+                            fetch('{{ url_for("project-mgmt-issue-tracking.api_toggle_watch", issue_id=issue.id) }}', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({user_id: currentUserId})
+                            }).then(function(r) { return r.json(); })
+                              .then(function(data) { setState(data.action === 'watched'); });
+                        });
+                    })();
+                    </script>
                     <script>
                     document.getElementById('delete-issue-btn').addEventListener('click', function() {
                         var btn = this;

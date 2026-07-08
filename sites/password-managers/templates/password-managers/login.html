@@ -67,5 +67,76 @@
         <div class="hint-text">Your master password is never stored on our servers.</div>
         <div class="secure-badge">End-to-end encrypted &middot; Zero-knowledge architecture</div>
     </form>
+
+    <!-- verify_identity_by_code: 2FA verification step -->
+    <div class="login-container" id="twofa-panel" style="display:none;">
+        <div class="lock-icon">&#x1f4f1;</div>
+        <h2>Two-Factor Verification</h2>
+        <p class="subtitle">Enter the 6-digit code from your authenticator app, or a backup code</p>
+
+        <div class="error" id="twofa-error" style="display:none;"></div>
+
+        <div class="form-group">
+            <label for="twofa-code">Verification Code</label>
+            <input type="text" id="twofa-code" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="16" placeholder="123456">
+        </div>
+        <button type="button" class="btn-login" id="twofa-verify-btn">Verify</button>
+
+        <div class="hint-text">Lost your device? Use one of your backup codes.</div>
+    </div>
+
+    <script>
+    (function() {
+        var loginForm = document.querySelector('form.login-container');
+        var panel = document.getElementById('twofa-panel');
+        var errBox = document.getElementById('twofa-error');
+        var pendingUserId = null;
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var email = document.getElementById('email').value.trim();
+            var password = document.getElementById('password').value;
+            fetch('{{ url_for("password-managers.api_login") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email, master_password: password})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.requires_2fa) {
+                    pendingUserId = res.data.user_id;
+                    loginForm.style.display = 'none';
+                    panel.style.display = 'block';
+                    document.getElementById('twofa-code').focus();
+                } else {
+                    // No 2FA required (or credentials handled server-side):
+                    // fall through to the normal form login.
+                    loginForm.submit();
+                }
+            })
+            .catch(function() { loginForm.submit(); });
+        });
+
+        document.getElementById('twofa-verify-btn').addEventListener('click', function() {
+            var code = document.getElementById('twofa-code').value.trim();
+            if (!code) { errBox.textContent = 'Please enter your verification code.'; errBox.style.display = 'block'; return; }
+            fetch('{{ url_for("password-managers.api_verify_2fa") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({code: code, user_id: pendingUserId})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.verified) {
+                    window.location = '{{ url_for("password-managers.index") }}';
+                } else {
+                    errBox.textContent = res.data.error || 'Invalid 2FA code.';
+                    errBox.style.display = 'block';
+                }
+            });
+        });
+    })();
+    </script>
 </body>
 </html>

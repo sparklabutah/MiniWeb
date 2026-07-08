@@ -119,8 +119,17 @@
         <div class="empty-state">No favorite players yet. Browse players and add them to your favorites.</div>
         {% endif %}
 
-        {% if fav_matches %}
         <div class="section-title">Your Teams' Matches</div>
+        <form class="add-form" method="get" action="{{ url_for('sports-esports.favorites_page') }}" style="background:#fff;border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:.75rem;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <label style="font-size:.8rem;color:#64748b;">From
+                <input type="date" name="date_from" value="{{ date_from }}" style="display:block;padding:.45rem .6rem;border:1px solid #e2e8f0;border-radius:.4rem;font-size:.9rem;">
+            </label>
+            <label style="font-size:.8rem;color:#64748b;">To
+                <input type="date" name="date_to" value="{{ date_to }}" style="display:block;padding:.45rem .6rem;border:1px solid #e2e8f0;border-radius:.4rem;font-size:.9rem;">
+            </label>
+            <button type="submit" class="add-btn">Filter Matches</button>
+        </form>
+        {% if fav_matches %}
         <div class="match-list">
             {% for m in fav_matches %}
             <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-row">
@@ -141,7 +150,66 @@
             </a>
             {% endfor %}
         </div>
+        {% else %}
+        <div class="empty-state">No matches for your favorite teams in this date range.</div>
         {% endif %}
+
+        <div class="add-section">
+            <h3>Search Teams &amp; Players</h3>
+            <div class="add-form">
+                <input type="search" id="semantic-search-input" placeholder="Describe a team or player, e.g. 'basketball team from Lakeport'" style="flex:1;min-width:260px;padding:.5rem .75rem;border:1px solid #e2e8f0;border-radius:.4rem;font-size:.9rem;">
+                <button type="button" class="add-btn" id="semantic-search-btn">Search</button>
+            </div>
+            <div id="semantic-search-results" style="margin-top:.75rem;"></div>
+        </div>
+        <script>
+        (function() {
+            var input = document.getElementById('semantic-search-input');
+            var btn = document.getElementById('semantic-search-btn');
+            var results = document.getElementById('semantic-search-results');
+            var toggleUrl = "{{ url_for('sports-esports.toggle_favorite') }}";
+
+            function favForm(hiddenName, id) {
+                return '<form action="' + toggleUrl + '" method="post" style="display:inline">' +
+                    '<input type="hidden" name="' + hiddenName + '" value="' + id + '">' +
+                    '<input type="hidden" name="action" value="add">' +
+                    '<button type="submit" class="add-btn" style="padding:.3rem .7rem;font-size:.75rem;">Add to Favorites</button></form>';
+            }
+
+            function esc(s) {
+                var d = document.createElement('div');
+                d.textContent = s;
+                return d.innerHTML;
+            }
+
+            function runSearch() {
+                var q = input.value.trim();
+                if (!q) { results.innerHTML = ''; return; }
+                fetch('{{ url_for('sports-esports.api_semantic_search') }}?q=' + encodeURIComponent(q))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var html = '';
+                        var teamUrl = "{{ url_for('sports-esports.team_detail', team_id=0) }}".replace('/0', '/');
+                        var playerUrl = "{{ url_for('sports-esports.player_detail', player_id=0) }}".replace('/0', '/');
+                        (data.teams || []).slice(0, 5).forEach(function(t) {
+                            html += '<div class="fav-card" style="margin-bottom:.5rem;">' +
+                                '<div class="info"><a href="' + teamUrl + t.id + '">' + esc(t.name) + '</a>' +
+                                '<div class="meta">Team &middot; ' + esc(t.city) + '</div></div>' +
+                                favForm('team_id', t.id) + '</div>';
+                        });
+                        (data.players || []).slice(0, 5).forEach(function(p) {
+                            html += '<div class="fav-card" style="margin-bottom:.5rem;">' +
+                                '<div class="info"><a href="' + playerUrl + p.id + '">' + esc(p.name) + '</a>' +
+                                '<div class="meta">Player &middot; ' + esc(p.position) + '</div></div>' +
+                                favForm('player_id', p.id) + '</div>';
+                        });
+                        results.innerHTML = html || '<div class="empty-state">No teams or players matched your search.</div>';
+                    });
+            }
+            btn.addEventListener('click', runSearch);
+            input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } });
+        })();
+        </script>
 
         <div class="add-section">
             <h3>Add a Team to Favorites</h3>

@@ -163,6 +163,13 @@
                     </div>
                     <div class="biz-actions">
                         <a href="{{ url_for('rating-review.write_review', business_id=biz.id) }}" class="write-review-btn">Write a Review</a>
+                        {% if user %}
+                        <button class="save-biz-btn" data-business-id="{{ biz.id }}" onclick="toggleSaveBiz(this)"
+                                style="padding:6px 14px;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:12px;color:#666;cursor:pointer;">&#9734; Save</button>
+                        {% else %}
+                        <a href="{{ url_for('rating-review.login', next=request.url) }}"
+                           style="padding:6px 14px;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:12px;color:#666;text-decoration:none;">&#9734; Save</a>
+                        {% endif %}
                         <a href="/sites/map-services/directions?to={{ biz.address|urlencode }}" style="color:#0073e6;font-size:.82rem;text-decoration:none;">Get Directions</a>
                     </div>
                 </div>
@@ -181,5 +188,34 @@
     <div class="footer">
         LakeReview &copy; 2026 &mdash; Lakeport's trusted local review platform
     </div>
+
+    {% if user %}
+    <script>
+    function markSaved(btn, saved) {
+        btn.innerHTML = saved ? "&#9733; Saved" : "&#9734; Save";
+        btn.style.color = saved ? "#d32323" : "#666";
+        btn.style.borderColor = saved ? "#d32323" : "#ddd";
+    }
+    function toggleSaveBiz(btn) {
+        fetch("{{ url_for('rating-review.api_user_save', user_id=user.id) }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({business_id: parseInt(btn.dataset.businessId, 10)})
+        })
+        .then(r => r.json())
+        .then(data => { if (data.action) markSaved(btn, data.action === "saved"); });
+    }
+    // Preload saved businesses so bookmark indicators reflect current state
+    fetch("{{ url_for('rating-review.api_user_saved', user_id=user.id) }}")
+        .then(r => r.json())
+        .then(saved => {
+            var ids = {};
+            saved.forEach(b => { ids[b.id] = true; });
+            document.querySelectorAll(".save-biz-btn").forEach(btn => {
+                if (ids[parseInt(btn.dataset.businessId, 10)]) markSaved(btn, true);
+            });
+        });
+    </script>
+    {% endif %}
 </body>
 </html>

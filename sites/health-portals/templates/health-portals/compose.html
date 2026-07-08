@@ -22,6 +22,11 @@
         .form-group textarea { min-height: 150px; resize: vertical; }
         .send-btn { padding: .6rem 1.5rem; background: #0d6e6e; color: #fff; border: none; border-radius: .3rem; font-weight: 600; cursor: pointer; font-size: .9rem; }
         .send-btn:hover { background: #0a5c5c; }
+        .upload-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-top: 1.2rem; }
+        .upload-card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #0d6e6e; }
+        .upload-status { font-size: .82rem; margin-top: .6rem; }
+        .upload-status.ok { color: #16a34a; }
+        .upload-status.err { color: #dc2626; }
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; }
     </style>
 </head>
@@ -62,6 +67,21 @@
                 <button type="submit" class="send-btn">Send Message</button>
             </form>
         </div>
+        <div class="upload-card">
+            <h2>Attach a Document for Your Care Team</h2>
+            <form id="document-upload-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="doc-file">Document (PDF, image, or lab result)</label>
+                    <input type="file" id="doc-file" name="file">
+                </div>
+                <div class="form-group">
+                    <label for="doc-description">Description</label>
+                    <input type="text" id="doc-description" name="description" placeholder="e.g. Outside lab results from March">
+                </div>
+                <button type="submit" class="send-btn">Upload Document</button>
+                <div class="upload-status" id="upload-status"></div>
+            </form>
+        </div>
     </div>
     <div class="footer">Lakeport Medical Center Patient Portal</div>
     <script>
@@ -78,6 +98,34 @@
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
         }).then(function(r) { return r.json(); }).then(function() {
             window.location.href = '{{ url_for("health-portals.messages_page") }}';
+        });
+    });
+
+    document.getElementById('document-upload-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var fileInput = document.getElementById('doc-file');
+        var status = document.getElementById('upload-status');
+        if (!fileInput.files.length) {
+            status.className = 'upload-status err';
+            status.textContent = 'Please choose a file to upload.';
+            return;
+        }
+        var formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('description', document.getElementById('doc-description').value);
+        fetch('{{ url_for("health-portals.api_document_upload") }}', {
+            method: 'POST', body: formData
+        }).then(function(r) {
+            return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+        }).then(function(res) {
+            if (res.ok) {
+                status.className = 'upload-status ok';
+                status.textContent = 'Uploaded "' + res.data.filename + '" — status: ' + res.data.status + '.';
+                document.getElementById('document-upload-form').reset();
+            } else {
+                status.className = 'upload-status err';
+                status.textContent = res.data.error || 'Upload failed.';
+            }
         });
     });
     </script>

@@ -64,6 +64,10 @@
 
         .category-icons { font-size: 1.5rem; }
 
+        .save-toggle { position: absolute; top: .6rem; left: .6rem; width: 32px; height: 32px; border: none; border-radius: 50%; background: rgba(255,255,255,.92); color: #636e72; font-size: 1.05rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .save-toggle:hover { background: #fff; color: #d63031; }
+        .save-toggle.saved { color: #d63031; }
+
         .no-events { text-align: center; padding: 3rem; color: #999; }
         .no-events h3 { margin-bottom: .5rem; }
     </style>
@@ -182,6 +186,7 @@
                         <span class="event-card-badge {% if event.status == 'on_sale' %}badge-on-sale{% elif event.status == 'completed' %}badge-completed{% else %}badge-sold-out{% endif %}">
                             {{ event.status | replace('_', ' ') }}
                         </span>
+                        <button type="button" class="save-toggle" data-event-id="{{ event.id }}" title="Save event" aria-pressed="false">&#9825;</button>
                     </div>
                     <div class="event-card-body">
                         <div class="event-card-category">{{ event.category }}</div>
@@ -306,10 +311,11 @@
 
                         var badgeClass = ev.status === 'on_sale' ? 'badge-on-sale' : (ev.status === 'completed' ? 'badge-completed' : 'badge-sold-out');
 
-                        html += '<div class="event-card"><a href="/event/' + ev.id + '">' +
+                        html += '<div class="event-card"><a href="/sites/ticketing-events/event/' + ev.id + '">' +
                             '<div class="event-card-img" style="background:' + bg + ';">' +
                             '<span class="category-icons">' + icon + '</span>' +
-                            '<span class="event-card-badge ' + badgeClass + '">' + ev.status.replace('_', ' ') + '</span></div>' +
+                            '<span class="event-card-badge ' + badgeClass + '">' + ev.status.replace('_', ' ') + '</span>' +
+                            '<button type="button" class="save-toggle" data-event-id="' + ev.id + '" title="Save event" aria-pressed="false">&#9825;</button></div>' +
                             '<div class="event-card-body">' +
                             '<div class="event-card-category">' + ev.category + '</div>' +
                             '<div class="event-card-title">' + ev.name + '</div>' +
@@ -318,8 +324,48 @@
                             '</a></div>';
                     });
                     grid.innerHTML = html;
+                    loadSavedState();
                 });
         }
+
+        // save_by_toggle: bookmark events to the wishlist
+        var USER_ID = {{ user.id if logged_in and user else 'null' }};
+
+        function markSaved(btn, saved) {
+            btn.classList.toggle('saved', saved);
+            btn.innerHTML = saved ? '&#9829;' : '&#9825;';
+            btn.setAttribute('aria-pressed', saved ? 'true' : 'false');
+            btn.title = saved ? 'Remove from saved events' : 'Save event';
+        }
+
+        function loadSavedState() {
+            if (!USER_ID) return;
+            fetch('{{ url_for("ticketing-events.api_wishlist") }}?user_id=' + USER_ID)
+                .then(function(r) { return r.json(); })
+                .then(function(items) {
+                    var ids = {};
+                    items.forEach(function(w) { ids[w.event_id] = true; });
+                    document.querySelectorAll('.save-toggle').forEach(function(btn) {
+                        markSaved(btn, !!ids[parseInt(btn.getAttribute('data-event-id'), 10)]);
+                    });
+                });
+        }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.save-toggle');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (!USER_ID) { window.location = '{{ url_for("ticketing-events.login_page") }}'; return; }
+            fetch('{{ url_for("ticketing-events.api_wishlist_toggle") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: USER_ID, event_id: parseInt(btn.getAttribute('data-event-id'), 10)})
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(res) { markSaved(btn, res.action === 'saved'); });
+        });
+        loadSavedState();
 
         function clearFilters() {
             document.getElementById('searchInput').value = '';

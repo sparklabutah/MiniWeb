@@ -245,6 +245,20 @@
             </button>
         </div>
 
+        <div class="tool-divider"></div>
+
+        <!-- Pan / zoom view controls -->
+        <div class="tool-group" id="view-tools">
+            <button class="tool-btn" onclick="zoomView(1.25)" title="Zoom in">+</button>
+            <span class="save-indicator" id="zoom-level" style="min-width:38px;text-align:center;">100%</span>
+            <button class="tool-btn" onclick="zoomView(0.8)" title="Zoom out">&minus;</button>
+            <button class="tool-btn" onclick="panView(60, 0)" title="Pan left">&larr;</button>
+            <button class="tool-btn" onclick="panView(0, 60)" title="Pan up">&uarr;</button>
+            <button class="tool-btn" onclick="panView(0, -60)" title="Pan down">&darr;</button>
+            <button class="tool-btn" onclick="panView(-60, 0)" title="Pan right">&rarr;</button>
+            <button class="tool-btn" onclick="resetView()" title="Reset view">Reset View</button>
+        </div>
+
         <div style="flex:1;"></div>
 
         <span class="save-indicator" id="save-indicator"></span>
@@ -460,13 +474,40 @@
             brushSize = parseInt(this.value);
         });
 
+        // ---- Pan / zoom view state ----
+        var viewZoom = 1, viewPanX = 0, viewPanY = 0;
+        function applyView() {
+            var t = 'translate(' + viewPanX + 'px,' + viewPanY + 'px) scale(' + viewZoom + ')';
+            canvas.style.transformOrigin = '0 0';
+            canvas.style.transform = t;
+            if (drawingPreview) {
+                drawingPreview.style.transformOrigin = '0 0';
+                drawingPreview.style.transform = t;
+            }
+            var lvl = document.getElementById('zoom-level');
+            if (lvl) lvl.textContent = Math.round(viewZoom * 100) + '%';
+        }
+        window.zoomView = function(factor) {
+            viewZoom = Math.min(4, Math.max(0.25, viewZoom * factor));
+            applyView();
+        };
+        window.panView = function(dx, dy) {
+            viewPanX += dx;
+            viewPanY += dy;
+            applyView();
+        };
+        window.resetView = function() {
+            viewZoom = 1; viewPanX = 0; viewPanY = 0;
+            applyView();
+        };
+
         // ---- Drawing events ----
         function getPos(e) {
             var rect = canvas.getBoundingClientRect();
             if (e.touches && e.touches.length > 0) {
-                return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                return { x: (e.touches[0].clientX - rect.left) / viewZoom, y: (e.touches[0].clientY - rect.top) / viewZoom };
             }
-            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            return { x: (e.clientX - rect.left) / viewZoom, y: (e.clientY - rect.top) / viewZoom };
         }
 
         function startDraw(e) {

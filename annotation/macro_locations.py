@@ -1,23 +1,19 @@
-"""Per-site macro-to-UI-location mapping.
-
-Generated from template scanning. Updated to remove misassigned dropdown macros.
-"""
+# Auto-maintained mapping of macros to verified site UI locations.
+# Audited against site templates/routes on 2026-07-08 (full site-by-site pass);
+# missing UIs were then built and their macro entries restored the same day.
 
 MACRO_LOCATIONS = {
     "academic-paper-db": {
         "navigate_by_route": [
             "'Scholar Search' page -> click paper title to view paper details",
             "'Scholar Search' page -> click category badge to filter by category",
-            "'Scholar Search' page -> click author name to view author page"
+            "Paper detail page -> click author name to view author page"
         ],
         "search_by_query": [
             "'Scholar Search' page -> 'Search papers...' text field at top"
         ],
         "search_by_semantic": [
             "'Scholar Search' page -> 'Search papers...' field with relevance ranking"
-        ],
-        "search_by_checkbox": [
-            "'Scholar Search' page -> category badge links on each paper card"
         ],
         "search_by_route": [
             "Category page -> category links in sidebar navigation"
@@ -28,9 +24,6 @@ MACRO_LOCATIONS = {
         "filter_by_dropdown": [
             "'Scholar Search' page -> 'Sort' dropdown (Date, Title, Relevance)",
             "'Scholar Search' page -> 'Year' dropdown for date filtering"
-        ],
-        "filter_by_date_range": [
-            "'Scholar Search' page -> 'Year' dropdown (Any, Since YYYY)"
         ],
         "sort_by_ranking": [
             "'Scholar Search' page -> 'Sort' dropdown (Date, Title, Relevance)"
@@ -49,14 +42,8 @@ MACRO_LOCATIONS = {
             "Paper detail page -> full abstract, metadata, author list",
             "Author page -> list of author's papers"
         ],
-        "compute_by_dropdown": [
-            "Category page -> paper count shown next to each category link"
-        ],
         "compare_from_table": [
             "Compare page -> two paper selection dropdowns and side-by-side table"
-        ],
-        "export_by_dropdown": [
-            "Paper detail page -> export link in metadata section"
         ],
         "export_by_route": [
             "Paper detail page -> export link with format options"
@@ -71,6 +58,9 @@ MACRO_LOCATIONS = {
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "compute_by_dropdown": [
+            "Category page -> 'Compute paper count' category dropdown showing the computed paper count on selection"
         ]
     },
     "agency-portals": {
@@ -94,7 +84,7 @@ MACRO_LOCATIONS = {
         "filter_by_dropdown": [
             "'Services' page -> category and department dropdowns",
             "'Permits' page -> status and type dropdowns",
-            "'Public Records' page -> type and category dropdowns"
+            "'Public Records' page -> record type dropdown"
         ],
         "filter_by_date_range": [
             "'Public Records' page -> date filter fields"
@@ -188,10 +178,7 @@ MACRO_LOCATIONS = {
             "'Settings' page -> default bot, theme, font size dropdowns"
         ],
         "export_by_dropdown": [
-            "Chat page -> export type and format dropdowns"
-        ],
-        "upload_by_upload": [
-            "'Settings' page -> file upload for knowledge base import"
+            "'Settings' page -> export type and format dropdowns"
         ],
         "share_by_toggle": [
             "Chat page -> 'Share' button for conversation"
@@ -207,12 +194,15 @@ MACRO_LOCATIONS = {
         ],
         "register_by_form": [
             "Register page -> email, password, and confirm fields"
+        ],
+        "upload_by_upload": [
+            "'Settings' page -> 'Import File to Knowledge Base' file input (.txt/.md/.csv/.json) with topic/category fields"
         ]
     },
     "auctions-p2p-marketplaces": {
         "navigate_by_route": [
             "'BidMarket' page -> click listing card to view details",
-            "'BidMarket' page -> click seller name to view profile",
+            "Listing detail -> click seller name to view profile",
             "Category page -> click listing to view details"
         ],
         "search_by_query": [
@@ -228,7 +218,7 @@ MACRO_LOCATIONS = {
             "'BidMarket' page -> 'Category' and 'Status' dropdowns"
         ],
         "filter_by_radio": [
-            "Listing detail -> condition radio buttons (New, Like New, Good, etc.)"
+            "'BidMarket' page -> condition radio buttons (New, Like New, Good, etc.)"
         ],
         "filter_by_slider": [
             "'BidMarket' page -> 'Max Price' slider below the sort dropdown"
@@ -249,7 +239,7 @@ MACRO_LOCATIONS = {
             "'Sell' page -> listing form (title, description, price, category)"
         ],
         "submit_by_form": [
-            "Listing detail -> bid amount input and bid button"
+            "Listing detail -> bid amount input and submit button"
         ],
         "edit_by_form": [
             "Edit listing page -> form with title, description, price, category"
@@ -264,9 +254,6 @@ MACRO_LOCATIONS = {
         "configure_by_slider": [
             "'BidMarket' page -> 'Max Price' slider, 0 to $999"
         ],
-        "rate_by_slider": [
-            "Listing detail -> bid form with amount input and seller rating"
-        ],
         "follow_by_toggle": [
             "Listing detail -> 'Follow Seller' button"
         ],
@@ -278,9 +265,6 @@ MACRO_LOCATIONS = {
         ],
         "message_from_free_text": [
             "Listing detail -> 'Send Message' form with subject and textarea"
-        ],
-        "submit_by_form": [
-            "Listing detail -> bid amount input and submit button"
         ],
         "add_by_button": [
             "Listing detail -> 'Add to Watchlist' button"
@@ -312,9 +296,6 @@ MACRO_LOCATIONS = {
             "'Transaction History' page -> 'Type' dropdown (Debit, Credit)",
             "'Transaction History' page -> 'Sort' dropdown (Date, Amount, Description)",
             "Credit Card Transactions -> category and status dropdowns"
-        ],
-        "filter_by_radio": [
-            "'Transaction History' page -> 'Type' dropdown for filtering by deposit/withdrawal"
         ],
         "filter_by_date_range": [
             "'Transaction History' page -> 'From' and 'To' date fields above the table",
@@ -353,7 +334,7 @@ MACRO_LOCATIONS = {
             "'Payees' page -> Add Payee form (name, account, routing fields)"
         ],
         "submit_by_form": [
-            "'Transfer Funds' page -> search payee field"
+            "'Transfer Funds' page -> transfer form with from/to account dropdowns, amount, and submit"
         ],
         "edit_by_form": [
             "'Settings' page -> user settings form (email, phone, notifications)",
@@ -369,9 +350,6 @@ MACRO_LOCATIONS = {
         "configure_by_date_range": [
             "'Pay Bills' page -> due date field and auto-pay dropdown"
         ],
-        "export_by_dropdown": [
-            "API export endpoint for transactions as CSV or JSON"
-        ],
         "pay_by_query": [
             "'Pay Bills' page -> select account, enter amount, and submit"
         ],
@@ -385,6 +363,9 @@ MACRO_LOCATIONS = {
         ],
         "verify_identity_by_code": [
             "'Verify ID' page -> 6-digit code input form"
+        ],
+        "export_by_dropdown": [
+            "'Transactions' page -> export format dropdown (CSV/JSON) with Export button"
         ]
     },
     "blogs": {
@@ -538,17 +519,8 @@ MACRO_LOCATIONS = {
         "compute_by_extremum": [
             "Ticker detail page -> price chart with period buttons (1D, 1W, 1M, 3M, 1Y)"
         ],
-        "compute_by_slider": [
-            "'Trade' page -> 'Shares' input with live estimate calculation"
-        ],
-        "compare_by_dropdown": [
-            "Compare page -> ticker selection dropdowns and side-by-side table"
-        ],
-        "verify_by_slider": [
-            "'Portfolio' page -> portfolio value and P&L data display"
-        ],
         "submit_by_form": [
-            "'Trade' page -> 'Symbol' dropdown search"
+            "'Trade' page -> trade form with symbol, shares, order type, and submit"
         ],
         "select_by_dropdown": [
             "'Trade' page -> 'Symbol' dropdown, 'Order Type' dropdown (Market, Limit, Stop Loss), 'Pay With' dropdown"
@@ -556,20 +528,11 @@ MACRO_LOCATIONS = {
         "configure_by_radio": [
             "'Trade' page -> Buy/Sell toggle and 'Order Type' dropdown"
         ],
-        "configure_by_slider": [
-            "'Trade' page -> 'Shares' input with real-time estimate update"
-        ],
-        "export_by_dropdown": [
-            "'All Securities' section -> 'Export CSV' link above the table"
-        ],
         "follow_by_toggle": [
             "Ticker detail page -> 'Add to Watchlist'/'Remove' button"
         ],
         "save_by_toggle": [
             "'Lists' page -> toggle watchlist inclusion"
-        ],
-        "submit_by_form": [
-            "'Trade' page -> trade form with symbol, shares, order type, and submit"
         ],
         "pay_by_query": [
             "'Trade' page -> 'Pay With' dropdown (Checking Account, Credit Card)"
@@ -580,11 +543,11 @@ MACRO_LOCATIONS = {
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
-        "verify_identity_by_code": [
-            "Login page -> username and password form for authentication"
-        ],
         "compute_by_dropdown": [
             "'All Securities' section -> sector and type filter dropdowns"
+        ],
+        "verify_identity_by_code": [
+            "'Login' page -> 2FA verification code input step shown after credentials"
         ]
     },
     "business-company": {
@@ -632,7 +595,7 @@ MACRO_LOCATIONS = {
             "Top bar -> 'Search events...' field"
         ],
         "filter_by_dropdown": [
-            "Left panel -> 'Category' checkboxes (Health, Personal, Work)",
+            "Left panel -> 'Category' dropdown (Work, Personal, Health)",
             "Left panel -> priority dropdown (High, Medium, Low)",
             "Left panel -> 'User' dropdown (Alex Rivera, Priya Sharma, etc.)",
             "Left panel -> sort dropdown (Date, Title, Priority)"
@@ -711,7 +674,7 @@ MACRO_LOCATIONS = {
             "'Alerts' page -> status, severity, category dropdowns",
             "'API Gateway' -> method, status, sort dropdowns",
             "'Billing' page -> month and category dropdowns",
-            "'Logs' page -> level and service dropdowns"
+            "'Logs' page -> level and category dropdowns"
         ],
         "filter_by_checkbox": [
             "'Instances' page -> 'Environment' checkboxes (Production, Staging, Development)"
@@ -754,14 +717,8 @@ MACRO_LOCATIONS = {
         "verify_by_dropdown": [
             "'Services' page -> 'Status' dropdown showing service health"
         ],
-        "create_by_form": [
-            "'Instances' page -> instance list with filters; 'Functions' page -> functions list"
-        ],
         "submit_by_form": [
             "'Services' page -> search field with filter dropdowns and 'Apply' button"
-        ],
-        "edit_by_form": [
-            "Instance detail page -> configuration display"
         ],
         "delete_from_table": [
             "'Instances' page -> 'Delete' button per instance row"
@@ -775,11 +732,15 @@ MACRO_LOCATIONS = {
         "configure_by_query": [
             "'Metrics' page -> CPU threshold slider with instance filter dropdown"
         ],
-        "export_by_dropdown": [
-            "'Console Home' page -> 'Export CSV' link in services section"
-        ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "create_by_form": [
+            "'Instances' page -> 'Launch instance' form (name, type, region, OS, environment)",
+            "'Functions' page -> 'Create function' form (name, runtime, handler, memory, timeout)"
+        ],
+        "edit_by_form": [
+            "Instance detail page -> 'Edit Configuration' section with name/type/vCPUs/memory/OS fields"
         ]
     },
     "cloud-storage-file-transfer": {
@@ -816,9 +777,6 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "File detail page -> file metadata, sharing info, transfer records"
         ],
-        "compute_by_slider": [
-            "Upload modal -> 'Size in bytes' input field"
-        ],
         "create_by_form": [
             "'New folder' button -> folder name input ('Untitled folder' placeholder)"
         ],
@@ -826,7 +784,7 @@ MACRO_LOCATIONS = {
             "Upload modal -> file type dropdown; main view -> type filter dropdown"
         ],
         "edit_by_form": [
-            "File detail page -> rename, move, share settings forms"
+            "File detail page -> sharing form ('Enter email to invite')"
         ],
         "delete_from_table": [
             "File rows -> delete action (moves to trash)",
@@ -880,12 +838,7 @@ MACRO_LOCATIONS = {
             "'Editor' page -> code content textarea with run/save buttons"
         ],
         "configure_by_slider": [
-            "'Editor' page -> font size slider in editor settings",
-            "'Editor' page -> tab size select dropdown",
-            "Settings page -> tab size, theme, difficulty selects"
-        ],
-        "export_by_dropdown": [
-            "'CodeRunner' gallery -> 'Export CSV' and 'Export JSON' links above snippets"
+            "'Editor' page -> font size slider in editor settings"
         ],
         "upload_by_query": [
             "Upload page -> file upload form for importing code snippets"
@@ -897,7 +850,7 @@ MACRO_LOCATIONS = {
     "comparison-aggregators": {
         "navigate_by_route": [
             "'PhoneCompare' page -> click phone card to view specs",
-            "'PhoneCompare' page -> click brand name to browse brand's phones"
+            "Phone detail page -> click brand name in breadcrumb to browse brand's phones"
         ],
         "search_by_query": [
             "'PhoneCompare' page -> 'Search phones...' field at top"
@@ -908,9 +861,6 @@ MACRO_LOCATIONS = {
         "filter_by_dropdown": [
             "'PhoneCompare' page -> brand and OS dropdowns in the filter bar"
         ],
-        "filter_by_checkbox": [
-            "'PhoneCompare' page -> feature checkboxes (NFC, waterproof, etc.)"
-        ],
         "filter_by_toggle": [
             "Phone detail page -> 'Favorite'/'Unfavorite' and 'Add/Remove from Compare' toggles"
         ],
@@ -920,9 +870,6 @@ MACRO_LOCATIONS = {
         ],
         "sort_by_ranking": [
             "'PhoneCompare' page -> sort dropdown (Newest, Name A-Z, Price, Battery)"
-        ],
-        "sort_by_slider": [
-            "'PhoneCompare' page -> sort dropdown for ordering by price/rating/name"
         ],
         "extract_by_dropdown": [
             "'PhoneCompare' page -> brand/OS dropdown returns filtered phone list"
@@ -951,9 +898,6 @@ MACRO_LOCATIONS = {
         "compare_from_table": [
             "'Compare' page -> comparison table of selected phones"
         ],
-        "verify_by_slider": [
-            "Phone detail page -> all technical specifications display"
-        ],
         "select_from_table": [
             "Phone detail page -> 'Add to Compare' button"
         ],
@@ -966,11 +910,14 @@ MACRO_LOCATIONS = {
         "save_by_toggle": [
             "Phone detail page -> 'Add to Favorites' button",
             "'Dashboard' page -> 'Remove from Favorites' button"
+        ],
+        "filter_by_checkbox": [
+            "'PhoneCompare' page -> 'Features:' checkboxes (NFC, GPS, Dual SIM, Fingerprint) in the filter toolbar"
         ]
     },
     "conference-review-submission": {
         "navigate_by_route": [
-            "'OpenReview' page -> click venue name to view papers",
+            "'PeerPortal' page -> click venue name to view papers",
             "Venue page -> click paper title to view details"
         ],
         "search_by_query": [
@@ -978,12 +925,6 @@ MACRO_LOCATIONS = {
         ],
         "search_by_semantic": [
             "Venue page -> search with keyword matching across paper titles"
-        ],
-        "filter_by_dropdown": [
-            "Venue page -> filter tabs: 'All Submissions', 'Accepted', 'Rejected'"
-        ],
-        "sort_by_slider": [
-            "Venue page -> sort buttons: 'Title', 'Score (high first)', 'Score (low first)', 'Most reviewed'"
         ],
         "extract_by_query": [
             "Search returns matching papers with titles and scores"
@@ -994,17 +935,8 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Paper detail page -> full paper info, reviews, scores"
         ],
-        "compare_by_slider": [
-            "Venue page -> 'Min' and 'Max' score inputs with sort radio buttons"
-        ],
-        "verify_by_slider": [
-            "Venue page -> score Min/Max filter inputs for verifying score thresholds"
-        ],
         "create_by_form": [
             "Review page -> title input, recommendation/confidence dropdowns, comments textarea"
-        ],
-        "submit_by_form": [
-            "Venue page -> search field to find papers, then paper page -> bid form"
         ],
         "submit_by_form": [
             "Paper detail page -> 'Bid'/'Unbid' button to declare review interest"
@@ -1012,15 +944,9 @@ MACRO_LOCATIONS = {
         "edit_by_query": [
             "Paper detail page -> 'Bid'/'Unbid' toggle button"
         ],
-        "delete_from_table": [
-            "Paper detail page -> 'Withdraw' action in metadata section"
-        ],
         "select_by_dropdown": [
             "Review form -> recommendation dropdown (accept, weak_accept, etc.)",
             "Review form -> confidence dropdown (high, medium, low)"
-        ],
-        "export_by_dropdown": [
-            "'OpenReview' page -> 'Export CSV' link in header"
         ],
         "upload_by_upload": [
             "Console page -> paper upload form accepting .pdf, .doc, .docx, .tex files"
@@ -1028,14 +954,14 @@ MACRO_LOCATIONS = {
         "post_from_free_text": [
             "Review form -> review text textarea, strengths/weaknesses fields"
         ],
-        "rate_by_slider": [
-            "Review form -> overall score input (1-10), novelty, clarity, significance scores"
-        ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
         "register_by_form": [
             "Login page -> username and password form for authentication"
+        ],
+        "delete_from_table": [
+            "Paper detail page -> 'Withdraw Submission' button in the Submission Details metadata grid"
         ]
     },
     "converters-calculators": {
@@ -1051,26 +977,11 @@ MACRO_LOCATIONS = {
         "extract_from_table": [
             "Converter page -> conversion result display with from/to dropdowns"
         ],
-        "extract_by_slider": [
-            "Converter page -> input value shows live converted result"
-        ],
         "compare_from_table": [
             "Dashboard page -> saved conversions list for comparison"
         ],
-        "select_by_slider": [
-            "Calculator page -> numeric inputs (weight, height, principal, rate, etc.)"
-        ],
-        "configure_by_slider": [
-            "Tip Calculator -> tip percent dropdown"
-        ],
-        "export_by_dropdown": [
-            "'CalcTools' page -> 'Export History CSV' link below conversion history"
-        ],
         "compute_by_query": [
             "Calculator page -> expression input for computation"
-        ],
-        "compute_by_slider": [
-            "Converter page -> numeric input for live conversion"
         ],
         "submit_by_form": [
             "Converter/Calculator -> save conversion result form"
@@ -1078,9 +989,6 @@ MACRO_LOCATIONS = {
         "translate_by_dropdown": [
             "Converter page -> from-unit and to-unit dropdowns (Length, Weight, Temperature, etc.)",
             "Base Converter -> from-base and to-base dropdowns (2-36)"
-        ],
-        "translate_by_slider": [
-            "Converter page -> numeric value input converts between selected units"
         ]
     },
     "course-sites-classrooms": {
@@ -1090,9 +998,6 @@ MACRO_LOCATIONS = {
         "navigate_by_route": [
             "'Welcome back, Alex!' page -> click course card to view course",
             "Course page -> click assignment to view details"
-        ],
-        "search_by_query": [
-            "'EduPortal LMS' page -> course listing search and navigation"
         ],
         "extract_by_query": [
             "Course page -> assignments, discussions, and gradebook links"
@@ -1104,17 +1009,8 @@ MACRO_LOCATIONS = {
             "Course detail page -> course info, assignments, materials",
             "Assignment detail page -> assignment instructions and submission form"
         ],
-        "extract_by_slider": [
-            "Gradebook page -> grades table with student scores and export link"
-        ],
-        "extract_by_date_range": [
-            "Assignment page -> due dates and submission form"
-        ],
         "create_by_form": [
             "Discussions page -> new discussion form (title and body textarea)"
-        ],
-        "submit_by_form": [
-            "Assignment page -> submission form with textarea and 'Submit' button"
         ],
         "submit_by_form": [
             "Assignment page -> submit assignment form (text content)",
@@ -1126,29 +1022,32 @@ MACRO_LOCATIONS = {
         "upload_by_upload": [
             "Assignment page -> file upload for assignment submission"
         ],
-        "play_by_route": [
-            "Course page -> lecture links to specific content"
-        ],
-        "play_by_playback": [
-            "Course page -> lecture content area with playback controls"
-        ],
         "post_from_free_text": [
             "Discussions page -> reply form textarea"
         ],
         "post_by_route": [
             "Discussions page -> post new discussion thread"
         ],
-        "react_by_toggle": [
-            "Discussions page -> 'Reply' form on discussion posts"
-        ],
-        "follow_by_toggle": [
-            "Course page -> enrollment controls for joining/leaving course"
-        ],
         "follow_by_route": [
             "'EduPortal LMS' page -> 'View & Enroll' link on course cards"
         ],
+        "search_by_query": [
+            "'EduPortal LMS' dashboard -> search input with 'Search' button filtering the course catalog by title, code, or department"
+        ],
+        "extract_by_date_range": [
+            "Assignment page -> 'From'/'To' date inputs with 'Filter by date' button filtering the submissions table"
+        ],
+        "play_by_route": [
+            "Course page -> lecture lesson title links that load the chosen lecture into the Lecture Player section"
+        ],
+        "play_by_playback": [
+            "Course page -> 'Lecture Player' section with Play/Pause toggle and elapsed-time counter"
+        ],
+        "follow_by_toggle": [
+            "Course page -> enrollment toggle button ('Enroll in Course' / 'Enrolled — Leave Course') in the course header"
+        ],
         "join_by_toggle": [
-            "Course page -> enroll/unenroll action for the course"
+            "Course page -> enroll/unenroll toggle button in the course header"
         ]
     },
     "crm": {
@@ -1163,7 +1062,7 @@ MACRO_LOCATIONS = {
         "search_by_query": [
             "'Contacts' page -> search input field",
             "'Companies' page -> search input field",
-            "'Deals' page -> search input field"
+            "'Deals' page -> 'Search deals...' text input + Filter button in the pipeline toolbar"
         ],
         "search_by_semantic": [
             "'Contacts' page -> 'Search contacts by name, email, or title...' field with company filter"
@@ -1176,9 +1075,6 @@ MACRO_LOCATIONS = {
             "'Companies' page -> industry dropdown filter",
             "'Deals' page -> stage dropdown (prospecting, qualification, proposal, etc.), owner dropdown",
             "'Activities' page -> type dropdown (call, meeting, email, note, task)"
-        ],
-        "filter_by_date_range": [
-            "'Activities' page -> date filter inputs"
         ],
         "sort_by_ranking": [
             "'Pipeline Overview' -> 'Sort Deals' dropdown (Amount High-Low, Low-High, Close Date, Name A-Z)"
@@ -1228,6 +1124,9 @@ MACRO_LOCATIONS = {
         ],
         "export_by_dropdown": [
             "'Pipeline Overview' dashboard -> 'Export CSV' link in Deals section header"
+        ],
+        "filter_by_date_range": [
+            "'Activities' page -> From/To date inputs + Filter button in the toolbar"
         ]
     },
     "crowdfunding-donations": {
@@ -1261,16 +1160,13 @@ MACRO_LOCATIONS = {
             "Search returns matching campaign cards"
         ],
         "extract_by_dropdown": [
-            "Category page -> filtered campaigns by category"
+            "'FundSpark' page -> status/sort dropdown returns filtered campaigns"
         ],
         "extract_by_route": [
             "Campaign detail page -> funding progress, updates, backers"
         ],
         "compute_by_dropdown": [
-            "Category page -> campaigns with funding progress bars"
-        ],
-        "verify_by_slider": [
-            "Campaign detail page -> funding progress bar (current vs goal)"
+            "'FundSpark' page -> status/sort dropdown with campaign funding progress bars"
         ],
         "create_by_form": [
             "'Start a Project' page -> campaign form (title, description, goal, category, dates)"
@@ -1278,23 +1174,14 @@ MACRO_LOCATIONS = {
         "submit_by_form": [
             "Campaign detail page -> pledge form with tier selection and custom amount input"
         ],
-        "select_by_radio": [
-            "Campaign detail page -> reward tier cards with 'Select this reward' buttons"
-        ],
-        "configure_by_slider": [
-            "Campaign detail page -> custom pledge amount input"
-        ],
         "post_from_free_text": [
             "Campaign detail page -> post update form textarea"
         ],
         "react_by_toggle": [
             "Campaign detail page -> 'Share' button"
         ],
-        "follow_by_dropdown": [
-            "Campaign detail page -> creator profile link with follow action"
-        ],
         "subscribe_by_toggle": [
-            "Campaign detail page -> updates section with posting form"
+            "Campaign detail page -> 'Subscribe to Updates' button"
         ],
         "share_by_dropdown": [
             "Campaign detail page -> 'Share' button for sharing via link"
@@ -1334,13 +1221,13 @@ MACRO_LOCATIONS = {
             "'Spark' page -> 'Looking for' dropdown, sort dropdown (Age, Name, Newest)"
         ],
         "filter_by_checkbox": [
-            "Profiles page -> 'Interest' filter input (e.g. hiking)"
+            "Profiles page -> interest checkboxes (hiking, cooking, reading, etc.)"
         ],
         "filter_by_date_range": [
             "'Spark' page -> 'Joined From' and 'To' date fields in filter bar"
         ],
         "filter_by_proximity": [
-            "Profiles page -> filter form with location and looking_for dropdowns"
+            "Profiles page -> filter form with gender and looking_for dropdowns"
         ],
         "sort_by_ranking": [
             "'Spark' page -> sort dropdown (Age Low-High, Age High-Low, Name A-Z, Newest)"
@@ -1387,17 +1274,8 @@ MACRO_LOCATIONS = {
         "save_by_toggle": [
             "Profile detail page -> Like/Pass buttons for saving interest"
         ],
-        "report_by_form": [
-            "Profile detail page -> profile action buttons area"
-        ],
-        "block_by_toggle": [
-            "Profile detail page -> profile action buttons area"
-        ],
         "message_from_free_text": [
             "Conversation page -> message textarea and send button"
-        ],
-        "subscribe_by_toggle": [
-            "'Edit Profile' page -> preference dropdowns for 'Looking for' and 'Gender Preference'"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -1405,8 +1283,11 @@ MACRO_LOCATIONS = {
         "register_by_query": [
             "Login page -> authentication form"
         ],
-        "verify_identity_by_code": [
-            "Login page -> authentication form with username and password"
+        "report_by_form": [
+            "Profile detail page -> report form (reason input + 'Report' button) under Like/Pass"
+        ],
+        "block_by_toggle": [
+            "Profile detail page -> Block/Blocked toggle button in the safety-actions row"
         ]
     },
     "design-creative": {
@@ -1439,9 +1320,6 @@ MACRO_LOCATIONS = {
         "create_from_table": [
             "Template page -> 'Use This Template' button"
         ],
-        "edit_by_toggle": [
-            "Project page -> status dropdown and title input for editing"
-        ],
         "edit_by_form": [
             "Project detail -> update form with name and status dropdown"
         ],
@@ -1449,7 +1327,7 @@ MACRO_LOCATIONS = {
             "Editor page -> canvas elements with Remove/Delete actions"
         ],
         "select_by_dropdown": [
-            "Editor page -> status dropdown for project"
+            "'Project' page -> status dropdown (Draft, Completed)"
         ],
         "select_by_chip": [
             "'DesignFlow' page -> category links for selecting template types"
@@ -1463,11 +1341,8 @@ MACRO_LOCATIONS = {
         "play_by_playback": [
             "Editor page -> canvas preview area with design elements"
         ],
-        "export_by_dropdown": [
-            "Project page -> 'Export / Print' button"
-        ],
         "upload_by_upload": [
-            "Editor page -> upload asset file input and color picker"
+            "'Assets' page -> 'Upload Asset' file input"
         ],
         "post_from_free_text": [
             "Project page -> 'Save Changes' button and update form"
@@ -1477,9 +1352,6 @@ MACRO_LOCATIONS = {
         ],
         "follow_by_toggle": [
             "Template page -> 'Favorite' toggle for tracking designs"
-        ],
-        "share_by_toggle": [
-            "Project page -> 'Copy Link' button for sharing via link"
         ],
         "save_by_toggle": [
             "Template page -> 'Favorite' button toggle"
@@ -1580,19 +1452,13 @@ MACRO_LOCATIONS = {
         ],
         "delete_from_table": [
             "'Trash' page -> permanent delete button per document",
-            "Document view -> delete button (moves to trash)"
-        ],
-        "export_by_dropdown": [
-            "'DocEdit' page -> 'Export JSON' and 'Export CSV' links in sidebar"
+            "Document view -> Delete button in the toolbar (owner only) moving the document to trash"
         ],
         "upload_by_upload": [
             "'DocEdit' page -> 'Upload File' button in sidebar"
         ],
-        "share_by_toggle": [
-            "Editor page -> share form with user dropdown and permission dropdown (view/edit/admin)"
-        ],
         "save_by_toggle": [
-            "Document rows -> star/unstar toggle button (filled/empty star)",
+            "Editor page -> 'Star'/'Unstar' toggle button in header",
             "'Starred' page -> unstar button"
         ],
         "invite_by_query": [
@@ -1603,6 +1469,9 @@ MACRO_LOCATIONS = {
         ]
     },
     "e-commerce": {
+        "pay_by_form": [
+            "'Checkout' page -> shipping address fields (full name, street, city, state, ZIP), shipping method radios (Standard/Express/Overnight), 'Pay with' dropdown, and 'Place Your Order' button"
+        ],
         "navigate_by_route": [
             "'ShopHub' page -> click product card to view details"
         ],
@@ -1617,12 +1486,6 @@ MACRO_LOCATIONS = {
         ],
         "filter_by_checkbox": [
             "'ShopHub' page -> category checkboxes in left sidebar filter panel"
-        ],
-        "filter_by_chip": [
-            "'ShopHub' page -> category filter dropdown with 'Apply Filters' button"
-        ],
-        "filter_by_toggle": [
-            "'ShopHub' page -> 'Any Rating' dropdown for filtering by star rating"
         ],
         "filter_by_slider": [
             "'ShopHub' page -> 'Max Price' slider in left sidebar filter panel"
@@ -1651,14 +1514,8 @@ MACRO_LOCATIONS = {
         "select_by_dropdown": [
             "Product detail -> quantity dropdown, size/variant dropdown"
         ],
-        "configure_by_chip": [
-            "Product detail page -> quantity dropdown for configuring order"
-        ],
         "configure_by_slider": [
             "'ShopHub' page -> 'Min $' input and 'Max Price' slider for price range"
-        ],
-        "rate_by_slider": [
-            "Product detail -> write review form with rating dropdown (1-5 stars)"
         ],
         "save_by_toggle": [
             "Product detail -> 'Add to Wishlist' button",
@@ -1668,13 +1525,13 @@ MACRO_LOCATIONS = {
             "Product detail and listing pages -> 'Add to Cart' button"
         ],
         "checkout_by_form": [
-            "'Cart' page -> checkout form with shipping and payment fields"
+            "'Checkout' page -> checkout form with shipping address, shipping method, and payment fields"
         ],
         "redeem_by_code": [
-            "'Cart' page -> checkout form with account type dropdown"
+            "'Cart' page -> promo code entry input with 'Apply' button in the order summary showing applied discount"
         ],
         "cancel_by_form": [
-            "'Orders' page -> 'Cancel Order' button"
+            "'Orders' page -> 'Cancel Order' button on each non-shipped order"
         ]
     },
     "email": {
@@ -1691,9 +1548,6 @@ MACRO_LOCATIONS = {
         "search_by_query": [
             "'WebMail' page -> 'Search mail...' field at top",
             "Search page -> search form"
-        ],
-        "search_by_dropdown": [
-            "Search page -> search within specific folder"
         ],
         "filter_by_dropdown": [
             "Message detail -> move to folder dropdown"
@@ -1753,6 +1607,9 @@ MACRO_LOCATIONS = {
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "search_by_dropdown": [
+            "'Search' page -> folder dropdown (All folders/Inbox/Sent/Drafts/Trash/Spam) scoping search results"
         ]
     },
     "flights-hotels": {
@@ -1820,12 +1677,6 @@ MACRO_LOCATIONS = {
         "select_by_slider": [
             "Flights page -> max price input for filtering by maximum price"
         ],
-        "configure_by_radio": [
-            "Flights tab -> 'Cabin Class' dropdown (Economy, Business, First)"
-        ],
-        "configure_by_slider": [
-            "Flights tab -> 'Travelers' dropdown selector"
-        ],
         "add_by_dropdown": [
             "Flight/Hotel detail -> 'Travelers'/nights dropdowns in booking form"
         ],
@@ -1837,10 +1688,7 @@ MACRO_LOCATIONS = {
             "Hotel detail -> Book Hotel form (nights, travelers, submit)"
         ],
         "pay_by_form": [
-            "Booking page -> payment form during checkout"
-        ],
-        "redeem_by_code": [
-            "'SkyLodge' page -> newsletter email input and 'Subscribe' button"
+            "Flight/Hotel detail -> booking form with account type payment selection"
         ],
         "cancel_by_form": [
             "Booking detail -> 'Cancel Booking' button with confirmation"
@@ -1852,7 +1700,7 @@ MACRO_LOCATIONS = {
         ],
         "navigate_by_route": [
             "'FormFlow' page -> click form card to view form",
-            "Top nav -> 'Blank form', 'From template' links"
+            "'FormFlow' page -> 'Blank form' and 'From template' quick-start cards"
         ],
         "extract_by_query": [
             "'FormFlow' page -> search filters forms showing title, response count, status"
@@ -1879,12 +1727,6 @@ MACRO_LOCATIONS = {
         "submit_by_route": [
             "Respond page -> fill out and submit form response"
         ],
-        "submit_by_ranking": [
-            "Respond page -> ranking field type (drag to reorder items)"
-        ],
-        "submit_by_slider": [
-            "Respond page -> slider field type (range input)"
-        ],
         "edit_by_query": [
             "'Blank form' page -> form builder with title, description, field types, options"
         ],
@@ -1894,14 +1736,14 @@ MACRO_LOCATIONS = {
         "select_by_dropdown": [
             "Form builder -> field type dropdown (text, textarea, rating, radio, checkbox, etc.)"
         ],
-        "export_by_dropdown": [
-            "Results page -> Summary and Individual Responses tabs with data display"
-        ],
-        "upload_by_upload": [
-            "Form builder -> field type dropdown includes various input types"
-        ],
         "share_by_toggle": [
             "'FormFlow' page -> 'Share' button on each form card (copies URL, shows 'Copied!')"
+        ],
+        "submit_by_ranking": [
+            "Respond page -> ranking field with up/down reorder buttons per item and live rank numbers"
+        ],
+        "upload_by_upload": [
+            "Form detail page -> 'Attachments' file input with 'Upload File' button"
         ]
     },
     "forums": {
@@ -1918,7 +1760,7 @@ MACRO_LOCATIONS = {
             "Search page -> search form"
         ],
         "search_by_semantic": [
-            "Semantic search API with keyword ranking"
+            "'Search' page -> 'Search ForumHub' field"
         ],
         "filter_by_dropdown": [
             "'ForumHub' page -> 'Subreddit' dropdown"
@@ -1930,7 +1772,7 @@ MACRO_LOCATIONS = {
             "'ForumHub' page -> 'Hot', 'New', 'Top' sort tabs above posts"
         ],
         "extract_by_semantic": [
-            "Semantic search API returns scored results"
+            "'Search' page -> search results list"
         ],
         "extract_by_dropdown": [
             "'ForumHub' page -> 'Subreddit' dropdown returns filtered posts"
@@ -1958,9 +1800,6 @@ MACRO_LOCATIONS = {
             "Post detail -> upvote/downvote arrow buttons",
             "Comments -> upvote/downvote arrow buttons"
         ],
-        "follow_by_dropdown": [
-            "User profile page -> 'Follow' button"
-        ],
         "follow_by_toggle": [
             "User profile page -> 'Follow' button"
         ],
@@ -1986,16 +1825,16 @@ MACRO_LOCATIONS = {
             "Login page -> username and password fields"
         ],
         "register_by_form": [
-            "Register page -> email, username, password fields"
+            "Register page -> username and password fields"
         ]
     },
     "handwritten-notes-whiteboards": {
+        "configure_by_slider": [
+            "Note editor -> brush size slider in the drawing toolbar (1-10)"
+        ],
         "navigate_by_route": [
             "'All Notes' list -> click note to open it",
             "Top nav -> '+ New Note' button; sidebar -> tag links (work, personal, ideas, etc.)"
-        ],
-        "navigate_by_pan_zoom": [
-            "Whiteboard page -> zoom/pan controls"
         ],
         "search_by_query": [
             "'NoteCanvas' page -> 'Search notes...' field at top"
@@ -2041,6 +1880,9 @@ MACRO_LOCATIONS = {
         ],
         "invite_by_form": [
             "Note page -> 'Invite by email' input and 'Invite' button in toolbar"
+        ],
+        "navigate_by_pan_zoom": [
+            "Note editor (whiteboard canvas) -> zoom in/out with % readout, four pan arrows, and Reset View in the toolbar"
         ]
     },
     "health-fitness-tracking": {
@@ -2080,28 +1922,19 @@ MACRO_LOCATIONS = {
             "'Exercise' page -> 'Type' dropdown for viewing stats by workout type"
         ],
         "compute_by_extremum": [
-            "'Reports' page -> workout statistics and goal progress displays"
+            "'Reports' page -> workout statistics summary cards (averages, totals)"
         ],
         "compute_by_slider": [
-            "'Goals' page -> goal targets with progress tracking display"
-        ],
-        "compare_by_date_range": [
-            "'Exercise' page -> 'From'/'To' date range for comparing workout periods"
+            "'Goals' page -> 'Days Above Threshold' panel: metric dropdown + threshold slider + 'Compute' button"
         ],
         "verify_by_slider": [
-            "'Goals' page -> goal progress bars and target achievements"
+            "'Goals' page -> 'Tolerance' slider + 'Verify Goals' button showing on/off-track verdict per goal"
         ],
         "create_by_form": [
             "'+ Add Exercise' page -> log workout form with date, type, duration, calories, notes"
         ],
-        "create_by_checkbox": [
-            "'+ Add Exercise' page -> workout type dropdown with exercise options"
-        ],
         "submit_by_form": [
             "'Food Diary' page -> 'Search foods...' input with 'Servings' field and 'Log Food' button"
-        ],
-        "edit_by_form": [
-            "Workout detail page -> workout editing controls"
         ],
         "delete_from_table": [
             "'Food Diary' page -> 'x' button on each food entry; Dashboard -> logged items"
@@ -2110,16 +1943,7 @@ MACRO_LOCATIONS = {
             "'Exercise' page -> workout list with type and date filters"
         ],
         "configure_by_slider": [
-            "'Goals' page -> goal target configuration with progress tracking"
-        ],
-        "play_by_dropdown": [
-            "Workout detail page -> workout details with duration and calorie data"
-        ],
-        "play_by_playback": [
-            "'Reports' page -> statistics display with workout trends"
-        ],
-        "export_by_dropdown": [
-            "Dashboard -> 'Export CSV' link in workout log section"
+            "'Goals' page -> 'Daily Targets' panel: steps/calories/water/sleep/heart-rate sliders + 'Save Targets' button"
         ]
     },
     "health-portals": {
@@ -2127,18 +1951,6 @@ MACRO_LOCATIONS = {
             "'Appointments' page -> click appointment to view details",
             "'Records' page -> click record to view details",
             "'Messages' page -> click message to view thread"
-        ],
-        "search_by_query": [
-            "'Medical Records' page -> records listing with filtering"
-        ],
-        "search_by_semantic": [
-            "'Medical Records' page -> detailed record information display"
-        ],
-        "search_by_checkbox": [
-            "'Appointments' page -> date range and status/provider/department filters"
-        ],
-        "filter_by_radio": [
-            "'Appointments' page -> status filter (all, scheduled, completed, cancelled)"
         ],
         "filter_by_date_range": [
             "'Appointments' page -> date range filter inputs"
@@ -2162,7 +1974,7 @@ MACRO_LOCATIONS = {
             "'Appointments' page -> 'From' and 'To' date fields for date range filtering"
         ],
         "submit_by_form": [
-            "'Schedule Appointment' page -> provider dropdown, date/time inputs, type, and notes"
+            "'Schedule Appointment' page -> appointment form with provider, type, date, time"
         ],
         "submit_by_route": [
             "'Prescriptions' page -> 'Request Refill' button on each prescription"
@@ -2170,17 +1982,8 @@ MACRO_LOCATIONS = {
         "edit_by_form": [
             "'Schedule Appointment' page -> editable form fields; Register page -> profile form"
         ],
-        "export_by_dropdown": [
-            "'Billing' page -> billing records with payment information"
-        ],
-        "upload_by_upload": [
-            "'Send Message' page -> message form with subject, recipient, body"
-        ],
         "message_from_free_text": [
             "'Send Message' page -> recipient dropdown, subject field, body textarea"
-        ],
-        "submit_by_form": [
-            "'Schedule Appointment' page -> appointment form with provider, type, date, time"
         ],
         "book_by_form": [
             "'Schedule Appointment' page -> book appointment with provider, date, time"
@@ -2198,10 +2001,22 @@ MACRO_LOCATIONS = {
             "Login page -> username and password fields"
         ],
         "register_by_form": [
-            "Register page -> name, email, phone, gender, password fields"
+            "Register page -> first/last name, username, email, date of birth, gender, phone fields"
         ],
         "verify_identity_by_code": [
             "Verify page -> 6-digit verification code input"
+        ],
+        "search_by_query": [
+            "'Medical Records' page -> keyword search input + 'Search' button above the records list"
+        ],
+        "search_by_semantic": [
+            "'Medical Records' page -> natural-language 'Smart Search' input returning relevance-ranked records"
+        ],
+        "export_by_dropdown": [
+            "'Billing' page -> 'Export billing records' format dropdown (CSV/JSON) + Export button"
+        ],
+        "upload_by_upload": [
+            "'Send Message' page -> 'Attach a Document for Your Care Team' file input with description and Upload button"
         ]
     },
     "instant-messaging": {
@@ -2218,9 +2033,6 @@ MACRO_LOCATIONS = {
         "search_by_dropdown": [
             "Chat sidebar -> search field for finding specific chats"
         ],
-        "filter_by_toggle": [
-            "'QuickChat' page -> conversation list with star/pin indicators"
-        ],
         "filter_by_date_range": [
             "'QuickChat' page -> 'From' and 'To' date fields below search"
         ],
@@ -2236,44 +2048,44 @@ MACRO_LOCATIONS = {
         "create_by_form": [
             "Chat panel -> 'Type a message' input with 'Send' button"
         ],
-        "edit_by_form": [
-            "Chat panel -> message display with sent messages"
-        ],
         "delete_from_table": [
             "Chat panel -> 'x' delete button per message"
-        ],
-        "upload_by_upload": [
-            "Chat panel -> message input area for sending content"
         ],
         "post_from_free_text": [
             "Chat panel -> message input box and send"
         ],
-        "follow_by_toggle": [
-            "'QuickChat' page -> pin/star indicators on each conversation"
-        ],
-        "join_by_route": [
-            "Chat panel -> group conversation with participant list"
-        ],
         "share_by_toggle": [
             "Chat panel -> 'Share' button in header (copies link, shows 'Copied!')"
         ],
-        "save_by_toggle": [
-            "Chat panel -> star toggle on messages"
-        ],
         "invite_by_form": [
             "'Contacts' page -> 'Add contact by email or username' input and 'Invite' button"
-        ],
-        "report_by_form": [
-            "Chat panel -> message actions in chat view"
-        ],
-        "block_by_toggle": [
-            "'Contacts' page -> contact management controls"
         ],
         "message_from_free_text": [
             "Chat panel -> message text input and send"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "edit_by_form": [
+            "Conversation page -> pencil button on sent messages opens inline edit form (text input + Save/Cancel)"
+        ],
+        "upload_by_upload": [
+            "Conversation page -> paperclip file input in the message input area"
+        ],
+        "follow_by_toggle": [
+            "'QuickChat' page -> pin toggle button (pushpin icon) on each conversation row"
+        ],
+        "join_by_route": [
+            "Conversation page -> 'Join Group' link in the group chat header that adds you to the group"
+        ],
+        "save_by_toggle": [
+            "Conversation page -> star toggle (hollow/filled) in each message's meta row"
+        ],
+        "report_by_form": [
+            "Conversation page -> flag button on each message opens inline report form (reason + Report)"
+        ],
+        "block_by_toggle": [
+            "'Contacts' page -> Block/Blocked toggle button on each contact card"
         ]
     },
     "insurance-loans": {
@@ -2292,7 +2104,7 @@ MACRO_LOCATIONS = {
             "'Your Policies' page -> 'Policy Type' and 'Status' dropdowns",
             "'Claims' page -> status and type dropdowns",
             "'Loans' page -> type and status dropdowns",
-            "'Payments' page -> type and status dropdowns"
+            "'Payments' page -> type dropdown"
         ],
         "filter_by_date_range": [
             "'Welcome back, Alex' dashboard -> 'From' and 'To' date fields in transactions section",
@@ -2348,9 +2160,6 @@ MACRO_LOCATIONS = {
         "select_by_extremum": [
             "'Your Policies' page -> type and status dropdowns for narrowing selection"
         ],
-        "configure_by_toggle": [
-            "Policy detail page -> settings and notification preferences"
-        ],
         "export_by_dropdown": [
             "Dashboard -> 'Export CSV' link in policies section"
         ],
@@ -2372,8 +2181,8 @@ MACRO_LOCATIONS = {
         "compute_by_extremum": [
             "'Payments' page -> payment records with date range filters"
         ],
-        "compute_by_slider": [
-            "'Loans' page -> loan details with amounts, rates, terms displayed"
+        "configure_by_toggle": [
+            "Policy detail page -> 'Policy Settings & Notifications' card with Autopay/Paperless/Email/SMS toggle switches"
         ]
     },
     "job-sites": {
@@ -2458,16 +2267,13 @@ MACRO_LOCATIONS = {
         ],
         "filter_by_dropdown": [
             "'StreamHub' page -> 'Category', 'Status', 'Streamer', 'Sort By' dropdowns",
-            "'Clips' page -> channel, category, sort dropdowns"
+            "'Clips' page -> channel dropdown"
         ],
         "sort_by_dropdown": [
             "'StreamHub' page -> 'Sort By' dropdown (Default, Most Viewed, Newest, Oldest, Longest)"
         ],
         "create_by_timestamp": [
             "Stream page -> 'Send a message...' chat input during live stream"
-        ],
-        "select_by_slider": [
-            "Stream page -> stream playback area with chat"
         ],
         "play_by_timestamp": [
             "Stream page -> live stream display with real-time chat"
@@ -2484,26 +2290,26 @@ MACRO_LOCATIONS = {
         "share_by_toggle": [
             "Stream page -> 'Share' button below player (copies link, shows 'Copied!')"
         ],
-        "report_by_form": [
-            "Stream page -> stream management controls"
-        ],
         "subscribe_by_toggle": [
-            "'Subscriptions' page -> subscribe/unsubscribe toggle per channel"
+            "Channel page -> 'Subscribe'/'Unsubscribe' button"
         ],
         "join_by_toggle": [
             "Stream page -> chat area with message input and 'Chat' submit button"
         ],
         "pay_by_dropdown": [
-            "Channel page -> 'Subscribe'/'Unsubscribe' button"
+            "Stream page -> 'Cheer' amount dropdown + 'Cheer' button under the chat input (pays channel points, posts a highlighted chat message)"
         ],
         "redeem_by_dropdown": [
-            "Channel page -> subscription management with 'Subscribe' button"
+            "Channel page -> 'Channel Point Rewards' cards with 'Redeem' buttons"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
         ],
         "register_by_form": [
             "Register page -> email, username, password fields"
+        ],
+        "report_by_form": [
+            "Stream page -> 'Report Stream' form below the stream tags (reason dropdown + description + Report button)"
         ]
     },
     "map-services": {
@@ -2517,9 +2323,6 @@ MACRO_LOCATIONS = {
         "search_by_semantic": [
             "'CascadiaMaps' page -> 'Search CascadiaMaps' field with map view"
         ],
-        "search_by_dropdown": [
-            "'CascadiaMaps' page -> category tabs for category-based search"
-        ],
         "search_by_pan_zoom": [
             "'CascadiaMaps' page -> map view with search overlay"
         ],
@@ -2528,9 +2331,6 @@ MACRO_LOCATIONS = {
         ],
         "filter_by_dropdown": [
             "'CascadiaMaps' page -> sort dropdown (Default, Rating, Name A-Z)"
-        ],
-        "filter_by_toggle": [
-            "'CascadiaMaps' page -> search results with place hours and status"
         ],
         "filter_by_slider": [
             "'CascadiaMaps' page -> 'Min Rating' slider in filter bar (0 to 5 stars)"
@@ -2568,12 +2368,6 @@ MACRO_LOCATIONS = {
         "export_by_route": [
             "Route detail page -> route info with distance and duration"
         ],
-        "rate_by_slider": [
-            "Place detail page -> rating dropdown for review (1-5 stars)"
-        ],
-        "share_by_query": [
-            "Place detail page -> 'Save Place' button"
-        ],
         "save_by_query": [
             "'Saved' page -> saved places list",
             "Place detail page -> 'Save Place' button"
@@ -2587,6 +2381,9 @@ MACRO_LOCATIONS = {
         "route_by_route": [
             "'Get Directions' page -> route display with waypoints"
         ],
+        "filter_by_toggle": [
+            "'CascadiaMaps' page -> 'Open now' toggle pill in the filter bar (green when active)"
+        ]
     },
     "multimedia-posting": {
         "navigate_by_route": [
@@ -2599,11 +2396,8 @@ MACRO_LOCATIONS = {
         "search_by_semantic": [
             "'Explore' page -> search with sort dropdown"
         ],
-        "search_by_checkbox": [
-            "'+ Create' page -> post type dropdown (photo, video, carousel)"
-        ],
         "filter_by_radio": [
-            "'+ Create' page -> post type dropdown with photo/video/carousel options"
+            "'Explore' page -> post type filter chips (Photos, Videos, Carousels)"
         ],
         "sort_by_dropdown": [
             "'Explore' page -> sort dropdown (newest, popular, oldest)"
@@ -2623,9 +2417,6 @@ MACRO_LOCATIONS = {
         "edit_by_form": [
             "'+ Create' page -> caption textarea, location, tags, type dropdown"
         ],
-        "delete_from_table": [
-            "Post detail page -> post management actions"
-        ],
         "post_by_query": [
             "'+ Create' page -> post creation with file upload, caption, location, tags"
         ],
@@ -2643,9 +2434,6 @@ MACRO_LOCATIONS = {
         ],
         "play_by_playback": [
             "'Stories' page -> story playback with prev/next navigation"
-        ],
-        "export_by_dropdown": [
-            "'Settings' page -> account settings with toggles"
         ],
         "upload_by_upload": [
             "'+ Create' page -> file upload area (click to select images/videos)"
@@ -2673,6 +2461,12 @@ MACRO_LOCATIONS = {
         ],
         "block_by_toggle": [
             "Post detail page -> block/unblock user action"
+        ],
+        "delete_from_table": [
+            "Post detail page -> 'Delete Post' entry in the more (...) actions menu (author only)"
+        ],
+        "export_by_dropdown": [
+            "'Settings' page -> 'Export Your Data' format dropdown (JSON/CSV) with download"
         ]
     },
     "music": {
@@ -2692,7 +2486,7 @@ MACRO_LOCATIONS = {
             "Search page -> results split by type (artists, albums, tracks)"
         ],
         "filter_by_dropdown": [
-            "'Browse' page -> genre links for filtering"
+            "'Browse' page -> 'Genre' dropdown for filtering"
         ],
         "sort_by_ranking": [
             "'Browse' page -> sort dropdown (name, listeners, newest)"
@@ -2708,12 +2502,6 @@ MACRO_LOCATIONS = {
         ],
         "add_by_button": [
             "Album/Track pages -> 'Add to Playlist' button"
-        ],
-        "play_by_dropdown": [
-            "Track page -> 'Play' button for track playback"
-        ],
-        "play_by_date_range": [
-            "'Browse' page -> genre and sort filters for browsing by period"
         ],
         "play_by_playback": [
             "Track page -> 'Play' button for audio playback"
@@ -2732,6 +2520,9 @@ MACRO_LOCATIONS = {
         ],
         "subscribe_by_toggle": [
             "Artist page -> 'Subscribe' button for release notifications"
+        ],
+        "play_by_date_range": [
+            "'Browse' page -> 'Play a release period' bar with two date inputs + Play button showing now-playing queue"
         ]
     },
     "news": {
@@ -2746,23 +2537,8 @@ MACRO_LOCATIONS = {
         "search_by_semantic": [
             "Search page -> 'Search articles...' field with results"
         ],
-        "filter_by_dropdown": [
-            "Category pages -> category-based article selection"
-        ],
-        "filter_by_date_range": [
-            "Search page -> article search; Category page -> category-filtered articles"
-        ],
-        "sort_by_dropdown": [
-            "Category page -> articles sorted by date"
-        ],
         "extract_by_query": [
             "Search returns matching articles with titles and snippets"
-        ],
-        "extract_by_semantic": [
-            "Semantic search API returns scored results"
-        ],
-        "extract_by_dropdown": [
-            "Category pages -> filtered articles by category"
         ],
         "extract_by_route": [
             "Article detail page -> full text, author, date, tags, comments"
@@ -2775,9 +2551,6 @@ MACRO_LOCATIONS = {
         ],
         "follow_by_dropdown": [
             "Article page -> category links and author attribution"
-        ],
-        "subscribe_by_toggle": [
-            "Register page -> registration form for newsletter preferences"
         ],
         "share_by_dropdown": [
             "Article page -> 'Share' action link in toolbar"
@@ -2794,9 +2567,22 @@ MACRO_LOCATIONS = {
         ],
         "register_by_form": [
             "Register page -> display name, email, username, password fields"
+        ],
+        "filter_by_date_range": [
+            "Search page -> From/To date inputs + 'Filter by Date' button",
+            "Category page -> From/To date inputs + 'Filter by Date' button in the category header"
+        ],
+        "extract_by_semantic": [
+            "Search page -> 'Smart Search' natural-language input + 'Find Stories' button with relevance scores"
+        ],
+        "subscribe_by_toggle": [
+            "Register page -> newsletter toggle buttons (Daily Digest, Breaking News Alerts, Weekly Roundup)"
         ]
     },
     "password-managers": {
+        "configure_by_slider": [
+            "'Generator' page -> password 'Length' slider (8-64) with live value display"
+        ],
         "navigate_by_semantic": [
             "Vault page -> 'Search entries...' field with 'Category' and 'Strength' filter dropdowns"
         ],
@@ -2853,17 +2639,17 @@ MACRO_LOCATIONS = {
         "export_by_dropdown": [
             "Vault page -> entries list with category and strength filters"
         ],
-        "upload_by_image": [
-            "New Entry page -> entry creation form with credential fields"
-        ],
         "upload_by_upload": [
             "'VaultGuard' home -> 'Import' button accepting .csv, .json files"
         ],
         "authenticate_by_code": [
             "'Unlock Your Vault' page -> 'Email Address' and 'Master Password' fields"
         ],
+        "upload_by_image": [
+            "'New Entry' page -> Icon Image file input on the entry creation form"
+        ],
         "verify_identity_by_code": [
-            "Login page -> 2FA verification code input (6-digit or backup code)"
+            "'Login' page -> Two-Factor Verification panel (6-digit or backup code input) shown after unlock"
         ]
     },
     "personal-portfolio": {
@@ -2912,7 +2698,7 @@ MACRO_LOCATIONS = {
             "'Petitions' page -> keyword search across petition titles and descriptions"
         ],
         "filter_by_query": [
-            "'Petitions' page -> status filter parameter"
+            "'Petitions' page -> 'Search petitions...' field filters petitions by keyword"
         ],
         "filter_by_dropdown": [
             "'Petitions' page -> category dropdown (community, infrastructure, etc.)",
@@ -2932,9 +2718,6 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Petition detail page -> description, signatures, comments, progress bar",
             "Election detail page -> races, candidates, results"
-        ],
-        "extract_by_date_range": [
-            "'Petitions' page -> sort and order dropdowns for filtering petitions"
         ],
         "verify_by_dropdown": [
             "'Voter Info' page -> precinct dropdown to check registration status"
@@ -2998,9 +2781,6 @@ MACRO_LOCATIONS = {
         ],
         "play_by_dropdown": [
             "Episode detail -> play button with speed select dropdown"
-        ],
-        "export_by_dropdown": [
-            "'Library' page -> followed/subscribed/saved content"
         ],
         "post_from_free_text": [
             "Audiobook detail -> review form (rating slider and review textarea)"
@@ -3066,11 +2846,8 @@ MACRO_LOCATIONS = {
             "'Backlog' page -> 'Search backlog...' field with project/type/priority dropdowns"
         ],
         "filter_by_dropdown": [
-            "'Backlog' page -> project, status, type, priority, sprint, assignee dropdowns",
+            "'Backlog' page -> project, type, priority dropdowns",
             "Project page -> assignee, type, priority dropdowns"
-        ],
-        "filter_by_date_range": [
-            "Project page -> sprint, assignee, type, and priority filters"
         ],
         "sort_by_ranking": [
             "Project page -> issue list with type and priority filters"
@@ -3111,11 +2888,14 @@ MACRO_LOCATIONS = {
         "post_from_free_text": [
             "Issue detail -> add comment textarea"
         ],
+        "filter_by_date_range": [
+            "Project board page -> 'Created from'/'to' date inputs in the filter form"
+        ],
         "export_by_dropdown": [
-            "Project page -> filtered issue list with search and filter controls"
+            "Project board page -> 'Export issues as' format dropdown (CSV/JSON) + Export button"
         ],
         "follow_by_toggle": [
-            "Issue detail page -> status transition, edit, and delete forms"
+            "Issue detail page -> 'Watch'/'Watching' toggle button in the actions row"
         ]
     },
     "qa-knowledge": {
@@ -3167,7 +2947,7 @@ MACRO_LOCATIONS = {
             "'All Questions' page -> follow tag from dropdown"
         ],
         "follow_by_toggle": [
-            "'Tags' page -> 'Follow'/'Unfollow' tag button"
+            "Tag questions page ('Questions tagged') -> 'Follow Tag' button"
         ],
         "share_by_dropdown": [
             "Question detail -> share platform dropdown (email, twitter, linkedin, copy_link)"
@@ -3204,15 +2984,6 @@ MACRO_LOCATIONS = {
         "filter_by_dropdown": [
             "'All Businesses' page -> 'All Categories' and 'Any Rating' dropdowns"
         ],
-        "filter_by_slider": [
-            "'All Businesses' page -> 'Any Rating' dropdown and '$'/'$$'/'$$$'/'$$$$' price radio buttons"
-        ],
-        "sort_by_dropdown": [
-            "'All Businesses' page -> sort control for ordering business list"
-        ],
-        "sort_by_slider": [
-            "'All Businesses' page -> 'Any Rating' filter for threshold filtering"
-        ],
         "extract_by_query": [
             "Search returns matching businesses with name, category, rating"
         ],
@@ -3222,14 +2993,8 @@ MACRO_LOCATIONS = {
         "extract_by_ranking": [
             "'All Businesses' page -> businesses list with star ratings, sortable by rating"
         ],
-        "extract_by_slider": [
-            "'All Businesses' page -> rating filter for businesses above threshold"
-        ],
         "compute_by_dropdown": [
             "'All Businesses' page -> 'All Categories' dropdown for viewing ratings by category"
-        ],
-        "compare_by_slider": [
-            "'All Businesses' page -> rating and price filters for comparing"
         ],
         "edit_by_form": [
             "'My Reviews' page -> 'Edit' button on each review"
@@ -3237,26 +3002,20 @@ MACRO_LOCATIONS = {
         "delete_from_table": [
             "'My Reviews' page -> 'Delete' button on each review"
         ],
-        "select_by_slider": [
-            "'All Businesses' page -> rating filter for selecting by minimum rating"
-        ],
         "post_from_free_text": [
             "Write Review page -> star rating radio buttons and review textarea"
         ],
         "react_by_toggle": [
             "Business detail page -> 'Useful', 'Funny', 'Cool' vote buttons on each review"
         ],
-        "rate_by_slider": [
-            "Write Review page -> star rating selector (1-5 stars)"
-        ],
         "follow_by_toggle": [
-            "Business detail page -> review interaction controls"
+            "Business detail page -> '+ Follow'/'Following' toggle button in each review's action row"
         ],
         "save_by_toggle": [
-            "'All Businesses' page -> business cards with bookmark indicators"
+            "'All Businesses' page -> 'Save'/'Saved' bookmark toggle on each business card"
         ],
         "report_by_form": [
-            "Write Review page -> review submission form with rating, title, text"
+            "Write Review page -> 'Report a Problem' card (reason dropdown + details + Submit Report button)"
         ]
     },
     "real-estate-buy-rent": {
@@ -3302,9 +3061,6 @@ MACRO_LOCATIONS = {
         "extract_by_extremum": [
             "Listings page -> sort by price to find cheapest/most expensive"
         ],
-        "compute_by_slider": [
-            "Listings page -> 'Min $', 'Max $', and 'Min Sqft' inputs for price range filtering"
-        ],
         "compare_by_dropdown": [
             "Listings page -> filtered listing cards for property comparison"
         ],
@@ -3317,15 +3073,15 @@ MACRO_LOCATIONS = {
         "select_by_extremum": [
             "Listings page -> sort and sqft_min filter for selecting by size/price"
         ],
-        "follow_by_toggle": [
-            "Agent detail page -> agent profile with contact info"
-        ],
         "save_by_toggle": [
             "Listing detail -> 'Save'/'Unsave' listing button",
             "'Saved' page -> saved listings list"
         ],
         "book_by_form": [
             "Listing detail page -> inquiry form with message textarea and 'Send Inquiry' button"
+        ],
+        "follow_by_toggle": [
+            "Agent detail page -> 'Follow Agent'/'Following' toggle button on the agent profile card"
         ]
     },
     "remote-calls": {
@@ -3396,12 +3152,10 @@ MACRO_LOCATIONS = {
             "'Join' page -> meeting code text field and submit"
         ]
     },
-    "restaurants": {
-        "_note": [
-            "Site not implemented; listed in manifest but directory does not exist"
-        ]
-    },
     "software-marketplace": {
+        "configure_by_slider": [
+            "'Settings' page -> 'Notification Frequency' slider (0-10, Off to Max) with live value display"
+        ],
         "navigate_by_route": [
             "'AppVault' home -> click app card to view details"
         ],
@@ -3438,9 +3192,6 @@ MACRO_LOCATIONS = {
         "configure_by_dropdown": [
             "'Settings' page -> theme (light/dark), language, content filter dropdowns"
         ],
-        "export_by_dropdown": [
-            "'Browse' page -> app list with category, rating, and price filters"
-        ],
         "save_by_toggle": [
             "App detail -> 'Add to Wishlist'/'Remove from Wishlist' button"
         ],
@@ -3460,20 +3211,11 @@ MACRO_LOCATIONS = {
         "search_by_query": [
             "'Players' page -> search input for filtering player names"
         ],
-        "search_by_semantic": [
-            "'Favorites' page -> team and player favorites with add/remove toggles"
-        ],
         "filter_by_dropdown": [
             "'Players' page -> league and team dropdowns"
         ],
         "filter_by_slider": [
             "'Standings' page -> 'Min Wins' slider (0-50) that filters the standings table"
-        ],
-        "filter_by_date_range": [
-            "'Favorites' page -> favorited teams and players with match data"
-        ],
-        "sort_by_ranking": [
-            "'Compare Teams' page -> 'Team A' and 'Team B' select dropdowns"
         ],
         "extract_by_query": [
             "Player search returns matching players"
@@ -3493,9 +3235,6 @@ MACRO_LOCATIONS = {
         "extract_by_extremum": [
             "'Compare Teams' page -> side-by-side team comparison with statistics"
         ],
-        "extract_by_slider": [
-            "'Compare Teams' page -> team selection dropdowns for comparing stats"
-        ],
         "compute_from_table": [
             "'Compare Teams' page -> comparison table showing team records and stats"
         ],
@@ -3503,7 +3242,7 @@ MACRO_LOCATIONS = {
             "'Compare Teams' page -> 'Team A' and 'Team B' dropdowns, then side-by-side table"
         ],
         "play_by_playback": [
-            "'Favorites' page -> match content with highlight references"
+            "Highlights page -> match highlight player with play button"
         ],
         "post_from_free_text": [
             "Match detail page -> comment textarea"
@@ -3520,6 +3259,12 @@ MACRO_LOCATIONS = {
         ],
         "save_by_toggle": [
             "'Favorites' page -> toggle favorite teams/players"
+        ],
+        "search_by_semantic": [
+            "'Favorites' page -> 'Search Teams & Players' natural-language search input with 'Add to Favorites' buttons on results"
+        ],
+        "filter_by_date_range": [
+            "'Favorites' page -> From/To date inputs filtering favorited teams' matches by date"
         ]
     },
     "spreadsheets-slides": {
@@ -3539,9 +3284,6 @@ MACRO_LOCATIONS = {
         "compute_by_extremum": [
             "Spreadsheet view -> data table with sortable columns"
         ],
-        "compute_by_slider": [
-            "Spreadsheet view -> data rows with numeric values for filtering"
-        ],
         "create_by_form": [
             "'+ New' -> Create Spreadsheet or Create Presentation form with title input"
         ],
@@ -3551,15 +3293,15 @@ MACRO_LOCATIONS = {
         "edit_by_form": [
             "Spreadsheet page -> cell edit form (per-cell inputs, bulk submit)"
         ],
-        "delete_from_table": [
-            "'SheetDeck' page -> file list with management controls"
-        ],
         "export_by_dropdown": [
             "Spreadsheet/presentation view -> data export controls"
         ],
         "share_by_toggle": [
             "Spreadsheet page -> 'Share' button in toolbar (copies link, shows 'Copied!')",
-            "Presentation page -> 'Share' button in toolbar"
+            "Spreadsheet page -> 'Share' button in toolbar"
+        ],
+        "delete_from_table": [
+            "'SheetDeck' page -> Delete button on each file card with confirm dialog"
         ]
     },
     "tax-filing-dmv-permits": {
@@ -3578,11 +3320,11 @@ MACRO_LOCATIONS = {
             "'File & Pay' page -> tax_year, type, status dropdowns",
             "'Motor Vehicles' page -> body_type, renewal_status dropdowns",
             "'Permits' page -> type, status dropdowns",
-            "'Payments' page -> type, status dropdowns",
+            "'Payments' page -> type dropdown",
             "'Forms' page -> category dropdown"
         ],
         "filter_by_date_range": [
-            "'City of Lakeport' home -> filing and permit data with date organization"
+            "'Permits' page -> 'From'/'To' date range filter"
         ],
         "extract_by_query": [
             "Search returns matching documents and filings"
@@ -3611,20 +3353,11 @@ MACRO_LOCATIONS = {
         "compute_by_extremum": [
             "'City of Lakeport' home -> payment records for finding extremes"
         ],
-        "compute_by_slider": [
-            "'City of Lakeport' home -> tax computation tools and filing data"
-        ],
         "verify_by_toggle": [
-            "'City of Lakeport' home -> document status and verification controls"
-        ],
-        "submit_by_form": [
-            "'City of Lakeport' home -> filing submission and permit application forms"
+            "Vehicle detail page -> 'Insurance Verified' toggle button"
         ],
         "submit_by_form": [
             "'Make Payment' page -> payment form with type, method, account type, amount"
-        ],
-        "edit_by_query": [
-            "'City of Lakeport' home -> filing data with editable fields"
         ],
         "apply_by_form": [
             "Apply Permit page -> permit form with type dropdown, description"
@@ -3638,9 +3371,6 @@ MACRO_LOCATIONS = {
         ],
         "select_by_date_range": [
             "'Appointments' page -> date input for scheduling"
-        ],
-        "export_by_dropdown": [
-            "'City of Lakeport' home -> filing and permit data export controls"
         ],
         "upload_by_upload": [
             "Apply Permit page -> file upload for supporting documents"
@@ -3656,6 +3386,12 @@ MACRO_LOCATIONS = {
         ],
         "verify_identity_by_code": [
             "Verify Identity page -> code input form"
+        ],
+        "edit_by_query": [
+            "'City of Lakeport' home -> Notes column in Recent Tax Filings table with per-filing text input + Save button"
+        ],
+        "export_by_dropdown": [
+            "'City of Lakeport' home -> 'Export Your Data' bar with data-type dropdown (filings/vehicles/permits/payments) and format dropdown (CSV/JSON)"
         ]
     },
     "team-chat-workspace": {
@@ -3672,14 +3408,14 @@ MACRO_LOCATIONS = {
         ],
         "filter_by_dropdown": [
             "'Members' page -> department dropdown",
-            "'Threads' page -> channel and user dropdowns"
+            "'Threads' page -> channel dropdown"
         ],
         "sort_by_ranking": [
             "'Meridian Chat' page -> sort dropdown (Sort: Recent, Sort: Name, Sort: Activity)"
         ],
         "filter_by_date_range": [
             "Channel page -> date filter inputs",
-            "'Threads' page -> date filter"
+            "'Threads' page -> From/To date inputs in the filter bar"
         ],
         "extract_by_query": [
             "Search returns matching messages across channels"
@@ -3693,14 +3429,8 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Thread detail page -> full thread with replies"
         ],
-        "create_by_form": [
-            "'Meridian Chat' page -> channel creation controls"
-        ],
         "submit_by_form": [
             "'Meridian Chat' page -> message input area for composing messages"
-        ],
-        "edit_by_form": [
-            "'Meridian Chat' page -> message editing in chat threads"
         ],
         "delete_from_table": [
             "Channel page -> 'x delete' button per message"
@@ -3711,26 +3441,11 @@ MACRO_LOCATIONS = {
         "post_from_free_text": [
             "Channel page -> message input box at bottom and 'Send' button"
         ],
-        "follow_by_dropdown": [
-            "'Meridian Chat' page -> channel list with join/follow controls"
-        ],
-        "follow_by_toggle": [
-            "'Meridian Chat' page -> thread following in channels"
-        ],
-        "join_by_toggle": [
-            "'Meridian Chat' page -> channel join/leave controls"
-        ],
         "share_by_toggle": [
             "Channel page -> 'Share' button in header (copies link, shows 'Copied!')"
         ],
-        "save_by_toggle": [
-            "'Meridian Chat' page -> message pinning/bookmarking"
-        ],
         "invite_by_form": [
             "Channel page -> 'Invite member' input and 'Invite' button in header"
-        ],
-        "block_by_toggle": [
-            "'Meridian Chat' page -> user management with block/unblock controls"
         ],
         "message_from_free_text": [
             "Channel page -> message text input and 'Send' button",
@@ -3738,6 +3453,27 @@ MACRO_LOCATIONS = {
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "create_by_form": [
+            "'Meridian Chat' page -> sidebar 'Create Channel' form (name + description + Create Channel button)"
+        ],
+        "edit_by_form": [
+            "Channel page -> 'edit' button on own messages revealing inline edit form (Save/Cancel)"
+        ],
+        "follow_by_dropdown": [
+            "'Meridian Chat' page -> sidebar 'Follow Member' member dropdown + Follow button"
+        ],
+        "follow_by_toggle": [
+            "Channel page -> 'Follow'/'Following' toggle button in the channel header"
+        ],
+        "join_by_toggle": [
+            "Channel page -> 'Join Channel'/'Leave Channel' toggle button in the channel header"
+        ],
+        "save_by_toggle": [
+            "Channel page -> per-message 'save'/'saved' bookmark toggle"
+        ],
+        "block_by_toggle": [
+            "'Members' page -> 'Block'/'Blocked' toggle button on each member card"
         ]
     },
     "ticketing-events": {
@@ -3780,22 +3516,13 @@ MACRO_LOCATIONS = {
             "Compare page -> compare two events with side-by-side table"
         ],
         "submit_by_form": [
-            "'LakeportEvents' page -> event booking with ticket selection"
-        ],
-        "select_by_slider": [
-            "'LakeportEvents' page -> ticket tier selection with price options"
+            "Event detail page -> ticket booking form with ticket type/quantity and purchase button"
         ],
         "select_by_date_range": [
             "'LakeportEvents' page -> event date selection"
         ],
         "configure_by_dropdown": [
             "'Settings' page -> location dropdown"
-        ],
-        "configure_by_slider": [
-            "'LakeportEvents' page -> notification and reminder settings"
-        ],
-        "save_by_toggle": [
-            "'LakeportEvents' page -> event card save/bookmark toggle"
         ],
         "add_by_button": [
             "Event detail -> 'Add to Cart' / purchase button with ticket_type and quantity dropdowns"
@@ -3807,7 +3534,7 @@ MACRO_LOCATIONS = {
             "Event detail -> book ticket form with type, quantity, submit"
         ],
         "redeem_by_code": [
-            "'LakeportEvents' page -> promotional code entry"
+            "'Checkout' page -> promotional code entry"
         ],
         "cancel_by_form": [
             "Cancel page -> reason textarea and submit"
@@ -3817,6 +3544,9 @@ MACRO_LOCATIONS = {
         ],
         "register_by_form": [
             "Register page -> name, email, password fields"
+        ],
+        "save_by_toggle": [
+            "'LakeportEvents' page -> heart save/bookmark toggle on each event card"
         ]
     },
     "transit-directions": {
@@ -3863,10 +3593,11 @@ MACRO_LOCATIONS = {
             "'Route Overview' -> route selection with time-based optimization"
         ],
         "export_by_dropdown": [
-            "'Lakeport Transit Authority' page -> route and fare data export controls"
+            "'Routes' page -> export control with data-type dropdown (routes/stops/fares) and format dropdown (CSV/JSON)",
+            "'Fares' page -> 'Export fare data' dropdown + Export button"
         ],
         "share_by_toggle": [
-            "'Lakeport Transit Authority' page -> trip plan sharing options"
+            "'Trip Planner' page -> per-saved-trip 'Sharing: On/Off' toggle button displaying the generated share link"
         ]
     },
     "translation": {
@@ -3883,10 +3614,7 @@ MACRO_LOCATIONS = {
             "'Settings' page -> toggle checkboxes for auto_detect, formal_mode, auto_pronounce"
         ],
         "export_by_dropdown": [
-            "'History' page -> export format dropdown (json, csv, txt) for download"
-        ],
-        "upload_by_upload": [
-            "'LinguaBridge' page -> text input area for batch content"
+            "'Settings' page -> export format dropdown (json, csv, txt) for download"
         ],
         "translate_by_query": [
             "'LinguaBridge' page -> source text input with source language dropdown (Detect, English, Spanish, etc.) and target language dropdown, then translate"
@@ -3894,7 +3622,7 @@ MACRO_LOCATIONS = {
     },
     "university-academic": {
         "navigate_by_semantic": [
-            "'Meridian State University' page -> department and faculty search"
+            "'Faculty & Staff' page -> search input (name or area)"
         ],
         "navigate_by_route": [
             "'Academics' page -> click course to view details",
@@ -3907,7 +3635,7 @@ MACRO_LOCATIONS = {
             "'Alumni' page -> search input"
         ],
         "search_by_semantic": [
-            "'Meridian State University' page -> faculty and department search"
+            "'Faculty & Staff' page -> search input (name or area)"
         ],
         "filter_by_dropdown": [
             "'Academics' page -> department and level dropdowns",
@@ -3917,9 +3645,6 @@ MACRO_LOCATIONS = {
         ],
         "extract_by_query": [
             "Search returns matching courses/faculty with details"
-        ],
-        "extract_by_checkbox": [
-            "'Academics' page -> level checkboxes (introductory, intermediate, advanced)"
         ],
         "extract_from_table": [
             "'Academics' page -> courses table (code, title, credits, level, instructor)",
@@ -3946,50 +3671,50 @@ MACRO_LOCATIONS = {
             "'Resources' page -> format selection (csv, json) and type (courses, faculty) for download"
         ],
         "subscribe_by_toggle": [
-            "'Research' page -> subscribe to research area updates toggle"
+            "'Campus Life' page -> Subscribe/Unsubscribe toggle per research area"
         ]
     },
     "url-shorteners-qr": {
         "navigate_by_query": [
-            "'SnapLink' page -> link management with URL search"
+            "'My Links' page -> 'Search links...' field"
         ],
         "navigate_by_route": [
             "'Recent Links' section -> click link title to view details",
             "Top nav -> 'Create', 'My Links' links"
         ],
         "search_by_query": [
-            "'SnapLink' page -> link search for finding shortened URLs"
+            "'My Links' page -> 'Search links...' field"
         ],
         "filter_by_date_range": [
             "'My Links' page -> date filter inputs"
         ],
         "extract_by_query": [
-            "'SnapLink' page -> link analytics with click statistics"
+            "'My Links' page -> search results showing per-link click counts"
         ],
         "extract_from_table": [
             "Link detail page -> click statistics table (countries, devices, referrers)"
         ],
-        "edit_by_query": [
-            "'SnapLink' page -> link editing controls for URL settings"
-        ],
         "delete_from_table": [
-            "'My Links' page -> 'Delete' button per link with confirm"
+            "Link detail page -> 'Delete' button"
         ],
         "configure_by_dropdown": [
             "'Shorten a URL' form -> redirect type dropdown (301 Permanent, 302 Temporary, 307 Strict)",
             "'My Links' page -> status filter and sort dropdowns"
-        ],
-        "export_by_dropdown": [
-            "'SnapLink' page -> link data export options"
-        ],
-        "share_by_toggle": [
-            "'SnapLink' page -> link sharing controls"
         ],
         "create_by_query": [
             "'Shorten a URL' form -> 'Paste your long URL here...' input, 'Title', 'Custom short code', 'Expiry', 'Tags' fields, 'Generate QR Code' checkbox, and 'Shorten URL' button"
         ],
         "create_by_form": [
             "'Shorten a URL' form -> URL input and optional custom code, then create short link"
+        ],
+        "edit_by_query": [
+            "Link detail page -> 'Edit Link' card with title, destination-URL, and tags inputs + Save button"
+        ],
+        "export_by_dropdown": [
+            "'My Links' page -> export control with CSV/JSON format dropdown and Export button"
+        ],
+        "share_by_toggle": [
+            "Link detail page -> 'Sharing: On/Off' toggle button revealing the short share URL and QR share link"
         ]
     },
     "version-control": {
@@ -4029,32 +3754,33 @@ MACRO_LOCATIONS = {
             "Issue detail -> description, comments",
             "Merge request detail -> info, changes, reviews"
         ],
-        "compare_from_table": [
-            "'MeridianGit' page -> branch and commit comparison tools"
-        ],
         "create_by_form": [
             "'New repository' page -> name, description, owner dropdown, default_branch dropdown"
-        ],
-        "submit_by_form": [
-            "'MeridianGit' page -> issue and merge request creation forms"
-        ],
-        "edit_by_form": [
-            "'MeridianGit' page -> issue and merge request editing controls"
-        ],
-        "upload_by_upload": [
-            "'MeridianGit' page -> file upload to repository via web"
         ],
         "select_by_dropdown": [
             "'New repository' page -> owner dropdown, default_branch dropdown"
         ],
-        "export_by_route": [
-            "'MeridianGit' page -> repository data download options"
-        ],
-        "post_from_free_text": [
-            "'MeridianGit' page -> comment forms on issues and merge requests"
-        ],
         "follow_by_toggle": [
             "Repo detail -> 'Star'/'Unstar' button"
+        ],
+        "compare_from_table": [
+            "Repository detail (Commits tab) -> per-commit base/compare radio selectors + 'Compare commits' button showing additions/deletions/files-changed delta"
+        ],
+        "submit_by_form": [
+            "Repository detail (Issues tab) -> 'New issue' form (title, labels)",
+            "Repository detail (Commits tab) -> 'Open a merge request' form (title, source/target branch, description)"
+        ],
+        "edit_by_form": [
+            "Repository detail (Issues tab) -> per-issue 'Edit' button revealing inline form (title, open/closed state)"
+        ],
+        "upload_by_upload": [
+            "Repository detail (Code tab) -> 'Upload file to repository' form with file input, destination path, and commit message"
+        ],
+        "export_by_route": [
+            "Repository detail header -> 'Export CSV' and 'Export JSON' download links"
+        ],
+        "post_from_free_text": [
+            "Repository detail (Issues tab) -> per-issue 'Comment' button revealing a free-text textarea"
         ]
     },
     "video": {
@@ -4072,12 +3798,6 @@ MACRO_LOCATIONS = {
         "filter_by_dropdown": [
             "'+ Upload' page -> category dropdown (Education, Entertainment, Gaming, etc.)",
             "'+ Upload' page -> visibility/status dropdown"
-        ],
-        "filter_by_slider": [
-            "'StreamHub' page -> video filtering with duration options"
-        ],
-        "filter_by_date_range": [
-            "'StreamHub' page -> date range for browsing by upload date"
         ],
         "sort_by_ranking": [
             "'StreamHub' page -> sort tabs: 'Trending', 'Latest', 'Popular', 'Most Liked'"
@@ -4097,23 +3817,14 @@ MACRO_LOCATIONS = {
         "configure_by_route": [
             "'Settings' page -> default quality, playback speed, autoplay/notifications options"
         ],
-        "play_by_slider": [
-            "'StreamHub' page -> video player with seek controls"
-        ],
-        "play_by_date_range": [
-            "'StreamHub' page -> date-filtered video list for recent uploads"
-        ],
         "play_by_playback": [
-            "'StreamHub' page -> video player with play/pause/seek controls"
+            "Watch page -> video player with play/pause/seek controls"
         ],
         "post_from_free_text": [
             "Watch page -> comment textarea and submit"
         ],
         "react_by_toggle": [
             "Watch page -> 'Like' toggle button"
-        ],
-        "rate_by_slider": [
-            "'StreamHub' page -> video rating with star input"
         ],
         "follow_by_toggle": [
             "Channel page -> 'Follow' button"
@@ -4122,7 +3833,7 @@ MACRO_LOCATIONS = {
             "Watch/Channel page -> 'Subscribe' button"
         ],
         "share_by_dropdown": [
-            "'StreamHub' page -> share button with platform options (link, twitter, facebook, reddit, email, embed)"
+            "Watch page -> 'Share' button with platform options (link, twitter, facebook, reddit, email, embed)"
         ],
         "save_by_toggle": [
             "Watch page -> 'Save to playlist' button"
@@ -4132,6 +3843,12 @@ MACRO_LOCATIONS = {
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
+        ],
+        "filter_by_date_range": [
+            "'StreamHub' page -> 'Uploaded from/to' date inputs in the filter bar with Clear Dates chip"
+        ],
+        "play_by_date_range": [
+            "'StreamHub' page -> 'Play Newest in Range' button linking to the watch page of the most recent upload in the date-filtered list"
         ]
     },
     "visual-how-to-guides": {
@@ -4162,9 +3879,6 @@ MACRO_LOCATIONS = {
         "extract_by_route": [
             "Guide detail page -> steps, author, rating, comments"
         ],
-        "play_by_date_range": [
-            "'StepVista' home -> guide listings organized with date browsing"
-        ],
         "play_by_playback": [
             "Step Playback page -> individual step with prev/next navigation"
         ],
@@ -4177,61 +3891,55 @@ MACRO_LOCATIONS = {
         "rate_by_slider": [
             "Guide detail page -> rating slider (1-5 stars)"
         ],
-        "follow_by_dropdown": [
-            "Author page -> 'Follow Author' button"
-        ],
         "save_by_toggle": [
             "Guide detail page -> 'Bookmark'/'Unbookmark' button",
             "'Bookmarks' page -> bookmarked guides list"
+        ],
+        "play_by_date_range": [
+            "'StepVista' home -> 'Browse Guides by Date' created-from/created-to date inputs + 'Show Guides' button with 'Play steps' links"
         ]
     },
     "weather": {
-        "navigate_by_query": [
-            "'LakeportWeather' page -> location search for weather data"
-        ],
-        "navigate_by_date_range": [
-            "'LakeportWeather' page -> date navigation for historical weather data"
-        ],
-        "navigate_by_pan_zoom": [
-            "'LakeportWeather' page -> location map with weather station coordinates"
-        ],
-        "search_by_query": [
-            "'LakeportWeather' page -> location search field for finding weather stations"
-        ],
-        "search_by_proximity": [
-            "'LakeportWeather' page -> nearby location search using coordinates"
-        ],
-        "filter_by_toggle": [
-            "'LakeportWeather' page -> unit toggle between metric and imperial",
-            "'LakeportWeather' page -> alert severity filter for alert levels"
-        ],
-        "extract_by_toggle": [
-            "'LakeportWeather' page -> extended forecast toggle for more days"
-        ],
         "extract_from_table": [
             "'7-Day Forecast' page -> forecast table",
             "'History' page -> 30-day historical weather table",
             "'Hourly' page -> 24-hour forecast cards"
         ],
-        "extract_by_date_range": [
-            "'LakeportWeather' page -> historical weather with date range selection"
-        ],
-        "compare_by_query": [
-            "'LakeportWeather' page -> multi-location comparison"
-        ],
-        "verify_by_slider": [
-            "'LakeportWeather' page -> temperature display with threshold controls"
-        ],
-        "configure_by_slider": [
-            "'LakeportWeather' page -> alert threshold configuration"
-        ],
         "subscribe_by_toggle": [
-            "'LakeportWeather' page -> alert subscription toggle",
-            "'Locations' page -> manage saved locations (login required)"
+            "'Locations' page -> manage saved locations (login required)",
+            "'Alerts' page -> per-alert 'Subscribe to alerts' switch (logged-in users)"
         ],
         "save_by_query": [
             "'Locations' page -> add location form and submit",
-            "'LakeportWeather' page -> save location button"
+            "'Locations' page -> 'Quick Save by Name' text input + 'Save Location' button"
+        ],
+        "navigate_by_query": [
+            "'Current' page -> location search bar (text input + 'Go' button) resolving a named weather station"
+        ],
+        "navigate_by_date_range": [
+            "'History' page -> From/To date inputs + 'View Range' button filtering the history table"
+        ],
+        "navigate_by_pan_zoom": [
+            "'Locations' page -> SVG station map with zoom in/out, arrow-pan, reset buttons and drag-to-pan"
+        ],
+        "search_by_query": [
+            "'Locations' page -> 'Search Weather Stations' text input + Search button listing matching stations"
+        ],
+        "search_by_proximity": [
+            "'Locations' page -> 'Find Nearby Stations' lat/lng/radius inputs + 'Find Nearby' button listing stations by distance"
+        ],
+        "filter_by_toggle": [
+            "'Current' page -> F/C unit switch on the current-conditions card",
+            "'Alerts' page -> Severe/Moderate/Minor severity toggle buttons with live shown-count"
+        ],
+        "extract_by_toggle": [
+            "'7-Day Forecast' page -> 'Show extended details' switch adding Dew Point, UV, Sunrise, Sunset columns"
+        ],
+        "extract_by_date_range": [
+            "'Current' page -> 'Past Weather Lookup' From/To date inputs + 'Get Data' button rendering matching days"
+        ],
+        "compare_by_query": [
+            "'Current' page -> 'Compare Locations' two-location form + Compare button with side-by-side table"
         ]
     },
     "wikis": {
@@ -4276,5 +3984,5 @@ MACRO_LOCATIONS = {
         "edit_by_dropdown": [
             "Edit page -> category dropdown, content textarea, edit summary"
         ]
-    }
+    },
 }

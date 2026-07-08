@@ -20,6 +20,11 @@
         .form-group label { display: block; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: .3rem; }
         .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .95rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
         .form-group input:focus { outline: none; border-color: #e74c3c; }
+        .newsletter-prefs { margin-bottom: 1.2rem; padding: .9rem 1rem; background: #f9f9f9; border: 1px solid #eee; border-radius: .3rem; }
+        .newsletter-prefs .prefs-title { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: .6rem; }
+        .newsletter-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: .35rem 0; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #555; }
+        .toggle-btn { border: 1px solid #ccc; background: #eee; color: #888; border-radius: 1rem; padding: .2rem .9rem; font-size: .75rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .toggle-btn[aria-pressed="true"] { background: #e74c3c; border-color: #e74c3c; color: #fff; }
         .btn-submit { display: block; width: 100%; padding: .7rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
         .btn-submit:hover { background: #c0392b; }
         .error-msg { background: #fce4e4; color: #c0392b; padding: .6rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; }
@@ -58,6 +63,24 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required>
                 </div>
+                <div class="newsletter-prefs">
+                    <div class="prefs-title">Newsletter Preferences</div>
+                    <div class="newsletter-toggle-row">
+                        <span>Daily Digest</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_daily_digest">Off</button>
+                    </div>
+                    <div class="newsletter-toggle-row">
+                        <span>Breaking News Alerts</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_breaking_news">Off</button>
+                    </div>
+                    <div class="newsletter-toggle-row">
+                        <span>Weekly Roundup</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_weekly_roundup">Off</button>
+                    </div>
+                    <input type="hidden" name="newsletter_daily_digest" id="newsletter_daily_digest" value="">
+                    <input type="hidden" name="newsletter_breaking_news" id="newsletter_breaking_news" value="">
+                    <input type="hidden" name="newsletter_weekly_roundup" id="newsletter_weekly_roundup" value="">
+                </div>
                 <button type="submit" class="btn-submit">Register</button>
             </form>
             <div class="form-footer">
@@ -69,5 +92,16 @@
     <footer class="site-footer">
         <p>&copy; Lakeport Tribune</p>
     </footer>
+
+    <script>
+    document.querySelectorAll('.toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var on = btn.getAttribute('aria-pressed') === 'true';
+            btn.setAttribute('aria-pressed', on ? 'false' : 'true');
+            btn.textContent = on ? 'Off' : 'On';
+            document.getElementById(btn.dataset.target).value = on ? '' : 'on';
+        });
+    });
+    </script>
 </body>
 </html>

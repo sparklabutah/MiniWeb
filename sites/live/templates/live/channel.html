@@ -149,12 +149,39 @@
                 <h4>{{ r.name }}</h4>
                 <p class="desc">{{ r.description }}</p>
                 <span class="cost">{{ "{:,}".format(r.cost) }} points</span>
+                {% if logged_in %}
+                <button class="btn btn-sm" style="margin-top:.5rem;display:block;"
+                        onclick="redeemReward({{ r.id | tojson }}, this)">Redeem</button>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
+        <div id="redeemFeedback" style="font-size:.8rem;margin-top:.5rem;min-height:1em;"></div>
         {% endif %}
     </div>
 
+    {% if logged_in %}
+    <script>
+        function redeemReward(rewardId, btn) {
+            fetch('{{ url_for("live.api_channel_redeem", user_id=channel_user.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reward_id: String(rewardId)})
+            }).then(r => r.json().then(d => ({ok: r.ok, data: d}))).then(res => {
+                const fb = document.getElementById('redeemFeedback');
+                if (res.ok) {
+                    btn.textContent = 'Redeemed!';
+                    btn.disabled = true;
+                    fb.style.color = '#9147ff';
+                    var rd = res.data.redemption || {};
+                    fb.textContent = 'Redeemed "' + rd.reward_name + '" — balance: ' + rd.remaining_balance + ' points';
+                } else {
+                    fb.style.color = '#eb0400';
+                    fb.textContent = res.data.error || 'Could not redeem reward.';
+                }
+            });
+        }
+    </script>
+    {% endif %}
     {% if logged_in and user.id != channel_user.id %}
     <script>
         function toggleFollow() {

@@ -371,6 +371,35 @@ def form_pass(profile_id):
     return redirect(url_for("dating.index"))
 
 
+@blueprint.route("/report/<int:profile_id>", methods=["POST"])
+def form_report_profile(profile_id):
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("dating.login_page"))
+    users = _load_users()
+    target = next((u for u in users if u["id"] == profile_id), None)
+    if not target:
+        abort(404)
+    target["reported"] = True
+    target["report_reason"] = request.form.get("reason", "").strip()
+    _save_users(users)
+    return redirect(url_for("dating.profile_detail", profile_id=profile_id))
+
+
+@blueprint.route("/block/<int:profile_id>", methods=["POST"])
+def form_block_profile(profile_id):
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("dating.login_page"))
+    users = _load_users()
+    target = next((u for u in users if u["id"] == profile_id), None)
+    if not target:
+        abort(404)
+    target["blocked"] = not target.get("blocked", False)
+    _save_users(users)
+    return redirect(url_for("dating.profile_detail", profile_id=profile_id))
+
+
 @blueprint.route("/send-message/<int:match_id>", methods=["POST"])
 def form_send_message(match_id):
     user = _get_current_user()

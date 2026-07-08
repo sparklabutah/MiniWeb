@@ -52,6 +52,35 @@
         .forecast-day .day-precip { font-size: .75rem; color: #42a5f5; margin-top: .2rem; }
 
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+
+        /* Location search (navigate_by_query) */
+        .loc-search-bar { display: flex; gap: .6rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+        .loc-search-bar input[type="text"] { flex: 1; min-width: 220px; padding: .55rem .8rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .9rem; }
+        .loc-search-bar input[type="text"]:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .btn-blue { background: #1565c0; color: #fff; border: none; padding: .55rem 1.2rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
+        .btn-blue:hover { background: #0d47a1; }
+        .loc-error { background: #fce4ec; color: #c62828; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
+
+        /* Unit toggle switch (filter_by_toggle) */
+        .unit-toggle { display: flex; align-items: center; gap: .5rem; font-size: .85rem; font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; cursor: pointer; inset: 0; background: rgba(255,255,255,.35); border-radius: 22px; transition: .2s; }
+        .switch .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .slider { background: #81d4fa; }
+        .switch input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Compare / lookup panels */
+        .tool-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 2rem; }
+        .tool-form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: .8rem; }
+        .tool-form .form-group { min-width: 160px; }
+        .tool-form label { display: block; font-size: .78rem; color: #475569; font-weight: 600; margin-bottom: .3rem; }
+        .tool-form input { width: 100%; padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .tool-form input:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .tool-table { width: 100%; border-collapse: collapse; }
+        .tool-table th { background: #e3f2fd; color: #1565c0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: .6rem .8rem; text-align: left; }
+        .tool-table td { padding: .5rem .8rem; border-top: 1px solid #f0f4f8; font-size: .85rem; }
+        .tool-msg { font-size: .85rem; color: #c62828; }
     </style>
 </head>
 <body>
@@ -90,6 +119,14 @@
         </div>
         {% endif %}
 
+        <form class="loc-search-bar" method="get" action="{{ url_for('weather.index') }}">
+            <input type="text" name="location" placeholder="View weather for a location (e.g., Seattle, WA)" value="{{ request.args.get('location', '') }}">
+            <button type="submit" class="btn-blue">Go</button>
+        </form>
+        {% if location_error %}
+        <div class="loc-error">{{ location_error }}</div>
+        {% endif %}
+
         <div class="current-card">
             <div>
                 <div class="current-location">{{ current.location }}</div>
@@ -97,21 +134,31 @@
                     <div class="current-icon">{{ icon_for(current.conditions) }}</div>
                     <div>
                         <div class="current-temp">
-                            {{ current.temp_f }}&deg;F
-                            <small>{{ current.temp_c }}&deg;C &middot; Feels like {{ current.feels_like_f }}&deg;F</small>
+                            <span id="cur-temp">{{ current.temp_f }}</span>&deg;<span id="cur-temp-unit">F</span>
+                            <small><span id="cur-alt-temp">{{ current.temp_c }}</span>&deg;<span id="cur-alt-unit">C</span> &middot; Feels like <span id="cur-feels">{{ current.feels_like_f }}</span>&deg;<span id="cur-feels-unit">F</span></small>
                         </div>
                     </div>
                 </div>
                 <div class="current-conditions">{{ current.conditions }}</div>
                 <div class="current-updated">Updated {{ current.updated }}</div>
             </div>
-            <div class="current-details">
-                <div class="detail"><strong>Humidity:</strong> {{ current.humidity }}%</div>
-                <div class="detail"><strong>Wind:</strong> {{ current.wind_mph }} mph {{ current.wind_dir }}</div>
-                <div class="detail"><strong>UV Index:</strong> {{ current.uv_index }}</div>
-                <div class="detail"><strong>Visibility:</strong> {{ current.visibility_mi }} mi</div>
-                <div class="detail"><strong>Pressure:</strong> {{ current.pressure_inhg }} inHg</div>
-                <div class="detail"><strong>Air Quality:</strong> {{ current.air_quality }}</div>
+            <div>
+                <div class="unit-toggle" style="margin-bottom: .8rem; justify-content: flex-end;">
+                    <span>&deg;F</span>
+                    <label class="switch">
+                        <input type="checkbox" id="unit-switch" onchange="toggleUnits(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                    <span>&deg;C</span>
+                </div>
+                <div class="current-details">
+                    <div class="detail"><strong>Humidity:</strong> {{ current.humidity }}%</div>
+                    <div class="detail"><strong>Wind:</strong> <span id="cur-wind">{{ current.wind_mph }}</span> <span id="cur-wind-unit">mph</span> {{ current.wind_dir }}</div>
+                    <div class="detail"><strong>UV Index:</strong> {{ current.uv_index }}</div>
+                    <div class="detail"><strong>Visibility:</strong> <span id="cur-vis">{{ current.visibility_mi }}</span> <span id="cur-vis-unit">mi</span></div>
+                    <div class="detail"><strong>Pressure:</strong> <span id="cur-pres">{{ current.pressure_inhg }}</span> <span id="cur-pres-unit">inHg</span></div>
+                    <div class="detail"><strong>Air Quality:</strong> {{ current.air_quality }}</div>
+                </div>
             </div>
         </div>
 
@@ -128,10 +175,115 @@
             </div>
             {% endfor %}
         </div>
+
+        <h2 class="section-title">Compare Locations</h2>
+        <div class="tool-card">
+            <form class="tool-form" onsubmit="compareLocations(event)">
+                <div class="form-group">
+                    <label for="cmp-loc1">First location</label>
+                    <input type="text" id="cmp-loc1" placeholder="e.g., Seattle, WA" required>
+                </div>
+                <div class="form-group">
+                    <label for="cmp-loc2">Second location</label>
+                    <input type="text" id="cmp-loc2" placeholder="e.g., Portland, OR" required>
+                </div>
+                <button type="submit" class="btn-blue">Compare</button>
+            </form>
+            <div id="compare-results"></div>
+        </div>
+
+        <h2 class="section-title">Past Weather Lookup</h2>
+        <div class="tool-card">
+            <form class="tool-form" onsubmit="lookupHistory(event)">
+                <div class="form-group">
+                    <label for="hist-from">From date</label>
+                    <input type="date" id="hist-from" required>
+                </div>
+                <div class="form-group">
+                    <label for="hist-to">To date</label>
+                    <input type="date" id="hist-to" required>
+                </div>
+                <button type="submit" class="btn-blue">Get Data</button>
+            </form>
+            <div id="history-results"></div>
+        </div>
     </div>
 
     <div class="footer">
         Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
     </div>
+
+    <script>
+        function toggleUnits(metric) {
+            fetch("{{ url_for('weather.api_current_units') }}?units=" + (metric ? "metric" : "imperial"))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var isMetric = d.display_units === "metric";
+                    document.getElementById("cur-temp").textContent = d.temp_display;
+                    document.getElementById("cur-temp-unit").textContent = isMetric ? "C" : "F";
+                    document.getElementById("cur-alt-temp").textContent = isMetric ? d.temp_f : d.temp_c;
+                    document.getElementById("cur-alt-unit").textContent = isMetric ? "F" : "C";
+                    document.getElementById("cur-feels").textContent = d.feels_like_display;
+                    document.getElementById("cur-feels-unit").textContent = isMetric ? "C" : "F";
+                    document.getElementById("cur-wind").textContent = d.wind_display;
+                    document.getElementById("cur-wind-unit").textContent = d.wind_unit;
+                    document.getElementById("cur-vis").textContent = d.visibility_display;
+                    document.getElementById("cur-vis-unit").textContent = d.visibility_unit;
+                    document.getElementById("cur-pres").textContent = d.pressure_display;
+                    document.getElementById("cur-pres-unit").textContent = d.pressure_unit;
+                });
+        }
+
+        function esc(s) {
+            var div = document.createElement("div");
+            div.textContent = String(s);
+            return div.innerHTML;
+        }
+
+        function compareLocations(e) {
+            e.preventDefault();
+            var loc1 = document.getElementById("cmp-loc1").value.trim();
+            var loc2 = document.getElementById("cmp-loc2").value.trim();
+            var out = document.getElementById("compare-results");
+            fetch("{{ url_for('weather.api_compare') }}?location1=" + encodeURIComponent(loc1) +
+                  "&location2=" + encodeURIComponent(loc2))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.error) { out.innerHTML = '<p class="tool-msg">' + esc(d.error) + '</p>'; return; }
+                    var html = '<table class="tool-table"><thead><tr><th>Location</th><th>Temp</th><th>Humidity</th><th>Wind</th><th>Conditions</th></tr></thead><tbody>';
+                    d.comparison.forEach(function(c) {
+                        if (c.error) {
+                            html += '<tr><td>' + esc(c.name) + '</td><td colspan="4" class="tool-msg">' + esc(c.error) + '</td></tr>';
+                        } else {
+                            html += '<tr><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.temp_f) + '&deg;F / ' + esc(c.temp_c) + '&deg;C</td><td>' +
+                                    esc(c.humidity) + '%</td><td>' + esc(c.wind_mph) + ' mph</td><td>' + esc(c.conditions) + '</td></tr>';
+                        }
+                    });
+                    out.innerHTML = html + '</tbody></table>';
+                })
+                .catch(function() { out.innerHTML = '<p class="tool-msg">Network error</p>'; });
+        }
+
+        function lookupHistory(e) {
+            e.preventDefault();
+            var from = document.getElementById("hist-from").value;
+            var to = document.getElementById("hist-to").value;
+            var out = document.getElementById("history-results");
+            fetch("{{ url_for('weather.api_historical') }}?date_from=" + encodeURIComponent(from) +
+                  "&date_to=" + encodeURIComponent(to))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var rows = d.historical || [];
+                    if (!rows.length) { out.innerHTML = '<p class="tool-msg">No historical data in that range.</p>'; return; }
+                    var html = '<table class="tool-table"><thead><tr><th>Date</th><th>High</th><th>Low</th><th>Precip</th><th>Conditions</th></tr></thead><tbody>';
+                    rows.forEach(function(day) {
+                        html += '<tr><td><strong>' + esc(day.date) + '</strong></td><td>' + esc(day.high_f) + '&deg;F</td><td>' +
+                                esc(day.low_f) + '&deg;F</td><td>' + esc(day.precip_in) + '"</td><td>' + esc(day.conditions) + '</td></tr>';
+                    });
+                    out.innerHTML = html + '</tbody></table>';
+                })
+                .catch(function() { out.innerHTML = '<p class="tool-msg">Network error</p>'; });
+        }
+    </script>
 </body>
 </html>

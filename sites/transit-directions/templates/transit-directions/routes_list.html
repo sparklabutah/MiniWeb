@@ -52,7 +52,7 @@
     <div class="container">
         <h2 class="page-title">All Routes</h2>
 
-        <form method="get" action="/routes" style="background:white;border-radius:12px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+        <form method="get" action="{{ url_for('transit-directions.routes_list') }}" style="background:white;border-radius:12px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
             <div>
                 <span style="font-size:13px;font-weight:600;color:#666;margin-right:8px;">Route Type:</span>
                 <label style="font-size:14px;cursor:pointer;margin-right:8px;"><input type="radio" name="type" value="" {% if not current_type %}checked{% endif %} onchange="this.form.submit()"> All</label>
@@ -70,6 +70,21 @@
                     <option value="frequency" {% if current_sort == 'frequency' %}selected{% endif %}>Frequency</option>
                 </select>
             </div>
+        </form>
+
+        <!-- Export route data (export_by_dropdown) -->
+        <form method="get" action="{{ url_for('transit-directions.api_export') }}" id="export-form" style="background:white;border-radius:12px;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#666;">Export data:</span>
+            <select name="data" id="export-data" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <option value="routes">Routes</option>
+                <option value="stops">Stops</option>
+                <option value="fares">Fares</option>
+            </select>
+            <select name="format" id="export-format" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit" style="background:#1a237e;color:white;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:14px;">Export</button>
         </form>
 
         <div class="route-list">

@@ -12,7 +12,11 @@ import urllib.request
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# CHPC cluster install; fall back to whatever `claude` is on PATH locally
 _CLAUDE_CLI = "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
+if not Path(_CLAUDE_CLI).exists():
+    import shutil as _shutil
+    _CLAUDE_CLI = _shutil.which("claude") or "claude"
 
 # Groq API — fast, free tier, OpenAI-compatible
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"

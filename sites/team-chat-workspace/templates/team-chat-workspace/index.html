@@ -138,6 +138,30 @@
                     {% endfor %}
                 </ul>
             </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Create Channel</div>
+                <form id="create-channel-form" onsubmit="return createChannel(event)" style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">
+                    <input type="text" id="new-ch-name" name="name" placeholder="Channel name" required
+                           style="background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:6px 8px;border-radius:4px;font-size:13px;">
+                    <input type="text" id="new-ch-desc" name="description" placeholder="Description (optional)"
+                           style="background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:6px 8px;border-radius:4px;font-size:13px;">
+                    <button type="submit" style="background:#007a5a;color:#fff;border:none;padding:6px 10px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;">Create Channel</button>
+                    <div id="create-ch-feedback" style="font-size:11px;color:#8b8b8d;min-height:1em;"></div>
+                </form>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Follow Member</div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">
+                    <select id="follow-user-select"
+                            style="background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:6px 8px;border-radius:4px;font-size:13px;">
+                        {% for uid, u in user_map.items() %}
+                        <option value="{{ uid }}">{{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="followUser()" style="background:#1264a3;color:#fff;border:none;padding:6px 10px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;">Follow</button>
+                    <div id="follow-feedback" style="font-size:11px;color:#8b8b8d;min-height:1em;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Content -->
@@ -218,6 +242,42 @@
             location.reload();
         });
         return false;
+    }
+    function createChannel(e) {
+        e.preventDefault();
+        var name = document.getElementById('new-ch-name').value.trim();
+        var desc = document.getElementById('new-ch-desc').value.trim();
+        var feedback = document.getElementById('create-ch-feedback');
+        if (!name) return false;
+        fetch('{{ url_for("team-chat-workspace.api_channels_create") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, description: desc})
+        }).then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (res.ok) {
+                location.reload();
+            } else {
+                feedback.style.color = '#e04e4e';
+                feedback.textContent = res.data.error || 'Could not create channel.';
+            }
+        });
+        return false;
+    }
+    function followUser() {
+        var sel = document.getElementById('follow-user-select');
+        var feedback = document.getElementById('follow-feedback');
+        fetch('{{ url_for("team-chat-workspace.index") }}api/users/' + encodeURIComponent(sel.value) + '/follow', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            feedback.style.color = '#2ea854';
+            feedback.textContent = (d.action === 'followed' ? 'Now following ' : 'Unfollowed ') + sel.options[sel.selectedIndex].text;
+        }).catch(function() {
+            feedback.style.color = '#e04e4e';
+            feedback.textContent = 'Error.';
+        });
     }
     </script>
 </body>

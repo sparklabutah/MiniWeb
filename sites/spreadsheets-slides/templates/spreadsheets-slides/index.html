@@ -159,6 +159,12 @@
                         </div>
                         <span>{{ f.updated_at[:10] if f.updated_at else '' }}</span>
                     </div>
+                    <div style="margin-top:0.5rem;text-align:right;">
+                        <button type="button" class="btn file-delete-btn"
+                                data-file-type="{{ f.file_type }}" data-file-id="{{ f.id }}" data-file-title="{{ f.title }}"
+                                style="background:#fce8e6;color:#c5221f;font-size:0.75rem;padding:0.25rem 0.7rem;"
+                                onclick="deleteFile(event, this)">Delete</button>
+                    </div>
                 </div>
             </a>
             {% endfor %}
@@ -201,6 +207,22 @@
         const params = new URLSearchParams(window.location.search);
         params.set('sort', val);
         window.location.href = '{{ url_for("spreadsheets-slides.index") }}?' + params.toString();
+    }
+
+    function deleteFile(event, btn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const type = btn.dataset.fileType;
+        const id = btn.dataset.fileId;
+        const title = btn.dataset.fileTitle;
+        if (!confirm('Delete "' + title + '"? This cannot be undone.')) return;
+        const base = type === 'spreadsheet'
+            ? '{{ url_for("spreadsheets-slides.api_spreadsheets_list") }}'
+            : '{{ url_for("spreadsheets-slides.api_presentations_list") }}';
+        fetch(base + '/' + id, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(() => window.location.reload())
+            .catch(() => alert('Failed to delete file.'));
     }
     </script>
 </body>

@@ -148,6 +148,31 @@ def index():
         params.extend([per_page + 1, offset])
         results = db.execute(sql, tuple(params))
 
+    # db.search() and the raw-SQL path read the base table only — merge in
+    # this session's posts so newly created entries appear in filtered views.
+    # (The default db.query() path above is already overlay-aware.)
+    if q or date_from or date_to or tag:
+        def _overlay_match(p):
+            if q:
+                text = " ".join(str(p.get(f, ""))
+                                for f in ("title", "body", "author_username")).lower()
+                if not all(t in text for t in q.lower().split()):
+                    return False
+            if cat and p.get("category") != cat:
+                return False
+            if author and p.get("author_username") != author:
+                return False
+            if date_from and (p.get("date") or "") < date_from:
+                return False
+            if date_to and (p.get("date") or "") > date_to:
+                return False
+            if tag and tag not in str(p.get("tags", "")):
+                return False
+            return True
+
+        results = db.merge_overlay(SITE, "posts", results, match=_overlay_match,
+                                   sort=db_sort, limit=per_page + 1)
+
     # Count total for pagination
     if q and not (date_from or date_to or tag):
         total_count = db.count(SITE, "posts", where=where if where else None)

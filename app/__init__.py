@@ -3,6 +3,31 @@ import json
 import os
 import pathlib
 
+
+def _load_dotenv():
+    """Load KEY=VALUE pairs from the project .env into os.environ.
+
+    Real environment variables always win — existing keys are not overridden.
+    Must run before any module (e.g. app.db) reads os.environ at import time.
+    """
+    env_path = pathlib.Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv()
+
 from flask import Flask, redirect, request, session
 
 SITES_DIR = pathlib.Path(__file__).resolve().parent.parent / "sites"

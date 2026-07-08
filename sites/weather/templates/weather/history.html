@@ -37,6 +37,15 @@
         .precip-val { color: #42a5f5; }
 
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+
+        /* Date range navigation (navigate_by_date_range) */
+        .range-form { background: #fff; border-radius: .5rem; padding: 1rem 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; display: flex; gap: .8rem; align-items: flex-end; flex-wrap: wrap; }
+        .range-form .form-group label { display: block; font-size: .78rem; color: #475569; font-weight: 600; margin-bottom: .3rem; }
+        .range-form input[type="date"] { padding: .45rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .range-form input[type="date"]:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .btn-range { background: #1565c0; color: #fff; border: none; padding: .5rem 1.2rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
+        .btn-range:hover { background: #0d47a1; }
+        .range-form .reset-link { font-size: .82rem; color: #1565c0; align-self: center; }
     </style>
 </head>
 <body>
@@ -64,6 +73,21 @@
 
     <div class="content">
         <h2 class="section-title">Past 30 Days &mdash; Lakeport, WA</h2>
+
+        <form class="range-form" method="get" action="{{ url_for('weather.history_page') }}">
+            <div class="form-group">
+                <label for="date-from">From date</label>
+                <input type="date" id="date-from" name="date_from" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="form-group">
+                <label for="date-to">To date</label>
+                <input type="date" id="date-to" name="date_to" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <button type="submit" class="btn-range">View Range</button>
+            {% if request.args.get('date_from') or request.args.get('date_to') %}
+            <a class="reset-link" href="{{ url_for('weather.history_page') }}">Reset to all 30 days</a>
+            {% endif %}
+        </form>
 
         {% if stats %}
         <div class="stats-grid">

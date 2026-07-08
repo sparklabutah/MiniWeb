@@ -200,9 +200,16 @@ def category_page(slug):
         abort(404)
 
     sort_by = request.args.get("sort", "date")
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
     sort_map = {"popularity": "-comments_count", "title": "title"}
     sql_sort = sort_map.get(sort_by, "-date")
     filtered = _load_articles(where={"category": slug}, sort=sql_sort, limit=50)
+    # Date range filter on the already-limited result set (same as api_articles)
+    if date_from:
+        filtered = [a for a in filtered if a.get("date", "") >= date_from]
+    if date_to:
+        filtered = [a for a in filtered if a.get("date", "") <= date_to]
 
     bookmarked_ids = set()
     if user:
@@ -212,7 +219,8 @@ def category_page(slug):
     return render_template("news/category.html",
                            category=category, articles=filtered,
                            categories=categories, user=user,
-                           sort=sort_by, bookmarked_ids=bookmarked_ids)
+                           sort=sort_by, bookmarked_ids=bookmarked_ids,
+                           date_from=date_from, date_to=date_to)
 
 
 @blueprint.route("/search")
@@ -221,6 +229,8 @@ def search_page():
     user = _current_user()
 
     q = request.args.get("q", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
     results = []
     if q:
         rows = db.search(SITE, "articles", q, limit=50)
@@ -230,6 +240,11 @@ def search_page():
                     a["tags"] = json.loads(a["tags"])
                 except (json.JSONDecodeError, TypeError):
                     a["tags"] = []
+        # Date range filter on the already-limited result set (same as api_articles)
+        if date_from:
+            rows = [a for a in rows if a.get("date", "") >= date_from]
+        if date_to:
+            rows = [a for a in rows if a.get("date", "") <= date_to]
         results = rows
 
     bookmarked_ids = set()
@@ -239,7 +254,8 @@ def search_page():
 
     return render_template("news/search.html",
                            q=q, results=results, categories=categories,
-                           user=user, bookmarked_ids=bookmarked_ids)
+                           user=user, bookmarked_ids=bookmarked_ids,
+                           date_from=date_from, date_to=date_to)
 
 
 @blueprint.route("/bookmarks")
@@ -339,9 +355,9 @@ def register_submit():
         "subscription_tier": "free",
         "subscribed_since": datetime.utcnow().strftime("%Y-%m-%d"),
         "newsletter_preferences": {
-            "daily_digest": False,
-            "breaking_news": False,
-            "weekly_roundup": False,
+            "daily_digest": request.form.get("newsletter_daily_digest") == "on",
+            "breaking_news": request.form.get("newsletter_breaking_news") == "on",
+            "weekly_roundup": request.form.get("newsletter_weekly_roundup") == "on",
             "categories": []
         },
         "notification_settings": {

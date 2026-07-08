@@ -70,16 +70,35 @@
                 {% for u in users %}
                 <div class="member-card">
                     <div class="avatar avatar-{{ loop.index0 % 7 }}">{{ u.display_name[:1] }}</div>
-                    <div class="member-info">
+                    <div class="member-info" style="flex:1;">
                         <div class="name">{{ u.display_name }}</div>
                         <div class="title">{{ u.title }}</div>
                         <div class="dept">{{ u.department }}</div>
                         {% if u.status_text %}<div class="status">{{ u.status_emoji }} {{ u.status_text }}</div>{% endif %}
                     </div>
+                    {% if current_user and u.id != current_user.id %}
+                    {% set is_blocked = u.id in (current_user.get('blocked_users') or []) %}
+                    <button class="block-toggle-btn" data-url="{{ url_for('team-chat-workspace.api_member_block', member_id=u.id) }}"
+                            onclick="toggleBlock(this)"
+                            style="background:{{ '#e04e4e' if is_blocked else '#3f3f42' }};color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;align-self:flex-start;">
+                        {{ 'Blocked' if is_blocked else 'Block' }}
+                    </button>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
+    <script>
+    function toggleBlock(btn) {
+        fetch(btn.getAttribute('data-url'), {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var blocked = d.action === 'blocked';
+            btn.textContent = blocked ? 'Blocked' : 'Block';
+            btn.style.background = blocked ? '#e04e4e' : '#3f3f42';
+        });
+    }
+    </script>
 </body>
 </html>

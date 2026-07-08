@@ -144,6 +144,16 @@
                     <div class="ch-meta">{{ active_channel.member_count }} members &middot; {{ active_channel.description }}</div>
                 </div>
                 <div style="display:flex;gap:.4rem;align-items:center;">
+                    {% set joined = active_channel.id in (current_user.get('joined_channels') or []) if current_user else false %}
+                    <button id="join-toggle-btn" onclick="toggleJoin(this)" data-joined="{{ '1' if joined else '0' }}"
+                            style="background:{{ '#3f3f42' if joined else '#007a5a' }};color:#fff;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        {{ 'Leave Channel' if joined else 'Join Channel' }}
+                    </button>
+                    {% set followed = active_channel.id in (current_user.get('followed_channels') or []) if current_user else false %}
+                    <button id="follow-toggle-btn" onclick="toggleFollow(this)" data-following="{{ '1' if followed else '0' }}"
+                            style="background:{{ '#3f3f42' if followed else '#1264a3' }};color:#fff;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        {{ '★ Following' if followed else '☆ Follow' }}
+                    </button>
                     <form method="POST" action="{{ url_for('team-chat-workspace.form_channel_invite', channel_id=active_channel.id) }}" style="display:flex;gap:.3rem;align-items:center;">
                         <input type="text" name="email" placeholder="Invite member" style="padding:.3rem .5rem;background:#383838;color:#d1d2d3;border:1px solid #4a4a4a;border-radius:4px;font-size:.78rem;width:130px;">
                         <button type="submit" style="background:#2b6cb0;color:#fff;border:none;padding:.35rem .6rem;border-radius:4px;font-size:.78rem;cursor:pointer;">Invite</button>
@@ -189,8 +199,20 @@
                                 </div>
                                 <div class="msg-text">{{ msg.text }}</div>
                                 {% if current_user and msg.user_id == current_user.id %}
-                                <button class="msg-delete-btn" data-url="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Delete message">&#10005; delete</button>
+                                <form class="msg-edit-form" data-message-id="{{ msg.id }}" onsubmit="return saveEdit(event, this)" style="display:none;gap:6px;margin-top:4px;">
+                                    <input type="text" name="text" value="{{ msg.text }}" style="flex:1;background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:5px 8px;border-radius:4px;font-size:13px;">
+                                    <button type="submit" style="background:#007a5a;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Save</button>
+                                    <button type="button" onclick="this.closest('.msg-edit-form').style.display='none'" style="background:#3f3f42;color:#ababad;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Cancel</button>
+                                </form>
+                                <button class="msg-edit-btn" onclick="showEditForm(this)" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;margin-right:8px;" title="Edit message">&#9998; edit</button>
+                                <button class="msg-delete-btn" data-url="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;margin-right:8px;" title="Delete message">&#10005; delete</button>
                                 {% endif %}
+                                {% set msg_saved = msg.id in (current_user.get('saved_messages') or []) if current_user else false %}
+                                <button class="msg-save-btn" data-url="{{ url_for('team-chat-workspace.api_message_save', message_id=msg.id) }}"
+                                        onclick="toggleSave(this)"
+                                        style="background:none;border:none;color:{{ '#d4a72c' if msg_saved else '#ababad' }};font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Save message">
+                                    {{ '★ saved' if msg_saved else '☆ save' }}
+                                </button>
                                 {% if msg.reactions %}
                                 <div class="reactions">
                                     {% for rxn in msg.reactions %}
@@ -251,6 +273,53 @@
         if (!text) return false;
         fetch('{{ url_for("team-chat-workspace.api_channel_send_message", channel_id=active_channel.id) }}', {
             method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+        return false;
+    }
+    function toggleJoin(btn) {
+        fetch('{{ url_for("team-chat-workspace.api_channel_join", channel_id=active_channel.id) }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var joined = d.action === 'joined';
+            btn.dataset.joined = joined ? '1' : '0';
+            btn.textContent = joined ? 'Leave Channel' : 'Join Channel';
+            btn.style.background = joined ? '#3f3f42' : '#007a5a';
+        });
+    }
+    function toggleFollow(btn) {
+        fetch('{{ url_for("team-chat-workspace.api_channel_follow", channel_id=active_channel.id) }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var following = d.action === 'followed';
+            btn.dataset.following = following ? '1' : '0';
+            btn.textContent = following ? '★ Following' : '☆ Follow';
+            btn.style.background = following ? '#3f3f42' : '#1264a3';
+        });
+    }
+    function toggleSave(btn) {
+        fetch(btn.getAttribute('data-url'), {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var saved = d.action === 'saved';
+            btn.textContent = saved ? '★ saved' : '☆ save';
+            btn.style.color = saved ? '#d4a72c' : '#ababad';
+        });
+    }
+    function showEditForm(btn) {
+        var form = btn.closest('.msg-body').querySelector('.msg-edit-form');
+        form.style.display = 'flex';
+        form.querySelector('input[name="text"]').focus();
+    }
+    function saveEdit(e, form) {
+        e.preventDefault();
+        var text = form.querySelector('input[name="text"]').value.trim();
+        if (!text) return false;
+        fetch('{{ url_for("team-chat-workspace.index") }}api/messages/' + encodeURIComponent(form.dataset.messageId), {
+            method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({text: text})
         }).then(function(r) { return r.json(); }).then(function() {

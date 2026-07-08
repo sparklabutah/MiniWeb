@@ -131,10 +131,43 @@
                 <h4>{{ plan.name }}</h4>
                 <p>{{ plan.origin }} &rarr; {{ plan.destination }}</p>
                 <p>Departs {{ plan.departure_time }}, arrives {{ plan.arrival_time }} ({{ plan.total_duration_minutes }} min) &bull; ${{ "%.2f"|format(plan.fare) }}</p>
+                <div style="margin-top:8px;">
+                    <button type="button" class="share-plan-toggle" data-plan-id="{{ plan.id }}" aria-pressed="false"
+                            style="background:white;color:#1a237e;border:1px solid #1a237e;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;">
+                        Sharing: Off
+                    </button>
+                    <span class="share-plan-result" style="display:none;font-size:13px;color:#666;margin-left:10px;"></span>
+                </div>
             </div>
             {% endfor %}
         </div>
         {% endif %}
     </div>
+
+    <script>
+    // Trip plan sharing toggles (share_by_toggle)
+    document.querySelectorAll('.share-plan-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var on = btn.getAttribute('aria-pressed') !== 'true';
+            var out = btn.parentElement.querySelector('.share-plan-result');
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.textContent = on ? 'Sharing: On' : 'Sharing: Off';
+            btn.style.background = on ? '#1a237e' : 'white';
+            btn.style.color = on ? 'white' : '#1a237e';
+            if (!on) { out.style.display = 'none'; return; }
+            out.style.display = 'inline';
+            out.textContent = 'Generating share link...';
+            fetch('{{ url_for("transit-directions.api_share") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: 'link', content_type: 'trip_plan',
+                                      content_id: parseInt(btn.dataset.planId, 10)})
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(d) { out.textContent = 'Share link: ' + d.url; })
+                .catch(function() { out.textContent = 'Could not generate share link.'; });
+        });
+    });
+    </script>
 </body>
 </html>

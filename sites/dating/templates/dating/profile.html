@@ -30,6 +30,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .btn-like { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
 .btn-pass { background: #f1f1f1; color: #888; }
 .matched-badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 0.4rem 1rem; border-radius: 1rem; font-weight: 600; font-size: 0.9rem; margin-top: 1rem; }
+.safety-actions { display: flex; gap: 0.8rem; margin-top: 1rem; justify-content: center; align-items: center; flex-wrap: wrap; border-top: 1px solid #f0ebff; padding-top: 1rem; }
+.btn-block { padding: 0.55rem 1.5rem; border: 1px solid #e8deff; border-radius: 2rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; background: #fff; color: #888; }
+.btn-block.blocked { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.report-form { display: flex; gap: 0.5rem; align-items: center; }
+.report-form input { padding: 0.55rem 1rem; border: 1px solid #e8deff; border-radius: 2rem; font-size: 0.85rem; outline: none; color: #555; }
+.report-form button { padding: 0.55rem 1.5rem; border: none; border-radius: 2rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; background: #f1f1f1; color: #dc2626; }
+.reported-badge { display: inline-block; background: #fef2f2; color: #dc2626; padding: 0.4rem 1rem; border-radius: 1rem; font-weight: 600; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -83,6 +90,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <form method="post" action="{{ url_for('dating.form_pass', profile_id=profile.id) }}">
     <button type="submit" class="btn-pass">Pass</button>
 </form>
+</div>
+{% endif %}
+{% if user and user.id != profile.id %}
+<div class="safety-actions">
+<form method="post" action="{{ url_for('dating.form_block_profile', profile_id=profile.id) }}">
+    <button type="submit" class="btn-block {% if profile.blocked %}blocked{% endif %}" title="Block or unblock this profile">{% if profile.blocked %}Blocked{% else %}Block{% endif %}</button>
+</form>
+{% if profile.reported %}
+<span class="reported-badge">Reported</span>
+{% else %}
+<form method="post" action="{{ url_for('dating.form_report_profile', profile_id=profile.id) }}" class="report-form">
+    <input type="text" name="reason" placeholder="Reason for report" required>
+    <button type="submit">Report</button>
+</form>
+{% endif %}
 </div>
 {% endif %}
 </div>

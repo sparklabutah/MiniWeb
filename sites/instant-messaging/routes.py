@@ -866,6 +866,22 @@ def api_join_group(conv_id):
     }), 201
 
 
+@blueprint.route("/join/<conv_id>")
+def join_group_link(conv_id):
+    """Join a group conversation via invite link (join_by_route)."""
+    conversations = _get_conversations()
+    conv = next((c for c in conversations if c["id"] == conv_id), None)
+    if not conv:
+        abort(404)
+    uid = session.get("im_user_id", CURRENT_USER_ID)
+    if conv["type"] == "group" and uid not in conv["participants"]:
+        user = _user_map().get(uid)
+        conv["participants"].append(uid)
+        conv["participant_names"].append(user["display_name"] if user else uid)
+        db.save_collection(SITE, "conversations", conversations)
+    return redirect(url_for("instant-messaging.conversation_page", conv_id=conv_id))
+
+
 # ---------------------------------------------------------------------------
 # API: share_by_dropdown — share/forward a message to another conversation
 # ---------------------------------------------------------------------------

@@ -830,6 +830,10 @@ def api_policy_update(policy_id):
         policy["deductible"] = data["deductible"]
     if "agent" in data:
         policy["agent"] = data["agent"]
+    # configure_by_toggle: policy settings and notification preferences
+    for key in ("autopay_enabled", "paperless_billing", "email_notifications", "sms_alerts"):
+        if key in data:
+            policy[key] = bool(data[key])
 
     _save_policies(policies)
     return jsonify(policy)

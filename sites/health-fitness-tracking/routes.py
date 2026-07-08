@@ -4,15 +4,16 @@ Reads workout logs, daily health stats, nutrition entries, fitness goals, food
 database, and user profiles from SQLite and exposes them through HTML pages
 and a JSON API.
 
-Supports all 26 assigned macros:
-  navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic,
+Assigned macros (see annotation/macro_locations.py — the authoritative list):
+  navigate_by_route, search_by_query, search_by_semantic,
   filter_by_dropdown, filter_by_date_range, sort_by_ranking,
   extract_by_dropdown, extract_from_table, extract_by_route, extract_by_date_range,
-  compute_by_dropdown, compute_by_extremum, compute_by_slider,
-  compare_by_date_range, verify_by_slider,
-  create_from_free_text, create_by_checkbox, submit_by_query,
-  edit_by_form, delete_from_table, select_from_table,
-  configure_by_slider, play_by_dropdown, play_by_playback, export_by_dropdown
+  compute_by_dropdown, compute_by_extremum, compute_by_slider, verify_by_slider,
+  create_by_form, submit_by_form, delete_from_table, select_from_table,
+  configure_by_slider, export_by_dropdown
+
+Some API endpoints below (compare, replay, quick-create, workout update) have no
+UI surface and are intentionally NOT listed in macro_locations.
 """
 
 import csv
@@ -157,8 +158,18 @@ def index():
     user_goals_rec = goals_data[0] if goals_data else None
     user_goals = user_goals_rec["goals"] if user_goals_rec else []
 
-    # Recent workouts (last 5)
-    recent_workouts = _load_workouts(where={"user_id": uid}, sort="-date", limit=5)
+    # Recent workouts (last 5), honoring the dashboard sort dropdown
+    sort_param = request.args.get("sort", "date")
+    sort_map = {
+        "date": "-date",
+        "calories": "-calories_burned",
+        "duration": "-duration_minutes",
+        "type": "type",
+        "heart_rate": "-heart_rate_avg",
+    }
+    recent_workouts = _load_workouts(
+        where={"user_id": uid}, sort=sort_map.get(sort_param, "-date"), limit=5
+    )
 
     return render_template(
         "health-fitness-tracking/index.html",
@@ -347,7 +358,22 @@ def stats_page():
     period = request.args.get("period", "week")
     row_limit = 30 if period == "month" else 7
 
-    user_stats = _load_daily_stats(where={"user_id": uid}, sort="-date", limit=row_limit)
+    # Optional explicit From/To range (filter form) overrides the period window
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+    if date_from or date_to:
+        sql = "SELECT * FROM [health_fitness_tracking_daily_stats] WHERE user_id = ?"
+        params = [uid]
+        if date_from:
+            sql += " AND date >= ?"
+            params.append(date_from)
+        if date_to:
+            sql += " AND date <= ?"
+            params.append(date_to)
+        sql += " ORDER BY date DESC LIMIT 90"
+        user_stats = db.execute(sql, tuple(params))
+    else:
+        user_stats = _load_daily_stats(where={"user_id": uid}, sort="-date", limit=row_limit)
 
     summary = {}
     if user_stats:

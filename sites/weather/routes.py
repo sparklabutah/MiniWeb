@@ -110,6 +110,17 @@ def _icon_for(conditions):
 def index():
     """Landing page -- current conditions + 7-day summary."""
     current = db.query(SITE, "current", limit=1)[0]
+    # Optional ?location= query navigates to another location's conditions
+    location_name = request.args.get("location", "").strip()
+    location_error = None
+    if location_name:
+        loc = _get_location_by_name(location_name)
+        if loc:
+            current["location"] = loc["name"]
+            current["lat"] = loc["lat"]
+            current["lng"] = loc["lng"]
+        else:
+            location_error = f"Location '{location_name}' not found"
     forecast = db.query(SITE, "forecast")  # only 7 rows
     alerts = db.query(SITE, "alerts")      # only 3 rows
     user = _current_user()
@@ -120,6 +131,7 @@ def index():
         alerts=alerts,
         user=user,
         icon_for=_icon_for,
+        location_error=location_error,
     )
 
 
@@ -163,7 +175,22 @@ def history_page():
         f"SUM(CASE WHEN precip_in > 0 THEN 1 ELSE 0 END) as rainy_days "
         f"FROM [{table}]",
         fetch="one")
-    historical = db.query(SITE, "historical", sort="date")  # 30 rows
+    # Optional date-range navigation (same pattern as api_historical)
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    if date_from or date_to:
+        clauses = []
+        params = []
+        if date_from:
+            clauses.append("[date] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[date] <= ?")
+            params.append(date_to)
+        sql = f"SELECT * FROM [{table}] WHERE " + " AND ".join(clauses) + " ORDER BY [date]"
+        historical = db.execute(sql, tuple(params))
+    else:
+        historical = db.query(SITE, "historical", sort="date")  # 30 rows
     user = _current_user()
     if stats_row and stats_row.get("avg_high") is not None:
         stats = {

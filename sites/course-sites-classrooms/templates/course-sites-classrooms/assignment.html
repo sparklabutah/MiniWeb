@@ -89,6 +89,37 @@
 
         <div class="section">
             <h3>Submissions</h3>
+            <form id="date-range-filter" onsubmit="filterSubmissionsByDate(); return false;"
+                  style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:.9rem;font-size:.85rem;color:#475569;">
+                <label for="sub-date-from">From</label>
+                <input type="date" id="sub-date-from" style="padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;font-size:.85rem;">
+                <label for="sub-date-to">To</label>
+                <input type="date" id="sub-date-to" style="padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;font-size:.85rem;">
+                <button type="submit" class="btn">Filter by date</button>
+                <button type="button" class="btn" onclick="clearDateFilter()">Clear</button>
+                <span id="date-filter-status" style="color:#94a3b8;"></span>
+            </form>
+            <script>
+                function filterSubmissionsByDate() {
+                    var from = document.getElementById('sub-date-from').value;
+                    var to = document.getElementById('sub-date-to').value;
+                    var rows = document.querySelectorAll('tr[data-submitted]');
+                    var shown = 0;
+                    rows.forEach(function (row) {
+                        var d = row.getAttribute('data-submitted');
+                        var visible = (!from || d >= from) && (!to || d <= to);
+                        row.style.display = visible ? '' : 'none';
+                        if (visible) shown++;
+                    });
+                    document.getElementById('date-filter-status').textContent =
+                        (from || to) ? shown + ' submission(s) in range' : '';
+                }
+                function clearDateFilter() {
+                    document.getElementById('sub-date-from').value = '';
+                    document.getElementById('sub-date-to').value = '';
+                    filterSubmissionsByDate();
+                }
+            </script>
             {% if submissions %}
             <table>
                 <thead>
@@ -105,7 +136,7 @@
                 </thead>
                 <tbody>
                     {% for sub in submissions %}
-                    <tr>
+                    <tr data-submitted="{{ sub.submitted_at[:10] }}">
                         {% if user and user.role in ('instructor', 'admin') %}
                         <td>{{ sub.student_name|default('--') }}</td>
                         {% endif %}

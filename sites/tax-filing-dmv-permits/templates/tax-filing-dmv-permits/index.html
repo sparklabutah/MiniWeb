@@ -251,6 +251,30 @@
                     <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}" class="link">Payment History &rarr;</a>
                 </div>
             </div>
+
+            <!-- export_by_dropdown: download filing and permit data -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:.4rem;padding:.9rem 1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:.85rem;font-weight:600;color:#1b3a4b;">Export Your Data:</span>
+                <label style="font-size:.82rem;color:#6b7280;">Data
+                    <select id="export-category" style="margin-left:.3rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.82rem;">
+                        <option value="filings">Tax Filings</option>
+                        <option value="vehicles">Vehicles</option>
+                        <option value="permits">Permits</option>
+                        <option value="payments">Payments</option>
+                    </select>
+                </label>
+                <label style="font-size:.82rem;color:#6b7280;">Format
+                    <select id="export-format" style="margin-left:.3rem;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.82rem;">
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                    </select>
+                </label>
+                <button type="button" id="export-btn"
+                        style="padding:.4rem 1rem;background:#1b3a4b;color:#fff;border:none;border-radius:.3rem;font-size:.82rem;font-weight:600;cursor:pointer;"
+                        onclick="window.location='{{ url_for('tax-filing-dmv-permits.api_export') }}?category=' + document.getElementById('export-category').value + '&format=' + document.getElementById('export-format').value;">
+                    Export
+                </button>
+            </div>
         </div>
 
         <!-- Recent filings -->
@@ -258,7 +282,7 @@
         <div class="section">
             <h3>Recent Tax Filings</h3>
             <table>
-                <thead><tr><th>Filing ID</th><th>Type</th><th>Tax Year</th><th>Tax Owed</th><th>Status</th></tr></thead>
+                <thead><tr><th>Filing ID</th><th>Type</th><th>Tax Year</th><th>Tax Owed</th><th>Status</th><th>Notes</th></tr></thead>
                 <tbody>
                 {% for f in filings[:5] %}
                 <tr>
@@ -267,10 +291,38 @@
                     <td>{{ f.tax_year }}</td>
                     <td>${{ "%.2f" | format(f.tax_owed) }}</td>
                     <td><span class="badge badge-{{ f.status }}">{{ f.status | title }}</span></td>
+                    <td>
+                        <span style="display:flex;gap:.4rem;align-items:center;">
+                            <input type="text" class="filing-notes-input" data-filing-id="{{ f.id }}" value="{{ f.notes }}"
+                                   placeholder="Add a note..."
+                                   style="width:150px;padding:.3rem .5rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem;">
+                            <button type="button" class="filing-notes-save"
+                                    style="padding:.3rem .7rem;background:#1b3a4b;color:#fff;border:none;border-radius:.3rem;font-size:.75rem;font-weight:600;cursor:pointer;">
+                                Save
+                            </button>
+                        </span>
+                    </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <script>
+            // edit_by_query: update filing notes via the tax-filings API
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('.filing-notes-save');
+                if (!btn) return;
+                var input = btn.parentElement.querySelector('.filing-notes-input');
+                btn.textContent = 'Saving...';
+                fetch('/sites/tax-filing-dmv-permits/api/tax-filings/' + input.getAttribute('data-filing-id'), {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({notes: input.value})
+                })
+                .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function() { btn.textContent = 'Saved'; setTimeout(function() { btn.textContent = 'Save'; }, 1500); })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Save'; }, 1500); });
+            });
+            </script>
         </div>
         {% endif %}
 

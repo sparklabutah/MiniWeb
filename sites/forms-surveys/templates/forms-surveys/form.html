@@ -92,6 +92,42 @@
         </div>
         {% endfor %}
 
+        <div class="section-title">Attachments</div>
+        <div class="field-card">
+            <ul id="attachment-list" style="list-style:none;font-size:.85rem;color:#5f6368;margin-bottom:.8rem;display:flex;flex-direction:column;gap:.3rem;">
+                {% for att in form.attachments or [] %}
+                <li>&#128206; {{ att.filename }} ({{ att.size }} bytes)</li>
+                {% endfor %}
+            </ul>
+            <form id="upload-form" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <input type="file" id="attachment-file" name="file" required style="font-size:.85rem;">
+                <button type="submit" class="btn primary">Upload File</button>
+            </form>
+            <div id="upload-status" style="font-size:.8rem;color:#5f6368;margin-top:.5rem;"></div>
+        </div>
+        <script>
+        document.getElementById('upload-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var input = document.getElementById('attachment-file');
+            var status = document.getElementById('upload-status');
+            if (!input.files.length) { status.textContent = 'Choose a file first.'; return; }
+            var fd = new FormData();
+            fd.append('file', input.files[0]);
+            status.textContent = 'Uploading…';
+            fetch("{{ url_for('forms-surveys.api_form_upload', form_id=form.id) }}", { method: 'POST', body: fd })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                .then(function (res) {
+                    if (!res.ok) { status.textContent = res.data.error || 'Upload failed.'; return; }
+                    var li = document.createElement('li');
+                    li.textContent = '📎 ' + res.data.filename + ' (' + res.data.size + ' bytes)';
+                    document.getElementById('attachment-list').appendChild(li);
+                    status.textContent = 'Uploaded ' + res.data.filename + '.';
+                    input.value = '';
+                })
+                .catch(function () { status.textContent = 'Upload failed.'; });
+        });
+        </script>
+
         {% if responses %}
         <div class="section-title">Recent Responses ({{ responses|length }})</div>
         {% for resp in responses[:10] %}

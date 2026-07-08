@@ -36,6 +36,30 @@
         </div>
         <div class="count">{{ papers|length }} papers in this category</div>
 
+        <div class="count-tool" style="display:flex;align-items:center;gap:.6rem;margin-bottom:1.5rem;padding:.7rem .9rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.35rem;font-size:.85rem;color:#475569;">
+            <label for="catCountSelect" style="font-weight:600;">Compute paper count:</label>
+            <select id="catCountSelect" style="padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.85rem;background:#fff;">
+                <option value="">Select a category&hellip;</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {{ 'selected' if c == category }}>{{ c }}</option>
+                {% endfor %}
+            </select>
+            <span id="catCountResult" style="color:#1e3a5f;font-weight:600;"></span>
+        </div>
+        <script>
+            document.getElementById('catCountSelect').addEventListener('change', function () {
+                var cat = this.value;
+                var result = document.getElementById('catCountResult');
+                if (!cat) { result.textContent = ''; return; }
+                result.textContent = 'Computing…';
+                var url = "{{ url_for('academic-paper-db.api_category_stats', cat_name='__CAT__') }}".replace('__CAT__', encodeURIComponent(cat));
+                fetch(url)
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { result.textContent = d.count + ' papers in ' + d.category; })
+                    .catch(function () { result.textContent = 'Error computing count'; });
+            });
+        </script>
+
         {% for paper in papers %}
         <div class="paper-item">
             <a href="{{ url_for('academic-paper-db.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a>
