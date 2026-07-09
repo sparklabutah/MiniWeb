@@ -44,6 +44,15 @@
         .msg-actions a:hover, .msg-actions form button:hover { background: #f1f3f4; }
         .msg-actions form { display: inline; }
         .move-form select { padding: 6px 10px; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.85rem; }
+        .more-menu { position: relative; display: inline-block; }
+        .more-menu summary { list-style: none; padding: 6px 14px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #dadce0; background: #fff; color: #5f6368; cursor: pointer; user-select: none; }
+        .more-menu summary::-webkit-details-marker { display: none; }
+        .more-menu summary:hover { background: #f1f3f4; }
+        .more-menu-items { position: absolute; top: 110%; left: 0; z-index: 50; min-width: 170px; background: #fff; border: 1px solid #dadce0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 4px 0; }
+        .more-menu-items form { display: block; }
+        .more-menu-items button, .more-menu-items a { display: block; width: 100%; text-align: left; padding: 8px 16px; border: none; border-radius: 0; background: none; font-size: 0.85rem; color: #202124; cursor: pointer; text-decoration: none; }
+        .more-menu-items button:hover, .more-menu-items a:hover { background: #f1f3f4; }
+        .report-form select, .report-form input[type="text"] { padding: 6px 10px; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -87,6 +96,16 @@
                     <button type="submit">{{ 'Unstar' if email.is_starred else 'Star' }}</button>
                 </form>
                 <button class="btn-danger" id="delete-email-btn">Delete</button>
+                <details class="more-menu" id="more-actions-menu">
+                    <summary>More &#9662;</summary>
+                    <div class="more-menu-items">
+                        <form method="post" action="{{ url_for('email.form_block_sender', email_id=email.id) }}">
+                            <input type="hidden" name="redirect_to" value="{{ url_for('email.index') }}">
+                            <button type="submit">Block sender</button>
+                        </form>
+                        <a href="#report-form">Report message</a>
+                    </div>
+                </details>
                 <script>
                 document.getElementById('delete-email-btn').addEventListener('click', function() {
                     var btn = this;
@@ -148,6 +167,16 @@
                         <input type="hidden" name="action" value="add">
                         <input type="hidden" name="redirect_to" value="{{ url_for('email.message_detail', email_id=email.id) }}">
                         <button type="submit">Add Label</button>
+                    </form>
+                    <form id="report-form" class="report-form" method="post" action="{{ url_for('email.form_report', email_id=email.id) }}" style="display:inline-flex;gap:4px;align-items:center;">
+                        <select name="reason">
+                            <option value="spam">Spam</option>
+                            <option value="phishing">Phishing</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="text" name="details" placeholder="Details (optional)" style="width:150px;">
+                        <input type="hidden" name="redirect_to" value="{{ url_for('email.index') }}">
+                        <button type="submit">Report</button>
                     </form>
                 </div>
             </div>

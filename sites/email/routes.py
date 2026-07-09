@@ -799,6 +799,65 @@ def form_label(email_id):
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
+@blueprint.route("/message/<int:email_id>/block", methods=["POST"])
+def form_block_sender(email_id):
+    """Block the sender of a message and move the message to spam."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("email.login_page"))
+    email, source = _find_email(email_id, user["id"])
+    if email:
+        sender = (email.get("from_addr") or "").strip().lower()
+        if sender:
+            users = _load_users()
+            for u in users:
+                if u["id"] == user["id"]:
+                    blocked = u.setdefault("blocked_senders", [])
+                    if sender not in blocked:
+                        blocked.append(sender)
+            _save_users(users)
+        email["folder"] = "spam"
+        if source == "sent":
+            sent = _load_sent()
+            for s in sent:
+                if s["id"] == email_id:
+                    s["folder"] = "spam"
+            _save_sent(sent)
+    return redirect(request.form.get("redirect_to", url_for("email.index")))
+
+
+@blueprint.route("/message/<int:email_id>/report", methods=["POST"])
+def form_report(email_id):
+    """Report a message (spam/phishing/other) via form; moves it to spam."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("email.login_page"))
+    reason = request.form.get("reason", "spam").strip()
+    details = request.form.get("details", "").strip()
+    email, source = _find_email(email_id, user["id"])
+    if email:
+        users = _load_users()
+        for u in users:
+            if u["id"] == user["id"]:
+                reports = u.setdefault("reported_messages", [])
+                reports.append({
+                    "email_id": email_id,
+                    "from_addr": email.get("from_addr", ""),
+                    "subject": email.get("subject", ""),
+                    "reason": reason,
+                    "details": details,
+                })
+        _save_users(users)
+        email["folder"] = "spam"
+        if source == "sent":
+            sent = _load_sent()
+            for s in sent:
+                if s["id"] == email_id:
+                    s["folder"] = "spam"
+            _save_sent(sent)
+    return redirect(request.form.get("redirect_to", url_for("email.index")))
+
+
 # ---------------------------------------------------------------------------
 # API routes  (all accept explicit user_id OR fall back to session)
 # ---------------------------------------------------------------------------

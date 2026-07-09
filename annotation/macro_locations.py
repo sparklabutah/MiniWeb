@@ -399,14 +399,8 @@ MACRO_LOCATIONS = {
         "create_by_form": [
             "'Compose' page -> create post form (title, body, category)"
         ],
-        "submit_by_route": [
-            "'Compose' page -> form submit to create new post"
-        ],
         "post_from_free_text": [
             "Post detail page -> comment textarea below article"
-        ],
-        "follow_by_dropdown": [
-            "Post detail page -> 'Follow'/'Unfollow' button"
         ],
         "follow_by_toggle": [
             "Post detail page -> 'Follow Author' button"
@@ -450,9 +444,6 @@ MACRO_LOCATIONS = {
         ],
         "select_by_dropdown": [
             "Reader page -> chapter dropdown to jump to a specific chapter"
-        ],
-        "play_by_route": [
-            "Reader page -> chapter content display"
         ],
         "post_from_free_text": [
             "Book detail page -> write review textarea"
@@ -548,7 +539,7 @@ MACRO_LOCATIONS = {
             "'Login' page -> 2FA verification code input step shown after credentials"
         ],
         "select_by_radio": [
-            "'Trade' page -> Buy/Sell toggle and 'Order Type' dropdown"
+            "'Trade' page -> 'Time in Force' radio buttons (Day / Good till canceled)"
         ]
     },
     "business-company": {
@@ -716,7 +707,7 @@ MACRO_LOCATIONS = {
             "'Metrics' page -> CPU threshold slider for filtering"
         ],
         "verify_by_dropdown": [
-            "'Services' page -> 'Status' dropdown showing service health"
+            "'Services' page -> 'Status' filter dropdown (All/Active/Warning/Stopped) + 'Apply' to verify which services are in a given state"
         ],
         "submit_by_form": [
             "'Services' page -> search field with filter dropdowns and 'Apply' button"
@@ -838,9 +829,6 @@ MACRO_LOCATIONS = {
         ],
         "configure_by_slider": [
             "'Editor' page -> font size slider in editor settings"
-        ],
-        "upload_by_query": [
-            "Upload page -> file upload form for importing code snippets"
         ],
         "share_by_route": [
             "'Editor' page -> 'Share Snippet' button; Snippet page -> 'Share' button"
@@ -1593,10 +1581,10 @@ MACRO_LOCATIONS = {
             "Message detail -> star button"
         ],
         "report_by_form": [
-            "Message detail -> 'Delete' button for removing spam"
+            "Message detail -> report form at bottom (reason dropdown: Spam/Phishing/Other, optional details, 'Report' button); moves message to Spam"
         ],
         "block_by_dropdown": [
-            "Message detail -> action buttons (Star, Delete, Mark read/unread, Move, Label)"
+            "Message detail -> 'More' dropdown in toolbar -> 'Block sender' (adds sender to blocked list, moves message to Spam)"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -2485,6 +2473,9 @@ MACRO_LOCATIONS = {
         ],
         "play_by_playback": [
             "Track page -> 'Play' button for audio playback"
+        ],
+        "play_by_route": [
+            "Track page -> navigate to a track from browse/album and press 'Play'"
         ],
         "follow_by_dropdown": [
             "Artist page -> 'More' dropdown with 'Follow' and 'Share Artist' options"
@@ -3758,6 +3749,9 @@ MACRO_LOCATIONS = {
         ]
     },
     "video": {
+        "play_by_route": [
+            "'StreamHub' page -> click video thumbnail to open the watch page with player"
+        ],
         "navigate_by_route": [
             "'StreamHub' page -> click video thumbnail to watch",
             "Channel page -> click video to watch",

@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
 
-from agents import AgentResult, BrowserUseAgent, MockAgent, ChatClaude
+from agents import AgentResult, BrowserUseAgent, MockAgent, ChatLLM
 from server import start_server, stop_server, wait_for_server
 from judge import judge_task, format_trajectory
 
@@ -53,14 +53,8 @@ AGENT_FACTORIES = {
         ).ChatOpenAI(model="gpt-4o"),
         **kw,
     ),
-    "claude": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.anthropic.chat", fromlist=["ChatAnthropic"]
-        ).ChatAnthropic(model="claude-sonnet-4-6-20250514"),
-        **kw,
-    ),
-    "claude-cli": lambda **kw: _make_browser_use_agent(
-        lambda: ChatClaude(model="claude-cli"),
+    "llm": lambda **kw: _make_browser_use_agent(
+        lambda: ChatLLM(),
         **kw,
     ),
     "groq": lambda **kw: _make_browser_use_agent(
@@ -338,7 +332,7 @@ def main():
     parser.add_argument("--no-headless", action="store_true")
     parser.add_argument("--timeout", type=int, default=300, help="Timeout per task in seconds")
     parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--judge-model", default="claude-cli", help="Model for LLM judge")
+    parser.add_argument("--judge-model", default="auto", help="Model for LLM judge")
     parser.add_argument("--ambiguous", action="store_true", help="Use ambiguous instructions instead of original")
     args = parser.parse_args()
     asyncio.run(run_eval(args))

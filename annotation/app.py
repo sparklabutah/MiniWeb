@@ -255,7 +255,10 @@ def _save_task(task):
 
     task_id = task.get("task_id") or generate_task_id()
     task["task_id"] = task_id
-    annotator = task.get("annotator", "anonymous")
+    # annotator becomes a directory name and a URL path segment — strip
+    # slashes/backslashes (a stray "Minh\" once forked the dataset in two)
+    annotator = task.get("annotator", "anonymous").strip().strip("\\/") or "anonymous"
+    task["annotator"] = annotator
     trajectory = task.pop("trajectory", [])
 
     # Primary storage: file system
@@ -462,6 +465,7 @@ _MACRO_ALIASES = {
     "sign_by_query": "sign_by_signature",
     "submit_by_dropdown": "submit_by_form",
     "translate_by_dropdown": "compute_by_dropdown",
+    "upload_by_query": "upload_by_upload",
     "upload_by_image": "upload_by_upload",
     "upload_by_route": "upload_by_upload",
 }
@@ -1042,6 +1046,12 @@ def api_create_task():
         "annotator": data.get("annotator", "anonymous"),
     }
     task_id = _save_task(task)
+
+    # Derive axtree + screenshot from the recorded HTML snapshots so saved
+    # observations match the backfilled/replayed data format (async).
+    from annotation.observations import schedule_completion
+    schedule_completion(task["annotator"], task_id,
+                        request.host_url.rstrip("/"))
 
     # Record N/A macros for future sampling improvement
     na_macros = data.get("macros_not_applicable", {})
@@ -1692,9 +1702,19 @@ def api_refine_instruction():
 
 
 def _call_llm(system_prompt, user_prompt):
-    """Call LLM via shared Groq/Claude helper."""
+    """Call LLM via the shared model-routing helper (default model)."""
     from app.llm import call_llm
     return call_llm(user_prompt, system=system_prompt, max_tokens=500, temperature=0.4)
+
+
+@annotation_bp.route("/api/llm_models")
+def api_llm_models():
+    """Supported models per provider, with configuration status."""
+    from app.llm import list_models, DEFAULT_MODEL, _get_env
+    return jsonify({
+        "default": _get_env("LLM_MODEL") or DEFAULT_MODEL,
+        "providers": list_models(),
+    })
 
 
 @annotation_bp.route("/api/make_ambiguous", methods=["POST"])
@@ -2099,7 +2119,7 @@ def _merge_llm_checks(configs, extra_checks):
 
 
 def _call_openai_simple(model, prompt, max_tokens=1500):
-    """LLM call via shared Groq/Claude helper."""
+    """LLM call via shared Groq/OpenAI/Gemini helper."""
     from app.llm import call_llm
     try:
         return call_llm(prompt, max_tokens=max_tokens, temperature=0.2)
@@ -2110,47 +2130,6 @@ def _call_openai_simple(model, prompt, max_tokens=1500):
 
 
 _verifier_processes = {}  # job_id -> subprocess.Popen
-
-
-def _spawn_claude_verifier_builder(ctx_file, result_file):
-    """Spawn claude CLI as a background subprocess to build verifiers."""
-    import subprocess, shutil
-
-    claude_bin = shutil.which("claude") or "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
-    import os as _os
-    if not _os.path.isfile(claude_bin):
-        result_file.write_text(json.dumps({"error": "claude CLI not found"}))
-        return
-
-    prompt = (
-        f"Read the JSON file at {ctx_file}. "
-        f"It contains context for a MiniWeb annotation task with fields: "
-        f"instruction, trajectory (with api_calls per action), macro_spans, "
-        f"expected_answer, expected_outcome, and admin_schemas. "
-        f"\n\n"
-        f"Generate a JSON array of verifier configs — one per macro span. "
-        f"Each config: {{\"macro\": \"name\", \"span\": [start, end], \"checks\": [...]}}. "
-        f"Check types: grounding (required_urls), state_query (endpoint, params, check, expected), "
-        f"answer_match (expected, match_type), record_exists/record_absent (endpoint, params), "
-        f"action_performed (action, target_contains). "
-        f"Always include grounding. For state-changing macros include state checks. "
-        f"For extraction macros include answer_match. "
-        f"Honor the expected_outcome field. "
-        f"\n\n"
-        f"Write ONLY the JSON array (no markdown) to {result_file}"
-    )
-
-    job_id = ctx_file.stem.replace("_context", "")
-
-    proc = subprocess.Popen(
-        [claude_bin, "-p", prompt,
-         "--allowedTools", "Read", "Write",
-         "--max-turns", "5"],
-        cwd=str(ctx_file.parent.parent.parent),  # project root
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    _verifier_processes[job_id] = proc
 
 
 @annotation_bp.route("/api/verifier_status/<job_id>")
@@ -2171,7 +2150,7 @@ def api_verifier_status(job_id):
         configs = json.loads(result_file.read_text())
         if not isinstance(configs, list):
             return jsonify({"status": "invalid_output", "ready": False,
-                            "error": "Claude output was not a JSON array"})
+                            "error": "LLM output was not a JSON array"})
     except (json.JSONDecodeError, OSError) as e:
         return jsonify({"status": "error", "ready": False, "error": str(e)})
 
@@ -2180,7 +2159,7 @@ def api_verifier_status(job_id):
 
 @annotation_bp.route("/api/load_verifiers", methods=["POST"])
 def api_load_verifiers():
-    """Load verifier configs from file (after Claude Code writes them)."""
+    """Load verifier configs from file (written by the verifier builder)."""
     from flask import current_app
     data = request.get_json(silent=True) or {}
     result_file = data.get("result_file", "")
@@ -2191,7 +2170,7 @@ def api_load_verifiers():
     import pathlib as _pl
     path = _pl.Path(result_file)
     if not path.exists():
-        return jsonify({"error": "File not found. Run the Claude Code command first.", "ready": False})
+        return jsonify({"error": "File not found. Build verifiers first.", "ready": False})
 
     try:
         configs = json.loads(path.read_text())
@@ -2255,8 +2234,8 @@ def api_run_verifiers():
 def api_agent_validate():
     """Run a browser-use agent with headless Chrome to attempt the task.
 
-    Spawns a real browser session, navigates the site, and uses ChatClaude
-    (Groq/Claude) as the LLM to decide actions. After the agent finishes,
+    Spawns a real browser session, navigates the site, and uses ChatLLM
+    (Groq/OpenAI/Gemini) as the LLM to decide actions. After the agent finishes,
     we check the server request log + agent's answer against the verifiers.
     """
     import asyncio
@@ -2298,10 +2277,10 @@ def api_agent_validate():
         _user_site = str(Path.home() / ".local/lib/python3.11/site-packages")
         if _user_site not in sys.path:
             sys.path.insert(0, _user_site)
-        from agents import ChatClaude
+        from agents import ChatLLM
         from browser_use import Agent, BrowserSession
 
-        llm = ChatClaude(model="claude-cli")
+        llm = ChatLLM()
         browser_session = BrowserSession(headless=True)
 
         try:
@@ -2607,7 +2586,7 @@ def _enrich_trajectory(trajectory, request_log):
     return enriched
 
 
-# --- Verifier system prompt for Claude ---
+# --- Verifier system prompt ---
 _VERIFIER_SYSTEM_PROMPT = """You are a verifier builder for MiniWeb, a web benchmark platform.
 
 Given a task's instruction, trajectory (with API calls), macro spans, and expected answer,
@@ -2668,63 +2647,8 @@ Instead, take the existing_configs as your starting point and apply ONLY the cha
 Keep everything that isn't mentioned in the feedback unchanged. Output the full corrected JSON array."""
 
 
-def _call_claude_for_verifiers(context):
-    """Call Claude to generate verifier configs from task context."""
-    import os
-
-    # Try Anthropic first
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        env_path = PROJECT_ROOT / ".env"
-        if env_path.exists():
-            for line in env_path.read_text().splitlines():
-                line = line.strip()
-                if line.startswith("export "):
-                    line = line[7:]
-                if line.startswith("ANTHROPIC_API_KEY="):
-                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
-
-    if api_key:
-        return _call_anthropic(api_key, context)
-
-    # Fallback to OpenAI
-    return _call_openai_verifiers(context)
-
-
-def _call_anthropic(api_key, context):
-    """Call Anthropic Claude API to generate verifier configs."""
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-
-        # Trim trajectory to avoid token limits
-        trimmed_ctx = _trim_context(context)
-
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            system=_VERIFIER_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": json.dumps(trimmed_ctx)}],
-        )
-
-        text = response.content[0].text.strip()
-        # Extract JSON from response (handle markdown code blocks)
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
-
-        return json.loads(text)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return None
-
-
 def _call_openai_verifiers(context):
-    """Generate verifier configs via Groq/Claude."""
+    """Generate verifier configs via the shared LLM helper."""
     from app.llm import call_llm
 
     trimmed_ctx = _trim_context(context)
@@ -2806,25 +2730,53 @@ def _trim_context(context):
 
 # --- Website Review ---
 
+_REVIEWS_DIR = SITES_DIR.parent / "data" / "reviews"
+
+
+def _review_file(site_id):
+    # site_id comes from the URL — sanitize to a plain name to keep paths safe
+    safe = "".join(c for c in site_id if c.isalnum() or c in "-_")
+    return _REVIEWS_DIR / f"{safe}.json"
+
+
+def _load_reviews(site_id):
+    f = _review_file(site_id)
+    if f.exists():
+        try:
+            return json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
 @annotation_bp.route("/api/review/<site_id>", methods=["POST"])
 def api_submit_review(site_id):
-    """Submit free-form feedback for a site."""
+    """Submit free-form feedback for a site. Stored in data/reviews/<site>.json."""
     data = request.get_json(silent=True) or {}
-    # Reviews stored in file system (future: data_sources/annotations/reviews/)
-    return jsonify({"status": "saved", "count": 0})
+    feedback = (data.get("feedback") or "").strip()
+    if not feedback:
+        return jsonify({"error": "feedback required"}), 400
+    reviews = _load_reviews(site_id)
+    reviews.append({
+        "annotator": data.get("annotator", "anonymous"),
+        "feedback": feedback,
+        "timestamp": datetime.now().isoformat(),
+    })
+    _REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+    _review_file(site_id).write_text(json.dumps(reviews, indent=1))
+    return jsonify({"status": "saved", "count": len(reviews)})
 
 
 @annotation_bp.route("/api/review_status")
 def api_review_status():
     """List sites with their review counts."""
     sites = _load_sites()
-    review_counts = {}
     result = []
     for s in sites:
         result.append({
             "id": s["id"],
             "name": s.get("name", s["id"]),
-            "review_count": review_counts.get(s["id"], 0),
+            "review_count": len(_load_reviews(s["id"])),
         })
     return jsonify(result)
 
@@ -2832,7 +2784,7 @@ def api_review_status():
 @annotation_bp.route("/api/reviews/<site_id>")
 def api_get_reviews(site_id):
     """Get all reviews for a site."""
-    return jsonify([])
+    return jsonify(_load_reviews(site_id))
 
 
     # Dashboard removed — use index page and verify page instead

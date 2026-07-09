@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
 
-from agents import AgentResult, BrowserUseAgent, MockAgent, ChatClaude
+from agents import AgentResult, BrowserUseAgent, MockAgent, ChatLLM
 from server import start_server, stop_server, wait_for_server
 from tasks import TASK_TIMEOUT, filter_tasks, load_tasks, run_task
 
@@ -77,15 +77,9 @@ AGENT_FACTORIES = {
         ).ChatOpenAI(model="gpt-5.5"),
         **kw,
     ),
-    "claude": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.anthropic.chat", fromlist=["ChatAnthropic"]
-        ).ChatAnthropic(model="claude-sonnet-4-6-20250514"),
-        **kw,
-    ),
     "mock": lambda **kw: MockAgent(**kw),
-    "claude-cli": lambda **kw: _make_browser_use_agent(
-        lambda: ChatClaude(model="claude-cli"),
+    "llm": lambda **kw: _make_browser_use_agent(
+        lambda: ChatLLM(),
         **kw,
     ),
 }
@@ -396,8 +390,8 @@ def main():
         help="Use LLM-as-judge instead of verifiers.py for evaluation",
     )
     parser.add_argument(
-        "--judge-model", default="claude-cli",
-        help="Model for LLM judge (default: claude-cli, or an OpenAI model name)",
+        "--judge-model", default="auto",
+        help="Model for LLM judge (default: auto = Groq/OpenAI/Gemini, or an OpenAI model name)",
     )
     args = parser.parse_args()
     asyncio.run(run_eval(args))

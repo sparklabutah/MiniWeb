@@ -22,26 +22,8 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-# CHPC cluster install; fall back to whatever `claude` is on PATH locally
-CLAUDE_CLI = "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
-if not Path(CLAUDE_CLI).exists():
-    import shutil as _shutil
-    CLAUDE_CLI = _shutil.which("claude") or "claude"
 
 
-def _get_api_key():
-    key = os.environ.get("OPENAI_API_KEY", "")
-    if key:
-        return key
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("export "):
-                line = line[7:]
-            if line.startswith("OPENAI_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
 
 
 _JUDGE_PROMPT = """You are a judge evaluating whether a browser agent correctly completed a web task.
@@ -170,43 +152,29 @@ def _parse_json_response(text):
     return json.loads(text)
 
 
-def _call_claude_cli(prompt, timeout=60):
-    """Call Claude CLI and return raw text output."""
-    result = subprocess.run(
-        [CLAUDE_CLI, "-p", prompt, "--output-format", "text"],
-        capture_output=True, text=True, timeout=timeout,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Claude CLI error: {result.stderr[:200]}")
-    return result.stdout.strip()
-
-
-def _call_openai(prompt, model, api_key):
-    """Call OpenAI API and return raw text output."""
-    payload = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_completion_tokens": 300,
-        "temperature": 0.1,
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read())
-        return result["choices"][0]["message"]["content"].strip()
+def _call_shared_llm(prompt, model=None):
+    """Judge via the shared model-routing helper (None -> default model)."""
+    import sys
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from app.llm import call_llm
+    text = call_llm(prompt, max_tokens=1000, temperature=0.0, json_mode=True,
+                    model=model)
+    if not text:
+        raise RuntimeError(f"LLM call failed (model={model or 'default'})")
+    return text
 
 
 def judge_task(instruction, trajectory, expected_answer, rubric,
-               agent_answer="", model="claude-cli"):
+               agent_answer="", model="auto"):
     """Call LLM to judge whether the agent completed the task.
 
     Returns: {"pass": bool, "score": float, "reasoning": str}
 
-    model="claude-cli" uses the Claude CLI (no API key needed).
-    Any other model value uses OpenAI API.
+    model may be any name in app.llm.SUPPORTED_MODELS — it is routed to the
+    right provider automatically. "auto" (or the legacy "claude-cli") uses
+    the default model.
     """
     traj_text = format_trajectory(trajectory)
 
@@ -219,13 +187,9 @@ def judge_task(instruction, trajectory, expected_answer, rubric,
     )
 
     try:
-        if model == "claude-cli":
-            text = _call_claude_cli(prompt)
-        else:
-            key = _get_api_key()
-            if not key:
-                return {"pass": False, "score": 0.0, "reasoning": "No API key available"}
-            text = _call_openai(prompt, model, key)
+        # "auto"/"claude-cli" (legacy alias) -> default model
+        routed = None if model in ("auto", "claude-cli") else model
+        text = _call_shared_llm(prompt, model=routed)
 
         verdict = _parse_json_response(text)
         return {

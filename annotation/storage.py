@@ -13,10 +13,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+# resolve(): a relative MINIWEB_ANNOTATIONS_DIR (e.g. "data/annotations" in
+# .env) would otherwise be resolved against app.root_path by Flask helpers
+# like send_from_directory, silently pointing inside the app package.
 ANNOTATIONS_DIR = Path(
     os.environ.get("MINIWEB_ANNOTATIONS_DIR",
                    os.path.join(os.path.dirname(__file__), "..", "data", "annotations"))
-)
+).resolve()
 
 
 def _task_dir(annotator: str, task_id: str) -> Path:

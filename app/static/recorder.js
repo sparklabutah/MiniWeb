@@ -137,14 +137,7 @@
         // Post observation after every action (debounced to avoid flooding)
         clearTimeout(_obsTimer);
         _obsTimer = setTimeout(function() {
-            post({
-                mw: 'observation',
-                url: location.pathname + location.search,
-                title: document.title || '',
-                timestamp: new Date().toISOString(),
-                snapshot: captureSnapshot(),
-                axtree: captureAxtree(),
-            });
+            post(makeObservation());
         }, 300);
     }
     var _obsTimer = null;
@@ -400,11 +393,39 @@
 
     // ── Initial page load ───────────────────────────────────────────────
 
+    function mirrorFormState() {
+        // outerHTML serializes attributes, not live DOM properties — typed
+        // text, checked radios, and selected options are invisible unless
+        // mirrored into attributes first.
+        try {
+            document.querySelectorAll('input').forEach(function(el) {
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                    if (el.checked) el.setAttribute('checked', '');
+                    else el.removeAttribute('checked');
+                } else if (el.type !== 'password' && el.type !== 'file') {
+                    el.setAttribute('value', el.value);
+                }
+            });
+            document.querySelectorAll('textarea').forEach(function(el) {
+                el.textContent = el.value;
+            });
+            document.querySelectorAll('select').forEach(function(el) {
+                for (var i = 0; i < el.options.length; i++) {
+                    if (el.options[i].selected) el.options[i].setAttribute('selected', '');
+                    else el.options[i].removeAttribute('selected');
+                }
+            });
+        } catch(e) { /* never block the capture */ }
+    }
+
     function captureSnapshot() {
         try {
+            mirrorFormState();
             var html = document.documentElement.outerHTML;
-            if (html.length > 200000) {
-                html = html.slice(0, 200000) + '<!-- truncated -->';
+            // 2MB cap: a truncated snapshot cannot be re-rendered for
+            // axtree/screenshot derivation, so keep this generous.
+            if (html.length > 2000000) {
+                html = html.slice(0, 2000000) + '<!-- truncated -->';
             }
             return html;
         } catch(e) {
@@ -477,15 +498,24 @@
         }
     }
 
-    function postPageLoad() {
-        post({
+    function makeObservation() {
+        // "axtree" (YAML aria-snapshot) and "screenshot" are derived
+        // server-side at save time from the snapshot; the in-page JSON
+        // walker is kept as axtree_json for backward compatibility.
+        return {
             mw: 'observation',
             url: location.pathname + location.search,
             title: document.title || '',
             timestamp: new Date().toISOString(),
             snapshot: captureSnapshot(),
-            axtree: captureAxtree(),
-        });
+            axtree_json: captureAxtree(),
+            scroll_top: window.scrollY || 0,
+            viewport: {width: window.innerWidth, height: window.innerHeight},
+        };
+    }
+
+    function postPageLoad() {
+        post(makeObservation());
     }
 
     if (document.readyState === 'complete') {

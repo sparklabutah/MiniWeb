@@ -373,30 +373,26 @@ class MockAgent:
         pass
 
 
-# ── Claude CLI LLM (drop-in for browser-use) ────────────────────────────────
+# ── Shared-API LLM (drop-in for browser-use) ────────────────────────────────
 
-# CHPC cluster install; fall back to whatever `claude` is on PATH locally
-CLAUDE_CLI = "/uufs/chpc.utah.edu/sys/installdir/r8/claude/2.1.83/bin/claude"
-if not pathlib.Path(CLAUDE_CLI).exists():
-    CLAUDE_CLI = shutil.which("claude") or "claude"
+class ChatLLM:
+    """browser-use BaseChatModel backed by the shared model-routing helper.
 
-
-class ChatClaude:
-    """browser-use BaseChatModel backed by Claude CLI subprocess.
-
-    Implements the ainvoke() protocol so browser-use Agent can use it as its LLM.
-    Each call spawns `claude -p <prompt>` and parses the response.
+    Implements the ainvoke() protocol so browser-use Agent can use it as its
+    LLM. Each call goes through app.llm.call_llm, which routes the model
+    name to its provider (Groq / OpenAI / Gemini). model="auto" uses the
+    default model (LLM_MODEL env or app.llm.DEFAULT_MODEL).
     """
 
-    _verified_api_keys: bool = True  # no key needed
+    _verified_api_keys: bool = True  # keys are resolved by app.llm
 
-    def __init__(self, model: str = "claude-cli", timeout: int = 120):
+    def __init__(self, model: str = "auto", timeout: int = 120):
         self.model = model
         self._timeout = timeout
 
     @property
     def provider(self) -> str:
-        return "claude-cli"
+        return "miniweb-llm"
 
     @property
     def name(self) -> str:
@@ -428,7 +424,7 @@ class ChatClaude:
 
     @staticmethod
     def _extract_json(text: str) -> str:
-        """Strip markdown code fences from Claude's response."""
+        """Strip markdown code fences from the LLM response."""
         text = text.strip()
         if text.startswith("```"):
             text = text.split("```")[1]
@@ -454,25 +450,30 @@ class ChatClaude:
             )
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                CLAUDE_CLI, "-p", prompt_text, "--output-format", "text",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            import sys as _sys
+            _root = str(pathlib.Path(__file__).resolve().parent.parent)
+            if _root not in _sys.path:
+                _sys.path.insert(0, _root)
+            from app.llm import call_llm
+            text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    call_llm, prompt_text,
+                    None,                       # system (already serialized)
+                    4000,                       # max_tokens
+                    0.3,                        # temperature
+                    output_format is not None,  # json_mode
+                    None if self.model == "auto" else self.model,
+                ),
+                timeout=self._timeout,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self._timeout
-            )
-            text = stdout.decode("utf-8", errors="replace").strip()
-
-            if proc.returncode != 0:
-                err = stderr.decode("utf-8", errors="replace")[:200]
+            if not text:
                 raise ModelProviderError(
-                    message=f"Claude CLI returned {proc.returncode}: {err}",
+                    message=f"LLM call failed (model={self.model})",
                     model=self.model,
                 )
         except asyncio.TimeoutError:
             raise ModelProviderError(
-                message=f"Claude CLI timed out after {self._timeout}s",
+                message=f"LLM call timed out after {self._timeout}s",
                 model=self.model,
             )
 
@@ -501,7 +502,7 @@ class ChatClaude:
                 parsed = output_format.model_validate_json(json_text)
             else:
                 raise ModelProviderError(
-                    message=f"Failed to parse JSON from Claude response: {text[:200]}",
+                    message=f"Failed to parse JSON from LLM response: {text[:200]}",
                     model=self.model,
                 )
 

@@ -13,15 +13,33 @@ def _load_dotenv():
     env_path = pathlib.Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
         return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
+    lines = env_path.read_text().splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        i += 1
         if not line or line.startswith("#") or "=" not in line:
             continue
         if line.startswith("export "):
             line = line[7:]
         key, _, value = line.partition("=")
         key = key.strip()
-        value = value.strip().strip('"').strip("'")
+        value = value.strip()
+        if value.startswith('"') and not (len(value) > 1 and value.endswith('"')):
+            # multi-line double-quoted value (e.g. GOOGLE_CREDENTIALS_JSON)
+            parts = [value[1:]]
+            while i < len(lines):
+                cont = lines[i]
+                i += 1
+                r = cont.rstrip()
+                if r.endswith('"') and not r.endswith('\\"'):
+                    parts.append(r[:-1])
+                    break
+                parts.append(cont)
+            # dotenv-style unescaping inside double-quoted values
+            value = "\n".join(parts).replace('\\"', '"').replace("\\\\", "\\")
+        else:
+            value = value.strip('"').strip("'")
         if key and key not in os.environ:
             os.environ[key] = value
 

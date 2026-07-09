@@ -716,6 +716,9 @@ def trade_submit():
     quantity = request.form.get("quantity", "0")
     price = request.form.get("price", "")
     account_type = request.form.get("account_type", "checking")
+    time_in_force = request.form.get("time_in_force", "day")
+    if time_in_force not in ("day", "gtc"):
+        time_in_force = "day"
 
     try:
         quantity = float(quantity)
@@ -751,6 +754,7 @@ def trade_submit():
         "symbol": symbol,
         "side": side,
         "order_type": order_type,
+        "time_in_force": time_in_force,
         "quantity": quantity,
         "price": limit_price,
         "filled_price": current_price if order_type == "market" else None,
