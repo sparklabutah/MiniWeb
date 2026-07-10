@@ -562,15 +562,14 @@ _EDGE_MACRO_HINTS = {
 
 
 def _generate_prompt(sites, coverage, force_single=False):
-    """Graph-aware prompt sampler.
+    """Site-first prompt sampler.
 
     Strategy:
-      1. Pick cell (N sites, M macros) — prefer under-filled cells
-      2. For N=1: pick a single under-covered site
-         For N≥2: pick a seed site, then expand along graph edges to find
-                  connected sites (prefer direct edges, then hub-mediated)
-      3. Pick M macros — combine site-specific macros with edge-implied macros,
-         weighted toward under-covered ones
+      1. Pick the site with the most uncovered macros
+      2. Pick chain length using ratio 3:2:3:2 for lengths 1:2:3:4+
+         (weighted toward lengths the site still needs)
+      3. Pick uncovered macros for that site
+      4. For cross-site: expand along graph edges
     """
     rng = random.Random()
     site_pool = list(sites)
@@ -581,28 +580,41 @@ def _generate_prompt(sites, coverage, force_single=False):
     # Load graph
     outgoing, incoming = _load_graph_edges()
 
-    # 1. Pick cell — 1-5 macros for single-site, 2-6 for multi-site
-    cell_counts = _get_cell_counts()
-    if force_single:
-        cells = [(1, m) for m in [1, 2, 3]]
-    else:
-        cells = [(n, m) for n in [1, 2, 3] for m in [1, 2, 3, 4, 5, 6] if m >= n]
-    cell_weights = [1.0 / (cell_counts.get((n, m), 0) + 1) for n, m in cells]
-    total = sum(cell_weights)
-    cell_weights = [w / total for w in cell_weights]
-    n_sites, n_macros = rng.choices(cells, weights=cell_weights, k=1)[0]
+    # --- Per-site coverage analysis ---
+    from annotation.storage import list_tasks
+    all_tasks = list_tasks()
 
-    # 2. Pick sites — graph-aware for multi-site tasks
-    # Strongly prefer unvisited sites (10x boost), then under-covered
+    # Count which macros are covered per site (by any task)
+    site_macro_covered = {}  # site_id -> set of covered macros
+    site_chain_counts = {}   # site_id -> {chain_len: count}
+    for t in all_tasks:
+        t_sites = [s["id"] if isinstance(s, dict) else s for s in t.get("sites", [])]
+        t_macros = t.get("macros", [])
+        chain_len = len(t_macros)
+        for sid in t_sites:
+            site_macro_covered.setdefault(sid, set()).update(t_macros)
+            site_chain_counts.setdefault(sid, {})
+            site_chain_counts[sid][chain_len] = site_chain_counts[sid].get(chain_len, 0) + 1
+
+    # For each site, find uncovered macros
+    site_uncovered = {}
+    for s in site_pool:
+        sid = s["id"]
+        all_macros = set(_load_site_macros(sid))
+        covered = site_macro_covered.get(sid, set())
+        uncovered = all_macros - covered
+        site_uncovered[sid] = uncovered
+
+    # --- 1. Pick site: prefer sites with most uncovered macros ---
     site_weights = []
     for s in site_pool:
-        count = s.get("annotated_count", 0)
-        if count == 0:
-            site_weights.append(10.0)  # unvisited sites get strong priority
+        sid = s["id"]
+        n_uncovered = len(site_uncovered.get(sid, set()))
+        if n_uncovered > 0:
+            site_weights.append(float(n_uncovered))
         else:
-            site_weights.append(1.0 / (count + 1))
+            site_weights.append(0.1)  # small weight for fully covered sites
 
-    # Pick seed site (weighted by under-coverage)
     total = sum(site_weights)
     norm_weights = [w / total for w in site_weights]
     seed = rng.choices(site_pool, weights=norm_weights, k=1)[0]
@@ -610,11 +622,40 @@ def _generate_prompt(sites, coverage, force_single=False):
     sampled_ids = {seed["id"]}
     edge_types_used = []
 
-    if n_sites >= 2:
+    # --- 2. Pick chain length using ratio 3:2:3:2 for lengths 1:2:3:4 ---
+    # Weight toward lengths the site still needs
+    chain_counts = site_chain_counts.get(seed["id"], {})
+    # Target ratio: 3:2:3:2 = lengths 1,2,3,4
+    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2}
+    chain_weights = []
+    chain_options = []
+    for length, target_w in target_ratio.items():
+        if force_single and length > 3:
+            continue
+        current = chain_counts.get(length, 0)
+        # Weight: target ratio / (current count + 1) — under-filled lengths get priority
+        w = target_w / (current + 1)
+        chain_weights.append(w)
+        chain_options.append(length)
+
+    if not chain_options:
+        chain_options = [1]
+        chain_weights = [1.0]
+    total = sum(chain_weights)
+    chain_weights = [w / total for w in chain_weights]
+    n_macros = rng.choices(chain_options, weights=chain_weights, k=1)[0]
+
+    # For single-site mode, cap at 3
+    if force_single:
+        n_sites = 1
+        n_macros = min(n_macros, 3)
+    else:
+        n_sites = 1  # default, may expand for cross-site below
+
+    if not force_single and n_macros >= 2 and rng.random() < 0.2:
+        # 20% chance of cross-site task when chain >= 2
+        n_sites = 2
         # Expand along graph edges from seed
-        # Priority 1: direct outgoing edges (seed does action → target receives)
-        # Priority 2: direct incoming edges (source does action → seed receives)
-        # Priority 3: hub-mediated (seed → hub → other site, e.g. both connect to email)
         candidates = []
 
         # Direct outgoing
@@ -737,14 +778,15 @@ def _generate_prompt(sites, coverage, force_single=False):
     if not macro_pool:
         return None
 
-    # Weight: under-covered macros get higher weight; difficulty category boost;
-    # edge-implied macros get a boost
-    from annotation.macro_difficulty import get_macro_weight
+    # Weight: strongly prefer uncovered macros for this site, all macros equal
+    site_uncov = site_uncovered.get(seed["id"], set())
     edge_macro_set = set(edge_macros)
     macro_weights = []
     for m in macro_pool:
-        w = 1.0 / (coverage.get(m, 0) + 1)
-        w *= get_macro_weight(m)  # difficulty-based boost
+        if m in site_uncov:
+            w = 10.0  # uncovered on this site — strong priority
+        else:
+            w = 1.0 / (coverage.get(m, 0) + 1)
         if m in edge_macro_set:
             w *= 3.0  # boost edge-implied macros
         macro_weights.append(w)
