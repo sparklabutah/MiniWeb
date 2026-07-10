@@ -356,7 +356,7 @@ textarea#instruction:focus {
                         <input type="checkbox" id="single-site-toggle" onchange="handleSingleSiteToggle()" style="accent-color:#2563eb;width:13px;height:13px;">
                         Single site
                     </label>
-                    <select id="site-picker" onchange="reshufflePrompt()" style="display:none;font-size:.68rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.3rem;color:#475569;max-width:220px;" title="Choose the site; only macros are sampled. (n/m) = macros satisfied here (covered on this site, or at their K=3-site target elsewhere) out of the site's macro pool.">
+                    <select id="site-picker" onchange="reshufflePrompt()" style="display:none;font-size:.68rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.3rem;color:#475569;max-width:220px;" title="Choose the site. Status bar shows remaining tasks needed per chain length.">
                         <option value="">🎲 Random site</option>
                     </select>
                     <span id="login-status" style="font-size:.65rem;color:#16a34a;"></span>
@@ -1457,11 +1457,21 @@ function reshufflePrompt() {
             updateChainDisplay();
             renderTagPalette();
             document.getElementById('instruction').value = '';
-            if (prompt.chosen_site && prompt.floor_total !== undefined) {
-                const remaining = prompt.floor_total - prompt.floor_covered;
-                document.getElementById('status').textContent = remaining > 0
-                    ? `New prompt loaded — ${remaining} macro${remaining === 1 ? '' : 's'} still need this site for the K=3 floor (${prompt.floor_covered}/${prompt.floor_total} satisfied)`
-                    : `New prompt loaded — this site has no floor work left (all macros covered here or at K=3 elsewhere) 🎉`;
+            if (prompt.chosen_site && prompt.chain_remaining) {
+                const cr = prompt.chain_remaining;
+                const parts = [];
+                if (cr['1'] > 0) parts.push(cr['1'] + '\u00d7 len-1');
+                if (cr['2'] > 0) parts.push(cr['2'] + '\u00d7 len-2');
+                if (cr['3'] > 0) parts.push(cr['3'] + '\u00d7 len-3');
+                if (cr['4'] > 0) parts.push(cr['4'] + '\u00d7 len-4');
+                const uncov = prompt.uncovered_macros || 0;
+                const total = prompt.total_macros || 0;
+                let status = '';
+                if (uncov > 0) status += uncov + '/' + total + ' macros uncovered. ';
+                else status += 'All macros covered. ';
+                if (parts.length > 0) status += 'Still need: ' + parts.join(', ');
+                else status += 'All chain targets met!';
+                document.getElementById('status').textContent = status;
             } else {
                 document.getElementById('status').textContent = 'New prompt loaded';
             }

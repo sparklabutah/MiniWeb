@@ -911,6 +911,15 @@ def _generate_site_prompt(site, rng=None):
             has_qa = True
         remaining = [m for m in remaining if m != pick]
 
+    # Compute how many tasks still needed per chain length
+    # Target ratio 3:2:3:2 — scale to cover all macros
+    total_macros = len(all_macros)
+    # One "batch" = 3×1 + 2×2 + 3×3 + 2×4 = 24 macro slots in 10 tasks
+    import math
+    batches = max(1, math.ceil(total_macros / 24))
+    targets = {1: 3 * batches, 2: 2 * batches, 3: 3 * batches, 4: 2 * batches}
+    chain_remaining = {k: max(0, targets[k] - chain_counts.get(k, 0)) for k in targets}
+
     return {
         "sites": [{"id": site_id, "name": site.get("name", site_id)}],
         "macros": sampled,
@@ -918,8 +927,10 @@ def _generate_site_prompt(site, rng=None):
         "num_macros": len(sampled),
         "edges": [],
         "chosen_site": True,
-        "floor_total": len(all_macros),
-        "floor_covered": len(all_macros) - len(uncovered),
+        "total_macros": total_macros,
+        "uncovered_macros": len(uncovered),
+        "chain_counts": chain_counts,
+        "chain_remaining": chain_remaining,
     }
 
 
