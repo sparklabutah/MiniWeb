@@ -231,6 +231,9 @@
             transition: filter 0.15s, box-shadow 0.15s;
         }
         .grid-event a { color: #fff; text-decoration: none; display: block; }
+        .grid-event .ge-edit { display: none; position: absolute; top: 2px; right: 3px; font-size: 11px; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.25); z-index: 2; }
+        .grid-event:hover .ge-edit { display: block; }
+        .grid-event .ge-edit:hover { background: rgba(255,255,255,.5); }
         .grid-event .ge-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
         .grid-event .ge-time { font-size: 11px; opacity: 0.9; font-weight: 400; }
         .grid-event .ge-loc { font-size: 11px; opacity: 0.8; font-weight: 400; }
@@ -449,10 +452,16 @@
                 </select>
 
                 <h3>Date Range</h3>
+                {# no onchange here: native date pickers fire change per
+                   segment, which reloaded the page mid-selection #}
                 <label style="font-size:12px;font-weight:500">From:</label>
-                <input type="date" id="filter-date-from" value="{{ date_from }}" onchange="applyFilters()">
+                <input type="date" id="filter-date-from" value="{{ date_from }}">
                 <label style="font-size:12px;font-weight:500">To:</label>
-                <input type="date" id="filter-date-to" value="{{ date_to }}" onchange="applyFilters()">
+                <input type="date" id="filter-date-to" value="{{ date_to }}">
+                <button type="button" id="apply-date-range" onclick="applyFilters()"
+                        style="margin-top:6px;padding:5px 14px;border:1px solid #dadce0;border-radius:4px;background:#1a73e8;color:#fff;font-size:12px;cursor:pointer">
+                    Apply Date Range
+                </button>
             </div>
 
             <div class="filter-section export-links">
@@ -524,6 +533,7 @@
                         {% set height_px = (duration_min * 60 // 60) %}
                         {% if height_px < 24 %}{% set height_px = 24 %}{% endif %}
                         <div class="grid-event bg-{{ event.category }}" style="top: {{ top_px }}px; height: {{ height_px }}px;" title="{{ event.title }} ({{ event.start[11:16] }}-{{ event.end[11:16] }}){% if event.location %} @ {{ event.location }}{% endif %}">
+                            <a class="ge-edit" href="{{ url_for('calendar-todo.event_edit_page', event_id=event.id) }}" title="Edit event">&#9998;</a>
                             <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">
                                 <div class="ge-title">{{ event.title }}</div>
                                 <div class="ge-time">{{ event.start[11:16] }} - {{ event.end[11:16] }}</div>

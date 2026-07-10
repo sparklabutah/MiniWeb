@@ -111,6 +111,12 @@
                 <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star" onclick="var b=this;fetch('/sites/cloud-storage-file-transfer/api/files/{{ file.id }}/star', {method:'POST'}).then(()=>{var s=b.classList.toggle('starred');b.innerHTML=s?'&#9733;':'&#9734;'})">
                     {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
                 </button>
+                <button class="btn btn-outline btn-sm" id="rename-file-btn" onclick="var f=document.getElementById('rename-form');f.style.display=f.style.display==='none'?'inline-flex':'none';f.querySelector('input').focus()">&#9998; Rename</button>
+                <form id="rename-form" method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_rename', file_id=file.id) }}" style="display:none;gap:4px;align-items:center;">
+                    <input type="text" name="name" value="{{ file.name }}" required
+                           style="padding:0.3rem 0.6rem;border:1px solid #dadce0;border-radius:4px;font-size:0.85rem;width:220px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </form>
                 <button class="btn btn-outline btn-sm" onclick="var b=this;navigator.clipboard.writeText(window.location.href);b.innerHTML='&#128279; Copied!';setTimeout(()=>b.innerHTML='&#128279; Share',2000)">&#128279; Share</button>
                 <button class="btn btn-outline btn-sm" onclick="var b=this;b.innerHTML='&#8595; Downloading...';setTimeout(()=>b.innerHTML='&#8595; Download',2000)">&#8595; Download</button>
                 <button class="btn btn-outline btn-sm" id="delete-file-btn" style="color:#d93025;">&#128465; Delete</button>

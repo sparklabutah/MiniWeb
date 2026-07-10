@@ -44,6 +44,24 @@ def _simulated_today():
 # Data loading
 # ---------------------------------------------------------------------------
 
+def _normalize_events(events):
+    """Map DB column 'end_' back to 'end' (reserved word escaping) and
+    default text fields to empty strings. Must be applied to EVERY read
+    path (db.query and db.search) before events reach templates."""
+    for e in events:
+        if "end_" in e and "end" not in e:
+            e["end"] = e.pop("end_")
+        for field in ("start", "end", "title", "description", "category",
+                       "calendar", "location", "priority", "status", "color"):
+            if e.get(field) is None:
+                e[field] = ""
+    return events
+
+
+def _search_events(q, where=None, limit=200):
+    return _normalize_events(db.search(SITE, "events", q, where=where, limit=limit))
+
+
 def _load_events(user_id=None, category=None, status=None):
     where = {}
     if user_id is not None:
@@ -53,15 +71,7 @@ def _load_events(user_id=None, category=None, status=None):
     if status:
         where["status"] = status
     events = db.query(SITE, "events", where=where if where else None)
-    # Map DB column 'end_' back to 'end' (reserved word escaping)
-    for e in events:
-        if "end_" in e and "end" not in e:
-            e["end"] = e.pop("end_")
-        for field in ("start", "end", "title", "description", "category",
-                       "calendar", "location", "priority", "status", "color"):
-            if e.get(field) is None:
-                e[field] = ""
-    return events
+    return _normalize_events(events)
 
 
 def _save_events(events):
@@ -201,7 +211,7 @@ def index():
             where["calendar"] = cal
         if priority:
             where["priority"] = priority
-        results = db.search(SITE, "events", q, where=where if where else None, limit=200)
+        results = _search_events(q, where=where if where else None)
     else:
         results = list(events)
         if uid:
@@ -531,7 +541,7 @@ def api_events():
             where["calendar"] = calendar
         if priority:
             where["priority"] = priority
-        results = db.search(SITE, "events", q, where=where if where else None, limit=200)
+        results = _search_events(q, where=where if where else None)
         # Apply date filters that FTS doesn't handle
         results = _filter_events(results, date_from=date_from, date_to=date_to)
     else:
@@ -550,7 +560,7 @@ def api_search():
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
-    results = db.search(SITE, "events", q, limit=50)
+    results = _search_events(q, limit=50)
     return jsonify(results)
 
 

@@ -260,7 +260,16 @@ def folder_view(folder_id):
     # Files in this folder
     folder_files = [f for f in files if f.get("folder_id") == folder_id
                     and not f.get("is_trashed", False)]
-    folder_files.sort(key=lambda f: f.get("modified_at", ""), reverse=True)
+
+    sort = request.args.get("sort", "modified").strip()
+    if sort == "name":
+        folder_files.sort(key=lambda f: f["name"].lower())
+    elif sort == "size":
+        folder_files.sort(key=lambda f: f.get("size_bytes", 0), reverse=True)
+    elif sort == "created":
+        folder_files.sort(key=lambda f: f.get("created_at", ""), reverse=True)
+    else:
+        folder_files.sort(key=lambda f: f.get("modified_at", ""), reverse=True)
 
     # Subfolders
     subfolders = _get_subfolders(folder_id, folders)
@@ -270,7 +279,7 @@ def folder_view(folder_id):
 
     return render_template(
         "cloud-storage-file-transfer/folder.html",
-        folder=folder, files=folder_files, subfolders=subfolders,
+        folder=folder, files=folder_files, subfolders=subfolders, sort=sort,
         breadcrumb=breadcrumb, user=user, user_map=user_map,
         folders=folders, format_size=_format_size, file_icon=_file_icon,
         open_in_urls=OPEN_IN_URLS,
@@ -877,6 +886,21 @@ def form_file_delete(file_id):
         file["modified_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         _save_files(files)
         return redirect(url_for("cloud-storage-file-transfer.index"))
+
+
+@blueprint.route("/file/<int:file_id>/rename", methods=["POST"])
+def form_file_rename(file_id):
+    """Form-based rename for the file detail page."""
+    new_name = request.form.get("name", "").strip()
+    files = _load_files()
+    file = next((f for f in files if f["id"] == file_id), None)
+    if file is None:
+        abort(404)
+    if new_name:
+        file["name"] = new_name
+        file["modified_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        _save_files(files)
+    return redirect(url_for("cloud-storage-file-transfer.file_detail", file_id=file_id))
 
 
 @blueprint.route("/file/<int:file_id>/invite", methods=["POST"])

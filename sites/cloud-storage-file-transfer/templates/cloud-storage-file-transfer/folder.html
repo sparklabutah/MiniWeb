@@ -107,11 +107,18 @@
             {% endfor %}
         </nav>
 
-        <div class="page-header">
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <h2>
                 <span style="color:{{ folder.color }};">&#128193;</span>
                 {{ folder.name }}
             </h2>
+            <select class="sort-select" style="border:1px solid #dadce0;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff;color:#3c4043;cursor:pointer;"
+                    onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=folder.id) }}?sort='+this.value">
+                <option value="modified" {% if sort == 'modified' %}selected{% endif %}>Last modified</option>
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+                <option value="size" {% if sort == 'size' %}selected{% endif %}>File size</option>
+                <option value="created" {% if sort == 'created' %}selected{% endif %}>Date created</option>
+            </select>
         </div>
 
         {% if subfolders %}

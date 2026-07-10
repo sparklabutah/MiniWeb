@@ -593,7 +593,7 @@ MACRO_LOCATIONS = {
             "Left panel -> sort dropdown (Date, Title, Priority)"
         ],
         "filter_by_date_range": [
-            "Left panel -> 'From' and 'To' date fields"
+            "Left panel -> 'From' and 'To' date fields + 'Apply Date Range' button"
         ],
         "sort_by_ranking": [
             "Left panel -> sort dropdown (Date, Title, Priority)"
