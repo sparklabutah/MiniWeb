@@ -238,10 +238,12 @@ def _get_vertex_token():
 
 
 def _call_gemini(prompt, system, max_tokens, temperature, json_mode, model):
+    # No maxOutputTokens: on Gemini 2.5+ the cap also covers internal
+    # "thinking" tokens, so small caps truncate (or empty) the visible
+    # answer. The model default is effectively unlimited (~65k).
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": max_tokens,
             "temperature": temperature,
         },
     }

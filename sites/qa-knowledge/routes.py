@@ -14,6 +14,7 @@ Macros supported (23):
 """
 import json
 import pathlib
+import re
 from collections import Counter
 from datetime import datetime
 
@@ -157,6 +158,25 @@ def _parse_dt(dt_str):
         return datetime.min
 
 
+def _strip_html(html_text):
+    """Plain text from a post's HTML body."""
+    import html as _html
+    text = re.sub(r"<[^>]+>", " ", html_text)
+    return " ".join(_html.unescape(text).split())
+
+
+def _fill_excerpt(item, limit=300):
+    """Derive body_excerpt from the HTML body when the import left it empty.
+
+    ~99.9% of imported questions/answers have their content only in `body`
+    (StackExchange HTML); body_excerpt is empty for them.
+    """
+    if not item.get("body_excerpt") and item.get("body"):
+        text = _strip_html(item["body"])
+        item["body_excerpt"] = text[:limit] + ("..." if len(text) > limit else "")
+    return item
+
+
 def _enrich_question(q, user_map, answers=None, fetch_answers=False):
     """Add author info and computed fields to a question dict.
 
@@ -164,15 +184,15 @@ def _enrich_question(q, user_map, answers=None, fetch_answers=False):
     If answers list is provided, filters from it (legacy path for small sets).
     """
     author = user_map.get(q.get("author_root_user_id", -1))
-    q_copy = dict(q)
+    q_copy = _fill_excerpt(dict(q))
     q_copy["author"] = author
     if fetch_answers:
-        q_answers = _load_answers(where={"question_id": q["id"]})
+        q_answers = [_fill_excerpt(dict(a)) for a in _load_answers(where={"question_id": q["id"]})]
         q_copy["answers"] = q_answers
         q_copy["answer_count"] = len(q_answers)
         q_copy["has_accepted"] = any(a.get("is_accepted") for a in q_answers)
     elif answers is not None:
-        q_answers = [a for a in answers if a["question_id"] == q["id"]]
+        q_answers = [_fill_excerpt(dict(a)) for a in answers if a["question_id"] == q["id"]]
         q_copy["answers"] = q_answers
         q_copy["answer_count"] = len(q_answers)
         q_copy["has_accepted"] = any(a.get("is_accepted") for a in q_answers)
@@ -210,8 +230,9 @@ def _get_logged_in_user():
 def _keyword_score(query, question):
     """Simple keyword-overlap relevance score for semantic search."""
     terms = query.lower().split()
+    body_text = question.get("body_excerpt") or _strip_html(question.get("body", ""))
     text = (question.get("title", "") + " " +
-            question.get("body_excerpt", "") + " " +
+            body_text + " " +
             " ".join(question.get("tags", []))).lower()
     return sum(1 for t in terms if t in text)
 
@@ -605,6 +626,11 @@ def edit_question_page(qid):
     question = _get_question(qid)
     if question is None:
         abort(404)
+    # prefill the textarea with the full body text (excerpt is empty for
+    # imported questions; edits are saved as plain text into body_excerpt)
+    question = dict(question)
+    if not question.get("body_excerpt") and question.get("body"):
+        question["body_excerpt"] = _strip_html(question["body"])
     current_user = _get_logged_in_user()
     return render_template("qa-knowledge/edit_question.html",
                            question=question, current_user=current_user)
@@ -624,6 +650,7 @@ def edit_question_submit(qid):
         q["title"] = title
     if body:
         q["body_excerpt"] = body
+        q["body"] = ""  # plain-text edit supersedes the imported HTML body
     if tags:
         q["tags"] = tags
     _save_question(q)
@@ -962,6 +989,7 @@ def api_question_update(qid):
         q["title"] = data["title"]
     if "body" in data or "body_excerpt" in data:
         q["body_excerpt"] = data.get("body", data.get("body_excerpt", q["body_excerpt"]))
+        q["body"] = ""  # plain-text edit supersedes the imported HTML body
     if "tags" in data:
         q["tags"] = data["tags"]
         _invalidate_tag_caches()
@@ -1050,6 +1078,7 @@ def api_answer_update(aid):
         abort(404)
     if "body" in data or "body_excerpt" in data:
         a["body_excerpt"] = data.get("body", data.get("body_excerpt", a["body_excerpt"]))
+        a["body"] = ""  # plain-text edit supersedes the imported HTML body
     _save_answer(a)
     return jsonify(a)
 

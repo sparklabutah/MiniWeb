@@ -24,6 +24,13 @@
         .post-body { display: flex; gap: 16px; }
         .post-content { flex: 1; }
         .post-content .body-text { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+        .body-text p { margin-bottom: 10px; }
+        .body-text pre { background: #f6f6f6; border: 1px solid #e3e6e8; border-radius: 5px; padding: 10px; overflow-x: auto; margin-bottom: 10px; font-size: 13px; }
+        .body-text code { background: #eff0f1; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+        .body-text pre code { background: none; padding: 0; }
+        .body-text blockquote { border-left: 4px solid #e3e6e8; padding: 4px 12px; color: #535a60; margin-bottom: 10px; }
+        .body-text ul, .body-text ol { margin: 0 0 10px 24px; }
+        .body-text img { max-width: 100%; }
         .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
         .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
         .meta { font-size: 12px; color: #6a737c; }
@@ -88,7 +95,13 @@
                     </form>
                 </div>
                 <div class="post-content">
+                    {# imported posts carry sanitized StackExchange HTML in `body`;
+                       user-authored posts have plain text in body_excerpt (escaped) #}
+                    {% if question.body %}
+                    <div class="body-text">{{ question.body | safe }}</div>
+                    {% else %}
                     <div class="body-text">{{ question.body_excerpt }}</div>
+                    {% endif %}
                     <div class="tags">
                         {% for t in question.tags %}
                         <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
@@ -156,7 +169,11 @@
                         {% endif %}
                     </div>
                     <div class="post-content">
+                        {% if a.body %}
+                        <div class="body-text">{{ a.body | safe }}</div>
+                        {% else %}
                         <div class="body-text">{{ a.body_excerpt }}</div>
+                        {% endif %}
                         <div class="meta">
                             answered {{ a.creation_date }}
                             {% if a.author %}
