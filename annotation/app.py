@@ -1239,63 +1239,78 @@ def coverage_page():
 
 @annotation_bp.route("/api/coverage_matrix")
 def api_coverage_matrix():
-    """Per-site and per-macro coverage against the K-site floor."""
+    """Per-site coverage: macros covered, chain breakdown, tasks remaining."""
+    import math
     from annotation.storage import list_tasks
-    single, multi = {}, {}
-    for t in list_tasks():
-        ids = _task_site_ids(t)
-        bucket = single if len(ids) == 1 else multi
-        for sid in ids:
-            site_map = bucket.setdefault(sid, {})
-            for m in t.get("macros", []):
-                m = _canon(m)
-                site_map[m] = site_map.get(m, 0) + 1
 
-    global_cov = _get_macro_site_coverage()
-    k_targets = _macro_k_targets()
+    all_tasks = list_tasks()
 
+    # Per-site analysis
     sites = {}
     for s in _load_sites():
         sid = s["id"]
-        pool = sorted(_site_macro_pool(sid))
-        macros = {}
-        needy = 0
-        for m in pool:
-            covered_here = sid in global_cov.get(m, set())
-            k_done = len(global_cov.get(m, set())) >= k_targets.get(m, _get_floor_k())
-            needed = not covered_here and not k_done
-            if needed:
-                needy += 1
-            macros[m] = {
-                "single": single.get(sid, {}).get(m, 0),
-                "multi": multi.get(sid, {}).get(m, 0),
-                "needed": needed,
-            }
+        all_macros = sorted(set(_load_site_macros(sid)))
+        total_macros = len(all_macros)
+
+        # Tasks for this site
+        site_tasks = [t for t in all_tasks
+                      if sid in [x["id"] if isinstance(x, dict) else x
+                                 for x in t.get("sites", [])]]
+
+        # Covered macros
+        covered = set()
+        chain_counts = {}
+        for t in site_tasks:
+            covered.update(t.get("macros", []))
+            cl = len(t.get("macros", []))
+            chain_counts[cl] = chain_counts.get(cl, 0) + 1
+
+        uncovered = [m for m in all_macros if m not in covered]
+
+        # Target: 3:2:3:2 ratio, scaled by batches needed
+        batches = max(1, math.ceil(total_macros / 24))
+        targets = {1: 3 * batches, 2: 2 * batches, 3: 3 * batches, 4: 2 * batches}
+        remaining = {k: max(0, targets[k] - chain_counts.get(k, 0)) for k in targets}
+        total_remaining = sum(remaining.values())
+        total_target = sum(targets.values())
+        total_done = sum(chain_counts.get(k, 0) for k in targets)
+
+        # Per-macro coverage detail
+        macro_detail = {}
+        for m in all_macros:
+            count = sum(1 for t in site_tasks if m in t.get("macros", []))
+            macro_detail[m] = {"count": count, "covered": m in covered}
+
         sites[sid] = {
             "name": s.get("name", sid),
-            "macros": macros,
-            "covered": len(pool) - needy,
-            "total": len(pool),
+            "total_macros": total_macros,
+            "covered_macros": total_macros - len(uncovered),
+            "uncovered": uncovered,
+            "chain_counts": chain_counts,
+            "chain_targets": targets,
+            "chain_remaining": remaining,
+            "tasks_done": len(site_tasks),
+            "tasks_target": total_target,
+            "tasks_remaining": total_remaining,
+            "macros": macro_detail,
         }
 
-    # Global per-macro floor progress
-    macros_global = {
-        m: {
-            "k": k,
-            "sites_covered": sorted(global_cov.get(m, set())),
-        }
-        for m, k in sorted(k_targets.items())
-    }
-    done = sum(1 for m, k in k_targets.items() if len(global_cov.get(m, set())) >= k)
-    slots_remaining = sum(max(0, k - len(global_cov.get(m, set())))
-                          for m, k in k_targets.items())
+    # Global summary
+    total_tasks_done = len(all_tasks)
+    total_tasks_remaining = sum(s["tasks_remaining"] for s in sites.values())
+    total_sites_complete = sum(1 for s in sites.values() if s["tasks_remaining"] == 0)
+    total_macros_covered = len(set(m for t in all_tasks for m in t.get("macros", [])))
+    all_possible_macros = set()
+    for site_macros in MACRO_LOCATIONS.values():
+        all_possible_macros.update(site_macros.keys())
     return jsonify({
-        "slots_remaining": slots_remaining,
-        "k": _get_floor_k(),
         "sites": sites,
-        "macros": macros_global,
-        "macros_done": done,
-        "macros_total": len(k_targets),
+        "total_tasks_done": total_tasks_done,
+        "total_tasks_remaining": total_tasks_remaining,
+        "total_sites": len(sites),
+        "sites_complete": total_sites_complete,
+        "macros_covered": total_macros_covered,
+        "macros_total": len(all_possible_macros),
     })
 
 

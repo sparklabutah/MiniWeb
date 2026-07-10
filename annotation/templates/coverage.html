@@ -3,161 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Macro Coverage - MiniWeb Annotation</title>
+    <title>Task Coverage - MiniWeb Annotation</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 1.5rem; }
         .header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
         .header h1 { font-size: 1.3rem; }
         .header a { color: #2563eb; text-decoration: none; font-size: .85rem; }
-        .summary { font-size: .85rem; color: #475569; }
-        .tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
-        .tabs button { padding: .4rem .9rem; border: 1px solid #cbd5e1; background: #fff; border-radius: .35rem; font-size: .85rem; cursor: pointer; }
-        .tabs button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .global-stats { display: flex; gap: 1.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+        .stat-box { background: #fff; border-radius: .5rem; padding: .8rem 1.2rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); min-width: 140px; }
+        .stat-box .val { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+        .stat-box .label { font-size: .75rem; color: #64748b; }
         .controls { display: flex; gap: .6rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
         .controls input[type="text"] { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .85rem; width: 240px; }
         .controls label { font-size: .8rem; color: #475569; display: flex; align-items: center; gap: .3rem; cursor: pointer; }
-        .legend { display: flex; gap: .8rem; font-size: .75rem; color: #475569; margin-left: auto; flex-wrap: wrap; }
-        .legend .chip { pointer-events: none; }
-        .site-card { background: #fff; border-radius: .5rem; padding: .9rem 1.1rem; margin-bottom: .7rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
-        .site-head { display: flex; align-items: baseline; gap: .7rem; margin-bottom: .55rem; flex-wrap: wrap; }
-        .site-head .name { font-weight: 700; font-size: .95rem; }
+        .site-card { background: #fff; border-radius: .5rem; padding: .9rem 1.1rem; margin-bottom: .6rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+        .site-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .5rem; flex-wrap: wrap; }
+        .site-head .name { font-weight: 700; font-size: .95rem; min-width: 200px; }
         .site-head .site-id { font-size: .72rem; color: #94a3b8; }
-        .progress { flex: 1; min-width: 120px; max-width: 260px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-        .progress .fill { height: 100%; background: #16a34a; border-radius: 4px; }
-        .site-head .count { font-size: .78rem; color: #475569; font-variant-numeric: tabular-nums; }
-        .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
-        .chip { font-size: .7rem; padding: .18rem .5rem; border-radius: .8rem; border: 1px solid transparent; white-space: nowrap; }
-        .chip.done { background: #dcfce7; color: #166534; border-color: #86efac; }
-        .chip.needed { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
-        .chip.satisfied { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
-        .chip .n { font-weight: 700; margin-left: .2rem; }
+        .progress { flex: 1; min-width: 100px; max-width: 200px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .progress .fill { height: 100%; border-radius: 4px; transition: width .3s; }
+        .fill-green { background: #16a34a; }
+        .fill-yellow { background: #eab308; }
+        .fill-red { background: #ef4444; }
+        .site-head .tasks-info { font-size: .78rem; color: #475569; font-variant-numeric: tabular-nums; }
+        .chain-row { display: flex; gap: .5rem; align-items: center; font-size: .75rem; color: #64748b; margin-bottom: .3rem; }
+        .chain-bar { display: flex; gap: .15rem; }
+        .chain-pip { width: 18px; height: 10px; border-radius: 2px; background: #e2e8f0; }
+        .chain-pip.filled { background: #3b82f6; }
+        .chain-label { min-width: 55px; }
+        .chain-count { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+        .macro-row { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .3rem; }
+        .macro-chip { font-size: .65rem; padding: .12rem .4rem; border-radius: .6rem; border: 1px solid transparent; }
+        .macro-chip.covered { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .macro-chip.uncovered { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .site-card.complete { opacity: .6; }
         .empty { text-align: center; color: #94a3b8; padding: 2rem; }
-        /* macro view */
-        .macro-row { background: #fff; border-radius: .4rem; padding: .55rem .9rem; margin-bottom: .35rem; display: flex; align-items: center; gap: .8rem; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-        .macro-row .mname { font-family: ui-monospace, monospace; font-size: .8rem; min-width: 230px; }
-        .macro-row .pips { display: flex; gap: .25rem; }
-        .pip { width: 14px; height: 14px; border-radius: 50%; background: #e2e8f0; }
-        .pip.filled { background: #16a34a; }
-        .macro-row .msites { font-size: .72rem; color: #64748b; flex: 1; }
-        .macro-row.mdone { opacity: .55; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Macro Coverage</h1>
+        <h1>Task Coverage</h1>
         <a href="{{ url_for('annotation.index') }}">&larr; Dashboard</a>
         <a href="{{ url_for('annotation.annotate') }}">Annotate</a>
-        <span class="summary" id="summary">Loading…</span>
     </div>
-    <div class="tabs">
-        <button id="tab-macros" class="active" onclick="setView('macros')">By macro (floor)</button>
-        <button id="tab-sites" onclick="setView('sites')">By site</button>
-    </div>
+    <div class="global-stats" id="global-stats"></div>
     <div class="controls">
-        <label>K (sites per macro):
-            <input type="number" id="floor-k" min="1" max="10" style="width:52px;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:.35rem;font-size:.85rem;"
-                   onchange="saveK(this.value)">
-        </label>
-        <input type="text" id="search" placeholder="Filter…" oninput="render()">
-        <label><input type="checkbox" id="hide-done" onchange="render()"> Hide completed</label>
-        <div class="legend" id="site-legend" style="display:none">
-            <span class="chip done">covered on this site</span>
-            <span class="chip needed">needed here (macro below K)</span>
-            <span class="chip satisfied">not needed (K reached elsewhere)</span>
-        </div>
+        <input type="text" id="search" placeholder="Filter sites..." oninput="render()">
+        <label><input type="checkbox" id="hide-done" onchange="render()"> Hide complete sites</label>
+        <label><input type="checkbox" id="show-macros" onchange="render()"> Show macro detail</label>
     </div>
     <div id="content"></div>
 
     <script>
     let DATA = null;
-    let VIEW = 'macros';
-
-    function setView(v) {
-        VIEW = v;
-        document.getElementById('tab-macros').classList.toggle('active', v === 'macros');
-        document.getElementById('tab-sites').classList.toggle('active', v === 'sites');
-        document.getElementById('site-legend').style.display = v === 'sites' ? '' : 'none';
-        render();
-    }
 
     function render() {
         if (!DATA) return;
         const q = document.getElementById('search').value.trim().toLowerCase();
         const hideDone = document.getElementById('hide-done').checked;
+        const showMacros = document.getElementById('show-macros').checked;
         const el = document.getElementById('content');
         el.innerHTML = '';
 
-        document.getElementById('summary').textContent =
-            `Floor (K=${DATA.k}): ${DATA.macros_done}/${DATA.macros_total} macros at target · ${DATA.slots_remaining} tasks remaining`;
-        document.getElementById('floor-k').value = DATA.k;
+        // Global stats
+        const gs = document.getElementById('global-stats');
+        gs.innerHTML = `
+            <div class="stat-box"><div class="val">${DATA.total_tasks_done}</div><div class="label">Tasks Done</div></div>
+            <div class="stat-box"><div class="val">${DATA.total_tasks_remaining}</div><div class="label">Tasks Remaining</div></div>
+            <div class="stat-box"><div class="val">${DATA.sites_complete}/${DATA.total_sites}</div><div class="label">Sites Complete</div></div>
+            <div class="stat-box"><div class="val">${DATA.macros_covered}/${DATA.macros_total}</div><div class="label">Macros Covered</div></div>
+        `;
 
-        if (VIEW === 'macros') {
-            const rows = Object.entries(DATA.macros)
-                .filter(([m]) => !q || m.includes(q))
-                .map(([m, info]) => ({ m, ...info, done: info.sites_covered.length >= info.k }))
-                .filter(r => !hideDone || !r.done)
-                .sort((a, b) => (a.sites_covered.length / a.k) - (b.sites_covered.length / b.k) || a.m.localeCompare(b.m));
-            for (const r of rows) {
-                const row = document.createElement('div');
-                row.className = 'macro-row' + (r.done ? ' mdone' : '');
+        // Sort: most remaining first
+        const sites = Object.entries(DATA.sites)
+            .filter(([sid, s]) => !q || sid.includes(q) || (s.name || '').toLowerCase().includes(q))
+            .filter(([_, s]) => !hideDone || s.tasks_remaining > 0)
+            .sort((a, b) => b[1].tasks_remaining - a[1].tasks_remaining);
+
+        for (const [sid, s] of sites) {
+            const card = document.createElement('div');
+            const pct = s.tasks_target ? Math.round(100 * s.tasks_done / s.tasks_target) : 0;
+            const fillClass = pct >= 100 ? 'fill-green' : pct >= 50 ? 'fill-yellow' : 'fill-red';
+            card.className = 'site-card' + (s.tasks_remaining === 0 ? ' complete' : '');
+
+            // Chain breakdown
+            let chainHtml = '';
+            for (const len of [1, 2, 3, 4]) {
+                const done = (s.chain_counts[len] || 0);
+                const target = (s.chain_targets[len] || 0);
+                const remaining = (s.chain_remaining[len] || 0);
                 let pips = '';
-                for (let i = 0; i < r.k; i++) {
-                    pips += `<span class="pip ${i < r.sites_covered.length ? 'filled' : ''}"></span>`;
+                for (let i = 0; i < target; i++) {
+                    pips += '<span class="chain-pip ' + (i < done ? 'filled' : '') + '"></span>';
                 }
-                row.innerHTML = `<span class="mname">${r.m}</span>
-                    <span class="pips" title="${r.sites_covered.length}/${r.k} sites">${pips}</span>
-                    <span class="msites">${r.sites_covered.length ? 'covered on: ' + r.sites_covered.join(', ') : 'not yet annotated on any site'}</span>`;
-                el.appendChild(row);
+                chainHtml += '<div class="chain-row">' +
+                    '<span class="chain-label">len-' + len + ':</span>' +
+                    '<div class="chain-bar">' + pips + '</div>' +
+                    '<span class="chain-count">' + done + '/' + target + '</span>' +
+                    (remaining > 0 ? '<span style="color:#ef4444;font-weight:600">need ' + remaining + '</span>' : '<span style="color:#16a34a">done</span>') +
+                    '</div>';
             }
-            if (!rows.length) el.innerHTML = '<div class="empty">Nothing matches.</div>';
-        } else {
-            const sites = Object.entries(DATA.sites)
-                .filter(([sid, s]) => !q || sid.includes(q) || (s.name || '').toLowerCase().includes(q))
-                .filter(([_, s]) => !hideDone || s.covered < s.total)
-                .sort((a, b) => (a[1].covered / (a[1].total || 1)) - (b[1].covered / (b[1].total || 1))
-                                || a[1].name.localeCompare(b[1].name));
-            for (const [sid, s] of sites) {
-                const card = document.createElement('div');
-                card.className = 'site-card';
-                const pct = s.total ? Math.round(100 * s.covered / s.total) : 0;
-                let chips = '';
-                for (const [m, c] of Object.entries(s.macros)) {
-                    const coveredHere = c.single > 0;
-                    const cls = coveredHere ? 'done' : (c.needed ? 'needed' : 'satisfied');
-                    const n = c.single + c.multi;
-                    chips += `<span class="chip ${cls}" title="${m}: ${c.single} single-site, ${c.multi} multi-site task(s) here${c.needed ? ' — still needed for the K-floor' : ''}">${m}${n ? `<span class="n">×${n}</span>` : ''}</span>`;
+
+            // Macro chips
+            let macroHtml = '';
+            if (showMacros) {
+                macroHtml = '<div class="macro-row">';
+                for (const [m, info] of Object.entries(s.macros).sort((a,b) => a[0].localeCompare(b[0]))) {
+                    const cls = info.covered ? 'covered' : 'uncovered';
+                    macroHtml += '<span class="macro-chip ' + cls + '" title="' + m + ': ' + info.count + ' task(s)">' + m + (info.count ? ' \u00d7' + info.count : '') + '</span>';
                 }
-                card.innerHTML = `
-                    <div class="site-head">
-                        <span class="name">${s.name}</span>
-                        <span class="site-id">${sid}</span>
-                        <div class="progress"><div class="fill" style="width:${pct}%"></div></div>
-                        <span class="count">${s.total - s.covered} still needed here</span>
-                    </div>
-                    <div class="chips">${chips}</div>`;
-                el.appendChild(card);
+                macroHtml += '</div>';
             }
-            if (!sites.length) el.innerHTML = '<div class="empty">No sites match.</div>';
+
+            card.innerHTML = `
+                <div class="site-head">
+                    <span class="name">${s.name}</span>
+                    <span class="site-id">${sid}</span>
+                    <div class="progress"><div class="fill ${fillClass}" style="width:${Math.min(pct, 100)}%"></div></div>
+                    <span class="tasks-info">${s.tasks_done}/${s.tasks_target} tasks · ${s.covered_macros}/${s.total_macros} macros · ${s.tasks_remaining > 0 ? s.tasks_remaining + ' remaining' : 'complete'}</span>
+                </div>
+                ${chainHtml}
+                ${macroHtml}`;
+            el.appendChild(card);
         }
+        if (!sites.length) el.innerHTML = '<div class="empty">No sites match.</div>';
     }
 
-    function loadMatrix() {
-        fetch('{{ url_for("annotation.api_coverage_matrix") }}')
-            .then(r => r.json())
-            .then(d => { DATA = d; render(); })
-            .catch(() => { document.getElementById('summary').textContent = 'Failed to load coverage.'; });
-    }
-
-    function saveK(k) {
-        fetch('{{ url_for("annotation.api_floor_k") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({k: parseInt(k, 10)})
-        }).then(r => r.json()).then(() => loadMatrix());
-    }
-
-    loadMatrix();
+    fetch('{{ url_for("annotation.api_coverage_matrix") }}')
+        .then(r => r.json())
+        .then(d => { DATA = d; render(); })
+        .catch(() => { document.getElementById('global-stats').innerHTML = '<div class="stat-box"><div class="val">Error</div><div class="label">Failed to load</div></div>'; });
     </script>
 </body>
 </html>
