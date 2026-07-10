@@ -13,142 +13,192 @@ A macro is a **primitive UI skill** — a single atomic interaction pattern that
 3. Click **Tag Range** — select the first and last action of a macro
 4. Click the macro chip to assign the range
 5. Repeat for each macro
-6. For QA macros (extract/compute), type the answer in the blue input field instead of tagging
+6. For QA macros (extract/compute), type the answer in the blue input field AND tag the range where the answer is visible
 
-## Tagging Rules
+## Span Boundary Decision Tree
 
-### What to tag
+### Where does the span START?
 
-- Tag the **action range** where the macro's interaction happens
-- Include the **submit/confirm** action at the end (click "Filter", "Submit", "Save")
-- Include **intermediate steps** (typing into fields, selecting options, adjusting sliders)
+```
+Is there a button/link that initiates this macro's specific flow?
+(e.g., "Checkout" button, "Compose" button, "New Post" button)
+│
+├─ YES → Start at that click (it's the entry action)
+│
+└─ NO → Start at the first interaction with the macro's UI element
+         (first field click, first dropdown open, first slider touch)
 
-### What NOT to tag
 
-- **Navigation clicks** at the start (clicking nav links to get to the right page) — the agent starts on the target page
-- **Scrolling** to find elements — unless scrolling IS the interaction (e.g., infinite scroll to load content)
-- **Accidental clicks** or corrections — tag the successful attempt, not failed ones
+What about scrolling to find the element?
+├─ Scrolling to reveal the form/element → EXCLUDE (setup, not interaction)
+└─ Scrolling AS the interaction (infinite scroll) → INCLUDE
 
-### Overlapping spans
+What about clicking into a field before typing?
+└─ INCLUDE — the click focuses the input, it's part of the interaction
+
+What about navigation clicks between pages during the macro?
+├─ Navigating to a page that IS the macro's form → INCLUDE
+│   (clicking "Checkout" → checkout page → fill form → submit)
+└─ Navigating to get to the area where the macro lives → EXCLUDE
+    (clicking "Settings" in navbar to find the slider)
+```
+
+### Where does the span END?
+
+```
+Does the macro have a submit/apply/save/confirm action?
+│
+├─ YES → End at that click (include it)
+│   ├─ Form submit button → include the click AND the submit event
+│   ├─ "Apply Filters" button → include it
+│   └─ "Save" / "Confirm" → include it
+│
+└─ NO (toggle, instant action) → End at the click itself
+    (like/bookmark/follow — one click, span is 1-2 actions)
+
+
+What about the page reload/redirect after submit?
+└─ EXCLUDE — the reload is a consequence, not part of the macro
+
+What about scrolling after submit to verify the result?
+└─ EXCLUDE — verification is separate from the interaction
+
+What about error → retry cycles?
+├─ Tag only the SUCCESSFUL attempt
+└─ If the error + correction is part of the natural flow
+    (e.g., typing wrong date, correcting it) → INCLUDE both
+```
+
+### Special Cases
+
+```
+QA macros (extract/compute):
+  Where does the answer become visible?
+  ├─ Already on the page → span = the page state where answer is shown
+  ├─ Need to sort/filter first → span covers the sort/filter actions
+  └─ Need to navigate to detail page → span starts at the click that opens it
+
+Multi-page macros (checkout flow across pages):
+  └─ Span covers ALL pages of the flow, from first page to final submit
+
+Toggle macros (save, follow, react):
+  └─ Span is just the click (1 action) or click + confirmation (2 actions)
+```
+
+### Overlapping Spans
 
 Spans CAN overlap when:
 - A reasoning macro (`extract_by_extremum`) encompasses the entire workflow including sub-macros (`filter_by_date_range`, `select_by_dropdown`)
 - The extract/compute macro covers the same actions as the interaction that produces the data
 
-### QA macros (action range should contains the answer)
+## Macro Selection Decision Tree
 
-For these macros, use the **blue answer input** on the macro node:
-- `extract_by_query` — "What is the total balance?"
-- `extract_by_extremum` — "What is the cheapest flight?"
-- `extract_by_ranking` — "What is the #1 trending video?"
-- `compute_by_extremum` — "What is the min/max price?"
-- `compare_from_table` — "Which has the better rating?"
-- `verify_from_free_text` — "Is the author mentioned by name?"
+```
+What is the user trying to accomplish?
+│
+├─ Finding/reading information? → EXTRACT or COMPUTE
+│   ├─ Just reading what's on the page? → extract_by_route
+│   ├─ Need to search/filter first to find it? → the search/filter is a SEPARATE macro
+│   ├─ Need to calculate/derive the answer? → compute_by_*
+│   └─ Comparing two or more items? → compare_by_*
+│
+├─ Changing a setting/filter/view? → How?
+│   ├─ Dropdown/select → filter_by_dropdown / sort_by_dropdown / select_by_dropdown
+│   ├─ Slider/range input → filter_by_slider / configure_by_slider
+│   ├─ Date picker → filter_by_date_range / select_by_date_range
+│   ├─ Toggle/checkbox → filter_by_toggle / configure_by_toggle
+│   └─ Typing a query → filter_by_query / search_by_query
+│
+├─ Creating something new? → create_by_form
+│   (new post, new listing, new event, new account = register_by_form)
+│
+├─ Submitting/sending something? → What?
+│   ├─ A message → message_from_free_text
+│   ├─ A review/comment → post_from_free_text
+│   ├─ An application/claim → submit_by_form / apply_by_form
+│   └─ Contact form → submit_by_form
+│
+├─ Buying/paying/booking? → What?
+│   ├─ Completing a purchase → checkout_by_form
+│   ├─ Making a payment → pay_by_form
+│   ├─ Reserving/booking → book_by_form
+│   └─ Adding to cart (not buying yet) → add_by_button
+│
+├─ Editing existing data? → edit_by_form / edit_by_dropdown
+│
+├─ Deleting something? → delete_from_table
+│
+├─ Social action? → What?
+│   ├─ Like/upvote → react_by_toggle
+│   ├─ Save/bookmark → save_by_toggle
+│   ├─ Follow/subscribe → follow_by_toggle / subscribe_by_toggle
+│   ├─ Share → share_by_dropdown (menu) or share_by_toggle (button)
+│   └─ Block/report → block_by_toggle / report_by_form
+│
+├─ Uploading a file? → upload_by_upload
+│
+├─ Playing media? → play_by_playback / play_by_dropdown
+│
+└─ Logging in? → authenticate_by_form
+```
 
-Type the expected answer directly. The tagged action range should contain the expected answer. The macro is considered success if the agent answer correctly while staying in this action range.
-
-## Macro Categories
+## Macro Categories & Priority
 
 ### Spatial Control (highest priority — hardest for agents)
 
-These involve precision interaction with spatial UI elements.
-
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `filter_by_slider` | Adjust a range slider | Drag/input on the slider + click Apply/Filter |
-| `filter_by_date_range` | Set date range inputs | Click date field + type/select dates + submit |
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `filter_by_slider` | Adjust a range slider | Include ALL intermediate `change` events as slider moves |
+| `filter_by_date_range` | Set date range inputs | Include date field clicks + typing + submit |
 | `rate_by_slider` | Set a star/slider rating | Click/drag on rating control |
 | `configure_by_slider` | Adjust a settings slider | Drag slider + save |
 | `compute_by_slider` | Compute by adjusting inputs | Set slider values + read result |
 | `select_by_date_range` | Pick dates for booking | Select check-in/check-out dates |
-| `create_by_drag` | Create by dragging elements | Drag actions on canvas |
-| `react_by_gesture` | Swipe/gesture interaction | Swipe or gesture actions |
-
-**Tagging tip**: Include ALL the intermediate `change` events that happen while dragging a slider — these show the slider moving through values.
 
 ### Reasoning (high priority — requires understanding)
 
-These require the agent to read, understand, and produce an answer.
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `extract_by_route` | Extract info from a page | Span where answer is visible + use QA answer field |
+| `extract_by_extremum` | Find min/max value | Span covers filter/sort that reveals answer + QA answer |
+| `extract_by_ranking` | Extract item at a rank | Span covers sort action + QA answer |
+| `compute_by_extremum` | Compute a min/max | Span covers relevant actions + QA answer |
 
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `extract_by_route` | Extract info from a page | Use QA answer field |
-| `extract_by_extremum` | Find min/max value | Tag the filter/sort actions that reveal the answer, use QA answer |
-| `extract_by_ranking` | Extract item at a rank | Tag sort action, use QA answer |
-| `compute_by_extremum` | Compute a min/max | Tag relevant actions, use QA answer |
-| `compare_by_route` | Compare across pages | Tag navigation between items |
+### State Change (medium priority)
 
-**Tagging tip**: For extract/compute macros, the span should cover the actions that make the answer visible (sorting, filtering). The actual answer goes in the QA answer field.
-
-### State Change (medium priority — form interactions)
-
-These create, modify, or delete data.
-
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `create_by_form` | Fill out a creation form | First field click → submit button click |
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `create_by_form` | Fill out a creation form | First field click → submit button |
 | `submit_by_form` | Submit a filled form | First field → submit |
-| `edit_by_form` | Edit existing data | Click edit → modify fields → save |
+| `edit_by_form` | Edit existing data | Click edit → modify → save |
 | `delete_from_table` | Delete an item | Click delete → confirm |
-| `checkout_by_form` | Complete checkout | Payment fields → place order |
+| `checkout_by_form` | Complete checkout | Entry button → payment fields → place order |
 | `pay_by_form` | Make a payment | Amount + method → submit |
-| `book_by_form` | Make a booking/reservation | Date/details → book |
-
-**Tagging tip**: Start the span at the first field interaction, not at navigation. Include the final submit/save click.
 
 ### Media (medium priority)
 
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `upload_by_upload` | Upload a file | Click file input → select file (from simulated picker) |
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `upload_by_upload` | Upload a file | Click file input → select from picker |
 | `play_by_playback` | Use playback controls | Click play/pause/seek |
-| `play_by_dropdown` | Play from a selection | Select track/episode → play |
 | `export_by_dropdown` | Export in a format | Select format → download |
-
-**Tagging tip**: For uploads, the file picker popup is part of the interaction — tag from the click on the file input through the file selection.
 
 ### Text Input (lower priority)
 
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `search_by_query` | Type a search query | Click search box → type → submit/enter |
-| `search_by_semantic` | Natural language search | Same as search_by_query |
-| `post_from_free_text` | Write and post content | Click textarea → type → post |
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `search_by_query` | Type a search query | Click search box → type → submit |
+| `post_from_free_text` | Write and post | Click textarea → type → post |
 | `message_from_free_text` | Send a message | Click input → type → send |
-| `edit_by_query` | Edit by typing new values | Click field → type new value |
-
-**Tagging tip**: Include the `type` and `keypress` events, not just the final `submit`. The typing IS the interaction.
 
 ### Simple Select (lower priority)
 
-| Macro | Description | What to tag |
-|-------|-------------|-------------|
-| `filter_by_dropdown` | Select from dropdown | Click dropdown → select option → apply filter |
-| `select_by_dropdown` | Choose an option | Click dropdown → select |
-| `sort_by_dropdown` | Sort via dropdown | Click sort dropdown → select order |
-| `save_by_toggle` | Bookmark/save toggle | Click star/bookmark button |
-| `follow_by_toggle` | Follow/unfollow | Click follow button |
-| `react_by_toggle` | Like/upvote | Click like/heart button |
-| `subscribe_by_toggle` | Subscribe toggle | Click subscribe button |
-
-**Tagging tip**: For toggles, the span is usually just 1-2 actions (click the button). For dropdowns, include the click to open + the option selection + any apply button.
-
-### Trivial (minimal tagging — rarely sampled)
-
-| Macro | Description | Notes |
-|-------|-------------|-------|
-| `navigate_by_route` | Click a nav link | **NOT sampled** — don't tag these |
-| `authenticate_by_form` | Log in | Username + password + sign in |
-| `register_by_form` | Create account | Fill registration form + submit |
-
-## Common Mistakes
-
-1. **Tagging navigation as a macro** — Don't. The agent starts on the target page.
-2. **Forgetting the submit action** — Always include the final button click that triggers the form submission.
-3. **Tagging too broadly** — A span of [1, 45] for a single `submit_by_form` is too wide. Tag only the form-filling actions.
-4. **Not using QA answer fields** — For extract/compute macros, type the answer instead of faking scroll actions.
-5. **Missing intermediate slider events** — Slider interactions generate multiple `change` events as the value moves. Include all of them.
-6. **Tagging duplicate actions** — If you typed something wrong and retyped, tag only the correct attempt.
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `filter_by_dropdown` | Select from dropdown | Open dropdown → select option → apply |
+| `save_by_toggle` | Bookmark/save | Just the click (1-2 actions) |
+| `follow_by_toggle` | Follow/unfollow | Just the click |
+| `react_by_toggle` | Like/upvote | Just the click |
 
 ## Expected Outcome Guidelines
 
