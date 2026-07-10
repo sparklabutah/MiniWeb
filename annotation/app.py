@@ -839,70 +839,87 @@ def _generate_prompt(sites, coverage, force_single=False):
 
 
 def _generate_site_prompt(site, rng=None):
-    """Sampler for an annotator-chosen site: only the macros are random.
+    """Sampler for an annotator-chosen site.
 
-    Coverage floor (K-site): every macro should be demonstrated on
-    min(K, #supporting sites) distinct sites via single-site tasks.
-    While this site can still contribute a new site toward some macro's K
-    target, sample exactly ONE such macro (weighted by difficulty) so each
-    task fills a floor slot. Once nothing here is floor-needy, fall back to
-    1-3 macros weighted by difficulty and inverse per-site coverage.
+    The annotator picks the site. This function picks:
+      1. Chain length using ratio 3:2:3:2 for lengths 1:2:3:4
+         (weighted toward lengths the site still needs)
+      2. Macros — strongly prefer uncovered macros on this site,
+         all macros weighted equally (no difficulty bias)
     """
     rng = rng or random.Random()
     site_id = site["id"]
 
-    from annotation.macro_difficulty import get_macro_weight
-
-    macro_pool = sorted(_site_macro_pool(site_id))
-    if not macro_pool:
+    all_macros = sorted(set(_load_site_macros(site_id)))
+    if not all_macros:
         return None
 
-    site_cov = _get_site_macro_coverage(site_id)
-    global_cov = _get_macro_site_coverage()
-    k_targets = _macro_k_targets()
-    # Floor-needy here: this site hasn't covered the macro yet AND the macro
-    # is still short of its K-site target globally.
-    uncovered = [m for m in macro_pool
-                 if site_id not in global_cov.get(m, set())
-                 and len(global_cov.get(m, set())) < k_targets.get(m, _get_floor_k())]
+    # Get per-site coverage
+    from annotation.storage import list_tasks
+    site_tasks = [t for t in list_tasks()
+                  if site_id in [s["id"] if isinstance(s, dict) else s
+                                 for s in t.get("sites", [])]]
 
-    def _weighted_pick(candidates, k):
-        picks = []
-        remaining = list(candidates)
-        _QA_VERBS = {"extract", "compute", "count", "compare", "verify",
-                     "calculate", "rank", "list"}
-        has_qa = False
-        for _ in range(min(k, len(remaining))):
-            if has_qa:
-                remaining = [m for m in remaining if m.split("_")[0] not in _QA_VERBS]
-                if not remaining:
-                    break
-            ws = [get_macro_weight(m) / (site_cov.get(m, 0) + 1) for m in remaining]
-            total = sum(ws)
-            pick = rng.choices(remaining, weights=[w / total for w in ws], k=1)[0]
-            picks.append(pick)
-            if pick.split("_")[0] in _QA_VERBS:
-                has_qa = True
-            remaining = [m for m in remaining if m != pick]
-        return picks
+    # Which macros are already covered on this site?
+    covered = set()
+    chain_counts = {}  # chain_len -> count
+    for t in site_tasks:
+        covered.update(t.get("macros", []))
+        cl = len(t.get("macros", []))
+        chain_counts[cl] = chain_counts.get(cl, 0) + 1
 
-    if uncovered:
-        # Floor building: one uncovered macro per task
-        sampled_macros = _weighted_pick(uncovered, 1)
-    else:
-        # Floor complete: sample 1-3 macros, under-covered first
-        n_macros = rng.choice([1, 2, 3])
-        sampled_macros = _weighted_pick(macro_pool, n_macros)
+    uncovered = [m for m in all_macros if m not in covered]
+
+    # 1. Pick chain length: ratio 3:2:3:2 for lengths 1:2:3:4
+    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2}
+    chain_options = []
+    chain_weights = []
+    for length, target_w in target_ratio.items():
+        current = chain_counts.get(length, 0)
+        w = target_w / (current + 1)
+        chain_options.append(length)
+        chain_weights.append(w)
+
+    total = sum(chain_weights)
+    chain_weights = [w / total for w in chain_weights]
+    n_macros = rng.choices(chain_options, weights=chain_weights, k=1)[0]
+
+    # 2. Pick macros — strongly prefer uncovered, equal weight otherwise
+    _QA_VERBS = {"extract", "compute", "count", "compare", "verify",
+                 "calculate", "rank", "list"}
+    sampled = []
+    remaining = list(all_macros)
+    has_qa = False
+
+    for _ in range(min(n_macros, len(remaining))):
+        if has_qa:
+            remaining = [m for m in remaining if m.split("_")[0] not in _QA_VERBS]
+            if not remaining:
+                break
+        ws = []
+        for m in remaining:
+            if m in uncovered:
+                ws.append(10.0)  # uncovered — strong priority
+            else:
+                site_count = sum(1 for t in site_tasks if m in t.get("macros", []))
+                ws.append(1.0 / (site_count + 1))
+        total = sum(ws)
+        ws = [w / total for w in ws]
+        pick = rng.choices(remaining, weights=ws, k=1)[0]
+        sampled.append(pick)
+        if pick.split("_")[0] in _QA_VERBS:
+            has_qa = True
+        remaining = [m for m in remaining if m != pick]
 
     return {
         "sites": [{"id": site_id, "name": site.get("name", site_id)}],
-        "macros": sampled_macros,
+        "macros": sampled,
         "num_sites": 1,
-        "num_macros": len(sampled_macros),
+        "num_macros": len(sampled),
         "edges": [],
         "chosen_site": True,
-        "floor_total": len(macro_pool),
-        "floor_covered": len(macro_pool) - len(uncovered),
+        "floor_total": len(all_macros),
+        "floor_covered": len(all_macros) - len(uncovered),
     }
 
 
