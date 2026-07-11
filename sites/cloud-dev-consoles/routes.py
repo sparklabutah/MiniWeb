@@ -402,6 +402,58 @@ def index():
                            now=now)
 
 
+@blueprint.route("/search")
+def global_search():
+    """Global search across all resource types (all collections are <50 rows)."""
+    q = request.args.get("q", "").strip()
+    groups = []
+    if q:
+        sources = [
+            ("Services", "services_page", _get_services(),
+             ["name", "description", "category", "tags"],
+             lambda r: (r.get("name"), f"{r.get('category', '')} · {r.get('status', '')}")),
+            ("Instances", "instances_page", _get_instances(),
+             ["name", "type", "region", "tags"],
+             lambda r: (r.get("name"), f"{r.get('type', '')} · {r.get('state', r.get('status', ''))}")),
+            ("Databases", "databases_page", _get_databases(),
+             ["name", "engine", "version"],
+             lambda r: (r.get("name"), f"{r.get('engine', '')} {r.get('version', '')}")),
+            ("Functions", "functions_page", _get_functions(),
+             ["name", "runtime", "description"],
+             lambda r: (r.get("name"), r.get("runtime", ""))),
+            ("Storage Buckets", "storage_page", _get_buckets(),
+             ["name", "region"],
+             lambda r: (r.get("name"), r.get("region", ""))),
+            ("IAM Users", "iam_page", _get_iam_users(),
+             ["name", "username", "email", "role"],
+             lambda r: (r.get("name", r.get("username")), r.get("role", ""))),
+            ("API Endpoints", "api_gateway_page", _get_api_endpoints(),
+             ["path", "name", "method", "description"],
+             lambda r: (f"{r.get('method', '')} {r.get('path', r.get('name', ''))}".strip(),
+                        r.get("description", ""))),
+            ("Alerts", "alerts_page", _load_alerts(),
+             ["name", "title", "severity", "message", "description"],
+             lambda r: (r.get("name", r.get("title", "")), r.get("severity", ""))),
+            ("Logs", "logs_page", _get_logs(),
+             ["message", "level", "service"],
+             lambda r: ((r.get("message", "") or "")[:90],
+                        f"{r.get('level', '')} · {r.get('service', '')}")),
+        ]
+        for label, endpoint, items, fields, render in sources:
+            hits = _search_resources(items, q, fields)
+            if hits:
+                groups.append({
+                    "label": label,
+                    "endpoint": endpoint,
+                    "total": len(hits),
+                    "items": [render(r) for r in hits[:8]],
+                })
+    user = _get_user(session["user_id"]) if "user_id" in session else None
+    total = sum(g["total"] for g in groups)
+    return render_template("cloud-dev-consoles/search_results.html",
+                           q=q, groups=groups, total=total, user=user)
+
+
 @blueprint.route("/services")
 def services_page():
     services = _get_services()

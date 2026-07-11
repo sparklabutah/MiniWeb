@@ -652,7 +652,7 @@ MACRO_LOCATIONS = {
             "'Logs' page -> search input"
         ],
         "search_by_semantic": [
-            "'Console Home' page -> 'Search services, instances, logs...' field"
+            "'Console Home' page -> global search field -> grouped results page across services, instances, databases, functions, buckets, IAM, endpoints, alerts, logs"
         ],
         "filter_by_query": [
             "All list pages -> search text input filters items by name"

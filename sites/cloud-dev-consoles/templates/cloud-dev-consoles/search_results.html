@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}.top-bar{background:#232f3e;color:#fff;padding:0 1.5rem;height:48px;display:flex;align-items:center;justify-content:space-between}.top-bar .logo{font-size:1.1rem;font-weight:700;color:#ff9900;text-decoration:none}.top-bar .logo span{color:#fff;font-weight:400;margin-left:.3rem}.nav-bar{background:#37475a;padding:0 1.5rem;display:flex;overflow-x:auto}.nav-bar a{color:#d5dbdb;text-decoration:none;padding:.6rem 1rem;font-size:.85rem;border-bottom:2px solid transparent}.nav-bar a:hover{color:#fff;border-bottom-color:#ff9900}.top-bar-right a{color:#d5dbdb;text-decoration:none;font-size:.85rem}.container{max-width:900px;margin:0 auto;padding:1.5rem}.page-title{font-size:1.4rem;margin-bottom:1rem}
+        .search-form{display:flex;gap:.6rem;margin-bottom:1.2rem}
+        .search-form input{flex:1;padding:.55rem .8rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.95rem}
+        .search-form button{padding:.55rem 1.4rem;background:#232f3e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9rem}
+        .result-count{font-size:.85rem;color:#64748b;margin-bottom:1rem}
+        .group{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:1rem;overflow:hidden}
+        .group-head{display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#f8f9fa;border-bottom:1px solid #e2e8f0}
+        .group-head h2{font-size:.85rem;text-transform:uppercase;color:#37475a;letter-spacing:.03em}
+        .group-head a{font-size:.8rem;color:#0073bb;text-decoration:none}
+        .hit{display:flex;justify-content:space-between;gap:1rem;padding:.55rem 1rem;border-bottom:1px solid #f0f2f5;font-size:.88rem}
+        .hit:last-child{border-bottom:none}
+        .hit .sub{color:#64748b;font-size:.8rem;white-space:nowrap}
+        .empty{background:#fff;border-radius:8px;padding:2rem;text-align:center;color:#64748b;font-size:.9rem}
+    </style>
+</head>
+<body>
+    <div class="top-bar"><a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a>
+        <div class="top-bar-right">
+            {% if user %}<a href="{{ url_for('cloud-dev-consoles.dashboard') }}">{{ user.name }}</a>{% else %}<a href="{{ url_for('cloud-dev-consoles.login_page') }}">Sign In</a>{% endif %}
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a><a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a><a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a><a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a><a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a><a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a><a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a><a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a><a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a><a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a><a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a><a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">Search</h1>
+        <form class="search-form" method="GET" action="{{ url_for('cloud-dev-consoles.global_search') }}">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search services, instances, databases, functions, logs..." autofocus>
+            <button type="submit">Search</button>
+        </form>
+        {% if q %}
+        <div class="result-count">{{ total }} result{{ 's' if total != 1 }} for &ldquo;{{ q }}&rdquo; across {{ groups|length }} resource type{{ 's' if groups|length != 1 }}</div>
+        {% for g in groups %}
+        <div class="group">
+            <div class="group-head">
+                <h2>{{ g.label }} ({{ g.total }})</h2>
+                <a href="{{ url_for('cloud-dev-consoles.' + g.endpoint) }}?q={{ q|urlencode }}">View all in {{ g.label }} &rarr;</a>
+            </div>
+            {% for name, sub in g["items"] %}
+            <div class="hit"><span>{{ name }}</span><span class="sub">{{ sub }}</span></div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% if not groups %}
+        <div class="empty">No resources match &ldquo;{{ q }}&rdquo;.</div>
+        {% endif %}
+        {% else %}
+        <div class="empty">Enter a query to search across all resource types.</div>
+        {% endif %}
+    </div>
+</body>
+</html>
