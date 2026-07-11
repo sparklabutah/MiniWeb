@@ -131,11 +131,17 @@ async def run_eval(args):
     print(f"  {DIM}Output:{RESET} {results_dir}")
     print(f"{CYAN}{'─' * 60}{RESET}\n")
 
+    # Real fixture files mirroring the fake in-page file picker, so upload
+    # tasks are completable by the agent (browser_use available_file_paths).
+    from generate_fixtures import ensure_fixtures
+    fixture_paths = ensure_fixtures()
+
     agent = AGENT_FACTORIES[args.model](
         use_vision=args.use_vision,
         max_steps=args.max_steps,
         timeout=args.timeout,
         headless=not args.no_headless,
+        available_file_paths=fixture_paths,
     )
 
     results = []

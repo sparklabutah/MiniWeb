@@ -80,12 +80,16 @@ class BrowserUseAgent:
         max_steps: int = 50,
         timeout: int = 300,
         headless: bool = True,
+        available_file_paths: list[str] | None = None,
     ):
         self.llm = llm
         self.use_vision = use_vision
         self.max_steps = max_steps
         self.timeout = timeout
         self.headless = headless
+        # real files the agent may attach to <input type=file> — mirrors the
+        # fake in-page file picker's catalog (see evaluation/generate_fixtures.py)
+        self.available_file_paths = available_file_paths or []
         self._session = None
         self._server_url: str | None = None
 
@@ -158,6 +162,7 @@ class BrowserUseAgent:
             use_vision=self.use_vision,
             save_conversation_path=str(task_dir / "conversations"),
             max_steps=self.max_steps,
+            available_file_paths=self.available_file_paths,
         )
 
         timed_out = False
@@ -258,7 +263,7 @@ class MockAgent:
     """
 
     def __init__(self, *, use_vision=False, max_steps=20,
-                 timeout=180, headless=True):
+                 timeout=180, headless=True, available_file_paths=None):
         self._server_url: str | None = None
         self.timeout = timeout
         self.max_steps = max_steps

@@ -599,6 +599,9 @@ def register_submit():
                                error="Username already taken.")
 
     new_user = {
+        # row_id is the users table PK — without it save_collection falls
+        # back to the list index, which collides with existing rows
+        "row_id": max((u.get("row_id", 0) for u in users), default=0) + 1,
         "root_user_id": _next_user_id(users),
         "se_username": username,
         "se_display_name": display_name,

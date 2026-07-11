@@ -116,11 +116,13 @@ async def worker(
 ):
     tag = f"{DIM}[W{worker_id}]{RESET}"
 
+    from generate_fixtures import ensure_fixtures
     agent = agent_factory(
         use_vision=use_vision,
         max_steps=max_steps,
         timeout=TASK_TIMEOUT,
         headless=headless,
+        available_file_paths=ensure_fixtures(),
     )
 
     try:

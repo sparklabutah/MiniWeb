@@ -365,8 +365,14 @@ textarea#instruction:focus {
                 </div>
 
                 <!-- Instruction (output from macro subtasks, editable) -->
-                <label style="font-size:.72rem">Task Instruction <span style="font-weight:400;color:#94a3b8">(auto-generated from macro subtasks, editable)</span></label>
-                <textarea id="instruction" rows="3" placeholder="Write subtasks on each macro node below, then click '✨ Combine' to auto-generate this instruction. Or write directly." style="font-size:.85rem;margin-bottom:.3rem;width:100%;flex-shrink:0"></textarea>
+                <label style="font-size:.72rem">Task Instruction <span style="font-weight:400;color:#94a3b8">(write in your own words)</span></label>
+                <textarea id="instruction" rows="3" placeholder="Write subtasks on each macro node below, then click '✨ Combine' for an LLM suggestion to rephrase. Or write directly." style="font-size:.85rem;margin-bottom:.3rem;width:100%;flex-shrink:0"></textarea>
+                <div id="combined-suggestion-box" style="display:none;margin-bottom:.3rem;flex-shrink:0">
+                    <div style="font-size:.62rem;font-weight:600;color:#92400e;margin-bottom:.15rem">&#10024; LLM suggestion &mdash; rephrase it in your own words (copying disabled)</div>
+                    <div id="combined-suggestion-text"
+                         style="background:#fffbeb;border:1px solid #fde68a;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#78350f;user-select:none;-webkit-user-select:none;-moz-user-select:none;cursor:default"
+                         oncopy="return false" oncut="return false" oncontextmenu="return false" ondragstart="return false" onselectstart="return false"></div>
+                </div>
                 <div id="refined-box" style="display:none;margin-bottom:.3rem;flex-shrink:0">
                     <div id="refined-text" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.3rem;padding:.4rem .5rem;font-size:.82rem;line-height:1.4;color:#0f172a;cursor:pointer" onclick="acceptRefinement()"></div>
                     <div style="display:flex;gap:.3rem;margin-top:.2rem">
@@ -462,7 +468,7 @@ textarea#instruction:focus {
                 <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.72rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:140px">
                 <div id="macro-search-results" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 16px rgba(0,0,0,.18);max-height:220px;overflow-y:auto;z-index:9999;width:300px;font-size:.75rem"></div>
             </div>
-            <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Combine into instruction</button>
+            <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Suggest instruction (LLM)</button>
             <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem" onclick="macroEdges=[];_drawArrows()">Clear arrows</button>
             <span style="flex:1"></span>
             <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
@@ -1223,9 +1229,11 @@ function generateInstruction() {
     }).then(r => r.json()).then(d => {
         document.getElementById('refine-status').textContent = '';
         if (d.refined) {
-            document.getElementById('instruction').value = d.refined;
-            var ti = document.getElementById('track-instruction');
-            if (ti) ti.value = d.refined;
+            // Shown as a read-only, non-copyable reference — the annotator
+            // must type the instruction in their own words (keeps phrasing
+            // diversity; no copy-paste monoculture).
+            document.getElementById('combined-suggestion-text').textContent = d.refined;
+            document.getElementById('combined-suggestion-box').style.display = 'block';
         }
     }).catch(() => { document.getElementById('refine-status').textContent = 'Error'; });
 }

@@ -38,16 +38,22 @@ def kill_port(port: int):
 
 
 def start_server(port: int) -> subprocess.Popen:
-    """Start the MiniWeb Flask server on the given port."""
+    """Start the MiniWeb Flask server on the given port.
+
+    Server output goes to a log file, NOT a pipe: with PIPE and no reader,
+    the request log fills the 64KB pipe buffer after a few hundred requests
+    and the server blocks on write — every request then hangs.
+    """
     kill_port(port)
     env = os.environ.copy()
     env["FLASK_RUN_PORT"] = str(port)
+    log = open(os.path.join(str(PROJECT_ROOT), "evaluation", f"server_{port}.log"), "w")
     return subprocess.Popen(
         [sys.executable, "run.py"],
         cwd=PROJECT_ROOT,
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=log,
+        stderr=subprocess.STDOUT,
     )
 
 
