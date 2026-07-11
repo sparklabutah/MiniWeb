@@ -188,9 +188,11 @@ async def run_eval(args):
                         for step in history_items:
                             if not isinstance(step, dict):
                                 continue
-                            mo = step.get("model_output", {})
-                            actions = mo.get("action", [])
-                            result_list = step.get("result", [])
+                            # "model_output" is null for steps where the LLM
+                            # call failed — .get's default doesn't cover that
+                            mo = step.get("model_output") or {}
+                            actions = mo.get("action") or []
+                            result_list = step.get("result") or []
                             goal = mo.get("next_goal", "")
                             memory = mo.get("memory", "")
                             eval_prev = mo.get("evaluation_previous_goal", "")
