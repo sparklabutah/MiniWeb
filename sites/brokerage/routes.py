@@ -1053,7 +1053,10 @@ def api_login():
     if not user or user.get("password") != password:
         return jsonify({"error": "Invalid credentials"}), 401
     session["user_id"] = user["id"]
-    return jsonify({"user_id": user["id"], "username": user["username"]})
+    # Honor the annotation-mode Skip-2FA toggle (session["_disable_2fa"]):
+    # tells the login page whether to show the verify-identity step.
+    return jsonify({"user_id": user["id"], "username": user["username"],
+                    "two_factor_required": not session.get("_disable_2fa")})
 
 
 @blueprint.route("/api/verify_identity", methods=["POST"])
