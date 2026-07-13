@@ -3783,7 +3783,7 @@ MACRO_LOCATIONS = {
             "'+ Upload' page -> category and visibility dropdowns"
         ],
         "play_by_playback": [
-            "Watch page -> video player with play/pause/seek controls"
+            "Watch page -> play button; playing reveals exact duration, stream quality, and chapters (POST /api/videos/<id>/play)"
         ],
         "post_from_free_text": [
             "Watch page -> comment textarea and submit"

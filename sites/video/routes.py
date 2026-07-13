@@ -917,6 +917,44 @@ def api_video_seek(video_id):
     })
 
 
+@blueprint.route("/api/videos/<int:video_id>/play", methods=["POST"])
+def api_video_play(video_id):
+    """Start playback (play_by_playback).
+
+    Increments the view count and returns playback details that are only
+    revealed once the video is actually played — exact duration, stream
+    quality, and chapter markers — making play a verifiable precondition.
+    """
+    import random as _random
+    videos = _videos()
+    video = next((v for v in videos if v["id"] == video_id), None)
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+
+    video["views"] = (video.get("views") or 0) + 1
+    db.save_item(SITE, "videos", video_id, video)
+
+    dur = video.get("duration_seconds") or 0
+    rnd = _random.Random(f"video-{video_id}")
+    titles = ["Intro", "Overview", "Main segment", "Details & examples",
+              "Recap", "Outro"]
+    n_chapters = max(2, min(6, dur // 180 + 2)) if dur > 60 else 2
+    bounds = sorted(rnd.sample(range(15, max(16, dur - 10)), n_chapters - 1)) if dur > 60 else [max(5, dur // 2)]
+    starts = [0] + bounds
+    chapters = [{"start_sec": s,
+                 "start": f"{s // 60}:{s % 60:02d}",
+                 "title": titles[i % len(titles)]}
+                for i, s in enumerate(starts)]
+    return jsonify({
+        "playing": True,
+        "video_id": video_id,
+        "views": video["views"],
+        "exact_duration": f"{dur // 60}:{dur % 60:02d}",
+        "stream_quality": rnd.choice(["720p", "1080p", "1440p"]),
+        "chapters": chapters,
+    })
+
+
 @blueprint.route("/api/videos/<int:video_id>/playback", methods=["POST"])
 def api_video_playback(video_id):
     """Set playback configuration: speed, quality (play_by_playback)."""
