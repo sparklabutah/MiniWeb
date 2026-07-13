@@ -349,6 +349,9 @@ def _load_site_macros(site_id):
 
 
 _NA_FILE = SITES_DIR.parent / "annotation" / "na_reports.json"
+# Skip-modal reports (reason + details) — same download-and-collect workflow
+# as na_reports.json
+_SKIP_REPORTS_FILE = SITES_DIR.parent / "annotation" / "skip_reports.json"
 
 
 def _load_na_reports():
@@ -1508,10 +1511,29 @@ def api_get_task(task_id):
 
 @annotation_bp.route("/api/report", methods=["POST"])
 def api_report():
-    """Save a skip report and record any NA macros."""
+    """Save a skip report (reason + details) and record any NA macros."""
     data = request.get_json(silent=True) or {}
     sites = data.get("sites", [])
     annotator = data.get("annotator", "anonymous")
+
+    # Persist the full skip report — reason/details were previously discarded
+    report = {
+        "sites": sites,
+        "macros": data.get("macros", []),
+        "reason": data.get("reason", ""),
+        "details": data.get("details", ""),
+        "instruction": data.get("instruction", ""),
+        "annotator": annotator,
+        "timestamp": datetime.now().isoformat(),
+    }
+    reports = []
+    if _SKIP_REPORTS_FILE.exists():
+        try:
+            reports = json.loads(_SKIP_REPORTS_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            reports = []
+    reports.append(report)
+    _SKIP_REPORTS_FILE.write_text(json.dumps(reports, indent=2))
 
     # Persist NA macro reports
     na_macros = data.get("macros_not_applicable", {})
@@ -1520,7 +1542,8 @@ def api_report():
         _save_na_report(sites, macro, annotator)
         saved_na += 1
 
-    return jsonify({"status": "reported", "na_saved": saved_na})
+    return jsonify({"status": "reported", "na_saved": saved_na,
+                    "skip_saved": True})
 
 
 @annotation_bp.route("/api/routes/<site_id>")
@@ -2816,7 +2839,11 @@ def _trim_context(context):
 
 # --- Website Review ---
 
-_REVIEWS_DIR = SITES_DIR.parent / "data" / "reviews"
+# Override on deployments (e.g. Railway) to point at a mounted volume so
+# runtime-submitted reviews survive redeploys; defaults to the repo copy.
+_REVIEWS_DIR = Path(
+    os.environ.get("MINIWEB_REVIEWS_DIR", str(SITES_DIR.parent / "data" / "reviews"))
+).resolve()
 
 
 def _review_file(site_id):
