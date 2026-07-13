@@ -73,10 +73,17 @@ def _current_user():
     user = db.get_item(SITE, "users", uid)
     if user:
         return user
-    formatted_id = f"tc-u{uid:03d}"
-    user = db.get_item(SITE, "users", formatted_id)
-    if user:
-        return user
+    # zero-padded id form — only meaningful for numeric ids. Other sites store
+    # string ids in session["user_id"] (e.g. "rc-u-001"), and formatting one
+    # with :03d raised ValueError: Unknown format code 'd' for object of type 'str'.
+    try:
+        formatted_id = f"tc-u{int(uid):03d}"
+    except (TypeError, ValueError):
+        formatted_id = None
+    if formatted_id:
+        user = db.get_item(SITE, "users", formatted_id)
+        if user:
+            return user
     users = _users()
     return users[0] if users else None
 
