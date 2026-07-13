@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import pathlib
+import random
 import uuid
 from datetime import datetime, timedelta
 
@@ -498,11 +499,55 @@ def login_submit():
     user = next((u for u in users if u["username"] == username), None)
     if not user:
         return render_template("remote-calls/login.html", error="Invalid username or password.")
-    # For MiniWeb, accept any non-empty password
     if not password:
         return render_template("remote-calls/login.html", error="Password is required.")
+    # Users with a stored password require an exact match (alex.rivera);
+    # users without one still accept any non-empty password.
+    if user.get("password") and password != user["password"]:
+        return render_template("remote-calls/login.html", error="Invalid username or password.")
     session["user_id"] = user["root_user_id"]
     return redirect(url_for("remote-calls.index"))
+
+
+@blueprint.route("/recording/<recording_id>/play", methods=["POST"])
+def recording_play(recording_id):
+    """Start playback of a recording.
+
+    Increments the view count and returns playback metadata that is only
+    revealed once the media is actually played (chapters, exact runtime,
+    resolution) — playing is a verifiable precondition for follow-up macros.
+    """
+    user, redir = _require_login()
+    if redir:
+        return jsonify({"error": "login required"}), 401
+    recordings = _load_recordings()
+    recording = next((r for r in recordings if r["id"] == recording_id), None)
+    if not recording:
+        return jsonify({"error": "Recording not found"}), 404
+
+    recording["views"] = (recording.get("views") or 0) + 1
+    db.save_item(SITE, "recordings", recording_id, recording)
+
+    # Deterministic playback details derived from the recording itself
+    dur = recording.get("duration_minutes") or 30
+    rnd = random.Random(recording_id)
+    titles = ["Opening & attendance", "Main discussion", "Deep dive",
+              "Q&A", "Action items & wrap-up"]
+    n_chapters = max(2, min(5, dur // 12 + 1))
+    bounds = sorted(rnd.sample(range(2, max(3, dur - 1)), n_chapters - 1)) if dur > 4 else []
+    starts = [0] + bounds
+    chapters = [{"start_min": s, "title": titles[i % len(titles)]}
+                for i, s in enumerate(starts)]
+    exact_seconds = dur * 60 + rnd.randint(0, 59)
+    return jsonify({
+        "playing": True,
+        "recording_id": recording_id,
+        "views": recording["views"],
+        "exact_duration": f"{exact_seconds // 60}:{exact_seconds % 60:02d}",
+        "resolution": rnd.choice(["1280x720", "1920x1080"]),
+        "audio_channels": rnd.choice(["mono", "stereo"]),
+        "chapters": chapters,
+    })
 
 
 @blueprint.route("/join")

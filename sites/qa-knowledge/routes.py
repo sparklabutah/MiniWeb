@@ -220,8 +220,16 @@ def _next_user_id(users):
 
 
 def _get_logged_in_user():
-    """Return the currently logged-in user or None."""
-    uid = session.get("qa_user_id")
+    """Return the currently logged-in user or None.
+
+    Falls back to the global auto-login (session["user_id"], a root user id)
+    when no site-specific login/logout has happened. An explicit logout sets
+    qa_user_id to None, which blocks the fallback until the next login.
+    """
+    if "qa_user_id" in session:
+        uid = session["qa_user_id"]
+        return _user_by_id(uid) if uid is not None else None
+    uid = session.get("user_id")
     if uid is not None:
         return _user_by_id(uid)
     return None
@@ -569,7 +577,9 @@ def login_submit():
 
 @blueprint.route("/logout")
 def logout():
-    session.pop("qa_user_id", None)
+    # explicit None (not pop): blocks the auto-login fallback in
+    # _get_logged_in_user until the user logs in again
+    session["qa_user_id"] = None
     return redirect(url_for("qa-knowledge.index"))
 
 

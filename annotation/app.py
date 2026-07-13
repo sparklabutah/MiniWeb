@@ -1379,6 +1379,7 @@ def api_auto_login():
         "video": "user_id",  # also needs username + display_name
         "weather": "weather_user_id",
         "team-chat-workspace": "user_id",  # uses root_user_id
+        "remote-calls": "user_id",  # uses root_user_id, not the rc-u-XXX id
     }
 
     logged_in = []
@@ -1414,7 +1415,7 @@ def api_auto_login():
                     session[key] = user.get("root_user_id", uid)
                     session["vc_username"] = user.get("username", "")
                     session["vc_name"] = user.get("name", "")
-                elif site_id == "team-chat-workspace":
+                elif site_id in ("team-chat-workspace", "remote-calls"):
                     session[key] = user.get("root_user_id", uid)
                 elif site_id == "video":
                     session[key] = uid

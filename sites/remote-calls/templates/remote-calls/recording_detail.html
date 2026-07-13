@@ -68,16 +68,53 @@
             <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a> &raquo; {{ recording.title }}
         </div>
 
-        <div class="player-section">
-            <div class="play-btn">&#9654;</div>
+        <div class="player-section" id="player-section">
+            <div class="play-btn" id="play-btn" role="button" tabindex="0" title="Play recording">&#9654;</div>
             <h2>{{ recording.title }}</h2>
-            <div class="player-meta">
+            <div class="player-meta" id="player-meta">
                 {{ format_duration_minutes(recording.duration_minutes) }}
                 &middot; {{ recording.file_size_mb }} MB
                 &middot; {{ recording.format|upper }}
-                &middot; {{ recording.views }} views
+                &middot; <span id="views-count">{{ recording.views }}</span> views
+            </div>
+            <div id="now-playing" style="display:none;text-align:left;max-width:560px;margin:1.2rem auto 0;background:rgba(255,255,255,.08);border-radius:.4rem;padding:1rem 1.2rem;">
+                <div style="font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:#80cbc4;margin-bottom:.5rem;">&#9654; Now playing</div>
+                <div style="height:6px;background:rgba(255,255,255,.15);border-radius:3px;margin-bottom:.8rem;"><div style="height:6px;width:12%;background:#80cbc4;border-radius:3px;"></div></div>
+                <div style="font-size:.85rem;line-height:1.7;" id="playback-info"></div>
+                <div style="font-size:.8rem;color:#b0bec5;margin-top:.6rem;">Chapters</div>
+                <ul id="chapter-list" style="list-style:none;padding:0;margin:.3rem 0 0;font-size:.85rem;line-height:1.8;"></ul>
             </div>
         </div>
+        <script>
+        (function() {
+            function startPlayback() {
+                fetch('{{ url_for("remote-calls.recording_play", recording_id=recording.id) }}', {method: 'POST'})
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (!d.playing) return;
+                        document.getElementById('views-count').textContent = d.views;
+                        document.getElementById('playback-info').innerHTML =
+                            'Exact runtime: <b>' + d.exact_duration + '</b> &middot; ' +
+                            'Resolution: <b>' + d.resolution + '</b> &middot; ' +
+                            'Audio: <b>' + d.audio_channels + '</b>';
+                        var ul = document.getElementById('chapter-list');
+                        ul.innerHTML = '';
+                        d.chapters.forEach(function(ch) {
+                            var li = document.createElement('li');
+                            li.textContent = String(Math.floor(ch.start_min / 60)) + ':' +
+                                String(ch.start_min % 60).padStart(2, '0') + '  —  ' + ch.title;
+                            ul.appendChild(li);
+                        });
+                        document.getElementById('now-playing').style.display = 'block';
+                        document.getElementById('play-btn').innerHTML = '&#10074;&#10074;';
+                    });
+            }
+            var btn = document.getElementById('play-btn');
+            btn.addEventListener('click', startPlayback);
+            btn.addEventListener('keydown', function(e) { if (e.key === 'Enter') startPlayback(); });
+            if (new URLSearchParams(window.location.search).get('autoplay') === '1') startPlayback();
+        })();
+        </script>
 
         <div class="detail-card">
             <h3>Recording Details</h3>

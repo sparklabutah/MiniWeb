@@ -3092,7 +3092,7 @@ MACRO_LOCATIONS = {
             "'Settings' page -> notification_sound, background, language dropdowns"
         ],
         "play_by_playback": [
-            "Recording detail page -> recording playback view"
+            "Recording detail page -> play button; playing reveals exact runtime, resolution, and chapters (POST /recording/<id>/play)"
         ],
         "export_by_dropdown": [
             "'Call Log' page -> filtered call history with search and filter controls"
