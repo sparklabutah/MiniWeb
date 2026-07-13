@@ -1235,10 +1235,13 @@ def api_export():
         writer.writeheader()
         for row in data:
             writer.writerow(row)
+        # Render inline (like the JSON export) instead of a silent download:
+        # in the annotation iframe an attachment shows no visible result,
+        # which reads as "export broken" to annotators and agents alike.
         return Response(
             output.getvalue(),
-            mimetype="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={data_type}.csv"},
+            mimetype="text/plain",
+            headers={"Content-Disposition": f"inline; filename={data_type}.csv"},
         )
     else:
         return jsonify(data)

@@ -697,7 +697,8 @@
                             Results
                         </a>
                         <button class="btn-action" onclick="event.preventDefault();event.stopPropagation();navigator.clipboard.writeText(window.location.origin+'/sites/forms-surveys/form/'+encodeURIComponent('{{ form.id }}')+'/respond');this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" title="Copy share link">Share</button>
-                        <button class="btn-action" style="color:#dc2626" onclick="event.preventDefault();event.stopPropagation();if(confirm('Delete this form and all its responses?')){var x=new XMLHttpRequest();x.open('POST','{{ url_for('forms-surveys.form_delete', form_id=form.id) }}');x.onload=function(){location.reload()};x.send()}" title="Delete form">Delete</button>
+                        <button class="btn-action" style="color:#dc2626" title="Delete form and all its responses"
+                                onclick="event.preventDefault();event.stopPropagation();var b=this;b.textContent='Deleting...';b.disabled=true;fetch('{{ url_for('forms-surveys.form_delete', form_id=form.id) }}',{method:'POST'}).then(function(r){if(!r.ok)throw 0;b.textContent='Deleted';location.reload()}).catch(function(){b.textContent='Delete';b.disabled=false})">Delete</button>
                     </div>
                 </div>
             </a>

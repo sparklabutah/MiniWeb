@@ -71,27 +71,26 @@ def _load_comments():
 
 
 def _load_ratings():
-    """Ratings stored as { "<user_id>_<guide_id>": <score> }."""
-    path = DATA_DIR / "ratings.json"
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text())
+    """Ratings as { "<user_id>_<guide_id>": <score> } — stored in the DB
+    (session overlay), replacing the old ratings.json file whose directory
+    only existed on the CHPC cluster (writes 500'd everywhere else)."""
+    return {r["id"]: r["score"] for r in db.query(SITE, "ratings")}
 
 
 def _save_ratings(ratings):
-    (DATA_DIR / "ratings.json").write_text(json.dumps(ratings, indent=2))
+    db.save_collection(SITE, "ratings",
+                       [{"id": k, "score": v} for k, v in ratings.items()])
 
 
 def _load_reactions():
-    """Reactions stored as { "<user_id>_<comment_id>": "helpful"|"unhelpful" }."""
-    path = DATA_DIR / "reactions.json"
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text())
+    """Reactions as { "<user_id>_<comment_id>": "helpful"|"unhelpful" } —
+    stored in the DB (session overlay), same migration as ratings."""
+    return {r["id"]: r["reaction"] for r in db.query(SITE, "reactions")}
 
 
 def _save_reactions(reactions):
-    (DATA_DIR / "reactions.json").write_text(json.dumps(reactions, indent=2))
+    db.save_collection(SITE, "reactions",
+                       [{"id": k, "reaction": v} for k, v in reactions.items()])
 
 
 def _get_user(user_id):
