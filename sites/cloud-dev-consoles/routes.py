@@ -873,6 +873,14 @@ def logs_page():
     levels = sorted(set(l["level"] for l in logs))
     log_categories = sorted(set(l["category"] for l in logs))
 
+    # Pagination — the logs table now holds thousands of entries
+    per_page = 100
+    page = max(1, request.args.get("page", 1, type=int) or 1)
+    total_results = len(results)
+    total_pages = max(1, (total_results + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    results = results[(page - 1) * per_page: page * per_page]
+
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
@@ -882,6 +890,8 @@ def logs_page():
                            log_categories=log_categories,
                            q=q, level=level, category=category,
                            date_from=date_from, date_to=date_to,
+                           page=page, total_pages=total_pages,
+                           total_results=total_results,
                            sort=sort, user=user)
 
 

@@ -26,8 +26,8 @@
         {% endif %}
 
         <!-- Market Movers -->
-        {% set top_gainers = tickers|sort(attribute='change_pct', reverse=True) %}
-        {% set top_losers = tickers|sort(attribute='change_pct') %}
+        {% set top_gainers = movers_gainers %}
+        {% set top_losers = movers_losers %}
 
         <div style="margin-bottom:32px;">
             <h2 class="rh-section-title">Market Movers</h2>
@@ -35,7 +35,7 @@
                 <!-- Top Gainers -->
                 <div style="flex:1;min-width:300px;">
                     <div style="font-size:13px;font-weight:600;color:#00C805;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Top Gainers</div>
-                    {% for t in top_gainers[:5] %}
+                    {% for t in top_gainers %}
                     <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" class="wl-item" style="text-decoration:none;border-radius:8px;border:none;margin-bottom:4px;background:rgba(47,51,54,0.2);">
                         <div>
                             <div class="wl-sym">{{ t.symbol }}</div>
@@ -63,7 +63,7 @@
                 <!-- Top Losers -->
                 <div style="flex:1;min-width:300px;">
                     <div style="font-size:13px;font-weight:600;color:#FF5000;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Top Losers</div>
-                    {% for t in top_losers[:5] %}
+                    {% for t in top_losers %}
                     <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" class="wl-item" style="text-decoration:none;border-radius:8px;border:none;margin-bottom:4px;background:rgba(47,51,54,0.2);">
                         <div>
                             <div class="wl-sym">{{ t.symbol }}</div>
@@ -98,7 +98,7 @@
             </div>
             <div class="rh-card-body" style="padding:0;">
                 <div style="display:flex;flex-wrap:wrap;">
-                    {% for t in tickers if t.type == 'index_fund' %}
+                    {% for t in summary_funds %}
                     <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" style="flex:1;min-width:150px;padding:16px 20px;border-right:1px solid rgba(47,51,54,0.5);border-bottom:1px solid rgba(47,51,54,0.5);text-decoration:none;">
                         <div class="rh-label">{{ t.symbol }}</div>
                         <div style="font-size:18px;font-weight:700;margin-top:4px;" data-live-price="{{ t.symbol }}">${{ "%.2f"|format(t.current_price) }}</div>
@@ -114,7 +114,7 @@
         <!-- All Securities Table -->
         <div class="rh-card">
             <div class="rh-card-header" style="flex-wrap:wrap;gap:12px;">
-                <h2>All Securities</h2>
+                <h2>All Securities <span style="font-size:13px;color:#6F7782;font-weight:400;">({{ total_results }} securities &middot; page {{ page }}/{{ total_pages }})</span></h2>
                 <a href="{{ url_for('brokerage.api_export', format='csv', type='stock') }}" style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;color:#fff;background:#00C805;text-decoration:none;" >Export CSV</a>
                 <form method="GET" action="{{ url_for('brokerage.index') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                     <input type="hidden" name="q" value="{{ q }}">
@@ -198,6 +198,13 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                {% if total_pages > 1 %}
+                <div style="display:flex;justify-content:center;gap:12px;padding:14px;align-items:center;">
+                    {% if page > 1 %}<a href="{{ url_for('brokerage.index', page=page-1, q=q, sector=sec, type=typ, sort=sort) }}" class="rh-btn rh-btn-outline" style="padding:6px 18px;font-size:13px;">&larr; Prev</a>{% endif %}
+                    <span style="font-size:13px;color:#6F7782;">Page {{ page }} of {{ total_pages }}</span>
+                    {% if page < total_pages %}<a href="{{ url_for('brokerage.index', page=page+1, q=q, sector=sec, type=typ, sort=sort) }}" class="rh-btn rh-btn-outline" style="padding:6px 18px;font-size:13px;">Next &rarr;</a>{% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

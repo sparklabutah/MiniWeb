@@ -43,25 +43,42 @@ def _load_config():
 def _load_tickers():
     return db.query(SITE, "tickers")
 
+_PH_CACHE = None
+
+
 def _load_price_history():
     """Load price history as a dict keyed by uppercase symbol.
 
-    The DB stores this as a single row with one column per symbol,
-    each containing JSON-encoded price data.
+    Reads the per-symbol brokerage_price_data table (symbol PK, JSON data);
+    falls back to the legacy single-row price_history table. Price data is
+    static base data (no route mutates it), so it is cached per process —
+    at ~500 symbols the JSON parse is too slow to repeat per request.
     """
-    rows = db.query(SITE, "price_history")
-    if not rows:
-        return {}
-    row = rows[0]
+    global _PH_CACHE
+    if _PH_CACHE is not None:
+        return _PH_CACHE
     result = {}
-    for col, val in row.items():
-        if col == "row_id" or col == "id":
-            continue
-        if val is not None:
+    try:
+        rows = db.execute("SELECT symbol, data FROM brokerage_price_data", fetch="all")
+    except Exception:
+        rows = None
+    if rows:
+        for r in rows:
             try:
-                result[col.upper()] = json.loads(val) if isinstance(val, str) else val
+                result[r["symbol"].upper()] = json.loads(r["data"])
             except (json.JSONDecodeError, TypeError):
                 pass
+    else:
+        legacy = db.query(SITE, "price_history")
+        if legacy:
+            for col, val in legacy[0].items():
+                if col in ("row_id", "id") or val is None:
+                    continue
+                try:
+                    result[col.upper()] = json.loads(val) if isinstance(val, str) else val
+                except (json.JSONDecodeError, TypeError):
+                    pass
+    _PH_CACHE = result
     return result
 
 def _load_options():
@@ -487,10 +504,30 @@ def index():
 
     sim_time = _get_sim_clock()
 
+    # Movers and market-summary strip come from the FULL market, not the
+    # filtered page — computed here since the table below is paginated.
+    movers_gainers = sorted(tickers, key=lambda t: -t["change_pct"])[:5]
+    movers_losers = sorted(tickers, key=lambda t: t["change_pct"])[:5]
+    summary_funds = [t for t in tickers
+                     if t["symbol"] in ("SPY", "QQQ", "IWM", "DIA", "VTI")]
+
+    # Pagination (506 securities — show 50 per page)
+    per_page = 50
+    page = max(1, request.args.get("page", 1, type=int) or 1)
+    total_results = len(results)
+    total_pages = max(1, (total_results + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    results = results[(page - 1) * per_page: page * per_page]
+
     return render_template("brokerage/index.html",
                            tickers=results, sectors=sectors, types=types,
                            q=q, sec=sec, typ=typ, sort=sort,
                            price_min=price_min, price_max=price_max,
+                           movers_gainers=movers_gainers,
+                           movers_losers=movers_losers,
+                           summary_funds=summary_funds,
+                           page=page, total_pages=total_pages,
+                           total_results=total_results,
                            user=user, sim_time=sim_time,
                            portfolio_value=portfolio_value,
                            portfolio_change=portfolio_change,

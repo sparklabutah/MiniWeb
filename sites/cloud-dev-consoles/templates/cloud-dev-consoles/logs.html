@@ -27,7 +27,7 @@
             <select name="sort"><option value="time" {% if sort == 'time' %}selected{% endif %}>Time</option><option value="level" {% if sort == 'level' %}selected{% endif %}>Severity</option><option value="service" {% if sort == 'service' %}selected{% endif %}>Service</option></select>
             <button type="submit">Apply</button>
         </form>
-        <div class="result-count">{{ logs|length }} log entries</div>
+        <div class="result-count">{{ total_results }} log entries &middot; page {{ page }}/{{ total_pages }}</div>
         <table id="logs-table">
             <thead><tr><th>Timestamp</th><th>Level</th><th>Service</th><th>Category</th><th>Message</th><th>Trace ID</th></tr></thead>
             <tbody>
@@ -42,6 +42,13 @@
             {% endfor %}
             </tbody>
         </table>
+        {% if total_pages > 1 %}
+        <div style="display:flex;justify-content:center;gap:12px;padding:14px;align-items:center;">
+            {% if page > 1 %}<a href="{{ url_for('cloud-dev-consoles.logs_page', page=page-1, q=q, level=level, category=category, sort=sort, date_from=date_from, date_to=date_to) }}" style="padding:.4rem 1rem;background:#232f3e;color:#fff;border-radius:4px;text-decoration:none;font-size:.85rem;">&larr; Prev</a>{% endif %}
+            <span style="font-size:.85rem;color:#64748b;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}<a href="{{ url_for('cloud-dev-consoles.logs_page', page=page+1, q=q, level=level, category=category, sort=sort, date_from=date_from, date_to=date_to) }}" style="padding:.4rem 1rem;background:#232f3e;color:#fff;border-radius:4px;text-decoration:none;font-size:.85rem;">Next &rarr;</a>{% endif %}
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>
