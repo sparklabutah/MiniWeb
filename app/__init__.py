@@ -313,14 +313,65 @@ def create_app():
     from annotation.app import annotation_bp
     app.register_blueprint(annotation_bp)
 
+    # -----------------------------------------------------------------
+    # Per-site session namespacing.
+    #
+    # 58 sites read session["user_id"], but they store incompatible id
+    # types in it: ints (1), numeric strings, and site-specific strings
+    # ("rc-u-001", "tc-u001", "im-u001", "mp-u-001"). With one shared key,
+    # logging into site A leaks A's id into site B — B either resolves the
+    # wrong user, silently falls back to "first user", or crashes (the
+    # team-chat f"tc-u{uid:03d}" ValueError seen on Railway).
+    #
+    # Rather than rewrite every site, swap the value in and out around each
+    # request: on the way in, load that site's own saved id into
+    # session["user_id"]; on the way out, store whatever the site left there
+    # back under its own key. Sites keep using session["user_id"] unchanged,
+    # but each one now has an isolated login state.
+    # -----------------------------------------------------------------
+    def _site_of(path):
+        parts = path.split("/", 3)
+        return parts[2] if len(parts) > 2 and parts[1] == "sites" and parts[2] else None
+
+    @app.before_request
+    def _load_site_session():
+        site = _site_of(request.path)
+        if not site:
+            return
+        from flask import g
+        g._session_site = site
+        key = f"_uid_{site}"
+        if key in session:
+            uid = session[key]
+            if uid is None:
+                session.pop("user_id", None)   # explicit logout on this site
+            else:
+                session["user_id"] = uid
+        else:
+            session.pop("user_id", None)       # no login on this site yet
+
+    @app.after_request
+    def _save_site_session(response):
+        from flask import g
+        site = getattr(g, "_session_site", None)
+        if site:
+            # None marks "logged out here" and is distinct from "never seen"
+            session[f"_uid_{site}"] = session.get("user_id")
+        return response
+
     # Auto-login: default to user 1 on any site request if not logged in.
     # This means tasks don't need an explicit "log in as X" step unless
     # they specifically test authentication or need a different user.
     # Pass MINIWEB_NO_AUTOLOGIN=1 to disable (for browser-agent eval).
+    # Registered AFTER _load_site_session so it sees this site's own state.
     if not os.environ.get("MINIWEB_NO_AUTOLOGIN"):
         @app.before_request
         def _auto_login():
-            if request.path.startswith("/sites/") and "user_id" not in session and not session.get("_no_autologin"):
+            site = _site_of(request.path)
+            if not site or session.get("_no_autologin"):
+                return
+            # only auto-login where this site has no session of its own yet
+            if f"_uid_{site}" not in session and "user_id" not in session:
                 session["user_id"] = 1
 
     # -----------------------------------------------------------------

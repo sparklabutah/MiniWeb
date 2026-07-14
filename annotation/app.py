@@ -1405,8 +1405,14 @@ def api_auto_login():
                 user = users[0]
 
             uid = user.get("id", user.get("root_user_id", 1))
+            # Sites that read session["user_id"] as a root_user_id
+            if site_id in ("team-chat-workspace", "remote-calls"):
+                uid = user.get("root_user_id", uid)
 
-            # Always set generic user_id to the site's user ID
+            # Namespaced per-site key (app/__init__ swaps this into
+            # session["user_id"] on requests to /sites/<site_id>/...)
+            session[f"_uid_{site_id}"] = uid
+            # Generic key too, for the current request cycle
             session["user_id"] = uid
 
             # Set site-specific session key
@@ -1450,6 +1456,10 @@ def api_auto_logout():
         if key in session:
             session.pop(key)
             cleared.append(key)
+    # Namespaced per-site keys (app/__init__ per-site session isolation)
+    for key in [k for k in session if k.startswith("_uid_")]:
+        session.pop(key)
+        cleared.append(key)
     # Prevent the before_request auto-login from re-setting user_id
     session["_no_autologin"] = True
     return jsonify({"cleared": cleared})
