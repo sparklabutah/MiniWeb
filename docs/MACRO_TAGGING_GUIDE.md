@@ -6,6 +6,23 @@ This guide is for human annotators tagging action trajectories with macro labels
 
 A macro is a **primitive UI skill** — a single atomic interaction pattern that an agent must perform. Examples: dragging a slider, filling a form, selecting from a dropdown. Each macro has a name like `filter_by_slider` (verb + modality).
 
+## The Mindset: a Three-Way Contract
+
+Every task is a contract between three parties, and every bad task is a disagreement between two of them:
+
+- **The instruction** — everything the agent is told. If the rubric will check a mechanism ("used the slider", "clicked the week arrows"), the instruction MUST state it. An agent can't be failed for not following a rule it never saw.
+- **The environment** — what's actually possible. Confirm every sampled macro is doable on the site before you record (mark N/A if not).
+- **The verifier** — what gets checked. Default to **outcome checks** (state/backend); check mechanisms only when the instruction states them; never contradict the instruction (a task that says "January 2025" with a rubric expecting March auto-fails every correct agent).
+
+**Golden rule: after building verifiers, run them against your own recorded trajectory. If your own demonstration doesn't pass your rubric, no agent ever will — fix the task before saving.**
+
+## Writing the Instruction
+
+- Write it **in your own words**. The ✨ LLM suggestion is a non-copyable reference on purpose — phrasing diversity is part of dataset quality.
+- Keep the **specific values** (names, amounts, dates, IDs) — those are the task parameters. Vary the phrasing, not the facts.
+- If the task requires a specific UI mechanism, **say so in the instruction** ("using the slider"). Leaving an equivalent path open (a typable field next to the slider) then becomes a deliberate constraint-following test — that's good task design, not a bug.
+- For judgment tasks ("like profiles matching Alex's interests"), don't let the rubric pin exact choices the instruction doesn't force. Either constrain the instruction until one answer is forced, or list acceptable alternatives.
+
 ## Tagging Workflow
 
 1. **Record** your trajectory by performing the task in the iframe
@@ -83,6 +100,17 @@ Multi-page macros (checkout flow across pages):
 
 Toggle macros (save, follow, react):
   └─ Span is just the click (1 action) or click + confirmation (2 actions)
+
+2FA / verify-payment steps:
+  └─ INCLUDE in the span — entering the code is part of completing the
+      payment/trade. (The Skip-2FA toolbar toggle removes these steps;
+      leave it OFF when verification IS the task, e.g. verify_identity_by_code.)
+
+Uploads (upload_by_upload etc.):
+  └─ Use the fake file picker's canonical filenames (photo.jpg, letter.docx,
+      notes.txt, data.csv, ...). Agents get real fixture files with exactly
+      these names and contents — a made-up filename makes the task
+      impossible for them.
 ```
 
 ### Overlapping Spans
@@ -144,7 +172,20 @@ What is the user trying to accomplish?
 
 ## Macro Categories & Priority
 
-### Spatial Control (highest priority — hardest for agents)
+Priorities below are updated with **measured agent evidence** (Gemini Flash browser-agent eval, July 2026): the categories are human-difficulty labels, and human difficulty ≠ agent difficulty. Agents passed 84% of text_input tasks but 0% of table-macro tasks — so tables and multi-macro chains discriminate hardest.
+
+### Tables (TOP priority — agents scored 0/8)
+
+The failure is not clicking tables — it's **selecting the right row by a data property** ("the account with the oldest password", "the 3rd production instance"). Design more of these.
+
+| Macro | Description | Span tip |
+|-------|-------------|----------|
+| `extract_from_table` | Read a value from the right row | Span where the row/value is visible + QA answer |
+| `navigate_from_table` | Open a row's detail page | The row click (verify the URL actually changed) |
+| `select_from_table` / `delete_from_table` | Act on the right row | Row selection → action → confirm |
+| `compare_from_table` | Compare rows | Span covers reading both rows + QA answer |
+
+### Spatial Control (high priority — agents pass ~56%)
 
 | Macro | Description | Span tip |
 |-------|-------------|----------|
@@ -183,7 +224,9 @@ What is the user trying to accomplish?
 | `play_by_playback` | Use playback controls | Click play/pause/seek |
 | `export_by_dropdown` | Export in a format | Select format → download |
 
-### Text Input (lower priority)
+### Text Input (lowest priority — agents pass ~84–100% of these)
+
+Plain search/post/message tasks are saturated; only annotate them as parts of longer chains.
 
 | Macro | Description | Span tip |
 |-------|-------------|----------|
@@ -215,3 +258,17 @@ After tagging, write what should be verifiable in the "Expected Outcome" field:
 - "User navigated correctly"
 
 Include **admin API checks** for state-changing macros — this lets the judge verify the mutation actually happened in the database, not just that a button was clicked.
+
+### Rules that keep outcomes verifiable at eval time
+
+1. **Mechanism checks require instruction wording.** "Must be a drag action" is only valid if the instruction says "using the slider". Otherwise write the outcome ("max price filter = $150,000 is applied") and let any mechanism count.
+2. **Never hardcode dynamic values.** Brokerage prices/gainers reshuffle every minute; cloud metrics and service health are time-simulated. Verify *properties* ("results sorted descending by change_pct at check time"), not literal tickers or numbers you saw while recording.
+3. **Never hardcode generated IDs or counters.** New-record IDs (e.g. `i-user000000000016`) depend on what ran before. Verify by `record_exists` on the record's *content* (name, type, region) and match reported IDs by pattern (`i-user\d+`).
+4. **Itemize multi-part tasks.** One line per required part — agents commonly complete n−1 of n, and itemized rubrics make the failure attributable.
+5. **List alternatives** when more than one answer/wording is defensible; the judge honors them.
+
+## When a Macro Can't Be Done
+
+- **The site has no UI for it** → mark the macro **N/A** on its node. Two independent N/A reports retire the site↔macro mapping — this is real signal, use it.
+- **The macro exists but this prompt combination doesn't work** → **Skip** with a reason in the details box.
+- **The site is broken** (error page, missing data) → file site feedback from the review page so it lands in `data/reviews/`, then skip.
