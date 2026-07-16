@@ -534,8 +534,10 @@ def create_app():
           ?last=N       — only the last N entries
         """
         from flask import jsonify
-        sid = session.get("_id", id(session))
-        log = list(_request_logs.get(sid, []))
+        if request.args.get("all") == "1":
+            log = [e for s in _request_logs.values() for e in s]
+        else:
+            log = list(_request_logs.get(session.get("_id", id(session)), []))
 
         method_filter = request.args.get("method", "").upper()
         path_filter = request.args.get("path", "")
@@ -605,11 +607,68 @@ def create_app():
 
     @app.route("/_admin/beacon")
     def _admin_beacon_get():
-        """Read the action beacon log for the current session."""
+        """Read the action beacon log.
+
+        ?all=1 merges every session (see /_admin/record) — for harnesses
+        reading an agent browser's beacons from outside its session.
+        """
         from flask import jsonify
-        sid = session.get("_id", id(session))
-        return jsonify({"count": len(_action_beacons.get(sid, [])),
-                        "entries": _action_beacons.get(sid, [])})
+        if request.args.get("all") == "1":
+            entries = [e for s in _action_beacons.values() for e in s]
+        else:
+            entries = _action_beacons.get(session.get("_id", id(session)), [])
+        return jsonify({"count": len(entries), "entries": entries})
+
+    # ------------------------------------------------------------------
+    # Recorder collector — the same action+observation stream recorder.js
+    # sends to the annotation iframe, but for runs with no parent window
+    # (browser agents). Lets an agent trajectory be recorded in exactly the
+    # human trajectory.json schema.
+    # ------------------------------------------------------------------
+    _recorder_stream = {}   # session_id -> [records]
+
+    @app.route("/_admin/record", methods=["POST"])
+    def _admin_record():
+        sid = _sid_for_recording()
+        data = request.get_json(silent=True) or {}
+        kind = data.get("mw")
+        if kind not in ("action", "observation"):
+            return "", 204
+
+        from datetime import datetime, timezone
+        rec = {k: v for k, v in data.items() if k != "mw"}
+        rec["type"] = kind
+        rec.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+
+        stream = _recorder_stream.setdefault(sid, [])
+        stream.append(rec)
+        if len(stream) > 5000:
+            del stream[:-5000]
+        return "", 204
+
+    @app.route("/_admin/record")
+    def _admin_record_get():
+        """Read the recorded stream.
+
+        ?all=1 merges every session on this server, ordered by timestamp —
+        needed when the reader is not the browser that produced the records
+        (an eval harness fetching an agent's trajectory). Only meaningful on
+        a single-run server; the default is the caller's own session.
+        """
+        from flask import jsonify
+        if request.args.get("all") == "1":
+            entries = [e for s in _recorder_stream.values() for e in s]
+            entries.sort(key=lambda e: e.get("timestamp", ""))
+        else:
+            entries = _recorder_stream.get(_sid_for_recording(), [])
+        if request.args.get("clear") == "1":
+            _recorder_stream.clear()
+        return jsonify({"count": len(entries), "entries": entries})
+
+    def _sid_for_recording():
+        # Agents drive a real browser, so the Flask session cookie is stable
+        # for the run; fall back to the data-overlay id used elsewhere.
+        return session.get("_data_overlay_sid") or session.get("_id") or id(session)
 
     @app.route("/_admin/session")
     def _admin_session():

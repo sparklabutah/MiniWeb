@@ -21,10 +21,38 @@
     var typingTimer = null;
     var typingTarget = null;
 
-    // ── Post to parent ─────────────────────────────────────────────────
+    // ── Post to parent (annotation UI) or backend (agent runs) ─────────
+    //
+    // Human annotation runs inside an iframe, so messages go to the parent.
+    // Browser-agent runs have no parent listening (no annotation UI), which
+    // meant every observation was discarded. When there is no parent, ship
+    // the same records to the backend collector instead, so agent runs
+    // produce the identical action+observation stream a human does.
+
+    var HAS_PARENT = (function () {
+        try { return window.top !== window.self; } catch (e) { return true; }
+    })();
+
+    function postToBackend(msg) {
+        try {
+            var body = JSON.stringify(msg);
+            // keepalive so records survive the navigation that follows a click
+            fetch('/_admin/record', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: body,
+                keepalive: true,
+                credentials: 'same-origin',
+            }).catch(function () {});
+        } catch (e) {}
+    }
 
     function post(msg) {
-        try { window.top.postMessage(msg, '*'); } catch(e) {}
+        if (HAS_PARENT) {
+            try { window.top.postMessage(msg, '*'); } catch (e) {}
+        } else {
+            postToBackend(msg);
+        }
     }
 
     // ── Human-readable element description ─────────────────────────────

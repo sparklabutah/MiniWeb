@@ -1049,6 +1049,413 @@ def graph():
                            affinities=SITE_AFFINITY_GROUPS)
 
 
+# --- Macro template builder ------------------------------------------------
+
+@annotation_bp.route("/macro-templates")
+def macro_templates_page():
+    """Author one verifier template per macro (the reusable skeletons the
+    per-task filler later fills in)."""
+    from annotation import macro_templates as mt
+    macros = mt.list_macros()
+    selected = request.args.get("macro") or (macros[0]["macro"] if macros else "")
+    return render_template("macro_templates.html",
+                           macros=macros,
+                           selected=selected,
+                           check_schema=mt.check_schema())
+
+
+@annotation_bp.route("/api/macro_templates", methods=["GET"])
+def api_list_macro_templates():
+    """Macros that already have a template — for the 'prefill from' dropdown."""
+    from annotation import macro_templates as mt
+    return jsonify({"macros": sorted(mt.load_all().keys())})
+
+
+@annotation_bp.route("/api/macro_template/<macro>", methods=["GET"])
+def api_get_macro_template(macro):
+    from annotation import macro_templates as mt
+    return jsonify({"macro": macro, "template": mt.load_template(macro)})
+
+
+@annotation_bp.route("/api/macro_template/<macro>", methods=["POST"])
+def api_save_macro_template(macro):
+    from annotation import macro_templates as mt
+    data = request.get_json(silent=True) or {}
+    tree = data.get("template")  # None deletes
+    try:
+        mt.save_template(macro, tree)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"status": "ok", "macro": macro,
+                    "has_template": tree is not None})
+
+
+@annotation_bp.route("/api/macro_usage/<macro>", methods=["GET"])
+def api_macro_usage(macro):
+    from annotation import macro_templates as mt
+    return jsonify(mt.macro_usage(macro))
+
+
+_TEMPLATE_MODEL = "gemini-3.5-flash"
+
+
+def _schema_lines(schema):
+    lines = []
+    for ctype, meta in schema.items():
+        parts = []
+        for p, ps in meta["params"].items():
+            if ps["kind"] == "enum":
+                parts.append(f"{p}(one of {ps['options']})")
+            else:
+                parts.append(f"{p}({ps['kind']})")
+        lines.append(f"  {ctype}: {meta.get('help','')}  params: {', '.join(parts)}")
+    return "\n".join(lines)
+
+
+def _generate_macro_template(macro, meta, observed, examples_text, schema_text, actions_text):
+    """Ask the LLM for a verifier template for one macro, in the style of the
+    human examples. Returns a tree dict (marked _suggested) or None."""
+    from app.llm import call_llm
+
+    system_prompt = (
+        "You author VERIFIER TEMPLATES for web-task macros. A template is a JSON tree:\n"
+        '  group: {"op":"AND"|"OR", "label":"..."(optional), "checks":[ ... ]}\n'
+        '  leaf : {"type": <check>, "label":"..."(optional), <params>}\n'
+        'Each param is either a FIXED value, or {"open": true} meaning it is filled per\n'
+        "task later. RULES:\n"
+        "- Leave task-specific values OPEN: target, url, expected, body_fields, value.\n"
+        "- FIX the invariants: the action type (for action_included) and the HTTP method\n"
+        "  (for request_made) — choose them from what the macro does.\n"
+        "- Prefer the highest-signal check for the macro's intent: a QA/extract/compute/\n"
+        "  compare/verify macro -> qa_answer (+ answer_grounded); an interaction ->\n"
+        "  action_included; a create/submit/pay/mutation -> request_made (POST) with\n"
+        "  body_fields open.\n"
+        "- Add a short `label` to each check and group saying what it asserts.\n"
+        "- Do NOT assert scroll/navigate. Keep it minimal — one to three checks.\n\n"
+        "Check types and params:\n" + schema_text + "\n\n"
+        "Assertable action types (fix `action` to one of these):\n  " + actions_text + "\n\n"
+        "Match the STYLE of these human-authored examples:\n" + examples_text + "\n\n"
+        "Return ONLY the JSON template tree for the requested macro, nothing else."
+    )
+    user_prompt = json.dumps({
+        "macro": macro, "verb": meta.get("verb", ""), "modality": meta.get("modality", ""),
+        "description": meta.get("description", ""), "observed_actions": observed,
+    }, ensure_ascii=False)
+
+    raw = call_llm(user_prompt, system=system_prompt, max_tokens=1500,
+                   temperature=0.3, json_mode=True, model=_TEMPLATE_MODEL)
+    if not raw:
+        return None
+    try:
+        tree = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(tree, dict):
+        return None
+    if "op" not in tree:                      # a bare leaf -> wrap in an AND group
+        tree = {"op": "AND", "checks": [tree]}
+    tree["_suggested"] = True
+    return tree
+
+
+@annotation_bp.route("/api/suggest_templates_batch", methods=["POST"])
+def api_suggest_templates_batch():
+    """Propose templates for macros that have none, using the confirmed
+    (human-authored) templates as in-context examples. Processes up to `limit`
+    per call so the caller can loop with progress. Suggestions are marked
+    `_suggested` so they read as drafts until you edit + Save.
+    """
+    from annotation import macro_templates as mt
+    data = request.get_json(silent=True) or {}
+    limit = int(data.get("limit", 8))
+
+    existing = mt.load_all()
+    confirmed = {m: t for m, t in existing.items() if not mt.is_suggested(t)}
+    if not confirmed:
+        return jsonify({"error": "author at least one template first — it's the example"}), 400
+
+    # targets: site-mapped macros with NO template yet, skipping navigation
+    mapped = mt.mapped_macros()
+    targets = sorted(m for m in mapped
+                     if m not in existing
+                     and (_MACRO_DESCRIPTIONS.get(m) or {}).get("verb") != "navigate")
+    remaining_after = max(0, len(targets) - limit)
+    batch = targets[:limit]
+    if not batch:
+        return jsonify({"processed": 0, "remaining": 0, "results": []})
+
+    # few-shot from confirmed templates (diverse, capped)
+    ex_lines, seen_verbs = [], set()
+    for m, t in confirmed.items():
+        verb = (_MACRO_DESCRIPTIONS.get(m) or {}).get("verb", "")
+        clean = {k: v for k, v in t.items() if k != "_suggested"}
+        desc = (_MACRO_DESCRIPTIONS.get(m) or {}).get("description", "")
+        ex_lines.append(f"{m} ({desc}):\n{json.dumps(clean, ensure_ascii=False)}")
+        seen_verbs.add(verb)
+    examples_text = "\n\n".join(ex_lines[:8])
+
+    schema = mt.check_schema()
+    schema_text = _schema_lines(schema)
+    from evaluation.action_vocabulary import ASSERTABLE_ACTIONS
+    actions_text = ", ".join(ASSERTABLE_ACTIONS)
+    observed_map = mt.observed_actions_all()
+
+    results = []
+    for macro in batch:
+        meta = _MACRO_DESCRIPTIONS.get(macro) or {}
+        tree = _generate_macro_template(
+            macro, meta, observed_map.get(macro, {}),
+            examples_text, schema_text, actions_text)
+        if tree:
+            mt.save_template(macro, tree)
+            results.append({"macro": macro, "ok": True})
+        else:
+            results.append({"macro": macro, "ok": False})
+
+    return jsonify({
+        "processed": len(batch),
+        "succeeded": sum(1 for r in results if r["ok"]),
+        "remaining": remaining_after,
+        "results": results,
+        "model": _TEMPLATE_MODEL,
+    })
+
+
+# task verifier — fill the macros' open template fields from the trajectory
+_VERIFIER_FILL_MODEL = "gemini-3.5-flash"
+
+
+def _span_actions(task, traj, macro):
+    """The concrete recorded actions inside a macro's span — the strongest
+    signal for what its open target/value should be."""
+    from annotation import macro_templates as mt
+    acts = [e for e in traj if e.get("type") == "action"]
+    span = (task.get("macro_spans") or {}).get(macro)
+    out = []
+    for idx in mt._span_indices(span, len(acts)):
+        a = acts[idx]
+        out.append({k: a[k] for k in
+                    ("action", "target", "value", "text", "option_text", "url", "method")
+                    if a.get(k) not in (None, "")})
+    return out
+
+
+@annotation_bp.route("/api/suggest_task_verifier", methods=["POST"])
+def api_suggest_task_verifier():
+    """Fill the OPEN fields of a task's macro templates from its trajectory.
+
+    Body: {task_id, annotator?}. Returns the human templates with their open
+    params filled in by the LLM (gemini-3.5-flash), grounded in the whole
+    trajectory (observations reduced to axtree only).
+    """
+    from annotation import macro_templates as mt
+    from app.llm import call_llm
+
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    annotator = data.get("annotator")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+
+    _dir, task, traj = _load_saved_task(annotator, task_id)
+    if not task:
+        return jsonify({"error": "task not found"}), 404
+
+    macros = task.get("macros") or []
+    draft = mt.build_task_draft(macros)
+    if not draft["templates"]:
+        return jsonify({"error": "none of this task's macros have a template yet",
+                        "missing": draft["missing"], "templates": {}}), 200
+    if not draft["slots"]:
+        # nothing open to fill — the templates are already concrete
+        return jsonify({"templates": draft["templates"], "missing": draft["missing"],
+                        "slots": [], "model": None})
+
+    # per-macro context: description + the actions the human took in its span
+    macro_ctx = []
+    for macro in draft["templates"]:
+        desc = (_MACRO_DESCRIPTIONS.get(macro) or {}).get("description", "")
+        macro_ctx.append({"macro": macro, "description": desc,
+                          "span_actions": _span_actions(task, traj, macro)})
+
+    slots_for_llm = [{"id": s["id"], "macro": s["macro"],
+                      "check": s["check_type"], "param": s["param"], "fixed": s["fixed"],
+                      "label": s.get("label", ""), "context": s.get("group_labels", [])}
+                     for s in draft["slots"]]
+
+    from evaluation.trajectory import synthesize_network_events
+    reduced = mt.reduce_trajectory_for_llm(synthesize_network_events(traj))
+
+    system_prompt = (
+        "You fill in the OPEN variables of pre-written verifier templates for a web task.\n"
+        "A human authored one template per macro (the check structure is fixed); your ONLY job\n"
+        "is to supply concrete values for the variables they left open, read off the recorded\n"
+        "trajectory. Do NOT invent checks, change structure, or fill a value the trajectory does\n"
+        "not support.\n\n"
+        "Each slot names its macro, the check type, the param to fill, the FIXED sibling\n"
+        "params, and — when the author wrote them — a `label` (what this check asserts) and\n"
+        "`context` (names of the enclosing logical groups). Use those labels as the intent:\n"
+        "they tell you what value the author meant this slot to capture.\n"
+        "Guidance by param:\n"
+        "  target  -> the human-readable component the action hit (from that macro's span action's `target`)\n"
+        "  value   -> the value entered/selected (the span action's value/text/option_text)\n"
+        "  url     -> the request path or page URL involved (from network events or observations)\n"
+        "  method  -> the HTTP method of the mutating request\n"
+        "  status  -> the response status code of that request\n"
+        "  body_fields -> an object of the key payload fields that were submitted {field: value}\n"
+        "  expected     -> the answer the task produces (use the task answer, or the value visible\n"
+        "                  on the page the macro ends on). For qa_answer/reasoning_contains this is\n"
+        "                  the value to look for; leave `mode` and `leaf` alone (leaf is auto-set).\n"
+        "  alternatives -> other acceptable surface forms of the expected answer (e.g. a name and\n"
+        "                  its email), as a list; [] if none\n\n"
+        "Return ONLY JSON: {\"fills\": {\"<slot id>\": <value>, ...}}. Use the exact slot ids.\n"
+        "A value may be a string, number, list, or object. Omit a slot only if the trajectory\n"
+        "genuinely has no value for it."
+    )
+    user_prompt = json.dumps({
+        "instruction": task.get("instruction", ""),
+        "answer": task.get("answer"),
+        "macros": macro_ctx,
+        "slots_to_fill": slots_for_llm,
+        "trajectory": reduced,
+    }, ensure_ascii=False, default=str)
+
+    raw = call_llm(user_prompt, system=system_prompt, max_tokens=4000,
+                   temperature=0.2, json_mode=True, model=_VERIFIER_FILL_MODEL)
+    if not raw:
+        return jsonify({"error": f"LLM unavailable ({_VERIFIER_FILL_MODEL})"}), 503
+
+    try:
+        fills = (json.loads(raw) or {}).get("fills", {})
+    except (json.JSONDecodeError, TypeError):
+        return jsonify({"error": "LLM returned malformed JSON", "raw": raw[:2000]}), 502
+
+    # map slot id -> (macro, path, param), then fill each macro's tree
+    by_id = {s["id"]: s for s in draft["slots"]}
+    per_macro_fills = {}
+    for sid, value in (fills or {}).items():
+        s = by_id.get(sid)
+        if not s:
+            continue
+        per_macro_fills.setdefault(s["macro"], []).append(
+            {"path": s["path"], "param": s["param"], "value": value})
+
+    filled = {}
+    for macro, tree in draft["templates"].items():
+        filled[macro] = mt.fill_open(tree, per_macro_fills.get(macro, []))
+    mt.inject_qa_leaf(filled, task)   # resolve qa_answer's leaf/chained per this task
+
+    return jsonify({
+        "templates": filled,
+        "missing": draft["missing"],
+        "slots": draft["slots"],
+        "filled_count": len(fills or {}),
+        "slot_count": len(draft["slots"]),
+        "model": _VERIFIER_FILL_MODEL,
+    })
+
+
+def _load_test_trajectory(annotator, task_id, which):
+    """Return (trajectory, answer, note) for the requested test source.
+
+    Network events the recorder missed (GET navigations; POSTs dropped by the
+    old walk collector) are reconstructed from the actions before verifying."""
+    from annotation.storage import ANNOTATIONS_DIR
+    from evaluation.trajectory import synthesize_network_events
+    tdir = ANNOTATIONS_DIR / annotator / task_id
+
+    if which == "walk":
+        wf = tdir / "verification_walk.json"
+        if not wf.exists():
+            return None, "", "no verification walk recorded for this task"
+        d = json.loads(wf.read_text())
+        return synthesize_network_events(d.get("trajectory", [])), d.get("answer", ""), "verification walk"
+    if which == "agent":
+        from pathlib import Path
+        from evaluation.trajectory import extract_final_reasoning
+        rd = Path("evaluation/results") / f"recorded_{task_id}"
+        ar = rd / "trajectory.json"
+        if not ar.exists():
+            return None, "", "no agent run recorded for this task"
+        traj = synthesize_network_events(json.loads(ar.read_text()))
+        reasoning = extract_final_reasoning(rd)
+        if reasoning:
+            traj = traj + [{"type": "reasoning", "text": reasoning}]
+        # the agent's answer is its final_result (for answer_matches, if used)
+        answer = ""
+        rp = rd / "result.json"
+        if rp.exists():
+            answer = (json.loads(rp.read_text()) or {}).get("final_result", "") or ""
+        return traj, answer, "agent attempt"
+    # default: gold human trajectory
+    tf = tdir / "trajectory.json"
+    task = json.loads((tdir / "task.json").read_text()) if (tdir / "task.json").exists() else {}
+    traj = json.loads(tf.read_text()) if tf.exists() else []
+    return synthesize_network_events(traj), task.get("answer", ""), "gold (human)"
+
+
+@annotation_bp.route("/api/run_task_verifier", methods=["POST"])
+def api_run_task_verifier():
+    """Sandbox: run a task verifier spec against a chosen trajectory.
+
+    Body: {task_id, annotator, which: gold|walk|agent, macros?}. If `macros` is
+    omitted the saved verifier.json is used. Returns the per-macro report.
+    """
+    from evaluation.verifiers import verify_task
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    annotator = data.get("annotator") or "anonymous"
+    which = data.get("which") or "gold"
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+
+    macros = data.get("macros")
+    if macros is None:
+        from annotation.storage import ANNOTATIONS_DIR
+        vf = ANNOTATIONS_DIR / annotator / task_id / "verifier.json"
+        if vf.exists():
+            macros = json.loads(vf.read_text()).get("macros", {})
+        else:
+            macros = {}
+    if not macros:
+        return jsonify({"error": "no verifier spec — suggest or save one first"}), 400
+
+    traj, answer, note = _load_test_trajectory(annotator, task_id, which)
+    if traj is None:
+        return jsonify({"error": note, "which": which}), 404
+
+    # resolve qa_answer leaf/chained from the task graph before running
+    from annotation.storage import ANNOTATIONS_DIR
+    from annotation import macro_templates as mt
+    tjson = ANNOTATIONS_DIR / annotator / task_id / "task.json"
+    if tjson.exists():
+        mt.inject_qa_leaf(macros, json.loads(tjson.read_text()))
+
+    report = verify_task({"task_id": task_id, "macros": macros}, traj, answer)
+    report["which"] = which
+    report["source"] = note
+    report["action_count"] = sum(1 for e in traj if e.get("type") == "action")
+    return jsonify(report)
+
+
+@annotation_bp.route("/api/task_verifier/<annotator>/<task_id>", methods=["GET", "POST"])
+def api_task_verifier(annotator, task_id):
+    """Load/save a task's filled verifier spec (verifier.json next to the task)."""
+    from annotation.storage import ANNOTATIONS_DIR
+    vf = ANNOTATIONS_DIR / annotator / task_id / "verifier.json"
+    if request.method == "GET":
+        if vf.exists():
+            return jsonify(json.loads(vf.read_text()))
+        return jsonify({"task_id": task_id, "macros": {}})
+    data = request.get_json(silent=True) or {}
+    spec = {"task_id": task_id,
+            "macros": data.get("macros", {}),
+            "model": data.get("model")}
+    vf.parent.mkdir(parents=True, exist_ok=True)
+    vf.write_text(json.dumps(spec, indent=2, default=str))
+    return jsonify({"status": "ok"})
+
+
 # --- API ---
 
 @annotation_bp.route("/api/tasks", methods=["GET"])
@@ -1844,18 +2251,45 @@ def api_make_ambiguous():
     if not instruction:
         return jsonify({"error": "No instruction provided"}), 400
 
+    # Rewrite VOICE ONLY. The task already has a recorded trajectory and an
+    # expected outcome, so the rewrite must not change what the agent has to do:
+    # every name, id, amount and date stays. What changes is how the request
+    # sounds — a colleague asking a favour (the house style, modelled on the
+    # dataset's strongest instructions) instead of a spec that walks the agent
+    # through the UI.
     system_prompt = (
-        "You are rewriting a web task instruction to make it more ambiguous and natural.\n\n"
-        "Rules:\n"
-        "- Remove explicit navigation steps ('go to X page', 'click on Y')\n"
-        "- Remove site names and UI element names where possible\n"
-        "- Keep the GOAL the same but describe it like a busy person would\n"
-        "- Use casual, short phrasing — how someone would ask a coworker\n"
-        "- Keep specific values (dollar amounts, names, IDs, dates) — those are the task parameters\n"
-        "- Remove polite filler ('Can you...', 'I need you to...', 'Could you please...')\n"
-        "- Make it 1-2 sentences max\n"
-        "- The agent should have to figure out WHERE and HOW, not just WHAT\n\n"
-        "Output ONLY the rewritten instruction, nothing else."
+        "You rephrase a web-task instruction so it sounds like a real person asking "
+        "a colleague for a favour, instead of a spec.\n\n"
+
+        "DIFFICULTY MUST NOT CHANGE. The task already has a recorded trajectory and "
+        "a verifier — the agent must end up doing exactly the same work.\n"
+        "- KEEP every specific: names, emails, IDs, amounts, dates, filenames, "
+        "credentials, text to type, the sort order, the filter values.\n"
+        "- Do NOT replace a name with a description ('Priya Sharma' must NOT become "
+        "'the person who ran the deploy') — that adds a lookup the original task "
+        "never asked for.\n"
+        "- Do NOT add or remove any step.\n"
+        "- If the instruction names a required mechanism ('using the slider'), keep it: "
+        "the verifier checks it.\n\n"
+
+        "WHAT YOU MAY CHANGE — only the wording:\n"
+        "- Drop UI hand-holding: 'go to the History page', 'click the Filter button', "
+        "'open the dropdown'. Say what is wanted, not which widget to press.\n"
+        "- Make it conversational: how someone would actually ask. A short reason for "
+        "the request is welcome if it does not add work.\n"
+        "- 1-3 sentences.\n\n"
+
+        "The house style (real examples):\n"
+        "  'Hey, what course is Dr. Balazinska teaching? Can you give me the official "
+        "course name?'\n"
+        "  \"Let's start to file a new claim - can you select auto for the policy?\"\n"
+        "  'I want to talk with the person running the Architecture Sync before-hand to "
+        "ask them some questions. Can you make a new calendar event, then invite whoever "
+        "owns that meeting for 30 minutes before that meeting starts.'\n"
+        "  (note: the last one keeps its own indirection because the ORIGINAL task was "
+        "written that way — do not invent indirection that was not there.)\n\n"
+
+        "Output ONLY the rephrased instruction, nothing else."
     )
 
     result = _call_llm(system_prompt, instruction)
@@ -2310,6 +2744,130 @@ def api_load_verifiers():
         agent_answer=data.get("expected_answer", ""),
     )
     return jsonify({"configs": configs, "results": results, "passed": passed, "ready": True})
+
+
+# ---------------------------------------------------------------------------
+# Verification walk — the annotator walks the task a SECOND time in the verify
+# panel, producing an independent trajectory of the same task.
+#
+# Two trajectories are worth more than one: whatever appears in both is
+# load-bearing (the checks a verifier should assert), whatever appears in only
+# one is incidental (a stray scroll, a fumbled field, a different route to the
+# same page). A second walk that cannot reproduce the outcome also means the
+# task is broken against current data — which is how silent drift gets caught.
+# ---------------------------------------------------------------------------
+
+def _load_saved_task(annotator, task_id):
+    """Load (dir, task.json, trajectory.json) for a task; searches all annotators."""
+    from annotation.storage import ANNOTATIONS_DIR
+    pattern = f"{annotator}/{task_id}" if annotator else f"*/{task_id}"
+    for d in ANNOTATIONS_DIR.glob(pattern):
+        task = json.loads((d / "task.json").read_text())
+        tf = d / "trajectory.json"
+        traj = json.loads(tf.read_text()) if tf.exists() else []
+        return d, task, traj
+    return None, None, []
+
+
+def _action_key(a):
+    """Identity of an action for cross-walk comparison.
+
+    Uses verb + semantic target + value. Deliberately NOT the selector:
+    recorded selectors are often bare tags ("a", "select") with no
+    discriminating power, while `target` carries the readable description.
+    """
+    val = a.get("value") or a.get("text") or a.get("option_text") or ""
+    target = (a.get("target") or "").strip().lower()
+    return (a.get("action", ""), target, str(val).strip().lower())
+
+
+@annotation_bp.route("/api/verification_walk", methods=["POST"])
+def api_verification_walk():
+    """Save a second walk of a task and compare it to the original.
+
+    Body: {task_id, annotator?, trajectory: [...], answer?}
+    Writes verification_walk.json next to the task and returns the comparison.
+    """
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+
+    d, task, original = _load_saved_task(data.get("annotator"), task_id)
+    if task is None:
+        return jsonify({"error": "task not found"}), 404
+
+    walk = data.get("trajectory") or []
+    walk_actions = [e for e in walk if e.get("type") == "action"]
+    orig_actions = [e for e in original if e.get("type") == "action"]
+
+    orig_keys = [_action_key(a) for a in orig_actions]
+    walk_keys = [_action_key(a) for a in walk_actions]
+    orig_set, walk_set = set(orig_keys), set(walk_keys)
+
+    common = [k for k in orig_keys if k in walk_set]
+    seen = set()
+    common = [k for k in common if not (k in seen or seen.add(k))]
+
+    payload = {
+        "task_id": task_id,
+        "answer": data.get("answer", ""),
+        "recorded_at": datetime.now().isoformat(),
+        "trajectory": walk,
+    }
+    (d / "verification_walk.json").write_text(json.dumps(payload, indent=1))
+
+    def fmt(keys):
+        return [{"action": k[0], "target": k[1][:60], "value": k[2][:30]} for k in keys]
+
+    return jsonify({
+        "task_id": task_id,
+        "original_actions": len(orig_actions),
+        "walk_actions": len(walk_actions),
+        # in BOTH walks -> essential; a verifier should assert these
+        "in_both": fmt(common),
+        # in one walk only -> incidental; asserting these would fail a valid path
+        "original_only": fmt([k for k in dict.fromkeys(orig_keys) if k not in walk_set]),
+        "walk_only": fmt([k for k in dict.fromkeys(walk_keys) if k not in orig_set]),
+        "answer_original": task.get("expected_answer", ""),
+        "answer_walk": data.get("answer", ""),
+        "answers_agree": _norm_answer(task.get("expected_answer", "")) ==
+                         _norm_answer(data.get("answer", "")) if data.get("answer") else None,
+    })
+
+
+def _norm_answer(s):
+    import re as _re
+    s = str(s or "").lower()
+    return " ".join(_re.sub(r"[^a-z0-9\s.]+", " ", s).split())
+
+
+@annotation_bp.route("/api/task_status", methods=["POST"])
+def api_task_status():
+    """Approve or reject a task after review.
+
+    Body: {task_id, annotator?, status: "approved"|"rejected", note?}
+    Records the decision on task.json — rejected tasks stay on disk (the
+    recording is still evidence) but are excluded from eval task loading.
+    """
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("task_id")
+    status = data.get("status")
+    if status not in ("approved", "rejected", "pending"):
+        return jsonify({"error": "status must be approved, rejected or pending"}), 400
+
+    d, task, _ = _load_saved_task(data.get("annotator"), task_id)
+    if task is None:
+        return jsonify({"error": "task not found"}), 404
+
+    task["review"] = {
+        "status": status,
+        "note": data.get("note", ""),
+        "reviewer": session.get("annotator_name", "anonymous"),
+        "reviewed_at": datetime.now().isoformat(),
+    }
+    (d / "task.json").write_text(json.dumps(task, indent=2, default=str))
+    return jsonify({"task_id": task_id, "review": task["review"]})
 
 
 @annotation_bp.route("/api/run_verifiers", methods=["POST"])

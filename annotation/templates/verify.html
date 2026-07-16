@@ -44,6 +44,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
     <h1>Verifier Builder</h1>
     <a href="/annotate/">← Annotator</a>
     <a href="/annotate/review">Review</a>
+    <a href="/annotate/macro-templates">Macro Templates</a>
     <span style="flex:1"></span>
     <span style="font-size:.75rem;color:#94a3b8">{{ tasks|length }} tasks available</span>
 </div>
@@ -75,20 +76,20 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         <!-- Task info -->
         <div class="section">
             <h3>{{ task.task_id }}</h3>
-            <label>Instruction (original)</label>
+            <label>Original instruction</label>
             <div style="font-size:.85rem;line-height:1.4;margin-bottom:.4rem">{{ task.instruction }}</div>
 
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
-                <label style="margin:0">Instruction (ambiguous) <span style="font-weight:400;text-transform:none;color:#94a3b8">— shorter, less hand-holdy</span></label>
+                <label style="margin:0">Instruction (refined, natural, realistic) <span style="font-weight:400;text-transform:none;color:#94a3b8">— same task, phrased like a real request</span></label>
                 <button onclick="generateAmbiguous()" id="ambig-btn"
                     style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
                     Suggest with AI
                 </button>
                 <span id="ambig-status" style="font-size:.65rem;color:#94a3b8"></span>
             </div>
-            <textarea id="instruction-ambiguous" rows="2"
+            <textarea id="instruction-ambiguous" rows="4"
                 style="width:100%;font-size:.85rem;padding:.4rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;margin-bottom:.5rem;font-family:inherit"
-                placeholder="Write a more ambiguous version of the instruction..."
+                placeholder="Rephrase the instruction as a natural request..."
                 onchange="saveAmbiguous('{{ task.task_id }}', '{{ task.annotator|default('anonymous') }}', this.value)"
             >{{ task.instruction_ambiguous or '' }}</textarea>
 
@@ -121,6 +122,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 <span id="playback-counter" style="font-size:.8rem;color:#64748b;min-width:80px;text-align:center">0 / 0</span>
                 <button onclick="playbackStep(1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">Next &rarr;</button>
                 <button onclick="playbackAuto()" id="playback-auto-btn" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&#9654; Play</button>
+                <span id="playback-source" style="font-size:.72rem;margin-left:auto"></span>
             </div>
             <div style="display:flex;gap:.75rem;height:400px">
                 <iframe id="playback-iframe" style="flex:2;border:1px solid #e2e8f0;border-radius:.3rem" src="about:blank"></iframe>
@@ -137,6 +139,55 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                     {% endif %}
                     {% endfor %}
                 </div>
+            </div>
+        </div>
+
+        <!-- Verification Walk: record the task a SECOND time -->
+        <div class="section">
+            <h3>Verification Walk
+                <span id="vw-status-badge" class="badge" style="background:#e2e8f0;color:#475569">
+                    {{ task.review.status|upper if task.get('review') else 'NOT REVIEWED' }}
+                </span>
+            </h3>
+            <div style="font-size:.78rem;color:#64748b;margin-bottom:.5rem">
+                Walk the task again on a <strong>fresh session</strong>. Actions that appear in
+                <em>both</em> walks are the essential ones a verifier should assert; actions in only
+                one are incidental. If the second walk can't reproduce the outcome, the task is
+                broken against current data.
+            </div>
+
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
+                <button id="vw-start" onclick="vwStart()"
+                        style="padding:.35rem .9rem;border:none;border-radius:.3rem;background:#2563eb;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    Reset &amp; Start Walk
+                </button>
+                <button id="vw-stop" onclick="vwStop()" disabled
+                        style="padding:.35rem .9rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">
+                    Stop &amp; Compare
+                </button>
+                <input id="vw-answer" placeholder="Answer from this walk (for QA tasks)"
+                       style="flex:1;min-width:200px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem">
+                <span id="vw-count" style="font-size:.75rem;color:#94a3b8"></span>
+            </div>
+
+            <iframe id="vw-iframe" src="about:blank"
+                    style="width:100%;height:420px;border:1px solid #e2e8f0;border-radius:.3rem;display:none"></iframe>
+
+            <div id="vw-compare" style="display:none;margin-top:.6rem"></div>
+
+            <!-- Approve / reject -->
+            <div style="display:flex;gap:.5rem;align-items:center;margin-top:.8rem;padding-top:.6rem;border-top:1px solid #e2e8f0;flex-wrap:wrap">
+                <input id="vw-note" placeholder="Review note (optional)"
+                       style="flex:1;min-width:220px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem">
+                <button onclick="vwReview('approved')"
+                        style="padding:.35rem 1.1rem;border:none;border-radius:.3rem;background:#16a34a;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    &#10003; Approve
+                </button>
+                <button onclick="vwReview('rejected')"
+                        style="padding:.35rem 1.1rem;border:none;border-radius:.3rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    &#10007; Reject
+                </button>
+                <span id="vw-review-msg" style="font-size:.75rem;color:#64748b"></span>
             </div>
         </div>
 
@@ -197,8 +248,34 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 
         <!-- Verifier builder -->
         <div class="section">
-            <h3>Verifier Builder <span class="badge badge-pending">Coming Soon</span></h3>
-            <p class="hint">Drag-and-drop verification checks will be wired here. For now, review the trajectory and macros above.</p>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <h3 style="margin:0">Verifier Builder</h3>
+                <button onclick="suggestTaskVerifier()" id="tv-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest with AI
+                </button>
+                <button onclick="saveTaskVerifier()" id="tv-save" class="btn btn-primary" style="padding:.2rem .6rem;font-size:.72rem;display:none">Save</button>
+                <span id="tv-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            <p class="hint">Fills each macro's <a href="/annotate/macro-templates" style="color:#2563eb">template</a> open fields from this trajectory (gemini-3.5-flash). Edit before saving.</p>
+            <div id="tv-missing" style="font-size:.72rem;color:#b45309;margin-bottom:.4rem"></div>
+            <div id="tv-result"></div>
+
+            <!-- Sandbox -->
+            <div id="tv-sandbox" style="display:none;margin-top:.6rem;padding-top:.6rem;border-top:1px dashed #e2e8f0">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                    <label style="margin:0">Test against</label>
+                    <select id="tv-which" class="param-input" style="width:auto;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.76rem">
+                        <option value="gold">Gold (human)</option>
+                        <option value="walk">Verification walk</option>
+                        <option value="agent">Agent attempt</option>
+                    </select>
+                    <button onclick="runTaskVerifier()" id="tv-run" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run</button>
+                    <button onclick="runBoth()" id="tv-runboth" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run Gold + Walk</button>
+                    <span id="tv-run-msg" style="font-size:.7rem;color:#94a3b8"></span>
+                </div>
+                <div id="tv-run-result" style="margin-top:.5rem"></div>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -249,14 +326,29 @@ function playbackGo(idx) {
     var obs = step.observation;
     var action = step.action;
 
+    // What the frame is showing is stated explicitly. Playback used to switch
+    // silently between a screenshot and a re-rendered HTML snapshot depending
+    // on what a task happened to have, which made two tasks look like two
+    // different tools. Now the source is always labelled.
+    var srcLabel = document.getElementById('playback-source');
+    function setLabel(text, color) {
+        if (srcLabel) { srcLabel.textContent = text; srcLabel.style.color = color; }
+    }
+
     if (obs && obs.screenshot) {
         // Show screenshot image
         var taskId = {{ task.task_id | tojson if task else '""' }};
         var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
         var imgUrl = '/annotate/api/screenshot/' + annotator + '/' + taskId + '/' + obs.screenshot;
         iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;display:flex;align-items:center;justify-content:center;height:100vh"><img src="' + imgUrl + '" style="max-width:100%;max-height:100%;object-fit:contain"></body></html>';
+        var derived = obs.backfill_method || (obs.backfilled ? 'derived' : '');
+        setLabel(derived ? ('screenshot (' + derived + ')') : 'screenshot (recorded)',
+                 derived ? '#b45309' : '#16a34a');
     } else if (obs && obs.snapshot) {
         iframe.srcdoc = obs.snapshot;
+        setLabel(obs.form_state_repaired
+                 ? 'live HTML snapshot (form state repaired) — no screenshot'
+                 : 'live HTML snapshot — no screenshot for this step', '#b45309');
         if (action.selector) {
             setTimeout(function() {
                 try {
@@ -323,6 +415,8 @@ function generateAmbiguous() {
         btn.textContent = 'Suggest with AI';
         if (d.ambiguous) {
             textarea.value = d.ambiguous;
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
             textarea.style.borderColor = '#86efac';
             status.textContent = 'AI suggestion loaded — edit and save';
             setTimeout(function() { textarea.style.borderColor = '#cbd5e1'; }, 2000);
@@ -419,6 +513,264 @@ function saveAmbiguous(taskId, annotator, value) {
             setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500);
         }
     });
+}
+
+// ── Verification Walk ──────────────────────────────────────────────────────
+// The annotator re-walks the task in the iframe below. recorder.js is injected
+// into every /sites/* page and posts its action+observation stream to the
+// parent window — the same channel the annotation workspace uses — so this
+// panel captures a second, independent trajectory of the same task.
+
+var vwTaskId    = {{ task.task_id | tojson if task else '""' }};
+var vwAnnotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+var vwStartUrl  = {{ (task.starting_url or '') | tojson if task else '""' }};
+var vwSites     = {{ (task.sites or []) | tojson if task else '[]' }};
+var vwTrajectory = [];
+var vwRecording = false;
+
+function vwSiteId() {
+    if (vwSites.length) return (typeof vwSites[0] === 'string') ? vwSites[0] : vwSites[0].id;
+    return '';
+}
+
+function vwStart() {
+    // Fresh session: revert the site data mutated by the first walk (or by
+    // exploration) so this is a genuine independent attempt.
+    fetch('/_reset_data', {method: 'POST'}).then(function() {
+        vwTrajectory = [];
+        vwRecording = true;
+        var url = vwStartUrl || ('/sites/' + vwSiteId() + '/');
+        var iframe = document.getElementById('vw-iframe');
+        iframe.src = url;
+        iframe.style.display = 'block';
+        document.getElementById('vw-start').disabled = true;
+        document.getElementById('vw-stop').disabled = false;
+        document.getElementById('vw-compare').style.display = 'none';
+        vwUpdateCount();
+    });
+}
+
+window.addEventListener('message', function(e) {
+    if (!vwRecording) return;
+    var d = e.data;
+    if (!d || (d.mw !== 'action' && d.mw !== 'observation' && d.mw !== 'network')) return;
+    var rec = {};
+    for (var k in d) { if (k !== 'mw') rec[k] = d[k]; }
+    rec.type = d.mw;
+    vwTrajectory.push(rec);
+    vwUpdateCount();
+});
+
+function vwUpdateCount() {
+    var acts = vwTrajectory.filter(function(e) { return e.type === 'action'; }).length;
+    document.getElementById('vw-count').textContent =
+        vwRecording ? (acts + ' actions recorded') : '';
+}
+
+function vwStop() {
+    vwRecording = false;
+    document.getElementById('vw-start').disabled = false;
+    document.getElementById('vw-stop').disabled = true;
+
+    fetch('/annotate/api/verification_walk', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            task_id: vwTaskId,
+            annotator: vwAnnotator,
+            trajectory: vwTrajectory,
+            answer: document.getElementById('vw-answer').value.trim(),
+        }),
+    }).then(function(r) { return r.json(); }).then(vwRenderCompare);
+}
+
+function vwRenderCompare(d) {
+    if (d.error) { alert('Error: ' + d.error); return; }
+
+    function list(title, items, color, hint) {
+        var rows = items.length
+            ? items.map(function(a) {
+                  return '<div style="padding:.2rem .4rem;font-size:.75rem;border-bottom:1px solid #f1f5f9">'
+                       + '<strong>' + a.action + '</strong> '
+                       + '<span style="color:#64748b">' + (a.target || '') + '</span>'
+                       + (a.value ? ' <em style="color:#0f766e">"' + a.value + '"</em>' : '')
+                       + '</div>'; }).join('')
+            : '<div style="padding:.4rem;font-size:.75rem;color:#94a3b8">(none)</div>';
+        return '<div style="flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:.3rem;overflow:hidden">'
+             + '<div style="padding:.3rem .5rem;background:' + color + ';font-size:.72rem;font-weight:600">'
+             + title + ' (' + items.length + ')</div>'
+             + '<div style="font-size:.7rem;color:#94a3b8;padding:.2rem .5rem;background:#fafafa">' + hint + '</div>'
+             + rows + '</div>';
+    }
+
+    var answerLine = '';
+    if (d.answer_walk) {
+        var agree = d.answers_agree;
+        answerLine = '<div style="margin-bottom:.5rem;padding:.4rem .6rem;border-radius:.3rem;font-size:.78rem;'
+            + 'background:' + (agree ? '#dcfce7' : '#fee2e2') + '">'
+            + (agree ? '&#10003; Answer reproduced: ' : '&#10007; ANSWER DIFFERS — original: ')
+            + '<code>' + (d.answer_original || '(none)') + '</code>'
+            + (agree ? '' : ' &nbsp;vs this walk: <code>' + d.answer_walk + '</code> — the task may be broken against current data')
+            + '</div>';
+    }
+
+    document.getElementById('vw-compare').innerHTML =
+        answerLine
+        + '<div style="font-size:.78rem;color:#475569;margin-bottom:.4rem">'
+        + 'Original walk: <strong>' + d.original_actions + '</strong> actions &nbsp;·&nbsp; '
+        + 'This walk: <strong>' + d.walk_actions + '</strong> actions</div>'
+        + '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'
+        + list('In BOTH walks', d.in_both, '#dcfce7', 'essential — assert these')
+        + list('Original only', d.original_only, '#fef3c7', 'incidental — do not assert')
+        + list('This walk only', d.walk_only, '#fef3c7', 'incidental — do not assert')
+        + '</div>';
+    document.getElementById('vw-compare').style.display = 'block';
+}
+
+function vwReview(status) {
+    fetch('/annotate/api/task_status', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            task_id: vwTaskId, annotator: vwAnnotator, status: status,
+            note: document.getElementById('vw-note').value.trim(),
+        }),
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        var badge = document.getElementById('vw-status-badge');
+        badge.textContent = status.toUpperCase();
+        badge.style.background = status === 'approved' ? '#16a34a' : '#dc2626';
+        badge.style.color = '#fff';
+        document.getElementById('vw-review-msg').textContent =
+            'Saved by ' + d.review.reviewer;
+    });
+}
+
+// --- Task Verifier Builder (fill macro templates from this trajectory) ---
+var TV_TASK = {{ task.task_id | tojson if task else '""' }};
+var TV_ANN  = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+var TV_MACROS = {};   // macro -> filled tree (editable model)
+
+function suggestTaskVerifier() {
+    var btn = document.getElementById('tv-btn');
+    var status = document.getElementById('tv-status');
+    btn.disabled = true; btn.textContent = 'Filling…'; status.textContent = '';
+    fetch('/annotate/api/suggest_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        btn.disabled = false; btn.textContent = 'Suggest with AI';
+        if (d.error && !(d.templates && Object.keys(d.templates).length)) {
+            status.textContent = d.error;
+        } else {
+            status.textContent = (d.filled_count||0) + '/' + (d.slot_count||0) + ' fields filled · ' + (d.model||'');
+        }
+        var miss = document.getElementById('tv-missing');
+        miss.innerHTML = (d.missing && d.missing.length)
+            ? '⚠ no template yet for: ' + d.missing.map(function(m){return '<code>'+m+'</code>';}).join(', ')
+              + ' — <a href="/annotate/macro-templates" style="color:#2563eb">author them</a>'
+            : '';
+        TV_MACROS = d.templates || {};
+        renderTaskVerifier();
+        document.getElementById('tv-save').style.display =
+            Object.keys(TV_MACROS).length ? '' : 'none';
+    }).catch(function(e){
+        btn.disabled = false; btn.textContent = 'Suggest with AI';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+function renderTaskVerifier() {
+    var el = document.getElementById('tv-result');
+    el.innerHTML = '';
+    Object.keys(TV_MACROS).forEach(function(macro){
+        var box = document.createElement('div');
+        box.style.cssText = 'border:1px solid #e2e8f0;border-radius:.35rem;padding:.5rem;margin-bottom:.4rem;background:#f8fafc';
+        var ta = document.createElement('textarea');
+        ta.style.cssText = 'width:100%;font-family:monospace;font-size:.72rem;border:1px solid #cbd5e1;border-radius:.25rem;padding:.4rem;min-height:120px';
+        ta.value = JSON.stringify(TV_MACROS[macro], null, 2);
+        ta.onchange = function(){
+            try { TV_MACROS[macro] = JSON.parse(ta.value); ta.style.borderColor='#86efac'; }
+            catch(e){ ta.style.borderColor='#ef4444'; }
+        };
+        box.innerHTML = '<div style="font-family:monospace;font-weight:600;font-size:.76rem;color:#2563eb;margin-bottom:.3rem">'+macro+'</div>';
+        box.appendChild(ta);
+        el.appendChild(box);
+    });
+    document.getElementById('tv-sandbox').style.display =
+        Object.keys(TV_MACROS).length ? '' : 'none';
+}
+
+function saveTaskVerifier() {
+    var status = document.getElementById('tv-status');
+    status.textContent = 'saving…';
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({macros: TV_MACROS, model: 'gemini-3.5-flash'})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        status.textContent = d.error ? ('error: '+d.error) : 'saved ✓';
+    });
+}
+
+// --- Sandbox: run the current spec against a trajectory ---
+function runTaskVerifier(which, container) {
+    which = which || document.getElementById('tv-which').value;
+    var msg = document.getElementById('tv-run-msg');
+    if (!container) { document.getElementById('tv-run-result').innerHTML = ''; }
+    msg.textContent = 'running ' + which + '…';
+    return fetch('/annotate/api/run_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN, which: which, macros: TV_MACROS})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        msg.textContent = '';
+        renderRunResult(d, which, container);
+        return d;
+    });
+}
+function runBoth() {
+    document.getElementById('tv-run-result').innerHTML = '';
+    var box = document.getElementById('tv-run-result');
+    var g = document.createElement('div'), w = document.createElement('div');
+    box.appendChild(g); box.appendChild(w);
+    runTaskVerifier('gold', g); runTaskVerifier('walk', w);
+}
+function renderRunResult(d, which, container) {
+    var el = container || document.getElementById('tv-run-result');
+    if (d.error) { el.innerHTML = '<div style="font-size:.74rem;color:#b45309">'+which+': '+d.error+'</div>'; return; }
+    var head = '<div style="display:flex;align-items:center;gap:.4rem;margin:.3rem 0">'+
+        '<span class="badge '+(d.passed?'badge-pass':'badge-fail')+'">'+(d.passed?'PASS':'FAIL')+'</span>'+
+        '<b style="font-size:.78rem">'+d.source+'</b>'+
+        '<span style="font-size:.68rem;color:#94a3b8">'+d.action_count+' actions</span></div>';
+    var rows = '';
+    Object.keys(d.macros||{}).forEach(function(macro){
+        var res = d.macros[macro];
+        rows += '<div style="margin:.2rem 0"><span class="badge '+(res.passed?'badge-pass':'badge-fail')+'">'+(res.passed?'✓':'✗')+'</span> '+
+                '<span style="font-family:monospace;font-size:.74rem">'+macro+'</span>';
+        rows += renderNode(res);
+        rows += '</div>';
+    });
+    el.innerHTML = head + rows;
+}
+function renderNode(node) {
+    if (node.op) {
+        var glab = node.label ? ' <b style="color:#475569">'+node.label+'</b>' : '';
+        var inner = (node.checks||[]).map(renderNode).join('');
+        return '<div style="margin-left:1rem;font-size:.7rem;color:#94a3b8">'+node.op+' ('+(node.passed?'pass':'fail')+')'+glab+inner+'</div>';
+    }
+    var c = node.passed ? '#166534' : '#991b1b';
+    var lab = node.label ? '<b>'+node.label+'</b> <span style="color:#94a3b8">('+node.type+')</span>' : node.type;
+    return '<div style="margin-left:1.2rem;font-size:.72rem;color:'+c+'">'+
+           (node.passed?'✓':'✗')+' '+lab+' <span style="color:#94a3b8">— '+(node.reason||'')+'</span></div>';
+}
+
+// load any previously saved verifier for this task
+if (TV_TASK) {
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK))
+        .then(function(r){ return r.json(); }).then(function(d){
+            if (d.macros && Object.keys(d.macros).length) {
+                TV_MACROS = d.macros; renderTaskVerifier();
+                document.getElementById('tv-save').style.display = '';
+                document.getElementById('tv-status').textContent = 'loaded saved verifier';
+            }
+        });
 }
 </script>
 </body>

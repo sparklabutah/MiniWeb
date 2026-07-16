@@ -113,7 +113,7 @@ class Capturer:
         self._browser.close()
         self._pw.stop()
 
-    def render_stored_html(self, html, url):
+    def render_stored_html(self, html, url, dropdown=None):
         """Render stored HTML at its original URL (so relative assets load)."""
         page = self.static_page
         target = self.base_url + url if url and url.startswith("/") else None
@@ -132,19 +132,120 @@ class Capturer:
             page.goto(target, wait_until="load", timeout=15000)
         else:
             page.set_content(html, wait_until="load", timeout=15000)
-        return self._capture(page, html_already=html)
+        return self._capture(page, html_already=html, dropdown=dropdown)
 
-    def capture_live(self, url):
+    def capture_live(self, url, dropdown=None):
         page = self.live_page
         page.goto(self.base_url + url, wait_until="load", timeout=15000)
         page.wait_for_timeout(300)
-        return self._capture(page)
+        return self._capture(page, dropdown=dropdown)
 
-    def _capture(self, page, html_already=None):
+    def _capture(self, page, html_already=None, dropdown=None):
         html = html_already if html_already is not None else page.content()
         axtree = page.locator("body").aria_snapshot()
-        shot = page.screenshot(full_page=False)
+        if dropdown:
+            _draw_open_dropdown(page, dropdown)
+        # full_page: the viewport is 1280x720 but pages are taller, so a
+        # viewport shot silently cropped whatever the annotator scrolled to.
+        shot = page.screenshot(full_page=True)
         return html, axtree, shot
+
+
+# --- synthesized dropdown -------------------------------------------------
+#
+# A native <select> popup is drawn by the OS, not the page, so it appears in NO
+# page screenshot — real or derived. The option list, however, is right there in
+# the DOM. For a `select` action we draw the list ourselves: an overlay anchored
+# under the control with the chosen option highlighted, so playback shows what
+# the annotator was looking at when they picked it.
+#
+# This is a RECONSTRUCTION, not a capture. Observations rendered this way are
+# flagged `dropdown_synthesized: true`.
+
+_DROPDOWN_JS = """
+(sel) => {
+  const el = document.querySelector(sel.selector);
+  if (!el || el.tagName.toLowerCase() !== 'select') return false;
+  const r = el.getBoundingClientRect();
+  const box = document.createElement('div');
+  box.setAttribute('data-synth-dropdown', '1');
+  box.style.cssText = [
+    'position:absolute',
+    'left:' + (r.left + window.scrollX) + 'px',
+    'top:' + (r.bottom + window.scrollY) + 'px',
+    'min-width:' + r.width + 'px',
+    'max-height:320px','overflow:hidden',
+    'background:#fff','border:1px solid #b0b0b0','border-radius:4px',
+    'box-shadow:0 6px 18px rgba(0,0,0,.28)','z-index:2147483647',
+    'font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+    'color:#111',
+  ].join(';');
+  for (const opt of el.options) {
+    const row = document.createElement('div');
+    const chosen = (opt.value === sel.value) ||
+                   (opt.textContent.trim() === (sel.option_text || '').trim());
+    row.textContent = opt.textContent;
+    row.style.cssText = 'padding:5px 12px;white-space:nowrap;' +
+      (chosen ? 'background:#0a64c8;color:#fff;font-weight:600;' : '');
+    box.appendChild(row);
+  }
+  document.body.appendChild(box);
+  return true;
+}
+"""
+
+
+def _draw_open_dropdown(page, dropdown):
+    """Overlay the option list of a <select> so the screenshot shows it open."""
+    try:
+        page.evaluate(_DROPDOWN_JS, dropdown)
+    except Exception:  # noqa: BLE001 — never fail a capture over decoration
+        pass
+
+
+# --- carry-forward reconstruction ------------------------------------------
+#
+# When an observation has no recorded HTML, the old fallback loaded the URL in a
+# FRESH session — which throws away everything the annotator had accumulated:
+# applied filters, half-filled forms, expanded rows, cart contents. For a `type`
+# action that is especially wrong: we would render a pristine page and inject one
+# value into it.
+#
+# Carrying the PREVIOUS observation's HTML forward is strictly more faithful: it
+# is the same page with all that state intact, and the action's own effect can be
+# applied to it (inject the typed text, mark the chosen <option>) with the same
+# code the form-state repair uses.
+#
+# Only safe when the previous observation is on the same page. Actions that
+# change page structure in ways we cannot reproduce (a click that opens a menu,
+# expands a row, or triggers a fetch) fall through to the live-URL path.
+
+CARRY_SAFE_ACTIONS = {"type", "change", "select", "check", "keypress", "scroll"}
+
+
+def _same_page(url_a, url_b):
+    """Same path? (query strings legitimately change within a page's lifetime)"""
+    return (url_a or "").split("?")[0] == (url_b or "").split("?")[0]
+
+
+def _carry_forward(prev_html, action):
+    """Previous page's HTML with this action's effect applied. None if not possible."""
+    from scripts.repair_form_state import _find_input_by_selector, _inject_value
+
+    if action.get("action") not in CARRY_SAFE_ACTIONS:
+        return None
+    value = action.get("text") or action.get("value") or action.get("option_text")
+    if not value:
+        # scroll/keypress with no value: the DOM is unchanged, carry as-is
+        return prev_html if action.get("action") in ("scroll", "keypress") else None
+
+    selector = action.get("selector", "")
+    attr, key = _find_input_by_selector(prev_html, selector)
+    if not attr:
+        return None
+    return _inject_value(prev_html, attr, key, value,
+                         is_select=action.get("action") == "select",
+                         selector=selector)
 
 
 def process_task(task_dir, cap, dry_run=False):
@@ -155,8 +256,10 @@ def process_task(task_dir, cap, dry_run=False):
     shots_dir = task_dir / "screenshots"
     stats = {"task": task_dir.name, "actions": 0, "rendered": 0,
              "created_obs": 0, "filled_axtree": 0, "filled_screenshot": 0,
-             "filled_html": 0, "live_url_fallback": 0, "failures": []}
+             "filled_html": 0, "live_url_fallback": 0, "carried_forward": 0,
+             "failures": []}
     inserts = []  # (position, event) spliced after the loop
+    prev = {"html": "", "url": ""}   # last observation with real HTML
 
     for action_no, action, obs, insert_pos in _pair_events(events):
         stats["actions"] += 1
@@ -176,10 +279,30 @@ def process_task(task_dir, cap, dry_run=False):
             stats["created_obs"] += 1
 
         html = obs.get("snapshot") or ""
+
+        # no recorded HTML? try carrying the previous page forward before
+        # falling back to a fresh page load that would lose all session state
+        if not html and prev["html"] and _same_page(prev["url"], obs.get("url") or action.get("url")):
+            carried = _carry_forward(prev["html"], action)
+            if carried:
+                html = carried
+                obs["snapshot"] = carried
+                obs["snapshot_source"] = "carried_forward"
+                obs["backfilled"] = True
+                # set the method here: `needs_html` below is computed from `html`,
+                # which we just filled, so the method assignment further down
+                # would be skipped and a stale "live_url" label left in place
+                obs["backfill_method"] = "carried_forward"
+                stats["carried_forward"] += 1
+
         ax = obs.get("axtree") or ""
         needs_ax = not _is_yaml_axtree(ax)
         needs_shot = not obs.get("screenshot") or not shot_path.exists()
         needs_html = not html
+
+        # remember the newest real page state for the next carry-forward
+        if html:
+            prev = {"html": html, "url": obs.get("url") or action.get("url") or ""}
 
         if not (needs_ax or needs_shot or needs_html):
             continue
@@ -187,15 +310,29 @@ def process_task(task_dir, cap, dry_run=False):
             stats["rendered"] += 1
             continue
 
+        # When the action was a <select>, draw the option list open in the
+        # screenshot — the native popup is OS-drawn and appears in no capture.
+        dropdown = None
+        if action.get("action") == "select" and action.get("selector"):
+            dropdown = {
+                "selector": action["selector"],
+                "value": str(action.get("value") or ""),
+                "option_text": action.get("option_text") or "",
+            }
+
         try:
             if html:
-                new_html, new_ax, shot = cap.render_stored_html(html, obs.get("url", ""))
-                method = "stored_html"
+                new_html, new_ax, shot = cap.render_stored_html(
+                    html, obs.get("url", ""), dropdown=dropdown)
+                # carried-forward HTML is still HTML we render — but say so
+                method = ("carried_forward"
+                          if obs.get("snapshot_source") == "carried_forward"
+                          else "stored_html")
             else:
                 url = obs.get("url") or action.get("url") or ""
                 if not url:
                     raise ValueError("no URL to capture from")
-                new_html, new_ax, shot = cap.capture_live(url)
+                new_html, new_ax, shot = cap.capture_live(url, dropdown=dropdown)
                 method = "live_url"
                 stats["live_url_fallback"] += 1
         except Exception as e:  # noqa: BLE001 — record and move on
@@ -216,6 +353,10 @@ def process_task(task_dir, cap, dry_run=False):
             shots_dir.mkdir(exist_ok=True)
             shot_path.write_bytes(shot)
             obs["screenshot"] = f"screenshots/{shot_name}"
+            obs["screenshot_full_page"] = True
+            if dropdown:
+                # honest provenance: the open list was drawn, not captured
+                obs["dropdown_synthesized"] = True
             stats["filled_screenshot"] += 1
         stats["rendered"] += 1
 
