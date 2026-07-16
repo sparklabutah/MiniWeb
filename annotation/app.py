@@ -1168,16 +1168,21 @@ def api_suggest_templates_batch():
     from annotation import macro_templates as mt
     data = request.get_json(silent=True) or {}
     limit = int(data.get("limit", 8))
+    exclude = set(data.get("exclude") or [])   # macros already handled this run
 
     existing = mt.load_all()
     confirmed = {m: t for m, t in existing.items() if not mt.is_suggested(t)}
     if not confirmed:
         return jsonify({"error": "author at least one template first — it's the example"}), 400
 
-    # targets: site-mapped macros with NO template yet, skipping navigation
+    # targets: site-mapped macros WITHOUT a confirmed template — this regenerates
+    # existing AI drafts with the latest confirmed examples, and never touches a
+    # human-confirmed template. `exclude` carries the ones already done this run
+    # so the batch loop terminates (regenerated drafts stay _suggested).
     mapped = mt.mapped_macros()
     targets = sorted(m for m in mapped
-                     if m not in existing
+                     if m not in confirmed
+                     and m not in exclude
                      and (_MACRO_DESCRIPTIONS.get(m) or {}).get("verb") != "navigate")
     remaining_after = max(0, len(targets) - limit)
     batch = targets[:limit]

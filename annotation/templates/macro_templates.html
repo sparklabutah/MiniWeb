@@ -459,15 +459,17 @@ function updateTemplateCount() {
 // ---------- bulk suggest the rest ----------
 function suggestAll() {
     var btn = document.getElementById('suggest-all-btn');
-    if (!confirm('Generate AI-suggested templates for all macros that don\'t have one yet, using your existing templates as examples? They\'ll be marked "AI" for you to review.')) return;
+    if (!confirm('Regenerate AI-suggested templates for every macro without a CONFIRMED one, using your confirmed templates as the examples? Existing AI drafts are refreshed; your confirmed templates are left untouched.')) return;
     btn.disabled = true;
+    var done = [];   // exclude cursor so the batch loop terminates
     function loop() {
         btn.textContent = 'Generating…';
         fetch('/annotate/api/suggest_templates_batch', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({limit: 8})
+            body: JSON.stringify({limit: 8, exclude: done})
         }).then(function(r){ return r.json(); }).then(function(d){
             if (d.error) { btn.disabled=false; btn.textContent='Suggest rest with AI'; alert(d.error); return; }
+            (d.results || []).forEach(function(r){ done.push(r.macro); });
             btn.textContent = 'Generating… (' + d.remaining + ' left)';
             if (d.remaining > 0) { loop(); }
             else { btn.textContent = 'Done — reloading'; setTimeout(function(){ location.reload(); }, 600); }
