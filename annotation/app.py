@@ -138,6 +138,9 @@ _MACRO_DESCRIPTIONS = {
     "create_by_timestamp": {"verb": "create", "modality": "timestamp", "description": "Create a clip or bookmark at a specific timestamp", "example": "Create a clip starting at 1:30 in the stream"},
     "create_by_query": {"verb": "create", "modality": "query", "description": "Create by entering text into an input", "example": "Enter a URL to create a short link"},
     "submit_by_form": {"verb": "submit", "modality": "form", "description": "Submit a filled-out form", "example": "Fill in the contact form and click Submit"},
+    # Consolidated macros (2026-07-16 merge) — canonical targets of the aliases below.
+    "submit_form": {"verb": "submit", "modality": "form", "description": "Submit form data to create or modify a record (unifies create / submit / register / apply / invite / report / post via a form)", "example": "Fill in the form fields and submit"},
+    "toggle_status": {"verb": "toggle", "modality": "status", "description": "Toggle a boolean relationship on an item (unifies follow / subscribe / save / join)", "example": "Click the toggle to follow / save / subscribe an item"},
     "submit_by_route": {"verb": "submit", "modality": "route", "description": "Submit by navigating to a submission URL", "example": "Navigate to /submit to finalize your entry"},
     "submit_by_dropdown": {"verb": "submit", "modality": "dropdown", "description": "Submit by selecting and confirming from dropdown", "example": "Select the recipient and submit the transfer"},
     "submit_by_ranking": {"verb": "submit", "modality": "ranking", "description": "Submit a ranking of items", "example": "Rank the candidates and submit your vote"},
@@ -291,10 +294,10 @@ def _load_sites():
 
 
 def _load_macros():
-    """Collect all unique macros across all sites from MACRO_LOCATIONS."""
+    """Collect all unique (canonical) macros across all sites from MACRO_LOCATIONS."""
     macros = set()
     for site_macros in MACRO_LOCATIONS.values():
-        macros.update(site_macros.keys())
+        macros.update(_canon(m) for m in site_macros.keys())
     return sorted(macros)
 
 
@@ -307,7 +310,7 @@ def _load_site_macros(site_id):
     """
     # MACRO_LOCATIONS is the audited source of truth
     if site_id in MACRO_LOCATIONS:
-        macros = list(MACRO_LOCATIONS[site_id].keys())
+        macros = [_canon(m) for m in MACRO_LOCATIONS[site_id].keys()]
         if macros:
             return sorted(set(macros))
 
@@ -471,12 +474,34 @@ _MACRO_ALIASES = {
     "upload_by_query": "upload_by_upload",
     "upload_by_image": "upload_by_upload",
     "upload_by_route": "upload_by_upload",
+    # Verb-synonym clusters merged 2026-07-16 (operationally identical by the
+    # swap test). Form-submit family -> submit_form; boolean status toggles ->
+    # toggle_status. block/react kept separate (distinct meaning); QA/control
+    # kept (distinct outcomes). Task files keep old names; aliased on read.
+    "create_by_form": "submit_form",
+    "create_by_query": "submit_form",
+    "submit_by_form": "submit_form",
+    "register_by_form": "submit_form",
+    "apply_by_form": "submit_form",
+    "invite_by_form": "submit_form",
+    "report_by_form": "submit_form",
+    "post_from_free_text": "submit_form",
+    "follow_by_toggle": "toggle_status",
+    "subscribe_by_toggle": "toggle_status",
+    "save_by_toggle": "toggle_status",
+    "join_by_toggle": "toggle_status",
 }
 
 
 def _canon(macro):
-    """Normalize a (possibly retired) macro name to its canonical form."""
-    return _MACRO_ALIASES.get(macro, macro)
+    """Normalize a (possibly retired) macro name to its canonical form.
+    Chains through aliases (with a cycle guard) so aliases that point at a
+    since-merged macro still resolve to the final canonical name."""
+    seen = set()
+    while macro in _MACRO_ALIASES and macro not in seen:
+        seen.add(macro)
+        macro = _MACRO_ALIASES[macro]
+    return macro
 
 
 def _site_macro_pool(site_id):
@@ -1235,13 +1260,16 @@ def _span_actions(task, traj, macro):
     signal for what its open target/value should be."""
     from annotation import macro_templates as mt
     acts = [e for e in traj if e.get("type") == "action"]
-    span = (task.get("macro_spans") or {}).get(macro)
     out = []
-    for idx in mt._span_indices(span, len(acts)):
-        a = acts[idx]
-        out.append({k: a[k] for k in
-                    ("action", "target", "value", "text", "option_text", "url", "method")
-                    if a.get(k) not in (None, "")})
+    # `macro` is canonical; aggregate every pre-merge span that maps to it
+    for orig, span in (task.get("macro_spans") or {}).items():
+        if _canon(orig) != macro:
+            continue
+        for idx in mt._span_indices(span, len(acts)):
+            a = acts[idx]
+            out.append({k: a[k] for k in
+                        ("action", "target", "value", "text", "option_text", "url", "method")
+                        if a.get(k) not in (None, "")})
     return out
 
 

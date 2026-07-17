@@ -31,6 +31,13 @@ TEMPLATES_PATH = Path(
                    str(ROOT / "data" / "macro_templates.yaml")))
 
 
+def _canon(m):
+    """Canonical macro name — merges retired/consolidated aliases. Task files
+    keep original names; everything downstream reads through this."""
+    from annotation.app import _canon as canon
+    return canon(m)
+
+
 # ---------------------------------------------------------------------------
 # check primitives — what the builder can drop into a template.
 #   params: name -> {kind, options?, default_open}
@@ -152,16 +159,16 @@ def _sites_for_macro(macro: str) -> list:
         return []
     out = []
     for site, macros in MACRO_LOCATIONS.items():
-        if isinstance(macros, dict) and macro in macros:
+        if isinstance(macros, dict) and any(_canon(m) == macro for m in macros):
             out.append(site)
     return sorted(out)
 
 
 def _locations_for_macro(macro: str) -> list:
-    """Per-website UI locations for a macro, from macro_locations.py.
+    """Per-website UI locations for a (canonical) macro, from macro_locations.py.
 
-    Returns [{site, locations:[str, ...]}] — the natural-language places the
-    macro shows up on each site, so the author can see what they're verifying."""
+    Returns [{site, locations:[str, ...]}] — aggregated across any pre-merge
+    names that canonicalize to this macro."""
     try:
         from annotation.macro_locations import MACRO_LOCATIONS
     except Exception:
@@ -169,11 +176,14 @@ def _locations_for_macro(macro: str) -> list:
     out = []
     for site in sorted(MACRO_LOCATIONS):
         macros = MACRO_LOCATIONS[site]
-        if isinstance(macros, dict) and macro in macros:
-            locs = macros[macro]
-            if isinstance(locs, str):
-                locs = [locs]
-            out.append({"site": site, "locations": list(locs or [])})
+        if not isinstance(macros, dict):
+            continue
+        locs = []
+        for m, l in macros.items():
+            if _canon(m) == macro:
+                locs.extend([l] if isinstance(l, str) else list(l or []))
+        if locs:
+            out.append({"site": site, "locations": locs})
     return out
 
 
@@ -240,22 +250,25 @@ def macro_usage(macro: str) -> dict:
             data = json.loads(tf.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        if macro not in (data.get("macros") or []):
+        if macro not in {_canon(m) for m in (data.get("macros") or [])}:
             continue
         ann, tid = tf.parent.parent.name, tf.parent.name
         tasks.append({"annotator": ann, "task_id": tid})
 
         acts = [e for e in _load_trajectory(tf.parent) if e.get("type") == "action"]
-        span = (data.get("macro_spans") or {}).get(macro)
-        for idx in _span_indices(span, len(acts)):
-            a = acts[idx]
-            act = a.get("action") or "?"
-            action_counts[act] = action_counts.get(act, 0) + 1
-            v = a.get("value") or a.get("text") or a.get("option_text")
-            shape = _classify_value(v)
-            value_shapes.setdefault(act, {})[shape] = value_shapes.setdefault(act, {}).get(shape, 0) + 1
-            if v and len(examples.setdefault(act, [])) < 3:
-                examples[act].append(str(v)[:40])
+        # aggregate spans from every pre-merge macro that canonicalizes to `macro`
+        for orig, span in (data.get("macro_spans") or {}).items():
+            if _canon(orig) != macro:
+                continue
+            for idx in _span_indices(span, len(acts)):
+                a = acts[idx]
+                act = a.get("action") or "?"
+                action_counts[act] = action_counts.get(act, 0) + 1
+                v = a.get("value") or a.get("text") or a.get("option_text")
+                shape = _classify_value(v)
+                value_shapes.setdefault(act, {})[shape] = value_shapes.setdefault(act, {}).get(shape, 0) + 1
+                if v and len(examples.setdefault(act, [])) < 3:
+                    examples[act].append(str(v)[:40])
 
     observed = []
     for act, cnt in sorted(action_counts.items(), key=lambda kv: -kv[1]):
@@ -403,7 +416,8 @@ def build_task_draft(macros: list) -> dict:
     """
     all_templates = load_all()
     templates, missing, slots = {}, [], []
-    for macro in macros or []:
+    # canonicalize + de-dup: a task listing two merged macros yields one entry
+    for macro in dict.fromkeys(_canon(m) for m in (macros or [])):
         tree = all_templates.get(macro)
         if not tree:
             missing.append(macro)
@@ -425,7 +439,7 @@ def mapped_macros() -> set:
     out = set()
     for _site, macros in MACRO_LOCATIONS.items():
         if isinstance(macros, dict):
-            out |= set(macros.keys())
+            out |= {_canon(m) for m in macros}
     return out
 
 
@@ -445,9 +459,10 @@ def observed_actions_all() -> dict:
         spans = data.get("macro_spans") or {}
         acts = [e for e in _load_trajectory(tf.parent) if e.get("type") == "action"]
         for macro, span in spans.items():
+            cm = _canon(macro)
             for idx in _span_indices(span, len(acts)):
                 a = acts[idx].get("action") or "?"
-                out.setdefault(macro, {})[a] = out.setdefault(macro, {}).get(a, 0) + 1
+                out.setdefault(cm, {})[a] = out.setdefault(cm, {}).get(a, 0) + 1
     return out
 
 
@@ -465,7 +480,7 @@ def list_macros() -> list:
             data = json.loads(tf.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        for m in (data.get("macros") or []):
+        for m in {_canon(x) for x in (data.get("macros") or [])}:
             task_counts[m] = task_counts.get(m, 0) + 1
 
     out = []

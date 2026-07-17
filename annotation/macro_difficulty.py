@@ -62,6 +62,9 @@ MACRO_CATEGORIES = {
     # --- STATE CHANGE: create, edit, delete, submit, pay, book ---
     # Multi-field forms, data mutation, needs verification
     "submit_by_form": "state_change",
+    # Consolidated macros (2026-07-16 merge)
+    "submit_form": "text_input",
+    "toggle_status": "simple_select",
     "create_by_form": "state_change",
     "edit_by_form": "state_change",
     "delete_from_table": "state_change",
