@@ -19,6 +19,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from annotation.macro_locations import MACRO_LOCATIONS
+from annotation.storage import ANNOTATIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITES_DIR = PROJECT_ROOT / "sites"
@@ -351,10 +352,10 @@ def _load_site_macros(site_id):
     return sorted(macros)
 
 
-_NA_FILE = SITES_DIR.parent / "annotation" / "na_reports.json"
+_NA_FILE = ANNOTATIONS_DIR / "na_reports.json"
 # Skip-modal reports (reason + details) — same download-and-collect workflow
 # as na_reports.json
-_SKIP_REPORTS_FILE = SITES_DIR.parent / "annotation" / "skip_reports.json"
+_SKIP_REPORTS_FILE = ANNOTATIONS_DIR / "skip_reports.json"
 
 
 def _load_na_reports():
@@ -490,6 +491,9 @@ _MACRO_ALIASES = {
     "subscribe_by_toggle": "toggle_status",
     "save_by_toggle": "toggle_status",
     "join_by_toggle": "toggle_status",
+    # Stray names free-typed in old tasks; never existed in MACRO_LOCATIONS
+    "create_from_free_text": "submit_form",
+    "navigate_by_sidebar": "navigate_by_route",
 }
 
 
@@ -502,6 +506,25 @@ def _canon(macro):
         seen.add(macro)
         macro = _MACRO_ALIASES[macro]
     return macro
+
+
+_CANONICAL_LOCATIONS = None
+
+def _canonical_macro_locations():
+    """MACRO_LOCATIONS re-keyed by canonical macro name, location lists
+    aggregated across any alias keys that merge into the same macro. The UI
+    samples canonical names, so lookups must be keyed the same way."""
+    global _CANONICAL_LOCATIONS
+    if _CANONICAL_LOCATIONS is None:
+        out = {}
+        for site, macros in MACRO_LOCATIONS.items():
+            site_out = {}
+            for m, locs in macros.items():
+                locs = [locs] if isinstance(locs, str) else list(locs or [])
+                site_out.setdefault(_canon(m), []).extend(locs)
+            out[site] = site_out
+        _CANONICAL_LOCATIONS = out
+    return _CANONICAL_LOCATIONS
 
 
 def _site_macro_pool(site_id):
@@ -540,7 +563,7 @@ def _get_cell_counts():
     counts = {}
     for t in list_tasks():
         n_sites = len(t.get("sites", []))
-        n_macros = len(t.get("macros", []))
+        n_macros = len({_canon(m) for m in t.get("macros", [])})
         key = (n_sites, n_macros)
         counts[key] = counts.get(key, 0) + 1
     return counts
@@ -1030,7 +1053,7 @@ def annotate():
                            sites=sites,
                            prompt=prompt,
                            macro_descriptions=_MACRO_DESCRIPTIONS,
-                           macro_locations=MACRO_LOCATIONS)
+                           macro_locations=_canonical_macro_locations())
 
 
 @annotation_bp.route("/review")
@@ -1072,6 +1095,30 @@ def graph():
     sites = _load_sites()
     return render_template("graph.html", sites=sites,
                            affinities=SITE_AFFINITY_GROUPS)
+
+
+@annotation_bp.route("/accounts")
+def accounts_page():
+    """Credential lookup — every seeded login account across all sites."""
+    from app import db
+    sites = []
+    for meta in _load_sites():
+        users = db.query(meta["id"], "users", limit=200)
+        rows = []
+        for u in users or []:
+            rows.append({
+                "id": u.get("id"),
+                "username": u.get("username") or "",
+                "email": u.get("email") or "",
+                "password": "" if u.get("password") in (None, "") else str(u["password"]),
+                "name": u.get("name") or u.get("full_name") or u.get("display_name") or "",
+                "role": u.get("role") or "",
+            })
+        if rows:
+            rows.sort(key=lambda r: (r["id"] is None, r["id"]))
+            sites.append({"id": meta["id"], "name": meta.get("name") or meta["id"],
+                          "url": meta["url"], "users": rows})
+    return render_template("accounts.html", sites=sites)
 
 
 # --- Macro template builder ------------------------------------------------
@@ -1535,6 +1582,17 @@ def api_create_task():
     if not data.get("instruction") or not data.get("sites"):
         return jsonify({"error": "instruction and sites required"}), 400
 
+    # Multi-macro tasks must ship a dependency graph that touches every macro
+    # (mirrors the client-side check in annotate.html so the API can't bypass it)
+    macros = data.get("macros") or []
+    if len(macros) >= 2:
+        edges = data.get("macro_edges") or []
+        linked = {e.get("from") for e in edges} | {e.get("to") for e in edges}
+        orphans = [m for m in macros if m not in linked]
+        if orphans:
+            return jsonify({"error": "macro dependencies incomplete",
+                            "unconnected_macros": orphans}), 400
+
     sites_list = data.get("sites", [])
     task = {
         "task_id": f"{'_'.join(s['id'] if isinstance(s, dict) else s for s in sites_list[:2])}_{uuid.uuid4().hex[:6]}",
@@ -1632,8 +1690,8 @@ def api_site_schema(site_id):
 
 @annotation_bp.route("/api/macro_locations/<site_id>")
 def api_macro_locations(site_id):
-    """Return macro-to-location map for a specific site."""
-    return jsonify(MACRO_LOCATIONS.get(site_id, {}))
+    """Return macro-to-location map for a specific site (canonical keys)."""
+    return jsonify(_canonical_macro_locations().get(site_id, {}))
 
 
 @annotation_bp.route("/api/site_macros/<site_id>")
@@ -1700,12 +1758,15 @@ def api_coverage_matrix():
                       if sid in [x["id"] if isinstance(x, dict) else x
                                  for x in t.get("sites", [])]]
 
-        # Covered macros
+        # Covered macros — canonicalize task macros so retired alias names
+        # (pre-consolidation) count toward the canonical macro, matching
+        # _get_macro_coverage and the sampled pool
         covered = set()
         chain_counts = {}
         for t in site_tasks:
-            covered.update(t.get("macros", []))
-            cl = len(t.get("macros", []))
+            cms = {_canon(m) for m in t.get("macros", [])}
+            covered.update(cms)
+            cl = len(cms)
             chain_counts[cl] = chain_counts.get(cl, 0) + 1
 
         uncovered = [m for m in all_macros if m not in covered]
@@ -1718,10 +1779,11 @@ def api_coverage_matrix():
         total_target = sum(targets.values())
         total_done = sum(chain_counts.get(k, 0) for k in targets)
 
-        # Per-macro coverage detail
+        # Per-macro coverage detail (canonical names on both sides)
         macro_detail = {}
         for m in all_macros:
-            count = sum(1 for t in site_tasks if m in t.get("macros", []))
+            count = sum(1 for t in site_tasks
+                        if m in {_canon(x) for x in t.get("macros", [])})
             macro_detail[m] = {"count": count, "covered": m in covered}
 
         sites[sid] = {
@@ -1742,10 +1804,13 @@ def api_coverage_matrix():
     total_tasks_done = len(all_tasks)
     total_tasks_remaining = sum(s["tasks_remaining"] for s in sites.values())
     total_sites_complete = sum(1 for s in sites.values() if s["tasks_remaining"] == 0)
-    total_macros_covered = len(set(m for t in all_tasks for m in t.get("macros", [])))
     all_possible_macros = set()
     for site_macros in MACRO_LOCATIONS.values():
-        all_possible_macros.update(site_macros.keys())
+        all_possible_macros.update(_canon(m) for m in site_macros.keys())
+    # Intersect with the pool so stray macro names in old task files can't
+    # push "covered" above what the denominator counts
+    total_macros_covered = len({_canon(m) for t in all_tasks
+                                for m in t.get("macros", [])} & all_possible_macros)
     return jsonify({
         "sites": sites,
         "total_tasks_done": total_tasks_done,

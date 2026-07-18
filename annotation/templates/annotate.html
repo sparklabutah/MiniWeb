@@ -27,7 +27,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans
 .action-sidebar-footer { border-top: 1px solid #e2e8f0; padding: .4rem .6rem; background: #f8fafc; }
 
 /* Action timeline entries */
-.act-entry { padding: .4rem .6rem; margin-bottom: .25rem; border-radius: .35rem; border: 1.5px solid transparent; cursor: pointer; font-size: .82rem; transition: all .1s; position: relative; }
+.act-entry { padding: .4rem .6rem; margin-bottom: .25rem; border-radius: .35rem; border: 1.5px solid transparent; cursor: pointer; font-size: .82rem; transition: all .1s; position: relative; user-select: none; }
 .act-entry:hover { background: #f1f5f9; }
 .act-entry.selected { border-color: #2563eb; background: #eff6ff; }
 .act-entry.in-range { background: #dbeafe; border-color: #93c5fd; }
@@ -305,8 +305,8 @@ textarea#instruction:focus {
                     <div class="range-hint" id="range-hint">Select start action</div>
                     <div id="range-macro-chips" class="macro-chips" style="margin-top:.3rem"></div>
                 </div>
+                <div id="range-tip" style="font-size:.62rem;color:#94a3b8;margin-top:.3rem">Click an action, then <b>&#8679; shift-click</b> another to tag the range</div>
                 <div style="display:flex;gap:.3rem;margin-top:.3rem">
-                    <button class="btn btn-sm btn-secondary" onclick="startRangeSelect()" id="range-btn" title="Select a range of actions for a macro">Tag Range</button>
                     <button class="btn btn-sm btn-secondary" onclick="clearAllTags()" title="Clear all macro tags">Clear Tags</button>
                     <button class="btn btn-sm btn-secondary" onclick="suggestTagsAI()" id="suggest-tags-btn" title="Let AI suggest macro tags" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">Suggest Tags</button>
                     <span id="suggest-tags-status" style="font-size:.6rem;color:#94a3b8"></span>
@@ -1596,12 +1596,11 @@ function startRecording() {
     cachedApiCalls = null;
     cachedRequestLog = null;
     rewindPoint = null;
-    rangeMode = false;
     lastLogCount = 0;
     // Clear server-side logs
     fetch('/_admin/log/clear', {method: 'POST'}).catch(() => {});
-    rangeStart = null;
-    rangeEnd = null;
+    rangeAnchor = null;
+    cancelRangeSelect();
     renderTimeline();
     renderMacroSpanSummary();
     recording = true;
@@ -1738,53 +1737,44 @@ function getActionMacros(actIdx) {
     return tags;
 }
 
-// ── Range selection for macro tagging ──
-let rangeMode = false;  // are we selecting a range?
+// ── Range selection for macro tagging (shift-click) ──
+// Plain click selects an action (the anchor). Shift-click another action
+// selects the whole anchor→action range and shows the macro chips.
+let rangeMode = false;   // a range is currently selected
 let rangeStart = null;
 let rangeEnd = null;
-
-function startRangeSelect() {
-    rangeMode = true;
-    rangeStart = null;
-    rangeEnd = null;
-    selectedActionIdx = null;
-    document.getElementById('range-controls').style.display = 'block';
-    document.getElementById('range-hint').textContent = 'Click the first action in the range';
-    document.getElementById('range-btn').textContent = 'Cancel';
-    document.getElementById('range-btn').onclick = cancelRangeSelect;
-    renderTimeline();
-    renderRangeMacroChips();
-}
+let rangeAnchor = null;  // last plain-clicked action; shift-click extends from here
 
 function cancelRangeSelect() {
     rangeMode = false;
     rangeStart = null;
     rangeEnd = null;
     document.getElementById('range-controls').style.display = 'none';
-    document.getElementById('range-btn').textContent = 'Tag Range';
-    document.getElementById('range-btn').onclick = startRangeSelect;
+    document.getElementById('range-tip').style.display = 'block';
     renderTimeline();
 }
 
-function handleTimelineClick(actIdx) {
-    if (!rangeMode) {
-        // Simple click — toggle selection for viewing observation
-        selectedActionIdx = (selectedActionIdx === actIdx) ? null : actIdx;
-        renderTimeline();
-        return;
-    }
-    // Range selection mode
-    if (rangeStart === null) {
-        rangeStart = actIdx;
-        document.getElementById('range-hint').textContent = 'Now click the last action (action ' + actIdx + ' to ...)';
-        renderTimeline();
-    } else if (rangeEnd === null) {
-        rangeEnd = Math.max(rangeStart, actIdx);
-        rangeStart = Math.min(rangeStart, actIdx);
-        document.getElementById('range-hint').textContent = 'Actions ' + rangeStart + '-' + rangeEnd + ' selected. Pick a macro below:';
+function handleTimelineClick(ev, actIdx) {
+    if (ev && ev.shiftKey) {
+        // Shift-click — select the range from the anchor to this action
+        const anchor = rangeAnchor !== null ? rangeAnchor : actIdx;
+        rangeStart = Math.min(anchor, actIdx);
+        rangeEnd = Math.max(anchor, actIdx);
+        rangeMode = true;
+        selectedActionIdx = null;
+        document.getElementById('range-controls').style.display = 'block';
+        document.getElementById('range-tip').style.display = 'none';
+        document.getElementById('range-hint').textContent =
+            'Actions ' + rangeStart + '-' + rangeEnd + ' selected. Pick a macro below (shift-click extends, click cancels):';
         renderTimeline();
         renderRangeMacroChips();
+        return;
     }
+    // Plain click — cancel any pending range, toggle selection, set anchor
+    if (rangeMode) cancelRangeSelect();
+    selectedActionIdx = (selectedActionIdx === actIdx) ? null : actIdx;
+    rangeAnchor = selectedActionIdx;
+    renderTimeline();
 }
 
 function assignRangeToMacro(macroName) {
@@ -1982,7 +1972,7 @@ function renderTimeline() {
             }).join('') + '</div>';
         }
 
-        html += `<div class="act-entry${isSelected ? ' selected' : ''}${inRange ? ' in-range' : ''}${isRewound ? ' rewound' : ''}" onclick="handleTimelineClick(${actIdx})">
+        html += `<div class="act-entry${isSelected ? ' selected' : ''}${inRange ? ' in-range' : ''}${isRewound ? ' rewound' : ''}" onclick="handleTimelineClick(event, ${actIdx})" onmousedown="if(event.shiftKey)event.preventDefault()">
             <span class="act-num">${actIdx}</span>
             <span class="act-icon">${icon}</span>
             <span class="act-verb">${verb}</span>
@@ -2916,6 +2906,40 @@ async function submitTask() {
         alert('Tag all macros before submitting.\n\nUntagged:\n• ' + names.join('\n• ') +
               '\n\nGo to Step 2, select action ranges, and assign them to macros.');
         return;
+    }
+
+    // Multi-macro tasks must have a fully connected dependency graph:
+    // every enabled macro needs at least one edge, and the graph must be
+    // one connected component (no orphan macros, no disjoint islands).
+    if (enabledMacros.length >= 2) {
+        const edges = macroEdges.filter(e => enabledMacros.includes(e.from) && enabledMacros.includes(e.to));
+        const linked = new Set();
+        edges.forEach(e => { linked.add(e.from); linked.add(e.to); });
+        const orphans = enabledMacros.filter(m => !linked.has(m));
+        if (orphans.length > 0) {
+            const names = orphans.map(m => (macroDescriptions[m]||{}).description || m);
+            alert('Define dependencies between all macros before submitting.\n\nNot connected:\n• ' +
+                  names.join('\n• ') + '\n\nGo to Step 1 and drag arrows between the macro nodes.');
+            return;
+        }
+        // connectivity check (undirected)
+        const adj = {};
+        edges.forEach(e => {
+            (adj[e.from] = adj[e.from] || []).push(e.to);
+            (adj[e.to] = adj[e.to] || []).push(e.from);
+        });
+        const seen = new Set([enabledMacros[0]]);
+        const stack = [enabledMacros[0]];
+        while (stack.length) {
+            for (const n of (adj[stack.pop()] || [])) {
+                if (!seen.has(n)) { seen.add(n); stack.push(n); }
+            }
+        }
+        if (seen.size < enabledMacros.length) {
+            alert('The macro dependency graph is split into disconnected groups.\n' +
+                  'Connect all macros into one flow in Step 1 before submitting.');
+            return;
+        }
     }
 
     // Fetch server logs to save alongside trajectory
