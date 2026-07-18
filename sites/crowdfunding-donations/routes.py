@@ -262,6 +262,48 @@ def logout():
 # Form-based mutation routes
 # ---------------------------------------------------------------------------
 
+def _record_pledge(campaigns, campaign, tier, tier_id, amount, user_id, extra=None):
+    """Apply a pledge: campaign totals, pledge row, user history, email.
+    Returns the new pledge id. `extra` fields are stored on the pledge row."""
+    campaign["raised_amount"] += amount
+    campaign["backer_count"] += 1
+    if tier:
+        tier["quantity_claimed"] += 1
+    if campaign["raised_amount"] >= campaign["goal_amount"] and campaign["status"] == "active":
+        campaign["status"] = "funded"
+    _save_campaigns(campaigns)
+
+    pledges = _load_pledges()
+    new_id = max((p["id"] for p in pledges), default=0) + 1
+    row = {
+        "id": new_id,
+        "user_id": user_id,
+        "campaign_id": campaign["id"],
+        "amount": amount,
+        "tier_id": tier_id,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "status": "completed"
+    }
+    row.update(extra or {})
+    pledges.append(row)
+    _save_pledges(pledges)
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user:
+        user.setdefault("backed_campaigns", []).append({
+            "campaign_id": campaign["id"],
+            "amount": amount,
+            "tier_id": tier_id
+        })
+        _save_users(users)
+
+    _add_email(user_id, "noreply@crowdfunding.lakeport.local",
+               "Pledge confirmed",
+               f'Your pledge of ${amount:.2f} to "{campaign["title"]}" has been confirmed. Thank you for your support!')
+    return new_id
+
+
 @blueprint.route("/campaign/<int:campaign_id>/pledge", methods=["POST"])
 def form_pledge(campaign_id):
     is_json = request.is_json
@@ -308,44 +350,7 @@ def form_pledge(campaign_id):
             return jsonify({"error": "Invalid amount"}), 400
         abort(400)
 
-    # Update campaign
-    campaign["raised_amount"] += amount
-    campaign["backer_count"] += 1
-    if tier:
-        tier["quantity_claimed"] += 1
-    # Check if now funded
-    if campaign["raised_amount"] >= campaign["goal_amount"] and campaign["status"] == "active":
-        campaign["status"] = "funded"
-    _save_campaigns(campaigns)
-
-    # Update pledges
-    pledges = _load_pledges()
-    new_id = max((p["id"] for p in pledges), default=0) + 1
-    pledges.append({
-        "id": new_id,
-        "user_id": user_id,
-        "campaign_id": campaign_id,
-        "amount": amount,
-        "tier_id": tier_id,
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "status": "completed"
-    })
-    _save_pledges(pledges)
-
-    # Update user backed_campaigns
-    users = _load_users()
-    user = next((u for u in users if u["id"] == user_id), None)
-    if user:
-        user.setdefault("backed_campaigns", []).append({
-            "campaign_id": campaign_id,
-            "amount": amount,
-            "tier_id": tier_id
-        })
-        _save_users(users)
-
-    _add_email(user_id, "noreply@crowdfunding.lakeport.local",
-               "Pledge confirmed",
-               f'Your pledge of ${amount:.2f} to "{campaign["title"]}" has been confirmed. Thank you for your support!')
+    new_id = _record_pledge(campaigns, campaign, tier, tier_id, amount, user_id)
 
     if is_json:
         # API path: direct payment bridge call (no 2FA)
@@ -370,6 +375,99 @@ def form_pledge(campaign_id):
                              amount=amount,
                              category="Donations",
                              account_type=account_type)
+    return redirect(verify_url)
+
+
+@blueprint.route("/campaign/<int:campaign_id>/checkout", methods=["GET", "POST"])
+def checkout(campaign_id):
+    """Pledge checkout: backer info, conditional shipping, payment method,
+    funding-model consent — then hands off to the shared 2FA flow."""
+    if "user_id" not in session:
+        return redirect(url_for("crowdfunding-donations.login_page"))
+    user_id = session["user_id"]
+
+    campaigns = _get_campaigns()
+    campaign = next((c for c in campaigns if c["id"] == campaign_id), None)
+    if not campaign or campaign["status"] not in ("active", "funded"):
+        abort(404)
+
+    tier_id = (request.form.get("tier_id", type=int) if request.method == "POST"
+               else request.args.get("tier_id", type=int))
+    tier = None
+    if tier_id:
+        tier = next((t for t in campaign["reward_tiers"] if t["id"] == tier_id), None)
+        if not tier:
+            abort(404)
+        if tier["quantity_claimed"] >= tier["quantity_available"]:
+            abort(400)
+    needs_shipping = bool(tier and tier.get("fulfillment", "physical") == "physical")
+    min_amount = tier["amount"] if tier else 1
+
+    users = _load_users()
+    me = next((u for u in users if u["id"] == user_id), None)
+
+    if request.method == "GET":
+        form = {"backer_name": (me or {}).get("name", ""),
+                "email": (me or {}).get("email", ""),
+                "amount": tier["amount"] if tier else ""}
+        return render_template("crowdfunding-donations/checkout.html",
+                               campaign=campaign, tier=tier,
+                               needs_shipping=needs_shipping,
+                               min_amount=min_amount, form=form, errors={})
+
+    # POST — validate
+    f = {k: (request.form.get(k) or "").strip() for k in
+         ("backer_name", "email", "amount", "account_type",
+          "street", "city", "state", "zip_code")}
+    f["anonymous"] = bool(request.form.get("anonymous"))
+    f["consent"] = bool(request.form.get("consent"))
+
+    errors = {}
+    if not f["backer_name"]:
+        errors["backer_name"] = "Name is required"
+    if not f["email"] or "@" not in f["email"]:
+        errors["email"] = "A valid email is required"
+    try:
+        amount = float(f["amount"])
+    except (TypeError, ValueError):
+        amount = 0
+    if amount < min_amount:
+        errors["amount"] = f"Minimum pledge is ${min_amount:.2f}"
+    if f["account_type"] not in ("checking", "credit"):
+        errors["account_type"] = "Choose a payment method"
+    if needs_shipping:
+        for k, label in (("street", "Street address"), ("city", "City"),
+                         ("state", "State"), ("zip_code", "ZIP code")):
+            if not f[k]:
+                errors[k] = f"{label} is required"
+    if not f["consent"]:
+        errors["consent"] = "Please confirm you understand how you will be charged"
+
+    if errors:
+        return render_template("crowdfunding-donations/checkout.html",
+                               campaign=campaign, tier=tier,
+                               needs_shipping=needs_shipping,
+                               min_amount=min_amount, form=f, errors=errors), 400
+
+    extra = {
+        "backer_name": f["backer_name"],
+        "email": f["email"],
+        "anonymous": f["anonymous"],
+        "shipping": ({"street": f["street"], "city": f["city"],
+                      "state": f["state"], "zip_code": f["zip_code"]}
+                     if needs_shipping else None),
+    }
+    _record_pledge(campaigns, campaign, tier, tier_id, amount, user_id, extra=extra)
+
+    from app.events import request_2fa
+    verify_url = request_2fa("payment",
+                             return_url=url_for("crowdfunding-donations.campaign_detail",
+                                                campaign_id=campaign_id),
+                             user_id=user_id,
+                             recipient=campaign["title"],
+                             amount=amount,
+                             category="Donations",
+                             account_type=f["account_type"])
     return redirect(verify_url)
 
 

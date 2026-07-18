@@ -283,16 +283,10 @@
                         <span>{{ tier.quantity_claimed }} backer{{ 's' if tier.quantity_claimed != 1 }}</span>
                     </div>
                     {% if campaign.status == 'active' and remaining > 0 %}
-                    <form method="post" action="{{ url_for('crowdfunding-donations.form_pledge', campaign_id=campaign.id) }}" class="tier-form">
-                        <input type="hidden" name="tier_id" value="{{ tier.id }}">
-                        <input type="hidden" name="amount" value="{{ tier.amount }}">
-                        <select name="account_type" class="tier-select">
-                            <option value="checking">Checking Account</option>
-                            <option value="credit">Credit Card</option>
-                        </select>
-                        <button type="submit" class="tier-btn">Select this reward</button>
+                    <div class="tier-form">
+                        <a href="{{ url_for('crowdfunding-donations.checkout', campaign_id=campaign.id, tier_id=tier.id) }}" class="tier-btn" style="display:block;text-align:center">Select this reward</a>
                         <div class="tier-payment-note">Payment processed via your <a href="/sites/banking/">linked bank account</a></div>
-                    </form>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -366,21 +360,12 @@
                     {% endif %}
                 </div>
 
-                <!-- Quick-pledge card (no tier) -->
+                <!-- Pledge without a reward -->
                 {% if campaign.status == 'active' %}
                 <div class="funding-card" id="rewards">
                     <div class="tier-section-title">Make a pledge</div>
-                    <form method="post" action="{{ url_for('crowdfunding-donations.form_pledge', campaign_id=campaign.id) }}">
-                        <input type="number" name="amount" placeholder="Enter amount ($)" min="1" step="any" required class="form-input" style="margin-bottom:.5rem">
-                        <div style="margin-bottom:.6rem">
-                            <label style="font-size:.78rem;color:#888;display:block;margin-bottom:.25rem">Payment method</label>
-                            <select name="account_type" class="tier-select" style="width:100%">
-                                <option value="checking">Checking Account</option>
-                                <option value="credit">Credit Card</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="pledge-cta">Pledge</button>
-                    </form>
+                    <div class="pledge-note" style="margin-bottom:.6rem">Back this project with any amount, no reward needed.</div>
+                    <a href="{{ url_for('crowdfunding-donations.checkout', campaign_id=campaign.id) }}" class="pledge-cta" style="display:block;text-align:center">Pledge without a reward</a>
                 </div>
                 {% endif %}
 

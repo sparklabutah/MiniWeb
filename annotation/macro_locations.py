@@ -1157,7 +1157,7 @@ MACRO_LOCATIONS = {
             "'Start a Project' page -> campaign form (title, description, goal, category, dates)"
         ],
         "submit_by_form": [
-            "Campaign detail page -> pledge form with tier selection and custom amount input"
+            "Campaign detail -> 'Select this reward' -> checkout form (name, email, shipping for physical tiers, anonymous + consent checkboxes)"
         ],
         "post_from_free_text": [
             "Campaign detail page -> post update form textarea"
@@ -1178,10 +1178,13 @@ MACRO_LOCATIONS = {
             "Campaign detail page -> 'Select this reward' button on each tier"
         ],
         "checkout_by_form": [
-            "Campaign detail page -> pledge form with amount and account type dropdown"
+            "Checkout page ('Select this reward' / 'Pledge without a reward') -> backer info, conditional shipping address for physical rewards, payment radios, consent checkbox"
         ],
         "pay_by_form": [
-            "Campaign detail page -> pledge payment form"
+            "Checkout page -> 'Complete pledge' -> 2FA payment verification"
+        ],
+        "select_by_radio": [
+            "Checkout page -> 'Payment method' radio cards (Checking account / Credit card)"
         ],
         "authenticate_by_form": [
             "Login page -> username and password fields"
@@ -1197,26 +1200,27 @@ MACRO_LOCATIONS = {
             "Top nav -> 'Discover', 'Matches', 'Profile' links"
         ],
         "search_by_query": [
-            "Profiles page -> search bar with text filter"
+            "Profiles page -> 'Search' bar (matches name, username, bio, location, interests)"
         ],
         "search_by_proximity": [
-            "Profiles page -> 'Interest' filter input (e.g. hiking) and gender/looking_for dropdowns"
+            "Profiles page -> 'Within (miles)' distance filter (requires login; distances shown per profile)"
         ],
         "filter_by_dropdown": [
-            "'Spark' page -> 'Looking for' dropdown, sort dropdown (Age, Name, Newest)",
+            "'Spark' page -> 'Looking for' dropdown in the Discovery Filters bar",
             "Profiles page -> filter form with gender and looking_for dropdowns"
         ],
         "filter_by_checkbox": [
-            "Profiles page -> interest checkboxes (hiking, cooking, reading, etc.)"
+            "Profiles page -> interest checkboxes (hiking, cooking, reading, etc.) — any-match"
         ],
         "filter_by_date_range": [
             "'Spark' page -> 'Joined From' and 'To' date fields in filter bar"
         ],
         "sort_by_ranking": [
-            "'Spark' page -> sort dropdown (Age Low-High, Age High-Low, Name A-Z, Newest)"
+            "'Spark' page -> sort dropdown (Age Low-High, Age High-Low, Name A-Z, Newest)",
+            "Profiles page -> 'Sort by' dropdown (Name, Age, Newest members)"
         ],
         "sort_by_proximity": [
-            "Profiles page -> profiles list with location filtering"
+            "Profiles page -> 'Sort by' dropdown -> 'Nearest' (requires login)"
         ],
         "extract_by_query": [
             "Profiles page -> search returns matching profiles"
@@ -1243,10 +1247,11 @@ MACRO_LOCATIONS = {
             "'Edit Profile' page -> 'Looking for' dropdown, 'Gender Preference' dropdown"
         ],
         "upload_by_upload": [
-            "Conversation page -> photo upload input in message compose area"
+            "Conversation page -> paperclip photo attach in message compose (filename stored on message, rendered as attachment chip)"
         ],
         "react_by_toggle": [
-            "'Spark' page -> heart button on profile cards"
+            "'Spark' page -> heart button on profile cards",
+            "'Likes You' page -> 'Like back' / 'Pass' buttons on pending likes"
         ],
         "react_by_gesture": [
             "'Spark' page -> heart (like) and X (pass) buttons on profile cards"
@@ -1270,7 +1275,7 @@ MACRO_LOCATIONS = {
             "Profile detail page -> Block/Blocked toggle button in the safety-actions row"
         ],
         "register_by_form": [
-            "Login page -> authentication form"
+            "Register page (/register, linked from login) -> signup form: username, password, name, age, gender, location, bio, interests, looking_for, gender preference"
         ]
     },
     "design-creative": {
