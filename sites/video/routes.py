@@ -273,6 +273,10 @@ def watch(video_id):
         ]
         recommended.extend(extras[: 8 - len(recommended)])
 
+    uid = _current_user_id()
+    me = user_map.get(uid) if uid is not None else None
+    is_subscribed = bool(me and channel and channel["id"] in (me.get("subscriptions") or []))
+
     return render_template(
         "video/watch.html",
         video=video,
@@ -282,7 +286,8 @@ def watch(video_id):
         comment_count=len(video_comments),
         recommended=recommended,
         user_map=user_map,
-        logged_in=_current_user_id() is not None,
+        logged_in=uid is not None,
+        is_subscribed=is_subscribed,
     )
 
 
@@ -310,13 +315,18 @@ def channel(user_id):
 
     user_map = {u["id"]: u for u in users}
 
+    uid = _current_user_id()
+    me = next((u for u in users if u["id"] == uid), None) if uid is not None else None
+    is_subscribed = bool(me and user_id in (me.get("subscriptions") or []))
+
     return render_template(
         "video/channel.html",
         channel=chan,
         videos=channel_videos,
         user_map=user_map,
         sort=sort,
-        logged_in=_current_user_id() is not None,
+        logged_in=uid is not None,
+        is_subscribed=is_subscribed,
     )
 
 

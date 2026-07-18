@@ -109,6 +109,12 @@
             {% endif %}
             <button class="btn btn-share" onclick="toggleSidebar()" title="Share and view details">Share / Details</button>
             <a href="{{ url_for('documents.view_doc', doc_id=doc.id) }}" class="btn btn-outline" title="Read-only view">View</a>
+            {% if user and doc.owner_id == user.id and not doc.is_trashed %}
+            <form method="post" action="{{ url_for('documents.form_trash_document', doc_id=doc.id) }}" style="display:inline"
+                  onsubmit="return confirm('Move this document to the trash?')">
+                <button type="submit" class="btn btn-trash-action" title="Move to trash">&#128465; Trash</button>
+            </form>
+            {% endif %}
             {% if not user %}
             <a href="{{ url_for('documents.login_page') }}" class="btn" style="background:#1a73e8;color:#fff;">Sign In</a>
             {% else %}

@@ -81,7 +81,11 @@
                 {% elif post.type == 'carousel' %}
                 <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>
                 {% endif %}
+                {% if post.image_url %}
+                <img src="{{ post.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                {% else %}
                 <span class="placeholder">&#128247;</span>
+                {% endif %}
             </div>
             <div class="post-sidebar">
                 <div class="post-header">
@@ -118,7 +122,7 @@
                     {% endif %}
                 </div>
                 <div class="post-actions-bar">
-                    <button id="like-btn" class="{{ 'active' if is_liked else '' }}" onclick="toggleLike()" title="Like">{{ '&#9829;' if is_liked else '&#9825;' }}</button>
+                    <button id="like-btn" class="{{ 'active' if is_liked else '' }}" onclick="toggleLike()" title="Like">{% if is_liked %}&#9829;{% else %}&#9825;{% endif %}</button>
                     <button title="Comment" onclick="document.getElementById('comment-input').focus()">&#128172;</button>
                     <div class="action-dropdown">
                         <button onclick="toggleShareMenu()" title="Share">&#10149;</button>
@@ -130,15 +134,15 @@
                         </div>
                     </div>
                     <span class="spacer"></span>
-                    <button id="save-btn" class="save-btn {{ 'active' if is_saved else '' }}" onclick="toggleSave()" title="Save">{{ '&#9733;' if is_saved else '&#9734;' }}</button>
+                    {% if logged_in and user and user.id == post.author_id %}
+                    <button class="danger" id="delete-post-btn" onclick="deletePost()" title="Delete this post">&#128465; Delete</button>
+                    {% endif %}
+                    <button id="save-btn" class="save-btn {{ 'active' if is_saved else '' }}" onclick="toggleSave()" title="Save">{% if is_saved %}&#9733;{% else %}&#9734;{% endif %}</button>
                     <div class="action-dropdown">
                         <button onclick="toggleMoreMenu()" title="More">&#8943;</button>
                         <div id="more-menu" class="action-dropdown-content">
                             <button class="danger" onclick="reportPost()">Report</button>
                             <button class="danger" onclick="blockUser()">Block User</button>
-                            {% if logged_in and user and user.id == post.author_id %}
-                            <button class="danger" id="delete-post-btn" onclick="deletePost()">Delete Post</button>
-                            {% endif %}
                         </div>
                     </div>
                 </div>

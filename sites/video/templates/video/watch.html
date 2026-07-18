@@ -222,7 +222,7 @@
                     {% endif %}
                 </div>
                 {% if channel %}
-                <button class="subscribe-btn" id="sub-btn" onclick="(function(btn){btn.textContent='Subscribing...';btn.disabled=true;fetch('{{ url_for('video.form_subscribe_channel', user_id=channel.id) }}',{method:'POST'}).then(function(){btn.textContent='Subscribed';btn.classList.add('subscribed')}).catch(function(){btn.textContent='Subscribe';btn.disabled=false})})(this)">Subscribe</button>
+                <button class="subscribe-btn{% if is_subscribed %} subscribed{% endif %}" id="sub-btn" onclick="(function(btn){var was=btn.classList.contains('subscribed');btn.textContent=was?'Unsubscribing...':'Subscribing...';btn.disabled=true;fetch('{{ url_for('video.form_subscribe_channel', user_id=channel.id) }}',{method:'POST'}).then(function(){btn.disabled=false;if(was){btn.textContent='Subscribe';btn.classList.remove('subscribed')}else{btn.textContent='Subscribed ✓';btn.classList.add('subscribed')}}).catch(function(){btn.textContent=was?'Subscribed ✓':'Subscribe';btn.disabled=false})})(this)">{% if is_subscribed %}Subscribed &#10003;{% else %}Subscribe{% endif %}</button>
                 {% endif %}
             </div>
 
@@ -329,7 +329,11 @@
             <a href="{{ url_for('video.watch', video_id=rv.id) }}" class="related-video">
                 {% set rtg = thumb_gradient(rv.category) %}
                 <div class="related-thumb" style="background: {{ rtg[0] }};">
+                    {% if rv.thumbnail_url and rv.thumbnail_url.startswith('/static') %}
+                    <img src="{{ rv.thumbnail_url }}" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover">
+                    {% else %}
                     <span style="color: {{ rtg[1] }}; font-size: 20px; opacity: 0.7;">&#9654;</span>
+                    {% endif %}
                     <span class="rel-dur">{{ format_duration(rv.duration_seconds) }}</span>
                 </div>
                 <div class="related-meta">

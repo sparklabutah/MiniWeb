@@ -54,7 +54,11 @@
             <span>Updated: {{ ss.updated_at[:10] if ss.updated_at else '' }}</span>
             <button class="btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
             {% if can_edit %}
-            <a href="{{ url_for('spreadsheets-slides.spreadsheet_view', sid=ss.id) }}" class="btn btn-green">Export CSV</a>
+            <select id="export-format" class="btn" title="Export format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button class="btn btn-green" onclick="window.location='{{ url_for('spreadsheets-slides.api_spreadsheet_export', sid=ss.id) }}?format='+document.getElementById('export-format').value">Export</button>
             {% endif %}
             {% if user %}
             <a href="{{ url_for('spreadsheets-slides.logout') }}" class="btn">Sign Out</a>

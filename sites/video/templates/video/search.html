@@ -105,7 +105,11 @@
                 <a href="{{ url_for('video.watch', video_id=video.id) }}" class="result-card">
                     {% set tg = thumb_gradient(video.category) %}
                     <div class="rc-thumb" style="background: {{ tg[0] }};">
+                        {% if video.thumbnail_url and video.thumbnail_url.startswith('/static') %}
+                        <img src="{{ video.thumbnail_url }}" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover">
+                        {% else %}
                         <span class="play-icon" style="color: {{ tg[1] }};">&#9654;</span>
+                        {% endif %}
                         <span class="rc-dur">{{ format_duration(video.duration_seconds) }}</span>
                     </div>
                     <div class="rc-info">

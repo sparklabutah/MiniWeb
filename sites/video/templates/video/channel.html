@@ -39,6 +39,7 @@
         .ch-actions { display: flex; gap: 8px; }
         .subscribe-btn { background: #fff; color: #0f0f0f; border: none; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
         .subscribe-btn:hover { opacity: 0.9; }
+        .subscribe-btn.subscribed { background: #272727; color: #fff; }
         .follow-btn { background: #272727; color: #fff; border: none; padding: 10px 20px; border-radius: 20px; font-size: 14px; cursor: pointer; }
         .follow-btn:hover { background: #3a3a3a; }
 
@@ -106,7 +107,7 @@
         </div>
         <div class="ch-actions">
             <form method="post" action="{{ url_for('video.form_subscribe_channel', user_id=channel.id) }}">
-                <button type="submit" class="subscribe-btn">Subscribe</button>
+                <button type="submit" class="subscribe-btn{% if is_subscribed %} subscribed{% endif %}">{% if is_subscribed %}Subscribed &#10003;{% else %}Subscribe{% endif %}</button>
             </form>
             <form method="post" action="{{ url_for('video.form_follow_channel', user_id=channel.id) }}">
                 <button type="submit" class="follow-btn">Follow</button>
@@ -129,7 +130,11 @@
             <a href="{{ url_for('video.watch', video_id=video.id) }}">
                 {% set tg = thumb_gradient(video.category) %}
                 <div class="thumb-wrap" style="background: {{ tg[0] }};">
+                    {% if video.thumbnail_url and video.thumbnail_url.startswith('/static') %}
+                    <img src="{{ video.thumbnail_url }}" alt="">
+                    {% else %}
                     <div class="thumb-placeholder"><span class="play-icon" style="color: {{ tg[1] }};">&#9654;</span></div>
+                    {% endif %}
                     <span class="thumb-duration">{{ format_duration(video.duration_seconds) }}</span>
                 </div>
             </a>

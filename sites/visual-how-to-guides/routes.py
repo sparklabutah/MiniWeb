@@ -609,7 +609,7 @@ def form_rate(guide_id):
     _save_ratings(ratings)
 
     # Recalculate guide average rating
-    guide_ratings = [v for k, v in ratings.items() if k.endswith(f"_{guide_id}")]
+    guide_ratings = [v for k, v in ratings.items() if str(k).endswith(f"_{guide_id}")]
     new_avg = round(sum(guide_ratings) / len(guide_ratings), 2) if guide_ratings else 0.0
 
     guides = _load_guides()
@@ -1066,7 +1066,7 @@ def api_rate_guide(guide_id):
     _save_ratings(ratings)
 
     # Recalculate guide average
-    guide_ratings = [v for k, v in ratings.items() if k.endswith(f"_{guide_id}")]
+    guide_ratings = [v for k, v in ratings.items() if str(k).endswith(f"_{guide_id}")]
     new_avg = round(sum(guide_ratings) / len(guide_ratings), 2) if guide_ratings else 0.0
 
     guide["rating"] = new_avg
