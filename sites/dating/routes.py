@@ -30,32 +30,17 @@ def _load_users():
     return db.query(SITE, "users")
 
 
-def _save_users(users):
-    db.save_collection(SITE, "users", users)
-
-
 def _load_matches():
     return db.query(SITE, "matches")
 
 
-def _save_matches(matches):
-    db.save_collection(SITE, "matches", matches)
-
-
 def _load_messages():
+    # Full-table load — only for the public stats/export endpoints.
     return db.query(SITE, "messages")
-
-
-def _save_messages(messages):
-    db.save_collection(SITE, "messages", messages)
 
 
 def _load_likes():
     return db.query(SITE, "likes")
-
-
-def _save_likes(likes):
-    db.save_collection(SITE, "likes", likes)
 
 
 def _get_user(user_id):
@@ -77,14 +62,55 @@ def _safe_user(u):
 # Matching logic helpers
 # ---------------------------------------------------------------------------
 
+def _get_prefs(user):
+    """Effective matching preferences for a user.
+
+    Seeded profiles store preferences nested in the `preferences` dict
+    (keys: min_age, max_age, gender_pref, max_distance_miles); profile edits
+    write top-level *_pref keys. Top-level keys win when both exist.
+    """
+    nested = user.get("preferences")
+    if not isinstance(nested, dict):
+        nested = {}
+    return {
+        "gender_pref": user.get("gender_pref") or nested.get("gender_pref") or "any",
+        "min_age": user.get("min_age_pref") or nested.get("min_age") or 18,
+        "max_age": user.get("max_age_pref") or nested.get("max_age") or 99,
+        "max_distance_miles": user.get("max_distance_pref") or nested.get("max_distance_miles"),
+    }
+
+
+def _distance_miles(a, b):
+    """Great-circle distance between two users, or None if either lacks coords."""
+    try:
+        lat1, lng1, lat2, lng2 = float(a["lat"]), float(a["lng"]), float(b["lat"]), float(b["lng"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    from math import asin, cos, radians, sin, sqrt
+    lat1, lng1, lat2, lng2 = map(radians, (lat1, lng1, lat2, lng2))
+    h = sin((lat2 - lat1) / 2) ** 2 + cos(lat1) * cos(lat2) * sin((lng2 - lng1) / 2) ** 2
+    return 2 * 3958.8 * asin(sqrt(h))
+
+
+def _next_id(collection):
+    """Next free integer id for a collection (overlay-aware)."""
+    newest = db.query(SITE, collection, sort="-id", limit=1)
+    return (newest[0].get("id", 0) if newest else 0) + 1
+
+
 def _matches_preferences(viewer, candidate):
     """Check if candidate fits viewer's preferences (age range, gender)."""
-    if viewer.get("gender_pref") and viewer["gender_pref"] != "any":
-        if candidate["gender"] != viewer["gender_pref"]:
-            return False
-    age = candidate["age"]
-    if age < viewer.get("min_age_pref", 18) or age > viewer.get("max_age_pref", 99):
+    prefs = _get_prefs(viewer)
+    if prefs["gender_pref"] != "any" and candidate["gender"] != prefs["gender_pref"]:
         return False
+    age = candidate["age"]
+    if age < prefs["min_age"] or age > prefs["max_age"]:
+        return False
+    max_dist = prefs["max_distance_miles"]
+    if max_dist:
+        dist = _distance_miles(viewer, candidate)
+        if dist is not None and dist > max_dist:
+            return False
     return True
 
 
@@ -109,13 +135,13 @@ def _get_match_between(user1_id, user2_id):
 def _get_discover_profiles(user_id):
     """Get profiles the user can discover (not already liked/matched, matching prefs)."""
     users = _load_users()
-    likes = _load_likes()
+    my_likes = db.query(SITE, "likes", where={"from_user_id": user_id})
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
         return []
 
     # IDs the user has already liked or passed on
-    already_acted = {l["to_user_id"] for l in likes if l["from_user_id"] == user_id}
+    already_acted = {l["to_user_id"] for l in my_likes}
     already_acted.add(user_id)  # exclude self
 
     candidates = []
@@ -138,6 +164,40 @@ def index():
     if not user:
         return redirect(url_for("dating.login_page"))
     profiles = _get_discover_profiles(user["id"])
+
+    min_age = request.args.get("min_age", type=int)
+    max_age = request.args.get("max_age", type=int)
+    if min_age is not None:
+        profiles = [p for p in profiles if p.get("age", 0) >= min_age]
+    if max_age is not None:
+        profiles = [p for p in profiles if p.get("age", 0) <= max_age]
+
+    looking_for = request.args.get("looking_for", "").strip()
+    if looking_for:
+        profiles = [p for p in profiles if p.get("looking_for") == looking_for]
+
+    interest = request.args.get("interest", "").strip().lower()
+    if interest:
+        profiles = [p for p in profiles
+                    if any(interest in i.lower() for i in p.get("interests", []))]
+
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    if date_from:
+        profiles = [p for p in profiles if (p.get("joined_date") or "")[:10] >= date_from]
+    if date_to:
+        profiles = [p for p in profiles if (p.get("joined_date") or "")[:10] <= date_to]
+
+    sort = request.args.get("sort", "")
+    if sort == "age_asc":
+        profiles.sort(key=lambda p: p.get("age", 0))
+    elif sort == "age_desc":
+        profiles.sort(key=lambda p: p.get("age", 0), reverse=True)
+    elif sort == "name":
+        profiles.sort(key=lambda p: p.get("name", "").lower())
+    elif sort == "newest":
+        profiles.sort(key=lambda p: p.get("joined_date") or "", reverse=True)
+
     return render_template("dating/index.html", user=user, profiles=profiles,
                            current_profile=profiles[0] if profiles else None)
 
@@ -161,16 +221,48 @@ def profiles_list():
     min_age = request.args.get("min_age", type=int)
     max_age = request.args.get("max_age", type=int)
 
+    q = request.args.get("q", "").strip().lower()
+    interests_checked = [i.lower() for i in request.args.getlist("interests")]
+    within = request.args.get("within", type=int)
+    sort = request.args.get("sort", "")
+
     # For simple exact-match filters, use db.query; for range/list filters, load filtered set
+    # (users table is small — <100 rows — so Python-side refinement is acceptable)
     users = db.query(SITE, "users", where=where if where else None)
 
     # Apply Python-side filters for complex conditions (interest in list, age range)
     if interest:
         users = [u for u in users if interest.lower() in [i.lower() for i in u.get("interests", [])]]
+    if interests_checked:
+        users = [u for u in users
+                 if any(i.lower() in interests_checked for i in u.get("interests", []))]
     if min_age is not None:
         users = [u for u in users if u.get("age", 0) >= min_age]
     if max_age is not None:
         users = [u for u in users if u.get("age", 0) <= max_age]
+    if q:
+        def _haystack(u):
+            return " ".join([u.get("name", ""), u.get("username", ""), u.get("bio", ""),
+                             u.get("location", ""), " ".join(u.get("interests", []))]).lower()
+        users = [u for u in users if all(term in _haystack(u) for term in q.split())]
+
+    # Distance from the logged-in user (needs coordinates on both sides)
+    distances = {}
+    if user:
+        for u in users:
+            distances[u["id"]] = _distance_miles(user, u) if u["id"] != user["id"] else 0.0
+    if within is not None and user:
+        users = [u for u in users
+                 if distances.get(u["id"]) is not None and distances[u["id"]] <= within]
+
+    if sort == "nearest" and user:
+        users.sort(key=lambda u: (distances.get(u["id"]) is None, distances.get(u["id"]) or 0))
+    elif sort == "age":
+        users.sort(key=lambda u: u.get("age", 0))
+    elif sort == "newest":
+        users.sort(key=lambda u: u.get("joined_date") or "", reverse=True)
+    elif sort == "name":
+        users.sort(key=lambda u: u.get("name", "").lower())
 
     # Pagination
     page = request.args.get("page", 1, type=int)
@@ -182,11 +274,16 @@ def profiles_list():
     end = start + per_page
     page_users = users[start:end]
 
+    # Query args to preserve in pagination links (everything except page)
+    filter_args = {k: v for k, v in request.args.to_dict(flat=False).items() if k != "page"}
+
     return render_template("dating/profiles.html", user=user,
                            profiles=page_users, total=total,
                            page=page, total_pages=total_pages,
+                           distances=distances, filter_args=filter_args,
                            gender=gender or "", looking_for=looking_for or "",
-                           interest=interest or "",
+                           interest=interest or "", q=q, within=within or "",
+                           sort=sort,
                            min_age=min_age or "", max_age=max_age or "")
 
 
@@ -216,7 +313,6 @@ def matches_page():
     if not user:
         return redirect(url_for("dating.login_page"))
     user_matches = _get_user_matches(user["id"])
-    messages = _load_messages()
     users = _load_users()
     user_map = {u["id"]: u for u in users}
 
@@ -226,9 +322,8 @@ def matches_page():
         other = user_map.get(other_id)
         if not other:
             continue
-        # Get last message
-        match_msgs = [msg for msg in messages if msg["match_id"] == m["id"]]
-        match_msgs.sort(key=lambda x: x["timestamp"])
+        match_msgs = db.query(SITE, "messages", where={"match_id": m["id"]},
+                              sort="timestamp")
         last_msg = match_msgs[-1] if match_msgs else None
         unread = sum(1 for msg in match_msgs
                      if msg["sender_id"] != user["id"] and not msg.get("read", True))
@@ -256,17 +351,13 @@ def conversation(match_id):
         abort(403)
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
     other = _get_user(other_id)
-    messages = _load_messages()
-    match_msgs = [msg for msg in messages if msg["match_id"] == match_id]
-    match_msgs.sort(key=lambda x: x["timestamp"])
+    match_msgs = db.query(SITE, "messages", where={"match_id": match_id},
+                          sort="timestamp")
     # Mark messages as read
-    updated = False
-    for msg in messages:
-        if msg["match_id"] == match_id and msg["sender_id"] != user["id"] and not msg.get("read"):
+    for msg in match_msgs:
+        if msg["sender_id"] != user["id"] and not msg.get("read"):
             msg["read"] = True
-            updated = True
-    if updated:
-        _save_messages(messages)
+            db.save_item(SITE, "messages", msg["id"], msg)
     return render_template("dating/conversation.html", user=user, other=other,
                            match=match, messages=match_msgs)
 
@@ -276,7 +367,8 @@ def edit_profile():
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
-    return render_template("dating/edit_profile.html", user=user)
+    return render_template("dating/edit_profile.html", user=user,
+                           prefs=_get_prefs(user))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -304,52 +396,128 @@ def logout():
     return redirect(url_for("dating.login_page"))
 
 
+@blueprint.route("/register", methods=["GET"])
+def register_page():
+    return render_template("dating/register.html", error=None, form={})
+
+
+@blueprint.route("/register", methods=["POST"])
+def register_submit():
+    form = {k: request.form.get(k, "").strip() for k in
+            ("username", "password", "name", "age", "gender", "location",
+             "bio", "interests", "looking_for", "gender_pref")}
+    error = None
+    if not form["username"] or not form["password"] or not form["name"]:
+        error = "Username, password and name are required"
+    elif not form["age"].isdigit() or not 18 <= int(form["age"]) <= 99:
+        error = "Age must be a number between 18 and 99"
+    elif any(u["username"] == form["username"] for u in _load_users()):
+        error = "That username is already taken"
+    if error:
+        return render_template("dating/register.html", error=error, form=form)
+
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    new_id = _next_id("users")
+    user = {
+        "id": new_id,
+        "root_user_id": 0,
+        "username": form["username"],
+        "password": form["password"],
+        "name": form["name"],
+        "age": int(form["age"]),
+        "gender": form["gender"] or "other",
+        "bio": form["bio"],
+        "location": form["location"],
+        "interests": [i.strip() for i in form["interests"].split(",") if i.strip()],
+        "looking_for": form["looking_for"] or "relationship",
+        "preferences": {"gender_pref": form["gender_pref"] or "any",
+                        "min_age": 18, "max_age": 99},
+        "photos": [],
+        "verified": 0,
+        "joined_date": now,
+        "last_active": now,
+    }
+    db.save_item(SITE, "users", new_id, user)
+    session["user_id"] = new_id
+    emit("signup", user_id=new_id, site_name="dating",
+         username=form["username"], password=form["password"], email="")
+    return redirect(url_for("dating.index"))
+
+
+@blueprint.route("/likes")
+def likes_page():
+    """Pending likes received by the current user ('Likes You')."""
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("dating.login_page"))
+    pending = db.query(SITE, "likes", where={"to_user_id": user["id"],
+                                             "status": "pending"},
+                       sort="-date")
+    user_map = {u["id"]: u for u in _load_users()}
+    likers = []
+    for like in pending:
+        liker = user_map.get(like["from_user_id"])
+        if liker:
+            likers.append({"like": like, "profile": liker})
+    return render_template("dating/likes.html", user=user, likers=likers)
+
+
 # ---------------------------------------------------------------------------
 # Form mutation routes
 # ---------------------------------------------------------------------------
+
+def _do_like(user_id, profile_id):
+    """Record a like; create a match if it's mutual.
+
+    Returns ("already", None), ("liked", None) or ("matched", match_id).
+    """
+    my_likes = db.query(SITE, "likes", where={"from_user_id": user_id})
+    if any(l["to_user_id"] == profile_id for l in my_likes):
+        return "already", None
+
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    their_likes = db.query(SITE, "likes", where={"from_user_id": profile_id})
+    reverse = next((l for l in their_likes
+                    if l["to_user_id"] == user_id and l["status"] == "pending"), None)
+
+    new_id = _next_id("likes")
+    if reverse:
+        reverse["status"] = "matched"
+        db.save_item(SITE, "likes", reverse["id"], reverse)
+        db.save_item(SITE, "likes", new_id,
+                     {"id": new_id, "from_user_id": user_id,
+                      "to_user_id": profile_id, "date": now, "status": "matched"})
+        match_id = _next_id("matches")
+        db.save_item(SITE, "matches", match_id,
+                     {"id": match_id, "user1_id": user_id, "user2_id": profile_id,
+                      "matched_date": now, "status": "active"})
+        return "matched", match_id
+
+    db.save_item(SITE, "likes", new_id,
+                 {"id": new_id, "from_user_id": user_id,
+                  "to_user_id": profile_id, "date": now, "status": "pending"})
+    return "liked", None
+
+
+def _do_pass(user_id, profile_id):
+    """Record a pass unless the user already acted on this profile."""
+    my_likes = db.query(SITE, "likes", where={"from_user_id": user_id})
+    if any(l["to_user_id"] == profile_id for l in my_likes):
+        return
+    new_id = _next_id("likes")
+    db.save_item(SITE, "likes", new_id,
+                 {"id": new_id, "from_user_id": user_id, "to_user_id": profile_id,
+                  "date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                  "status": "passed"})
+
 
 @blueprint.route("/like/<int:profile_id>", methods=["POST"])
 def form_like(profile_id):
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
-
-    likes = _load_likes()
-    # Check if already liked
-    existing = next((l for l in likes if l["from_user_id"] == user["id"]
-                     and l["to_user_id"] == profile_id), None)
-    if existing:
-        return redirect(url_for("dating.index"))
-
-    new_id = max((l["id"] for l in likes), default=0) + 1
-    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-    # Check if the other person already liked us
-    reverse = next((l for l in likes if l["from_user_id"] == profile_id
-                    and l["to_user_id"] == user["id"] and l["status"] == "pending"), None)
-
-    if reverse:
-        # Mutual match!
-        reverse["status"] = "matched"
-        new_like = {"id": new_id, "from_user_id": user["id"],
-                    "to_user_id": profile_id, "date": now, "status": "matched"}
-        likes.append(new_like)
-        _save_likes(likes)
-        # Create match
-        matches = _load_matches()
-        match_id = max((m["id"] for m in matches), default=0) + 1
-        matches.append({
-            "id": match_id, "user1_id": user["id"], "user2_id": profile_id,
-            "matched_date": now, "status": "active"
-        })
-        _save_matches(matches)
-    else:
-        new_like = {"id": new_id, "from_user_id": user["id"],
-                    "to_user_id": profile_id, "date": now, "status": "pending"}
-        likes.append(new_like)
-        _save_likes(likes)
-
-    return redirect(url_for("dating.index"))
+    _do_like(user["id"], profile_id)
+    return redirect(request.form.get("next") or url_for("dating.index"))
 
 
 @blueprint.route("/pass/<int:profile_id>", methods=["POST"])
@@ -357,18 +525,23 @@ def form_pass(profile_id):
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
+    _do_pass(user["id"], profile_id)
+    return redirect(request.form.get("next") or url_for("dating.index"))
 
-    likes = _load_likes()
-    existing = next((l for l in likes if l["from_user_id"] == user["id"]
-                     and l["to_user_id"] == profile_id), None)
-    if not existing:
-        new_id = max((l["id"] for l in likes), default=0) + 1
-        now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        likes.append({"id": new_id, "from_user_id": user["id"],
-                      "to_user_id": profile_id, "date": now, "status": "passed"})
-        _save_likes(likes)
 
-    return redirect(url_for("dating.index"))
+@blueprint.route("/unmatch/<int:match_id>", methods=["POST"])
+def form_unmatch(match_id):
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("dating.login_page"))
+    match = db.get_item(SITE, "matches", match_id)
+    if not match or match["status"] != "active":
+        abort(404)
+    if user["id"] not in (match["user1_id"], match["user2_id"]):
+        abort(403)
+    match["status"] = "unmatched"
+    db.save_item(SITE, "matches", match_id, match)
+    return redirect(url_for("dating.matches_page"))
 
 
 @blueprint.route("/report/<int:profile_id>", methods=["POST"])
@@ -376,13 +549,12 @@ def form_report_profile(profile_id):
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
-    users = _load_users()
-    target = next((u for u in users if u["id"] == profile_id), None)
+    target = _get_user(profile_id)
     if not target:
         abort(404)
     target["reported"] = True
     target["report_reason"] = request.form.get("reason", "").strip()
-    _save_users(users)
+    db.save_item(SITE, "users", profile_id, target)
     return redirect(url_for("dating.profile_detail", profile_id=profile_id))
 
 
@@ -391,12 +563,11 @@ def form_block_profile(profile_id):
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
-    users = _load_users()
-    target = next((u for u in users if u["id"] == profile_id), None)
+    target = _get_user(profile_id)
     if not target:
         abort(404)
     target["blocked"] = not target.get("blocked", False)
-    _save_users(users)
+    db.save_item(SITE, "users", profile_id, target)
     return redirect(url_for("dating.profile_detail", profile_id=profile_id))
 
 
@@ -414,20 +585,23 @@ def form_send_message(match_id):
         abort(403)
 
     content = request.form.get("content", "").strip()
-    if not content:
+    attachment = request.files.get("file")
+    attachment_name = attachment.filename if attachment and attachment.filename else ""
+    if not content and not attachment_name:
         return redirect(url_for("dating.conversation", match_id=match_id))
 
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
 
-    messages = _load_messages()
-    new_id = max((m["id"] for m in messages), default=0) + 1
-    messages.append({
+    new_id = _next_id("messages")
+    msg = {
         "id": new_id, "match_id": match_id, "sender_id": user["id"],
         "content": content,
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "read": False
-    })
-    _save_messages(messages)
+    }
+    if attachment_name:
+        msg["attachment"] = attachment_name
+    db.save_item(SITE, "messages", new_id, msg)
     _add_email(other_id, "noreply@dating.lakeport.local",
                "You have a new message",
                f"You have received a new message from your match. Log in to read it.")
@@ -450,8 +624,7 @@ def form_update_profile():
     if not user:
         return redirect(url_for("dating.login_page"))
 
-    users = _load_users()
-    u = next((u for u in users if u["id"] == user["id"]), None)
+    u = _get_user(user["id"])
     if not u:
         return redirect(url_for("dating.login_page"))
 
@@ -463,20 +636,30 @@ def form_update_profile():
         u["looking_for"] = request.form["looking_for"].strip()
     if request.form.get("interests"):
         u["interests"] = [i.strip() for i in request.form["interests"].split(",") if i.strip()]
+
+    # Preferences live in the nested `preferences` dict AND top-level *_pref
+    # keys (the form's representation) — keep both in sync.
+    prefs = u.get("preferences") if isinstance(u.get("preferences"), dict) else {}
     if request.form.get("min_age_pref"):
         try:
-            u["min_age_pref"] = int(request.form["min_age_pref"])
+            u["min_age_pref"] = prefs["min_age"] = int(request.form["min_age_pref"])
         except ValueError:
             pass
     if request.form.get("max_age_pref"):
         try:
-            u["max_age_pref"] = int(request.form["max_age_pref"])
+            u["max_age_pref"] = prefs["max_age"] = int(request.form["max_age_pref"])
+        except ValueError:
+            pass
+    if request.form.get("max_distance_pref"):
+        try:
+            u["max_distance_pref"] = prefs["max_distance_miles"] = int(request.form["max_distance_pref"])
         except ValueError:
             pass
     if request.form.get("gender_pref"):
-        u["gender_pref"] = request.form["gender_pref"].strip()
+        u["gender_pref"] = prefs["gender_pref"] = request.form["gender_pref"].strip()
+    u["preferences"] = prefs
 
-    _save_users(users)
+    db.save_item(SITE, "users", u["id"], u)
     return redirect(url_for("dating.edit_profile"))
 
 
@@ -542,38 +725,12 @@ def api_like():
     if not profile_id:
         return jsonify({"error": "profile_id required"}), 400
 
-    likes = _load_likes()
-    existing = next((l for l in likes if l["from_user_id"] == user["id"]
-                     and l["to_user_id"] == profile_id), None)
-    if existing:
+    action, match_id = _do_like(user["id"], profile_id)
+    if action == "already":
         return jsonify({"error": "Already acted on this profile"}), 400
-
-    new_id = max((l["id"] for l in likes), default=0) + 1
-    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-    reverse = next((l for l in likes if l["from_user_id"] == profile_id
-                    and l["to_user_id"] == user["id"] and l["status"] == "pending"), None)
-
-    if reverse:
-        reverse["status"] = "matched"
-        new_like = {"id": new_id, "from_user_id": user["id"],
-                    "to_user_id": profile_id, "date": now, "status": "matched"}
-        likes.append(new_like)
-        _save_likes(likes)
-        matches = _load_matches()
-        match_id = max((m["id"] for m in matches), default=0) + 1
-        matches.append({
-            "id": match_id, "user1_id": user["id"], "user2_id": profile_id,
-            "matched_date": now, "status": "active"
-        })
-        _save_matches(matches)
+    if action == "matched":
         return jsonify({"action": "matched", "match_id": match_id})
-    else:
-        new_like = {"id": new_id, "from_user_id": user["id"],
-                    "to_user_id": profile_id, "date": now, "status": "pending"}
-        likes.append(new_like)
-        _save_likes(likes)
-        return jsonify({"action": "liked"})
+    return jsonify({"action": "liked"})
 
 
 @blueprint.route("/api/pass", methods=["POST"])
@@ -586,15 +743,7 @@ def api_pass():
     if not profile_id:
         return jsonify({"error": "profile_id required"}), 400
 
-    likes = _load_likes()
-    existing = next((l for l in likes if l["from_user_id"] == user["id"]
-                     and l["to_user_id"] == profile_id), None)
-    if not existing:
-        new_id = max((l["id"] for l in likes), default=0) + 1
-        now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        likes.append({"id": new_id, "from_user_id": user["id"],
-                      "to_user_id": profile_id, "date": now, "status": "passed"})
-        _save_likes(likes)
+    _do_pass(user["id"], profile_id)
     return jsonify({"action": "passed"})
 
 
@@ -604,7 +753,6 @@ def api_matches():
     if not user:
         return jsonify({"error": "Not authenticated"}), 401
     user_matches = _get_user_matches(user["id"])
-    messages = _load_messages()
     users = _load_users()
     user_map = {u["id"]: u for u in users}
     result = []
@@ -613,8 +761,8 @@ def api_matches():
         other = user_map.get(other_id)
         if not other:
             continue
-        match_msgs = [msg for msg in messages if msg["match_id"] == m["id"]]
-        match_msgs.sort(key=lambda x: x["timestamp"])
+        match_msgs = db.query(SITE, "messages", where={"match_id": m["id"]},
+                              sort="timestamp")
         last_msg = match_msgs[-1] if match_msgs else None
         unread = sum(1 for msg in match_msgs
                      if msg["sender_id"] != user["id"] and not msg.get("read", True))
@@ -646,9 +794,8 @@ def api_messages(match_id):
         return jsonify({"error": "Match not found"}), 404
     if user["id"] not in (match["user1_id"], match["user2_id"]):
         return jsonify({"error": "Forbidden"}), 403
-    messages = _load_messages()
-    match_msgs = [msg for msg in messages if msg["match_id"] == match_id]
-    match_msgs.sort(key=lambda x: x["timestamp"])
+    match_msgs = db.query(SITE, "messages", where={"match_id": match_id},
+                          sort="timestamp")
     return jsonify(match_msgs)
 
 
@@ -662,12 +809,13 @@ def api_messages_list():
             return jsonify({"error": "Not authenticated"}), 401
         user_id = user["id"]
 
-    messages = _load_messages()
-    # Return messages where the user is the sender or is in a match they belong to
+    # Return messages from every match the user belongs to
     matches = _load_matches()
     user_match_ids = {m["id"] for m in matches
                       if m["user1_id"] == user_id or m["user2_id"] == user_id}
-    user_msgs = [msg for msg in messages if msg["match_id"] in user_match_ids]
+    user_msgs = []
+    for mid in user_match_ids:
+        user_msgs.extend(db.query(SITE, "messages", where={"match_id": mid}))
     user_msgs.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(user_msgs)
 
@@ -692,16 +840,14 @@ def api_send_message():
 
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
 
-    messages = _load_messages()
-    new_id = max((m["id"] for m in messages), default=0) + 1
+    new_id = _next_id("messages")
     new_msg = {
         "id": new_id, "match_id": match_id, "sender_id": user["id"],
         "content": content,
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "read": False
     }
-    messages.append(new_msg)
-    _save_messages(messages)
+    db.save_item(SITE, "messages", new_id, new_msg)
 
     try:
         from app.bridges import on_message
@@ -718,23 +864,26 @@ def api_update_profile():
     if not user:
         return jsonify({"error": "Not authenticated"}), 401
     data = request.get_json(silent=True) or {}
-    users = _load_users()
-    u = next((u for u in users if u["id"] == user["id"]), None)
+    u = _get_user(user["id"])
     if not u:
         return jsonify({"error": "User not found"}), 404
 
-    for field in ["bio", "location", "looking_for", "gender_pref"]:
+    prefs = u.get("preferences") if isinstance(u.get("preferences"), dict) else {}
+    for field in ["bio", "location", "looking_for"]:
         if field in data:
             u[field] = data[field]
+    if "gender_pref" in data:
+        u["gender_pref"] = prefs["gender_pref"] = data["gender_pref"]
     if "interests" in data:
         u["interests"] = data["interests"] if isinstance(data["interests"], list) else \
             [i.strip() for i in data["interests"].split(",") if i.strip()]
     if "min_age_pref" in data:
-        u["min_age_pref"] = int(data["min_age_pref"])
+        u["min_age_pref"] = prefs["min_age"] = int(data["min_age_pref"])
     if "max_age_pref" in data:
-        u["max_age_pref"] = int(data["max_age_pref"])
+        u["max_age_pref"] = prefs["max_age"] = int(data["max_age_pref"])
+    u["preferences"] = prefs
 
-    _save_users(users)
+    db.save_item(SITE, "users", u["id"], u)
     return jsonify(_safe_user(u))
 
 

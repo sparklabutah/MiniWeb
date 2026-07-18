@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spark - Discover</title>
+    <title>HeartLink - Discover</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #faf5f0; min-height: 100vh; }
-        .header { background: linear-gradient(135deg, #e8475f, #f4845f); padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(232,71,95,0.15); }
-        .header h1 { font-size: 1.5rem; color: #fff; font-weight: 800; letter-spacing: -0.5px; }
-        .header-nav { display: flex; gap: 1rem; align-items: center; }
-        .header-nav a { color: rgba(255,255,255,0.9); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 0.3rem 0.7rem; border-radius: 0.4rem; transition: background 0.2s; }
-        .header-nav a:hover { background: rgba(255,255,255,0.15); }
-        .header-nav a.active { background: rgba(255,255,255,0.2); }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; min-height: 100vh; }
+        .navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+        .navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+        .navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+        .navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+        .navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+        .navbar .nav-links a.active { background: #f0ebff; color: #667eea; }
 
         .discover-container { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
         .filter-bar { background: #fff; border-radius: 0.8rem; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .filter-bar h3 { font-size: 0.85rem; color: #888; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .filter-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
         .filter-row label { font-size: 0.82rem; color: #666; }
-        .filter-row select, .filter-row input[type="number"] { padding: 0.35rem 0.5rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; background: #faf5f0; }
+        .filter-row select, .filter-row input[type="number"] { padding: 0.35rem 0.5rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; background: #f5f0ff; }
         .filter-row input[type="number"] { width: 65px; }
         .filter-row input[type="text"] { flex: 1; padding: 0.35rem 0.5rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; }
-        .filter-btn { padding: 0.35rem 0.8rem; background: #e8475f; color: #fff; border: none; border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; }
+        .filter-btn { padding: 0.35rem 0.8rem; background: #667eea; color: #fff; border: none; border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; }
 
         .profile-card { background: #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; }
-        .card-photo { width: 100%; height: 400px; background: linear-gradient(135deg, #fce4ec, #f8bbd0); display: flex; align-items: center; justify-content: center; position: relative; }
-        .card-photo .initials { font-size: 5rem; color: #e8475f; font-weight: 700; opacity: 0.5; }
+        .card-photo { width: 100%; height: 400px; background: linear-gradient(135deg, #e8eaf6, #f3e5f5); display: flex; align-items: center; justify-content: center; position: relative; }
+        .card-photo .initials { font-size: 5rem; color: #667eea; font-weight: 700; opacity: 0.5; }
         .card-photo .verified-badge { position: absolute; top: 1rem; right: 1rem; background: #4caf50; color: #fff; padding: 0.25rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
         .card-info { padding: 1.2rem 1.5rem; }
         .card-name { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; }
@@ -35,14 +35,14 @@
         .card-looking { display: inline-block; background: #fff3e0; color: #e65100; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.78rem; font-weight: 500; margin-top: 0.5rem; }
         .card-bio { font-size: 0.95rem; color: #444; line-height: 1.5; margin-top: 0.8rem; }
         .card-interests { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
-        .card-interests .tag { background: #fce4ec; color: #c62828; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.78rem; }
+        .card-interests .tag { background: #f0ebff; color: #667eea; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.78rem; }
         .card-interests .tag.shared { background: #e8f5e9; color: #2e7d32; }
 
         .card-actions { display: flex; justify-content: center; gap: 1.5rem; padding: 1.2rem 1.5rem; }
         .btn-action { width: 60px; height: 60px; border-radius: 50%; border: none; font-size: 1.5rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; align-items: center; justify-content: center; }
         .btn-action:hover { transform: scale(1.1); }
-        .btn-pass { background: #fff; color: #e8475f; box-shadow: 0 2px 10px rgba(232,71,95,0.2); border: 2px solid #fce4ec; }
-        .btn-like { background: linear-gradient(135deg, #e8475f, #f4845f); color: #fff; box-shadow: 0 4px 15px rgba(232,71,95,0.3); }
+        .btn-pass { background: #fff; color: #667eea; box-shadow: 0 2px 10px rgba(102,126,234,0.2); border: 2px solid #f0ebff; }
+        .btn-like { background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; box-shadow: 0 4px 15px rgba(102,126,234,0.3); }
         .btn-profile-link { background: #fff; color: #667eea; box-shadow: 0 2px 10px rgba(102,126,234,0.2); border: 2px solid #e8eaf6; font-size: 1.2rem; }
 
         .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
@@ -51,19 +51,21 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Spark</h1>
-        <div class="header-nav">
+    <nav class="navbar">
+        <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+        <div class="nav-links">
             <a href="{{ url_for('dating.index') }}" class="active">Discover</a>
+            <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+            <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
             <a href="{{ url_for('dating.matches_page') }}">Matches</a>
             <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
             <a href="{{ url_for('dating.logout') }}">Logout</a>
-            <a href="/">MiniWeb</a>
+            <a href="/">&larr; MiniWeb</a>
         </div>
-    </div>
+    </nav>
 
     <div class="discover-container">
-        <form class="filter-bar" method="get" action="{{ url_for('dating.index') }}">
+        <form class="filter-bar" id="filter-form" method="get" action="{{ url_for('dating.index') }}">
             <h3>Discovery Filters</h3>
             <div class="filter-row">
                 <label>Age:</label>
@@ -92,12 +94,12 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div class="profile-count" style="margin-bottom:0;">{{ profiles|length }} profile{{ 's' if profiles|length != 1 }} to discover</div>
             <div style="display:flex;gap:.5rem;align-items:center;">
-                <select onchange="location.href='?sort='+this.value" style="padding:.3rem .5rem;border:1px solid #ddd;border-radius:.4rem;font-size:.82rem;background:#fff;">
+                <select name="sort" form="filter-form" onchange="document.getElementById('filter-form').requestSubmit ? document.getElementById('filter-form').requestSubmit() : document.getElementById('filter-form').submit()" style="padding:.3rem .5rem;border:1px solid #ddd;border-radius:.4rem;font-size:.82rem;background:#fff;">
                     <option value="">Sort by</option>
-                    <option value="age_asc">Age (Low-High)</option>
-                    <option value="age_desc">Age (High-Low)</option>
-                    <option value="name">Name A-Z</option>
-                    <option value="newest">Newest</option>
+                    <option value="age_asc" {{ 'selected' if request.args.get('sort') == 'age_asc' }}>Age (Low-High)</option>
+                    <option value="age_desc" {{ 'selected' if request.args.get('sort') == 'age_desc' }}>Age (High-Low)</option>
+                    <option value="name" {{ 'selected' if request.args.get('sort') == 'name' }}>Name A-Z</option>
+                    <option value="newest" {{ 'selected' if request.args.get('sort') == 'newest' }}>Newest</option>
                 </select> </div>
         </div>
 

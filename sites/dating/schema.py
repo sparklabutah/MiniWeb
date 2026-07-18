@@ -66,6 +66,9 @@ TABLES = {
             ("photos", "TEXT NOT NULL DEFAULT ''"),
             ("verified", "INTEGER NOT NULL DEFAULT 0"),
             ("last_active", "TEXT NOT NULL DEFAULT ''"),
+            ("joined_date", "TEXT NOT NULL DEFAULT ''"),
+            ("lat", "REAL"),
+            ("lng", "REAL"),
         ],
         "indexes": [
             "root_user_id",

@@ -31,6 +31,7 @@ h2 { margin-bottom: 1rem; color: #1a1a2e; }
     <div class="nav-links">
         <a href="{{ url_for('dating.index') }}">Discover</a>
         <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
         <a href="{{ url_for('dating.matches_page') }}" class="active">Matches</a>
         <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
         <a href="{{ url_for('dating.logout') }}">Logout</a>
@@ -48,6 +49,9 @@ h2 { margin-bottom: 1rem; color: #1a1a2e; }
 <div class="match-meta">
 <div class="match-date">{{ md.match.matched_date[:10] }}</div>
 {% if md.unread_count > 0 %}<span class="unread-badge">{{ md.unread_count }} new</span>{% endif %}
+<form method="post" action="{{ url_for('dating.form_unmatch', match_id=md.match.id) }}" onsubmit="return confirm('Unmatch {{ md.other.name }}? This closes the conversation.')" style="margin-top:.3rem;">
+<button type="submit" style="background:none;border:1px solid #eee;color:#aaa;font-size:.72rem;padding:.15rem .5rem;border-radius:1rem;cursor:pointer;">Unmatch</button>
+</form>
 </div>
 </div>
 {% endfor %}

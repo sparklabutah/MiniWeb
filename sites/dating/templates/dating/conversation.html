@@ -36,9 +36,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <nav class="navbar">
     <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
     <div class="nav-links">
-        <a href="{{ url_for('dating.matches_page') }}">Back to Matches</a>
         <a href="{{ url_for('dating.index') }}">Discover</a>
         <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
+        <a href="{{ url_for('dating.matches_page') }}" class="active">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
     </div>
 </nav>
 <div class="chat-container">
@@ -55,6 +58,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="bubble-row {{ 'mine' if msg.sender_id == user.id else 'theirs' }}">
             <div class="bubble">
                 {{ msg.content }}
+                {% if msg.attachment %}<div style="margin-top:.3rem;font-size:.8rem;opacity:.85;">&#128206; {{ msg.attachment }}</div>{% endif %}
                 <span class="time">{{ msg.timestamp }}</span>
             </div>
         </div>
@@ -69,8 +73,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
     <form class="compose" method="post" enctype="multipart/form-data" action="{{ url_for('dating.form_send_message', match_id=match.id) }}">
         <label for="photo-upload" style="cursor:pointer;font-size:1.2rem;padding:0.4rem;" title="Attach photo">📎</label>
-        <input type="file" id="photo-upload" name="file" accept="image/*" style="display:none;">
-        <input type="text" name="content" placeholder="Type a message..." required autocomplete="off">
+        <input type="file" id="photo-upload" name="file" accept="image/*" style="display:none;"
+               onchange="document.getElementById('attach-name').textContent = this.files.length ? this.files[0].name : ''">
+        <span id="attach-name" style="font-size:.75rem;color:#667eea;align-self:center;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <input type="text" name="content" placeholder="Type a message..." autocomplete="off">
         <button type="submit">Send</button>
     </form>
 </div>

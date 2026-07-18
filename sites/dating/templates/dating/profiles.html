@@ -52,6 +52,7 @@ h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
         <a href="{{ url_for('dating.index') }}">Discover</a>
         <a href="{{ url_for('dating.profiles_list') }}" class="active">Browse Profiles</a>
         {% if user %}
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
         <a href="{{ url_for('dating.matches_page') }}">Matches</a>
         <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
         <a href="{{ url_for('dating.logout') }}">Logout</a>
@@ -66,6 +67,10 @@ h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
 
 <div class="filters">
 <form method="get" action="{{ url_for('dating.profiles_list') }}">
+    <div class="filter-group" style="flex:1;min-width:180px;">
+        <label for="f_q">Search</label>
+        <input type="search" name="q" id="f_q" value="{{ q }}" placeholder="Name, bio, keyword&hellip;">
+    </div>
     <div class="filter-group">
         <label for="f_gender">Gender</label>
         <select name="gender" id="f_gender">
@@ -106,6 +111,22 @@ h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
         <label for="f_max_age">Max age</label>
         <input type="number" name="max_age" id="f_max_age" value="{{ max_age }}" placeholder="99" style="width:70px">
     </div>
+    {% if user %}
+    <div class="filter-group">
+        <label for="f_within">Within (miles)</label>
+        <input type="number" name="within" id="f_within" value="{{ within }}" placeholder="any" style="width:80px">
+    </div>
+    {% endif %}
+    <div class="filter-group">
+        <label for="f_sort">Sort by</label>
+        <select name="sort" id="f_sort">
+            <option value="">Default</option>
+            <option value="name" {{ 'selected' if sort == 'name' }}>Name A-Z</option>
+            <option value="age" {{ 'selected' if sort == 'age' }}>Age</option>
+            <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest members</option>
+            {% if user %}<option value="nearest" {{ 'selected' if sort == 'nearest' }}>Nearest</option>{% endif %}
+        </select>
+    </div>
     <button type="submit" class="filter-btn">Filter</button>
     <a href="{{ url_for('dating.profiles_list') }}" class="clear-btn">Clear</a>
 </form>
@@ -123,7 +144,7 @@ h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
             <a href="{{ url_for('dating.profile_detail', profile_id=p.id) }}">{{ p.name }}</a>
             {% if p.verified %}<span class="verified-mark">[Verified]</span>{% endif %}
         </h3>
-        <div class="profile-meta">{{ p.age }} -- {{ p.gender | capitalize }} -- {{ p.location }} -- Looking for: {{ p.looking_for }}</div>
+        <div class="profile-meta">{{ p.age }} -- {{ p.gender | capitalize }} -- {{ p.location }}{% if user and p.id != user.id and distances.get(p.id) is not none %} (~{{ distances[p.id] | round | int }} mi away){% endif %} -- Looking for: {{ p.looking_for }}</div>
         <div class="profile-tags">
             {% for i in p.interests[:5] %}<span>{{ i }}</span>{% endfor %}
             {% if p.interests|length > 5 %}<span>+{{ p.interests|length - 5 }} more</span>{% endif %}
@@ -136,17 +157,17 @@ h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if page > 1 %}
-    <a href="{{ url_for('dating.profiles_list', page=page-1, gender=gender, looking_for=looking_for, interest=interest, min_age=min_age, max_age=max_age) }}">Previous</a>
+    <a href="{{ url_for('dating.profiles_list', page=page-1, **filter_args) }}">Previous</a>
     {% endif %}
     {% for p_num in range(1, total_pages+1) %}
         {% if p_num == page %}
         <span class="current">{{ p_num }}</span>
         {% else %}
-        <a href="{{ url_for('dating.profiles_list', page=p_num, gender=gender, looking_for=looking_for, interest=interest, min_age=min_age, max_age=max_age) }}">{{ p_num }}</a>
+        <a href="{{ url_for('dating.profiles_list', page=p_num, **filter_args) }}">{{ p_num }}</a>
         {% endif %}
     {% endfor %}
     {% if page < total_pages %}
-    <a href="{{ url_for('dating.profiles_list', page=page+1, gender=gender, looking_for=looking_for, interest=interest, min_age=min_age, max_age=max_age) }}">Next</a>
+    <a href="{{ url_for('dating.profiles_list', page=page+1, **filter_args) }}">Next</a>
     {% endif %}
 </div>
 {% endif %}
