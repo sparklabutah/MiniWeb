@@ -34,7 +34,12 @@ IMGCOL = re.compile(r"image|img|avatar|photo|thumbnail|thumb|logo|poster|cover|i
 def local_path(url):
     """Filesystem path for a /static or /sites/<site>/static url, else None."""
     if url.startswith("/static/"):
-        return ROOT / "app" / url.lstrip("/")
+        # data/static (volume) shadows app/static for generated content
+        p = ROOT / "data" / url.lstrip("/")
+        if p.exists():
+            return p
+        bundled = ROOT / "app" / url.lstrip("/")
+        return bundled if bundled.exists() else p
     if url.startswith("/sites/"):
         return ROOT / url.lstrip("/")
     return None

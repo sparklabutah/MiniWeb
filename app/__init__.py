@@ -259,6 +259,23 @@ def create_app():
     )
     app.secret_key = os.environ.get("SECRET_KEY", "miniweb-dev-key-change-in-production")
 
+    # Generated images (covers, avatars, thumbnails) live under data/ so they
+    # sit on the persistent volume instead of the image/git. URLs stay
+    # /static/<sub>/... — this route shadows the bundled static folder for
+    # those three subdirs, falling back to it for anything not in data/.
+    from flask import send_from_directory
+    from pathlib import Path as _Path
+    data_static = _Path(os.environ.get(
+        "MINIWEB_DATA_STATIC",
+        str(_Path(__file__).resolve().parent.parent / "data" / "static")))
+
+    @app.route("/static/<any(generated, avatars, thumbnails):sub>/<path:filename>")
+    def _data_static_files(sub, filename):
+        target = data_static / sub / filename
+        if target.is_file():
+            return send_from_directory(data_static / sub, filename)
+        return send_from_directory(_Path(app.static_folder) / sub, filename)
+
     # Session cookie config for production (behind reverse proxy / HTTPS)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"):

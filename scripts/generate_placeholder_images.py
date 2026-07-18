@@ -31,7 +31,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 DB_PATH = ROOT / "data" / "trimmed_miniweb.db"
-STATIC = ROOT / "app" / "static"
+# generated images live on the data volume; /static/<sub> urls are served
+# from here by the app (see _data_static_files in app/__init__.py)
+STATIC = ROOT / "data" / "static"
 MODEL = "gemini-3.1-flash-image"
 STYLE = "Simple, clean, flat illustration style with a muted palette. No text unless asked."
 
@@ -96,7 +98,9 @@ def build_jobs():
         for r in db.execute(f"SELECT * FROM [{t}]"):
             for c in icols:
                 v = r[c]
-                if not isinstance(v, str) or not v.startswith("/static") or (ROOT / "app" / v.lstrip("/")).exists():
+                if (not isinstance(v, str) or not v.startswith("/static")
+                        or (ROOT / "data" / v.lstrip("/")).exists()
+                        or (ROOT / "app" / v.lstrip("/")).exists()):
                     continue
                 if v in seen:
                     continue
