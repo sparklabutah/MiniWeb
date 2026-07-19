@@ -469,6 +469,8 @@ textarea#instruction:focus {
                 <div id="macro-search-results" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 16px rgba(0,0,0,.18);max-height:220px;overflow-y:auto;z-index:9999;width:300px;font-size:.75rem"></div>
             </div>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Suggest instruction (LLM)</button>
+            <button class="btn btn-secondary" id="suggest-graph-btn" style="font-size:.65rem;padding:.1rem .4rem" onclick="suggestGraphAI()" title="AI fills empty subtask boxes and proposes dependency arrows">✨ Suggest graph + subtasks (LLM)</button>
+            <span id="suggest-graph-status" style="font-size:.6rem;color:#94a3b8"></span>
             <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem" onclick="macroEdges=[];_drawArrows()">Clear arrows</button>
             <span style="flex:1"></span>
             <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
@@ -1236,6 +1238,41 @@ function generateInstruction() {
             document.getElementById('combined-suggestion-box').style.display = 'block';
         }
     }).catch(() => { document.getElementById('refine-status').textContent = 'Error'; });
+}
+
+// --- AI suggestion for the dependency graph + per-macro subtasks ---
+function suggestGraphAI() {
+    const enabled = getEnabledMacros();
+    if (!enabled.length) { alert('No macros in the graph to suggest for'); return; }
+    const btn = document.getElementById('suggest-graph-btn');
+    const status = document.getElementById('suggest-graph-status');
+    btn.disabled = true;
+    status.textContent = 'Thinking...';
+    const sites = currentPrompt ? currentPrompt.sites.map(s => s.id || s.name) : [];
+    fetch('/annotate/api/suggest_task_graph', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({macros: enabled, sites: sites})
+    }).then(r => r.json()).then(d => {
+        btn.disabled = false;
+        if (d.error) { status.textContent = d.error; return; }
+        // Fill only empty subtask boxes — never overwrite the annotator's text
+        let filled = 0, added = 0;
+        for (const m of enabled) {
+            if (d.subtasks && d.subtasks[m] && !(macroSubtasks[m] || '').trim()) {
+                macroSubtasks[m] = d.subtasks[m];
+                filled++;
+            }
+        }
+        for (const e of (d.edges || [])) {
+            if (!enabled.includes(e.from) || !enabled.includes(e.to)) continue;
+            if (!macroEdges.some(x => x.from === e.from && x.to === e.to)) {
+                macroEdges.push({from: e.from, to: e.to});
+                added++;
+            }
+        }
+        renderMacroList();
+        status.textContent = filled + ' subtasks, ' + added + ' arrows suggested — review & edit';
+    }).catch(() => { btn.disabled = false; status.textContent = 'Error'; });
 }
 
 function _topologicalSort(macros, edges) {

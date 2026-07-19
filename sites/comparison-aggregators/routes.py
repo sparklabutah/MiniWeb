@@ -228,7 +228,9 @@ def _db_query_phones(q="", brand=None, os_family=None, price_min=None,
     # Interpret all rows, then apply post-filters that need computed fields
     phones = []
     for i, raw in enumerate(rows):
-        phone = _interpret_record(raw, offset + i + 1)
+        # id must be the DB row id — phone_detail/favorite/compare routes all
+        # look phones up by it; a positional index links to the wrong phone.
+        phone = _interpret_record(raw, int(raw.get("id") or 0) or (offset + i + 1))
         phones.append(phone)
 
     # Feature filters on the FTS path (SQL path already filtered them)

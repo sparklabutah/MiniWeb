@@ -438,11 +438,19 @@ def form_save_paper(paper_id):
 @blueprint.route("/author/<path:author_name>")
 def author_profile(author_name):
     """Author profile page showing their publications."""
-    papers = _get_papers(q=author_name, limit=50)
-    # Filter to only papers where this person is actually an author
-    author_papers = [p for p in papers if author_name.lower() in p.get("authors_str", "").lower()]
-    if not author_papers:
-        author_papers = papers  # fallback to search results
+    # authors_parsed stores [["Last", "First", ""], ...] while author_name is
+    # "First Last" — match the JSON layout directly in SQL.
+    parts = author_name.strip().rsplit(" ", 1)
+    if len(parts) == 2:
+        pattern = f'%"{parts[1]}", "{parts[0]}%'
+    else:
+        pattern = f'%"{parts[0]}"%'
+    conn = db.get_conn()
+    rows = conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] WHERE authors_parsed LIKE ? "
+        "ORDER BY update_date DESC LIMIT 10",
+        (pattern,)).fetchall()
+    author_papers = [_interpret_record(_deserialize_row(r), r["rowid"]) for r in rows]
 
     user = None
     is_followed = False
