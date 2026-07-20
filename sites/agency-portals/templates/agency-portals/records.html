@@ -29,7 +29,7 @@
         <button type="submit" class="btn btn-primary">Filter</button>
     </form>
 
-    <p class="result-count">{{ records|length }} record(s) found</p>
+    <p class="result-count">{{ total if total is defined else records|length }} record(s) found</p>
 
     <table class="data-table">
         <thead>
@@ -55,5 +55,17 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% if pages is defined and pages > 1 %}
+    <div class="pagination" style="display:flex; align-items:center; gap:1rem; margin-top:1.5rem;">
+        {% if page > 1 %}
+        <a class="btn btn-secondary" href="{{ url_for('agency-portals.records_page', q=q or None, type=rtype or None, date_from=date_from or None, date_to=date_to or None, page=page-1) }}">&laquo; Previous</a>
+        {% endif %}
+        <span class="result-count" style="margin-bottom:0;">Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}
+        <a class="btn btn-primary" href="{{ url_for('agency-portals.records_page', q=q or None, type=rtype or None, date_from=date_from or None, date_to=date_to or None, page=page+1) }}">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

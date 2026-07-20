@@ -74,7 +74,7 @@
                    style="padding: .5rem .8rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem;">
             <button type="submit">Filter</button>
         </form>
-        <div class="result-count">{{ activities|length }} activit{{ 'ies' if activities|length != 1 else 'y' }}</div>
+        <div class="result-count">{{ total_count }} activit{{ 'ies' if total_count != 1 else 'y' }}{% if total_pages > 1 %} &mdash; page {{ page }} of {{ total_pages }}{% endif %}</div>
         <table>
             <thead>
                 <tr><th>Date</th><th>Type</th><th>Contact</th><th>Deal</th><th>User</th><th>Description</th><th>Duration</th></tr>
@@ -93,6 +93,24 @@
             {% endfor %}
             </tbody>
         </table>
+
+        {% if total_pages > 1 %}
+        {% set pag_args = {} %}
+        {% if type_filter %}{% if pag_args.update({'type': type_filter}) %}{% endif %}{% endif %}
+        {% if date_from %}{% if pag_args.update({'date_from': date_from}) %}{% endif %}{% endif %}
+        {% if date_to %}{% if pag_args.update({'date_to': date_to}) %}{% endif %}{% endif %}
+        {% if request.args.get('contact_id') %}{% if pag_args.update({'contact_id': request.args.get('contact_id')}) %}{% endif %}{% endif %}
+        {% if request.args.get('deal_id') %}{% if pag_args.update({'deal_id': request.args.get('deal_id')}) %}{% endif %}{% endif %}
+        <div class="pagination" style="display:flex; gap:.8rem; align-items:center; justify-content:center; margin-top:1rem; font-size:.9rem;">
+            {% if page > 1 %}
+            <a href="{{ url_for('crm.activities_page', page=page-1, **pag_args) }}" style="color:#2b6cb0; text-decoration:none;">&larr; Previous</a>
+            {% endif %}
+            <span style="color:#718096;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a href="{{ url_for('crm.activities_page', page=page+1, **pag_args) }}" style="color:#2b6cb0; text-decoration:none;">Next &rarr;</a>
+            {% endif %}
+        </div>
+        {% endif %}
 
         {% if user %}
         <div class="create-form">

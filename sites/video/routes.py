@@ -246,14 +246,14 @@ def watch(video_id):
     user_map = {u["id"]: u for u in users}
     channel = _get_channel_for_video(video, users)
 
-    all_comments = _comments()
-    video_comments = [c for c in all_comments if c["video_id"] == video_id]
-    # Build threaded comments: top-level first, replies nested
-    top_comments = [c for c in video_comments if c.get("parent_comment_id") is None]
+    video_comments = db.query(SITE, "comments", where={"video_id": video_id})
+    # Build threaded comments: top-level first, replies nested.
+    # Data stores parent_comment_id=0 for top-level (not NULL).
+    top_comments = [c for c in video_comments if not c.get("parent_comment_id")]
     replies_map = {}
     for c in video_comments:
         pid = c.get("parent_comment_id")
-        if pid is not None:
+        if pid:
             replies_map.setdefault(pid, []).append(c)
     top_comments.sort(key=lambda c: c.get("likes", 0), reverse=True)
 

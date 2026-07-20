@@ -165,17 +165,11 @@ def hourly_page():
 
 @blueprint.route("/history")
 def history_page():
-    """30-day historical weather page."""
+    """30-day historical weather page (multi-year archive via date range)."""
     table = db.get_table_name(SITE, "historical")
-    # Compute stats via SQL aggregation
-    stats_row = db.execute(
-        f"SELECT AVG(high_f) as avg_high, AVG(low_f) as avg_low, "
-        f"MAX(high_f) as max_high, MIN(low_f) as min_low, "
-        f"SUM(precip_in) as total_precip, "
-        f"SUM(CASE WHEN precip_in > 0 THEN 1 ELSE 0 END) as rainy_days "
-        f"FROM [{table}]",
-        fetch="one")
-    # Optional date-range navigation (same pattern as api_historical)
+    # Optional date-range navigation (same pattern as api_historical).
+    # The archive spans many years, so the default view is the most recent
+    # 30 days and explicit ranges are capped at 500 rows.
     date_from = request.args.get("date_from", "")
     date_to = request.args.get("date_to", "")
     if date_from or date_to:
@@ -187,10 +181,23 @@ def history_page():
         if date_to:
             clauses.append("[date] <= ?")
             params.append(date_to)
-        sql = f"SELECT * FROM [{table}] WHERE " + " AND ".join(clauses) + " ORDER BY [date]"
-        historical = db.execute(sql, tuple(params))
+        where_sql = " AND ".join(clauses)
     else:
-        historical = db.query(SITE, "historical", sort="date")  # 30 rows
+        last = db.execute(f"SELECT MAX([date]) AS d FROM [{table}]", fetch="one")
+        where_sql = "[date] >= date(?, '-29 days')"
+        params = [last["d"] if last else ""]
+    historical = db.execute(
+        f"SELECT * FROM [{table}] WHERE {where_sql} ORDER BY [date] LIMIT 500",
+        tuple(params))
+    # Stats over the same displayed window
+    stats_row = db.execute(
+        f"SELECT AVG(high_f) as avg_high, AVG(low_f) as avg_low, "
+        f"MAX(high_f) as max_high, MIN(low_f) as min_low, "
+        f"SUM(precip_in) as total_precip, "
+        f"SUM(CASE WHEN precip_in > 0 THEN 1 ELSE 0 END) as rainy_days "
+        f"FROM (SELECT * FROM [{table}] WHERE {where_sql} "
+        f"ORDER BY [date] LIMIT 500)",
+        tuple(params), fetch="one")
     user = _current_user()
     if stats_row and stats_row.get("avg_high") is not None:
         stats = {
@@ -351,6 +358,8 @@ def api_historical():
     date_to = request.args.get("date_to", "")
     table = db.get_table_name(SITE, "historical")
 
+    # The archive spans many years: default to the most recent 30 days,
+    # cap explicit ranges at 500 rows.
     if date_from or date_to:
         clauses = []
         params = []
@@ -360,10 +369,14 @@ def api_historical():
         if date_to:
             clauses.append("[date] <= ?")
             params.append(date_to)
-        sql = f"SELECT * FROM [{table}] WHERE " + " AND ".join(clauses) + " ORDER BY [date]"
-        historical = db.execute(sql, tuple(params))
+        where_sql = " AND ".join(clauses)
     else:
-        historical = db.query(SITE, "historical", sort="date")  # 30 rows
+        last = db.execute(f"SELECT MAX([date]) AS d FROM [{table}]", fetch="one")
+        where_sql = "[date] >= date(?, '-29 days')"
+        params = [last["d"] if last else ""]
+    historical = db.execute(
+        f"SELECT * FROM [{table}] WHERE {where_sql} ORDER BY [date] LIMIT 500",
+        tuple(params))
 
     return jsonify({"location": "Lakeport, WA", "historical": historical})
 

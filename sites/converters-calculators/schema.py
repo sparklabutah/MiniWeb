@@ -17,6 +17,24 @@ TABLES = {
             ("speed", "TEXT NOT NULL DEFAULT ''"),
         ],
     },
+    "history": {
+        "table_name": "converters_calculators_history",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("root_user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("tool", "TEXT NOT NULL DEFAULT ''"),
+            ("from_value", "TEXT NOT NULL DEFAULT ''"),
+            ("from_unit", "TEXT NOT NULL DEFAULT ''"),
+            ("to_unit", "TEXT NOT NULL DEFAULT ''"),
+            ("result", "TEXT NOT NULL DEFAULT ''"),
+            ("created_at", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "user_id",
+            "created_at",
+        ],
+    },
     "users": {
         "table_name": "converters_calculators_users",
         "columns": [

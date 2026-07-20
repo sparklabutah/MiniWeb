@@ -226,14 +226,42 @@ def permits_page():
     ptype = request.args.get("type", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
+    page = max(request.args.get("page", type=int) or 1, 1)
+    per_page = 50
 
-    results = _load_permits(status=status or None, ptype=ptype or None)
+    # SQL-level filtering + pagination (the permit archive is large)
+    clauses, params = [], []
+    if status:
+        clauses.append("[status] = ?")
+        params.append(status)
+    if ptype:
+        clauses.append("[type] = ?")
+        params.append(ptype)
     if date_from:
-        results = [p for p in results if p["date_submitted"] >= date_from]
+        clauses.append("[date_submitted] >= ?")
+        params.append(date_from)
     if date_to:
-        results = [p for p in results if p["date_submitted"] <= date_to]
+        clauses.append("[date_submitted] <= ?")
+        params.append(date_to)
+    where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
     if q:
-        results = _search_permits(results, q)
+        # keyword matching needs Python; run it over the SQL-filtered set
+        rows = db.execute(
+            f"SELECT * FROM [agency_portals_permits]{where_sql} ORDER BY [id]",
+            tuple(params))
+        rows = _search_permits(rows, q)
+        total = len(rows)
+        results = rows[(page - 1) * per_page:page * per_page]
+    else:
+        total = db.execute(
+            f"SELECT COUNT(*) FROM [agency_portals_permits]{where_sql}",
+            tuple(params), fetch="val")
+        results = db.execute(
+            f"SELECT * FROM [agency_portals_permits]{where_sql} "
+            f"ORDER BY [id] LIMIT ? OFFSET ?",
+            tuple(params) + (per_page, (page - 1) * per_page))
+    pages = max((total + per_page - 1) // per_page, 1)
 
     stat_rows = db.execute("SELECT DISTINCT [status] FROM [agency_portals_permits] ORDER BY [status]", ())
     statuses = [r["status"] for r in stat_rows]
@@ -245,7 +273,8 @@ def permits_page():
     return render_template("agency-portals/permits.html",
                            permits=results, statuses=statuses, types=types,
                            q=q, status=status, ptype=ptype,
-                           date_from=date_from, date_to=date_to, user=user)
+                           date_from=date_from, date_to=date_to, user=user,
+                           total=total, page=page, pages=pages)
 
 
 @blueprint.route("/permit/<int:permit_id>")
@@ -268,6 +297,8 @@ def records_page():
     dept_id = request.args.get("department", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
+    page = max(request.args.get("page", type=int) or 1, 1)
+    per_page = 50
 
     did = None
     if dept_id:
@@ -276,13 +307,36 @@ def records_page():
         except ValueError:
             pass
 
-    results = _load_records(rtype=rtype or None)
+    # SQL-level filtering + pagination (the records archive is large)
+    clauses, params = [], []
+    if rtype:
+        clauses.append("[type] = ?")
+        params.append(rtype)
     if date_from:
-        results = [r for r in results if r["date_filed"] >= date_from]
+        clauses.append("[date_filed] >= ?")
+        params.append(date_from)
     if date_to:
-        results = [r for r in results if r["date_filed"] <= date_to]
+        clauses.append("[date_filed] <= ?")
+        params.append(date_to)
+    where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
     if q:
-        results = _search_records(results, q)
+        # keyword scoring needs Python; run it over the SQL-filtered set
+        rows = db.execute(
+            f"SELECT * FROM [agency_portals_records]{where_sql} ORDER BY [id]",
+            tuple(params))
+        rows = _search_records(rows, q)
+        total = len(rows)
+        results = rows[(page - 1) * per_page:page * per_page]
+    else:
+        total = db.execute(
+            f"SELECT COUNT(*) FROM [agency_portals_records]{where_sql}",
+            tuple(params), fetch="val")
+        results = db.execute(
+            f"SELECT * FROM [agency_portals_records]{where_sql} "
+            f"ORDER BY [id] LIMIT ? OFFSET ?",
+            tuple(params) + (per_page, (page - 1) * per_page))
+    pages = max((total + per_page - 1) // per_page, 1)
 
     type_rows = db.execute("SELECT DISTINCT [type] FROM [agency_portals_records] ORDER BY [type]", ())
     record_types = [r["type"] for r in type_rows]
@@ -293,7 +347,8 @@ def records_page():
                            records=results, departments=departments,
                            record_types=record_types, q=q, rtype=rtype,
                            dept_id=dept_id, date_from=date_from,
-                           date_to=date_to, user=user)
+                           date_to=date_to, user=user,
+                           total=total, page=page, pages=pages)
 
 
 @blueprint.route("/announcements")

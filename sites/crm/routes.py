@@ -265,40 +265,54 @@ def deal_detail(deal_id):
 
 @blueprint.route("/activities")
 def activities_page():
-    activities = _get_activities()
     type_filter = request.args.get("type", "").strip()
     contact_filter = request.args.get("contact_id", "").strip()
     deal_filter = request.args.get("deal_id", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
-    results = list(activities)
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    per_page = 50
+
+    where = {}
     if type_filter:
-        results = [a for a in results if a["type"] == type_filter]
-    if date_from:
-        results = [a for a in results if a["date"] >= date_from]
-    if date_to:
-        results = [a for a in results if a["date"] <= date_to]
+        where["type"] = type_filter
     if contact_filter:
         try:
-            cid = int(contact_filter)
-            results = [a for a in results if a["contact_id"] == cid]
+            where["contact_id"] = int(contact_filter)
         except ValueError:
             pass
     if deal_filter:
         try:
-            did = int(deal_filter)
-            results = [a for a in results if a["deal_id"] == did]
+            where["deal_id"] = int(deal_filter)
         except ValueError:
             pass
-    results.sort(key=lambda a: a["date"], reverse=True)
+
+    if date_from or date_to:
+        # Date ranges aren't expressible in db.query's equality filters;
+        # fetch the (already narrowed) match set sorted, then slice.
+        matched = db.query(SITE, "activities", where=where or None, sort="-date")
+        if date_from:
+            matched = [a for a in matched if a["date"] >= date_from]
+        if date_to:
+            matched = [a for a in matched if a["date"] <= date_to]
+        total_count = len(matched)
+        results = matched[(page - 1) * per_page:(page - 1) * per_page + per_page]
+    else:
+        total_count = db.count(SITE, "activities", where=where or None)
+        results = db.query(SITE, "activities", where=where or None, sort="-date",
+                           limit=per_page, offset=(page - 1) * per_page)
+
+    total_pages = max(1, -(-total_count // per_page))
     for a in results:
         a["_contact_name"] = _contact_name(a["contact_id"])
         a["_user_name"] = _user_name(a["user_id"])
-        a["_deal_name"] = next((d["name"] for d in _get_deals() if d["id"] == a["deal_id"]), "Unknown")
+        deal = db.get_item(SITE, "deals", a["deal_id"])
+        a["_deal_name"] = deal["name"] if deal else "Unknown"
     user = _current_user()
     return render_template("crm/activities.html", activities=results,
                            type_filter=type_filter, date_from=date_from,
-                           date_to=date_to, user=user)
+                           date_to=date_to, user=user, page=page,
+                           total_pages=total_pages, total_count=total_count)
 
 
 @blueprint.route("/login", methods=["GET"])

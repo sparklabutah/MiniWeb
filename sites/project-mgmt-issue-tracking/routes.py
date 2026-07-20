@@ -38,7 +38,8 @@ def _load_projects():
     return [_ensure_project_key(_remap_key(p)) for p in db.query(SITE, "projects")]
 
 
-_PROJECT_PREFIXES = {1: "MF", 2: "MV", 3: "ML", 4: "IT", 5: "WR"}
+_PROJECT_PREFIXES = {1: "MF", 2: "MV", 3: "ML", 4: "IT", 5: "WR",
+                     6: "MC", 7: "MP", 8: "MG", 9: "MD"}
 
 
 def _remap_key(item):
