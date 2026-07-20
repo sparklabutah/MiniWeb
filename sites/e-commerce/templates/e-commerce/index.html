@@ -138,7 +138,7 @@
                     <h3>Quick Categories</h3>
                     {% for c in categories[:10] %}
                     <label style="display:block;font-size:.82rem;margin-bottom:.3rem;cursor:pointer;">
-                        <input type="checkbox" name="categories" value="{{ c }}" {% if c == cat %}checked{% endif %} style="accent-color:#febd69;"> {{ c }}
+                        <input type="checkbox" name="categories" value="{{ c }}" {% if c in checked_cats or c == cat %}checked{% endif %} style="accent-color:#febd69;"> {{ c }}
                     </label>
                     {% endfor %}
                 </div>
@@ -155,6 +155,7 @@
                 <form method="GET" action="{{ url_for('e-commerce.index') }}" style="display:inline;">
                     {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
                     {% if cat %}<input type="hidden" name="category" value="{{ cat }}">{% endif %}
+                    {% for cc in checked_cats %}<input type="hidden" name="categories" value="{{ cc }}">{% endfor %}
                     {% if brand %}<input type="hidden" name="brand" value="{{ brand }}">{% endif %}
                     {% if min_price is not none %}<input type="hidden" name="min_price" value="{{ min_price }}">{% endif %}
                     {% if max_price is not none %}<input type="hidden" name="max_price" value="{{ max_price }}">{% endif %}
@@ -208,7 +209,7 @@
             {% if total_pages > 1 %}
             <div class="pagination">
                 {% if page > 1 %}
-                <a href="{{ url_for('e-commerce.index', q=q, category=cat, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=page-1) }}">Previous</a>
+                <a href="{{ url_for('e-commerce.index', q=q, category=cat, categories=checked_cats, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=page-1) }}">Previous</a>
                 {% else %}
                 <span class="disabled">Previous</span>
                 {% endif %}
@@ -217,7 +218,7 @@
                     {% if pg == page %}
                     <span class="current">{{ pg }}</span>
                     {% elif pg <= 3 or pg > total_pages - 2 or (pg >= page - 1 and pg <= page + 1) %}
-                    <a href="{{ url_for('e-commerce.index', q=q, category=cat, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=pg) }}">{{ pg }}</a>
+                    <a href="{{ url_for('e-commerce.index', q=q, category=cat, categories=checked_cats, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=pg) }}">{{ pg }}</a>
                     {% elif pg == 4 and page > 5 %}
                     <span>...</span>
                     {% elif pg == total_pages - 2 and page < total_pages - 4 %}
@@ -226,7 +227,7 @@
                 {% endfor %}
 
                 {% if page < total_pages %}
-                <a href="{{ url_for('e-commerce.index', q=q, category=cat, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=page+1) }}">Next</a>
+                <a href="{{ url_for('e-commerce.index', q=q, category=cat, categories=checked_cats, brand=brand, min_price=min_price, max_price=max_price, min_rating=min_rating, sort=sort, page=page+1) }}">Next</a>
                 {% else %}
                 <span class="disabled">Next</span>
                 {% endif %}

@@ -466,7 +466,7 @@ def sprint_detail(sprint_id):
 def backlog():
     """Backlog — issues not assigned to any sprint."""
     issues = _load_issues()
-    backlog_issues = [i for i in issues if i.get("sprint") is None
+    backlog_issues = [i for i in issues if not i.get("sprint")
                       and i["status"] not in ("done", "closed")]
 
     # Apply filters

@@ -281,11 +281,15 @@ def _search_products(products, query):
 
 
 def _filter_products(products, category=None, brand=None, min_price=None,
-                     max_price=None, min_rating=None):
+                     max_price=None, min_rating=None, categories=None):
     results = list(products)
     if category:
         results = [p for p in results if p["top_category"] == category or
                    category in p["categories"]]
+    if categories:
+        results = [p for p in results
+                   if any(c == p["top_category"] or c in p["categories"]
+                          for c in categories)]
     if brand:
         results = [p for p in results if p["brand"].lower() == brand.lower()]
     if min_price is not None:
@@ -323,6 +327,7 @@ def index():
 
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
+    checked_cats = [c for c in request.args.getlist("categories") if c.strip()]
     brand = request.args.get("brand", "").strip()
     min_price = request.args.get("min_price", type=float)
     max_price = request.args.get("max_price", type=float)
@@ -334,7 +339,7 @@ def index():
         results = _search_products(results, q)
     results = _filter_products(results, category=cat, brand=brand,
                                min_price=min_price, max_price=max_price,
-                               min_rating=min_rating)
+                               min_rating=min_rating, categories=checked_cats)
     if sort:
         results = _sort_products(results, sort)
 
@@ -356,7 +361,8 @@ def index():
 
     return render_template("e-commerce/index.html",
                            products=paged_results, categories=categories,
-                           brands=brands, q=q, cat=cat, brand=brand,
+                           brands=brands, q=q, cat=cat,
+                           checked_cats=checked_cats, brand=brand,
                            min_price=min_price, max_price=max_price,
                            min_rating=min_rating, sort=sort, user=user,
                            page=page, total_pages=total_pages,
