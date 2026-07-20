@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pathlib
+import sqlite3
 
 
 def _load_dotenv():
@@ -251,6 +252,100 @@ def register_site_blueprints(app: Flask):
         app.register_blueprint(bp, url_prefix=f"/sites/{site_id}")
 
 
+def _register_recovery_routes(app):
+    """Token-gated, DB-independent endpoint to replace the SQLite file.
+
+    Exists so a corrupt or half-uploaded database on the persistent volume
+    can be replaced through the app itself (the app boots in recovery mode
+    even when the DB is unreadable). Enabled only when MINIWEB_RECOVERY_TOKEN
+    is set. Chunked + resumable: uploads append to <db>.upload.tmp, then an
+    explicit /complete call validates and atomically renames onto the DB.
+    """
+    import hmac
+    import threading
+    import time as _time
+
+    from flask import jsonify, request as _req
+
+    from app import db as _db
+
+    def _authed():
+        token = os.environ.get("MINIWEB_RECOVERY_TOKEN", "")
+        given = _req.headers.get("X-Recovery-Token", "")
+        return bool(token) and hmac.compare_digest(token, given)
+
+    def _paths():
+        db_path = pathlib.Path(_db._DB_PATH)
+        return db_path, db_path.with_suffix(db_path.suffix + ".upload.tmp")
+
+    @app.route("/recovery/db", methods=["GET"])
+    def _recovery_status():
+        if not _authed():
+            return "not found", 404
+        db_path, tmp = _paths()
+        return jsonify({
+            "db_healthy": bool(app.config.get("DB_HEALTHY")),
+            "db_size": db_path.stat().st_size if db_path.exists() else 0,
+            "tmp_size": tmp.stat().st_size if tmp.exists() else 0,
+        })
+
+    @app.route("/recovery/db", methods=["POST"])
+    def _recovery_chunk():
+        if not _authed():
+            return "not found", 404
+        _, tmp = _paths()
+        offset = _req.args.get("offset", type=int)
+        have = tmp.stat().st_size if tmp.exists() else 0
+        if offset is None or (offset != 0 and offset != have):
+            # resumable protocol: chunks must append exactly at tmp's end
+            return jsonify({"error": "bad offset", "tmp_size": have}), 409
+        mode = "wb" if offset == 0 else "ab"
+        written = 0
+        with open(tmp, mode) as f:
+            while True:
+                chunk = _req.stream.read(8 * 1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                written += len(chunk)
+        return jsonify({"tmp_size": offset + written})
+
+    @app.route("/recovery/db/complete", methods=["POST"])
+    def _recovery_complete():
+        if not _authed():
+            return "not found", 404
+        db_path, tmp = _paths()
+        if not tmp.exists():
+            return jsonify({"error": "no uploaded file"}), 400
+        # validate: SQLite header + readable schema
+        with open(tmp, "rb") as f:
+            if f.read(16) != b"SQLite format 3\x00":
+                return jsonify({"error": "not a SQLite database"}), 400
+        try:
+            check = sqlite3.connect(str(tmp), timeout=30)
+            check.execute("PRAGMA schema_version").fetchone()
+            n_tables = check.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+            check.close()
+        except sqlite3.Error as e:
+            return jsonify({"error": f"validation failed: {e}"}), 400
+        # stale WAL/SHM from the old file would corrupt the new one
+        for suffix in ("-wal", "-shm"):
+            side = pathlib.Path(str(db_path) + suffix)
+            if side.exists():
+                side.unlink()
+        os.replace(tmp, db_path)
+        # workers hold connections/fds to the old inode — restart the process
+        # so every worker reopens the new file (Railway restarts on exit)
+        if _req.args.get("restart", "1") != "0":
+            def _bye():
+                _time.sleep(1.5)
+                os._exit(0)
+            threading.Thread(target=_bye, daemon=True).start()
+        return jsonify({"replaced": True, "tables": n_tables,
+                        "restarting": _req.args.get("restart", "1") != "0"})
+
+
 def create_app():
     app = Flask(
         __name__,
@@ -287,8 +382,18 @@ def create_app():
     # Initialize SQLite database (per-site tables).
     # All sites use db.query() / db.save_item() for data access.
     # Session mutations are isolated in the session_overlay table.
+    # A corrupt/partial DB (e.g. an interrupted volume upload) must not
+    # crash-loop the app — boot anyway so /recovery/db can replace it.
     from app import db
-    db.init_db()
+    try:
+        db.init_db()
+        app.config["DB_HEALTHY"] = True
+    except sqlite3.Error as e:
+        app.config["DB_HEALTHY"] = False
+        app.logger.error("DB unusable at boot (%s) — recovery mode; "
+                         "replace it via POST /recovery/db", e)
+
+    _register_recovery_routes(app)
 
     @app.teardown_appcontext
     def _close_db(exc):
