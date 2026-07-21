@@ -61,7 +61,10 @@ def main():
         with tarfile.open(tar_path, "w:gz") as tf:
             for annotator in sorted(os.listdir(src)):
                 adir = os.path.join(src, annotator)
-                if not os.path.isdir(adir) or annotator == "annotations":
+                # skip files, the legacy nested 'annotations' snapshot, and
+                # dot-dirs (.trash holds deleted/replaced task generations)
+                if (not os.path.isdir(adir) or annotator == "annotations"
+                        or annotator.startswith(".")):
                     continue
                 for task_id in sorted(os.listdir(adir)):
                     tdir = os.path.join(adir, task_id)
