@@ -57,6 +57,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         <div id="task-list">
             {% for t in tasks %}
             <div class="task-card{% if task and t.task_id == task.task_id %} active{% endif %}"
+                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ (t.sites[0].id if t.sites else ''))|lower }}"
                  onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}'">
                 <div class="tc-id">{{ t.task_id }}</div>
                 <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
@@ -340,7 +341,9 @@ function playbackGo(idx) {
         var taskId = {{ task.task_id | tojson if task else '""' }};
         var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
         var imgUrl = '/annotate/api/screenshot/' + annotator + '/' + taskId + '/' + obs.screenshot;
-        iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;display:flex;align-items:center;justify-content:center;height:100vh"><img src="' + imgUrl + '" style="max-width:100%;max-height:100%;object-fit:contain"></body></html>';
+        // full-width (zoomed) screenshot; taller than the pane, so the user
+        // scrolls up/down instead of squinting at a shrink-to-fit image
+        iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;overflow:auto"><img src="' + imgUrl + '" style="width:100%;height:auto;display:block"></body></html>';
         var derived = obs.backfill_method || (obs.backfilled ? 'derived' : '');
         setLabel(derived ? ('screenshot (' + derived + ')') : 'screenshot (recorded)',
                  derived ? '#b45309' : '#16a34a');
@@ -391,10 +394,24 @@ function playbackAuto() {
 }
 
 function filterTasks(q) {
-    q = q.toLowerCase();
+    // match against the full instruction/site/annotator (data-search),
+    // not just the 80-char excerpt the card displays
+    var terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    var visible = 0;
     document.querySelectorAll('.task-card').forEach(c => {
-        c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+        var hay = (c.dataset.search || c.textContent).toLowerCase();
+        var hit = terms.every(t => hay.includes(t));
+        c.style.display = hit ? '' : 'none';
+        if (hit) visible++;
     });
+    var empty = document.getElementById('task-search-empty');
+    if (!empty) {
+        empty = document.createElement('div');
+        empty.id = 'task-search-empty';
+        empty.style.cssText = 'padding:.6rem;font-size:.75rem;color:#94a3b8';
+        document.getElementById('task-list').appendChild(empty);
+    }
+    empty.textContent = visible === 0 ? 'No tasks match "' + q + '"' : '';
 }
 
 function generateAmbiguous() {
