@@ -317,11 +317,18 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 <script>
 // --- Trajectory Playback ---
 var _trajData = {{ task.trajectory | tojson if task else '[]' }};
-// Build action list with paired observation (the observation right after each action)
+// Build action list with paired observation: the first observation between
+// this action and the next one — network entries may sit in between (the
+// recorder posts the observation after the action's requests settle), so
+// scanning only the immediately-next event missed screenshots that exist.
 var _steps = [];
 for (var _i = 0; _i < _trajData.length; _i++) {
     if (_trajData[_i].type === 'action') {
-        var obs = (_i + 1 < _trajData.length && _trajData[_i + 1].type === 'observation') ? _trajData[_i + 1] : null;
+        var obs = null;
+        for (var _j = _i + 1; _j < _trajData.length; _j++) {
+            if (_trajData[_j].type === 'action') break;
+            if (_trajData[_j].type === 'observation') { obs = _trajData[_j]; break; }
+        }
         _steps.push({ action: _trajData[_i], observation: obs });
     }
 }
