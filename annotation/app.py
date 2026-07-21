@@ -1044,14 +1044,63 @@ def index():
 
 @annotation_bp.route("/task")
 def annotate():
-    """Single annotation interface — system samples sites × macros."""
+    """Single annotation interface — system samples sites × macros.
+
+    With ?rerecord=<task_id>[&annotator=<name>] the prompt is built from that
+    saved task instead of sampled, and the task's design data is shipped to
+    the template so the editor opens prefilled; saving then replaces the
+    original recording (see api_create_task's replace branch).
+    """
     sites = _load_sites()
-    coverage = _get_macro_coverage()
-    prompt = _generate_prompt(sites, coverage)
+    rerecord = None
+    rerecord_id = request.args.get("rerecord", "").strip()
+    if rerecord_id:
+        from annotation.storage import get_annotators, load_task
+        annotator = request.args.get("annotator", "").strip()
+        candidates = [annotator] if annotator else get_annotators()
+        task = None
+        for ann in candidates:
+            task = load_task(ann, rerecord_id)
+            if task:
+                annotator = ann
+                break
+        if not task:
+            return redirect(url_for("annotation.verify"))
+        site_map = {s["id"]: s for s in sites}
+        task_site_ids = [s["id"] if isinstance(s, dict) else s
+                         for s in task.get("sites", [])]
+        prompt = {
+            "sites": [{"id": sid, "name": site_map.get(sid, {}).get("name", sid)}
+                      for sid in task_site_ids],
+            "macros": task.get("macros", []),
+            "num_sites": len(task_site_ids),
+            "num_macros": len(task.get("macros", [])),
+            "edges": [],
+        }
+        rerecord = {
+            "task_id": rerecord_id,
+            "annotator": annotator,
+            "instruction": task.get("instruction", ""),
+            "expected_answer": task.get("expected_answer") or "",
+            "answer_type": task.get("answer_type", "string"),
+            "alternatives": task.get("alternatives", ""),
+            "expected_outcome": task.get("expected_outcome", ""),
+            "macro_edges": task.get("macro_edges", []),
+            "macro_positions": task.get("macro_positions", {}),
+            "macro_subtasks": task.get("macro_subtasks", {}),
+            "qa_answers": task.get("qa_answers", {}),
+            "starting_url": task.get("starting_url", ""),
+            "requires_login": task.get("requires_login", True),
+            "missing_sites": [sid for sid in task_site_ids if sid not in site_map],
+        }
+    else:
+        coverage = _get_macro_coverage()
+        prompt = _generate_prompt(sites, coverage)
 
     return render_template("annotate.html",
                            sites=sites,
                            prompt=prompt,
+                           rerecord=rerecord,
                            macro_descriptions=_MACRO_DESCRIPTIONS,
                            macro_locations=_canonical_macro_locations())
 
@@ -1610,13 +1659,44 @@ def api_create_task():
         "macro_positions": data.get("macro_positions", {}),
         "macro_subtasks": data.get("macro_subtasks", {}),
         "macro_spans": data.get("macro_spans", {}),
+        "qa_answers": data.get("qa_answers", {}),
+        "starting_url": data.get("starting_url", ""),
+        "requires_login": data.get("requires_login", True),
         "trajectory": data.get("trajectory", []),
         "server_log": data.get("server_log", []),
         "beacon_log": data.get("beacon_log", []),
         "agent_result": data.get("agent_result"),
         "annotator": data.get("annotator", "anonymous"),
     }
-    task_id = _save_task(task)
+
+    # Re-record: replace an existing task in place. The new recording keeps
+    # the original task_id and annotator dir (external references stay
+    # stable); the previous version moves to the recoverable .trash.
+    replace_id = data.get("replace_task_id")
+    trashed_from = None
+    if replace_id:
+        from annotation.storage import ANNOTATIONS_DIR, get_annotators, trash_task
+        orig_annotator = data.get("replace_annotator") or next(
+            (a for a in get_annotators()
+             if (ANNOTATIONS_DIR / a / replace_id).exists()), None)
+        if not orig_annotator or not (ANNOTATIONS_DIR / orig_annotator / replace_id).exists():
+            return jsonify({"error": "Task to replace not found"}), 404
+        task["task_id"] = replace_id
+        task["annotator"] = orig_annotator
+        task["rerecorded_at"] = datetime.now().isoformat()
+        task["rerecorded_by"] = data.get("annotator", "anonymous")
+        # trash-then-save: moving the whole old dir away also removes stale
+        # screenshots/ and logs that a plain overwrite would leave behind
+        trashed_from = trash_task(orig_annotator, replace_id)
+
+    try:
+        task_id = _save_task(task)
+    except Exception:
+        if trashed_from:
+            # restore the original so a failed replace never loses the task
+            import shutil
+            shutil.move(trashed_from, str(ANNOTATIONS_DIR / task["annotator"] / replace_id))
+        raise
 
     # Derive axtree + screenshot from the recorded HTML snapshots so saved
     # observations match the backfilled/replayed data format (async).
@@ -2022,6 +2102,20 @@ def api_get_task(task_id):
     if not task:
         return jsonify({"error": "Task not found"}), 404
     return jsonify(task)
+
+
+@annotation_bp.route("/api/tasks/<task_id>", methods=["DELETE"])
+def api_delete_task(task_id):
+    """Move a task to the recoverable .trash (per-task delete from review)."""
+    from annotation.storage import ANNOTATIONS_DIR, get_annotators, trash_task
+    annotator = request.args.get("annotator", "")
+    if not annotator:
+        annotator = next((a for a in get_annotators()
+                          if (ANNOTATIONS_DIR / a / task_id).exists()), "")
+    dest = trash_task(annotator, task_id) if annotator else None
+    if not dest:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify({"status": "trashed", "task_id": task_id, "trash_path": dest})
 
 
 @annotation_bp.route("/api/report", methods=["POST"])

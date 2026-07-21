@@ -111,7 +111,8 @@ def list_tasks(annotator: str = None) -> list[dict]:
     else:
         if not ANNOTATIONS_DIR.exists():
             return []
-        annotators = [d.name for d in ANNOTATIONS_DIR.iterdir() if d.is_dir()]
+        annotators = [d.name for d in ANNOTATIONS_DIR.iterdir()
+                      if d.is_dir() and not d.name.startswith(".")]
 
     for ann in annotators:
         ann_dir = ANNOTATIONS_DIR / ann
@@ -141,11 +142,36 @@ def delete_task(annotator: str, task_id: str) -> bool:
     return False
 
 
+def trash_task(annotator: str, task_id: str) -> str | None:
+    """Move a task dir into the hidden trash (recoverable delete).
+
+    Destination is {ANNOTATIONS_DIR}/.trash/{annotator}/{task_id}-{timestamp};
+    the timestamp suffix keeps every generation when a task is trashed more
+    than once (e.g. repeated re-records). Returns the destination path, or
+    None when the task doesn't exist. The dot-prefix keeps the trash out of
+    list_tasks/get_annotators/get_stats.
+    """
+    import shutil
+    d = _task_dir(annotator, task_id)
+    if not d.exists():
+        return None
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    dest = ANNOTATIONS_DIR / ".trash" / annotator / f"{task_id}-{stamp}"
+    n = 0
+    while dest.exists():  # same-instant collision: shutil.move would nest
+        n += 1
+        dest = dest.with_name(f"{task_id}-{stamp}-{n}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(d), str(dest))
+    return str(dest)
+
+
 def get_annotators() -> list[str]:
     """List all annotator names."""
     if not ANNOTATIONS_DIR.exists():
         return []
-    return sorted(d.name for d in ANNOTATIONS_DIR.iterdir() if d.is_dir())
+    return sorted(d.name for d in ANNOTATIONS_DIR.iterdir()
+                  if d.is_dir() and not d.name.startswith("."))
 
 
 def get_stats() -> dict:
@@ -155,7 +181,7 @@ def get_stats() -> dict:
         return stats
 
     for ann_dir in ANNOTATIONS_DIR.iterdir():
-        if not ann_dir.is_dir():
+        if not ann_dir.is_dir() or ann_dir.name.startswith("."):
             continue
         count = sum(1 for t in ann_dir.iterdir() if (t / "task.json").exists())
         stats["annotators"][ann_dir.name] = count

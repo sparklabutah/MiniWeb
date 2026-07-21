@@ -76,7 +76,17 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         {% else %}
         <!-- Task info -->
         <div class="section">
-            <h3>{{ task.task_id }}</h3>
+            <div style="display:flex;align-items:center;gap:.6rem">
+                <h3 style="flex:1;margin:0">{{ task.task_id }}</h3>
+                <button onclick="rerecordTask()"
+                    style="padding:.25rem .7rem;font-size:.72rem;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
+                    &#8634; Re-record
+                </button>
+                <button onclick="deleteTask()"
+                    style="padding:.25rem .7rem;font-size:.72rem;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
+                    &#128465; Delete
+                </button>
+            </div>
             <label>Original instruction</label>
             <div style="font-size:.85rem;line-height:1.4;margin-bottom:.4rem">{{ task.instruction }}</div>
 
@@ -412,6 +422,30 @@ function filterTasks(q) {
         document.getElementById('task-list').appendChild(empty);
     }
     empty.textContent = visible === 0 ? 'No tasks match "' + q + '"' : '';
+}
+
+// --- Delete / Re-record (task header buttons) ---
+var _reviewTaskId = {{ task.task_id | tojson if task else '""' }};
+var _reviewAnnotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+
+function rerecordTask() {
+    if (!_reviewTaskId) return;
+    if (!confirm('Re-record "' + _reviewTaskId + '"?\n\nThe annotation interface will open prefilled with this task\'s design. The current recording is replaced only when you save the new one.')) return;
+    location.href = '/annotate/task?rerecord=' + encodeURIComponent(_reviewTaskId)
+        + '&annotator=' + encodeURIComponent(_reviewAnnotator);
+}
+
+function deleteTask() {
+    if (!_reviewTaskId) return;
+    if (!confirm('Move task "' + _reviewTaskId + '" to trash?')) return;
+    fetch('/annotate/api/tasks/' + encodeURIComponent(_reviewTaskId)
+          + '?annotator=' + encodeURIComponent(_reviewAnnotator), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'trashed') location.href = '/annotate/verify';
+            else alert('Delete failed: ' + (d.error || 'unknown error'));
+        })
+        .catch(e => alert('Delete failed: ' + e));
 }
 
 function generateAmbiguous() {

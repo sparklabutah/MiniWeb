@@ -508,6 +508,7 @@ textarea#instruction:focus {
 <script>
 const macroDescriptions = {{ macro_descriptions | tojson }};
 const macroLocations = {{ macro_locations | tojson }};
+const rerecordTask = {{ rerecord | tojson }};   // set when replacing an existing task
 let currentPrompt = {{ prompt | tojson }};
 let currentStep = 1;
 let selectedMacros = currentPrompt ? currentPrompt.macros.slice() : [];
@@ -658,7 +659,46 @@ function renderSiteLabels() {
     ).join('');
 }
 
+// --- Re-record mode: hydrate the editor from the saved task -----------------
+function hydrateRerecord() {
+    const t = rerecordTask;
+    if (!t) return;
+    macroSubtasks = t.macro_subtasks || {};
+    macroEdges = t.macro_edges || [];
+    macroPositions = t.macro_positions || {};
+    qaAnswers = t.qa_answers || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('instruction', t.instruction || '');
+    set('final-answer', t.expected_answer || '');
+    set('answer-type', t.answer_type || 'string');
+    set('alternatives', t.alternatives || '');
+    set('expected-outcome', t.expected_outcome || '');
+    const login = document.getElementById('auto-login-toggle');
+    if (login) login.checked = t.requires_login !== false;
+
+    // banner + hide prompt-mutation controls (they would clobber the prefill)
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#fffbeb;border:1px solid #fcd34d;color:#92400e;' +
+        'padding:.4rem .7rem;font-size:.75rem;border-radius:.3rem;margin:.3rem .6rem;font-weight:600';
+    banner.textContent = 'Re-recording ' + t.task_id + ' (by ' + t.annotator +
+        ') — saving will REPLACE the original recording.' +
+        (t.missing_sites && t.missing_sites.length
+            ? '  ⚠ Site(s) no longer in registry: ' + t.missing_sites.join(', ')
+            : '');
+    const panel = document.querySelector('.main-layout') || document.body;
+    panel.parentNode.insertBefore(banner, panel);
+    document.querySelectorAll('button').forEach(b => {
+        const txt = (b.textContent || '').trim();
+        if (txt === '↻ New' || txt === 'Skip') b.style.display = 'none';
+    });
+    const sst = document.getElementById('single-site-toggle');
+    if (sst && sst.parentElement) sst.parentElement.style.display = 'none';
+    const sp = document.getElementById('site-picker');
+    if (sp) sp.style.display = 'none';
+}
+
 function initAnnotation() {
+    hydrateRerecord();
     if (currentPrompt) {
         renderSiteLabels();
         renderMacroList();
@@ -1426,6 +1466,7 @@ async function _populateSitePicker() {
 }
 
 function reshufflePrompt() {
+    if (rerecordTask) return;  // re-record mode is pinned to the saved task
     document.getElementById('status').textContent = 'Loading new prompt...';
     const singleSite = document.getElementById('single-site-toggle')?.checked ? '1' : '';
     const chosenSite = singleSite ? (document.getElementById('site-picker')?.value || '') : '';
@@ -2974,9 +3015,20 @@ async function submitTask() {
                 beacon_log: beaconLog,
                 agent_result: agentResult || null,
                 annotator,
+                replace_task_id: rerecordTask ? rerecordTask.task_id : undefined,
+                replace_annotator: rerecordTask ? rerecordTask.annotator : undefined,
             })
         });
         const d = await r.json();
+        if (d.task_id && rerecordTask) {
+            document.getElementById('status').innerHTML =
+                `<span style="color:#16a34a;font-weight:600">Replaced: ${d.task_id} — returning to review...</span>`;
+            setTimeout(() => {
+                location.href = '/annotate/verify?task_id=' + encodeURIComponent(d.task_id)
+                    + '&annotator=' + encodeURIComponent(rerecordTask.annotator);
+            }, 1000);
+            return;
+        }
         if (d.task_id) {
             // Refresh floor counts in the site picker (a slot was just filled)
             if (document.getElementById('single-site-toggle')?.checked) _populateSitePicker();
