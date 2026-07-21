@@ -1674,12 +1674,19 @@ function toggleRecording() {
 }
 
 function stopAndNext() {
-    recording = false;
-    if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
-    // Final poll to catch any last requests
-    pollServerLog();
-    updateRecUI();
-    goStep(3);
+    // ask the recorder to flush buffered typing + the pending observation
+    // BEFORE we stop listening — otherwise a recording that ends right
+    // after typing loses its final type action and page state
+    const iframe = document.getElementById('site-iframe');
+    try { iframe.contentWindow.postMessage({mw: 'flush'}, '*'); } catch (e) {}
+    setTimeout(() => {
+        recording = false;
+        if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+        // Final poll to catch any last requests
+        pollServerLog();
+        updateRecUI();
+        goStep(3);
+    }, 350);
 }
 
 function updateRecUI() {

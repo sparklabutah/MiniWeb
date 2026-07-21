@@ -145,6 +145,8 @@
     // ── Action posting ──────────────────────────────────────────────────
 
     function postAction(action, el, extra) {
+        // the previous action's observation must land before this action
+        _flushObservation();
         var msg = {
             mw: 'action',
             action: action,
@@ -162,13 +164,59 @@
             try { navigator.sendBeacon('/_admin/beacon', new Blob([beacon], {type: 'application/json'})); }
             catch(e) { /* sendBeacon not available, silently skip */ }
         }
-        // Post observation after every action (debounced to avoid flooding)
+        // Every action gets exactly one observation. It captures as late as
+        // possible — after any network the action kicked off settles (a
+        // 300ms snapshot would show the page BEFORE its effect: translate
+        // API responses, filter fetches, form XHRs) — but never later than
+        // the NEXT action: if one arrives first, the pending observation is
+        // flushed immediately so no step is skipped and ordering holds.
+        _obsPending = true;
+        _obsWaited = 0;
         clearTimeout(_obsTimer);
-        _obsTimer = setTimeout(function() {
-            post(makeObservation());
-        }, 300);
+        _armObservation();
     }
     var _obsTimer = null;
+    var _obsPending = false;
+    var _obsWaited = 0;
+    var _inflight = 0;
+
+    function _flushObservation() {
+        if (!_obsPending) return;
+        clearTimeout(_obsTimer);
+        _obsPending = false;
+        post(makeObservation());
+    }
+
+    function _armObservation() {
+        // initial 600ms window: sites often debounce their own fetches
+        // (e.g. translate-as-you-type) — give them time to start
+        _obsTimer = setTimeout(function() {
+            if (_inflight > 0 && _obsWaited < 4000) {
+                _obsWaited += 250;   // network still settling — check again
+                _armObservation();
+                return;
+            }
+            _obsPending = false;
+            post(makeObservation());
+        }, _obsWaited ? 250 : 600);
+    }
+
+    function _netDone() {
+        // a response just landed while an observation is pending: capture
+        // shortly after, so the snapshot includes the rendered effect
+        if (_obsPending) {
+            clearTimeout(_obsTimer);
+            _obsWaited = Math.max(_obsWaited, 250);
+            _armObservation();
+        }
+    }
+
+    // click-then-navigate: flush buffered typing and capture the outgoing
+    // page before it unloads
+    window.addEventListener('beforeunload', function() {
+        flushPendingInput();
+        _flushObservation();
+    });
 
     // ── Network interception ────────────────────────────────────────────
     // Wraps fetch() and XMLHttpRequest to log all HTTP traffic
@@ -196,8 +244,10 @@
             } catch(e) {}
         }
         var t0 = performance.now();
+        _inflight++;
 
         return origFetch.apply(this, arguments).then(function(response) {
+            _inflight = Math.max(0, _inflight - 1); _netDone();
             var duration = Math.round(performance.now() - t0);
             // Clone to read body without consuming it
             var clone = response.clone();
@@ -227,6 +277,7 @@
             });
             return response;
         }).catch(function(err) {
+            _inflight = Math.max(0, _inflight - 1); _netDone();
             post({
                 mw: 'network',
                 method: method, url: url, status: 0, error: err.message,
@@ -252,8 +303,10 @@
         if (_isNoisy(xhr._mw_url)) return origXHRSend.apply(this, arguments);
         var t0 = performance.now();
         xhr._mw_body = body;
+        _inflight++;
 
         xhr.addEventListener('loadend', function() {
+            _inflight = Math.max(0, _inflight - 1); _netDone();
             var respText = '';
             try { respText = xhr.responseText || ''; } catch(e) {}
             var respBody = respText.length > 500 ? respText.slice(0, 500) + '...' : respText;
@@ -328,13 +381,31 @@
         postAction('click', target, extra);
     }, true);
 
-    // ── Input — buffer typing, only flush on next click/submit/nav ─────
+    // ── Input — buffer typing; flush on the debounce, blur, or the next
+    // click/submit/nav, whichever comes first. Without the debounce flush a
+    // typing burst that ends the recording (type → read result → stop) was
+    // never posted at all — no type action, no observation of the effect.
     document.addEventListener('input', function(e) {
         var el = e.target;
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
             pendingInput = { el: el, text: el.value };
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(flushPendingInput, TYPING_DEBOUNCE);
         }
     }, true);
+
+    document.addEventListener('focusout', function(e) {
+        var el = e.target;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') flushPendingInput();
+    }, true);
+
+    // parent UI can force everything out before it stops recording
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.mw === 'flush') {
+            flushPendingInput();
+            _flushObservation();
+        }
+    });
 
     // ── Select/checkbox/range — log immediately (these are one-shot) ───
     document.addEventListener('change', function(e) {
