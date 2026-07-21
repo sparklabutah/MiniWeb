@@ -274,7 +274,14 @@ def _register_recovery_routes(app):
         given = _req.headers.get("X-Recovery-Token", "")
         return bool(token) and hmac.compare_digest(token, given)
 
-    def _paths():
+    def _annotations_dir():
+        from annotation.storage import ANNOTATIONS_DIR
+        return pathlib.Path(ANNOTATIONS_DIR)
+
+    def _paths(target="db"):
+        if target == "annotations":
+            ann = _annotations_dir()
+            return ann, ann.parent / "annotations.upload.tmp"
         db_path = pathlib.Path(_db._DB_PATH)
         return db_path, db_path.with_suffix(db_path.suffix + ".upload.tmp")
 
@@ -283,17 +290,19 @@ def _register_recovery_routes(app):
         if not _authed():
             return "not found", 404
         db_path, tmp = _paths()
+        _, ann_tmp = _paths("annotations")
         return jsonify({
             "db_healthy": bool(app.config.get("DB_HEALTHY")),
             "db_size": db_path.stat().st_size if db_path.exists() else 0,
             "tmp_size": tmp.stat().st_size if tmp.exists() else 0,
+            "annotations_tmp_size": ann_tmp.stat().st_size if ann_tmp.exists() else 0,
         })
 
     @app.route("/recovery/db", methods=["POST"])
     def _recovery_chunk():
         if not _authed():
             return "not found", 404
-        _, tmp = _paths()
+        _, tmp = _paths(_req.args.get("target", "db"))
         offset = _req.args.get("offset", type=int)
         have = tmp.stat().st_size if tmp.exists() else 0
         if offset is None or (offset != 0 and offset != have):
@@ -344,6 +353,67 @@ def _register_recovery_routes(app):
             threading.Thread(target=_bye, daemon=True).start()
         return jsonify({"replaced": True, "tables": n_tables,
                         "restarting": _req.args.get("restart", "1") != "0"})
+
+    @app.route("/recovery/annotations/complete", methods=["POST"])
+    def _recovery_annotations_complete():
+        """Extract an uploaded tar.gz of task dirs into ANNOTATIONS_DIR.
+
+        Additive: task directories in the archive replace their counterparts;
+        tasks not present in the archive are left untouched. Members must be
+        relative paths shaped like <annotator>/<task_id>/<file> (an optional
+        leading 'annotations/' component is stripped).
+        """
+        import tarfile
+
+        if not _authed():
+            return "not found", 404
+        ann_dir, tmp = _paths("annotations")
+        if not tmp.exists():
+            return jsonify({"error": "no uploaded file"}), 400
+        try:
+            tf = tarfile.open(tmp, "r:gz")
+        except tarfile.TarError as e:
+            return jsonify({"error": f"not a tar.gz: {e}"}), 400
+        replaced_dirs, files = set(), 0
+        with tf:
+            members = tf.getmembers()
+            for m in members:
+                parts = pathlib.PurePosixPath(m.name).parts
+                if parts and parts[0] in ("annotations", "."):
+                    parts = parts[1:]
+                if any(p in ("..", "") or p.startswith("/") for p in parts):
+                    return jsonify({"error": f"unsafe path: {m.name}"}), 400
+                if m.isdir() or not parts:
+                    continue
+                if len(parts) < 3 or not (m.isreg()):
+                    return jsonify({"error": f"unexpected member: {m.name} "
+                                    "(want <annotator>/<task_id>/<file>)"}), 400
+            # second pass: wipe each task dir once, then write files
+            import shutil as _shutil
+            for m in members:
+                if not m.isreg():
+                    continue
+                parts = pathlib.PurePosixPath(m.name).parts
+                if parts[0] in ("annotations", "."):
+                    parts = parts[1:]
+                task_dir = ann_dir / parts[0] / parts[1]
+                key = str(task_dir)
+                if key not in replaced_dirs:
+                    if task_dir.exists():
+                        _shutil.rmtree(task_dir)
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                    replaced_dirs.add(key)
+                dest = ann_dir.joinpath(*parts)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with tf.extractfile(m) as src, open(dest, "wb") as out:
+                    while True:
+                        chunk = src.read(1 << 20)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                files += 1
+        tmp.unlink()
+        return jsonify({"replaced_tasks": len(replaced_dirs), "files": files})
 
 
 def create_app():

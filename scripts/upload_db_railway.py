@@ -34,6 +34,12 @@ def main():
     ap.add_argument("--url", required=True, help="Base URL of the deployment")
     ap.add_argument("--token", default=os.environ.get("MINIWEB_RECOVERY_TOKEN", ""))
     ap.add_argument("--db", default="data/trimmed_miniweb.db")
+    ap.add_argument("--annotations", action="store_true",
+                    help="Upload data/annotations (task dirs) instead of the DB. "
+                    "Tars <annotator>/<task_id> dirs, uploads, and the server "
+                    "replaces those task dirs in its ANNOTATIONS_DIR (additive; "
+                    "tasks absent from the archive are untouched).")
+    ap.add_argument("--annotations-dir", default="data/annotations")
     ap.add_argument("--chunk-mb", type=int, default=32)
     ap.add_argument("--no-restart", action="store_true",
                     help="Don't restart the remote app after replacing the DB")
@@ -43,9 +49,33 @@ def main():
     if not args.token:
         sys.exit("No token: pass --token or set MINIWEB_RECOVERY_TOKEN")
 
+    target = "annotations" if args.annotations else "db"
+    if args.annotations:
+        # tar the task dirs (skip any nested 'annotations' duplicate dir)
+        import tarfile
+        import tempfile
+        src = args.annotations_dir
+        fd, tar_path = tempfile.mkstemp(suffix=".tar.gz")
+        os.close(fd)
+        n = 0
+        with tarfile.open(tar_path, "w:gz") as tf:
+            for annotator in sorted(os.listdir(src)):
+                adir = os.path.join(src, annotator)
+                if not os.path.isdir(adir) or annotator == "annotations":
+                    continue
+                for task_id in sorted(os.listdir(adir)):
+                    tdir = os.path.join(adir, task_id)
+                    if os.path.isdir(tdir):
+                        tf.add(tdir, arcname=f"{annotator}/{task_id}")
+                        n += 1
+        print(f"packed {n} task dirs -> {tar_path} "
+              f"({os.path.getsize(tar_path) / 1e6:.1f} MB)")
+        args.db = tar_path
+
     size = os.path.getsize(args.db)
     status = api(args.url, args.token)
-    offset = 0 if args.fresh else status.get("tmp_size", 0)
+    key = "annotations_tmp_size" if args.annotations else "tmp_size"
+    offset = 0 if args.fresh else status.get(key, 0)
     if offset > size:
         offset = 0
     print(f"remote db_healthy={status.get('db_healthy')} | local {size/1e9:.2f} GB | "
@@ -60,7 +90,8 @@ def main():
             for attempt in range(5):
                 try:
                     r = api(args.url, args.token, "POST",
-                            f"/recovery/db?offset={offset}", body=data)
+                            f"/recovery/db?offset={offset}&target={target}",
+                            body=data)
                     break
                 except (urllib.error.URLError, OSError) as e:
                     if attempt == 4:
@@ -68,7 +99,7 @@ def main():
                     print(f"  retry {attempt + 1} at offset {offset}: {e}")
                     time.sleep(2 ** attempt)
                     # re-sync offset with the server after a failure
-                    offset = api(args.url, args.token).get("tmp_size", offset)
+                    offset = api(args.url, args.token).get(key, offset)
                     f.seek(offset)
                     data = f.read(chunk)
             offset = r["tmp_size"]
@@ -76,6 +107,12 @@ def main():
             rate = offset / max(time.time() - t0, 1) / 1e6
             print(f"  {done * 100:5.1f}%  ({offset / 1e9:.2f} GB, {rate:.1f} MB/s)",
                   flush=True)
+
+    if args.annotations:
+        r = api(args.url, args.token, "POST", "/recovery/annotations/complete")
+        print("server:", r)
+        os.unlink(args.db)
+        return
 
     restart = "0" if args.no_restart else "1"
     r = api(args.url, args.token, "POST", f"/recovery/db/complete?restart={restart}")
