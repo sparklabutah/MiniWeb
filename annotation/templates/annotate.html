@@ -393,6 +393,8 @@ textarea#instruction:focus {
                 <div style="display:flex;gap:.3rem;margin-bottom:.5rem;align-items:center">
                     <button id="rec-btn" class="btn btn-recording" onclick="toggleRecording()">Recording...</button>
                     <span id="rec-status" style="font-size:.78rem;color:#ef4444;font-weight:600">REC</span>
+                    <span id="capture-badge" style="font-size:.62rem;color:#94a3b8;border:1px solid #e2e8f0;border-radius:.6rem;padding:.05rem .4rem">screen: derived</span>
+                    <a id="capture-retry" href="#" onclick="retryCapture();return false" style="display:none;font-size:.62rem;color:#2563eb">enable screen capture</a>
                     <span id="rec-count" style="font-size:.78rem;color:#64748b;margin-left:auto">0 actions</span>
                 </div>
 
@@ -1628,7 +1630,95 @@ function pollServerLog() {
 
 var startingUrl = '';
 
+// --- Real screen capture (tab share, one prompt per sitting) ----------------
+let captureStream = null;
+let captureVideo = null;
+let captureCanvas = null;
+let captureDeclined = false;
+
+function _setCaptureBadge(live) {
+    const b = document.getElementById('capture-badge');
+    const retry = document.getElementById('capture-retry');
+    if (!b) return;
+    b.textContent = live ? 'screen: live' : 'screen: derived';
+    b.style.color = live ? '#16a34a' : '#94a3b8';
+    b.style.borderColor = live ? '#86efac' : '#e2e8f0';
+    if (retry) retry.style.display = (!live && captureDeclined) ? '' : 'none';
+}
+
+function ensureCaptureStream() {
+    if (captureStream && captureStream.getVideoTracks()[0]?.readyState === 'live') {
+        _setCaptureBadge(true);
+        return;
+    }
+    captureStream = null;
+    if (captureDeclined || !navigator.mediaDevices?.getDisplayMedia) {
+        _setCaptureBadge(false);
+        return;
+    }
+    navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
+        preferCurrentTab: true,
+        selfBrowserSurface: 'include',
+        surfaceSwitching: 'exclude',
+        audio: false,
+    }).then(stream => {
+        captureStream = stream;
+        if (!captureVideo) {
+            captureVideo = document.createElement('video');
+            captureVideo.muted = true;
+            captureVideo.playsInline = true;
+            captureVideo.autoplay = true;
+            // off-screen but NOT display:none — hidden video can stall frames
+            captureVideo.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px';
+            document.body.appendChild(captureVideo);
+        }
+        captureVideo.srcObject = stream;
+        captureVideo.play().catch(() => {});
+        stream.getVideoTracks()[0].addEventListener('ended', () => {
+            captureStream = null;
+            _setCaptureBadge(false);
+        });
+        _setCaptureBadge(true);
+    }).catch(() => {
+        captureDeclined = true;   // don't re-prompt this sitting
+        _setCaptureBadge(false);
+    });
+}
+
+function retryCapture() {
+    captureDeclined = false;
+    ensureCaptureStream();
+}
+
+function grabFrame() {
+    // one real frame, cropped to the site iframe, downscaled, as a JPEG
+    try {
+        const v = captureVideo;
+        if (!captureStream || !v || v.readyState < 2 || !v.videoWidth) return null;
+        const rect = document.getElementById('site-iframe').getBoundingClientRect();
+        // per-capture scale: self-corrects for zoom/DPR/resize
+        const scaleX = v.videoWidth / window.innerWidth;
+        const scaleY = v.videoHeight / window.innerHeight;
+        const sx = Math.max(0, rect.left * scaleX);
+        const sy = Math.max(0, rect.top * scaleY);
+        const sw = Math.min(rect.width * scaleX, v.videoWidth - sx);
+        const sh = Math.min(rect.height * scaleY, v.videoHeight - sy);
+        if (sw < 50 || sh < 50) return null;
+        const outW = Math.min(1440, Math.round(sw));
+        const outH = Math.round(sh * outW / sw);
+        if (!captureCanvas) captureCanvas = document.createElement('canvas');
+        captureCanvas.width = outW;
+        captureCanvas.height = outH;
+        captureCanvas.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, outW, outH);
+        return captureCanvas.toDataURL('image/jpeg', 0.85);
+    } catch (e) {
+        return null;   // derivation covers this step
+    }
+}
+
 function startRecording() {
+    ensureCaptureStream();   // one prompt per sitting; never blocks recording
     trajectory = [];
     actionCounter = 0;
     macroSpans = {};
@@ -1746,7 +1836,7 @@ window.addEventListener('message', function(e) {
         });
         renderTrajectory();
     } else if (d.mw === 'observation') {
-        trajectory.push({
+        const entry = {
             type: 'observation',
             url: d.url || '',
             title: d.title || '',
@@ -1760,7 +1850,17 @@ window.addEventListener('message', function(e) {
             axtree_json: d.axtree_json || '',
             scroll_top: d.scroll_top || 0,
             viewport: d.viewport || null,
-        });
+        };
+        // real screen capture: one frame per observation, if the tab-share
+        // stream is live and this observation belongs to an action
+        if (actionCounter > 0) {
+            const frame = grabFrame();
+            if (frame) {
+                entry.screenshot_data = frame;
+                entry.screenshot_captured = true;
+            }
+        }
+        trajectory.push(entry);
         renderTrajectory();
     }
 });

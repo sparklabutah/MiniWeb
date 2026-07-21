@@ -517,17 +517,48 @@
         } catch(e) { /* never block the capture */ }
     }
 
+    function mirrorCanvases() {
+        // A <canvas> bitmap is not part of outerHTML — unsaved drawings
+        // vanish from snapshots. Embed each canvas's pixels as a data URL
+        // attribute; the server-side renderer swaps it in as an image.
+        // Returns the canvases touched so the caller can clean up.
+        var touched = [];
+        document.querySelectorAll('canvas').forEach(function(c) {
+            if (!c.width || !c.height || c.width * c.height > 4000000) return;
+            try {
+                touched.push(c);
+                c.setAttribute('data-mw-canvas', c.toDataURL('image/png'));
+            } catch(e) { /* tainted canvas — skip */ }
+        });
+        return touched;
+    }
+
     function captureSnapshot() {
+        var canvases = [];
         try {
             mirrorFormState();
+            canvases = mirrorCanvases();
             var html = document.documentElement.outerHTML;
             // 2MB cap: a truncated snapshot cannot be re-rendered for
             // axtree/screenshot derivation, so keep this generous.
+            if (html.length > 2000000 && canvases.length) {
+                // canvas bitmaps pushed us over — retry without them rather
+                // than shipping a truncated, unrenderable snapshot
+                canvases.forEach(function(c) { c.removeAttribute('data-mw-canvas'); });
+                canvases = [];
+                document.documentElement.setAttribute('data-mw-canvas-skipped', '1');
+                html = document.documentElement.outerHTML;
+                document.documentElement.removeAttribute('data-mw-canvas-skipped');
+            }
             if (html.length > 2000000) {
                 html = html.slice(0, 2000000) + '<!-- truncated -->';
             }
+            canvases.forEach(function(c) { c.removeAttribute('data-mw-canvas'); });
             return html;
         } catch(e) {
+            canvases.forEach(function(c) {
+                try { c.removeAttribute('data-mw-canvas'); } catch(e2) {}
+            });
             return '';
         }
     }

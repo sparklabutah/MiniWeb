@@ -43,6 +43,10 @@ def save_task(annotator: str, task_id: str, task_data: dict, trajectory: list):
     d = _task_dir(annotator, task_id)
     d.mkdir(parents=True, exist_ok=True)
 
+    # Real captured frames arrive inline as data URLs — write them out as
+    # screenshot files before the trajectory is dumped
+    _extract_inline_screenshots(d, trajectory)
+
     # Extract logs and agent data before saving task metadata
     server_log = task_data.pop("server_log", [])
     beacon_log = task_data.pop("beacon_log", [])
@@ -71,6 +75,48 @@ def save_task(annotator: str, task_id: str, task_data: dict, trajectory: list):
     if agent_result:
         with open(d / "agent_result.json", "w") as f:
             json.dump(agent_result, f, indent=2, default=str)
+
+
+def _extract_inline_screenshots(task_dir: Path, events: list):
+    """Write inline captured frames (obs["screenshot_data"] data URLs) to
+    screenshots/step_NNN files and reference them from the observation.
+
+    The step number is the ordinal of the action the observation belongs to,
+    numbered exactly like backfill_observations._pair_events (each action
+    pairs with the first observation before the next action) — the backfill's
+    skip-gate matches on the referenced file, so parity keeps real captures
+    from being re-rendered over.
+    """
+    import base64
+
+    action_no = -1
+    paired = False   # current action already has its observation
+    for e in events:
+        if e.get("type") == "action":
+            action_no += 1
+            paired = False
+            continue
+        if e.get("type") != "observation":
+            continue
+        data = e.pop("screenshot_data", None)
+        if paired or action_no < 0:
+            continue                     # unpaired observation — drop any frame
+        paired = True
+        if not data:
+            continue
+        try:
+            header, b64 = data.split(",", 1)
+            ext = "png" if "png" in header else "jpg"
+            raw = base64.b64decode(b64)
+            shots = task_dir / "screenshots"
+            shots.mkdir(exist_ok=True)
+            name = f"step_{action_no:03d}.{ext}"
+            (shots / name).write_bytes(raw)
+            e["screenshot"] = f"screenshots/{name}"
+            e["screenshot_captured"] = True
+            e["screenshot_full_page"] = False
+        except (ValueError, OSError):
+            pass                         # bad frame — derivation covers it
 
 
 def load_task(annotator: str, task_id: str) -> dict | None:

@@ -61,8 +61,9 @@ def is_complete(task_dir: Path) -> bool:
         shot = obs.get("screenshot")
         if not shot or not (task_dir / shot).exists():
             return False
-        if not obs.get("screenshot_full_page"):
-            return False                 # rendered before full-page capture
+        if not obs.get("screenshot_full_page") and not obs.get("screenshot_captured"):
+            return False  # rendered before full-page capture (real captured
+            #               frames are viewport-sized and complete as-is)
     return True
 
 

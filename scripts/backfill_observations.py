@@ -143,6 +143,9 @@ class Capturer:
 
     def _capture(self, page, html_already=None, dropdown=None, checks=None):
         html = html_already if html_already is not None else page.content()
+        # canvas bitmaps travel as data-mw-canvas attributes (a canvas
+        # serializes empty) — swap them in as images before axtree/screenshot
+        _swap_canvas_images(page)
         # apply synthesized checkbox/radio state BEFORE the axtree so both the
         # screenshot and the aria snapshot reflect what the annotator saw
         if checks:
@@ -257,6 +260,29 @@ def _apply_check_states(page, checks):
     """Set checkbox/radio state on the rendered DOM (screenshot + axtree only)."""
     try:
         page.evaluate(_CHECKS_JS, checks)
+    except Exception:  # noqa: BLE001 — never fail a capture over decoration
+        pass
+
+
+_CANVAS_SWAP_JS = """
+() => {
+  document.querySelectorAll('canvas[data-mw-canvas]').forEach(c => {
+    const img = document.createElement('img');
+    img.src = c.getAttribute('data-mw-canvas');
+    for (const a of ['class', 'style', 'id', 'width', 'height']) {
+      const v = c.getAttribute(a);
+      if (v !== null && a !== 'data-mw-canvas') img.setAttribute(a, v);
+    }
+    c.replaceWith(img);
+  });
+}
+"""
+
+
+def _swap_canvas_images(page):
+    """Render recorded canvas bitmaps (data-mw-canvas attrs) as images."""
+    try:
+        page.evaluate(_CANVAS_SWAP_JS)
     except Exception:  # noqa: BLE001 — never fail a capture over decoration
         pass
 
@@ -399,7 +425,10 @@ def process_task(task_dir, cap, dry_run=False):
 
         ax = obs.get("axtree") or ""
         needs_ax = not _is_yaml_axtree(ax)
-        needs_shot = not obs.get("screenshot") or not shot_path.exists()
+        # honor whatever file the observation references (captured frames are
+        # .jpg; derived renders are .png) — only re-render when it's missing
+        ref = obs.get("screenshot")
+        needs_shot = not ref or not (task_dir / ref).exists()
         needs_html = not html
 
         # remember the newest real page state for the next carry-forward

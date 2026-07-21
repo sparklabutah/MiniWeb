@@ -383,9 +383,13 @@ function playbackGo(idx) {
         // full-width (zoomed) screenshot; taller than the pane, so the user
         // scrolls up/down instead of squinting at a shrink-to-fit image
         iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;overflow:auto"><img src="' + imgUrl + '" style="width:100%;height:auto;display:block"></body></html>';
-        var derived = obs.backfill_method || (obs.backfilled ? 'derived' : '');
-        setLabel(derived ? ('screenshot (' + derived + ')') : 'screenshot (recorded)',
-                 derived ? '#b45309' : '#16a34a');
+        if (obs.screenshot_captured) {
+            setLabel('screenshot (captured)', '#16a34a');
+        } else {
+            var derived = obs.backfill_method || (obs.backfilled ? 'derived' : '');
+            setLabel(derived ? ('screenshot (' + derived + ')') : 'screenshot (recorded)',
+                     derived ? '#b45309' : '#16a34a');
+        }
     } else if (obs && obs.snapshot) {
         iframe.srcdoc = obs.snapshot;
         setLabel(obs.form_state_repaired
