@@ -113,7 +113,7 @@ class Capturer:
         self._browser.close()
         self._pw.stop()
 
-    def render_stored_html(self, html, url, dropdown=None):
+    def render_stored_html(self, html, url, dropdown=None, checks=None):
         """Render stored HTML at its original URL (so relative assets load)."""
         page = self.static_page
         target = self.base_url + url if url and url.startswith("/") else None
@@ -132,16 +132,21 @@ class Capturer:
             page.goto(target, wait_until="load", timeout=15000)
         else:
             page.set_content(html, wait_until="load", timeout=15000)
-        return self._capture(page, html_already=html, dropdown=dropdown)
+        return self._capture(page, html_already=html, dropdown=dropdown,
+                             checks=checks)
 
-    def capture_live(self, url, dropdown=None):
+    def capture_live(self, url, dropdown=None, checks=None):
         page = self.live_page
         page.goto(self.base_url + url, wait_until="load", timeout=15000)
         page.wait_for_timeout(300)
-        return self._capture(page, dropdown=dropdown)
+        return self._capture(page, dropdown=dropdown, checks=checks)
 
-    def _capture(self, page, html_already=None, dropdown=None):
+    def _capture(self, page, html_already=None, dropdown=None, checks=None):
         html = html_already if html_already is not None else page.content()
+        # apply synthesized checkbox/radio state BEFORE the axtree so both the
+        # screenshot and the aria snapshot reflect what the annotator saw
+        if checks:
+            _apply_check_states(page, checks)
         axtree = page.locator("body").aria_snapshot()
         if dropdown:
             _draw_open_dropdown(page, dropdown)
@@ -203,6 +208,83 @@ def _draw_open_dropdown(page, dropdown):
         pass
 
 
+# --- synthesized checkbox/radio state ---------------------------------------
+#
+# Old recordings serialized pages with outerHTML, which writes attributes, not
+# live DOM properties — so a box the annotator checked renders unchecked in the
+# stored snapshot (the server-rendered page after "Apply" is the first place
+# the state shows up). Like the dropdown overlay, we reconstruct at render
+# time: every check-ish action since the last navigation is applied to the
+# rendered DOM before the axtree/screenshot are taken. The stored HTML itself
+# stays as-recorded. Observations rendered this way are flagged
+# `check_state_synthesized: true`.
+#
+# Recorded selectors are a bare "input", so elements are located by the
+# action's target label: value match first (radio 'Good' -> value="Good"),
+# then the text of the wrapping/for-linked label.
+
+_CHECKS_JS = """
+(checks) => {
+  let applied = 0;
+  for (const c of checks) {
+    const kind = c.kind === 'radio' ? 'radio' : 'checkbox';
+    const inputs = Array.from(document.querySelectorAll('input[type=' + kind + ']'));
+    let el = inputs.find(i => (i.value || '').trim() === c.label);
+    if (!el) {
+      el = inputs.find(i => {
+        let lab = i.closest('label');
+        if (!lab && i.id) lab = document.querySelector('label[for="' + i.id + '"]');
+        const txt = lab ? lab.textContent : (i.parentElement ? i.parentElement.textContent : '');
+        return (txt || '').replace(/\\s+/g, ' ').trim().includes(c.label);
+      });
+    }
+    if (!el) continue;
+    if (kind === 'radio' && c.checked && el.name) {
+      document.querySelectorAll('input[type=radio][name="' + el.name + '"]')
+        .forEach(r => { r.checked = false; r.removeAttribute('checked'); });
+    }
+    el.checked = !!c.checked;
+    if (c.checked) el.setAttribute('checked', '');
+    else el.removeAttribute('checked');
+    applied++;
+  }
+  return applied;
+}
+"""
+
+
+def _apply_check_states(page, checks):
+    """Set checkbox/radio state on the rendered DOM (screenshot + axtree only)."""
+    try:
+        page.evaluate(_CHECKS_JS, checks)
+    except Exception:  # noqa: BLE001 — never fail a capture over decoration
+        pass
+
+
+_CHECK_TARGET_RE = None
+
+
+def _check_from_action(action):
+    """{kind,label,checked} for a check-ish action, else None."""
+    import re as _re
+    global _CHECK_TARGET_RE
+    if _CHECK_TARGET_RE is None:
+        _CHECK_TARGET_RE = _re.compile(r"^(checkbox|radio)\s+'(.*)'\s*$", _re.S)
+    m = _CHECK_TARGET_RE.match(str(action.get("target") or ""))
+    if not m:
+        return None
+    kind, label = m.group(1), m.group(2).strip()
+    if action.get("action") == "check":
+        checked = bool(action.get("checked", True))
+    elif action.get("action") == "click":
+        # a click on a radio always selects it; on a checkbox assume it turns
+        # the box on (the recorder's paired `check` event corrects if not)
+        checked = True
+    else:
+        return None
+    return {"kind": kind, "label": label, "checked": checked}
+
+
 # --- carry-forward reconstruction ------------------------------------------
 #
 # When an observation has no recorded HTML, the old fallback loaded the URL in a
@@ -260,6 +342,8 @@ def process_task(task_dir, cap, dry_run=False):
              "failures": []}
     inserts = []  # (position, event) spliced after the loop
     prev = {"html": "", "url": ""}   # last observation with real HTML
+    pending_checks = []              # check states since the last navigation
+    check_page_url = None            # url the pending checks belong to
 
     for action_no, action, obs, insert_pos in _pair_events(events):
         stats["actions"] += 1
@@ -277,6 +361,24 @@ def process_task(task_dir, cap, dry_run=False):
             }
             inserts.append((insert_pos, obs))
             stats["created_obs"] += 1
+
+        # accumulate synthesized check state; a navigation (any URL change —
+        # the server re-renders state into the new document) resets it
+        cur_url = obs.get("url") or action.get("url") or ""
+        if cur_url != check_page_url:
+            pending_checks = []
+            check_page_url = cur_url
+        if action.get("action") == "submit":
+            # the server's response re-renders (and resets) form state — the
+            # synthesized checks must not leak onto the post-submit page
+            pending_checks = []
+        state = _check_from_action(action)
+        if state:
+            # a later action on the same control supersedes the earlier one
+            pending_checks = [c for c in pending_checks
+                              if not (c["kind"] == state["kind"]
+                                      and c["label"] == state["label"])]
+            pending_checks.append(state)
 
         html = obs.get("snapshot") or ""
 
@@ -323,7 +425,8 @@ def process_task(task_dir, cap, dry_run=False):
         try:
             if html:
                 new_html, new_ax, shot = cap.render_stored_html(
-                    html, obs.get("url", ""), dropdown=dropdown)
+                    html, obs.get("url", ""), dropdown=dropdown,
+                    checks=list(pending_checks))
                 # carried-forward HTML is still HTML we render — but say so
                 method = ("carried_forward"
                           if obs.get("snapshot_source") == "carried_forward"
@@ -332,7 +435,8 @@ def process_task(task_dir, cap, dry_run=False):
                 url = obs.get("url") or action.get("url") or ""
                 if not url:
                     raise ValueError("no URL to capture from")
-                new_html, new_ax, shot = cap.capture_live(url, dropdown=dropdown)
+                new_html, new_ax, shot = cap.capture_live(
+                    url, dropdown=dropdown, checks=list(pending_checks))
                 method = "live_url"
                 stats["live_url_fallback"] += 1
         except Exception as e:  # noqa: BLE001 — record and move on
@@ -357,6 +461,8 @@ def process_task(task_dir, cap, dry_run=False):
             if dropdown:
                 # honest provenance: the open list was drawn, not captured
                 obs["dropdown_synthesized"] = True
+            if pending_checks:
+                obs["check_state_synthesized"] = True
             stats["filled_screenshot"] += 1
         stats["rendered"] += 1
 
