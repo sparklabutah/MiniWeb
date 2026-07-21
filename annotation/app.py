@@ -1685,6 +1685,22 @@ def api_create_task():
         task["annotator"] = orig_annotator
         task["rerecorded_at"] = datetime.now().isoformat()
         task["rerecorded_by"] = data.get("annotator", "anonymous")
+        # Carry over reviewer-authored data from the old task: the refined
+        # instruction and the review note survive; the approve/reject status
+        # and the verified/stale tag reset — the recording just changed, so
+        # it needs review again.
+        try:
+            old = json.loads((ANNOTATIONS_DIR / orig_annotator / replace_id
+                              / "task.json").read_text())
+            if old.get("instruction_ambiguous"):
+                task["instruction_ambiguous"] = old["instruction_ambiguous"]
+            if old.get("review", {}).get("note"):
+                task["review"] = {"status": "pending",
+                                  "note": old["review"]["note"],
+                                  "reviewer": old["review"].get("reviewer", ""),
+                                  "reviewed_at": ""}
+        except (OSError, json.JSONDecodeError):
+            pass
         # trash-then-save: moving the whole old dir away also removes stale
         # screenshots/ and logs that a plain overwrite would leave behind
         trashed_from = trash_task(orig_annotator, replace_id)
@@ -1697,6 +1713,14 @@ def api_create_task():
             import shutil
             shutil.move(trashed_from, str(ANNOTATIONS_DIR / task["annotator"] / replace_id))
         raise
+
+    if trashed_from:
+        # the verifier spec lives in a sidecar file — preserve it across the
+        # replace (the reviewer's checks usually still apply to the redo)
+        old_vf = Path(trashed_from) / "verifier.json"
+        if old_vf.exists():
+            import shutil
+            shutil.copy2(old_vf, ANNOTATIONS_DIR / task["annotator"] / task_id / "verifier.json")
 
     # Derive axtree + screenshot from the recorded HTML snapshots so saved
     # observations match the backfilled/replayed data format (async).
