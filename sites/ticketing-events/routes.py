@@ -803,6 +803,7 @@ PROMO_CODES = {
     "SUMMER10": {"discount_pct": 10, "description": "10% off summer events"},
     "WELCOME20": {"discount_pct": 20, "description": "20% off for new users"},
     "VIP50": {"discount_pct": 50, "description": "50% off VIP tickets"},
+    "PRODUCERSFRIEND": {"discount_pct": 15, "description": "15% off — producer's friends & family"},
 }
 
 

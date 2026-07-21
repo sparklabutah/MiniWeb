@@ -39,7 +39,8 @@ _LISTINGS_TABLE = "real_estate_buy_rent_listings"
 
 def _query_listings(q="", prop_type="", status="", price_min=None, price_max=None,
                     beds_min=None, baths_min=None, sqft_min=None,
-                    sort="date", limit=50, offset=0):
+                    sort="date", limit=50, offset=0, features=None,
+                    count_only=False):
     """Query listings with all filters in SQL."""
     if q:
         results = db.search(SITE, "listings", q, limit=limit)
@@ -48,7 +49,11 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
             results = [l for l in results if l.get("type") == prop_type]
         if status:
             results = [l for l in results if l.get("status") == status]
-        return results
+        if features:
+            results = [l for l in results
+                       if all(f.lower() in str(l.get("features", "")).lower()
+                              for f in features)]
+        return len(results) if count_only else results
 
     clauses = []
     params = []
@@ -73,6 +78,9 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
     if sqft_min is not None:
         clauses.append("[sqft] >= ?")
         params.append(sqft_min)
+    for feat in (features or []):
+        clauses.append("LOWER([features]) LIKE ?")
+        params.append(f"%{feat.lower()}%")
 
     sort_map = {
         "date": "[listed_date] DESC",
@@ -83,6 +91,9 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
     }
     order = sort_map.get(sort, "[listed_date] DESC")
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    if count_only:
+        return db.execute(f"SELECT COUNT(*) FROM [{_LISTINGS_TABLE}]{where}",
+                          tuple(params), fetch="val")
     sql = f"SELECT * FROM [{_LISTINGS_TABLE}]{where} ORDER BY {order} LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     return db.execute(sql, tuple(params))
@@ -168,19 +179,26 @@ def listings_page():
     beds_min = request.args.get("beds", type=int)
     baths_min = request.args.get("baths", type=int)
     sqft_min = request.args.get("sqft_min", type=int)
+    features = [f for f in request.args.getlist("features") if f.strip()]
     sort = request.args.get("sort", "date").strip()
 
     results = _query_listings(q=q, prop_type=prop_type, status=status,
                               price_min=price_min, price_max=price_max,
                               beds_min=beds_min, baths_min=baths_min,
-                              sqft_min=sqft_min, sort=sort, limit=50)
+                              sqft_min=sqft_min, sort=sort, limit=50,
+                              features=features)
+    total = _query_listings(q=q, prop_type=prop_type, status=status,
+                            price_min=price_min, price_max=price_max,
+                            beds_min=beds_min, baths_min=baths_min,
+                            sqft_min=sqft_min, features=features,
+                            count_only=True)
 
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
 
     return render_template("real-estate-buy-rent/listings.html",
-                           listings=results,
+                           listings=results, total=total,
                            property_types=_property_types,
                            statuses=_statuses,
                            q=q, prop_type=prop_type, status=status,

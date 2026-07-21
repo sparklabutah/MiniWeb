@@ -471,8 +471,15 @@ def tag_questions(tag):
     desc = sql_sort.startswith("-")
     col = sql_sort.lstrip("-")
     direction = "DESC" if desc else "ASC"
+    page = max(request.args.get("page", 1, type=int), 1)
+    per_page = 50
+    total = db.execute(
+        f"SELECT COUNT(*) FROM [{table}] WHERE [tags] LIKE ?",
+        (f'%"{tag}"%',), fetch="val")
+    total_pages = max(1, (total + per_page - 1) // per_page)
     rows = db.execute(
-        f"SELECT * FROM [{table}] WHERE [tags] LIKE ? ORDER BY [{col}] {direction} LIMIT 50",
+        f"SELECT * FROM [{table}] WHERE [tags] LIKE ? ORDER BY [{col}] {direction} "
+        f"LIMIT {per_page} OFFSET {(page - 1) * per_page}",
         (f'%"{tag}"%',), fetch="all"
     )
     for q in rows:
@@ -488,6 +495,7 @@ def tag_questions(tag):
     return render_template(
         "qa-knowledge/tag_questions.html",
         questions=enriched, tag=tag, sort=sort, current_user=current_user,
+        total=total, page=page, total_pages=total_pages,
     )
 
 
