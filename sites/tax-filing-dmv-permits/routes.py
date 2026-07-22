@@ -833,14 +833,17 @@ def search_page():
     results = {"filings": [], "vehicles": [], "permits": [], "payments": []}
 
     if q:
+        # FTS/BM25 search (multi-word queries work; results ranked + capped)
+        # instead of the old whole-table Python substring scan, which failed
+        # every multi-word query and dumped entire tables on common tokens
         if category in ("all", "filings"):
-            results["filings"] = [f for f in _load_filings() if _search_text(f, q)]
+            results["filings"] = db.search(SITE, "tax_filings", q, limit=50)
         if category in ("all", "vehicles"):
-            results["vehicles"] = [v for v in _load_vehicles() if _search_text(v, q) or q.lower() in json.dumps(v["vehicle"]).lower()]
+            results["vehicles"] = db.search(SITE, "vehicles", q, limit=50)
         if category in ("all", "permits"):
-            results["permits"] = [p for p in _load_permits() if _search_text(p, q)]
+            results["permits"] = db.search(SITE, "permits", q, limit=50)
         if category in ("all", "payments"):
-            results["payments"] = [p for p in _load_payments() if _search_text(p, q)]
+            results["payments"] = db.search(SITE, "payments", q, limit=50)
 
     total = sum(len(v) for v in results.values())
     return render_template(

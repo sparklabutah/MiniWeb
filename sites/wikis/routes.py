@@ -42,10 +42,17 @@ _WIKIPEDIA_CATEGORIES = [
 
 
 def _normalise_slug(title):
-    """Convert an article title to a URL-safe slug."""
+    """Convert an article title to a URL-safe slug.
+
+    Underscores become hyphens (ZIM paths use them as word separators) —
+    dropping them collapsed "Houston_Street" into "houstonstreet", which the
+    reverse lookup could never resolve, so multi-word article links 404ed.
+    """
     slug = title.lower().strip()
+    slug = slug.replace("_", "-")
     slug = re.sub(r"[^a-z0-9\s-]", "", slug)
     slug = re.sub(r"[\s]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-")
     return slug
 
 
@@ -141,18 +148,24 @@ def _find_raw_wiki_by_slug(slug):
     try:
         from app.db import _get_conn, _deserialize_row
         conn = _get_conn()
-        # Try path-based match first (ZIM articles use path like "A/Article_Name")
-        # Convert slug back to path-like: replace - with _
-        path_guess = "A/" + slug.replace("-", "_")
+        # Normalized-path match: mirror _normalise_slug's transform in SQL so
+        # the slug round-trips ("A/Houston_Street" <-> "houston-street"),
+        # case-insensitively
         rows = conn.execute(
-            "SELECT * FROM wikis_articles WHERE path = ? LIMIT 1",
-            (path_guess,)).fetchall()
+            "SELECT * FROM wikis_articles WHERE "
+            "LOWER(REPLACE(REPLACE(SUBSTR(path, 3), '_', '-'), ' ', '-')) = ? "
+            "LIMIT 1",
+            (slug,)).fetchall()
         if not rows:
-            # Try title LIKE match
-            title_guess = slug.replace("-", " ")
-            rows = conn.execute(
-                "SELECT * FROM wikis_articles WHERE LOWER(title) LIKE ? LIMIT 1",
-                (f"%{title_guess}%",)).fetchall()
+            # Fallback for titles with punctuation the slug strips, e.g.
+            # "The Spires (Houston)": narrow by the first word, then compare
+            # each candidate's recomputed slug exactly
+            first = slug.split("-", 1)[0]
+            candidates = conn.execute(
+                "SELECT * FROM wikis_articles WHERE LOWER(title) LIKE ? LIMIT 200",
+                (f"%{first}%",)).fetchall()
+            rows = [r for r in candidates
+                    if _normalise_slug(r["path"][2:] if r["path"] else r["title"]) == slug][:1]
         if rows:
             raw = _deserialize_row(rows[0])
             if isinstance(raw.get("categories"), str):

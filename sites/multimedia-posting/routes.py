@@ -81,7 +81,13 @@ def _get_user(user_id):
 
 def _get_current_user():
     if "user_id" in session:
-        return _get_user(session["user_id"])
+        u = _get_user(session["user_id"])
+        if u:
+            return u
+        # global autologin stores int 1, but this site's user ids are strings
+        # (mp-u-001...), so it never resolved — the owner-gated actions
+        # (delete etc.) were unreachable in a normal session
+        return _get_user("mp-u-001")
     return None
 
 

@@ -205,7 +205,9 @@ def index():
 @blueprint.route("/profiles")
 def profiles_list():
     """Paginated text-based list of all profiles. Supports filtering."""
-    user = _get_current_user()
+    # fall back to the default viewer so distances/proximity sort work while
+    # browsing logged-out (proximity needs a viewpoint with coordinates)
+    user = _get_current_user() or _get_user(1)
 
     # Build SQL filter
     where = {}
@@ -434,6 +436,10 @@ def register_submit():
                         "min_age": 18, "max_age": 99},
         "photos": [],
         "verified": 0,
+        # Lakeport centroid — signup has no geocoding, and without coords the
+        # proximity sort silently no-ops for the new account
+        "lat": 47.97,
+        "lng": -122.22,
         "joined_date": now,
         "last_active": now,
     }

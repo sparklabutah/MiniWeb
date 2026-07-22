@@ -77,7 +77,10 @@
             {% for job in jobs %}
             <div class="job-card" id="saved-{{ job.id }}">
                 <div class="job-info">
-                    <h3><a href="{{ url_for('job-sites.job_detail', job_id=job.id) }}">{{ job.job_title }}</a></h3>
+                    {# saved jobs are external-listing snapshots with no catalog
+                       row — the saved-row id is NOT a jobs.row_id, so link the
+                       stored posting URL instead of job_detail #}
+                    <h3><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.job_title }}</a></h3>
                     <div class="company">{{ job.company }} {% if job.company_rating %}<span class="rating">&#9733; {{ job.company_rating }}</span>{% endif %}</div>
                     <div class="meta">{{ job.location }} &bull; {{ job.salary_range }} &bull; Saved {{ job.saved_date }}</div>
                     {% if job.tags %}
@@ -92,7 +95,7 @@
                     {% endif %}
                 </div>
                 <div class="job-actions">
-                    <a href="{{ url_for('job-sites.job_detail', job_id=job.id) }}" class="btn-sm btn-apply">View</a>
+                    <a href="{{ job.url }}" target="_blank" rel="noopener" class="btn-sm btn-apply">View</a>
                     <button class="btn-sm btn-unsave" onclick="unsave({{ job.id }})">Unsave</button>
                 </div>
             </div>
