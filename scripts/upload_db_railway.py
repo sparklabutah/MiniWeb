@@ -40,6 +40,10 @@ def main():
                     "replaces those task dirs in its ANNOTATIONS_DIR (additive; "
                     "tasks absent from the archive are untouched).")
     ap.add_argument("--annotations-dir", default="data/annotations")
+    ap.add_argument("--prune", action="store_true",
+                    help="With --annotations: also move remote tasks that no "
+                    "longer exist locally into the server's .trash, so local "
+                    "deletions propagate and deployed task counts stay true.")
     ap.add_argument("--chunk-mb", type=int, default=32)
     ap.add_argument("--no-restart", action="store_true",
                     help="Don't restart the remote app after replacing the DB")
@@ -58,6 +62,7 @@ def main():
         fd, tar_path = tempfile.mkstemp(suffix=".tar.gz")
         os.close(fd)
         n = 0
+        manifest = []
         with tarfile.open(tar_path, "w:gz") as tf:
             for annotator in sorted(os.listdir(src)):
                 adir = os.path.join(src, annotator)
@@ -70,7 +75,14 @@ def main():
                     tdir = os.path.join(adir, task_id)
                     if os.path.isdir(tdir):
                         tf.add(tdir, arcname=f"{annotator}/{task_id}")
+                        manifest.append(f"{annotator}/{task_id}")
                         n += 1
+            if args.prune:
+                import io as _io
+                blob = json.dumps(manifest).encode()
+                info = tarfile.TarInfo("_manifest.json")
+                info.size = len(blob)
+                tf.addfile(info, _io.BytesIO(blob))
         print(f"packed {n} task dirs -> {tar_path} "
               f"({os.path.getsize(tar_path) / 1e6:.1f} MB)")
         args.db = tar_path
@@ -112,8 +124,13 @@ def main():
                   flush=True)
 
     if args.annotations:
-        r = api(args.url, args.token, "POST", "/recovery/annotations/complete")
+        prune_q = "?prune=1" if args.prune else ""
+        r = api(args.url, args.token, "POST", f"/recovery/annotations/complete{prune_q}")
         print("server:", r)
+        if r.get("pruned_to_trash"):
+            print(f"pruned {len(r['pruned_to_trash'])} remote tasks to server trash:")
+            for t in r["pruned_to_trash"]:
+                print("  -", t)
         os.unlink(args.db)
         return
 

@@ -358,10 +358,16 @@ def _register_recovery_routes(app):
     def _recovery_annotations_complete():
         """Extract an uploaded tar.gz of task dirs into ANNOTATIONS_DIR.
 
-        Additive: task directories in the archive replace their counterparts;
-        tasks not present in the archive are left untouched. Members must be
-        relative paths shaped like <annotator>/<task_id>/<file> (an optional
-        leading 'annotations/' component is stripped).
+        Additive by default: task directories in the archive replace their
+        counterparts; tasks not present in the archive are left untouched.
+        Members must be relative paths shaped like <annotator>/<task_id>/<file>
+        (an optional leading 'annotations/' component is stripped).
+
+        With ?prune=1 and a _manifest.json member (a list of
+        "annotator/task_id" strings covering the uploader's full live set),
+        remote task dirs NOT in the manifest are moved to the .trash — this is
+        how local deletions propagate; without it the two copies drift and
+        task counts on the deployed tool go stale.
         """
         import tarfile
 
@@ -372,9 +378,11 @@ def _register_recovery_routes(app):
             return jsonify({"error": "no uploaded file"}), 400
         try:
             tf = tarfile.open(tmp, "r:gz")
-        except tarfile.TarError as e:
-            return jsonify({"error": f"not a tar.gz: {e}"}), 400
+            tf.getmembers()          # force full parse: truncated gzip raises here
+        except (tarfile.TarError, EOFError, OSError) as e:
+            return jsonify({"error": f"not a valid tar.gz: {e}"}), 400
         replaced_dirs, files = set(), 0
+        manifest = None
         with tf:
             members = tf.getmembers()
             for m in members:
@@ -384,6 +392,13 @@ def _register_recovery_routes(app):
                 if any(p in ("..", "") or p.startswith("/") for p in parts):
                     return jsonify({"error": f"unsafe path: {m.name}"}), 400
                 if m.isdir() or not parts:
+                    continue
+                if list(parts) == ["_manifest.json"] and m.isreg():
+                    with tf.extractfile(m) as src:
+                        try:
+                            manifest = set(json.loads(src.read().decode()))
+                        except (ValueError, UnicodeDecodeError):
+                            return jsonify({"error": "bad _manifest.json"}), 400
                     continue
                 if len(parts) < 3 or not (m.isreg()):
                     return jsonify({"error": f"unexpected member: {m.name} "
@@ -396,6 +411,8 @@ def _register_recovery_routes(app):
                 parts = pathlib.PurePosixPath(m.name).parts
                 if parts[0] in ("annotations", "."):
                     parts = parts[1:]
+                if len(parts) < 3:      # _manifest.json and other root files
+                    continue
                 task_dir = ann_dir / parts[0] / parts[1]
                 key = str(task_dir)
                 if key not in replaced_dirs:
@@ -413,7 +430,25 @@ def _register_recovery_routes(app):
                         out.write(chunk)
                 files += 1
         tmp.unlink()
-        return jsonify({"replaced_tasks": len(replaced_dirs), "files": files})
+
+        pruned = []
+        if _req.args.get("prune") == "1":
+            if manifest is None:
+                return jsonify({"error": "prune=1 requires _manifest.json in the archive"}), 400
+            from annotation.storage import trash_task
+            for adir in ann_dir.iterdir():
+                if not adir.is_dir() or adir.name.startswith(".") or adir.name == "annotations":
+                    continue
+                for tdir in adir.iterdir():
+                    if not tdir.is_dir() or not (tdir / "task.json").exists():
+                        continue
+                    if f"{adir.name}/{tdir.name}" not in manifest:
+                        dest = trash_task(adir.name, tdir.name)
+                        if dest:
+                            pruned.append(f"{adir.name}/{tdir.name}")
+
+        return jsonify({"replaced_tasks": len(replaced_dirs), "files": files,
+                        "pruned_to_trash": pruned})
 
 
 def create_app():
