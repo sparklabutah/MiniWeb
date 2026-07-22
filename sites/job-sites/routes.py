@@ -411,6 +411,52 @@ def saved_page():
     )
 
 
+def _saved_as_job(saved):
+    """Adapt a saved_jobs snapshot row to the shape job_detail.html renders.
+
+    Saved jobs are external-listing snapshots with no catalog row, so they
+    get their own detail/apply routes keyed on the saved-row id.
+    """
+    job = dict(saved)
+    job["job_description"] = saved.get("description_snippet", "")
+    job.setdefault("requirements", [])
+    job.setdefault("row_id", None)
+    return job
+
+
+def _get_saved_job(user, saved_id):
+    rows = db.query(SITE, "saved_jobs", where={"id": saved_id}, limit=1)
+    saved = rows[0] if rows else None
+    if saved is None or saved.get("user_id") != user["id"]:
+        return None
+    return saved
+
+
+@blueprint.route("/saved/<int:saved_id>")
+def saved_job_detail(saved_id):
+    """Detail view for a saved (external snapshot) job — same look and
+    Apply flow as catalog job pages."""
+    user, logged_in = _get_browsing_user()
+    saved = _get_saved_job(user, saved_id)
+    if saved is None:
+        abort(404)
+    job = _saved_as_job(saved)
+    applications = _load_applications()
+    applied = any(
+        a for a in applications
+        if a["user_id"] == user["id"] and a["job_title"] == job["job_title"]
+        and a["company"] == job["company"]
+    )
+    is_following = job["company"] in user.get("followed_companies", [])
+    return render_template(
+        "job-sites/job_detail.html",
+        user=user, logged_in=logged_in,
+        job=job, applied=applied, is_following=is_following,
+        saved_view=True,
+        apply_url=url_for("job-sites.apply_saved_page", saved_id=saved_id),
+    )
+
+
 @blueprint.route("/applications")
 def applications_page():
     """Applications list."""
@@ -447,6 +493,17 @@ def alerts_page():
     )
 
 
+@blueprint.route("/apply/saved/<int:saved_id>", methods=["GET", "POST"])
+def apply_saved_page(saved_id):
+    """Apply to a saved (external snapshot) job — same form and application
+    record as catalog jobs (applications match on title + company)."""
+    user, logged_in = _get_browsing_user()
+    saved = _get_saved_job(user, saved_id)
+    if saved is None:
+        abort(404)
+    return _apply_flow(user, logged_in, _saved_as_job(saved))
+
+
 @blueprint.route("/apply/<int:job_id>", methods=["GET", "POST"])
 def apply_form_page(job_id):
     """Apply to a job via HTML form (apply_by_form macro).
@@ -458,7 +515,11 @@ def apply_form_page(job_id):
     job = _get_job_by_id(job_id)
     if job is None:
         abort(404)
+    return _apply_flow(user, logged_in, job)
 
+
+def _apply_flow(user, logged_in, job):
+    """Shared GET/POST application flow for catalog and saved jobs."""
     if request.method == "GET":
         return render_template(
             "job-sites/apply.html",

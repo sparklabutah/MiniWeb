@@ -62,8 +62,13 @@
 
     <div class="main">
         <div class="breadcrumb">
+            {% if job.row_id %}
             <a href="{{ url_for('job-sites.jobs_page') }}">Jobs</a> &raquo;
             <a href="{{ url_for('job-sites.job_detail', job_id=job.row_id) }}">{{ job.job_title }}</a> &raquo;
+            {% else %}
+            <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a> &raquo;
+            <a href="{{ url_for('job-sites.saved_job_detail', saved_id=job.id) }}">{{ job.job_title }}</a> &raquo;
+            {% endif %}
             Apply
         </div>
 
@@ -83,7 +88,9 @@
             <div class="error-msg">{{ error }}</div>
             {% endif %}
 
-            <form class="form-card" method="post" enctype="multipart/form-data" action="{{ url_for('job-sites.apply_form_page', job_id=job.row_id) }}">
+            {# no action: post back to the current URL so the same form serves
+               both catalog (/apply/<id>) and saved (/apply/saved/<id>) jobs #}
+            <form class="form-card" method="post" enctype="multipart/form-data">
                 <h3>Submit Your Application</h3>
 
                 <div class="form-group">

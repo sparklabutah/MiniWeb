@@ -93,9 +93,14 @@
                 {% if applied %}
                 <span class="applied-badge">Applied</span>
                 {% else %}
-                <a href="{{ url_for('job-sites.apply_form_page', job_id=job.row_id) }}" class="btn btn-primary">Apply Now</a>
+                <a href="{{ apply_url or url_for('job-sites.apply_form_page', job_id=job.row_id) }}" class="btn btn-primary">Apply Now</a>
                 {% endif %}
+                {% if saved_view %}
+                {% if job.url %}<a href="{{ job.url }}" target="_blank" rel="noopener" class="btn btn-secondary">Original Posting &#8599;</a>{% endif %}
+                <button class="btn btn-secondary" onclick="unsaveAndBack({{ job.id }})">Unsave</button>
+                {% else %}
                 <button class="btn btn-secondary" id="save-btn" onclick="toggleSave({{ job.row_id }})">Save Job</button>
+                {% endif %}
                 <button class="btn btn-secondary" id="follow-btn" onclick="toggleFollow('{{ job.company }}')">
                     {% if is_following %}Following{% else %}Follow {{ job.company }}{% endif %}
                 </button>
@@ -143,6 +148,12 @@
     </div>
 
     <script>
+    function unsaveAndBack(savedId) {
+        fetch("{{ url_for('job-sites.index') }}api/jobs/" + savedId + "/save", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+        }).then(() => { window.location = "{{ url_for('job-sites.saved_page') }}"; });
+    }
     function applyJob(jobId) {
         const btn = document.getElementById("apply-btn");
         btn.disabled = true;
