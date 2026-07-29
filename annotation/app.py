@@ -1754,6 +1754,121 @@ def api_macro_descriptions():
     return jsonify(_MACRO_DESCRIPTIONS)
 
 
+def _macro_search_keyword(query, exclude, limit):
+    """Offline relevance ranker over the macro catalog.
+
+    Token-overlap scoring across name + description + verb + modality +
+    example, with a boost for hits in the macro name. Used both as the
+    no-API-key fallback and to seed the LLM shortlist. Returns a ranked list
+    of macro-name strings.
+    """
+    import re
+    terms = [t for t in re.split(r"[^a-z0-9]+", query.lower()) if len(t) > 1]
+    if not terms:
+        return []
+    scored = []
+    for name, meta in _MACRO_DESCRIPTIONS.items():
+        if name in exclude:
+            continue
+        name_l = name.lower()
+        blob = " ".join([
+            name_l.replace("_", " "),
+            (meta.get("description") or "").lower(),
+            (meta.get("verb") or "").lower(),
+            (meta.get("modality") or "").lower(),
+            (meta.get("example") or "").lower(),
+        ])
+        score = 0
+        for t in terms:
+            if t in name_l:
+                score += 3
+            score += blob.count(t)
+        if score:
+            scored.append((score, name))
+    scored.sort(key=lambda s: (-s[0], s[1]))
+    return [name for _, name in scored[:limit]]
+
+
+@annotation_bp.route("/api/macro_search", methods=["POST"])
+def api_macro_search():
+    """Semantic (LLM) search over the macro catalog by natural-language query.
+
+    Body: {query: str, exclude?: [str], limit?: int}
+    Returns {mode: "semantic"|"keyword", results: [{key, description, verb,
+    modality}]}. Falls back to the offline keyword ranker when no LLM is
+    configured or the model response can't be used, so the box always returns
+    something useful.
+    """
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+    exclude = set(data.get("exclude") or [])
+    try:
+        limit = max(1, min(15, int(data.get("limit", 8))))
+    except (ValueError, TypeError):
+        limit = 8
+    if not query:
+        return jsonify({"error": "query required"}), 400
+
+    def _pack(names):
+        out = []
+        for n in names:
+            meta = _MACRO_DESCRIPTIONS.get(n)
+            if not meta:
+                continue
+            out.append({"key": n,
+                        "description": meta.get("description") or n,
+                        "verb": meta.get("verb", ""),
+                        "modality": meta.get("modality", "")})
+        return out
+
+    # Shortlist with the offline ranker to keep the prompt small, but always
+    # give the model the full catalog names so it can pick beyond keyword hits.
+    shortlist = _macro_search_keyword(query, exclude, 40)
+
+    catalog_lines = []
+    for name, meta in _MACRO_DESCRIPTIONS.items():
+        if name in exclude:
+            continue
+        catalog_lines.append(
+            f"{name}: {meta.get('description','')} "
+            f"[{meta.get('verb','')}/{meta.get('modality','')}]")
+    catalog = "\n".join(catalog_lines)
+
+    system_prompt = (
+        "You help an annotator find UI-skill macros by meaning.\n"
+        "Each macro is a primitive skill (e.g. filter_by_slider, "
+        "create_by_form). Given a natural-language description of what the "
+        "annotator wants to do, return the most relevant macros, most "
+        "relevant first.\n"
+        "Match on intent and UI mechanism, not just shared words — e.g. "
+        "'drag a price range' -> filter_by_slider, 'find papers about a "
+        "topic' -> search_by_semantic.\n"
+        "Only choose macro names from the provided catalog. "
+        f"Return ONLY a JSON array of up to {limit} macro-name strings, "
+        'no prose. Example: ["filter_by_slider", "sort_by_column"]'
+    )
+    user_prompt = f"Annotator wants: {query}\n\nMacro catalog:\n{catalog}"
+
+    result = _call_llm(system_prompt, user_prompt)
+    if result:
+        try:
+            import re
+            m = re.search(r"\[.*\]", result, re.DOTALL)
+            if m:
+                names = json.loads(m.group())
+                names = [n for n in names
+                         if isinstance(n, str)
+                         and n in _MACRO_DESCRIPTIONS and n not in exclude]
+                if names:
+                    return jsonify({"mode": "semantic",
+                                    "results": _pack(names[:limit])})
+        except Exception:
+            pass  # fall through to keyword ranking
+
+    return jsonify({"mode": "keyword",
+                    "results": _pack(shortlist[:limit])})
+
+
 @annotation_bp.route("/api/schema/<site_id>")
 def api_site_schema(site_id):
     """Return DB schema for a site: collections and their fields."""

@@ -57,7 +57,7 @@
     </div>
 
     <nav>
-        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.index') }}{% if request.args.get('location') %}?location={{ request.args.get('location')|urlencode }}{% endif %}">Current</a>
         <a href="{{ url_for('weather.forecast_page') }}" class="active">7-Day Forecast</a>
         <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
         <a href="{{ url_for('weather.history_page') }}">History</a>
@@ -66,7 +66,15 @@
     </nav>
 
     <div class="content">
-        <h2 class="section-title">7-Day Forecast &mdash; Lakeport, WA</h2>
+        <h2 class="section-title">7-Day Forecast &mdash; {{ location_name }}</h2>
+        {% if location_error %}
+        <div class="loc-error" style="background:#fdecea;color:#b71c1c;padding:.6rem .9rem;border-radius:.3rem;margin-bottom:1rem;">{{ location_error }} &mdash; showing Lakeport, WA</div>
+        {% endif %}
+
+        <form method="get" action="{{ url_for('weather.forecast_page') }}" style="display:flex;gap:.6rem;margin-bottom:1.2rem;flex-wrap:wrap;">
+            <input type="text" name="location" placeholder="Forecast for a location (e.g., Seattle, WA)" value="{{ request.args.get('location', '') }}" style="flex:1;min-width:220px;padding:.55rem .8rem;border:1.5px solid #d1d5db;border-radius:.3rem;font-size:.9rem;">
+            <button type="submit" style="padding:.55rem 1.1rem;border:none;border-radius:.3rem;background:#1565c0;color:#fff;font-size:.9rem;cursor:pointer;">View forecast</button>
+        </form>
 
         <div class="extended-toggle">
             <label class="switch">
@@ -112,7 +120,7 @@
     </div>
 
     <div class="footer">
-        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+        Lakeport Weather &middot; Data for {{ location_name }} &middot; <a href="/">MiniWeb</a>
     </div>
 
     <script>
@@ -122,7 +130,8 @@
 
         function toggleExtended(on) {
             if (!on) { removeExtendedCells(); return; }
-            fetch("{{ url_for('weather.api_forecast_extended') }}?extended=true")
+            var locParam = "&location=" + encodeURIComponent({{ location_name|tojson }});
+            fetch("{{ url_for('weather.api_forecast_extended') }}?extended=true" + locParam)
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     removeExtendedCells();

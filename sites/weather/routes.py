@@ -63,14 +63,61 @@ def _get_location_by_id(loc_id):
 
 
 def _get_location_by_name(name):
-    """Return a location dict whose name matches (case-insensitive)."""
+    """Return the location dict best matching ``name``.
+
+    Matching is forgiving so a bare city ("Seattle", "portland") resolves to
+    the stored "Seattle, WA" / "Portland, OR" record:
+      1. exact case-insensitive equality (fastest, unambiguous)
+      2. prefix / substring on the city part before the comma
+      3. FTS/BM25 fuzzy search via db.search (typo- and token-tolerant)
+    Returns None only when nothing plausibly matches.
+    """
     # locations table is small (<20 rows), OK without limit
     locations = db.query(SITE, "locations")
-    name_lower = name.strip().lower()
+    q = name.strip().lower()
+    if not q:
+        return None
+
+    # 1. exact match
     for loc in locations:
-        if loc["name"].lower() == name_lower:
+        if loc["name"].lower() == q:
             return loc
-    return None
+
+    # 2. city-part prefix/substring (e.g. "seattle" -> "Seattle, WA").
+    # Prefer a prefix hit; fall back to any substring hit.
+    prefix, contains = None, None
+    for loc in locations:
+        city = loc["name"].split(",")[0].strip().lower()
+        if city == q or city.startswith(q):
+            prefix = prefix or loc
+        elif q in loc["name"].lower():
+            contains = contains or loc
+    if prefix:
+        return prefix
+    if contains:
+        return contains
+
+    # 3. fuzzy full-text search over the fts_weather_locations index
+    try:
+        hits = db.search(SITE, "locations", name.strip(), limit=1)
+    except Exception:
+        hits = []
+    return hits[0] if hits else None
+
+
+def _location_id_from_request(default_id=1):
+    """Resolve the ?location= query arg to a (location_id, name, error) triple.
+
+    Falls back to the default location (Lakeport, id=1) when the arg is absent,
+    and reports a not-found error string when a supplied name can't be matched.
+    """
+    name = request.args.get("location", "").strip()
+    if not name:
+        return default_id, None, None
+    loc = _get_location_by_name(name)
+    if loc:
+        return loc["id"], loc["name"], None
+    return default_id, name, f"Location '{name}' not found"
 
 
 # ---------------------------------------------------------------------------
@@ -113,15 +160,18 @@ def index():
     # Optional ?location= query navigates to another location's conditions
     location_name = request.args.get("location", "").strip()
     location_error = None
+    loc_id = 1  # default: Lakeport
     if location_name:
         loc = _get_location_by_name(location_name)
         if loc:
             current["location"] = loc["name"]
             current["lat"] = loc["lat"]
             current["lng"] = loc["lng"]
+            loc_id = loc["id"]
         else:
             location_error = f"Location '{location_name}' not found"
-    forecast = db.query(SITE, "forecast")  # only 7 rows
+    # Each location has its own 7-day forecast (keyed by location_id)
+    forecast = db.query(SITE, "forecast", where={"location_id": loc_id}, sort="date")
     alerts = db.query(SITE, "alerts")      # only 3 rows
     user = _current_user()
     return render_template(
@@ -137,12 +187,15 @@ def index():
 
 @blueprint.route("/forecast")
 def forecast_page():
-    """Extended 7-day forecast page."""
-    forecast = db.query(SITE, "forecast")  # only 7 rows
+    """Extended 7-day forecast page (per-location via ?location=)."""
+    loc_id, loc_name, location_error = _location_id_from_request()
+    forecast = db.query(SITE, "forecast", where={"location_id": loc_id}, sort="date")
     user = _current_user()
     return render_template(
         "weather/forecast.html",
         forecast=forecast,
+        location_name=loc_name or "Lakeport, WA",
+        location_error=location_error,
         user=user,
         icon_for=_icon_for,
     )
@@ -320,12 +373,15 @@ def api_forecast():
         days = max(1, min(7, int(days)))
     except (ValueError, TypeError):
         days = 7
-    forecast = db.query(SITE, "forecast", limit=days)
     loc = _get_location_by_name(location_name)
     if loc:
+        forecast = db.query(SITE, "forecast", where={"location_id": loc["id"]},
+                            sort="date", limit=days)
         return jsonify({"location": loc["name"], "forecast": forecast})
     elif location_name.lower() != "lakeport, wa":
         return jsonify({"error": f"Location '{location_name}' not found"}), 404
+    forecast = db.query(SITE, "forecast", where={"location_id": 1},
+                        sort="date", limit=days)
     return jsonify({"location": "Lakeport, WA", "forecast": forecast})
 
 
@@ -799,7 +855,8 @@ def api_forecast_extended():
     Query params:
         extended -- 'true' to include dew point, UV, pressure estimates
     """
-    forecast = db.query(SITE, "forecast")  # only 7 rows
+    loc_id, loc_name, _ = _location_id_from_request()
+    forecast = db.query(SITE, "forecast", where={"location_id": loc_id}, sort="date")
     extended = request.args.get("extended", "false").lower() == "true"
     if extended:
         for i, day in enumerate(forecast):
@@ -808,7 +865,8 @@ def api_forecast_extended():
             day["pressure_inhg"] = round(30.1 - i * 0.05, 2)
             day["sunrise"] = "5:15 AM"
             day["sunset"] = "9:10 PM"
-    return jsonify({"location": "Lakeport, WA", "extended": extended, "forecast": forecast})
+    return jsonify({"location": loc_name or "Lakeport, WA",
+                    "extended": extended, "forecast": forecast})
 
 
 # ---------------------------------------------------------------------------

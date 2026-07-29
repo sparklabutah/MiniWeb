@@ -467,7 +467,7 @@ textarea#instruction:focus {
         <div style="display:flex;align-items:center;gap:.4rem;padding:.3rem .6rem;flex-shrink:0;border-bottom:1px solid #e2e8f0;background:#fff">
             <span style="font-size:.78rem;font-weight:600;color:#1e293b">Macro Graph</span>
             <div style="position:relative">
-                <input type="text" id="macro-search" placeholder="+ add macro..." oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" style="font-size:.72rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:140px">
+                <input type="text" id="macro-search" placeholder="+ add macro (Enter = AI search)" title="Type to filter by keyword; press Enter to search by meaning (semantic)" oninput="showMacroSearch(this.value)" onclick="showMacroSearch(this.value)" onkeydown="macroSearchKey(event)" style="font-size:.72rem;padding:.15rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;width:180px">
                 <div id="macro-search-results" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;box-shadow:0 4px 16px rgba(0,0,0,.18);max-height:220px;overflow-y:auto;z-index:9999;width:300px;font-size:.75rem"></div>
             </div>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Suggest instruction (LLM)</button>
@@ -1234,6 +1234,69 @@ function addMacroFromSearch(macroKey) {
     }
     document.getElementById('macro-search').value = '';
     document.getElementById('macro-search-results').style.display = 'none';
+}
+
+// Position the results dropdown under the search input.
+function _positionMacroResults() {
+    const results = document.getElementById('macro-search-results');
+    const rect = document.getElementById('macro-search').getBoundingClientRect();
+    results.style.left = rect.left + 'px';
+    results.style.top = (rect.bottom + 4) + 'px';
+    results.style.bottom = 'auto';
+    results.style.display = 'block';
+}
+
+// Enter = semantic (meaning-based) search via the LLM-backed endpoint.
+function macroSearchKey(e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const q = e.target.value.trim();
+    if (q.length < 2) return;
+    runSemanticMacroSearch(q);
+}
+
+function _renderMacroResults(items, mode) {
+    const results = document.getElementById('macro-search-results');
+    if (!items.length) {
+        results.innerHTML = '<div style="padding:.4rem .5rem;color:#94a3b8">No matching macros</div>';
+        _positionMacroResults();
+        return;
+    }
+    const badge = mode === 'semantic'
+        ? '<span style="background:#ede9fe;color:#6d28d9;padding:0 .3rem;border-radius:.25rem;font-size:.6rem;font-weight:600">AI</span>'
+        : '<span style="background:#f1f5f9;color:#64748b;padding:0 .3rem;border-radius:.25rem;font-size:.6rem;font-weight:600">keyword</span>';
+    const head = `<div style="padding:.25rem .6rem;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:.62rem;position:sticky;top:0;background:#fff">${badge} best matches by meaning</div>`;
+    results.innerHTML = head + items.map(m => {
+        const meta = [m.verb, m.modality].filter(Boolean).join(' · ');
+        return `<div style="padding:.4rem .6rem;cursor:pointer;border-bottom:1px solid #f1f5f9"
+              onmousedown="addMacroFromSearch('${m.key}')"
+              onmouseenter="this.style.background='#eff6ff'"
+              onmouseleave="this.style.background=''">
+            <div style="font-weight:500;color:#1e293b">${escHtml(m.description || m.key)}</div>
+            <div style="font-size:.65rem;color:#94a3b8">${m.key}${meta ? ' — ' + escHtml(meta) : ''}</div>
+        </div>`;
+    }).join('');
+    _positionMacroResults();
+}
+
+function runSemanticMacroSearch(q) {
+    const results = document.getElementById('macro-search-results');
+    results.innerHTML = '<div style="padding:.5rem .6rem;color:#6d28d9">🔎 Searching macros by meaning…</div>';
+    _positionMacroResults();
+    fetch('/annotate/api/macro_search', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: q, exclude: selectedMacros, limit: 8})
+    })
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { _renderMacroResults([], 'keyword'); return; }
+            _renderMacroResults(d.results || [], d.mode || 'keyword');
+        })
+        .catch(() => {
+            // network/LLM failure: fall back to the instant substring search
+            showMacroSearch(q);
+        });
 }
 
 // Close search results when clicking outside

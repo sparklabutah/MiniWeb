@@ -58,6 +58,9 @@
 
         .message { padding: 8px 20px; display: flex; gap: 10px; }
         .message:hover { background: #222529; }
+        /* highlight a message jumped to from search */
+        .message.jump-highlight { background: #3a3d16; box-shadow: inset 3px 0 0 #f2c744; animation: jumpflash 2.4s ease-out; }
+        @keyframes jumpflash { 0% { background: #5a5d20; } 60% { background: #3a3d16; } 100% { background: transparent; box-shadow: inset 3px 0 0 transparent; } }
         .message .avatar { width: 36px; height: 36px; border-radius: 4px; background: #3f3f42; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
         .message .msg-body { flex: 1; min-width: 0; }
         .message .msg-header { display: flex; align-items: baseline; gap: 8px; }
@@ -188,7 +191,7 @@
                             {% set ns.current_date = msg_date %}
                             <div class="date-divider"><span>{{ msg_date }}</span></div>
                         {% endif %}
-                        <div class="message" data-message-id="{{ msg.id }}">
+                        <div class="message" id="msg-{{ msg.id }}" data-message-id="{{ msg.id }}">
                             <div class="avatar avatar-{{ (msg.user.root_user_id|default(loop.index0)) % 7 }}">
                                 {{ msg.user.display_name[:1] if msg.user else '?' }}
                             </div>
@@ -327,6 +330,25 @@
         });
         return false;
     }
+
+    // Jump-to-message: when arriving from a search result (?jump=<msg-id>),
+    // scroll that message into view and flash it, then drop the param so a
+    // reload/back doesn't re-trigger the highlight.
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        var target = params.get('jump');
+        if (!target) return;
+        var el = document.getElementById('msg-' + target) ||
+                 document.querySelector('[data-message-id="' + target + '"]');
+        if (el) {
+            el.scrollIntoView({ block: 'center' });
+            el.classList.add('jump-highlight');
+            setTimeout(function () { el.classList.remove('jump-highlight'); }, 2600);
+        }
+        params.delete('jump');
+        var qs = params.toString();
+        history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    })();
     </script>
 </body>
 </html>
