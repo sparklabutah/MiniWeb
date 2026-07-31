@@ -1,0 +1,975 @@
+# Canonical macro registry — the SINGLE source of truth for macro
+# identity, metadata, difficulty and retired-name aliases.
+# Consumers derive from this: annotation/macros.py, macro_difficulty,
+# _MACRO_DESCRIPTIONS/_MACRO_ALIASES/_canon in annotation/app.py.
+# Per-site UI locations stay in annotation/macro_locations.py (validated
+# against this registry). Edit this file directly; regenerate the docs
+# sheet with scripts/export_macro_sheet.py.
+# Also defines: archetypes (Layer 1 commit types), interaction_primitives
+# (Layer 2, ranked easy->hard), and each macro's archetype. See docs/macro_taxonomy.md.
+categories:
+  spatial_control: 5.0
+  reasoning: 8.0
+  state_change: 4.0
+  media: 4.0
+  text_input: 1.5
+  simple_select: 1.0
+  trivial: 0.5
+archetypes:
+  form_write:
+    collapses_to: submit_form
+    description: author-and-commit content via a form
+  query:
+    collapses_to: filter_by_query
+    description: refine/reorder a view (filter/sort/search)
+  one_shot_mutate:
+    collapses_to: delete_from_table
+    description: act on an existing item + confirm
+  boolean_mutate:
+    collapses_to: toggle_status
+    description: toggle a boolean state (follow/save/subscribe/react/block)
+  read_reason:
+    collapses_to: null
+    description: extract/compute/compare/verify an answer
+  media:
+    collapses_to: null
+    description: play or record media
+  navigate:
+    collapses_to: navigate_by_route
+    description: navigate between pages (not sampled)
+  input_primitive:
+    collapses_to: null
+    description: select a value with no standalone committed outcome
+interaction_primitives:
+- name: link
+  desc: click a labelled link
+- name: button
+  desc: click a labelled button
+- name: radio
+  desc: pick one of a few visible options
+- name: chip
+  desc: click a tag/chip
+- name: checkbox
+  desc: small target + read checked state
+- name: dropdown
+  desc: open an occluding list, locate+click an option
+- name: toggle
+  desc: small switch + read on/off state
+- name: text-field
+  desc: locate a field and type content
+- name: table-cell
+  desc: localize a cell in a grid
+- name: number
+  desc: numeric stepper/spinner
+- name: date-range
+  desc: navigate a calendar grid
+- name: slider
+  desc: estimate a pixel position for a continuous value
+- name: drag
+  desc: drag gesture (reorder, div-drawn slider)
+macros:
+  book_by_date_range:
+    verb: book
+    modality: date range
+    category: spatial_control
+    archetype: form_write
+    description: Book by selecting dates
+    example: Select check-in and check-out dates for the hotel
+  compare_by_date_range:
+    verb: compare
+    modality: date range
+    category: spatial_control
+    archetype: read_reason
+    description: Compare data across different time periods
+    example: Compare Q1 vs Q2 sales figures
+  compute_by_slider:
+    verb: compute
+    modality: slider
+    category: spatial_control
+    archetype: read_reason
+    description: Compute result by adjusting slider inputs
+    example: Set the loan calculator to $200K, 5%, 30yr and report monthly payment
+  configure_by_date_range:
+    verb: configure
+    modality: date range
+    category: spatial_control
+    archetype: form_write
+    description: Configure a date-based setting
+    example: Set the recurring event to every Monday
+  configure_by_slider:
+    verb: configure
+    modality: slider
+    category: spatial_control
+    archetype: form_write
+    description: Configure a setting with a slider
+    example: Set the password length to 16 characters
+  create_by_drag:
+    verb: create
+    modality: drag
+    category: spatial_control
+    archetype: form_write
+    description: Create by dragging elements
+    example: Drag blocks onto the canvas to build a design
+  edit_by_date_range:
+    verb: edit
+    modality: date range
+    category: spatial_control
+    archetype: form_write
+    description: Edit by changing a date range
+    example: Change the event date to next Friday
+  edit_by_drag:
+    verb: edit
+    modality: drag
+    category: spatial_control
+    archetype: form_write
+    description: Edit by dragging elements to new positions
+    example: Drag the task card from 'To Do' to 'In Progress'
+  extract_by_date_range:
+    verb: extract
+    modality: date range
+    category: spatial_control
+    archetype: read_reason
+    description: Extract info from a specific date range
+    example: How many transactions were made in March 2024?
+  filter_by_date_range:
+    verb: filter
+    modality: date range
+    category: spatial_control
+    archetype: query
+    description: Filter results to a specific date range
+    example: Set date range to 'Jan 1 - Mar 31' to see Q1 transactions
+    aliases:
+    - navigate_by_date_range
+    - search_by_date_range
+  filter_by_slider:
+    verb: filter
+    modality: slider
+    category: spatial_control
+    archetype: query
+    description: Filter by adjusting a range slider
+    example: Set the price slider from $50 to $200
+    aliases:
+    - select_by_slider
+  navigate_by_pan_zoom:
+    verb: navigate
+    modality: pan/zoom
+    category: spatial_control
+    archetype: navigate
+    description: Navigate a visual interface by panning or zooming
+    example: Zoom into the downtown area on the map
+  play_by_date_range:
+    verb: play
+    modality: date range
+    category: spatial_control
+    archetype: media
+    description: Play media from a specific time range
+    example: Jump to the 5-minute mark in the recording
+  rate_by_slider:
+    verb: rate
+    modality: slider
+    category: spatial_control
+    archetype: form_write
+    description: Rate something using a star/slider rating
+    example: Set the review rating to 4 out of 5 stars
+  react_by_gesture:
+    verb: react
+    modality: gesture
+    category: spatial_control
+    archetype: boolean_mutate
+    description: React with a gesture (swipe, double-tap)
+    example: Swipe right to like the profile
+  search_by_pan_zoom:
+    verb: search
+    modality: pan/zoom
+    category: spatial_control
+    archetype: query
+    description: Search by panning or zooming on a map
+    example: Zoom into the downtown area to find nearby restaurants
+  select_by_date_range:
+    verb: select
+    modality: date range
+    category: spatial_control
+    archetype: input_primitive
+    description: Select a date range
+    example: Select check-in and check-out dates
+  sort_by_date_range:
+    verb: sort
+    modality: date range
+    category: spatial_control
+    archetype: query
+    description: Sort items by date
+    example: Sort by 'Newest first' to see most recent items
+  submit_by_date_range:
+    verb: submit
+    modality: date range
+    category: spatial_control
+    archetype: form_write
+    description: Submit with a date range selection
+    example: Select vacation dates and submit the request
+  verify_by_slider:
+    verb: verify
+    modality: slider
+    category: spatial_control
+    archetype: read_reason
+    description: Verify a value matches expected range
+    example: Verify the portfolio return shown matches the 12-month chart
+  compare_by_route:
+    verb: compare
+    modality: route
+    category: reasoning
+    archetype: read_reason
+    description: Compare items on different pages
+    example: Compare two product detail pages
+  compute_by_extremum:
+    verb: compute
+    modality: extremum
+    category: reasoning
+    archetype: read_reason
+    description: Compute a min/max across items
+    example: Find the highest-rated restaurant with more than 50 reviews
+  compute_by_route:
+    verb: compute
+    modality: route
+    category: reasoning
+    archetype: read_reason
+    description: Compute from data on a specific route
+    example: Go to analytics page and calculate year-over-year growth
+  extract_by_extremum:
+    verb: extract
+    modality: extremum
+    category: reasoning
+    archetype: read_reason
+    description: Extract the min or max value from a dataset
+    example: What is the cheapest flight to New York?
+  extract_by_image:
+    verb: extract
+    modality: image
+    category: reasoning
+    archetype: read_reason
+    description: Extract information from an image
+    example: What text is written on the whiteboard in the image?
+  extract_by_ranking:
+    verb: extract
+    modality: ranking
+    category: reasoning
+    archetype: read_reason
+    description: Extract the item at a specific rank
+    example: 'What is the title of the #1 trending article?'
+  extract_by_route:
+    verb: extract
+    modality: route
+    category: reasoning
+    archetype: read_reason
+    description: Extract info from a specific page/route
+    example: Go to the user profile and report the email address
+  verify_identity_by_code:
+    verb: verify identity
+    modality: code
+    category: reasoning
+    archetype: form_write
+    description: Verify identity using a code or OTP
+    example: Enter the verification code sent to your email
+    aliases:
+    - authenticate_by_code
+  add_by_button:
+    verb: add
+    modality: button
+    category: state_change
+    archetype: form_write
+    description: Add an item by clicking a button
+    example: Click 'Add to Cart' on the product page
+  book_by_form:
+    verb: book
+    modality: form
+    category: state_change
+    archetype: form_write
+    description: Book/reserve by filling out a form
+    example: Select date, party size, and book the restaurant
+  cancel_by_form:
+    verb: cancel
+    modality: form
+    category: state_change
+    archetype: one_shot_mutate
+    description: Cancel a booking or order via form
+    example: Select a reason and confirm the cancellation
+  checkout_by_form:
+    verb: checkout
+    modality: form
+    category: state_change
+    archetype: form_write
+    description: Complete checkout by filling payment form
+    example: Enter card details and click 'Place Order'
+  create_by_timestamp:
+    verb: create
+    modality: timestamp
+    category: state_change
+    archetype: form_write
+    description: Create a clip or bookmark at a specific timestamp
+    example: Create a clip starting at 1:30 in the stream
+  delete_from_table:
+    verb: delete
+    modality: table
+    category: state_change
+    archetype: one_shot_mutate
+    description: Delete an item from a list or table
+    example: Click the trash icon to delete the 3rd email
+  edit_by_form:
+    verb: edit
+    modality: form
+    category: state_change
+    archetype: form_write
+    description: Edit existing data through a form
+    example: Edit your profile name and bio in the settings form
+  edit_by_image:
+    verb: edit
+    modality: image
+    category: state_change
+    archetype: form_write
+    description: Edit an image or visual content
+    example: Crop the profile photo and save
+  edit_by_ranking:
+    verb: edit
+    modality: ranking
+    category: state_change
+    archetype: form_write
+    description: Edit the order/ranking of items
+    example: Reorder the playlist by dragging songs
+  pay_by_form:
+    verb: pay
+    modality: form
+    category: state_change
+    archetype: form_write
+    description: Make a payment via a form
+    example: Enter the amount and recipient, then click Pay
+  submit_by_ranking:
+    verb: submit
+    modality: ranking
+    category: state_change
+    archetype: form_write
+    description: Submit a ranking of items
+    example: Rank the candidates and submit your vote
+  submit_by_route:
+    verb: submit
+    modality: route
+    category: state_change
+    archetype: form_write
+    description: Submit by navigating to a submission URL
+    example: Navigate to /submit to finalize your entry
+  export_by_route:
+    verb: export
+    modality: route
+    category: media
+    archetype: form_write
+    description: Export by navigating to an export URL
+    example: Go to /export/pdf to download the PDF version
+  play_by_playback:
+    verb: play
+    modality: playback
+    category: media
+    archetype: media
+    description: Play media content using playback controls
+    example: Click the play button to start the podcast episode
+  play_by_route:
+    verb: play
+    modality: route
+    category: media
+    archetype: media
+    description: Play by navigating to a media page
+    example: Click the video thumbnail to start playing
+  play_by_timestamp:
+    verb: play
+    modality: timestamp
+    category: media
+    archetype: media
+    description: Play from a specific timestamp
+    example: Click the timestamp '2:15' to jump to that point
+  upload_by_upload:
+    verb: upload
+    modality: upload
+    category: media
+    archetype: form_write
+    description: Upload a file using the file picker
+    example: Click 'Choose File' and upload your resume PDF
+    aliases:
+    - upload_by_image
+    - upload_by_query
+    - upload_by_route
+  compare_by_query:
+    verb: compare
+    modality: query
+    category: text_input
+    archetype: read_reason
+    description: Compare results for different queries
+    example: Compare the weather forecast for Monday vs Friday
+  compute_by_query:
+    verb: compute
+    modality: query
+    category: text_input
+    archetype: read_reason
+    description: Compute an answer from queried data
+    example: Calculate the total cost of items in the cart
+  copy_by_route:
+    verb: copy
+    modality: route
+    category: text_input
+    archetype: form_write
+    description: Copy content by clicking a copy button
+    example: Click the copy icon next to the API key
+  create_by_code:
+    verb: create
+    modality: code
+    category: text_input
+    archetype: form_write
+    description: Create by writing code
+    example: Write a Python function in the code editor
+  edit_by_query:
+    verb: edit
+    modality: query
+    category: text_input
+    archetype: form_write
+    description: Edit by entering new values
+    example: Change the document title by typing a new name
+    aliases:
+    - configure_by_query
+  extract_by_code:
+    verb: extract
+    modality: code
+    category: text_input
+    archetype: read_reason
+    description: Extract data using a code or formula
+    example: What is the value of cell B5 in the spreadsheet?
+  extract_by_query:
+    verb: extract
+    modality: query
+    category: text_input
+    archetype: read_reason
+    description: Find and extract specific information from the page
+    example: What is the total balance shown on the dashboard?
+  extract_by_semantic:
+    verb: extract
+    modality: semantic
+    category: text_input
+    archetype: read_reason
+    description: Extract information described in natural language
+    example: Find the author who published the most papers in 2023
+  extract_from_free_text:
+    verb: extract
+    modality: free text
+    category: text_input
+    archetype: read_reason
+    description: Extract info from unstructured text content
+    example: Read the article and identify the main conclusion
+  filter_by_checkbox:
+    verb: filter
+    modality: checkbox
+    category: text_input
+    archetype: query
+    description: Filter by checking/unchecking checkboxes
+    example: Check 'In Stock' to show only available products
+  filter_by_query:
+    verb: filter
+    modality: query
+    category: text_input
+    archetype: query
+    description: Filter by typing text in a filter input
+    example: Type 'urgent' in the filter box to show only urgent items
+  filter_by_semantic:
+    verb: filter
+    modality: semantic
+    category: text_input
+    archetype: query
+    description: Filter using a natural language description
+    example: Filter for 'high priority tasks assigned to me'
+  join_by_code:
+    verb: join
+    modality: code
+    category: text_input
+    archetype: boolean_mutate
+    description: Join by entering an invite code
+    example: Enter the meeting code to join the video call
+  message_from_free_text:
+    verb: message
+    modality: free text
+    category: text_input
+    archetype: form_write
+    description: Send a message by typing text
+    example: Type a message and click Send
+  pay_by_query:
+    verb: pay
+    modality: query
+    category: text_input
+    archetype: form_write
+    description: Pay by entering payment details
+    example: Enter $50 and confirm the bill payment
+  post_by_route:
+    verb: post
+    modality: route
+    category: text_input
+    archetype: form_write
+    description: Post by navigating to a post page
+    example: Go to /submit to create a new post
+  redeem_by_code:
+    verb: redeem
+    modality: code
+    category: text_input
+    archetype: form_write
+    description: Redeem a promo code or coupon
+    example: Enter code 'SAVE20' and click Apply
+  route_by_query:
+    verb: route
+    modality: query
+    category: text_input
+    archetype: query
+    description: Get directions by entering origin and destination
+    example: Enter 'Home to Airport' to get driving directions
+  route_by_route:
+    verb: route
+    modality: route
+    category: text_input
+    archetype: query
+    description: View a pre-computed route
+    example: 'Click on Route #3 to see its details'
+  save_by_query:
+    verb: save
+    modality: query
+    category: text_input
+    archetype: boolean_mutate
+    description: Save by entering and confirming
+    example: Name your saved search and click Save
+  search_by_proximity:
+    verb: search
+    modality: proximity
+    category: text_input
+    archetype: query
+    description: Search for items near a location
+    example: Search for restaurants within 5 miles of downtown
+  search_by_query:
+    verb: search
+    modality: query
+    category: text_input
+    archetype: query
+    description: Search using a text query in a search box
+    example: Type 'machine learning' in the search bar and press Enter
+    aliases:
+    - search_by_code
+    - select_by_query
+  search_by_route:
+    verb: search
+    modality: route
+    category: text_input
+    archetype: query
+    description: Search by navigating to a search-result URL pattern
+    example: Go to /search?q=einstein to see results for einstein
+    aliases:
+    - filter_by_route
+  search_by_semantic:
+    verb: search
+    modality: semantic
+    category: text_input
+    archetype: query
+    description: Search using natural language or meaning-based query
+    example: Search for 'papers about image recognition' to find relevant results
+  select_by_extremum:
+    verb: select
+    modality: extremum
+    category: text_input
+    archetype: input_primitive
+    description: Select the min or max item
+    example: Select the cheapest available flight
+  select_by_ranking:
+    verb: select
+    modality: ranking
+    category: text_input
+    archetype: input_primitive
+    description: Select the item at a specific rank
+    example: Select the top-rated option
+  sign_by_signature:
+    verb: sign
+    modality: signature
+    category: text_input
+    archetype: form_write
+    description: Sign by drawing a signature
+    example: Draw your signature in the signature box
+    aliases:
+    - sign_by_query
+  sort_by_extremum:
+    verb: sort
+    modality: extremum
+    category: text_input
+    archetype: query
+    description: Sort to find the min/max value
+    example: Sort by price descending to find the most expensive item
+  sort_by_proximity:
+    verb: sort
+    modality: proximity
+    category: text_input
+    archetype: query
+    description: Sort by geographic distance or proximity
+    example: Sort transit stops by distance from your location
+  sort_by_ranking:
+    verb: sort
+    modality: ranking
+    category: text_input
+    archetype: query
+    description: Sort items by a ranking criterion
+    example: 'Click ''Price: Low to High'' to sort by ascending price'
+  submit_form:
+    verb: submit
+    modality: form
+    category: text_input
+    archetype: form_write
+    description: Submit form data to create or modify a record (unifies create / submit / register / apply / invite / report / post via a form)
+    example: Fill in the form fields and submit
+    aliases:
+    - apply_by_form
+    - apply_by_query
+    - create_by_form
+    - create_by_query
+    - create_from_free_text
+    - invite_by_form
+    - invite_by_query
+    - post_by_query
+    - post_from_free_text
+    - register_by_form
+    - register_by_query
+    - report_by_form
+    - share_by_query
+    - submit_by_dropdown
+    - submit_by_form
+  translate_by_query:
+    verb: translate
+    modality: query
+    category: text_input
+    archetype: read_reason
+    description: Translate text by entering it
+    example: Type 'Hello, how are you?' and translate to Spanish
+  verify_from_free_text:
+    verb: verify
+    modality: free text
+    category: text_input
+    archetype: read_reason
+    description: Verify a claim by reading page content
+    example: Verify that the article mentions the source study by name
+  block_by_dropdown:
+    verb: block
+    modality: dropdown
+    category: simple_select
+    archetype: boolean_mutate
+    description: Block via user dropdown menu
+    example: Select 'Block user' from the three-dot menu
+  block_by_toggle:
+    verb: block
+    modality: toggle
+    category: simple_select
+    archetype: boolean_mutate
+    description: Block/unblock a user
+    example: Click Block to prevent the user from messaging you
+  compare_by_dropdown:
+    verb: compare
+    modality: dropdown
+    category: simple_select
+    archetype: read_reason
+    description: Compare items selected from dropdowns
+    example: Compare iPhone 15 vs Samsung S24 specs side by side
+  compare_from_table:
+    verb: compare
+    modality: table
+    category: simple_select
+    archetype: read_reason
+    description: Compare items listed in a table
+    example: Which of the top 3 hotels has the best price-to-rating ratio?
+  compute_by_dropdown:
+    verb: compute
+    modality: dropdown
+    category: simple_select
+    archetype: read_reason
+    description: Compute a value after selecting options
+    example: Select 'USD to EUR' and compute the conversion of $500
+    aliases:
+    - translate_by_dropdown
+  compute_from_table:
+    verb: compute
+    modality: table
+    category: simple_select
+    archetype: read_reason
+    description: Compute from tabular data
+    example: Sum the values in the 'Amount' column
+  configure_by_dropdown:
+    verb: configure
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Configure a setting using a dropdown
+    example: Set the language to 'Spanish' from the dropdown
+  configure_by_toggle:
+    verb: configure
+    modality: toggle
+    category: simple_select
+    archetype: form_write
+    description: Configure by toggling a switch
+    example: Enable two-factor authentication
+    aliases:
+    - configure_by_route
+  create_by_dropdown:
+    verb: create
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Create something by selecting from dropdowns
+    example: Create a new playlist by selecting genre and mood
+  create_by_toggle:
+    verb: create
+    modality: toggle
+    category: simple_select
+    archetype: form_write
+    description: Create by toggling options
+    example: Create a new alert by toggling notification preferences
+  create_from_table:
+    verb: create
+    modality: table
+    category: simple_select
+    archetype: form_write
+    description: Create by adding a row to a table
+    example: Add a new contact by filling in the table row
+  edit_by_dropdown:
+    verb: edit
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Edit by selecting a new value from dropdown
+    example: Change the issue priority from 'Low' to 'High'
+  export_by_dropdown:
+    verb: export
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Export data in a format selected from dropdown
+    example: Select 'CSV' and click Export to download the data
+  extract_by_dropdown:
+    verb: extract
+    modality: dropdown
+    category: simple_select
+    archetype: read_reason
+    description: Extract info after selecting a category from dropdown
+    example: Select 'Q1 2024' and report the total revenue shown
+  extract_by_toggle:
+    verb: extract
+    modality: toggle
+    category: simple_select
+    archetype: read_reason
+    description: Extract info revealed by toggling a UI element
+    example: Expand the 'Details' section and report the serial number
+  extract_from_table:
+    verb: extract
+    modality: table
+    category: simple_select
+    archetype: read_reason
+    description: Extract data from a table on the page
+    example: What is the price in the 3rd row of the products table?
+  filter_by_chip:
+    verb: filter
+    modality: chip
+    category: simple_select
+    archetype: query
+    description: Filter by clicking tag chips
+    example: Click the 'Vegan' chip to filter menu items
+    aliases:
+    - select_by_chip
+  filter_by_dropdown:
+    verb: filter
+    modality: dropdown
+    category: simple_select
+    archetype: query
+    description: Narrow results by selecting a value from a dropdown
+    example: Select 'Electronics' from the Category dropdown
+    aliases:
+    - filter_by_proximity
+  filter_by_radio:
+    verb: filter
+    modality: radio
+    category: simple_select
+    archetype: query
+    description: Filter by selecting a radio button option
+    example: Select 'Credit' radio button to show only credit transactions
+  filter_by_toggle:
+    verb: filter
+    modality: toggle
+    category: simple_select
+    archetype: query
+    description: Filter by toggling a switch on/off
+    example: Toggle 'Show completed' to include/exclude done tasks
+  follow_by_dropdown:
+    verb: follow
+    modality: dropdown
+    category: simple_select
+    archetype: boolean_mutate
+    description: Follow by selecting from dropdown
+    example: Select a user from the dropdown and follow them
+  pay_by_dropdown:
+    verb: pay
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Pay using a method from dropdown
+    example: Select 'Credit Card' and confirm payment
+  play_by_dropdown:
+    verb: play
+    modality: dropdown
+    category: simple_select
+    archetype: media
+    description: Play media selected from a dropdown
+    example: Select a track from the queue dropdown and play it
+  react_by_toggle:
+    verb: react
+    modality: toggle
+    category: simple_select
+    archetype: boolean_mutate
+    description: React to content (like, upvote, etc.)
+    example: Click the heart icon to like the post
+  redeem_by_dropdown:
+    verb: redeem
+    modality: dropdown
+    category: simple_select
+    archetype: form_write
+    description: Redeem a reward from dropdown
+    example: Select '500 points for $5 off' and redeem
+  search_by_dropdown:
+    verb: search
+    modality: dropdown
+    category: simple_select
+    archetype: query
+    description: Search by selecting a category from a dropdown
+    example: Select 'Inbox' from the folder dropdown to search within inbox
+  select_by_dropdown:
+    verb: select
+    modality: dropdown
+    category: simple_select
+    archetype: input_primitive
+    description: Select an option from a dropdown
+    example: Select 'Dark mode' from the theme dropdown
+    aliases:
+    - add_by_dropdown
+  select_by_radio:
+    verb: select
+    modality: radio
+    category: simple_select
+    archetype: input_primitive
+    description: Select one option from radio buttons
+    example: Select 'Priority Mail' shipping option
+    aliases:
+    - configure_by_radio
+    - create_by_radio
+    - route_by_radio
+  select_from_table:
+    verb: select
+    modality: table
+    category: simple_select
+    archetype: input_primitive
+    description: Select items from a table
+    example: Click checkboxes to select 3 files for download
+  share_by_dropdown:
+    verb: share
+    modality: dropdown
+    category: simple_select
+    archetype: boolean_mutate
+    description: Share via a method selected from dropdown
+    example: Select 'Copy link' from the share dropdown
+  share_by_toggle:
+    verb: share
+    modality: toggle
+    category: simple_select
+    archetype: boolean_mutate
+    description: Toggle sharing on/off
+    example: Enable link sharing for the document
+  sort_by_dropdown:
+    verb: sort
+    modality: dropdown
+    category: simple_select
+    archetype: query
+    description: Sort by selecting an option from a dropdown
+    example: Select 'Most Popular' from the sort dropdown
+  sort_by_toggle:
+    verb: sort
+    modality: toggle
+    category: simple_select
+    archetype: query
+    description: Toggle sort direction (ascending/descending)
+    example: Click the column header to toggle ascending/descending
+  toggle_status:
+    verb: toggle
+    modality: status
+    category: simple_select
+    archetype: boolean_mutate
+    description: Toggle a boolean relationship on an item (unifies follow / subscribe / save / join)
+    example: Click the toggle to follow / save / subscribe an item
+    aliases:
+    - follow_by_route
+    - follow_by_toggle
+    - join_by_toggle
+    - save_by_toggle
+    - subscribe_by_toggle
+  verify_by_dropdown:
+    verb: verify
+    modality: dropdown
+    category: simple_select
+    archetype: read_reason
+    description: Verify data after selecting an option
+    example: Select 'Completed' filter and verify all shown orders are completed
+  verify_by_toggle:
+    verb: verify
+    modality: toggle
+    category: simple_select
+    archetype: read_reason
+    description: Verify state after toggling a setting
+    example: Toggle 2FA on and verify the security status shows 'Enhanced'
+  authenticate_by_form:
+    verb: authenticate
+    modality: form
+    category: trivial
+    archetype: form_write
+    description: Log in by entering credentials in a form
+    example: Enter username and password, then click Login
+  join_by_route:
+    verb: join
+    modality: route
+    category: trivial
+    archetype: boolean_mutate
+    description: Join by navigating to a join page
+    example: Go to the meeting link to join the call
+  navigate_by_query:
+    verb: navigate
+    modality: query
+    category: trivial
+    archetype: navigate
+    description: Navigate by entering a query in a search/address bar
+    example: Type a URL slug in the address bar to go to that page
+  navigate_by_route:
+    verb: navigate
+    modality: route
+    category: trivial
+    archetype: navigate
+    description: Go to a specific page by clicking a link or menu item
+    example: Click 'Dashboard' in the sidebar to go to the dashboard page
+    aliases:
+    - navigate_by_sidebar
+  navigate_by_semantic:
+    verb: navigate
+    modality: semantic
+    category: trivial
+    archetype: navigate
+    description: Navigate to a page described in natural language
+    example: Find and go to the page that shows your recent orders
+  navigate_from_table:
+    verb: navigate
+    modality: table
+    category: trivial
+    archetype: navigate
+    description: Click a row in a table to navigate to its detail page
+    example: Click a file name in the file list to open it
+  share_by_route:
+    verb: share
+    modality: route
+    category: trivial
+    archetype: boolean_mutate
+    description: Share by navigating to a share page
+    example: Go to the share page and copy the public link

@@ -19,6 +19,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from annotation.macro_locations import MACRO_LOCATIONS
+from annotation import macros as _registry
 from annotation.storage import ANNOTATIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -54,199 +55,9 @@ annotation_bp = Blueprint(
 # Macro descriptions — verb + modality + explanation + example
 # ---------------------------------------------------------------------------
 
-_MACRO_DESCRIPTIONS = {
-    # Navigation
-    "navigate_by_route": {"verb": "navigate", "modality": "route", "description": "Go to a specific page by clicking a link or menu item", "example": "Click 'Dashboard' in the sidebar to go to the dashboard page"},
-    "navigate_by_semantic": {"verb": "navigate", "modality": "semantic", "description": "Navigate to a page described in natural language", "example": "Find and go to the page that shows your recent orders"},
-    "navigate_by_date_range": {"verb": "navigate", "modality": "date range", "description": "Navigate to content within a specific date range", "example": "Go to events for next week using the calendar picker"},
-    "navigate_by_pan_zoom": {"verb": "navigate", "modality": "pan/zoom", "description": "Navigate a visual interface by panning or zooming", "example": "Zoom into the downtown area on the map"},
-    "navigate_by_query": {"verb": "navigate", "modality": "query", "description": "Navigate by entering a query in a search/address bar", "example": "Type a URL slug in the address bar to go to that page"},
-    "navigate_from_table": {"verb": "navigate", "modality": "table", "description": "Click a row in a table to navigate to its detail page", "example": "Click a file name in the file list to open it"},
-    # Search
-    "search_by_query": {"verb": "search", "modality": "query", "description": "Search using a text query in a search box", "example": "Type 'machine learning' in the search bar and press Enter"},
-    "search_by_semantic": {"verb": "search", "modality": "semantic", "description": "Search using natural language or meaning-based query", "example": "Search for 'papers about image recognition' to find relevant results"},
-    "search_by_checkbox": {"verb": "search", "modality": "checkbox", "description": "Search by selecting checkboxes to define criteria", "example": "Check 'Python' and 'JavaScript' to find repos using those languages"},
-    "search_by_route": {"verb": "search", "modality": "route", "description": "Search by navigating to a search-result URL pattern", "example": "Go to /search?q=einstein to see results for einstein"},
-    "search_by_code": {"verb": "search", "modality": "code", "description": "Search using a code, ID, or reference number", "example": "Enter permit number 'LP-2024-001' to find the permit"},
-    "search_by_dropdown": {"verb": "search", "modality": "dropdown", "description": "Search by selecting a category from a dropdown", "example": "Select 'Inbox' from the folder dropdown to search within inbox"},
-    "search_by_proximity": {"verb": "search", "modality": "proximity", "description": "Search for items near a location", "example": "Search for restaurants within 5 miles of downtown"},
-    "search_by_date_range": {"verb": "search", "modality": "date range", "description": "Search by specifying a date range", "example": "Search for flights departing between June 1 and June 15"},
-    "search_by_pan_zoom": {"verb": "search", "modality": "pan/zoom", "description": "Search by panning or zooming on a map", "example": "Zoom into the downtown area to find nearby restaurants"},
-    # Filter
-    "filter_by_dropdown": {"verb": "filter", "modality": "dropdown", "description": "Narrow results by selecting a value from a dropdown", "example": "Select 'Electronics' from the Category dropdown"},
-    "filter_by_radio": {"verb": "filter", "modality": "radio", "description": "Filter by selecting a radio button option", "example": "Select 'Credit' radio button to show only credit transactions"},
-    "filter_by_checkbox": {"verb": "filter", "modality": "checkbox", "description": "Filter by checking/unchecking checkboxes", "example": "Check 'In Stock' to show only available products"},
-    "filter_by_slider": {"verb": "filter", "modality": "slider", "description": "Filter by adjusting a range slider", "example": "Set the price slider from $50 to $200"},
-    "filter_by_date_range": {"verb": "filter", "modality": "date range", "description": "Filter results to a specific date range", "example": "Set date range to 'Jan 1 - Mar 31' to see Q1 transactions"},
-    "filter_by_query": {"verb": "filter", "modality": "query", "description": "Filter by typing text in a filter input", "example": "Type 'urgent' in the filter box to show only urgent items"},
-    "filter_by_semantic": {"verb": "filter", "modality": "semantic", "description": "Filter using a natural language description", "example": "Filter for 'high priority tasks assigned to me'"},
-    "filter_by_toggle": {"verb": "filter", "modality": "toggle", "description": "Filter by toggling a switch on/off", "example": "Toggle 'Show completed' to include/exclude done tasks"},
-    "filter_by_chip": {"verb": "filter", "modality": "chip", "description": "Filter by clicking tag chips", "example": "Click the 'Vegan' chip to filter menu items"},
-    "filter_by_route": {"verb": "filter", "modality": "route", "description": "Filter by navigating to a filtered URL", "example": "Go to /flights?class=business to see business class flights"},
-    "filter_by_proximity": {"verb": "filter", "modality": "proximity", "description": "Filter by geographic proximity", "example": "Filter to show only results within 10 miles"},
-    # Sort
-    "sort_by_ranking": {"verb": "sort", "modality": "ranking", "description": "Sort items by a ranking criterion", "example": "Click 'Price: Low to High' to sort by ascending price"},
-    "sort_by_date_range": {"verb": "sort", "modality": "date range", "description": "Sort items by date", "example": "Sort by 'Newest first' to see most recent items"},
-    "sort_by_dropdown": {"verb": "sort", "modality": "dropdown", "description": "Sort by selecting an option from a dropdown", "example": "Select 'Most Popular' from the sort dropdown"},
-    "sort_by_slider": {"verb": "sort", "modality": "slider", "description": "Sort by adjusting a slider value", "example": "Adjust the relevance slider to re-rank results"},
-    "sort_by_toggle": {"verb": "sort", "modality": "toggle", "description": "Toggle sort direction (ascending/descending)", "example": "Click the column header to toggle ascending/descending"},
-    "sort_by_extremum": {"verb": "sort", "modality": "extremum", "description": "Sort to find the min/max value", "example": "Sort by price descending to find the most expensive item"},
-    "sort_by_proximity": {"verb": "sort", "modality": "proximity", "description": "Sort by geographic distance or proximity", "example": "Sort transit stops by distance from your location"},
-    "sort_by_proximity": {"verb": "sort", "modality": "proximity", "description": "Sort by geographic distance or proximity", "example": "Sort transit stops by distance from your location"},
-    # Extract
-    "extract_by_query": {"verb": "extract", "modality": "query", "description": "Find and extract specific information from the page", "example": "What is the total balance shown on the dashboard?"},
-    "extract_by_semantic": {"verb": "extract", "modality": "semantic", "description": "Extract information described in natural language", "example": "Find the author who published the most papers in 2023"},
-    "extract_by_dropdown": {"verb": "extract", "modality": "dropdown", "description": "Extract info after selecting a category from dropdown", "example": "Select 'Q1 2024' and report the total revenue shown"},
-    "extract_from_table": {"verb": "extract", "modality": "table", "description": "Extract data from a table on the page", "example": "What is the price in the 3rd row of the products table?"},
-    "extract_by_route": {"verb": "extract", "modality": "route", "description": "Extract info from a specific page/route", "example": "Go to the user profile and report the email address"},
-    "extract_by_ranking": {"verb": "extract", "modality": "ranking", "description": "Extract the item at a specific rank", "example": "What is the title of the #1 trending article?"},
-    "extract_by_extremum": {"verb": "extract", "modality": "extremum", "description": "Extract the min or max value from a dataset", "example": "What is the cheapest flight to New York?"},
-    "extract_by_slider": {"verb": "extract", "modality": "slider", "description": "Extract value shown at a slider position", "example": "What interest rate is shown when the term slider is at 30 years?"},
-    "extract_by_date_range": {"verb": "extract", "modality": "date range", "description": "Extract info from a specific date range", "example": "How many transactions were made in March 2024?"},
-    "extract_by_code": {"verb": "extract", "modality": "code", "description": "Extract data using a code or formula", "example": "What is the value of cell B5 in the spreadsheet?"},
-    "extract_by_toggle": {"verb": "extract", "modality": "toggle", "description": "Extract info revealed by toggling a UI element", "example": "Expand the 'Details' section and report the serial number"},
-    "extract_by_image": {"verb": "extract", "modality": "image", "description": "Extract information from an image", "example": "What text is written on the whiteboard in the image?"},
-    "extract_by_checkbox": {"verb": "extract", "modality": "checkbox", "description": "Extract info after applying checkbox filters", "example": "Check 'Active' and report how many users are shown"},
-    "extract_from_free_text": {"verb": "extract", "modality": "free text", "description": "Extract info from unstructured text content", "example": "Read the article and identify the main conclusion"},
-    # Compute
-    "compute_by_dropdown": {"verb": "compute", "modality": "dropdown", "description": "Compute a value after selecting options", "example": "Select 'USD to EUR' and compute the conversion of $500"},
-    "compute_by_extremum": {"verb": "compute", "modality": "extremum", "description": "Compute a min/max across items", "example": "Find the highest-rated restaurant with more than 50 reviews"},
-    "compute_by_slider": {"verb": "compute", "modality": "slider", "description": "Compute result by adjusting slider inputs", "example": "Set the loan calculator to $200K, 5%, 30yr and report monthly payment"},
-    "compute_by_query": {"verb": "compute", "modality": "query", "description": "Compute an answer from queried data", "example": "Calculate the total cost of items in the cart"},
-    "compute_from_table": {"verb": "compute", "modality": "table", "description": "Compute from tabular data", "example": "Sum the values in the 'Amount' column"},
-    "compute_by_route": {"verb": "compute", "modality": "route", "description": "Compute from data on a specific route", "example": "Go to analytics page and calculate year-over-year growth"},    # Compare
-    "compare_by_dropdown": {"verb": "compare", "modality": "dropdown", "description": "Compare items selected from dropdowns", "example": "Compare iPhone 15 vs Samsung S24 specs side by side"},
-    "compare_from_table": {"verb": "compare", "modality": "table", "description": "Compare items listed in a table", "example": "Which of the top 3 hotels has the best price-to-rating ratio?"},
-    "compare_by_slider": {"verb": "compare", "modality": "slider", "description": "Compare values at different slider positions", "example": "Compare monthly payments at 4% vs 5% interest rate"},
-    "compare_by_date_range": {"verb": "compare", "modality": "date range", "description": "Compare data across different time periods", "example": "Compare Q1 vs Q2 sales figures"},
-    "compare_by_route": {"verb": "compare", "modality": "route", "description": "Compare items on different pages", "example": "Compare two product detail pages"},
-    "compare_by_query": {"verb": "compare", "modality": "query", "description": "Compare results for different queries", "example": "Compare the weather forecast for Monday vs Friday"},
-    # Verify
-    "verify_by_slider": {"verb": "verify", "modality": "slider", "description": "Verify a value matches expected range", "example": "Verify the portfolio return shown matches the 12-month chart"},
-    "verify_by_dropdown": {"verb": "verify", "modality": "dropdown", "description": "Verify data after selecting an option", "example": "Select 'Completed' filter and verify all shown orders are completed"},
-    "verify_by_toggle": {"verb": "verify", "modality": "toggle", "description": "Verify state after toggling a setting", "example": "Toggle 2FA on and verify the security status shows 'Enhanced'"},
-    "verify_from_free_text": {"verb": "verify", "modality": "free text", "description": "Verify a claim by reading page content", "example": "Verify that the article mentions the source study by name"},
-    "verify_identity_by_code": {"verb": "verify identity", "modality": "code", "description": "Verify identity using a code or OTP", "example": "Enter the verification code sent to your email"},
-    # Create / Submit
-    "create_by_form": {"verb": "create", "modality": "free text", "description": "Create new content by typing free-form text", "example": "Write a new blog post with title and body"},
-    "create_by_dropdown": {"verb": "create", "modality": "dropdown", "description": "Create something by selecting from dropdowns", "example": "Create a new playlist by selecting genre and mood"},
-    "create_by_toggle": {"verb": "create", "modality": "toggle", "description": "Create by toggling options", "example": "Create a new alert by toggling notification preferences"},
-    "create_by_checkbox": {"verb": "create", "modality": "checkbox", "description": "Create by checking options", "example": "Create a workout plan by checking desired exercises"},
-    "create_by_drag": {"verb": "create", "modality": "drag", "description": "Create by dragging elements", "example": "Drag blocks onto the canvas to build a design"},
-    "create_by_radio": {"verb": "create", "modality": "radio", "description": "Create by selecting radio options", "example": "Create a new poll by selecting question type"},
-    "create_by_code": {"verb": "create", "modality": "code", "description": "Create by writing code", "example": "Write a Python function in the code editor"},
-    "create_from_table": {"verb": "create", "modality": "table", "description": "Create by adding a row to a table", "example": "Add a new contact by filling in the table row"},
-    "create_by_timestamp": {"verb": "create", "modality": "timestamp", "description": "Create a clip or bookmark at a specific timestamp", "example": "Create a clip starting at 1:30 in the stream"},
-    "create_by_query": {"verb": "create", "modality": "query", "description": "Create by entering text into an input", "example": "Enter a URL to create a short link"},
-    "submit_by_form": {"verb": "submit", "modality": "form", "description": "Submit a filled-out form", "example": "Fill in the contact form and click Submit"},
-    # Consolidated macros (2026-07-16 merge) — canonical targets of the aliases below.
-    "submit_form": {"verb": "submit", "modality": "form", "description": "Submit form data to create or modify a record (unifies create / submit / register / apply / invite / report / post via a form)", "example": "Fill in the form fields and submit"},
-    "toggle_status": {"verb": "toggle", "modality": "status", "description": "Toggle a boolean relationship on an item (unifies follow / subscribe / save / join)", "example": "Click the toggle to follow / save / subscribe an item"},
-    "submit_by_route": {"verb": "submit", "modality": "route", "description": "Submit by navigating to a submission URL", "example": "Navigate to /submit to finalize your entry"},
-    "submit_by_dropdown": {"verb": "submit", "modality": "dropdown", "description": "Submit by selecting and confirming from dropdown", "example": "Select the recipient and submit the transfer"},
-    "submit_by_ranking": {"verb": "submit", "modality": "ranking", "description": "Submit a ranking of items", "example": "Rank the candidates and submit your vote"},
-    "submit_by_slider": {"verb": "submit", "modality": "slider", "description": "Submit after setting slider values", "example": "Set the bid amount with the slider and submit"},
-    "submit_by_date_range": {"verb": "submit", "modality": "date range", "description": "Submit with a date range selection", "example": "Select vacation dates and submit the request"},
-    # Edit
-    "edit_by_form": {"verb": "edit", "modality": "form", "description": "Edit existing data through a form", "example": "Edit your profile name and bio in the settings form"},
-    "edit_by_query": {"verb": "edit", "modality": "query", "description": "Edit by entering new values", "example": "Change the document title by typing a new name"},
-    "edit_by_dropdown": {"verb": "edit", "modality": "dropdown", "description": "Edit by selecting a new value from dropdown", "example": "Change the issue priority from 'Low' to 'High'"},
-    "edit_by_toggle": {"verb": "edit", "modality": "toggle", "description": "Edit a setting by toggling it", "example": "Toggle 'Public' to make the repository private"},
-    "edit_by_drag": {"verb": "edit", "modality": "drag", "description": "Edit by dragging elements to new positions", "example": "Drag the task card from 'To Do' to 'In Progress'"},
-    "edit_by_ranking": {"verb": "edit", "modality": "ranking", "description": "Edit the order/ranking of items", "example": "Reorder the playlist by dragging songs"},
-    "edit_by_date_range": {"verb": "edit", "modality": "date range", "description": "Edit by changing a date range", "example": "Change the event date to next Friday"},
-    "edit_by_image": {"verb": "edit", "modality": "image", "description": "Edit an image or visual content", "example": "Crop the profile photo and save"},
-    # Delete
-    "delete_from_table": {"verb": "delete", "modality": "table", "description": "Delete an item from a list or table", "example": "Click the trash icon to delete the 3rd email"},
-    # Select / Configure
-    "select_by_dropdown": {"verb": "select", "modality": "dropdown", "description": "Select an option from a dropdown", "example": "Select 'Dark mode' from the theme dropdown"},
-    "select_from_table": {"verb": "select", "modality": "table", "description": "Select items from a table", "example": "Click checkboxes to select 3 files for download"},
-    "select_by_radio": {"verb": "select", "modality": "radio", "description": "Select one option from radio buttons", "example": "Select 'Priority Mail' shipping option"},
-    "select_by_chip": {"verb": "select", "modality": "chip", "description": "Select by clicking tag chips", "example": "Click the 'Rock' and 'Pop' genre chips"},
-    "select_by_slider": {"verb": "select", "modality": "slider", "description": "Select a value using a slider", "example": "Set the quantity slider to 5"},
-    "select_by_ranking": {"verb": "select", "modality": "ranking", "description": "Select the item at a specific rank", "example": "Select the top-rated option"},
-    "select_by_extremum": {"verb": "select", "modality": "extremum", "description": "Select the min or max item", "example": "Select the cheapest available flight"},
-    "select_by_date_range": {"verb": "select", "modality": "date range", "description": "Select a date range", "example": "Select check-in and check-out dates"},
-    "select_by_query": {"verb": "select", "modality": "query", "description": "Select by entering a search query", "example": "Type a city name to select it as destination"},
-    "configure_by_dropdown": {"verb": "configure", "modality": "dropdown", "description": "Configure a setting using a dropdown", "example": "Set the language to 'Spanish' from the dropdown"},
-    "configure_by_slider": {"verb": "configure", "modality": "slider", "description": "Configure a setting with a slider", "example": "Set the password length to 16 characters"},
-    "configure_by_toggle": {"verb": "configure", "modality": "toggle", "description": "Configure by toggling a switch", "example": "Enable two-factor authentication"},
-    "configure_by_radio": {"verb": "configure", "modality": "radio", "description": "Configure by selecting a radio option", "example": "Set notifications to 'Email only'"},
-    "configure_by_query": {"verb": "configure", "modality": "query", "description": "Configure by entering a value", "example": "Set the custom domain to 'mysite.com'"},
-    "configure_by_chip": {"verb": "configure", "modality": "chip", "description": "Configure by selecting chips", "example": "Select interest chips: 'Tech', 'Sports', 'Music'"},
-    "configure_by_date_range": {"verb": "configure", "modality": "date range", "description": "Configure a date-based setting", "example": "Set the recurring event to every Monday"},
-    "configure_by_route": {"verb": "configure", "modality": "route", "description": "Configure settings by navigating to a settings page", "example": "Go to Settings > Playback to configure video quality"},
-    # Media
-    "play_by_playback": {"verb": "play", "modality": "playback", "description": "Play media content using playback controls", "example": "Click the play button to start the podcast episode"},
-    "play_by_dropdown": {"verb": "play", "modality": "dropdown", "description": "Play media selected from a dropdown", "example": "Select a track from the queue dropdown and play it"},
-    "play_by_route": {"verb": "play", "modality": "route", "description": "Play by navigating to a media page", "example": "Click the video thumbnail to start playing"},
-    "play_by_date_range": {"verb": "play", "modality": "date range", "description": "Play media from a specific time range", "example": "Jump to the 5-minute mark in the recording"},
-    "play_by_slider": {"verb": "play", "modality": "slider", "description": "Control playback with a slider", "example": "Scrub the timeline slider to 50% of the video"},
-    "play_by_timestamp": {"verb": "play", "modality": "timestamp", "description": "Play from a specific timestamp", "example": "Click the timestamp '2:15' to jump to that point"},
-    "export_by_dropdown": {"verb": "export", "modality": "dropdown", "description": "Export data in a format selected from dropdown", "example": "Select 'CSV' and click Export to download the data"},
-    "export_by_route": {"verb": "export", "modality": "route", "description": "Export by navigating to an export URL", "example": "Go to /export/pdf to download the PDF version"},
-    "upload_by_upload": {"verb": "upload", "modality": "upload", "description": "Upload a file using the file picker", "example": "Click 'Choose File' and upload your resume PDF"},
-    "upload_by_query": {"verb": "upload", "modality": "query", "description": "Upload by entering a URL or path", "example": "Paste the image URL to upload it"},
-    "upload_by_route": {"verb": "upload", "modality": "route", "description": "Upload by navigating to upload page", "example": "Go to /upload and drag files into the drop zone"},
-    "upload_by_image": {"verb": "upload", "modality": "image", "description": "Upload an image file", "example": "Upload a profile photo from your computer"},
-    "copy_by_route": {"verb": "copy", "modality": "route", "description": "Copy content by clicking a copy button", "example": "Click the copy icon next to the API key"},
-    # Social
-    "follow_by_toggle": {"verb": "follow", "modality": "toggle", "description": "Follow/unfollow by clicking a toggle button", "example": "Click 'Follow' to start following the author"},
-    "follow_by_dropdown": {"verb": "follow", "modality": "dropdown", "description": "Follow by selecting from dropdown", "example": "Select a user from the dropdown and follow them"},
-    "follow_by_route": {"verb": "follow", "modality": "route", "description": "Follow by navigating to follow URL", "example": "Go to the author's page and click Follow"},
-    "subscribe_by_toggle": {"verb": "subscribe", "modality": "toggle", "description": "Subscribe/unsubscribe with a toggle", "example": "Toggle the Subscribe button for the newsletter"},
-    "save_by_toggle": {"verb": "save", "modality": "toggle", "description": "Save/unsave an item with a toggle", "example": "Click the bookmark icon to save the article"},
-    "save_by_query": {"verb": "save", "modality": "query", "description": "Save by entering and confirming", "example": "Name your saved search and click Save"},
-    "react_by_toggle": {"verb": "react", "modality": "toggle", "description": "React to content (like, upvote, etc.)", "example": "Click the heart icon to like the post"},
-    "react_by_gesture": {"verb": "react", "modality": "gesture", "description": "React with a gesture (swipe, double-tap)", "example": "Swipe right to like the profile"},
-    "rate_by_slider": {"verb": "rate", "modality": "slider", "description": "Rate something using a star/slider rating", "example": "Set the review rating to 4 out of 5 stars"},
-    "share_by_dropdown": {"verb": "share", "modality": "dropdown", "description": "Share via a method selected from dropdown", "example": "Select 'Copy link' from the share dropdown"},
-    "share_by_toggle": {"verb": "share", "modality": "toggle", "description": "Toggle sharing on/off", "example": "Enable link sharing for the document"},
-    "share_by_query": {"verb": "share", "modality": "query", "description": "Share by entering a recipient", "example": "Type an email address to share the file"},
-    "share_by_route": {"verb": "share", "modality": "route", "description": "Share by navigating to a share page", "example": "Go to the share page and copy the public link"},
-    "report_by_form": {"verb": "report", "modality": "form", "description": "Report content by filling out a form", "example": "Select a reason and submit the report"},
-    "block_by_toggle": {"verb": "block", "modality": "toggle", "description": "Block/unblock a user", "example": "Click Block to prevent the user from messaging you"},
-    "block_by_dropdown": {"verb": "block", "modality": "dropdown", "description": "Block via user dropdown menu", "example": "Select 'Block user' from the three-dot menu"},
-    "invite_by_form": {"verb": "invite", "modality": "form", "description": "Invite someone by filling out a form", "example": "Enter email addresses and send the meeting invite"},
-    "invite_by_query": {"verb": "invite", "modality": "query", "description": "Invite by entering a name or email", "example": "Type a username to invite them to the channel"},
-    "join_by_toggle": {"verb": "join", "modality": "toggle", "description": "Join/leave a group or channel", "example": "Click 'Join' to become a member of the subreddit"},
-    "join_by_route": {"verb": "join", "modality": "route", "description": "Join by navigating to a join page", "example": "Go to the meeting link to join the call"},
-    "join_by_code": {"verb": "join", "modality": "code", "description": "Join by entering an invite code", "example": "Enter the meeting code to join the video call"},
-    "message_from_free_text": {"verb": "message", "modality": "free text", "description": "Send a message by typing text", "example": "Type a message and click Send"},
-    "post_from_free_text": {"verb": "post", "modality": "free text", "description": "Create a post by writing text", "example": "Write a comment and click Post"},
-    "post_by_route": {"verb": "post", "modality": "route", "description": "Post by navigating to a post page", "example": "Go to /submit to create a new post"},
-    "post_by_query": {"verb": "post", "modality": "query", "description": "Post content via a query", "example": "Enter the post title and submit"},
-    # Transact
-    "add_by_button": {"verb": "add", "modality": "button", "description": "Add an item by clicking a button", "example": "Click 'Add to Cart' on the product page"},
-    "add_by_dropdown": {"verb": "add", "modality": "dropdown", "description": "Add by selecting from a dropdown", "example": "Select a track and add it to the playlist"},
-    "checkout_by_form": {"verb": "checkout", "modality": "form", "description": "Complete checkout by filling payment form", "example": "Enter card details and click 'Place Order'"},
-    "pay_by_form": {"verb": "pay", "modality": "form", "description": "Make a payment via a form", "example": "Enter the amount and recipient, then click Pay"},
-    "pay_by_query": {"verb": "pay", "modality": "query", "description": "Pay by entering payment details", "example": "Enter $50 and confirm the bill payment"},
-    "pay_by_dropdown": {"verb": "pay", "modality": "dropdown", "description": "Pay using a method from dropdown", "example": "Select 'Credit Card' and confirm payment"},
-    "book_by_form": {"verb": "book", "modality": "form", "description": "Book/reserve by filling out a form", "example": "Select date, party size, and book the restaurant"},
-    "book_by_date_range": {"verb": "book", "modality": "date range", "description": "Book by selecting dates", "example": "Select check-in and check-out dates for the hotel"},
-    "cancel_by_form": {"verb": "cancel", "modality": "form", "description": "Cancel a booking or order via form", "example": "Select a reason and confirm the cancellation"},
-    "redeem_by_code": {"verb": "redeem", "modality": "code", "description": "Redeem a promo code or coupon", "example": "Enter code 'SAVE20' and click Apply"},
-    "redeem_by_dropdown": {"verb": "redeem", "modality": "dropdown", "description": "Redeem a reward from dropdown", "example": "Select '500 points for $5 off' and redeem"},
-    "apply_by_form": {"verb": "apply", "modality": "form", "description": "Apply for something by filling a form", "example": "Fill out the job application and submit"},
-    "apply_by_query": {"verb": "apply", "modality": "query", "description": "Apply by entering details", "example": "Enter your qualifications and apply for the permit"},
-    # Account
-    "authenticate_by_form": {"verb": "authenticate", "modality": "form", "description": "Log in by entering credentials in a form", "example": "Enter username and password, then click Login"},
-    "authenticate_by_code": {"verb": "authenticate", "modality": "code", "description": "Authenticate using a code", "example": "Enter the 2FA code from your authenticator app"},
-    "register_by_form": {"verb": "register", "modality": "form", "description": "Create a new account via registration form", "example": "Fill in name, email, password and click Register"},
-    "register_by_query": {"verb": "register", "modality": "query", "description": "Register by entering details", "example": "Enter your email to create an account"},
-    # Route / Directions
-    "route_by_query": {"verb": "route", "modality": "query", "description": "Get directions by entering origin and destination", "example": "Enter 'Home to Airport' to get driving directions"},
-    "route_by_radio": {"verb": "route", "modality": "radio", "description": "Select route type via radio buttons", "example": "Select 'Walking' to get walking directions"},
-    "route_by_route": {"verb": "route", "modality": "route", "description": "View a pre-computed route", "example": "Click on Route #3 to see its details"},
-    # Translate
-    "translate_by_query": {"verb": "translate", "modality": "query", "description": "Translate text by entering it", "example": "Type 'Hello, how are you?' and translate to Spanish"},
-    "translate_by_dropdown": {"verb": "translate", "modality": "dropdown", "description": "Translate by selecting source/target language", "example": "Select English → French from the language dropdowns"},
-    "translate_by_slider": {"verb": "translate", "modality": "slider", "description": "Adjust translation settings with slider", "example": "Set the formality slider to 'Formal'"},
-    # Sign
-    "sign_by_query": {"verb": "sign", "modality": "query", "description": "Sign a document by entering signature", "example": "Type your full name to e-sign the document"},
-    "sign_by_signature": {"verb": "sign", "modality": "signature", "description": "Sign by drawing a signature", "example": "Draw your signature in the signature box"},
-}
+# Derived from the canonical registry (data/macros.yaml) via annotation/macros.py.
+# Retired-name entries are gone — resolve any name via _canon()/_registry.describe().
+_MACRO_DESCRIPTIONS = _registry.descriptions()
 
 
 # ---------------------------------------------------------------------------
@@ -447,65 +258,11 @@ def _get_floor_k():
 # task files so historical annotations keep counting; task files themselves
 # are never rewritten. (filter_by_radio is site-scoped and NOT aliased —
 # it remains a valid macro on other sites.)
-_MACRO_ALIASES = {
-    "add_by_dropdown": "select_by_dropdown",
-    "apply_by_query": "create_by_query",
-    "authenticate_by_code": "verify_identity_by_code",
-    "configure_by_query": "edit_by_query",
-    "configure_by_radio": "select_by_radio",
-    "create_by_radio": "select_by_radio",
-    "route_by_radio": "select_by_radio",
-    "configure_by_route": "configure_by_toggle",
-    "select_by_chip": "filter_by_chip",
-    "filter_by_proximity": "filter_by_dropdown",
-    "filter_by_route": "search_by_route",
-    "follow_by_route": "follow_by_toggle",
-    "invite_by_query": "invite_by_form",
-    "navigate_by_date_range": "filter_by_date_range",
-    "post_by_query": "post_from_free_text",
-    "register_by_query": "register_by_form",
-    "search_by_code": "search_by_query",
-    "search_by_date_range": "filter_by_date_range",
-    "select_by_query": "search_by_query",
-    "select_by_slider": "filter_by_slider",
-    "share_by_query": "invite_by_form",
-    "sign_by_query": "sign_by_signature",
-    "submit_by_dropdown": "submit_by_form",
-    "translate_by_dropdown": "compute_by_dropdown",
-    "upload_by_query": "upload_by_upload",
-    "upload_by_image": "upload_by_upload",
-    "upload_by_route": "upload_by_upload",
-    # Verb-synonym clusters merged 2026-07-16 (operationally identical by the
-    # swap test). Form-submit family -> submit_form; boolean status toggles ->
-    # toggle_status. block/react kept separate (distinct meaning); QA/control
-    # kept (distinct outcomes). Task files keep old names; aliased on read.
-    "create_by_form": "submit_form",
-    "create_by_query": "submit_form",
-    "submit_by_form": "submit_form",
-    "register_by_form": "submit_form",
-    "apply_by_form": "submit_form",
-    "invite_by_form": "submit_form",
-    "report_by_form": "submit_form",
-    "post_from_free_text": "submit_form",
-    "follow_by_toggle": "toggle_status",
-    "subscribe_by_toggle": "toggle_status",
-    "save_by_toggle": "toggle_status",
-    "join_by_toggle": "toggle_status",
-    # Stray names free-typed in old tasks; never existed in MACRO_LOCATIONS
-    "create_from_free_text": "submit_form",
-    "navigate_by_sidebar": "navigate_by_route",
-}
+_MACRO_ALIASES = _registry.alias_map()
 
 
-def _canon(macro):
-    """Normalize a (possibly retired) macro name to its canonical form.
-    Chains through aliases (with a cycle guard) so aliases that point at a
-    since-merged macro still resolve to the final canonical name."""
-    seen = set()
-    while macro in _MACRO_ALIASES and macro not in seen:
-        seen.add(macro)
-        macro = _MACRO_ALIASES[macro]
-    return macro
+# Canonical-name resolver (alias chain with cycle guard) — from the registry.
+_canon = _registry.canon
 
 
 _CANONICAL_LOCATIONS = None
@@ -592,19 +349,22 @@ def _load_graph_edges():
 
 
 # Edge types that imply specific macros the task should exercise
+# Edge-type -> hint macros to boost when that cross-site edge is present.
+# Canonical names only: the consumer matches these against the canonical macro
+# pool, so a retired name here would silently never fire.
 _EDGE_MACRO_HINTS = {
     "purchase": ["checkout_by_form", "add_by_button"],
     "payment": ["pay_by_form", "pay_by_dropdown"],
     "booking": ["book_by_form", "book_by_date_range"],
-    "signup": ["register_by_form", "authenticate_by_form"],
+    "signup": ["submit_form", "authenticate_by_form"],
     "credential": ["authenticate_by_form"],
     "notification": ["extract_by_route"],
-    "file_created": ["create_by_form", "upload_by_upload"],
+    "file_created": ["submit_form", "upload_by_upload"],
     "message": ["message_from_free_text"],
-    "translate": ["translate_by_query", "translate_by_dropdown"],
+    "translate": ["translate_by_query", "compute_by_dropdown"],
     "share": ["share_by_dropdown", "share_by_toggle"],
-    "crosspost": ["post_from_free_text"],
-    "shorten": ["create_by_query"],
+    "crosspost": ["submit_form"],
+    "shorten": ["submit_form"],
     "location": ["navigate_by_route", "search_by_query"],
     "directions": ["route_by_query"],
     "deadline": ["extract_by_date_range"],

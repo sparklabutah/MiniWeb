@@ -58,9 +58,9 @@ Each site is a self-contained Flask blueprint under `sites/<id>/`:
 | Financial | 2 | banking, brokerage |
 | + 8 more categories | 21 | ... |
 
-### Macro System (170 macros)
+### Macro System (121 canonical macros)
 
-Macros are primitive UI skills that agents must perform. Each macro is tagged with a difficulty category:
+Macros are primitive UI skills that agents must perform, defined in the canonical registry `data/macros.yaml` (see `docs/macro_taxonomy.md` for the two-layer model). Each macro is tagged with a difficulty category:
 
 | Category | Macros | Weight | Description |
 |----------|--------|--------|-------------|

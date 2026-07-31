@@ -48,12 +48,13 @@ rows = db.execute(
 
 ## Macro System
 
-Macros are primitive UI skills (e.g., `filter_by_slider`, `create_by_form`). The authoritative source for which macros each site supports is `annotation/macro_locations.py` — NOT the README files.
+Macros are primitive UI skills (e.g., `filter_by_slider`, `create_by_form`). The canonical registry is `data/macros.yaml` (loaded via `annotation/macros.py`) — the single source of truth for macro identity, metadata, difficulty and retired-name aliases. Per-site UI locations live in `annotation/macro_locations.py`, validated against the registry.
 
-- 170 unique macros across 7 difficulty categories (see `annotation/macro_difficulty.py`)
+- **121 canonical macros** in `data/macros.yaml` (+ retired-name aliases folded in). `_MACRO_DESCRIPTIONS`, `_MACRO_ALIASES`, `_canon` in `annotation/app.py` and `MACRO_CATEGORIES`/`CATEGORY_WEIGHTS` in `annotation/macro_difficulty.py` all derive from it — do not edit those, edit the registry.
+- Two-layer taxonomy (see `docs/macro_taxonomy.md`): **Layer 1** = commit archetype (`annotation/macros.py: archetype()`); **Layer 2** = interaction primitives derived from trajectories (`annotation/macros.py`).
 - Each macro maps to specific UI locations per site
 - Navigation macros (`navigate_by_route`) are NOT sampled for tasks — agents start on the target page
-- Macro descriptions live in `_MACRO_DESCRIPTIONS` in `annotation/app.py`
+- `tests/test_macro_registry.py` guards against drift; regenerate the docs sheet with `scripts/export_macro_sheet.py`
 
 ## Key Architecture
 
