@@ -277,6 +277,32 @@ def watch(video_id):
     me = user_map.get(uid) if uid is not None else None
     is_subscribed = bool(me and channel and channel["id"] in (me.get("subscriptions") or []))
 
+    # Record this view in the watch history so History reflects what you watch.
+    # De-duplicate per (user, video): re-watching bumps the entry to the top
+    # rather than adding a duplicate; a first watch also counts as a view.
+    hist_uid = uid if uid is not None else 1
+    history = _history()
+    now = datetime.now(timezone.utc).isoformat()
+    existing = next((h for h in history
+                     if h.get("user_id") == hist_uid and h.get("video_id") == video_id), None)
+    if existing:
+        existing["watched_at"] = now
+        db.save_collection(SITE, "watch_history", history)
+    else:
+        history.append({
+            "id": _next_id(history),
+            "user_id": hist_uid,
+            "video_id": video_id,
+            "video_title": video.get("title", ""),
+            "channel_name": (channel or {}).get("channel_name", ""),
+            "watched_at": now,
+            "progress_percent": 0,
+            "duration_seconds": video.get("duration_seconds", 0),
+        })
+        db.save_collection(SITE, "watch_history", history)
+        video["views"] = video.get("views", 0) + 1
+        db.save_collection(SITE, "videos", videos)
+
     return render_template(
         "video/watch.html",
         video=video,
@@ -837,6 +863,8 @@ def api_video_like(video_id):
         video["dislikes"] = video.get("dislikes", 0) + 1
     elif action == "unlike":
         video["likes"] = max(0, video.get("likes", 0) - 1)
+    elif action == "undislike":
+        video["dislikes"] = max(0, video.get("dislikes", 0) - 1)
 
     db.save_collection(SITE, "videos", videos)
     return jsonify({"likes": video["likes"], "dislikes": video["dislikes"]})

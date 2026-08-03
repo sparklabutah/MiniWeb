@@ -154,9 +154,8 @@
                     {{ format_views(video.views) }} views &middot; {{ time_ago(video.upload_date) }}
                 </div>
                 <div class="action-buttons">
-                    <form method="post" action="{{ url_for('video.api_video_like', video_id=video.id) }}" style="display:inline;">
-                        <button type="submit" class="action-btn" title="Like">&#128077; {{ format_views(video.likes) }}</button>
-                    </form>
+                    <button type="button" id="like-btn" class="action-btn" title="Like" onclick="rateVideo(1, this)">&#128077; <span id="like-count">{{ format_views(video.likes) }}</span></button>
+                    <button type="button" id="dislike-btn" class="action-btn" title="Dislike" onclick="rateVideo(-1, this)">&#128078; <span id="dislike-count">{{ format_views(video.dislikes) }}</span></button>
                     <form method="post" action="{{ url_for('video.form_save_video', video_id=video.id) }}">
                         <button type="submit" class="action-btn" title="Save">&#128278; Save</button>
                     </form>
@@ -319,6 +318,42 @@
         </div>
     </div>
 <script>
+// Like / dislike — AJAX toggle so the button updates the counter in place
+// instead of navigating to the raw JSON response.
+var rateState = 0; // 1 = liked, -1 = disliked, 0 = none
+function fmtCount(n) {
+    n = +n;
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+    return '' + n;
+}
+function rateVideo(target, btn) {
+    var actions;
+    if (target === 1) {
+        if (rateState === 1) { actions = ['unlike']; rateState = 0; }
+        else if (rateState === -1) { actions = ['undislike', 'like']; rateState = 1; }
+        else { actions = ['like']; rateState = 1; }
+    } else {
+        if (rateState === -1) { actions = ['undislike']; rateState = 0; }
+        else if (rateState === 1) { actions = ['unlike', 'dislike']; rateState = -1; }
+        else { actions = ['dislike']; rateState = -1; }
+    }
+    var url = '/sites/video/api/videos/{{ video.id }}/like';
+    (function send(i) {
+        if (i >= actions.length) return;
+        fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: actions[i]})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.likes !== undefined) document.getElementById('like-count').textContent = fmtCount(d.likes);
+            if (d.dislikes !== undefined) document.getElementById('dislike-count').textContent = fmtCount(d.dislikes);
+            send(i + 1);
+        }).catch(function() {});
+    })(0);
+    document.getElementById('like-btn').classList.toggle('active', rateState === 1);
+    document.getElementById('dislike-btn').classList.toggle('active', rateState === -1);
+}
 function shareVideo(platform) {
     var videoId = {{ video.id }};
     fetch('/sites/video/api/videos/' + videoId + '/share', {
