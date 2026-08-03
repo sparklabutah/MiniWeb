@@ -388,12 +388,15 @@ def resource_detail(resource_id):
                if r.get("type") == resource["type"] and r.get("id") != resource_id][:4]
     # Type-specific preview data
     dataset_rows = _dataset_sample_rows(10) if resource["type"] == "dataset" else None
+    dl_ext = ".csv" if resource["type"] == "dataset" else ".pdf"
+    download_name = _res_slug(resource.get("title")) + dl_ext
     return render_template(
         "project-homepages/resource_detail.html",
         project=project,
         resource=resource,
         related=related,
         dataset_rows=dataset_rows,
+        download_name=download_name,
         user=_current_user(),
         sections_list=_get_section_list(project),
     )

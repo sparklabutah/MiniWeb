@@ -38,6 +38,40 @@
     'audio/*': ['.mp3', '.wav', '.ogg'],
   };
 
+  // --- Downloaded files: files the user downloads are added to the simulated
+  // explorer (persisted in localStorage) so they can be re-selected/uploaded. ---
+  var STORE_KEY = '_miniweb_downloaded_files';
+  var TYPE_BY_EXT = {
+    '.pdf': 'application/pdf', '.csv': 'text/csv', '.json': 'application/json',
+    '.txt': 'text/plain', '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.mp4': 'video/mp4', '.zip': 'application/zip', '.tar': 'application/x-tar',
+    '.gz': 'application/gzip', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  };
+  function extOf(name) { var m = /\.[a-z0-9]+$/i.exec(name || ''); return m ? m[0].toLowerCase() : ''; }
+  function loadStored() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
+  function saveStored(a) { try { localStorage.setItem(STORE_KEY, JSON.stringify(a.slice(-40))); } catch (e) {} }
+  function stubContent(ext, name) {
+    if (ext === '.pdf') return '%PDF-1.4 simulated downloaded document: ' + name;
+    if (ext === '.csv') return 'id,name,value\n1,sample,100\n2,sample,200';
+    if (ext === '.json') return '{"downloaded": true, "name": "' + name + '"}';
+    return 'Simulated downloaded file: ' + name;
+  }
+  function addDownloadedFile(name) {
+    if (!name) return;
+    var ext = extOf(name);
+    var stored = loadStored();
+    if (stored.some(function (f) { return f.name === name; })) return;  // dedupe
+    stored.push({
+      name: name, type: TYPE_BY_EXT[ext] || 'application/octet-stream',
+      ext: [ext || '.bin'], content: stubContent(ext, name), downloaded: true,
+    });
+    saveStored(stored);
+  }
+  // Expose for pages that trigger downloads programmatically.
+  window.MiniWebFiles = { add: addDownloadedFile, listDownloaded: loadStored };
+
   function parseAccept(accept) {
     if (!accept) return null;
     var parts = accept.split(',').map(function (s) { return s.trim().toLowerCase(); });
@@ -52,10 +86,15 @@
     return exts.size > 0 ? exts : null;
   }
 
+  function allFiles() {
+    // Downloaded files first so they're easy to find at the top.
+    return loadStored().concat(FILES);
+  }
   function getFilesForInput(input) {
+    var all = allFiles();
     var allowed = parseAccept(input.getAttribute('accept'));
-    if (!allowed) return FILES;
-    return FILES.filter(function (f) { return f.ext.some(function (e) { return allowed.has(e); }); });
+    if (!allowed) return all;
+    return all.filter(function (f) { return f.ext.some(function (e) { return allowed.has(e); }); });
   }
 
   function selectFile(input, file) {
@@ -139,7 +178,7 @@
     '._fp-name{flex:1}';
   document.head.appendChild(css);
 
-  // --- Intercept ---
+  // --- Intercept file inputs (upload picker) ---
   document.addEventListener('click', function (e) {
     var input = e.target.closest('input[type="file"]');
     if (input) {
@@ -148,5 +187,35 @@
       show(input);
     }
   }, true);
+
+  // --- Register downloads into the simulated explorer ---
+  function savedToast(name) {
+    var t = document.createElement('div');
+    t.textContent = '✓ Saved ' + name + ' to Files';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 18px;border-radius:8px;font:600 13px -apple-system,sans-serif;z-index:1000000;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+    document.body.appendChild(t);
+    setTimeout(function () { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; }, 1800);
+    setTimeout(function () { t.remove(); }, 2400);
+  }
+  function filenameFromHref(href) {
+    try {
+      var path = href.split('?')[0].split('#')[0];
+      var last = path.split('/').filter(Boolean).pop() || '';
+      return /\.[a-z0-9]+$/i.test(last) ? decodeURIComponent(last) : '';
+    } catch (e) { return ''; }
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[download], a[href*="/download"], a[href*="export"][href*="format="], [data-download-name]');
+    if (!a) return;
+    var name = a.getAttribute('download') || a.getAttribute('data-download-name');
+    if (!name) name = filenameFromHref(a.getAttribute('href') || '');
+    if (!name) {  // export links without a filename in the URL
+      var href = a.getAttribute('href') || '';
+      var fmt = (href.match(/format=([a-z0-9]+)/i) || [])[1];
+      if (fmt) name = 'export.' + fmt;
+    }
+    if (name) { addDownloadedFile(name); savedToast(name); }
+    // Do NOT preventDefault — let the real download proceed.
+  }, false);
 
 })();
