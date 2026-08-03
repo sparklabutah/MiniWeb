@@ -3,424 +3,270 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LiveStream - Live Streaming</title>
+    <title>PulseLive — Browse</title>
+    <link rel="stylesheet" href="/static/twitch.css">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; }
-
-        /* -- Header -------------------------------------------------------- */
-        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
-        .header h1 a span { color: #9147ff; }
-        .header-right { display: flex; align-items: center; gap: 1rem; }
-        .header-right a { color: #dedee3; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
-        .header-right a:hover { background: #2f2f35; }
-        .header-right .user-badge { background: #9147ff; color: #fff; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; }
-        nav { background: #18181b; padding: .5rem 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid #2f2f35; }
-        nav a { color: #adadb8; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .6rem; border-radius: .3rem; }
-        nav a:hover { color: #efeff1; background: #2f2f35; }
-        nav a.active { color: #9147ff; font-weight: 700; border-bottom: 2px solid #9147ff; }
-
-        /* -- Featured Live Section ---------------------------------------- */
-        .featured-section { background: #18181b; margin: 0; padding: 0; border-bottom: 1px solid #2f2f35; }
-        .featured-wrap { max-width: 1400px; margin: 0 auto; display: flex; height: 480px; }
-
-        /* Video player area */
-        .player-area { flex: 1; position: relative; background: linear-gradient(135deg, #1a0533 0%, #0d0d2b 40%, #0a1628 70%, #0e0e10 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .player-area::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 40%, rgba(145,71,255,.15) 0%, transparent 70%); }
-        .player-area::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 70% 60%, rgba(0,128,255,.08) 0%, transparent 60%); }
-
-        .player-overlay { position: relative; z-index: 2; text-align: center; }
-        .player-overlay .live-indicator { display: inline-flex; align-items: center; gap: .5rem; background: #eb0400; color: #fff; font-size: .8rem; font-weight: 700; padding: .35rem .8rem; border-radius: .3rem; text-transform: uppercase; margin-bottom: 1rem; animation: live-pulse 2s ease-in-out infinite; }
-        .player-overlay .live-indicator .dot { width: 8px; height: 8px; background: #fff; border-radius: 50%; animation: dot-blink 1.5s ease-in-out infinite; }
-        @keyframes live-pulse { 0%,100%{ opacity:1; } 50%{ opacity:.85; } }
-        @keyframes dot-blink { 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
-
-        .player-overlay .stream-title-hero { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: .5rem; max-width: 500px; }
-        .player-overlay .streamer-line { display: flex; align-items: center; gap: .5rem; justify-content: center; margin-bottom: .7rem; }
-        .player-overlay .streamer-line .avatar-circle { width: 32px; height: 32px; border-radius: 50%; background: #9147ff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; color: #fff; flex-shrink: 0; }
-        .player-overlay .streamer-line a { color: #bf94ff; text-decoration: none; font-weight: 600; font-size: .95rem; }
-        .player-overlay .streamer-line a:hover { color: #9147ff; }
-        .player-overlay .viewer-count { display: inline-flex; align-items: center; gap: .4rem; color: #adadb8; font-size: .85rem; }
-        .player-overlay .viewer-count .red-dot { width: 8px; height: 8px; background: #eb0400; border-radius: 50%; }
-        .player-overlay .category-pill { display: inline-block; background: rgba(145,71,255,.25); color: #bf94ff; font-size: .75rem; padding: .2rem .6rem; border-radius: 1rem; margin-top: .5rem; }
-
-        /* Animated wave bars in background */
-        .wave-bars { position: absolute; bottom: 0; left: 0; right: 0; height: 60px; display: flex; align-items: flex-end; gap: 3px; padding: 0 20px; opacity: .15; z-index: 1; }
-        .wave-bars span { flex: 1; background: #9147ff; border-radius: 2px 2px 0 0; animation: wave-bar 1.8s ease-in-out infinite; }
-        @keyframes wave-bar { 0%,100%{ height: 10%; } 50%{ height: 80%; } }
-
-        /* Chat panel */
-        .chat-panel { width: 340px; display: flex; flex-direction: column; background: #18181b; border-left: 1px solid #2f2f35; }
-        .chat-header { padding: .7rem 1rem; border-bottom: 1px solid #2f2f35; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .chat-header h3 { font-size: .9rem; font-weight: 700; color: #efeff1; }
-        .chat-header .chat-badge { background: #eb0400; color: #fff; font-size: .65rem; padding: .15rem .4rem; border-radius: .2rem; font-weight: 600; }
-        .chat-messages { flex: 1; overflow-y: auto; padding: .5rem .8rem; display: flex; flex-direction: column; gap: 0; scrollbar-width: thin; scrollbar-color: #2f2f35 transparent; }
-        .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-track { background: transparent; }
-        .chat-messages::-webkit-scrollbar-thumb { background: #2f2f35; border-radius: 3px; }
-
-        .chat-msg { padding: .35rem 0; font-size: .82rem; line-height: 1.4; animation: msg-slide-in .4s ease-out; }
-        .chat-msg .chat-user { font-weight: 700; cursor: pointer; }
-        .chat-msg .chat-text { color: #d3d3d8; }
-        .chat-msg .badge { font-size: .6rem; padding: .1rem .3rem; border-radius: .15rem; font-weight: 600; margin-right: .2rem; vertical-align: middle; }
-        .badge-sub { background: #9147ff; color: #fff; }
-        .badge-broadcaster { background: #eb0400; color: #fff; }
-        .badge-mod { background: #00ad03; color: #fff; }
-
-        @keyframes msg-slide-in {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .chat-input-area { padding: .6rem .8rem; border-top: 1px solid #2f2f35; flex-shrink: 0; }
-        .chat-input-area input { width: 100%; background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .45rem .7rem; border-radius: .3rem; font-size: .82rem; outline: none; }
-        .chat-input-area input:focus { border-color: #9147ff; }
-        .chat-input-area .chat-hint { font-size: .7rem; color: #737380; margin-top: .3rem; }
-
-        /* -- Main content ------------------------------------------------- */
-        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        .filters { background: #18181b; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .filter-group { display: flex; flex-direction: column; gap: .3rem; }
-        .filter-group label { font-size: .75rem; color: #adadb8; text-transform: uppercase; font-weight: 600; }
-        .filter-group select, .filter-group input[type="text"] { background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .45rem .7rem; border-radius: .3rem; font-size: .85rem; }
-        .filter-group select:focus, .filter-group input[type="text"]:focus { border-color: #9147ff; outline: none; }
-        .btn { background: #9147ff; color: #fff; border: none; padding: .5rem 1rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
-        .btn:hover { background: #772ce8; }
-        .btn-outline { background: transparent; border: 1px solid #9147ff; color: #9147ff; }
-        .btn-outline:hover { background: #9147ff22; }
-        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: #efeff1; }
-
-        /* Stream grid */
-        .stream-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
-        .stream-card { background: #18181b; border-radius: .5rem; overflow: hidden; transition: transform .15s; }
-        .stream-card:hover { transform: translateY(-2px); }
-        .stream-card a { text-decoration: none; color: inherit; }
-        .stream-thumb { position: relative; background: #26262c; height: 160px; display: flex; align-items: center; justify-content: center; }
-        .stream-thumb .category-badge { position: absolute; top: .5rem; left: .5rem; background: #9147ff; color: #fff; font-size: .7rem; padding: .2rem .5rem; border-radius: .2rem; font-weight: 600; }
-        .stream-thumb .live-badge { position: absolute; top: .5rem; right: .5rem; background: #eb0400; color: #fff; font-size: .7rem; padding: .2rem .5rem; border-radius: .2rem; font-weight: 700; text-transform: uppercase; }
-        .stream-thumb .viewers { position: absolute; bottom: .5rem; left: .5rem; background: rgba(0,0,0,.7); color: #fff; font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; }
-        .stream-thumb .play-icon { font-size: 2.5rem; color: #5c5c6a; }
-        .stream-info { padding: .8rem; }
-        .stream-info .streamer-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
-        .stream-info .avatar { width: 28px; height: 28px; border-radius: 50%; background: #9147ff; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: #fff; font-weight: 700; flex-shrink: 0; }
-        .stream-info .streamer-name { font-size: .8rem; color: #adadb8; font-weight: 500; }
-        .stream-info .stream-title { font-size: .9rem; font-weight: 600; color: #efeff1; margin-bottom: .3rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .stream-info .stream-meta { font-size: .75rem; color: #737380; display: flex; gap: .8rem; flex-wrap: wrap; }
-        .stream-info .tags { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .4rem; }
-        .stream-info .tag { background: #2f2f35; color: #adadb8; font-size: .65rem; padding: .15rem .4rem; border-radius: .2rem; }
-        .no-results { text-align: center; padding: 3rem; color: #737380; }
-
-        /* Color palette for usernames */
-        .uc-1 { color: #ff6b6b; } .uc-2 { color: #ffa06b; } .uc-3 { color: #ffd56b; }
-        .uc-4 { color: #6bff8e; } .uc-5 { color: #6bd4ff; } .uc-6 { color: #a76bff; }
-        .uc-7 { color: #ff6bc4; } .uc-8 { color: #6bffda; } .uc-9 { color: #ffb86b; }
-        .uc-0 { color: #c4ff6b; }
-
-        @media (max-width: 900px) {
-            .featured-wrap { flex-direction: column; height: auto; }
-            .player-area { min-height: 260px; }
-            .chat-panel { width: 100%; height: 320px; border-left: none; border-top: 1px solid #2f2f35; }
-        }
+        /* hero animated equalizer bars behind the poster */
+        .hero-eq { position: absolute; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; opacity: .18; z-index: 1; }
+        .hero-eq span { flex: 1; background: #9147ff; border-radius: 2px 2px 0 0; animation: eq 1.8s ease-in-out infinite; }
+        @keyframes eq { 0%,100%{ height: 10%; } 50%{ height: 80%; } }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
-        <div class="header-right">
-            <a href="{{ url_for('live.index') }}">Browse</a>
-            <a href="{{ url_for('live.clips_page') }}">Clips</a>
-            {% if logged_in %}
-                <a href="{{ url_for('live.subscriptions_page') }}">Subscriptions</a>
-                <span class="user-badge">{{ user.display_name }}</span>
-                <a href="{{ url_for('live.logout') }}">Logout</a>
-            {% else %}
-                <a href="{{ url_for('live.login_page') }}" class="btn">Log In</a>
-                <a href="{{ url_for('live.register_page') }}">Sign Up</a>
-            {% endif %}
-        </div>
+    {% set active_nav = 'browse' %}
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <main class="tw-main">
+            <div class="tw-content">
+
+                {% if featured_stream %}
+                <section class="tw-hero">
+                    <div class="tw-hero-player" style="background: {{ featured_stream.thumb_css }};">
+                        <div class="hero-eq">
+                            {% for i in range(48) %}<span style="animation-delay: {{ (i * 0.06)|round(2) }}s;"></span>{% endfor %}
+                        </div>
+                        <span class="live-tag"><span class="dot"></span> LIVE</span>
+                        <div class="tw-hero-overlay">
+                            <div class="h-title">{{ featured_stream.title }}</div>
+                            <div class="h-row">
+                                <span class="tw-avatar" style="width:34px;height:34px;font-size:.85rem;background: {{ featured_streamer.avatar_color if featured_streamer else '#9147ff' }};">{{ featured_streamer.display_name[0]|upper if featured_streamer else '?' }}</span>
+                                <a class="h-chan" href="{{ url_for('live.channel_page', user_id=featured_stream.channel_id) }}">{{ featured_streamer.display_name if featured_streamer else 'Unknown' }}</a>
+                                <span class="h-view"><span class="tw-dot"></span> <span id="viewer-count">{{ featured_stream.average_viewers }}</span> watching</span>
+                                {% if featured_uptime is not none %}<span class="h-view" title="Stream uptime">&#9201; <span id="hero-uptime">0:00:00</span></span>{% endif %}
+                                <span class="tw-pill">{{ featured_stream.category }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tw-hero-chat tw-chat">
+                        <div class="tw-chat-head">Stream Chat <span class="live-badge">LIVE</span></div>
+                        <div class="tw-chat-msgs" id="chat-messages"></div>
+                        <div class="tw-chat-input">
+                            <div class="box">
+                                <input type="text" id="chat-input" placeholder="Send a message" autocomplete="off">
+                                <button class="tw-btn tw-btn-sm" id="chat-send" type="button">Chat</button>
+                            </div>
+                            <div class="bottom">
+                                <span class="hint">{% if logged_in %}Chatting as {{ user.display_name }}{% else %}<a href="{{ url_for('live.login_page') }}">Log in</a> to chat{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {% endif %}
+
+                {% if ad %}
+                <a class="tw-ad" href="/sites/{{ ad.site }}/">
+                    <div class="l"><span><span class="label">Ad</span><span class="brand">{{ ad.brand }}</span></span><span class="tag">{{ ad.tagline }}</span></div>
+                    <span class="tw-btn tw-btn-sm">Visit {{ ad.domain }} &rarr;</span>
+                </a>
+                {% endif %}
+
+                <div class="tw-page-head">
+                    <h1>Browse</h1>
+                </div>
+
+                <div class="tw-tabs">
+                    <a href="{{ url_for('live.index') }}" class="{{ 'active' if not selected_status }}">All</a>
+                    <a href="{{ url_for('live.index', status='live') }}" class="{{ 'active' if selected_status == 'live' }}">Live channels</a>
+                    <a href="{{ url_for('live.index', status='completed') }}" class="{{ 'active' if selected_status == 'completed' }}">Past streams</a>
+                </div>
+
+                <form class="tw-filters" method="get" action="{{ url_for('live.index') }}" style="margin-bottom:1.3rem;">
+                    <div class="tw-fg">
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ q }}" placeholder="Search streams...">
+                    </div>
+                    <div class="tw-fg">
+                        <label>Category</label>
+                        <select name="category">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {{ 'selected' if selected_category == cat }}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="">All</option>
+                            <option value="live" {{ 'selected' if selected_status == 'live' }}>Live</option>
+                            <option value="completed" {{ 'selected' if selected_status == 'completed' }}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Streamer</label>
+                        <select name="streamer">
+                            <option value="">All Streamers</option>
+                            {% for s in streamers %}
+                            <option value="{{ s.id }}" {{ 'selected' if selected_streamer == s.id }}>{{ s.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Sort By</label>
+                        <select name="sort">
+                            <option value="default" {{ 'selected' if selected_sort == 'default' }}>Recommended</option>
+                            <option value="viewers" {{ 'selected' if selected_sort == 'viewers' }}>Most Viewed</option>
+                            <option value="newest" {{ 'selected' if selected_sort == 'newest' }}>Newest</option>
+                            <option value="oldest" {{ 'selected' if selected_sort == 'oldest' }}>Oldest</option>
+                            <option value="duration" {{ 'selected' if selected_sort == 'duration' }}>Longest</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="tw-btn">Filter</button>
+                    {% if selected_category or selected_status or selected_streamer or q %}
+                    <a href="{{ url_for('live.index') }}" class="tw-btn-2">Clear</a>
+                    {% endif %}
+                </form>
+
+                {% if streams %}
+                <div class="tw-grid">
+                    {% for stream in streams %}
+                    {% set streamer = user_map.get(stream.channel_id) %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.stream_detail', stream_id=stream.id) }}" style="background: {{ stream.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                {% if stream.status == 'live' %}
+                                <span class="tw-live-pill">Live</span>
+                                <span class="tw-viewers"><span class="tw-dot"></span> {{ fmt_count(stream.average_viewers) }}</span>
+                                {% else %}
+                                <span class="tw-vod-pill">VOD</span>
+                                <span class="tw-viewers">{{ fmt_count(stream.total_views) }} views</span>
+                                {% endif %}
+                                {% if stream.duration_minutes %}<span class="tw-dur">{{ stream.duration_minutes }}m</span>{% endif %}
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ streamer.avatar_color if streamer else '#9147ff' }};">{{ streamer.display_name[0]|upper if streamer else '?' }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.stream_detail', stream_id=stream.id) }}" title="{{ stream.title }}">{{ stream.title }}</a>
+                                <a class="tw-card-chan" href="{{ url_for('live.channel_page', user_id=stream.channel_id) }}">{{ streamer.display_name if streamer else 'Unknown' }}</a>
+                                <a class="tw-card-cat" href="{{ url_for('live.index', category=stream.category) }}">{{ stream.category }}</a>
+                                {% if stream.tags %}
+                                <div class="tw-pills">
+                                    {% for tag in stream.tags[:3] %}<span class="tw-pill">{{ tag }}</span>{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>No streams found matching your filters.</p></div>
+                {% endif %}
+
+            </div>
+        </main>
     </div>
 
-    <nav>
-        <a href="{{ url_for('live.index') }}" class="{{ 'active' if not selected_category and not selected_status }}">All</a>
-        <a href="{{ url_for('live.index', status='live') }}" class="{{ 'active' if selected_status == 'live' }}">Live Now</a>
-        <a href="{{ url_for('live.index', status='completed') }}" class="{{ 'active' if selected_status == 'completed' }}">Past Streams</a>
-        {% for cat in categories %}
-        <a href="{{ url_for('live.index', category=cat) }}" class="{{ 'active' if selected_category == cat }}">{{ cat }}</a>
-        {% endfor %}
-    </nav>
-
-    {% if featured_stream %}
-    <!-- ============================================================= -->
-    <!-- Featured "Live Now" Stream                                      -->
-    <!-- ============================================================= -->
-    <section class="featured-section">
-        <div class="featured-wrap">
-            <!-- Simulated video player -->
-            <div class="player-area">
-                <div class="wave-bars">
-                    {% for i in range(40) %}
-                    <span style="animation-delay: {{ (i * 0.07)|round(2) }}s;"></span>
-                    {% endfor %}
-                </div>
-                <div class="player-overlay">
-                    <div class="live-indicator"><span class="dot"></span> LIVE</div>
-                    <div class="stream-title-hero">{{ featured_stream.title }}</div>
-                    <div class="streamer-line">
-                        <div class="avatar-circle">{{ featured_streamer.display_name[0] if featured_streamer else '?' }}</div>
-                        <a href="{{ url_for('live.channel_page', user_id=featured_stream.channel_id) }}">
-                            {{ featured_streamer.display_name if featured_streamer else 'Unknown' }}
-                        </a>
-                    </div>
-                    <div class="viewer-count">
-                        <span class="red-dot"></span>
-                        <span id="viewer-count">{{ featured_stream.average_viewers }}</span> watching now
-                    </div>
-                    <div class="category-pill">{{ featured_stream.category }}</div>
-                </div>
-            </div>
-
-            <!-- Live chat panel -->
-            <div class="chat-panel">
-                <div class="chat-header">
-                    <h3>Stream Chat</h3>
-                    <span class="chat-badge">LIVE</span>
-                </div>
-                <div class="chat-messages" id="chat-messages">
-                    <!-- Messages injected by JS -->
-                </div>
-                <div class="chat-input-area">
-                    <input type="text" placeholder="Send a message..." id="chat-input" autocomplete="off">
-                    <div class="chat-hint">Press Enter to send (login required)</div>
-                </div>
+    <!-- Login-required modal -->
+    <div class="tw-modal-bg" id="loginModal">
+        <div class="tw-modal">
+            <h3>Log in to chat</h3>
+            <p>You need to be logged in to send messages in Stream Chat.</p>
+            <div class="acts">
+                <button type="button" class="tw-btn-2" onclick="document.getElementById('loginModal').classList.remove('show')">Not now</button>
+                <a class="tw-btn" href="{{ url_for('live.login_page') }}">Log In</a>
             </div>
         </div>
-    </section>
-    {% endif %}
-
-    <div class="container">
-        <form class="filters" method="get" action="{{ url_for('live.index') }}">
-            <div class="filter-group">
-                <label>Search</label>
-                <input type="text" name="q" value="{{ q }}" placeholder="Search streams...">
-            </div>
-            <div class="filter-group">
-                <label>Category</label>
-                <select name="category">
-                    <option value="">All Categories</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat }}" {{ 'selected' if selected_category == cat }}>{{ cat }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Status</label>
-                <select name="status">
-                    <option value="">All</option>
-                    <option value="live" {{ 'selected' if selected_status == 'live' }}>Live</option>
-                    <option value="completed" {{ 'selected' if selected_status == 'completed' }}>Completed</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Streamer</label>
-                <select name="streamer">
-                    <option value="">All Streamers</option>
-                    {% for s in streamers %}
-                    <option value="{{ s.id }}" {{ 'selected' if selected_streamer == s.id }}>{{ s.display_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Sort By</label>
-                <select name="sort">
-                    <option value="default" {{ 'selected' if selected_sort == 'default' }}>Default</option>
-                    <option value="viewers" {{ 'selected' if selected_sort == 'viewers' }}>Most Viewed</option>
-                    <option value="newest" {{ 'selected' if selected_sort == 'newest' }}>Newest</option>
-                    <option value="oldest" {{ 'selected' if selected_sort == 'oldest' }}>Oldest</option>
-                    <option value="duration" {{ 'selected' if selected_sort == 'duration' }}>Longest</option>
-                </select>
-            </div>
-            <button type="submit" class="btn">Filter</button>
-            {% if selected_category or selected_status or selected_streamer or q %}
-            <a href="{{ url_for('live.index') }}" class="btn btn-outline">Clear</a>
-            {% endif %}
-        </form>
-
-        {% if streams %}
-        <h2 class="section-title">
-            {% if selected_status == 'live' %}Live Streams
-            {% elif selected_status == 'completed' %}Past Streams
-            {% else %}All Streams
-            {% endif %}
-            <span style="font-weight:400; color:#737380; font-size:.85rem;">({{ streams|length }})</span>
-        </h2>
-        <div class="stream-grid">
-            {% for stream in streams %}
-            {% set streamer = user_map.get(stream.channel_id) %}
-            <div class="stream-card">
-                <a href="{{ url_for('live.stream_detail', stream_id=stream.id) }}">
-                    <div class="stream-thumb">
-                        <span class="play-icon">&#9654;</span>
-                        <span class="category-badge">{{ stream.category }}</span>
-                        {% if stream.status == 'live' %}
-                        <span class="live-badge">LIVE</span>
-                        {% endif %}
-                        <span class="viewers">
-                            {% if stream.status == 'live' %}
-                                {{ stream.average_viewers }} viewers
-                            {% else %}
-                                {{ stream.total_views }} views
-                            {% endif %}
-                        </span>
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">{{ stream.title }}</div>
-                        <div class="streamer-row">
-                            <div class="avatar">{{ streamer.display_name[0] if streamer else '?' }}</div>
-                            <span class="streamer-name">{{ streamer.display_name if streamer else 'Unknown' }}</span>
-                        </div>
-                        <div class="stream-meta">
-                            {% if stream.duration_minutes %}
-                            <span>{{ stream.duration_minutes }} min</span>
-                            {% endif %}
-                            <span>Peak: {{ stream.peak_viewers }}</span>
-                        </div>
-                        {% if stream.tags %}
-                        <div class="tags">
-                            {% for tag in stream.tags[:4] %}
-                            <span class="tag">{{ tag }}</span>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="no-results">
-            <p>No streams found matching your filters.</p>
-        </div>
-        {% endif %}
     </div>
 
     {% if featured_stream %}
     <script>
     (function() {
-        var chatBox      = document.getElementById('chat-messages');
-        var viewerEl     = document.getElementById('viewer-count');
-        var chatInput    = document.getElementById('chat-input');
-        var streamId     = {{ featured_stream.id | tojson }};
-        var baseViewers  = {{ featured_stream.average_viewers }};
-        var nextOffset   = 0;
-        var pollInterval = 1500;  // ms between fetches
-        var batchSize    = 2;     // messages per fetch
+        var chatBox   = document.getElementById('chat-messages');
+        var viewerEl  = document.getElementById('viewer-count');
+        var chatInput = document.getElementById('chat-input');
+        var sendBtn   = document.getElementById('chat-send');
+        var streamId  = {{ featured_stream.id | tojson }};
+        var baseViewers = {{ featured_stream.average_viewers }};
+        var loggedIn  = {{ logged_in | tojson }};
+        var nextOffset = 0;
+        var batchSize  = 2;
 
-        /* ---- colour hash for usernames -------------------------------- */
         function userColor(name) {
             var h = 0;
             for (var i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
-            return 'uc-' + (Math.abs(h) % 10);
+            return 'hsl(' + (Math.abs(h) % 360) + ',70%,66%)';
         }
+        function escapeHtml(t) { var d = document.createElement('div'); d.appendChild(document.createTextNode(t)); return d.innerHTML; }
 
-        /* ---- render one message --------------------------------------- */
         function appendMsg(msg) {
             var div = document.createElement('div');
-            div.className = 'chat-msg';
+            div.className = 'tw-msg' + (msg.tip_amount ? ' cheer' : '');
             var badges = '';
-            var badgeList = msg.badges;
-            if (typeof badgeList === 'string') {
-                try { badgeList = JSON.parse(badgeList); } catch(e) { badgeList = []; }
-            }
-            if (badgeList && badgeList.length) {
-                for (var i = 0; i < badgeList.length; i++) {
-                    var b = badgeList[i];
-                    var cls = b === 'subscriber' ? 'badge-sub' : b === 'broadcaster' ? 'badge-broadcaster' : 'badge-mod';
-                    badges += '<span class="badge ' + cls + '">' + b.toUpperCase() + '</span>';
-                }
-            }
+            var bl = msg.badges;
+            if (typeof bl === 'string') { try { bl = JSON.parse(bl); } catch(e) { bl = []; } }
+            if (bl && bl.length) { for (var i = 0; i < bl.length; i++) { badges += '<span class="badge ' + bl[i] + '">' + bl[i].substring(0,3) + '</span>'; } }
             div.innerHTML = badges +
-                '<span class="chat-user ' + userColor(msg.username) + '">' +
-                msg.username + '</span>: ' +
-                '<span class="chat-text">' + escapeHtml(msg.message) + '</span>';
+                '<span class="u" style="color:' + userColor(msg.username) + '">' + escapeHtml(msg.username) + '</span>: ' +
+                '<span class="t">' + escapeHtml(msg.message) + '</span>';
             chatBox.appendChild(div);
-
-            /* keep max 80 messages in DOM */
-            while (chatBox.children.length > 80) {
-                chatBox.removeChild(chatBox.firstChild);
-            }
-            /* auto-scroll */
+            while (chatBox.children.length > 80) chatBox.removeChild(chatBox.firstChild);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function escapeHtml(t) {
-            var d = document.createElement('div');
-            d.appendChild(document.createTextNode(t));
-            return d.innerHTML;
+        /* Chat pace scales with viewer count: busier => faster + bigger bursts. */
+        function chatPace(viewers) {
+            var v = Math.max(1, viewers);
+            var perSec = Math.min(6, 0.25 + Math.sqrt(v) / 22);
+            var delay  = (1000 / perSec) * (0.4 + Math.random() * 1.9);
+            delay = Math.max(250, Math.min(6000, delay));
+            var batch = 1, r = Math.random();
+            if (v > 5000 && r > 0.45) batch = 3;
+            else if (v > 1000 && r > 0.55) batch = 2;
+            else if (v > 200 && r > 0.75) batch = 2;
+            return { delay: delay, batch: batch };
         }
 
-        /* ---- poll the API --------------------------------------------- */
         function fetchChat() {
-            var url = '{{ url_for("live.api_chat_live") }}' +
-                      '?stream_id=' + encodeURIComponent(streamId) +
-                      '&offset=' + nextOffset +
-                      '&limit=' + batchSize;
-
-            /* If stream has no chat, poll all chat messages */
+            var pace = chatPace(baseViewers);
+            batchSize = pace.batch;
+            var url = '{{ url_for("live.api_chat_live") }}';
             {% if featured_chat_count > 0 %}
+            url += '?stream_id=' + encodeURIComponent(streamId) + '&offset=' + nextOffset + '&limit=' + batchSize;
             {% else %}
-            url = '{{ url_for("live.api_chat_live") }}' +
-                  '?offset=' + nextOffset + '&limit=' + batchSize;
+            url += '?offset=' + nextOffset + '&limit=' + batchSize;
             {% endif %}
-
-            fetch(url)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.messages && data.messages.length) {
-                        for (var i = 0; i < data.messages.length; i++) {
-                            appendMsg(data.messages[i]);
-                        }
-                        nextOffset = data.next_offset;
-                    }
-                })
-                .catch(function() {})
-                .finally(function() {
-                    /* Randomize next interval between 1-2.5s for realism */
-                    var delay = 1000 + Math.random() * 1500;
-                    setTimeout(fetchChat, delay);
-                });
+            fetch(url).then(function(r){ return r.json(); }).then(function(data){
+                if (data.messages && data.messages.length) {
+                    for (var i = 0; i < data.messages.length; i++) appendMsg(data.messages[i]);
+                    nextOffset = data.next_offset;
+                }
+            }).catch(function(){}).finally(function(){ setTimeout(fetchChat, pace.delay); });
         }
 
-        /* ---- viewer count ticker -------------------------------------- */
         function tickViewers() {
-            var delta = Math.floor(Math.random() * 11) - 5; // -5 to +5
+            var delta = Math.floor(Math.random() * 11) - 5;
             baseViewers = Math.max(1, baseViewers + delta);
             viewerEl.textContent = baseViewers.toLocaleString();
             setTimeout(tickViewers, 2000 + Math.random() * 3000);
         }
 
-        /* ---- chat input (post message) -------------------------------- */
-        if (chatInput) {
-            chatInput.addEventListener('keydown', function(e) {
-                if (e.key !== 'Enter') return;
-                var text = chatInput.value.trim();
-                if (!text) return;
-                chatInput.value = '';
-
-                fetch('{{ url_for("live.api_stream_chat_post", stream_id=featured_stream.id) }}', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message: text}),
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(msg) {
-                    if (msg.id) appendMsg(msg);
-                })
-                .catch(function() {});
-            });
+        /* Live uptime clock for the featured stream (ticks up every second) */
+        var heroUptime = {{ featured_uptime | tojson }};
+        if (heroUptime !== null) {
+            var huEl = document.getElementById('hero-uptime');
+            function fmtUptime(s) { var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h + ':' + (m<10?'0':'') + m + ':' + (sec<10?'0':'') + sec; }
+            (function tickUptime() { if (huEl) huEl.textContent = fmtUptime(heroUptime); heroUptime++; setTimeout(tickUptime, 1000); })();
         }
 
-        /* ---- kick it off ---------------------------------------------- */
+        function trySend() {
+            var text = chatInput.value.trim();
+            if (!text) return;
+            if (!loggedIn) { document.getElementById('loginModal').classList.add('show'); return; }
+            chatInput.value = '';
+            fetch('{{ url_for("live.api_stream_chat_post", stream_id=featured_stream.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: text})
+            }).then(function(r){ return r.json(); }).then(function(msg){ if (msg.id) appendMsg(msg); }).catch(function(){});
+        }
+        if (sendBtn) sendBtn.addEventListener('click', trySend);
+        if (chatInput) chatInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); trySend(); } });
+
         fetchChat();
         tickViewers();
     })();

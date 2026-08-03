@@ -1,0 +1,29 @@
+<div class="masthead">
+    <div class="mast-inner">
+        <div class="brand"><span class="plus" style="display:inline;">✚</span>Lakeport Medical Center<span>Patient Portal &middot; MyHealth Online</span></div>
+        <div class="mast-right">
+            <span class="signed">Signed in as <b style="color:#fff;">{{ user.full_name if user else 'Guest' }}</b></span>
+            {% if logged_in %}<a href="{{ url_for('health-portals.logout') }}">Sign Out</a>{% else %}<a href="{{ url_for('health-portals.login_page') }}">Sign In</a>{% endif %}
+            &nbsp;|&nbsp; <a href="{{ url_for('health-portals.compose_page') }}">Contact Us</a>
+            &nbsp;|&nbsp; <a href="/">MiniWeb</a>
+        </div>
+    </div>
+</div>
+
+<div class="tabstrip">
+    <div class="tab-inner">
+        <a class="tab {{ 'active' if active_page == 'home' }}" href="{{ url_for('health-portals.index') }}">Home</a>
+        <a class="tab {{ 'active' if active_page == 'appointments' }}" href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
+        <a class="tab {{ 'active' if active_page == 'records' }}" href="{{ url_for('health-portals.records_page') }}">Medical Records</a>
+        <a class="tab {{ 'active' if active_page == 'messages' }}" href="{{ url_for('health-portals.messages_page') }}">Messages{% if unread_count %} <span class="ct">({{ unread_count }})</span>{% endif %}</a>
+        <a class="tab {{ 'active' if active_page == 'prescriptions' }}" href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
+        <a class="tab {{ 'active' if active_page == 'billing' }}" href="{{ url_for('health-portals.billing_page') }}">Billing</a>
+    </div>
+</div>
+
+<div class="utilbar">
+    <div class="util-inner">
+        <span>Last login: {{ user.last_login[:10] if user and user.last_login else '—' }}{% if user and user.last_login %} at {{ user.last_login[11:16] }}{% endif %}</span>
+        <span>{% if user %}MRN: LMC-{{ '%07d'|format(1000000 + user.id) }} &nbsp;&middot;&nbsp; Member ID: {{ user.insurance_id or 'N/A' }}{% endif %}</span>
+    </div>
+</div>

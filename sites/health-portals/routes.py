@@ -99,6 +99,23 @@ def _get_browsing_user():
     return _get_user(1), False
 
 
+@blueprint.context_processor
+def _inject_unread():
+    """Expose the message unread-count to every template (tab bar badge)."""
+    from flask import request as _rq
+    if "/api/" in _rq.path:
+        return {}
+    try:
+        user, _ = _get_browsing_user()
+        if not user:
+            return {"unread_count": 0}
+        msgs = _load_messages()
+        n = sum(1 for m in msgs if m.get("recipient_id") == user["id"] and not m.get("read", True))
+        return {"unread_count": n}
+    except Exception:
+        return {"unread_count": 0}
+
+
 def _get_providers():
     """Return list of provider users."""
     return [u for u in _load_users() if u.get("role") == "provider"]
@@ -147,6 +164,24 @@ _verification_codes = {}
 # HTML routes
 # ---------------------------------------------------------------------------
 
+# Hospital announcements / health tips. No announcements table exists in the
+# data model, so these curated cards are the source of truth for the feed.
+_ANNOUNCEMENTS = [
+    {"title": "Flu Shot Clinic Now Open", "category": "Seasonal", "date": "2026-08-01",
+     "body": "Walk-in flu shots are available Monday–Friday, 8 AM–5 PM at the Lakeport Medical Center pharmacy. No appointment needed — covered by most insurance plans."},
+    {"title": "Video Visits With Your Care Team", "category": "Telehealth", "date": "2026-07-24",
+     "body": "Connect with your provider from home. Choose “Video Visit” when scheduling on the Appointments page for eligible visit types."},
+    {"title": "New Patient Portal Features", "category": "Portal", "date": "2026-07-15",
+     "body": "You can now view lab results, see your care team, and request prescription refills right from your dashboard."},
+    {"title": "Summer Wellness: Stay Hydrated", "category": "Health Tip", "date": "2026-07-02",
+     "body": "As temperatures climb, aim for 6–8 glasses of water a day and watch for signs of heat exhaustion — dizziness, headache, or nausea."},
+]
+_ANNOUNCEMENT_COLORS = {
+    "Seasonal": "#0d9488", "Telehealth": "#2563eb", "Portal": "#7c3aed",
+    "Health Tip": "#059669", "Notice": "#b45309",
+}
+
+
 @blueprint.route("/")
 def index():
     user, logged_in = _get_browsing_user()
@@ -154,10 +189,17 @@ def index():
 
     appointments = _load_appointments()
     today = datetime.now().strftime("%Y-%m-%d")
+    my_appts = [a for a in appointments if a["patient_id"] == patient_id]
     upcoming = sorted(
-        [a for a in appointments if a["patient_id"] == patient_id and a["date"] >= today],
+        [a for a in my_appts if a["date"] >= today],
         key=lambda a: (a["date"], a["time"]),
     )[:5]
+    # Recent appointments (for when nothing is upcoming) — most recent first.
+    recent_appts = sorted(my_appts, key=lambda a: (a["date"], a["time"]), reverse=True)[:4]
+    for a in upcoming + recent_appts:
+        a["provider_name"] = _get_provider_name(a["provider_id"])
+        prov = _get_user(a["provider_id"]) or {}
+        a["provider_specialty"] = prov.get("specialty") or prov.get("department") or ""
 
     messages = _load_messages()
     recent_msgs = sorted(
@@ -165,31 +207,76 @@ def index():
         key=lambda m: m["date"],
         reverse=True,
     )[:5]
-
     unread_count = sum(1 for m in messages if m.get("recipient_id") == patient_id and not m.get("read", True))
-
-    prescriptions = [p for p in _load_prescriptions() if p["patient_id"] == patient_id and p["status"] == "active"]
-
-    billing = _load_billing()
-    pending_bills = [b for b in billing if b["patient_id"] == patient_id and b["payment_status"] == "pending"]
-    total_due = sum(b.get("patient_responsibility") or b.get("patient_copay", 0) for b in pending_bills)
-
-    for a in upcoming:
-        a["provider_name"] = _get_provider_name(a["provider_id"])
-
     for m in recent_msgs:
         if m.get("sender_id"):
             m["sender_name"] = _get_provider_name(m["sender_id"]) if m["sender_id"] != patient_id else user["full_name"]
         else:
             m["sender_name"] = "System"
 
+    # Current medications (active prescriptions)
+    meds = [p for p in _load_prescriptions() if p["patient_id"] == patient_id and p["status"] == "active"]
+    for p in meds:
+        p["prescriber_name"] = _get_provider_name(p["prescriber_id"])
+
+    billing = _load_billing()
+    pending_bills = [b for b in billing if b["patient_id"] == patient_id and b["payment_status"] == "pending"]
+    total_due = sum(b.get("patient_responsibility") or b.get("patient_copay", 0) for b in pending_bills)
+
+    # Medical records: latest vitals, recent labs, recent visits
+    my_records = sorted(
+        [r for r in _load_records() if r["patient_id"] == patient_id],
+        key=lambda r: r.get("date", ""), reverse=True,
+    )
+    latest_vitals, vitals_date = None, None
+    for r in my_records:
+        if r.get("vitals"):
+            latest_vitals, vitals_date = r["vitals"], r.get("date")
+            break
+    labs = None
+    for r in my_records:
+        if r.get("lab_results"):
+            labs = {"date": r.get("date"), "provider": _get_provider_name(r.get("provider_id")),
+                    "tests": r["lab_results"], "record_id": r["id"]}
+            break
+    recent_records = []
+    for r in my_records[:4]:
+        recent_records.append({
+            **r,
+            "provider_name": _get_provider_name(r.get("provider_id")),
+            "type_label": (r.get("record_type") or "").replace("_", " ").title(),
+        })
+
+    # Care team: primary physician first, then other providers the patient has seen
+    ordered_ids, seen = [], set()
+    for pid in [user.get("primary_physician_id")] + [a["provider_id"] for a in my_appts]:
+        if pid and pid not in seen:
+            seen.add(pid)
+            ordered_ids.append(pid)
+    care_team = []
+    for pid in ordered_ids:
+        p = _get_user(pid)
+        if p and p.get("role") == "provider":
+            p = dict(p)
+            p["is_primary"] = (pid == user.get("primary_physician_id"))
+            care_team.append(p)
+    care_team = care_team[:4]
+
+    allergies = user.get("allergies") if isinstance(user.get("allergies"), list) else []
+
+    announcements = [dict(a, color=_ANNOUNCEMENT_COLORS.get(a["category"], "#0d6e6e")) for a in _ANNOUNCEMENTS]
+
     return render_template(
         "health-portals/index.html",
         user=user, logged_in=logged_in,
-        upcoming=upcoming, recent_msgs=recent_msgs,
-        unread_count=unread_count,
-        active_prescriptions=len(prescriptions),
+        upcoming=upcoming, recent_appts=recent_appts,
+        recent_msgs=recent_msgs, unread_count=unread_count,
+        meds=meds, active_prescriptions=len(meds),
         pending_bills=pending_bills, total_due=total_due,
+        latest_vitals=latest_vitals, vitals_date=vitals_date,
+        labs=labs, recent_records=recent_records,
+        care_team=care_team, allergies=allergies,
+        announcements=announcements,
     )
 
 

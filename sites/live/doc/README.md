@@ -37,7 +37,7 @@ All data loaded by default (`num_data_points: -1`). Data is small enough to serv
 
 ## Target Macros
 
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, sort_by_dropdown, create_by_timestamp, select_by_slider, play_by_timestamp, play_by_playback, post_from_free_text, follow_by_toggle, share_by_dropdown, report_by_form, subscribe_by_toggle, join_by_toggle, pay_by_dropdown, redeem_by_dropdown, authenticate_by_form, register_by_form
+navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, sort_by_dropdown, select_by_slider, play_by_timestamp, play_by_playback, post_from_free_text, follow_by_toggle, share_by_dropdown, report_by_form, subscribe_by_toggle, join_by_toggle, pay_by_dropdown, redeem_by_dropdown, authenticate_by_form, register_by_form
 
 ## Temporal Dynamics
 

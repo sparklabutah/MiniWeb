@@ -561,11 +561,21 @@
             markUnsaved();
         };
 
-        // ---- Track changes ----
+        // ---- Track changes + auto-save ----
+        var autosaveTimer = null;
+        function scheduleAutosave() {
+            if (!isLoggedIn) return;
+            if (autosaveTimer) clearTimeout(autosaveTimer);
+            // Save shortly after the user stops drawing/typing so the figure
+            // is persisted without needing to click Save.
+            autosaveTimer = setTimeout(function() { window.saveNote(); }, 1200);
+        }
+
         function markUnsaved() {
             hasUnsaved = true;
             saveIndicator.textContent = 'Unsaved changes';
             saveIndicator.style.color = 'var(--amber-dark)';
+            scheduleAutosave();
         }
 
         if (isLoggedIn) {

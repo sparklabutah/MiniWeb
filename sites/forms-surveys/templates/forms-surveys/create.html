@@ -68,18 +68,22 @@
     </div>
     <div class="container">
         <div class="template-hint">
+            {% if prefill %}
+            Starting from the <strong>{{ prefill.title }}</strong> template — edit any field below, then create your form.
+            {% else %}
             Start from scratch or <a href="{{ url_for('forms-surveys.templates_page') }}">browse templates</a> for a quick start.
+            {% endif %}
         </div>
 
         <form method="POST" action="{{ url_for('forms-surveys.create_form_submit') }}" id="create-form">
             <div class="form-section title-section">
                 <div class="form-group">
                     <label for="title">Form Title</label>
-                    <input type="text" id="title" name="title" placeholder="Untitled Form" required>
+                    <input type="text" id="title" name="title" placeholder="Untitled Form" value="{{ prefill.title if prefill else '' }}" required>
                 </div>
                 <div class="form-group">
                     <label for="description">Description</label>
-                    <textarea id="description" name="description" placeholder="Form description (optional)"></textarea>
+                    <textarea id="description" name="description" placeholder="Form description (optional)">{{ prefill.description if prefill else '' }}</textarea>
                 </div>
                 <div class="form-group">
                     <label for="status">Status</label>
@@ -141,16 +145,17 @@
         }
     }
 
-    function addField() {
+    function addField(data) {
         const container = document.getElementById('fields-container');
+        const i = fieldIndex;
         const div = document.createElement('div');
         div.className = 'field-builder';
-        div.dataset.index = fieldIndex;
+        div.dataset.index = i;
         div.innerHTML = `
             <button type="button" class="btn-remove-field" onclick="removeField(this)">&times;</button>
             <div class="field-row">
-                <input type="text" name="field_label_${fieldIndex}" placeholder="Question" required>
-                <select name="field_type_${fieldIndex}" onchange="toggleOptions(this)">
+                <input type="text" name="field_label_${i}" placeholder="Question" required>
+                <select name="field_type_${i}" onchange="toggleOptions(this)">
                     <option value="text">Short text</option>
                     <option value="textarea">Long text</option>
                     <option value="radio">Multiple choice</option>
@@ -161,15 +166,35 @@
                 </select>
             </div>
             <div class="options-input" style="display: none;">
-                <input type="text" name="field_options_${fieldIndex}" placeholder="Option 1, Option 2, Option 3">
+                <input type="text" name="field_options_${i}" placeholder="Option 1, Option 2, Option 3">
                 <div class="options-hint">Comma-separated options</div>
             </div>
             <label class="required-check">
-                <input type="checkbox" name="field_required_${fieldIndex}">
+                <input type="checkbox" name="field_required_${i}">
                 Required
             </label>
         `;
         container.appendChild(div);
+
+        // Populate from template data when provided.
+        if (data) {
+            const labelEl = div.querySelector(`input[name="field_label_${i}"]`);
+            const typeEl  = div.querySelector(`select[name="field_type_${i}"]`);
+            const optsEl  = div.querySelector(`input[name="field_options_${i}"]`);
+            const reqEl   = div.querySelector(`input[name="field_required_${i}"]`);
+            if (labelEl) labelEl.value = data.label || '';
+            if (typeEl && data.type) {
+                // Only set if the builder offers this type; otherwise leave as Short text.
+                if ([].slice.call(typeEl.options).some(o => o.value === data.type)) {
+                    typeEl.value = data.type;
+                }
+                toggleOptions(typeEl);
+            }
+            if (optsEl && data.options) {
+                optsEl.value = Array.isArray(data.options) ? data.options.join(', ') : data.options;
+            }
+            if (reqEl) reqEl.checked = !!data.required;
+        }
         fieldIndex++;
     }
 
@@ -179,6 +204,17 @@
             builder.remove();
         }
     }
+
+    // Prefill the builder when arriving via "Use Template".
+    (function initPrefill() {
+        const prefill = {{ prefill | tojson }};
+        if (prefill && prefill.fields && prefill.fields.length) {
+            const container = document.getElementById('fields-container');
+            container.innerHTML = '';   // drop the default blank field
+            fieldIndex = 0;
+            prefill.fields.forEach(function (f) { addField(f); });
+        }
+    })();
     </script>
 </body>
 </html>

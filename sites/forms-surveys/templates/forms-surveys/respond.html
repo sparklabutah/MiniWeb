@@ -5,56 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FormFlow - {{ form.title }}</title>
     <style>
+        /* Google Forms–style respond page (Material theme, deep-purple accent) */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
-        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.3rem; font-weight: 700; }
-        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
-        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
-        .header-nav a:hover { color: #fff; }
-        .container { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
-        .form-header { background: #fff; border-radius: 8px; border: 1px solid #dadce0; border-top: 4px solid #673ab7; padding: 1.5rem; margin-bottom: 1rem; }
-        .form-header h2 { font-size: 1.4rem; margin-bottom: .3rem; }
-        .form-header .desc { color: #5f6368; font-size: .9rem; }
-        .form-header .required-note { font-size: .8rem; color: #d32f2f; margin-top: .5rem; }
-        .field-card { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1.2rem 1.5rem; margin-bottom: .75rem; }
-        .field-card .field-label { font-size: .95rem; font-weight: 500; margin-bottom: .8rem; }
-        .field-card .field-label .required { color: #d32f2f; }
-        input[type="text"], textarea { width: 100%; padding: .6rem .8rem; border: none; border-bottom: 1.5px solid #dadce0; font-size: .95rem; font-family: inherit; outline: none; transition: border-color .15s; }
-        input[type="text"]:focus, textarea:focus { border-color: #673ab7; }
-        textarea { min-height: 80px; resize: vertical; }
-        select { width: 100%; padding: .6rem .8rem; border: 1.5px solid #dadce0; border-radius: 4px; font-size: .95rem; background: #fff; outline: none; }
+        body { font-family: 'Roboto', 'Google Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background: #f0ebf8; color: #202124; padding-bottom: 2.5rem; -webkit-font-smoothing: antialiased; }
+        .gf-wrap { max-width: 640px; margin: 0 auto; padding: 1.5rem .75rem 0; }
+
+        /* Header card with the theme-color top strip */
+        .gf-header { background: #fff; border: 1px solid #dadce0; border-radius: 8px; border-top: 10px solid #673ab7; padding: 1.5rem 1.5rem 1.4rem; margin-bottom: .75rem; }
+        .gf-header h1 { font-size: 1.75rem; font-weight: 400; line-height: 1.3; color: #202124; }
+        .gf-header .gf-desc { font-size: .875rem; color: #202124; line-height: 1.5; margin-top: .7rem; white-space: pre-wrap; }
+        .gf-header .gf-required { font-size: .75rem; color: #d93025; margin-top: 1.1rem; }
+
+        /* Question cards */
+        .field-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1.5rem; margin-bottom: .75rem; }
+        .field-card .field-label { font-size: 1rem; font-weight: 400; color: #202124; line-height: 1.4; margin-bottom: 1rem; }
+        .field-card .field-label .required { color: #d93025; margin-left: .15rem; }
+
+        /* Short/long answer: Material underline inputs */
+        input[type="text"] { width: 70%; min-width: 12rem; padding: .4rem 0; border: none; border-bottom: 1px solid #dadce0; font-size: .875rem; font-family: inherit; color: #202124; background: transparent; outline: none; transition: border-color .2s; }
+        textarea { width: 100%; padding: .4rem 0; border: none; border-bottom: 1px solid #dadce0; font-size: .875rem; font-family: inherit; color: #202124; background: transparent; outline: none; resize: vertical; min-height: 1.6rem; transition: border-color .2s; }
+        input[type="text"]:focus, textarea:focus { border-bottom: 2px solid #673ab7; }
+        input::placeholder, textarea::placeholder { color: #70757a; }
+
+        /* Dropdown */
+        select { width: auto; min-width: 13rem; padding: .5rem .75rem; border: 1px solid #dadce0; border-radius: 4px; font-size: .875rem; font-family: inherit; color: #202124; background: #fff; outline: none; }
         select:focus { border-color: #673ab7; }
-        .radio-group, .checkbox-group { display: flex; flex-direction: column; gap: .5rem; }
-        .radio-group label, .checkbox-group label { display: flex; align-items: center; gap: .5rem; font-size: .9rem; cursor: pointer; padding: .3rem 0; }
-        .radio-group input, .checkbox-group input { accent-color: #673ab7; width: 18px; height: 18px; }
-        .rating-group { display: flex; gap: .8rem; }
-        .rating-group label { display: flex; flex-direction: column; align-items: center; gap: .3rem; cursor: pointer; }
-        .rating-group input { accent-color: #673ab7; width: 20px; height: 20px; }
-        .rating-group .rating-num { font-size: .85rem; color: #5f6368; }
-        .submit-section { margin-top: 1rem; display: flex; gap: .5rem; }
-        .btn-submit { background: #673ab7; color: #fff; border: none; padding: .7rem 2rem; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .btn-submit:hover { background: #5e35b1; }
-        .btn-cancel { background: #fff; color: #5f6368; border: 1px solid #dadce0; padding: .7rem 1.5rem; border-radius: 6px; font-size: 1rem; cursor: pointer; text-decoration: none; }
-        .btn-cancel:hover { background: #f1f3f4; }
+
+        /* Radio & checkbox as Material option rows */
+        .radio-group, .checkbox-group { display: flex; flex-direction: column; gap: 0; }
+        .radio-group label, .checkbox-group label { display: flex; align-items: center; gap: .85rem; font-size: .875rem; color: #202124; cursor: pointer; padding: .55rem .25rem; border-radius: 4px; }
+        .radio-group label:hover, .checkbox-group label:hover { background: #f8f6fc; }
+        .radio-group input[type="radio"], .checkbox-group input[type="checkbox"] { accent-color: #673ab7; width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
+
+        /* Rating = Google "linear scale": number above the radio */
+        .rating-group { display: flex; gap: 1.6rem; flex-wrap: wrap; padding-top: .3rem; }
+        .rating-group label { display: flex; flex-direction: column-reverse; align-items: center; gap: .45rem; cursor: pointer; }
+        .rating-group input[type="radio"] { accent-color: #673ab7; width: 20px; height: 20px; cursor: pointer; }
+        .rating-group .rating-num { font-size: .8rem; color: #5f6368; }
+
+        /* Slider / file */
+        .slider-group input[type="range"] { accent-color: #673ab7; }
+        input[type="file"] { font-size: .85rem; color: #5f6368; }
+
+        /* Submit / Clear action row */
+        .gf-actions { display: flex; align-items: center; justify-content: space-between; margin-top: .35rem; padding: 0 .1rem; }
+        .btn-submit { background: #673ab7; color: #fff; border: none; padding: .6rem 1.6rem; border-radius: 4px; font-size: .9rem; font-weight: 500; letter-spacing: .15px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+        .btn-submit:hover { background: #5e35b1; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .btn-clear { background: none; border: none; color: #673ab7; font-size: .9rem; font-weight: 500; cursor: pointer; padding: .6rem .6rem; border-radius: 4px; text-decoration: none; font-family: inherit; }
+        .btn-clear:hover { background: #f3edfb; }
+
+        /* Footer (Google-Forms style disclaimer + page indicator) */
+        .gf-footer { max-width: 640px; margin: 1.2rem auto 0; padding: 0 .85rem; font-size: .7rem; color: #5f6368; line-height: 1.6; }
+        .gf-footer a { color: #5f6368; }
+        .gf-page { text-align: right; font-size: .78rem; color: #5f6368; margin: .5rem .1rem 0; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>FormFlow</h1>
-        <div class="header-nav">
-            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
-            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
-            {% if user %}
-            <span style="color: #ce93d8; font-size: .85rem;">{{ user.name }}</span>
-            {% endif %}
-        </div>
-    </div>
-    <div class="container">
-        <div class="form-header">
-            <h2>{{ form.title }}</h2>
-            <p class="desc">{{ form.description }}</p>
-            <p class="required-note">* Required</p>
+    <div class="gf-wrap">
+        <div class="gf-header">
+            <h1>{{ form.title }}</h1>
+            {% if form.description %}<div class="gf-desc">{{ form.description }}</div>{% endif %}
+            <div class="gf-required">* Indicates required question</div>
         </div>
 
         <form method="POST" action="{{ url_for('forms-surveys.submit_response_form', form_id=form.id) }}">
@@ -101,7 +112,7 @@
 
                 {% elif field.type == 'rating' %}
                 <div class="rating-group">
-                    {% for opt in field.options %}
+                    {% for opt in (field.options or ['1', '2', '3', '4', '5']) %}
                     <label>
                         <input type="radio" name="{{ field.id }}" value="{{ opt }}" {% if field.required %}required{% endif %}>
                         <span class="rating-num">{{ opt }}</span>
@@ -127,16 +138,77 @@
                     </ol>
                     <input type="hidden" name="{{ field.id }}" value="{{ field.options|join(',') }}">
                 </div>
+
+                {% elif field.type == 'choice' %}
+                <div class="radio-group">
+                    {% for opt in field.options %}
+                    <label>
+                        <input type="radio" name="{{ field.id }}" value="{{ opt }}" {% if field.required %}required{% endif %}>
+                        {{ opt }}
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {% elif field.type == 'slider' %}
+                {% set smin = field.slider_min|default(0) %}
+                {% set smax = field.slider_max|default(10) %}
+                <div class="slider-group" style="display:flex;align-items:center;gap:.8rem;">
+                    <span style="font-size:.8rem;color:#5f6368;">{{ smin }}</span>
+                    <input type="range" name="{{ field.id }}" min="{{ smin }}" max="{{ smax }}"
+                           value="{{ ((smin + smax) // 2) }}" step="1"
+                           style="flex:1;accent-color:#673ab7;"
+                           oninput="this.parentElement.querySelector('output').textContent=this.value"
+                           {% if field.required %}required{% endif %}>
+                    <output style="font-weight:600;color:#673ab7;min-width:1.6em;text-align:center;">{{ ((smin + smax) // 2) }}</output>
+                    <span style="font-size:.8rem;color:#5f6368;">{{ smax }}</span>
+                </div>
+
+                {% elif field.type == 'file' %}
+                <input type="file" name="{{ field.id }}" {% if field.required %}required{% endif %}>
+
+                {% else %}
+                <input type="text" name="{{ field.id }}" placeholder="Your answer" {% if field.required %}required{% endif %}>
                 {% endif %}
             </div>
             {% endfor %}
 
-            <div class="submit-section">
+            <div class="gf-actions">
                 <button type="submit" class="btn-submit">Submit</button>
-                <a href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}" class="btn-cancel">Cancel</a>
+                <button type="reset" class="btn-clear" onclick="document.querySelectorAll('.ranking-group').forEach(resetRanking)">Clear form</button>
             </div>
         </form>
+
+        <div class="gf-page">Page 1 of 1</div>
     </div>
+
+    <div class="gf-footer">
+        Never submit passwords through FormFlow.<br>
+        This content is created by the form owner. The data you submit will be sent to
+        <a href="{{ url_for('forms-surveys.index') }}">FormFlow</a>.
+    </div>
+
+    <script>
+    // Restore ranking widgets to their original order when the form is cleared.
+    function resetRanking(group) {
+        var list = group.querySelector('ol');
+        var items = Array.prototype.slice.call(group.querySelectorAll('.ranking-item'));
+        items.sort(function (a, b) {
+            return (a.getAttribute('data-orig') | 0) - (b.getAttribute('data-orig') | 0);
+        });
+        items.forEach(function (li, idx) {
+            li.querySelector('.rank-pos').textContent = idx + 1;
+            list.appendChild(li);
+        });
+        var hidden = group.querySelector('input[type="hidden"]');
+        if (hidden) hidden.value = items.map(function (li) { return li.getAttribute('data-value'); }).join(',');
+    }
+    // Tag original ranking order once on load so Clear can restore it.
+    document.querySelectorAll('.ranking-group').forEach(function (group) {
+        group.querySelectorAll('.ranking-item').forEach(function (li, i) {
+            li.setAttribute('data-orig', i);
+        });
+    });
+    </script>
     <script>
     function moveRankItem(btn, dir) {
         var li = btn.closest('.ranking-item');

@@ -39,6 +39,9 @@
         .conv-meta-time { font-size: .65rem; color: #8696a0; text-align: right; white-space: nowrap; }
         .conv-item.unread .conv-meta-time { color: #00a884; font-weight: 600; }
         .unread-dot { width: 10px; height: 10px; background: #00a884; border-radius: 50%; flex-shrink: 0; margin-left: .3rem; }
+        .pin-toggle { background: none; border: none; cursor: pointer; font-size: .85rem; margin-left: .3rem; padding: .15rem; border-radius: .3rem; filter: grayscale(1); opacity: .45; transition: all .15s; flex-shrink: 0; }
+        .pin-toggle:hover { background: #2a3942; opacity: .8; }
+        .pin-toggle.pinned { filter: none; opacity: 1; }
 
         /* Chat panel */
         .chat-panel { flex: 1; display: flex; flex-direction: column; background: #0b141a; }
@@ -141,6 +144,7 @@
                         <div class="unread-dot"></div>
                         {% endif %}
                     </div>
+                    <button class="pin-toggle {% if c.pinned_count|default(0) > 0 %}pinned{% endif %}" data-url="{{ url_for('instant-messaging.api_pin_conversation', conv_id=c.id) }}" title="{% if c.pinned_count|default(0) > 0 %}Unpin conversation{% else %}Pin conversation{% endif %}">&#128204;</button>
                 </a>
                 {% endfor %}
             </div>
@@ -199,7 +203,7 @@
                                 {% if msg.is_current_user %}
                                     <button class="msg-act im-edit-btn" data-msg="{{ msg.id }}" title="Edit message">&#9998;</button>
                                     <span class="msg-read" style="color:{% if msg.read %}#53bdeb{% else %}#8696a0{% endif %}">&#10003;&#10003;</span>
-                                    <button class="im-msg-delete-btn" data-url="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete">&#10005;</button>
+                                    <button class="im-msg-delete-btn" data-url="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete message">&#10005;</button>
                                 {% endif %}
                             </div>
                             {% if msg.is_current_user %}
@@ -243,6 +247,28 @@
         }
         scrollToBottom();
 
+        // follow_by_toggle: pin/unpin a conversation from the sidebar
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.pin-toggle');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var pinned = d.pinned_count > 0;
+                    btn.classList.toggle('pinned', pinned);
+                    btn.title = pinned ? 'Unpin conversation' : 'Pin conversation';
+                });
+        });
+
+        // URL templates so freshly-sent messages get the same working action
+        // buttons (star / report / edit / delete) as server-rendered ones.
+        var STAR_URL_T   = "{{ url_for('instant-messaging.api_star_message', msg_id='__MID__') }}";
+        var DEL_URL_T    = "{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id='__MID__') }}";
+        var EDIT_URL_T   = "{{ url_for('instant-messaging.api_edit_message', msg_id='__MID__') }}";
+        var REPORT_URL_T = "{{ url_for('instant-messaging.api_report_message', msg_id='__MID__') }}";
+
         function sendMessage() {
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
@@ -261,7 +287,24 @@
                 row.className = 'msg-row sent';
                 const now = new Date();
                 const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                row.innerHTML = `<div class="msg-bubble"><div class="msg-text">${escapeHtml(msg.text)}</div><div class="msg-meta"><span class="msg-time">${time}</span><span class="msg-read" style="color:#8696a0">&#10003;&#10003;</span></div></div>`;
+                const mid = msg.id;
+                const safe = escapeHtml(msg.text);
+                row.innerHTML =
+                    '<div class="msg-bubble">' +
+                        '<div class="msg-text">' + safe + '</div>' +
+                        '<div class="msg-meta">' +
+                            '<span class="msg-time">' + time + '</span>' +
+                            '<button class="msg-act im-star-btn" data-url="' + STAR_URL_T.replace('__MID__', mid) + '" title="Star message">&#9734;</button>' +
+                            '<button class="msg-act im-report-btn" data-msg="' + mid + '" title="Report message">&#9873;</button>' +
+                            '<button class="msg-act im-edit-btn" data-msg="' + mid + '" title="Edit message">&#9998;</button>' +
+                            '<span class="msg-read" style="color:#8696a0">&#10003;&#10003;</span>' +
+                            '<button class="im-msg-delete-btn" data-url="' + DEL_URL_T.replace('__MID__', mid) + '" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete message">&#10005;</button>' +
+                        '</div>' +
+                        '<form class="msg-inline-form im-edit-form" id="edit-form-' + mid + '" data-url="' + EDIT_URL_T.replace('__MID__', mid) + '"><input type="text" name="text" required><button type="submit">Save</button><button type="button" class="cancel">Cancel</button></form>' +
+                        '<form class="msg-inline-form im-report-form" id="report-form-' + mid + '" data-url="' + REPORT_URL_T.replace('__MID__', mid) + '"><input type="text" name="reason" placeholder="Reason for report" required><button type="submit">Report</button><button type="button" class="cancel">Cancel</button></form>' +
+                    '</div>';
+                // set edit input value via JS so quotes in the text can't break the markup
+                row.querySelector('.im-edit-form input[name="text"]').value = msg.text;
                 area.appendChild(row);
                 scrollToBottom();
             })

@@ -155,8 +155,9 @@ def index():
             "unread_count": unread_counts.get(conv["id"], 0),
         })
 
-    # Sort by last message time (most recent first)
+    # Sort by last message time (most recent first), then pinned chats to top
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
+    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     return render_template(
         "instant-messaging/index.html",
@@ -242,6 +243,7 @@ def conversation_page(conv_id):
             "unread_count": unread_counts.get(c["id"], 0),
         })
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
+    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     return render_template(
         "instant-messaging/conversation.html",
@@ -255,6 +257,49 @@ def conversation_page(conv_id):
         users_map=users_map,
         active_conv_id=conv_id,
     )
+
+
+@blueprint.route("/message/<user_id>")
+def open_with(user_id):
+    """Open (or create) a direct conversation with a contact, then show it.
+
+    Clicking a contact should start messaging them: reuse the existing direct
+    thread if one exists, otherwise create it, then land on the chat.
+    """
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
+
+    target = next((u for u in _get_users() if u["id"] == user_id), None)
+    if not target:
+        abort(404)
+
+    conversations = _get_conversations()
+    want = {CURRENT_USER_ID, user_id}
+    existing = next(
+        (c for c in conversations
+         if c.get("type") == "direct" and set(c.get("participants", [])) == want),
+        None,
+    )
+    if existing:
+        return redirect(url_for("instant-messaging.conversation_page", conv_id=existing["id"]))
+
+    users_map = _user_map()
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_conv = {
+        "id": f"conv-{uuid.uuid4().hex[:6]}",
+        "type": "direct",
+        "participants": [CURRENT_USER_ID, user_id],
+        "participant_names": [users_map[p]["display_name"]
+                              for p in (CURRENT_USER_ID, user_id) if p in users_map],
+        "created": now,
+        "last_message": now,
+        "message_count": 0,
+        "pinned_count": 0,
+        "muted": False,
+    }
+    conversations.append(new_conv)
+    db.save_collection(SITE, "conversations", conversations)
+    return redirect(url_for("instant-messaging.conversation_page", conv_id=new_conv["id"]))
 
 
 @blueprint.route("/contacts")
@@ -287,6 +332,7 @@ def contacts_page():
             "last_timestamp": last_msg["timestamp"] if last_msg else c.get("last_message", ""),
         })
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
+    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     # Exclude current user from contacts
     contacts = [u for u in users if u["id"] != CURRENT_USER_ID]
@@ -1022,7 +1068,7 @@ def form_delete_message(conversation_id=None, conv_id=None, message_id=None, msg
     messages = _get_messages()
     messages = [m for m in messages if m["id"] != mid]
     db.save_collection(SITE, "messages", messages)
-    return redirect(url_for("instant-messaging.conversation_view", conv_id=cid))
+    return redirect(url_for("instant-messaging.conversation_page", conv_id=cid))
 
 
 # ---------------------------------------------------------------------------

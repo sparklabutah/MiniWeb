@@ -52,6 +52,22 @@
         .featured-card .meta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .75rem; color: #888; }
         .featured-card .meta span { margin-right: .8rem; }
         .featured-card .excerpt { font-size: .9rem; color: #555; margin-top: .5rem; line-height: 1.5; }
+        /* Featured thumbnails */
+        .featured-card .card-thumb { display: block; height: 132px; position: relative; text-decoration: none; background-size: cover; background-position: center; }
+        .featured-card .card-thumb::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.45), transparent 55%); }
+        .featured-card .card-thumb .thumb-cat { position: absolute; left: .8rem; bottom: .6rem; z-index: 1; color: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+        /* Advertisements */
+        .ad-label { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .58rem; text-transform: uppercase; letter-spacing: 1.5px; color: #b8b8b8; margin-bottom: .3rem; text-align: center; }
+        .ad-leaderboard { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-radius: .4rem; padding: 1.1rem 1.6rem; margin: 0 0 2rem; background: linear-gradient(120deg, #12203a, #24406e); color: #fff; text-decoration: none; }
+        .ad-leaderboard .lb-brand { font-family: Georgia, 'Times New Roman', serif; font-size: 1.3rem; font-weight: 700; }
+        .ad-leaderboard .lb-copy { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; opacity: .85; }
+        .ad-leaderboard .lb-cta { background: #f4b41a; color: #12203a; padding: .5rem 1.2rem; border-radius: .3rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .82rem; font-weight: 700; white-space: nowrap; }
+        .ad-box { margin-bottom: 1.5rem; }
+        .ad-creative { display: block; border: 1px solid #e8e0d4; border-radius: .4rem; padding: 1.2rem 1.3rem; text-decoration: none; background: #fbf6ec; transition: box-shadow .2s; }
+        .ad-creative:hover { box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+        .ad-brand { font-family: Georgia, 'Times New Roman', serif; font-size: 1.15rem; font-weight: 700; color: #1a1a2e; margin-bottom: .3rem; }
+        .ad-copy { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .82rem; color: #6a6a6a; line-height: 1.45; margin-bottom: .6rem; }
+        .ad-cta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; font-weight: 700; color: #b8860b; }
 
         /* Content layout */
         .content-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
@@ -157,10 +173,15 @@
             <h2>Featured Stories</h2>
             <div class="featured-grid">
                 {% for article in featured %}
+                {% set cat = categories | selectattr('slug', 'equalto', article.category) | first %}
+                {% set ccolor = cat.color if cat else '#666' %}
                 <div class="featured-card">
+                    <a class="card-thumb" href="{{ url_for('news.article_detail', article_id=article.id) }}"
+                       style="background-image: linear-gradient(135deg, {{ ccolor }}, {{ ccolor }}aa){% if article.image_url %}, url('{{ article.image_url }}'){% endif %};">
+                        <span class="thumb-cat">{{ cat.name if cat else article.category }}</span>
+                    </a>
                     <div class="card-body">
-                        {% set cat = categories | selectattr('slug', 'equalto', article.category) | first %}
-                        <span class="cat-badge" style="background:{{ cat.color if cat else '#666' }}">{{ cat.name if cat else article.category }}</span>
+                        <span class="cat-badge" style="background:{{ ccolor }}">{{ cat.name if cat else article.category }}</span>
                         <h3><a href="{{ url_for('news.article_detail', article_id=article.id) }}">{{ article.title }}</a></h3>
                         <p class="excerpt">{{ article.body[:150] }}...</p>
                         <div class="meta">
@@ -173,6 +194,18 @@
                 {% endfor %}
             </div>
         </section>
+
+        <!-- Advertisement (leaderboard) — promotes a real MiniWeb site, links to it -->
+        {% if ads %}
+        <div class="ad-label">Advertisement &middot; Sponsored</div>
+        <a class="ad-leaderboard" href="/sites/{{ ads[0].site }}/">
+            <div>
+                <div class="lb-brand">{{ ads[0].brand }}</div>
+                <div class="lb-copy">{{ ads[0].tagline }}</div>
+            </div>
+            <span class="lb-cta">Visit {{ ads[0].domain }} &rarr;</span>
+        </a>
+        {% endif %}
 
         <!-- Main content + sidebar -->
         <div class="content-layout">
@@ -232,6 +265,18 @@
                     </div>
                     {% endfor %}
                 </div>
+
+                <!-- Advertisement (sidebar) — promotes a real MiniWeb site, links to it -->
+                {% if ads %}
+                <div class="ad-box">
+                    <div class="ad-label">Advertisement</div>
+                    <a class="ad-creative" href="/sites/{{ ads[1].site }}/">
+                        <div class="ad-brand">{{ ads[1].brand }}</div>
+                        <div class="ad-copy">{{ ads[1].tagline }}</div>
+                        <div class="ad-cta">{{ ads[1].domain }} &rarr;</div>
+                    </a>
+                </div>
+                {% endif %}
 
                 <!-- Trending / Most commented -->
                 <div class="sidebar-box">

@@ -94,9 +94,176 @@ def _semantic_score(text, query):
 # HTML routes
 # ---------------------------------------------------------------------------
 
+def _dashboard_analytics(uid, view_date, cal_goal, step_goal=10000):
+    """Compute dense-analytics aggregates + inline-SVG chart geometry."""
+    import math
+    vd = datetime.strptime(view_date, "%Y-%m-%d").date()
+
+    def fmt(d):
+        return d.strftime("%Y-%m-%d")
+
+    stats = [s for s in _load_daily_stats(where={"user_id": uid}) if s["date"] <= view_date]
+    stats.sort(key=lambda s: s["date"])
+    by_date = {s["date"]: s for s in stats}
+    workouts_all = _load_workouts(where={"user_id": uid})
+    workout_dates = {w["date"] for w in workouts_all}
+
+    def sday(d):
+        return by_date.get(fmt(d))
+
+    today = sday(vd) or {}
+    last7 = [s for s in (sday(vd - timedelta(days=k)) for k in range(7)) if s]
+    avg_steps = int(sum(s["steps"] for s in last7) / len(last7)) if last7 else 0
+
+    wlist = [s for s in stats if s.get("weight_kg")]
+    weight_current = wlist[-1]["weight_kg"] if wlist else 0
+    w30 = [s for s in wlist if s["date"] >= fmt(vd - timedelta(days=30))]
+    weight_delta = round(w30[-1]["weight_kg"] - w30[0]["weight_kg"], 1) if len(w30) >= 2 else 0.0
+
+    wk = [w for w in workouts_all if fmt(vd - timedelta(days=6)) <= w["date"] <= view_date]
+
+    streak, dd = 0, vd
+    while True:
+        s = sday(dd)
+        if (s and s.get("active_minutes", 0) >= 30) or fmt(dd) in workout_dates:
+            streak += 1
+            dd -= timedelta(days=1)
+        else:
+            break
+
+    kpis = {
+        "steps": today.get("steps", 0), "avg_steps": avg_steps,
+        "active_min": today.get("active_minutes", 0),
+        "weight": weight_current, "weight_delta": weight_delta,
+        "sleep": today.get("sleep_hours", 0),
+        "workouts_week": len(wk),
+        "distance_week": round(sum(w.get("distance_km", 0) for w in wk), 1),
+        "cals_burned": today.get("calories_burned", 0),
+        "streak": streak,
+    }
+
+    # ---- weight trend (last 45 logged points) ----
+    wwin = [s for s in stats if s.get("weight_kg")][-45:]
+    W, H, P = 560, 150, 12
+    weight = None
+    if len(wwin) >= 2:
+        ws = [s["weight_kg"] for s in wwin]
+        wmin, wmax = min(ws), max(ws)
+        span = (wmax - wmin) or 1
+        iw, ih = W - 2 * P, H - 2 * P
+        pts = []
+        for i, s in enumerate(wwin):
+            x = P + (i / (len(wwin) - 1)) * iw
+            y = P + ih - (s["weight_kg"] - wmin) / span * ih
+            pts.append((round(x, 1), round(y, 1)))
+        poly = " ".join(f"{x},{y}" for x, y in pts)
+        area = f"{P},{H-P} " + poly + f" {W-P},{H-P}"
+        weight = {"poly": poly, "area": area, "W": W, "H": H,
+                  "min": round(wmin, 1), "max": round(wmax, 1),
+                  "first": wwin[0]["weight_kg"], "last": wwin[-1]["weight_kg"],
+                  "delta": round(wwin[-1]["weight_kg"] - wwin[0]["weight_kg"], 1),
+                  "start_date": wwin[0]["date"], "end_date": wwin[-1]["date"]}
+
+    # ---- steps last 14 days (bars) ----
+    swin = []
+    for k in range(13, -1, -1):
+        d = vd - timedelta(days=k)
+        s = sday(d)
+        swin.append({"date": fmt(d), "dow": d.strftime("%a")[:1], "steps": s["steps"] if s else 0})
+    smax = max([x["steps"] for x in swin] + [step_goal, 1])
+    BW, BH, bp = 560, 150, 12
+    n = len(swin)
+    gap = 6
+    bw = (BW - 2 * bp - gap * (n - 1)) / n
+    for i, x in enumerate(swin):
+        x["x"] = round(bp + i * (bw + gap), 1)
+        x["w"] = round(bw, 1)
+        h = (x["steps"] / smax) * (BH - 2 * bp - 4)
+        x["h"] = round(h, 1)
+        x["y"] = round(BH - bp - h, 1)
+        x["over"] = x["steps"] >= step_goal
+    steps = {"bars": swin, "W": BW, "H": BH, "max": smax, "goal": step_goal,
+             "goal_y": round(BH - bp - (step_goal / smax) * (BH - 2 * bp - 4), 1)}
+
+    # ---- this week's training dots ----
+    week_days = []
+    for k in range(6, -1, -1):
+        d = vd - timedelta(days=k)
+        dws = [w for w in wk if w["date"] == fmt(d)]
+        week_days.append({"dow": d.strftime("%a"), "date": fmt(d),
+                          "has": bool(dws), "type": (dws[0]["type"] if dws else "")})
+    week = {"days": week_days,
+            "minutes": sum(w["duration_minutes"] for w in wk),
+            "calories": sum(w["calories_burned"] for w in wk),
+            "distance": round(sum(w.get("distance_km", 0) for w in wk), 1),
+            "count": len(wk)}
+
+    # ---- activity heatmap: 12 weeks x 7 days ----
+    def lvl(m):
+        return 0 if m <= 0 else 1 if m < 20 else 2 if m < 40 else 3 if m < 60 else 4
+    week_monday = vd - timedelta(days=vd.weekday())
+    start = week_monday - timedelta(weeks=11)
+    CS, CG = 13, 3
+    cells = []
+    for col in range(12):
+        for row in range(7):
+            d = start + timedelta(days=col * 7 + row)
+            if d > vd:
+                continue
+            m = (sday(d) or {}).get("active_minutes", 0)
+            cells.append({"x": col * (CS + CG), "y": row * (CS + CG),
+                          "s": CS, "level": lvl(m), "date": fmt(d), "mins": m})
+    heat = {"cells": cells, "W": 12 * (CS + CG), "H": 7 * (CS + CG)}
+
+    return {"kpis": kpis, "weight": weight, "steps": steps, "week": week, "heat": heat}
+
+
+def _series_charts(rows):
+    """Build line/bar chart geometry for the Trends page from daily_stats rows."""
+    r = sorted(rows, key=lambda s: s["date"])
+    if not r:
+        return None
+
+    def line(vals):
+        W, H, P = 780, 150, 12
+        vmin, vmax = min(vals), max(vals)
+        span = (vmax - vmin) or 1
+        iw, ih = W - 2 * P, H - 2 * P
+        pts = []
+        for i, v in enumerate(vals):
+            x = P + (i / (len(vals) - 1) if len(vals) > 1 else 0) * iw
+            y = P + ih - (v - vmin) / span * ih
+            pts.append((round(x, 1), round(y, 1)))
+        poly = " ".join(f"{x},{y}" for x, y in pts)
+        return {"poly": poly, "area": f"{P},{H-P} {poly} {W-P},{H-P}",
+                "W": W, "H": H, "min": round(vmin, 1), "max": round(vmax, 1)}
+
+    def bars(vals, goal=None):
+        W, H, bp = 780, 150, 12
+        n = len(vals)
+        gap = 3 if n <= 14 else 2
+        bw = (W - 2 * bp - gap * (n - 1)) / n if n else 0
+        vmax = max(vals + ([goal] if goal else []) + [1])
+        out = []
+        for i, v in enumerate(vals):
+            h = (v / vmax) * (H - 2 * bp - 2)
+            out.append({"x": round(bp + i * (bw + gap), 1), "w": round(bw, 1),
+                        "h": round(h, 1), "y": round(H - bp - h, 1), "v": v})
+        gy = round(H - bp - (goal / vmax) * (H - 2 * bp - 2), 1) if goal else None
+        return {"bars": out, "W": W, "H": H, "goal_y": gy, "max": vmax}
+
+    wr = [s["weight_kg"] for s in r if s.get("weight_kg")]
+    return {
+        "weight": line(wr) if len(wr) >= 2 else None,
+        "steps": bars([s["steps"] for s in r], 10000),
+        "sleep": bars([round(s["sleep_hours"], 1) for s in r], None),
+        "active": bars([s["active_minutes"] for s in r], 30),
+    }
+
+
 @blueprint.route("/")
 def index():
-    """Dashboard -- MyFitnessPal-style food diary with calorie ring."""
+    """Dashboard -- data-dense fitness analytics."""
     user = _get_current_user()
     uid = user["id"] if user else 1
 
@@ -168,11 +335,41 @@ def index():
         "heart_rate": "-heart_rate_avg",
     }
     recent_workouts = _load_workouts(
-        where={"user_id": uid}, sort=sort_map.get(sort_param, "-date"), limit=5
+        where={"user_id": uid}, sort=sort_map.get(sort_param, "-date"), limit=8
     )
+
+    # Analytics aggregates + chart geometry
+    an = _dashboard_analytics(uid, view_date, calorie_goal)
+    _vd = datetime.strptime(view_date, "%Y-%m-%d").date()
+    prev_date = (_vd - timedelta(days=1)).strftime("%Y-%m-%d")
+    next_date = (_vd + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Calorie ring (SVG donut) + macro bars
+    import math
+    consumed = nutrition_totals["calories"]
+    ring_r = 54
+    ring_c = round(2 * math.pi * ring_r, 1)
+    ring_pct = min(consumed / calorie_goal, 1.0) if calorie_goal else 0
+    cal_ring = {
+        "consumed": consumed, "goal": calorie_goal, "burned": exercise_calories,
+        "net": consumed - exercise_calories, "remaining": calorie_goal - consumed + exercise_calories,
+        "r": ring_r, "c": ring_c, "dash": round(ring_pct * ring_c, 1),
+        "pct": round(ring_pct * 100),
+    }
+
+    def _bar(cur, goal):
+        return {"cur": cur, "goal": goal, "pct": min(round(cur / goal * 100), 100) if goal else 0}
+    macros = {
+        "protein": _bar(nutrition_totals["protein_g"], protein_goal),
+        "carbs": _bar(nutrition_totals["carbs_g"], carbs_goal),
+        "fat": _bar(nutrition_totals["fat_g"], fat_goal),
+        "fiber": _bar(nutrition_totals.get("fiber_g", 0), 30),
+    }
 
     return render_template(
         "health-fitness-tracking/index.html",
+        an=an, cal_ring=cal_ring, macros=macros,
+        prev_date=prev_date, next_date=next_date,
         user=display_user,
         today_stats=today_stats,
         view_date=view_date,
@@ -393,12 +590,15 @@ def stats_page():
             "weight_end": user_stats[0].get("weight_kg"),
         }
 
+    charts = _series_charts(user_stats)
+
     return render_template(
         "health-fitness-tracking/stats.html",
         user=user,
         stats=user_stats,
         summary=summary,
         period=period,
+        charts=charts,
         logged_in=user is not None,
     )
 

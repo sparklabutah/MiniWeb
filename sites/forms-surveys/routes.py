@@ -438,7 +438,27 @@ def index():
     # Enrich with owner name
     for f in my_forms:
         f["_owner_name"] = _user_name(f["owner_id"])
-    return render_template("forms-surveys/index.html", forms=my_forms, user=user)
+
+    # "Forms to fill out": active forms shared by OTHERS that this user hasn't
+    # responded to yet — a respondent-side to-do inbox.
+    to_fill = []
+    if user:
+        answered = {r["form_id"] for r in _get_responses()
+                    if r.get("respondent_id") == user["id"]}
+        for f in forms:
+            if (f.get("status") == "active"
+                    and f["owner_id"] != user["id"]
+                    and f["owner_id"] != 0
+                    and f["id"] not in answered):
+                item = dict(f)
+                item["_owner_name"] = _user_name(f["owner_id"])
+                item["_qcount"] = len(f.get("fields") or [])
+                to_fill.append(item)
+        to_fill.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        to_fill = to_fill[:12]
+
+    return render_template("forms-surveys/index.html", forms=my_forms,
+                           user=user, to_fill=to_fill, pending_count=len(to_fill))
 
 
 @blueprint.route("/form/<int:form_id>")
@@ -504,6 +524,11 @@ def submit_response_form(form_id):
     form["responses_count"] = len([r for r in responses if r["form_id"] == form_id])
     _save_forms(forms)
 
+    # Backend signal for verification: log the submission on the event bus.
+    emit("form_response", user_id=user["id"] if user else None,
+         site_name="forms-surveys", form_id=form_id, form_title=form["title"],
+         response_id=new_id, field_count=len(answers))
+
     _add_email(user["id"] if user else 1, "noreply@forms-surveys.lakeport.local",
                "Form submission received",
                f'Your response to "{form["title"]}" has been recorded. Thank you for your submission.')
@@ -539,7 +564,22 @@ def form_results(form_id):
 def create_form_page():
     user = _current_user()
     templates = _get_templates()
-    return render_template("forms-surveys/create.html", user=user, templates=templates)
+
+    # When arriving via "Use Template", prefill the builder from that template
+    # instead of opening a blank form.
+    prefill = None
+    tpl_id = request.args.get("template", "").strip()
+    if tpl_id:
+        tpl = next((t for t in templates if str(t.get("id")) == tpl_id), None)
+        if tpl:
+            prefill = {
+                "title": tpl.get("name", ""),
+                "description": tpl.get("description", ""),
+                "fields": tpl.get("fields", []) or [],
+            }
+
+    return render_template("forms-surveys/create.html", user=user,
+                           templates=templates, prefill=prefill)
 
 
 @blueprint.route("/create", methods=["POST"])
@@ -780,6 +820,11 @@ def api_form_respond(form_id):
     # Update response count
     form["responses_count"] = len([r for r in responses if r["form_id"] == form_id])
     _save_forms(forms)
+
+    # Backend signal for verification: log the submission on the event bus.
+    emit("form_response", user_id=response_obj["respondent_id"],
+         site_name="forms-surveys", form_id=form_id, form_title=form["title"],
+         response_id=new_id, field_count=len(answers))
 
     return jsonify(response_obj), 201
 

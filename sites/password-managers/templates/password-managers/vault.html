@@ -4,152 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ vault.name }} - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
-        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2d3348; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
-        .header h1 a span { color: #6c8cff; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; transition: all .15s; }
-        nav a:hover { color: #c9cdd8; background: #1e2235; }
-        nav a.active { color: #6c8cff; background: #1e2235; font-weight: 600; }
-        nav .spacer { flex: 1; }
-        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
-        nav .btn-auth:hover { background: #5a7af0; color: #fff; }
-        nav .btn-logout { color: #f87171; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
-        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
-        .breadcrumb a { color: #6c8cff; text-decoration: none; }
-        .breadcrumb a:hover { text-decoration: underline; }
-        .vault-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
-        .vault-icon-lg { width: 48px; height: 48px; border-radius: .5rem; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #fff; }
-        .vault-title h2 { font-size: 1.3rem; color: #e1e4e8; }
-        .vault-title p { font-size: .85rem; color: #8b92a5; }
-        .filters { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: 1.2rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
-        .filters label { font-size: .8rem; color: #8b92a5; font-weight: 600; }
-        .filters select, .filters input[type="text"] { background: #1e2235; border: 1px solid #2d3348; color: #e1e4e8; padding: .4rem .6rem; border-radius: .3rem; font-size: .85rem; }
-        .filters select:focus, .filters input:focus { border-color: #6c8cff; outline: none; }
-        .filters .btn-filter { background: #6c8cff; color: #fff; border: none; padding: .4rem 1rem; border-radius: .3rem; font-size: .85rem; cursor: pointer; font-weight: 600; }
-        .filters .btn-filter:hover { background: #5a7af0; }
-        .filters .btn-clear { background: transparent; color: #8b92a5; border: 1px solid #2d3348; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; cursor: pointer; text-decoration: none; }
-        .filters .btn-clear:hover { color: #e1e4e8; border-color: #6c8cff; }
-        .entry-count { font-size: .85rem; color: #8b92a5; margin-bottom: .8rem; }
-        .entries-list { list-style: none; }
-        .entry-row { display: flex; align-items: center; gap: 1rem; padding: .9rem 1.2rem; background: #161822; border: 1px solid #2d3348; border-radius: .4rem; margin-bottom: .5rem; text-decoration: none; color: inherit; transition: border-color .15s; }
-        .entry-row:hover { border-color: #6c8cff; }
-        .entry-fav { font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
-        .entry-main { flex: 1; min-width: 0; }
-        .entry-title { font-size: .95rem; font-weight: 600; color: #e1e4e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .entry-subtitle { font-size: .8rem; color: #8b92a5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .entry-badges { display: flex; gap: .4rem; flex-shrink: 0; align-items: center; }
-        .badge { font-size: .7rem; padding: .15rem .5rem; border-radius: .2rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03rem; }
-        .badge-login { background: #1e2235; color: #6c8cff; }
-        .badge-secure_note { background: #1a2e1a; color: #4ade80; }
-        .badge-credit_card { background: #2d1f0f; color: #fbbf24; }
-        .strength-indicator { display: flex; gap: 2px; align-items: center; }
-        .strength-bar { width: 4px; height: 14px; border-radius: 1px; background: #2d3348; }
-        .strength-excellent .strength-bar { background: #34d399; }
-        .strength-excellent .strength-bar:nth-child(n+5) { background: #2d3348; }
-        .strength-strong .strength-bar:nth-child(-n+3) { background: #60a5fa; }
-        .strength-fair .strength-bar:nth-child(-n+2) { background: #fbbf24; }
-        .strength-weak .strength-bar:nth-child(-n+1) { background: #f87171; }
-        .entry-date { font-size: .75rem; color: #6b7280; white-space: nowrap; flex-shrink: 0; }
-        .empty-state { text-align: center; padding: 3rem; color: #8b92a5; }
-        .empty-state p { font-size: 1rem; margin-bottom: .5rem; }
+        .vault-head { display: flex; align-items: center; gap: 1rem; }
+        .vault-icon-lg { width: 46px; height: 46px; border-radius: .5rem; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .filter-bar { display: flex; gap: .9rem; flex-wrap: wrap; align-items: flex-end; }
+        .filter-bar .field { margin-bottom: 0; }
+        .filter-bar .field select, .filter-bar .field input[type=text] { min-width: 160px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
-    </div>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
 
-    <nav>
-        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
-        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
-        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
-        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
-        <a href="{{ url_for('password-managers.settings_page') }}">Settings</a>
-        <span class="spacer"></span>
-        {% if logged_in %}
-        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
-        {% else %}
-        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
-        {% endif %}
-    </nav>
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
 
-    <div class="container">
-        <div class="breadcrumb">
-            <a href="{{ url_for('password-managers.index') }}">Vaults</a> &rsaquo; {{ vault.name }}
-        </div>
-
-        <div class="vault-header">
-            <div class="vault-icon-lg" style="background: {{ vault.color }};">
-                {% if vault.icon == 'user' %}&#x1f464;{% elif vault.icon == 'briefcase' %}&#x1f4bc;{% elif vault.icon == 'shield' %}&#x1f6e1;{% elif vault.icon == 'rocket' %}&#x1f680;{% else %}&#x1f512;{% endif %}
-            </div>
-            <div class="vault-title">
-                <h2>{{ vault.name }}</h2>
-                <p>{{ vault.type|title }} vault{% if vault.shared %} &middot; Shared with {{ vault.members|length }} member{{ 's' if vault.members|length > 1 }}{% endif %}</p>
-            </div>
-        </div>
-
-        <form class="filters" method="get" action="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}">
-            <label>Category:</label>
-            <select name="category">
-                <option value="">All</option>
-                {% for cat in categories %}
-                <option value="{{ cat }}" {% if filter_category == cat %}selected{% endif %}>{{ cat|replace('_', ' ')|title }}</option>
-                {% endfor %}
-            </select>
-
-            <label>Strength:</label>
-            <select name="strength">
-                <option value="">All</option>
-                <option value="excellent" {% if filter_strength == 'excellent' %}selected{% endif %}>Excellent</option>
-                <option value="strong" {% if filter_strength == 'strong' %}selected{% endif %}>Strong</option>
-                <option value="fair" {% if filter_strength == 'fair' %}selected{% endif %}>Fair</option>
-                <option value="weak" {% if filter_strength == 'weak' %}selected{% endif %}>Weak</option>
-            </select>
-
-            <label>Search:</label>
-            <input type="text" name="q" value="{{ filter_search }}" placeholder="Search entries...">
-
-            <button type="submit" class="btn-filter">Filter</button>
-            <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn-clear">Clear</a>
-        </form>
-
-        <div class="entry-count">{{ entries|length }} item{{ 's' if entries|length != 1 }}</div>
-
-        {% if entries %}
-        <ul class="entries-list">
-            {% for entry in entries %}
-            <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="entry-row">
-                <div class="entry-fav">{% if entry.favorite %}&#9733;{% else %}&#9734;{% endif %}</div>
-                <div class="entry-main">
-                    <div class="entry-title">{{ entry.title }}</div>
-                    <div class="entry-subtitle">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(50) }}{% endif %}</div>
+        <main class="main">
+            <div class="page-head">
+                <div class="vault-head">
+                    <div class="vault-icon-lg" style="background: {{ vault.color }};">{{ vault.name[0]|upper }}</div>
+                    <div>
+                        <h2>{{ vault.name }}</h2>
+                        <p class="muted">{{ vault.type|title }} vault{% if vault.shared %} &middot; Shared with {{ vault.members|length }} member{{ 's' if vault.members|length > 1 }}{% endif %}</p>
+                    </div>
                 </div>
-                <div class="entry-badges">
-                    <span class="badge badge-{{ entry.category }}">{{ entry.category|replace('_', ' ') }}</span>
+                <a href="{{ url_for('password-managers.index') }}" class="back-link">&larr; Vaults</a>
+            </div>
+
+            <div class="card card-pad">
+                <form class="filter-bar" method="get" action="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}">
+                    <div class="field">
+                        <label class="form-label" for="f-category">Category</label>
+                        <select name="category" id="f-category">
+                            <option value="">All</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if filter_category == cat %}selected{% endif %}>{{ cat|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="form-label" for="f-strength">Strength</label>
+                        <select name="strength" id="f-strength">
+                            <option value="">All</option>
+                            <option value="excellent" {% if filter_strength == 'excellent' %}selected{% endif %}>Excellent</option>
+                            <option value="strong" {% if filter_strength == 'strong' %}selected{% endif %}>Strong</option>
+                            <option value="fair" {% if filter_strength == 'fair' %}selected{% endif %}>Fair</option>
+                            <option value="weak" {% if filter_strength == 'weak' %}selected{% endif %}>Weak</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="form-label" for="f-q">Search</label>
+                        <input type="text" name="q" id="f-q" value="{{ filter_search }}" placeholder="Search entries...">
+                    </div>
+
+                    <div class="field">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn btn-outline">Clear</a>
+                    </div>
+                </form>
+            </div>
+
+            <div>
+                <div class="section-title">{{ entries|length }} item{{ 's' if entries|length != 1 }}</div>
+
+                {% if entries %}
+                <div class="card list">
+                    {% for entry in entries %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="list-row">
+                        <div class="row-icon" style="background: {{ vault.color }};">{{ entry.title[0]|upper }}</div>
+                        <div class="row-main">
+                            <div class="row-title">{{ entry.title }}</div>
+                            <div class="row-sub">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(50) }}{% endif %}</div>
+                        </div>
+                        <div class="row-meta">
+                            <span class="chip">{{ entry.category|replace('_', ' ') }}</span>
+                            {% if entry.strength %}
+                            <span class="strength-dot strength-{{ entry.strength }}" title="{{ entry.strength }}"></span>
+                            {% endif %}
+                            <span class="row-time">{{ entry.last_used[:10] if entry.last_used else '' }}</span>
+                            <span class="chev">&rsaquo;</span>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
-                {% if entry.strength %}
-                <div class="strength-indicator strength-{{ entry.strength }}" title="{{ entry.strength }}">
-                    <div class="strength-bar"></div>
-                    <div class="strength-bar"></div>
-                    <div class="strength-bar"></div>
-                    <div class="strength-bar"></div>
+                {% else %}
+                <div class="card card-pad" style="text-align:center;">
+                    <p class="muted" style="margin-bottom:.6rem;">No entries match your filters.</p>
+                    <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn btn-outline">Clear filters</a>
                 </div>
                 {% endif %}
-                <div class="entry-date">{{ entry.last_used[:10] if entry.last_used else '' }}</div>
-            </a>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <div class="empty-state">
-            <p>No entries match your filters.</p>
-            <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn-clear">Clear filters</a>
-        </div>
-        {% endif %}
+            </div>
+        </main>
     </div>
 </body>
 </html>

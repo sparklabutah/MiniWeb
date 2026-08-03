@@ -18,12 +18,10 @@
         nav a.active { color: #00a884; border-bottom: 2px solid #00a884; }
         .app-container { display: flex; height: calc(100vh - 90px); }
         .sidebar { width: 380px; min-width: 320px; background: #111b21; border-right: 1px solid #2a3942; display: flex; flex-direction: column; }
-        .sidebar-header { padding: .8rem 1rem; display: flex; align-items: center; gap: .6rem; }
+        .sidebar-header { padding: .8rem 1rem; display: flex; flex-direction: column; align-items: stretch; gap: .5rem; }
         .search-box { flex: 1; position: relative; }
-        .search-box input { width: 100%; padding: .5rem .8rem .5rem 2.2rem; background: #202c33; border: none; border-radius: .5rem; color: #e9edef; font-size: .85rem; outline: none; }
+        .search-box input { width: 100%; padding: .55rem .9rem; background: #202c33; border: none; border-radius: .5rem; color: #e9edef; font-size: .85rem; outline: none; }
         .search-box input::placeholder { color: #8696a0; }
-        .search-box::before { content: "search"; font-family: 'Material Icons', sans-serif; position: absolute; left: .6rem; top: 50%; transform: translateY(-50%); color: #8696a0; font-size: .9rem; }
-        .search-icon { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: #8696a0; font-size: .8rem; }
         .conversation-list { flex: 1; overflow-y: auto; }
         .conversation-list::-webkit-scrollbar { width: 6px; }
         .conversation-list::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
@@ -48,7 +46,6 @@
         .welcome-icon { font-size: 4rem; margin-bottom: 1rem; opacity: .6; }
         .welcome h2 { color: #e9edef; font-size: 1.8rem; font-weight: 300; margin-bottom: .8rem; }
         .welcome p { color: #8696a0; font-size: .9rem; line-height: 1.5; }
-        .pinned-indicator { color: #8696a0; font-size: .7rem; margin-left: .3rem; }
         .pin-toggle { background: none; border: none; cursor: pointer; font-size: .85rem; margin-left: .4rem; padding: .15rem; border-radius: .3rem; filter: grayscale(1); opacity: .45; transition: all .15s; }
         .pin-toggle:hover { background: #2a3942; opacity: .8; }
         .pin-toggle.pinned { filter: none; opacity: 1; }
@@ -78,7 +75,6 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <div class="search-box">
-                    <span class="search-icon">&#128269;</span>
                     <input type="text" id="searchInput" placeholder="Search or start new chat" oninput="filterConversations()">
                 </div>
                 <div style="display:flex;gap:4px;padding:4px 8px;align-items:center;">
@@ -106,8 +102,6 @@
                     </div>
                     {% if conv.unread_count > 0 %}
                     <span class="unread-badge">{{ conv.unread_count }}</span>
-                    {% elif conv.pinned_count > 0 %}
-                    <span class="pinned-indicator" title="{{ conv.pinned_count }} pinned">&#128204;</span>
                     {% endif %}
                     <button class="pin-toggle {% if conv.pinned_count > 0 %}pinned{% endif %}" data-url="{{ url_for('instant-messaging.api_pin_conversation', conv_id=conv.id) }}" title="{% if conv.pinned_count > 0 %}Unpin conversation{% else %}Pin conversation{% endif %}">&#128204;</button>
                 </a>

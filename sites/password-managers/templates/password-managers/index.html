@@ -4,179 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaultGuard - Password Manager</title>
+    <link rel="stylesheet" href="/static/pm.css">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
-        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2d3348; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
-        .header h1 a span { color: #6c8cff; }
-        .header .user-info { font-size: .85rem; color: #8b92a5; }
-        .header .user-info strong { color: #c9cdd8; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; transition: all .15s; }
-        nav a:hover { color: #c9cdd8; background: #1e2235; }
-        nav a.active { color: #6c8cff; background: #1e2235; font-weight: 600; }
-        nav .spacer { flex: 1; }
-        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
-        nav .btn-auth:hover { background: #5a7af0; color: #fff; }
-        nav .btn-logout { color: #f87171; }
-        nav .btn-logout:hover { color: #ef4444; background: #1e2235; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
-        .score-banner { background: linear-gradient(135deg, #1e2235, #252a3a); border-radius: .6rem; padding: 1.5rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 2rem; border: 1px solid #2d3348; }
-        .score-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 800; flex-shrink: 0; }
-        .score-good { background: linear-gradient(135deg, #065f46, #047857); color: #6ee7b7; border: 3px solid #34d399; }
-        .score-fair { background: linear-gradient(135deg, #78350f, #92400e); color: #fcd34d; border: 3px solid #fbbf24; }
-        .score-poor { background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #fca5a5; border: 3px solid #f87171; }
-        .score-info h2 { font-size: 1.2rem; color: #e1e4e8; margin-bottom: .3rem; }
-        .score-info p { color: #8b92a5; font-size: .9rem; }
-        .score-info .alerts { margin-top: .5rem; }
-        .score-info .alert-badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; margin-right: .4rem; }
-        .alert-critical { background: #7f1d1d; color: #fca5a5; }
-        .alert-warning { background: #78350f; color: #fcd34d; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .stat-card { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1.2rem; text-align: center; }
-        .stat-card .stat-value { font-size: 1.8rem; font-weight: 700; color: #6c8cff; }
-        .stat-card .stat-label { font-size: .8rem; color: #8b92a5; margin-top: .2rem; }
-        h3 { color: #c9cdd8; font-size: 1rem; margin-bottom: .8rem; }
-        .vaults-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .vault-card { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1.3rem; text-decoration: none; color: inherit; transition: border-color .15s, transform .1s; display: block; }
-        .vault-card:hover { border-color: #6c8cff; transform: translateY(-2px); }
-        .vault-card .vault-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
-        .vault-icon { width: 36px; height: 36px; border-radius: .4rem; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff; font-weight: 700; }
-        .vault-card .vault-name { font-size: 1rem; font-weight: 600; color: #e1e4e8; }
-        .vault-card .vault-meta { display: flex; justify-content: space-between; align-items: center; }
-        .vault-card .vault-count { font-size: .85rem; color: #8b92a5; }
-        .vault-card .vault-type { font-size: .7rem; text-transform: uppercase; font-weight: 600; letter-spacing: .04rem; padding: .15rem .5rem; border-radius: .2rem; background: #1e2235; color: #6c8cff; }
-        .vault-card .vault-type.shared { color: #34d399; background: #0d3028; }
-        .recent-list { list-style: none; }
-        .recent-item { display: flex; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #161822; border: 1px solid #2d3348; border-radius: .4rem; margin-bottom: .5rem; text-decoration: none; color: inherit; transition: border-color .15s; }
-        .recent-item:hover { border-color: #6c8cff; }
-        .recent-item .entry-icon { width: 32px; height: 32px; border-radius: .3rem; background: #1e2235; display: flex; align-items: center; justify-content: center; font-size: .85rem; flex-shrink: 0; }
-        .recent-item .entry-info { flex: 1; }
-        .recent-item .entry-title { font-size: .9rem; font-weight: 600; color: #e1e4e8; }
-        .recent-item .entry-url { font-size: .75rem; color: #8b92a5; }
-        .recent-item .entry-time { font-size: .75rem; color: #6b7280; white-space: nowrap; }
-        .strength-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .3rem; }
-        .strength-excellent { background: #34d399; }
-        .strength-strong { background: #60a5fa; }
-        .strength-fair { background: #fbbf24; }
-        .strength-weak { background: #f87171; }
-        .back-link { color: #6c8cff; text-decoration: none; font-size: .85rem; display: inline-block; margin-bottom: 1rem; }
-        .back-link:hover { text-decoration: underline; }
+        .score-banner { display: flex; align-items: center; gap: 1.3rem; }
+        .score-info h3 { font-size: 1.05rem; margin-bottom: .15rem; }
+        .alerts { margin-top: .55rem; display: flex; gap: .4rem; flex-wrap: wrap; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
-        <div class="user-info">
-            {% if user %}
-            <strong>{{ user.display_name }}</strong> &middot; {{ user.plan|title }} Plan
-            {% endif %}
-        </div>
-    </div>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
 
-    <nav>
-        <a href="{{ url_for('password-managers.index') }}" class="active">Vaults</a>
-        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
-        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
-        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
-        <a href="{{ url_for('password-managers.settings_page') }}">Settings</a>
-        <span class="spacer"></span>
-        {% if logged_in %}
-        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
-        {% else %}
-        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
-        {% endif %}
-    </nav>
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
 
-    <div class="container">
-        <a href="/" class="back-link">&larr; Back to MiniWeb</a>
+        <main class="main">
+            <div class="page-head">
+                <h2>My Vault</h2>
+                <a href="/" class="back-link">&larr; Back to MiniWeb</a>
+            </div>
 
-        {% if report and report.overall_score is defined %}
-        <div class="score-banner">
-            <div class="score-circle {% if report.overall_score >= 80 %}score-good{% elif report.overall_score >= 60 %}score-fair{% else %}score-poor{% endif %}">
-                {{ report.overall_score }}
-            </div>
-            <div class="score-info">
-                <h2>Security Score: {{ report.overall_rating }}</h2>
-                <p>{{ stats.total_entries }} items across {{ stats.total_vaults }} vaults</p>
-                <div class="alerts">
-                    {% if stats.breach_count > 0 %}
-                    <span class="alert-badge alert-critical">{{ stats.breach_count }} breach alert{{ 's' if stats.breach_count > 1 }}</span>
-                    {% endif %}
-                    {% if stats.weak_count > 0 %}
-                    <span class="alert-badge alert-warning">{{ stats.weak_count }} weak password{{ 's' if stats.weak_count > 1 }}</span>
-                    {% endif %}
-                    {% if stats.fair_count > 0 %}
-                    <span class="alert-badge alert-warning">{{ stats.fair_count }} fair password{{ 's' if stats.fair_count > 1 }}</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.total_entries }}</div>
-                <div class="stat-label">Total Items</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.total_vaults }}</div>
-                <div class="stat-label">Vaults</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.favorites }}</div>
-                <div class="stat-label">Favorites</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.strengths.get('excellent', 0) }}</div>
-                <div class="stat-label">Excellent Passwords</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.weak_count + stats.fair_count }}</div>
-                <div class="stat-label">Need Attention</div>
-            </div>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">
-            <h3 style="margin-bottom:0">Your Vaults</h3>
-            <form method="POST" enctype="multipart/form-data" action="{{ url_for('password-managers.form_import') }}" style="display:flex;gap:.5rem;align-items:center;">
-                <input type="file" name="file" accept=".csv,.json" style="font-size:.75rem;color:#8b92a5;">
-                <button type="submit" style="padding:.35rem .8rem;background:#1e2235;color:#6c8cff;border:1px solid #2d3348;border-radius:.3rem;font-size:.8rem;cursor:pointer;">Import</button>
-            </form>
-        </div>
-        <div class="vaults-grid">
-            {% for vault in vaults %}
-            <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="vault-card">
-                <div class="vault-header">
-                    <div class="vault-icon" style="background: {{ vault.color }};">
-                        {% if vault.icon == 'user' %}&#x1f464;{% elif vault.icon == 'briefcase' %}&#x1f4bc;{% elif vault.icon == 'shield' %}&#x1f6e1;{% elif vault.icon == 'rocket' %}&#x1f680;{% else %}&#x1f512;{% endif %}
+            {% if report and report.overall_score is defined %}
+            <div class="card card-pad score-banner">
+                <a href="{{ url_for('password-managers.security_report_page') }}" title="View full security report"
+                   class="score-circle {% if report.overall_score >= 80 %}score-good{% elif report.overall_score >= 60 %}score-fair{% else %}score-poor{% endif %}">{{ report.overall_score }}</a>
+                <div class="score-info">
+                    <h3>Security Score: {{ report.overall_rating }}</h3>
+                    <p class="muted">{{ stats.total_entries }} items across {{ stats.total_vaults }} vaults</p>
+                    <div class="alerts">
+                        {% if stats.breach_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#breach" class="pill bad" title="Review breach alerts">{{ stats.breach_count }} breach alert{{ 's' if stats.breach_count > 1 }} &rsaquo;</a>{% endif %}
+                        {% if stats.weak_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#weak" class="pill warn" title="Review weak passwords">{{ stats.weak_count }} weak password{{ 's' if stats.weak_count > 1 }} &rsaquo;</a>{% endif %}
+                        {% if stats.fair_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#weak" class="pill warn" title="Review fair passwords">{{ stats.fair_count }} fair password{{ 's' if stats.fair_count > 1 }} &rsaquo;</a>{% endif %}
                     </div>
-                    <span class="vault-name">{{ vault.name }}</span>
                 </div>
-                <div class="vault-meta">
-                    <span class="vault-count">{{ vault._entry_count }} item{{ 's' if vault._entry_count != 1 }}</span>
-                    <span class="vault-type {% if vault.shared %}shared{% endif %}">{{ vault.type }}</span>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
+            </div>
+            {% endif %}
 
-        <h3>Recently Used</h3>
-        <ul class="recent-list">
-            {% for entry in recent_entries %}
-            <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="recent-item">
-                <div class="entry-icon">
-                    <span class="strength-dot strength-{{ entry.strength or 'strong' }}"></span>
+            <div class="stats-grid">
+                <div class="card stat-card"><div class="stat-value">{{ stats.total_entries }}</div><div class="stat-label">Total Items</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.total_vaults }}</div><div class="stat-label">Vaults</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.favorites }}</div><div class="stat-label">Favorites</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.strengths.get('excellent', 0) }}</div><div class="stat-label">Excellent</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.weak_count + stats.fair_count }}</div><div class="stat-label">Need Attention</div></div>
+            </div>
+
+            <div>
+                <div class="page-head" style="margin-bottom:.7rem;">
+                    <div class="section-title" style="border:0;padding:0;">Your Vaults</div>
+                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('password-managers.form_import') }}"
+                          title="Import saved logins from a .csv or .json export (e.g. from another password manager)">
+                        <input type="file" name="file" accept=".csv,.json" id="import-file" style="display:none;" onchange="if(this.files.length){this.form.submit();}">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('import-file').click();">Import logins</button>
+                    </form>
                 </div>
-                <div class="entry-info">
-                    <div class="entry-title">{{ entry.title }}</div>
-                    <div class="entry-url">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(40) }}{% endif %}</div>
+                <div class="card list">
+                    {% for vault in vaults %}
+                    <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="list-row">
+                        <div class="row-icon" style="background: {{ vault.color }};">{{ vault.name[0]|upper }}</div>
+                        <div class="row-main"><div class="row-title">{{ vault.name }}</div></div>
+                        <div class="row-meta">
+                            <span class="muted">{{ vault._entry_count }} item{{ 's' if vault._entry_count != 1 }}</span>
+                            <span class="chip {% if vault.shared %}good{% endif %}">{{ vault.type }}</span>
+                            <span class="chev">&rsaquo;</span>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
-                <div class="entry-time">{{ entry.last_used[:10] if entry.last_used else '' }}</div>
-            </a>
-            {% endfor %}
-        </ul>
+            </div>
+
+            <div>
+                <div class="section-title">Recently Used</div>
+                <div class="card list">
+                    {% for entry in recent_entries %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="list-row">
+                        <span class="strength-dot strength-{{ entry.strength or 'strong' }}"></span>
+                        <div class="row-main">
+                            <div class="row-title">{{ entry.title }}</div>
+                            <div class="row-sub">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(40) }}{% endif %}</div>
+                        </div>
+                        <div class="row-time">{{ entry.last_used[:10] if entry.last_used else '' }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </main>
     </div>
 </body>
 </html>

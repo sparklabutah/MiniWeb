@@ -3,55 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - LiveStream</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; display: flex; flex-direction: column; min-height: 100vh; }
-        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
-        .header h1 a span { color: #9147ff; }
-        .register-container { max-width: 400px; margin: 3rem auto; padding: 2rem; background: #18181b; border-radius: .5rem; }
-        .register-container h2 { text-align: center; margin-bottom: 1.5rem; font-size: 1.3rem; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: .85rem; color: #adadb8; margin-bottom: .3rem; font-weight: 600; }
-        .form-group input { width: 100%; background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .6rem .8rem; border-radius: .3rem; font-size: .9rem; }
-        .form-group input:focus { border-color: #9147ff; outline: none; }
-        .btn { width: 100%; background: #9147ff; color: #fff; border: none; padding: .7rem; border-radius: .3rem; font-size: .9rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
-        .btn:hover { background: #772ce8; }
-        .error { background: #eb0400; color: #fff; padding: .5rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-size: .85rem; }
-        .login-link { text-align: center; margin-top: 1rem; font-size: .85rem; color: #adadb8; }
-        .login-link a { color: #9147ff; text-decoration: none; }
-    </style>
+    <title>Sign Up - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
-    </div>
-    <div class="register-container">
-        <h2>Sign Up for LiveStream</h2>
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
-        <form method="post" action="{{ url_for('live.register_submit') }}">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="display_name">Display Name</label>
-                <input type="text" id="display_name" name="display_name">
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email">
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit" class="btn">Sign Up</button>
-        </form>
-        <p class="login-link">Already have an account? <a href="{{ url_for('live.login_page') }}">Log in</a></p>
+    {% set logged_in = false %}
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-auth-wrap">
+        <div class="tw-auth-card">
+            <h2>Sign Up for PulseLive</h2>
+            {% if error %}<div class="tw-error">{{ error }}</div>{% endif %}
+            <form method="post" action="{{ url_for('live.register_submit') }}">
+                <div class="tw-field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="tw-field">
+                    <label for="display_name">Display Name</label>
+                    <input type="text" id="display_name" name="display_name">
+                </div>
+                <div class="tw-field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email">
+                </div>
+                <div class="tw-field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="tw-btn">Sign Up</button>
+            </form>
+            <p class="tw-auth-alt">Already have an account? <a href="{{ url_for('live.login_page') }}">Log in</a></p>
+        </div>
     </div>
 </body>
 </html>

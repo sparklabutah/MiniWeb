@@ -903,25 +903,36 @@ def api_video_ratings(video_id):
 
 @blueprint.route("/api/videos/<int:video_id>/seek", methods=["POST"])
 def api_video_seek(video_id):
-    """Set playback seek position (play_by_slider)."""
+    """Set playback seek position — the seek bar is a slider (play_by_slider).
+
+    Accepts `position` (seconds) or `position_pct` (0-100). Clamps to the
+    duration, persists the resume point (session overlay), and returns a
+    formatted label so a scrub is verifiable.
+    """
     videos = _videos()
     video = next((v for v in videos if v["id"] == video_id), None)
     if not video:
         return jsonify({"error": "Video not found"}), 404
 
-    data = request.get_json(force=True)
-    position = data.get("position", 0)
-    duration = video.get("duration_seconds", 0)
-    if position < 0:
+    data = request.get_json(force=True) or {}
+    duration = int(video.get("duration_seconds") or 0)
+    position = data.get("position")
+    if position is None and data.get("position_pct") is not None:
+        position = float(data["position_pct"]) / 100.0 * duration
+    try:
+        position = int(round(float(position or 0)))
+    except (TypeError, ValueError):
         position = 0
-    if duration > 0 and position > duration:
-        position = duration
+    position = max(0, min(position, duration)) if duration > 0 else max(0, position)
+
+    video["playback_position_sec"] = position
+    db.save_item(SITE, "videos", video_id, video)
 
     progress = round((position / duration) * 100, 1) if duration > 0 else 0
-
     return jsonify({
         "video_id": video_id,
         "position_seconds": position,
+        "position_label": f"{position // 60}:{position % 60:02d}",
         "duration_seconds": duration,
         "progress_percent": progress,
     })

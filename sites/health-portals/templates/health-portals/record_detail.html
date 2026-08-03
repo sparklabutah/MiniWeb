@@ -4,73 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Record Details - Lakeport Medical Center</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
-        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
-        .header h1 a span { color: #7ee8e8; }
-        .header-right a { color: #c0e8e8; text-decoration: none; font-size: .85rem; margin-left: 1rem; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
-        nav a:hover { background: #e6f7f7; }
-        nav a.active { font-weight: 700; background: #d0f0f0; }
-        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
-        .breadcrumb { font-size: .8rem; color: #64748b; margin-bottom: 1rem; }
-        .breadcrumb a { color: #0d6e6e; text-decoration: none; }
-        .card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 1.5rem; margin-bottom: 1.2rem; }
-        .card h2 { font-size: 1.3rem; margin-bottom: .3rem; }
-        .card h3 { font-size: 1rem; color: #0d6e6e; margin-bottom: .8rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .5rem; }
-        .badge { display: inline-block; padding: .2rem .6rem; border-radius: 1rem; font-size: .75rem; font-weight: 600; margin-left: .5rem; background: #dbeafe; color: #1d4ed8; }
-        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: 1rem; }
-        @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
-        .detail-item .label { font-size: .75rem; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: .15rem; }
-        .detail-item .value { font-size: .9rem; color: #1a202c; }
-        .summary-text { font-size: .9rem; line-height: 1.7; color: #334155; margin-top: .5rem; background: #f8fafc; padding: 1rem; border-radius: .4rem; }
-        .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .8rem; margin-top: .5rem; }
-        .vital-item { background: #f0f4f8; padding: .8rem; border-radius: .4rem; text-align: center; }
-        .vital-item .vital-value { font-size: 1.2rem; font-weight: 700; color: #0d6e6e; }
-        .vital-item .vital-label { font-size: .7rem; color: #64748b; margin-top: .2rem; }
-        .lab-table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
-        .lab-table th { text-align: left; padding: .6rem .8rem; font-size: .75rem; color: #64748b; text-transform: uppercase; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-        .lab-table td { padding: .6rem .8rem; font-size: .85rem; border-bottom: 1px solid #f1f5f9; }
-        .lab-result-normal { color: #16a34a; font-weight: 600; }
-        .lab-result-elevated { color: #d97706; font-weight: 600; }
-        .pt-section { margin-top: .5rem; }
-        .pt-item { display: flex; margin-bottom: .5rem; }
-        .pt-item .pt-label { font-weight: 600; color: #334155; font-size: .85rem; min-width: 150px; }
-        .pt-item .pt-value { font-size: .85rem; color: #475569; }
-        .vacc-card { background: #f0f4f8; padding: .8rem 1rem; border-radius: .4rem; margin-bottom: .5rem; }
-        .vacc-card .vacc-name { font-weight: 600; color: #1a202c; font-size: .9rem; }
-        .vacc-card .vacc-meta { font-size: .8rem; color: #64748b; margin-top: .2rem; }
-        .referral-box { background: #f0f4f8; padding: 1rem; border-radius: .4rem; margin-top: .5rem; }
-        .referral-box .ref-item { margin-bottom: .4rem; font-size: .85rem; }
-        .referral-box .ref-item strong { color: #334155; }
-        .back-link { display: inline-block; margin-top: 1rem; color: #0d6e6e; text-decoration: none; font-size: .9rem; font-weight: 500; }
-        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
-    </style>
+    <link rel="stylesheet" href="/static/health.css">
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('health-portals.index') }}">Lakeport <span>Medical</span> Center</a></h1>
-        <div class="header-right">
-            {% if logged_in %}
-                <a href="{{ url_for('health-portals.logout') }}">Sign Out ({{ user.first_name }})</a>
-            {% else %}
-                <a href="{{ url_for('health-portals.login_page') }}">Sign In</a>
-            {% endif %}
-            <a href="/">MiniWeb</a>
-        </div>
-    </div>
-
-    <nav>
-        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
-        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
-        <a href="{{ url_for('health-portals.records_page') }}" class="active">Records</a>
-        <a href="{{ url_for('health-portals.messages_page') }}">Messages</a>
-        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
-        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
-    </nav>
+    {% set active_page = 'records' %}
+    {% include "health-portals/_masthead.html" %}
 
     <div class="main">
         <div class="breadcrumb">
@@ -272,8 +210,6 @@
         <a href="{{ url_for('health-portals.records_page') }}" class="back-link">&larr; Back to Records</a>
     </div>
 
-    <div class="footer">
-        Lakeport Medical Center &mdash; (555) 800-2200 &mdash; Patient Portal
-    </div>
+    {% include "health-portals/_footer.html" %}
 </body>
 </html>

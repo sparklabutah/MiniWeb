@@ -4,142 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Entry - VaultGuard</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
-        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
-        .header h1 a span { color: #6c8cff; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
-        nav a:hover { color: #c9cdd8; background: #1e2235; }
-        nav .spacer { flex: 1; }
-        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
-        nav .btn-logout { color: #f87171; }
-        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
-        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
-        .breadcrumb a { color: #6c8cff; text-decoration: none; }
-        h2 { color: #e1e4e8; font-size: 1.3rem; margin-bottom: 1.5rem; }
-        .form-card { background: #161822; border: 1px solid #2d3348; border-radius: .6rem; padding: 2rem; }
-        .form-group { margin-bottom: 1.2rem; }
-        .form-group label { display: block; font-size: .85rem; color: #c9cdd8; font-weight: 600; margin-bottom: .4rem; }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%; padding: .6rem .8rem; background: #1e2235; border: 1.5px solid #2d3348;
-            border-radius: .4rem; font-size: .9rem; color: #e1e4e8;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            border-color: #6c8cff; outline: none;
-        }
-        .form-group textarea { min-height: 80px; resize: vertical; }
-        .form-row { display: flex; gap: 1rem; }
-        .form-row .form-group { flex: 1; }
-        .checkbox-group { display: flex; align-items: center; gap: .5rem; }
-        .checkbox-group input[type="checkbox"] { accent-color: #6c8cff; width: 16px; height: 16px; }
-        .btn-submit { width: 100%; padding: .8rem; background: #6c8cff; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
-        .btn-submit:hover { background: #5a7af0; }
-    </style>
+    <link rel="stylesheet" href="/static/pm.css">
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
-    </div>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
 
-    <nav>
-        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
-        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
-        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
-        <a href="{{ url_for('password-managers.audit_log_page') }}">Audit Log</a>
-        <a href="{{ url_for('password-managers.settings_page') }}">Settings</a>
-        <span class="spacer"></span>
-        {% if logged_in %}
-        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
-        {% else %}
-        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
-        {% endif %}
-    </nav>
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
 
-    <div class="container">
-        <div class="breadcrumb">
-            <a href="{{ url_for('password-managers.index') }}">Vaults</a> &rsaquo; New Entry
-        </div>
-
-        <h2>Create New Entry</h2>
-
-        <form class="form-card" method="post" action="{{ url_for('password-managers.new_entry_submit') }}" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="vault_id">Vault</label>
-                <select name="vault_id" id="vault_id">
-                    {% for v in vaults %}
-                    <option value="{{ v.id }}">{{ v.name }}</option>
-                    {% endfor %}
-                </select>
+        <main class="main">
+            <div class="page-head">
+                <h2>Create New Entry</h2>
+                <a class="back-link" href="{{ url_for('password-managers.index') }}">&lsaquo; Back to Vaults</a>
             </div>
 
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input type="text" name="title" id="title" required placeholder="e.g., Netflix, Gmail...">
-            </div>
+            <form class="card card-pad" method="post" action="{{ url_for('password-managers.new_entry_submit') }}" enctype="multipart/form-data">
+                <div class="card-title">Login Details</div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="username">Username / Email</label>
-                    <input type="text" name="username" id="username" placeholder="user@example.com">
-                </div>
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="text" name="password" id="password" placeholder="Enter password">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="url">Website URL</label>
-                <input type="text" name="url" id="url" placeholder="https://example.com">
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="category">Category</label>
-                    <select name="category" id="category">
-                        <option value="login">Login</option>
-                        <option value="secure_note">Secure Note</option>
-                        <option value="credit_card">Credit Card</option>
+                <div class="field">
+                    <label class="form-label" for="vault_id">Vault</label>
+                    <select name="vault_id" id="vault_id">
+                        {% for v in vaults %}
+                        <option value="{{ v.id }}">{{ v.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="strength">Strength</label>
-                    <select name="strength" id="strength">
-                        <option value="excellent">Excellent</option>
-                        <option value="strong" selected>Strong</option>
-                        <option value="fair">Fair</option>
-                        <option value="weak">Weak</option>
-                    </select>
+
+                <div class="field">
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" name="title" id="title" required placeholder="e.g., Netflix, Gmail...">
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="tags">Tags (comma-separated)</label>
-                <input type="text" name="tags" id="tags" placeholder="social, personal, work">
-            </div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="username">Username / Email</label>
+                        <input type="text" name="username" id="username" placeholder="user@example.com">
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="password">Password</label>
+                        <input type="text" name="password" id="password" placeholder="Enter password">
+                    </div>
+                </div>
 
-            <div class="form-group">
-                <label for="notes">Notes</label>
-                <textarea name="notes" id="notes" placeholder="Additional notes..."></textarea>
-            </div>
+                <div class="field">
+                    <label class="form-label" for="url">Website URL</label>
+                    <input type="text" name="url" id="url" placeholder="https://example.com">
+                </div>
 
-            <div class="form-group">
-                <label for="icon">Icon Image (optional)</label>
-                <input type="file" name="icon" id="icon" accept="image/*" style="padding:.45rem .8rem;">
-            </div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="category">Category</label>
+                        <select name="category" id="category">
+                            <option value="login">Login</option>
+                            <option value="secure_note">Secure Note</option>
+                            <option value="credit_card">Credit Card</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="strength">Strength</label>
+                        <select name="strength" id="strength">
+                            <option value="excellent">Excellent</option>
+                            <option value="strong" selected>Strong</option>
+                            <option value="fair">Fair</option>
+                            <option value="weak">Weak</option>
+                        </select>
+                    </div>
+                </div>
 
-            <div class="form-group">
-                <div class="checkbox-group">
+                <div class="field">
+                    <label class="form-label" for="tags">Tags (comma-separated)</label>
+                    <input type="text" name="tags" id="tags" placeholder="social, personal, work">
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="notes">Notes</label>
+                    <textarea name="notes" id="notes" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="icon">Icon Image (optional)</label>
+                    <input type="file" name="icon" id="icon" accept="image/*">
+                </div>
+
+                <div class="checkline">
                     <input type="checkbox" name="favorite" id="favorite">
                     <label for="favorite">Mark as favorite</label>
                 </div>
-            </div>
 
-            <button type="submit" class="btn-submit">Create Entry</button>
-        </form>
+                <div style="margin-top:1.2rem; display:flex; gap:.6rem;">
+                    <button type="submit" class="btn btn-primary">Create Entry</button>
+                    <a class="btn btn-outline" href="{{ url_for('password-managers.index') }}">Cancel</a>
+                </div>
+            </form>
+        </main>
     </div>
 </body>
 </html>

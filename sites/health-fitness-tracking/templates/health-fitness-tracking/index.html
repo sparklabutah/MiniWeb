@@ -3,524 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - FitTrack</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
-
-        /* ---------- Header ---------- */
-        .header { background: #0073e6; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .header .logo { color: #fff; font-size: 1.25rem; font-weight: 700; text-decoration: none; letter-spacing: -.02em; }
-        .header .logo span { font-weight: 300; opacity: .85; }
-        .header-right { display: flex; align-items: center; gap: 1rem; }
-        .header-right a { color: rgba(255,255,255,.9); text-decoration: none; font-size: .85rem; font-weight: 500; }
-        .header-right a:hover { color: #fff; text-decoration: underline; }
-
-        /* ---------- Nav ---------- */
-        nav { background: #fff; border-bottom: 1px solid #ddd; padding: 0; }
-        nav .nav-inner { max-width: 960px; margin: 0 auto; display: flex; gap: 0; }
-        nav a { display: block; padding: .75rem 1.2rem; color: #555; text-decoration: none; font-size: .85rem; font-weight: 500; border-bottom: 3px solid transparent; }
-        nav a:hover { color: #0073e6; }
-        nav a.active { color: #0073e6; border-bottom-color: #0073e6; font-weight: 600; }
-
-        /* ---------- Layout ---------- */
-        .container { max-width: 960px; margin: 0 auto; padding: 1rem 1rem 3rem; }
-
-        /* ---------- Date bar ---------- */
-        .date-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1.5rem; padding: .6rem 0; }
-        .date-bar a { color: #0073e6; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
-        .date-bar a:hover { color: #005bb5; }
-        .date-bar .date-label { font-size: 1rem; font-weight: 600; color: #333; min-width: 150px; text-align: center; }
-
-        /* ---------- Top summary row ---------- */
-        .top-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-        @media (max-width: 700px) { .top-row { grid-template-columns: 1fr; } }
-
-        /* Calorie ring card */
-        .calorie-card { background: #fff; border-radius: .6rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: flex; align-items: center; gap: 1.5rem; }
-        .ring-container { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
-        .ring-container svg { transform: rotate(-90deg); }
-        .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .ring-center .remaining { font-size: 1.6rem; font-weight: 700; color: #0073e6; }
-        .ring-center .remaining-label { font-size: .7rem; color: #888; text-transform: uppercase; letter-spacing: .03em; }
-        .calorie-breakdown { flex: 1; }
-        .cal-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid #f0f0f0; font-size: .85rem; }
-        .cal-row:last-child { border-bottom: none; }
-        .cal-row .label { color: #666; }
-        .cal-row .value { font-weight: 600; }
-
-        /* Macro bars card */
-        .macro-card { background: #fff; border-radius: .6rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-        .macro-card h3 { font-size: .85rem; color: #666; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 1rem; }
-        .macro-row { margin-bottom: 1rem; }
-        .macro-row:last-child { margin-bottom: 0; }
-        .macro-header { display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: .3rem; }
-        .macro-header .macro-name { font-weight: 600; color: #333; }
-        .macro-header .macro-nums { color: #888; }
-        .macro-bar-bg { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
-        .macro-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-        .macro-bar-fill.protein { background: #0073e6; }
-        .macro-bar-fill.carbs { background: #f5a623; }
-        .macro-bar-fill.fat { background: #e74c8b; }
-
-        /* ---------- Food diary ---------- */
-        .diary-section { margin-bottom: 1rem; }
-        .diary-section h2 { font-size: 1.1rem; font-weight: 600; color: #333; margin-bottom: .8rem; border-bottom: 2px solid #0073e6; display: inline-block; padding-bottom: .2rem; }
-
-        .meal-section { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1rem; overflow: hidden; }
-        .meal-header { display: flex; justify-content: space-between; align-items: center; padding: .8rem 1rem; background: #f8f9fa; border-bottom: 1px solid #eee; cursor: pointer; }
-        .meal-header h4 { font-size: .9rem; font-weight: 600; color: #333; text-transform: capitalize; }
-        .meal-header .meal-cal { font-size: .85rem; color: #888; font-weight: 500; }
-        .meal-body { padding: 0; }
-        .food-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f5f5f5; font-size: .85rem; }
-        .food-row:last-child { border-bottom: none; }
-        .food-row .food-name { color: #333; flex: 1; }
-        .food-row .food-cal { color: #666; font-weight: 500; min-width: 60px; text-align: right; }
-        .food-row .food-delete { color: #ccc; cursor: pointer; margin-left: .8rem; font-size: .9rem; }
-        .food-row .food-delete:hover { color: #e74c3c; }
-        .add-food-btn { display: flex; align-items: center; gap: .4rem; padding: .65rem 1rem; color: #0073e6; font-size: .85rem; font-weight: 500; cursor: pointer; border: none; background: none; width: 100%; text-align: left; border-top: 1px solid #f0f0f0; }
-        .add-food-btn:hover { background: #f0f7ff; }
-        .add-food-btn .plus { font-size: 1.1rem; font-weight: 700; }
-
-        /* ---------- Exercise & water row ---------- */
-        .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-        @media (max-width: 700px) { .bottom-row { grid-template-columns: 1fr; } }
-
-        .exercise-card, .water-card, .steps-card { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-        .exercise-card h3, .water-card h3, .steps-card h3 { font-size: .85rem; color: #666; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .8rem; }
-        .exercise-item { display: flex; justify-content: space-between; padding: .4rem 0; font-size: .85rem; border-bottom: 1px solid #f5f5f5; }
-        .exercise-item:last-child { border-bottom: none; }
-        .exercise-item .ex-name { color: #333; text-transform: capitalize; }
-        .exercise-item .ex-cal { color: #e74c3c; font-weight: 500; }
-        .exercise-total { display: flex; justify-content: space-between; margin-top: .6rem; padding-top: .6rem; border-top: 2px solid #eee; font-weight: 600; font-size: .85rem; }
-
-        .water-row { display: flex; align-items: center; gap: .8rem; }
-        .water-glasses { display: flex; gap: .3rem; flex-wrap: wrap; }
-        .water-glass { width: 28px; height: 28px; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: .8rem; }
-        .water-glass.filled { background: #0073e6; color: #fff; }
-        .water-glass.empty { background: #e9ecef; color: #aaa; }
-        .water-count { font-size: .9rem; font-weight: 600; color: #333; margin-left: .5rem; }
-
-        .steps-big { font-size: 2rem; font-weight: 700; color: #0073e6; }
-        .steps-goal { font-size: .8rem; color: #888; margin-top: .2rem; }
-
-        /* ---------- Modal ---------- */
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: #fff; border-radius: .6rem; width: 100%; max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; border-bottom: 1px solid #eee; }
-        .modal-header h3 { font-size: 1rem; font-weight: 600; }
-        .modal-close { background: none; border: none; font-size: 1.4rem; color: #888; cursor: pointer; padding: 0 .3rem; }
-        .modal-close:hover { color: #333; }
-        .modal-body { padding: 1rem 1.2rem; overflow-y: auto; flex: 1; }
-        .search-input { width: 100%; padding: .7rem 1rem; border: 2px solid #0073e6; border-radius: .4rem; font-size: .95rem; outline: none; }
-        .search-input:focus { border-color: #005bb5; box-shadow: 0 0 0 3px rgba(0,115,230,.15); }
-        .search-results { margin-top: .8rem; max-height: 280px; overflow-y: auto; }
-        .search-result { padding: .7rem .5rem; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .search-result:hover { background: #f0f7ff; }
-        .sr-name { font-size: .85rem; font-weight: 500; color: #333; flex: 1; }
-        .sr-meta { font-size: .8rem; color: #888; text-align: right; min-width: 80px; }
-        .sr-macros { font-size: .75rem; color: #aaa; }
-        .search-empty { padding: 1.5rem; text-align: center; color: #999; font-size: .85rem; }
-
-        /* Food confirm panel */
-        .food-confirm { display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: .4rem; border: 1px solid #e0e0e0; }
-        .food-confirm.active { display: block; }
-        .food-confirm h4 { font-size: .9rem; font-weight: 600; margin-bottom: .8rem; color: #333; }
-        .confirm-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin-bottom: .8rem; }
-        .confirm-macro { text-align: center; padding: .5rem; background: #fff; border-radius: .3rem; }
-        .confirm-macro .cm-val { font-size: 1rem; font-weight: 700; }
-        .confirm-macro .cm-label { font-size: .7rem; color: #888; text-transform: uppercase; }
-        .confirm-macro.cal .cm-val { color: #e74c3c; }
-        .confirm-macro.pro .cm-val { color: #0073e6; }
-        .confirm-macro.carb .cm-val { color: #f5a623; }
-        .confirm-macro.fat .cm-val { color: #e74c8b; }
-        .servings-row { display: flex; align-items: center; gap: 1rem; margin-bottom: .8rem; }
-        .servings-row label { font-size: .85rem; font-weight: 500; }
-        .servings-row input { width: 80px; padding: .4rem; border: 1px solid #ddd; border-radius: .3rem; font-size: .9rem; text-align: center; }
-        .servings-row .serving-note { font-size: .75rem; color: #999; }
-        .log-food-btn { width: 100%; padding: .7rem; background: #0073e6; color: #fff; border: none; border-radius: .4rem; font-size: .9rem; font-weight: 600; cursor: pointer; }
-        .log-food-btn:hover { background: #005bb5; }
-
-        /* ---------- Footer ---------- */
-        .footer { text-align: center; padding: 2rem; color: #aaa; font-size: .8rem; }
-    </style>
+    <title>FitTrack — Overview</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
 </head>
 <body>
-    <div class="header">
-        <a href="{{ url_for('health-fitness-tracking.index') }}" class="logo">Fit<span>Track</span></a>
-        <div class="header-right">
-            {% if logged_in and user %}
-                <span style="color:rgba(255,255,255,.8); font-size:.85rem;">{{ user.display_name }}</span>
-                <a href="{{ url_for('health-fitness-tracking.logout') }}">Sign Out</a>
-            {% else %}
-                <a href="{{ url_for('health-fitness-tracking.login_page') }}">Sign In</a>
-            {% endif %}
-        </div>
-    </div>
+    {% set active_page = 'overview' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
 
-    <nav>
-        <div class="nav-inner">
-            <a href="{{ url_for('health-fitness-tracking.index') }}" class="active">Dashboard</a>
-            <a href="{{ url_for('health-fitness-tracking.nutrition_page') }}">Food Diary</a>
-            <a href="{{ url_for('health-fitness-tracking.workouts_page') }}">Exercise</a>
-            <a href="{{ url_for('health-fitness-tracking.goals_page') }}">Goals</a>
-            <a href="{{ url_for('health-fitness-tracking.stats_page') }}">Reports</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div style="display:flex;justify-content:flex-end;gap:.5rem;align-items:center;margin-bottom:.5rem;">
-            <select onchange="location.href='?sort='+this.value" style="padding:.35rem .6rem;border:1px solid #ddd;border-radius:.3rem;font-size:.82rem;background:#fff;color:#555;">
-                <option value="date" {{ 'selected' if request.args.get('sort', 'date') == 'date' }}>Sort: Date</option>
-                <option value="calories" {{ 'selected' if request.args.get('sort') == 'calories' }}>Sort: Calories</option>
-                <option value="duration" {{ 'selected' if request.args.get('sort') == 'duration' }}>Sort: Duration</option>
-                <option value="type" {{ 'selected' if request.args.get('sort') == 'type' }}>Sort: Type</option>
-                <option value="heart_rate" {{ 'selected' if request.args.get('sort') == 'heart_rate' }}>Sort: Heart Rate</option>
-            </select>
-            <a href="{{ url_for('health-fitness-tracking.api_export', format='csv', data_type='workouts') }}" style="padding:.35rem .8rem;background:#0073e6;color:#fff;border-radius:.3rem;text-decoration:none;font-size:.82rem;font-weight:600;" >Export CSV</a>
-        </div>
-        <!-- Date navigation -->
-        {% set prev_dt = view_date %}
-        {% set next_dt = view_date %}
-        <div class="date-bar">
-            <a href="{{ url_for('health-fitness-tracking.index', date=(view_date | replace('-','') | int - 1) ) }}"
-               onclick="event.preventDefault(); navigateDate(-1);">&larr;</a>
-            <div class="date-label" id="date-label">{{ view_date }}</div>
-            <a href="#" onclick="event.preventDefault(); navigateDate(1);">&rarr;</a>
-        </div>
-
-        <!-- Calorie ring + macro bars -->
-        <div class="top-row">
-            <div class="calorie-card">
-                <div class="ring-container">
-                    {% set consumed = nutrition_totals.calories %}
-                    {% set goal = calorie_goal %}
-                    {% set remaining = goal - consumed + exercise_calories %}
-                    {% set pct = [consumed / goal * 100, 100] | min if goal > 0 else 0 %}
-                    {% set circumference = 2 * 3.14159 * 56 %}
-                    {% set dash = circumference * pct / 100 %}
-                    <svg width="140" height="140" viewBox="0 0 140 140">
-                        <circle cx="70" cy="70" r="56" stroke="#e9ecef" stroke-width="10" fill="none"/>
-                        <circle cx="70" cy="70" r="56"
-                                stroke="{% if remaining < 0 %}#e74c3c{% else %}#0073e6{% endif %}"
-                                stroke-width="10" fill="none"
-                                stroke-dasharray="{{ dash }} {{ circumference }}"
-                                stroke-linecap="round"/>
-                    </svg>
-                    <div class="ring-center">
-                        <div class="remaining">{{ remaining | int }}</div>
-                        <div class="remaining-label">Remaining</div>
-                    </div>
-                </div>
-                <div class="calorie-breakdown">
-                    <div class="cal-row">
-                        <span class="label">Base Goal</span>
-                        <span class="value">{{ goal | int }}</span>
-                    </div>
-                    <div class="cal-row">
-                        <span class="label">Food</span>
-                        <span class="value">{{ consumed | int }}</span>
-                    </div>
-                    <div class="cal-row">
-                        <span class="label">Exercise</span>
-                        <span class="value">-{{ exercise_calories | int }}</span>
-                    </div>
-                    <div class="cal-row" style="font-weight:700;">
-                        <span class="label">Remaining</span>
-                        <span class="value" style="color:{% if remaining < 0 %}#e74c3c{% else %}#0073e6{% endif %};">{{ remaining | int }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="macro-card">
-                <h3>Macronutrients</h3>
-                {% set pro_pct = [nutrition_totals.protein_g / protein_goal * 100, 100] | min if protein_goal > 0 else 0 %}
-                {% set carb_pct = [nutrition_totals.carbs_g / carbs_goal * 100, 100] | min if carbs_goal > 0 else 0 %}
-                {% set fat_pct = [nutrition_totals.fat_g / fat_goal * 100, 100] | min if fat_goal > 0 else 0 %}
-                <div class="macro-row">
-                    <div class="macro-header">
-                        <span class="macro-name">Protein</span>
-                        <span class="macro-nums">{{ nutrition_totals.protein_g | int }}g / {{ protein_goal }}g</span>
-                    </div>
-                    <div class="macro-bar-bg"><div class="macro-bar-fill protein" style="width:{{ pro_pct }}%"></div></div>
-                </div>
-                <div class="macro-row">
-                    <div class="macro-header">
-                        <span class="macro-name">Carbs</span>
-                        <span class="macro-nums">{{ nutrition_totals.carbs_g | int }}g / {{ carbs_goal }}g</span>
-                    </div>
-                    <div class="macro-bar-bg"><div class="macro-bar-fill carbs" style="width:{{ carb_pct }}%"></div></div>
-                </div>
-                <div class="macro-row">
-                    <div class="macro-header">
-                        <span class="macro-name">Fat</span>
-                        <span class="macro-nums">{{ nutrition_totals.fat_g | int }}g / {{ fat_goal }}g</span>
-                    </div>
-                    <div class="macro-bar-bg"><div class="macro-bar-fill fat" style="width:{{ fat_pct }}%"></div></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Food Diary -->
-        <div class="diary-section">
-            <h2>Food Diary</h2>
-
-            {% for meal_type in ["breakfast", "lunch", "dinner", "snack"] %}
-            <div class="meal-section">
-                <div class="meal-header" onclick="toggleMeal(this)">
-                    <h4>{{ meal_type | capitalize }}</h4>
-                    <span class="meal-cal">{{ meal_totals.get(meal_type, 0) }} cal</span>
-                </div>
-                <div class="meal-body">
-                    {% for food in meals_by_type.get(meal_type, []) %}
-                    <div class="food-row">
-                        <span class="food-name">{{ food.description }}</span>
-                        <span class="food-cal">{{ food.calories }}</span>
-                        <span class="food-delete" title="Remove" onclick="deleteFood({{ food.id }})">&#10005;</span>
-                    </div>
-                    {% endfor %}
-                    <button class="add-food-btn" onclick="openFoodModal('{{ meal_type }}')">
-                        <span class="plus">+</span> Add Food
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Exercise + Water/Steps -->
-        <div class="bottom-row">
-            <div class="exercise-card">
-                <h3>Exercise</h3>
-                {% for w in today_workouts %}
-                <div class="exercise-item">
-                    <span class="ex-name">{{ w.type | replace('_', ' ') }}</span>
-                    <span class="ex-cal">{{ w.calories_burned }} cal</span>
-                </div>
-                {% else %}
-                <div style="color:#999; font-size:.85rem; padding:.5rem 0;">No exercise logged today.</div>
-                {% endfor %}
-                {% if today_workouts %}
-                <div class="exercise-total">
-                    <span>Total Burned</span>
-                    <span style="color:#e74c3c;">{{ exercise_calories }} cal</span>
-                </div>
-                {% endif %}
-                <a href="{{ url_for('health-fitness-tracking.log_workout_page') }}" class="add-food-btn" style="border-top:1px solid #f0f0f0; text-decoration:none;">
-                    <span class="plus">+</span> Add Exercise
-                </a>
-            </div>
-
+    <div class="ft-shell">
+        <div class="ft-datebar">
             <div>
-                <div class="water-card" style="margin-bottom:1rem;">
-                    <h3>Water</h3>
-                    <div class="water-row">
-                        <div class="water-glasses">
-                            {% for i in range(8) %}
-                            <div class="water-glass {% if i < water_glasses %}filled{% else %}empty{% endif %}">
-                                &#9679;
+                <h1>Daily Overview</h1>
+                <div class="sub">Your training, nutrition &amp; recovery at a glance</div>
+            </div>
+            <div class="ft-datenav">
+                <a href="?date={{ prev_date }}">&#8249;</a>
+                <span class="d">{{ view_date }}</span>
+                <a href="?date={{ next_date }}">&#8250;</a>
+            </div>
+        </div>
+
+        <!-- KPI strip -->
+        <div class="kpis">
+            <div class="kpi"><div class="k-lbl">Steps Today</div><div class="k-val">{{ "{:,}".format(an.kpis.steps) }}</div><div class="k-delta flat">7-day avg {{ "{:,}".format(an.kpis.avg_steps) }}</div></div>
+            <div class="kpi"><div class="k-lbl">Active Min</div><div class="k-val">{{ an.kpis.active_min }}<span class="u"> min</span></div><div class="k-delta flat">move goal 30</div></div>
+            <div class="kpi"><div class="k-lbl">Weight</div><div class="k-val">{{ an.kpis.weight }}<span class="u"> kg</span></div><div class="k-delta {{ 'down' if an.kpis.weight_delta < 0 else 'up' if an.kpis.weight_delta > 0 else 'flat' }}">{{ '%+.1f'|format(an.kpis.weight_delta) }} kg / 30d</div></div>
+            <div class="kpi"><div class="k-lbl">Sleep</div><div class="k-val">{{ an.kpis.sleep }}<span class="u"> h</span></div><div class="k-delta flat">last night</div></div>
+            <div class="kpi"><div class="k-lbl">Workouts</div><div class="k-val">{{ an.kpis.workouts_week }}</div><div class="k-delta flat">this week</div></div>
+            <div class="kpi"><div class="k-lbl">Distance</div><div class="k-val">{{ an.kpis.distance_week }}<span class="u"> km</span></div><div class="k-delta flat">7-day total</div></div>
+            <div class="kpi"><div class="k-lbl">Active Streak</div><div class="k-val">{{ an.kpis.streak }}<span class="u"> d</span></div><div class="k-delta down">🔥 keep it going</div></div>
+        </div>
+
+        <div class="ft-grid">
+            <!-- ===== main column ===== -->
+            <div class="col">
+                <!-- Weight trend -->
+                <div class="panel">
+                    <div class="panel-h">
+                        <h3>Weight Trend</h3>
+                        {% if an.weight %}<span class="meta">{{ an.weight.start_date }} → {{ an.weight.end_date }} · <b style="color:{{ '#16a34a' if an.weight.delta < 0 else '#dc2626' }}">{{ '%+.1f'|format(an.weight.delta) }} kg</b></span>{% endif %}
+                    </div>
+                    <div class="panel-b">
+                        {% if an.weight %}
+                        <svg class="chart" viewBox="0 0 {{ an.weight.W }} {{ an.weight.H }}">
+                            {% for gy in [0.25, 0.5, 0.75] %}<line class="grid-line" x1="12" y1="{{ (an.weight.H * gy)|round(1) }}" x2="{{ an.weight.W - 12 }}" y2="{{ (an.weight.H * gy)|round(1) }}"/>{% endfor %}
+                            <polygon class="wt-area" points="{{ an.weight.area }}"/>
+                            <polyline class="wt-line" points="{{ an.weight.poly }}"/>
+                            <circle class="wt-dot" cx="{{ an.weight.poly.split(' ')[-1].split(',')[0] }}" cy="{{ an.weight.poly.split(' ')[-1].split(',')[1] }}" r="3.5"/>
+                        </svg>
+                        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:4px;">
+                            <span>{{ an.weight.max }} kg</span><span>range</span><span>{{ an.weight.min }} kg</span>
+                        </div>
+                        {% else %}<div style="color:var(--faint);text-align:center;padding:20px;">Not enough weight data.</div>{% endif %}
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Steps — Last 14 Days</h3><span class="meta">goal {{ "{:,}".format(an.steps.goal) }}/day</span></div>
+                    <div class="panel-b">
+                        <svg class="chart" viewBox="0 0 {{ an.steps.W }} {{ an.steps.H }}">
+                            <line class="goal-line" x1="12" y1="{{ an.steps.goal_y }}" x2="{{ an.steps.W - 12 }}" y2="{{ an.steps.goal_y }}"/>
+                            {% for b in an.steps.bars %}
+                            <rect class="bar {{ 'over' if b.over }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"><title>{{ b.date }}: {{ "{:,}".format(b.steps) }} steps</title></rect>
+                            <text class="bar-lbl" x="{{ (b.x + b.w/2)|round(1) }}" y="{{ an.steps.H - 2 }}">{{ b.dow }}</text>
+                            {% endfor %}
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Recent activity table -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Recent Activity</h3><a href="{{ url_for('health-fitness-tracking.workouts_page') }}">View all →</a></div>
+                    <table class="dt">
+                        <tr><th>Date</th><th>Activity</th><th>Duration</th><th>Distance</th><th>Calories</th><th>Avg HR</th></tr>
+                        {% for w in recent_workouts %}
+                        <tr>
+                            <td>{{ w.date }}</td>
+                            <td><a href="{{ url_for('health-fitness-tracking.workout_detail', workout_id=w.id) }}"><span class="type-tag tt-{{ w.type }}">{{ w.type|replace('_',' ') }}</span></a></td>
+                            <td>{{ w.duration_minutes }} min</td>
+                            <td>{{ (w.distance_km ~ ' km') if w.distance_km else '—' }}</td>
+                            <td>{{ w.calories_burned }}</td>
+                            <td>{{ (w.heart_rate_avg ~ ' bpm') if w.heart_rate_avg else '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- ===== side column ===== -->
+            <div class="col">
+                <!-- Calorie budget -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Calorie Budget</h3><a href="{{ url_for('health-fitness-tracking.nutrition_page') }}">Food log →</a></div>
+                    <div class="panel-b">
+                        <div class="ring-wrap">
+                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                <circle class="ring-bg" cx="70" cy="70" r="{{ cal_ring.r }}"/>
+                                <circle class="ring-fg" cx="70" cy="70" r="{{ cal_ring.r }}" stroke-dasharray="{{ cal_ring.dash }} {{ cal_ring.c }}" transform="rotate(-90 70 70)"/>
+                            </svg>
+                            <div class="ring-center">
+                                <div class="big">{{ cal_ring.remaining }}</div>
+                                <div class="lbl">kcal left</div>
                             </div>
+                        </div>
+                        <div class="cal-row">
+                            <div><div class="n">{{ cal_ring.goal }}</div><div class="l">Goal</div></div>
+                            <div><div class="n">{{ cal_ring.consumed }}</div><div class="l">Food</div></div>
+                            <div><div class="n">{{ cal_ring.burned }}</div><div class="l">Exercise</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Macros -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Macronutrients</h3></div>
+                    <div class="panel-b">
+                        {% for key, m in [('protein', macros.protein), ('carbs', macros.carbs), ('fat', macros.fat), ('fiber', macros.fiber)] %}
+                        <div class="macro">
+                            <div class="m-top"><span class="m-name" style="text-transform:capitalize;">{{ key }}</span><span class="m-val">{{ m.cur }} / {{ m.goal }} g</span></div>
+                            <div class="m-track"><div class="m-fill {{ key }}" style="width:{{ m.pct }}%;"></div></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- This week's training -->
+                <div class="panel">
+                    <div class="panel-h"><h3>This Week</h3><span class="meta">{{ an.week.count }} workouts</span></div>
+                    <div class="panel-b">
+                        <div class="week-dots">
+                            {% for d in an.week.days %}
+                            <div class="wd {{ 'on' if d.has }}"><div class="dot" title="{{ d.date }}{{ ' · ' ~ d.type|replace('_',' ') if d.type }}">{{ '✓' if d.has else '' }}</div><div class="lbl">{{ d.dow[0] }}</div></div>
                             {% endfor %}
                         </div>
-                        <span class="water-count">{{ water_glasses }} / 8 glasses</span>
+                        <div class="week-stats">
+                            <div><div class="n">{{ an.week.minutes }}</div><div class="l">Minutes</div></div>
+                            <div><div class="n">{{ an.week.distance }}</div><div class="l">Km</div></div>
+                            <div><div class="n">{{ "{:,}".format(an.week.calories) }}</div><div class="l">Kcal</div></div>
+                        </div>
                     </div>
                 </div>
-                <div class="steps-card">
-                    <h3>Steps</h3>
-                    <div class="steps-big">{{ "{:,}".format(steps) }}</div>
-                    <div class="steps-goal">Goal: 10,000 steps</div>
+
+                <!-- Activity heatmap -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Activity — 12 Weeks</h3></div>
+                    <div class="panel-b">
+                        <svg class="heat chart" viewBox="0 0 {{ an.heat.W }} {{ an.heat.H }}" style="max-width:230px;">
+                            {% for c in an.heat.cells %}
+                            <rect class="h{{ c.level }}" x="{{ c.x }}" y="{{ c.y }}" width="{{ c.s }}" height="{{ c.s }}" rx="2"><title>{{ c.date }}: {{ c.mins }} active min</title></rect>
+                            {% endfor %}
+                        </svg>
+                        <div class="heat-legend">Less <i style="background:#eceff3;"></i><i style="background:#c6e6cf;"></i><i style="background:#7fce97;"></i><i style="background:#39a860;"></i><i style="background:#16803c;"></i> More</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Food Search Modal -->
-    <div class="modal-overlay" id="food-modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Add Food to <span id="modal-meal-type">Breakfast</span></h3>
-                <button class="modal-close" onclick="closeFoodModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="search-input" id="food-search" placeholder="Search foods (e.g. chicken breast, rice, apple...)" autocomplete="off">
-                <div class="search-results" id="search-results">
-                    <div class="search-empty">Type to search the food database</div>
-                </div>
-
-                <div class="food-confirm" id="food-confirm">
-                    <h4 id="confirm-food-name"></h4>
-                    <div class="confirm-macros">
-                        <div class="confirm-macro cal">
-                            <div class="cm-val" id="confirm-cal">0</div>
-                            <div class="cm-label">Calories</div>
-                        </div>
-                        <div class="confirm-macro pro">
-                            <div class="cm-val" id="confirm-pro">0g</div>
-                            <div class="cm-label">Protein</div>
-                        </div>
-                        <div class="confirm-macro carb">
-                            <div class="cm-val" id="confirm-carb">0g</div>
-                            <div class="cm-label">Carbs</div>
-                        </div>
-                        <div class="confirm-macro fat">
-                            <div class="cm-val" id="confirm-fat">0g</div>
-                            <div class="cm-label">Fat</div>
-                        </div>
-                    </div>
-                    <div class="servings-row">
-                        <label for="servings">Servings:</label>
-                        <input type="number" id="servings" value="1" min="0.25" step="0.25">
-                        <span class="serving-note">per 100g serving</span>
-                    </div>
-                    <button class="log-food-btn" onclick="logFood()">Log Food</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="footer">FitTrack &mdash; Your Nutrition & Fitness Dashboard</div>
-
-    <script>
-        let currentMealType = 'breakfast';
-        let selectedFood = null;
-        const viewDate = '{{ view_date }}';
-        const userId = {{ (user.id if user else 1) | int }};
-
-        /* Date navigation */
-        function navigateDate(offset) {
-            const d = new Date(viewDate + 'T00:00:00');
-            d.setDate(d.getDate() + offset);
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            window.location.href = '{{ url_for("health-fitness-tracking.index") }}?date=' + y + '-' + m + '-' + day;
-        }
-
-        /* Toggle meal section visibility */
-        function toggleMeal(header) {
-            const body = header.nextElementSibling;
-            body.style.display = body.style.display === 'none' ? '' : 'none';
-        }
-
-        /* Food modal */
-        function openFoodModal(mealType) {
-            currentMealType = mealType;
-            document.getElementById('modal-meal-type').textContent = mealType.charAt(0).toUpperCase() + mealType.slice(1);
-            document.getElementById('food-modal').classList.add('active');
-            document.getElementById('food-search').value = '';
-            document.getElementById('search-results').innerHTML = '<div class="search-empty">Type to search the food database</div>';
-            document.getElementById('food-confirm').classList.remove('active');
-            selectedFood = null;
-            setTimeout(() => document.getElementById('food-search').focus(), 100);
-        }
-
-        function closeFoodModal() {
-            document.getElementById('food-modal').classList.remove('active');
-        }
-
-        /* Close modal on overlay click */
-        document.getElementById('food-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeFoodModal();
-        });
-
-        /* Food search with debounce */
-        let searchTimeout;
-        document.getElementById('food-search').addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            const q = this.value.trim();
-            if (q.length < 2) {
-                document.getElementById('search-results').innerHTML = '<div class="search-empty">Type at least 2 characters to search</div>';
-                document.getElementById('food-confirm').classList.remove('active');
-                return;
-            }
-            searchTimeout = setTimeout(() => {
-                fetch('{{ url_for("health-fitness-tracking.api_food_search") }}?q=' + encodeURIComponent(q))
-                    .then(r => r.json())
-                    .then(results => {
-                        const container = document.getElementById('search-results');
-                        if (!results.length) {
-                            container.innerHTML = '<div class="search-empty">No foods found for "' + q + '"</div>';
-                            return;
-                        }
-                        container.innerHTML = results.map(f => {
-                            const cal = Math.round(f.calories || 0);
-                            const pro = Math.round(f.protein || 0);
-                            const carb = Math.round(f.carbs || 0);
-                            const fat = Math.round(f.fat || 0);
-                            return '<div class="search-result" onclick=\'selectFood(' + JSON.stringify(f).replace(/'/g, "\\'") + ')\'>' +
-                                '<div class="sr-name">' + escapeHtml(f.description || '') + '</div>' +
-                                '<div><div class="sr-meta">' + cal + ' cal</div>' +
-                                '<div class="sr-macros">P:' + pro + 'g C:' + carb + 'g F:' + fat + 'g</div></div>' +
-                                '</div>';
-                        }).join('');
-                    })
-                    .catch(() => {
-                        document.getElementById('search-results').innerHTML = '<div class="search-empty">Search error. Try again.</div>';
-                    });
-            }, 300);
-        });
-
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        function selectFood(food) {
-            selectedFood = food;
-            document.getElementById('food-confirm').classList.add('active');
-            document.getElementById('confirm-food-name').textContent = food.description || '';
-            document.getElementById('servings').value = 1;
-            updateConfirmMacros();
-        }
-
-        document.getElementById('servings').addEventListener('input', updateConfirmMacros);
-
-        function updateConfirmMacros() {
-            if (!selectedFood) return;
-            const s = parseFloat(document.getElementById('servings').value) || 1;
-            document.getElementById('confirm-cal').textContent = Math.round((selectedFood.calories || 0) * s);
-            document.getElementById('confirm-pro').textContent = Math.round((selectedFood.protein || 0) * s) + 'g';
-            document.getElementById('confirm-carb').textContent = Math.round((selectedFood.carbs || 0) * s) + 'g';
-            document.getElementById('confirm-fat').textContent = Math.round((selectedFood.fat || 0) * s) + 'g';
-        }
-
-        function logFood() {
-            if (!selectedFood) return;
-            const s = parseFloat(document.getElementById('servings').value) || 1;
-            const payload = {
-                user_id: userId,
-                date: viewDate,
-                meal_type: currentMealType,
-                description: selectedFood.description || '',
-                calories: Math.round((selectedFood.calories || 0) * s),
-                protein_g: Math.round((selectedFood.protein || 0) * s),
-                carbs_g: Math.round((selectedFood.carbs || 0) * s),
-                fat_g: Math.round((selectedFood.fat || 0) * s),
-                fiber_g: Math.round((selectedFood.fiber || 0) * s),
-            };
-            fetch('{{ url_for("health-fitness-tracking.api_nutrition_create") }}', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload),
-            })
-            .then(r => r.json())
-            .then(() => {
-                closeFoodModal();
-                window.location.reload();
-            })
-            .catch(err => alert('Error logging food: ' + err));
-        }
-
-        function deleteFood(mealId) {
-            if (!confirm('Remove this food entry?')) return;
-            fetch('{{ url_for("health-fitness-tracking.api_nutrition_delete", meal_id=0) }}'.replace('/0', '/' + mealId), {
-                method: 'DELETE',
-            })
-            .then(r => r.json())
-            .then(() => window.location.reload())
-            .catch(err => alert('Error: ' + err));
-        }
-    </script>
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard · Data shown for {{ view_date }}</div>
 </body>
 </html>

@@ -113,10 +113,35 @@ def _semantic_score(article, query):
 # HTML routes
 # ---------------------------------------------------------------------------
 
+# House ads promote real MiniWeb sites and link to them (/sites/<id>/).
+_AD_POOL = [
+    {"site": "e-commerce", "brand": "ShopWave", "domain": "shopwave.com",
+     "tagline": "Fall sale is on — up to 40% off home, tech & more. Free 2-day shipping."},
+    {"site": "video", "brand": "StreamHub", "domain": "streamtube.tv",
+     "tagline": "Stream thousands of shows and creators. Start watching free today."},
+    {"site": "brokerage", "brand": "TradePulse", "domain": "tradepulse.com",
+     "tagline": "Commission-free trading. Open an account and get your first stock on us."},
+    {"site": "job-sites", "brand": "JobScout", "domain": "jobscout.careers",
+     "tagline": "500+ new local jobs this week in Cascadia County. Find your next role."},
+    {"site": "ticketing-events", "brand": "EventPass", "domain": "eventpass.live",
+     "tagline": "Concerts, games & festivals near Lakeport. Get tickets before they sell out."},
+    {"site": "auctions-p2p-marketplaces", "brand": "BidMarket", "domain": "bidmarket.com",
+     "tagline": "Buy and sell locally — thousands of deals from your neighbors."},
+    {"site": "insurance-loans", "brand": "Cascadia Insurance & Lending", "domain": "cascadiainsure.com",
+     "tagline": "Home, auto & life coverage from a local team. Get a quote in under 5 minutes."},
+    {"site": "music", "brand": "SoundWave", "domain": "soundwave.fm",
+     "tagline": "Millions of songs, zero ads on Premium. Your first month is free."},
+    {"site": "weather", "brand": "Lakeport Weather", "domain": "lakeportweather.com",
+     "tagline": "Hyperlocal forecasts and severe-weather alerts for Cascadia County."},
+]
+
+
 @blueprint.route("/")
 def index():
+    import random
     categories = _load_categories()
     user = _current_user()
+    ads = random.sample(_AD_POOL, 2)  # [0] leaderboard, [1] sidebar
 
     sort_by = request.args.get("sort", "date")
 
@@ -146,7 +171,7 @@ def index():
                            articles=sorted_articles, featured=featured,
                            latest=latest, categories=categories,
                            cat_articles=cat_articles, user=user,
-                           sort=sort_by,
+                           sort=sort_by, ads=ads,
                            bookmarked_ids=bookmarked_ids)
 
 

@@ -4,131 +4,104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit Log - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
-        .header { background: linear-gradient(135deg, #1a1d29, #252a3a); padding: .8rem 2rem; display: flex; align-items: center; border-bottom: 1px solid #2d3348; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
-        .header h1 a span { color: #6c8cff; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #161822; border-bottom: 1px solid #2d3348; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #8b92a5; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
-        nav a:hover { color: #c9cdd8; background: #1e2235; }
-        nav a.active { color: #6c8cff; background: #1e2235; font-weight: 600; }
-        nav .spacer { flex: 1; }
-        nav .btn-auth { background: #6c8cff; color: #fff; padding: .4rem 1rem; border-radius: .3rem; font-weight: 600; }
-        nav .btn-logout { color: #f87171; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
-        .breadcrumb { font-size: .85rem; color: #8b92a5; margin-bottom: 1rem; }
-        .breadcrumb a { color: #6c8cff; text-decoration: none; }
-        h2 { color: #e1e4e8; font-size: 1.3rem; margin-bottom: 1rem; }
-        .filters { background: #161822; border: 1px solid #2d3348; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: 1.2rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
-        .filters label { font-size: .8rem; color: #8b92a5; font-weight: 600; }
-        .filters select { background: #1e2235; border: 1px solid #2d3348; color: #e1e4e8; padding: .4rem .6rem; border-radius: .3rem; font-size: .85rem; }
-        .filters select:focus { border-color: #6c8cff; outline: none; }
-        .filters .btn-filter { background: #6c8cff; color: #fff; border: none; padding: .4rem 1rem; border-radius: .3rem; font-size: .85rem; cursor: pointer; font-weight: 600; }
-        .filters .btn-clear { background: transparent; color: #8b92a5; border: 1px solid #2d3348; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; cursor: pointer; text-decoration: none; }
-        .filters .btn-clear:hover { color: #e1e4e8; border-color: #6c8cff; }
-        .event-count { font-size: .85rem; color: #8b92a5; margin-bottom: .8rem; }
-        .audit-table { width: 100%; border-collapse: collapse; background: #161822; border: 1px solid #2d3348; border-radius: .5rem; overflow: hidden; }
-        .audit-table th { text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .04rem; color: #6b7280; padding: .7rem 1rem; border-bottom: 1px solid #2d3348; background: #1a1d29; }
-        .audit-table td { font-size: .85rem; padding: .7rem 1rem; border-bottom: 1px solid #1e2235; color: #c9cdd8; vertical-align: top; }
-        .audit-table tr:hover td { background: #1a1d29; }
-        .audit-table tr:last-child td { border-bottom: none; }
-        .action-badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
-        .action-view_password { background: #1e2235; color: #6c8cff; }
-        .action-autofill { background: #0d3028; color: #34d399; }
-        .action-edit_entry { background: #2d1f0f; color: #fbbf24; }
-        .action-login_success { background: #065f46; color: #6ee7b7; }
-        .action-login_failed { background: #7f1d1d; color: #fca5a5; }
-        .action-share_vault { background: #1e1e3f; color: #a78bfa; }
-        .entry-link { color: #6c8cff; text-decoration: none; }
-        .entry-link:hover { text-decoration: underline; }
-        .device-info { font-size: .8rem; color: #8b92a5; }
-        .ip-addr { font-family: 'SF Mono', monospace; font-size: .8rem; color: #6b7280; }
-        .details-text { font-size: .8rem; color: #8b92a5; max-width: 300px; }
+        .filters { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; }
+        .filters .field { margin-bottom: 0; }
+        .ip-addr { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: .78rem; color: var(--faint); }
+        .details-text { font-size: .8rem; color: var(--muted); max-width: 320px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('password-managers.index') }}">Vault<span>Guard</span></a></h1>
-    </div>
+    {% set active_page = 'audit' %}
+    {% include "password-managers/_topbar.html" %}
 
-    <nav>
-        <a href="{{ url_for('password-managers.index') }}">Vaults</a>
-        <a href="{{ url_for('password-managers.generator_page') }}">Generator</a>
-        <a href="{{ url_for('password-managers.security_report_page') }}">Security</a>
-        <a href="{{ url_for('password-managers.audit_log_page') }}" class="active">Audit Log</a>
-        <span class="spacer"></span>
-        {% if logged_in %}
-        <a href="{{ url_for('password-managers.logout') }}" class="btn-logout">Sign Out</a>
-        {% else %}
-        <a href="{{ url_for('password-managers.login_page') }}" class="btn-auth">Sign In</a>
-        {% endif %}
-    </nav>
+    <div class="shell">
+        {% set active_side = 'audit' %}
+        {% include "password-managers/_sidebar.html" %}
 
-    <div class="container">
-        <div class="breadcrumb">
-            <a href="{{ url_for('password-managers.index') }}">Home</a> &rsaquo; Audit Log
-        </div>
+        <main class="main">
+            <div class="page-head">
+                <h2>Access Audit Log</h2>
+                <a href="/" class="back-link">&larr; Back to MiniWeb</a>
+            </div>
 
-        <h2>Access Audit Log</h2>
+            <div class="card card-pad">
+                <form class="filters" method="get" action="{{ url_for('password-managers.audit_log_page') }}">
+                    <div class="field">
+                        <label class="form-label">Action</label>
+                        <select name="action">
+                            <option value="">All Actions</option>
+                            {% for action in actions %}
+                            <option value="{{ action }}" {% if filter_action == action %}selected{% endif %}>{{ action|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-        <form class="filters" method="get" action="{{ url_for('password-managers.audit_log_page') }}">
-            <label>Action:</label>
-            <select name="action">
-                <option value="">All Actions</option>
-                {% for action in actions %}
-                <option value="{{ action }}" {% if filter_action == action %}selected{% endif %}>{{ action|replace('_', ' ')|title }}</option>
-                {% endfor %}
-            </select>
+                    <div class="field">
+                        <label class="form-label">Vault</label>
+                        <select name="vault">
+                            <option value="">All Vaults</option>
+                            {% for v in vaults %}
+                            <option value="{{ v.id }}" {% if filter_vault == v.id %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-            <label>Vault:</label>
-            <select name="vault">
-                <option value="">All Vaults</option>
-                {% for v in vaults %}
-                <option value="{{ v.id }}" {% if filter_vault == v.id %}selected{% endif %}>{{ v.name }}</option>
-                {% endfor %}
-            </select>
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                    <a href="{{ url_for('password-managers.audit_log_page') }}" class="btn btn-outline">Clear</a>
+                </form>
+            </div>
 
-            <button type="submit" class="btn-filter">Filter</button>
-            <a href="{{ url_for('password-managers.audit_log_page') }}" class="btn-clear">Clear</a>
-        </form>
-
-        <div class="event-count">{{ audit_log|length }} event{{ 's' if audit_log|length != 1 }}</div>
-
-        <table class="audit-table">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Entry</th>
-                    <th>Device / IP</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for event in audit_log %}
-                <tr>
-                    <td>{{ event.timestamp[:16]|replace('T', ' ') }}</td>
-                    <td>{{ user_map.get(event.user_id, 'User ' ~ event.user_id) }}</td>
-                    <td><span class="action-badge action-{{ event.action }}">{{ event.action|replace('_', ' ') }}</span></td>
-                    <td>
-                        {% if event.entry_id %}
-                        <a href="{{ url_for('password-managers.entry_detail', entry_id=event.entry_id) }}" class="entry-link">{{ event.entry_title }}</a>
-                        {% else %}
-                        <span style="color: #6b7280;">&mdash;</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div class="device-info">{{ event.device }}</div>
-                        <div class="ip-addr">{{ event.ip_address }}</div>
-                    </td>
-                    <td><div class="details-text">{{ event.details }}</div></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            <div>
+                <div class="section-title">{{ audit_log|length }} event{{ 's' if audit_log|length != 1 }}</div>
+                <div class="card">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Entry</th>
+                                <th>Device / IP</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in audit_log %}
+                            <tr>
+                                <td>{{ event.timestamp[:16]|replace('T', ' ') }}</td>
+                                <td>{{ user_map.get(event.user_id, 'User ' ~ event.user_id) }}</td>
+                                <td>
+                                    {% if event.action in ('login_failed', 'share_vault') %}
+                                    <span class="chip bad">{{ event.action|replace('_', ' ') }}</span>
+                                    {% elif event.action in ('edit_entry',) %}
+                                    <span class="chip warn">{{ event.action|replace('_', ' ') }}</span>
+                                    {% elif event.action in ('autofill', 'login_success') %}
+                                    <span class="chip good">{{ event.action|replace('_', ' ') }}</span>
+                                    {% else %}
+                                    <span class="chip">{{ event.action|replace('_', ' ') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if event.entry_id %}
+                                    <a href="{{ url_for('password-managers.entry_detail', entry_id=event.entry_id) }}">{{ event.entry_title }}</a>
+                                    {% else %}
+                                    <span class="muted">&mdash;</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>{{ event.device }}</div>
+                                    <div class="ip-addr">{{ event.ip_address }}</div>
+                                </td>
+                                <td><div class="details-text">{{ event.details }}</div></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
     </div>
 </body>
 </html>

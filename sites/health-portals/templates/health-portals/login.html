@@ -4,70 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Lakeport Medical Center</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; }
-        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
-        .header h1 a span { color: #7ee8e8; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
-        nav a:hover { background: #e6f7f7; }
-        nav a.active { font-weight: 700; background: #d0f0f0; }
-        .login-container { max-width: 420px; margin: 4rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-        .login-container h2 { color: #0d6e6e; margin-bottom: .5rem; font-size: 1.5rem; }
-        .login-container .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
-        .form-group { margin-bottom: 1.2rem; }
-        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
-        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
-        .form-group input:focus { border-color: #0d6e6e; outline: none; box-shadow: 0 0 0 3px rgba(13,110,110,.15); }
-        .btn-login { width: 100%; padding: .8rem; background: #0d6e6e; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .btn-login:hover { background: #148f8f; }
-        .error { background: #fef2f2; color: #dc2626; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #fee2e2; }
-        .secure-badge { text-align: center; margin-top: 1.5rem; font-size: .8rem; color: #94a3b8; }
-        .demo-accounts { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
-        .demo-accounts h4 { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
-        .demo-account { background: #f8fafc; padding: .6rem .8rem; border-radius: .3rem; margin-bottom: .5rem; font-size: .8rem; color: #475569; }
-        .demo-account strong { color: #0d6e6e; }
-    </style>
+    <link rel="stylesheet" href="/static/health.css">
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('health-portals.index') }}">Lakeport <span>Medical</span> Center</a></h1>
-    </div>
-
-    <nav>
-        <a href="{{ url_for('health-portals.index') }}">Dashboard</a>
-        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
-        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
-        <a href="{{ url_for('health-portals.messages_page') }}">Messages</a>
-        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
-        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
-        <a href="{{ url_for('health-portals.login_page') }}" class="active">Sign In</a>
-    </nav>
+    {% include "health-portals/_masthead_plain.html" %}
 
     <form class="login-container" method="post" action="{{ url_for('health-portals.login_submit') }}">
-        <h2>Patient Portal Sign In</h2>
-        <p class="subtitle">Access your health records securely</p>
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
-        </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" name="password" id="password" required placeholder="Enter your password">
-        </div>
-        <button type="submit" class="btn-login">Sign In</button>
-        <div class="secure-badge">HIPAA-Compliant Secure Connection</div>
+        <div class="portlet-head">Patient Portal Sign In</div>
+        <div class="portlet-body" style="padding:16px 18px;">
+            <p class="subtitle" style="margin-bottom:14px;">Access your health records securely.</p>
+            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required placeholder="Enter your password">
+            </div>
+            <button type="submit" class="btn-login block">Sign In</button>
+            <div style="text-align:center;margin-top:12px;"><span class="secure-badge">🔒 HIPAA-Compliant Secure Connection</span></div>
 
-        <div class="demo-accounts">
-            <h4>Demo Accounts</h4>
-            <div class="demo-account"><strong>alex.rivera</strong> &mdash; Patient (age 30, knee PT)</div>
-            <div class="demo-account"><strong>james.rivera</strong> &mdash; Patient (age 64, hypertension)</div>
+            <div class="demo-accounts" style="border:none;margin-top:16px;padding:12px 0 0;border-top:1px solid #d8e2e7;">
+                <label style="margin-bottom:8px;">Demo Accounts</label>
+                <div class="demo-account" style="margin-bottom:4px;"><strong>alex.rivera</strong> &mdash; Patient (age 30, knee PT)</div>
+                <div class="demo-account"><strong>james.rivera</strong> &mdash; Patient (age 64, hypertension)</div>
+                <div style="font-size:10px;color:#8a99a0;margin-top:6px;">Password: any value (or leave blank)</div>
+            </div>
         </div>
     </form>
+
+    {% include "health-portals/_footer.html" %}
 </body>
 </html>

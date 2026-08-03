@@ -2249,9 +2249,6 @@ MACRO_LOCATIONS = {
         "sort_by_dropdown": [
             "'StreamHub' page -> 'Sort By' dropdown (Default, Most Viewed, Newest, Oldest, Longest)"
         ],
-        "create_by_timestamp": [
-            "Stream page -> clip title input + 'Create Clip at current time' button below the player (clips at the current playback timestamp)"
-        ],
         "play_by_timestamp": [
             "Stream page -> seek bar and 'Jump to' mm:ss input below the player (plays from the chosen timestamp)"
         ],

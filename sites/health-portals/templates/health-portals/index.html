@@ -4,183 +4,229 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lakeport Medical Center - Patient Portal</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
-        .header { background: linear-gradient(135deg, #0d6e6e, #148f8f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { color: #fff; font-size: 1.3rem; font-weight: 700; }
-        .header h1 span { color: #7ee8e8; }
-        .header-nav a { color: #c0e8e8; text-decoration: none; margin-left: 1.2rem; font-size: .85rem; }
-        .header-nav a:hover { color: #fff; }
-        .header-nav .btn-signin { background: #7ee8e8; color: #0d6e6e; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
-        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        nav a { color: #0d6e6e; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
-        nav a:hover { background: #e6f7f7; }
-        nav a.active { font-weight: 700; background: #d0f0f0; }
-        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
-        .welcome { background: linear-gradient(135deg, #0d6e6e, #148f8f); color: #fff; padding: 2rem; border-radius: .6rem; margin-bottom: 1.5rem; }
-        .welcome h2 { font-size: 1.6rem; font-weight: 300; margin-bottom: .5rem; }
-        .welcome p { color: #c0e8e8; font-size: .95rem; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .stat-card { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: center; }
-        .stat-card .number { font-size: 2rem; font-weight: 700; color: #0d6e6e; }
-        .stat-card .label { font-size: .8rem; color: #64748b; margin-top: .2rem; }
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
-        .panel { background: #fff; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); overflow: hidden; }
-        .panel-header { padding: 1rem 1.2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-        .panel-header h3 { font-size: 1rem; color: #1a202c; }
-        .panel-header a { font-size: .8rem; color: #0d6e6e; text-decoration: none; font-weight: 600; }
-        .panel-body { padding: .5rem 0; }
-        .list-item { padding: .8rem 1.2rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-        .list-item:last-child { border-bottom: none; }
-        .list-item .title { font-size: .9rem; font-weight: 500; color: #1a202c; }
-        .list-item .subtitle { font-size: .78rem; color: #64748b; margin-top: .15rem; }
-        .list-item a { text-decoration: none; color: inherit; flex: 1; }
-        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 1rem; font-size: .7rem; font-weight: 600; }
-        .badge-scheduled { background: #dbeafe; color: #1d4ed8; }
-        .badge-completed { background: #dcfce7; color: #16a34a; }
-        .badge-unread { background: #fee2e2; color: #dc2626; }
-        .badge-pending { background: #fef3c7; color: #d97706; }
-        .badge-active { background: #dcfce7; color: #16a34a; }
-        .empty { padding: 1.5rem; text-align: center; color: #94a3b8; font-size: .85rem; }
-        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .75rem; margin-top: 2rem; }
-    </style>
+    <link rel="stylesheet" href="/static/health.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Lakeport <span>Medical</span> Center</h1>
-        <div class="header-nav">
-            {% if logged_in %}
-                <a href="{{ url_for('health-portals.logout') }}">Sign Out ({{ user.first_name }})</a>
-            {% else %}
-                <a href="{{ url_for('health-portals.login_page') }}" class="btn-signin">Sign In</a>
-            {% endif %}
-            <a href="/">MiniWeb</a>
-        </div>
-    </div>
+    {% set active_page = 'home' %}
+    {% include "health-portals/_masthead.html" %}
 
-    <nav>
-        <a href="{{ url_for('health-portals.index') }}" class="active">Dashboard</a>
-        <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a>
-        <a href="{{ url_for('health-portals.records_page') }}">Records</a>
-        <a href="{{ url_for('health-portals.messages_page') }}">Messages{% if unread_count %} ({{ unread_count }}){% endif %}</a>
-        <a href="{{ url_for('health-portals.prescriptions_page') }}">Prescriptions</a>
-        <a href="{{ url_for('health-portals.billing_page') }}">Billing</a>
-    </nav>
-
-    <div class="main">
-        <div class="welcome">
-            <h2>Welcome back, {{ user.first_name }}</h2>
-            <p>Manage your health all in one place. View appointments, records, messages, and more.</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="number">{{ upcoming|length }}</div>
-                <div class="label">Upcoming Appointments</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ unread_count }}</div>
-                <div class="label">Unread Messages</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ active_prescriptions }}</div>
-                <div class="label">Active Prescriptions</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">${{ "%.2f"|format(total_due) }}</div>
-                <div class="label">Balance Due</div>
-            </div>
-        </div>
-
-        <div class="dashboard-grid">
-            <div class="panel">
-                <div class="panel-header">
-                    <h3>Upcoming Appointments</h3>
-                    <a href="{{ url_for('health-portals.appointments_page') }}">View All</a>
-                </div>
-                <div class="panel-body">
+    <div class="wrap">
+        <!-- Patient banner -->
+        <table class="patient-banner">
+            <tr>
+                <td class="pb-cell pb-photo"><div class="id-badge">{{ user.first_name[0] }}{{ user.last_name[0] }}</div></td>
+                <td class="pb-cell">
+                    <div class="pb-name">{{ user.full_name }}</div>
+                    <div class="pb-meta">
+                        DOB: <b>{{ user.date_of_birth }}</b> &nbsp;&middot;&nbsp; Sex: <b>{{ user.gender|capitalize }}</b>
+                        {% if user.blood_type %}&nbsp;&middot;&nbsp; Blood Type: <b>{{ user.blood_type }}</b>{% endif %}<br>
+                        {% for c in care_team if c.is_primary %}Primary Care Provider: <b>{{ c.full_name }}</b> &nbsp;&middot;&nbsp; {% endfor %}
+                        Insurance: <b>{{ user.insurance_provider or 'Self-Pay' }}</b>
+                    </div>
+                </td>
+                <td class="pb-cell pb-next">
+                    <div class="h">Next Appointment</div>
                     {% if upcoming %}
-                        {% for appt in upcoming %}
-                        <div class="list-item">
-                            <a href="{{ url_for('health-portals.appointment_detail', appt_id=appt.id) }}">
-                                <div class="title">{{ appt.category }}</div>
-                                <div class="subtitle">{{ appt.date }} at {{ appt.time }} &mdash; {{ appt.provider_name }}</div>
-                            </a>
-                            <span class="badge badge-scheduled">{{ appt.status }}</span>
-                        </div>
-                        {% endfor %}
+                    <div class="v">{{ upcoming[0].date }} at {{ upcoming[0].time }}</div>
+                    <div class="s">{{ upcoming[0].category }} &middot; {{ upcoming[0].provider_name }}</div>
                     {% else %}
-                        <div class="empty">No upcoming appointments</div>
+                    <div class="v">None scheduled</div>
+                    <div class="s"><a href="{{ url_for('health-portals.schedule_page') }}">Request an appointment &raquo;</a></div>
                     {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Announcements -->
+        <div class="portlet">
+            <div class="portlet-head">Announcements &amp; Health Bulletins</div>
+            <div class="portlet-body">
+                {% for a in announcements %}
+                <div class="ann">
+                    <span class="ann-date">{{ a.date }}</span>
+                    <span class="ann-cat" style="background: {{ a.color }};">{{ a.category }}</span>
+                    <span class="ann-title">{{ a.title }}</span>
+                    <div class="ann-body">{{ a.body }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cols">
+            <!-- ===== Main column ===== -->
+            <div class="col-main">
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>{% if upcoming %}Upcoming Appointments{% else %}Recent Appointments{% endif %}</span>
+                        <a href="{{ url_for('health-portals.appointments_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% set appts = upcoming if upcoming else recent_appts %}
+                        {% if appts %}
+                        <table class="dtable">
+                            <tr><th>Date</th><th>Time</th><th>Type</th><th>Provider</th><th>Status</th></tr>
+                            {% for a in appts %}
+                            <tr>
+                                <td>{{ a.date }}</td><td>{{ a.time }}</td>
+                                <td><a href="{{ url_for('health-portals.appointment_detail', appt_id=a.id) }}">{{ a.category }}</a></td>
+                                <td>{{ a.provider_name }}<br><span class="muted">{{ a.provider_specialty }}</span></td>
+                                <td><span class="lab lab-{{ a.status }}">{{ a.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No appointments on file.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Recent Lab &amp; Test Results</span>
+                        <a href="{{ url_for('health-portals.records_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if labs %}
+                        <table class="dtable">
+                            <tr><th>Test</th><th>Result</th><th>Collected</th></tr>
+                            {% for t in labs.tests %}
+                            <tr>
+                                <td><a href="{{ url_for('health-portals.record_detail', record_id=labs.record_id) }}" title="{{ t.details }}">{{ t.test }}</a></td>
+                                <td><span class="lab {{ 'lab-normal' if t.result|lower == 'normal' else 'lab-abn' }}">{{ t.result }}</span></td>
+                                <td class="muted">{{ labs.date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <div style="padding:4px 8px;font-size:10px;color:#7a8a91;">Ordered by {{ labs.provider }}</div>
+                        {% else %}<div class="empty">No lab results available.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Recent Visits &amp; Documents</span>
+                        <a href="{{ url_for('health-portals.records_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if recent_records %}
+                        <table class="dtable">
+                            <tr><th>Date</th><th>Type</th><th>Provider</th><th>Summary</th></tr>
+                            {% for r in recent_records %}
+                            <tr>
+                                <td>{{ r.date }}</td>
+                                <td><a href="{{ url_for('health-portals.record_detail', record_id=r.id) }}">{{ r.type_label }}</a></td>
+                                <td>{{ r.provider_name }}</td>
+                                <td class="muted">{{ r.summary[:60] if r.summary }}{% if r.summary and r.summary|length > 60 %}…{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No records on file.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Message Center</span>
+                        <a href="{{ url_for('health-portals.messages_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if recent_msgs %}
+                        <table class="dtable">
+                            <tr><th>Subject</th><th>From</th><th>Date</th></tr>
+                            {% for m in recent_msgs[:4] %}
+                            <tr>
+                                <td><a href="{{ url_for('health-portals.message_detail', msg_id=m.id) }}">{{ m.subject }}</a>
+                                    {% if not m.read and m.recipient_id == user.id %} <span class="lab lab-unread">NEW</span>{% endif %}</td>
+                                <td>{{ m.sender_name }}</td><td class="muted">{{ m.date[:10] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No messages.</div>{% endif %}
+                    </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-header">
-                    <h3>Recent Messages</h3>
-                    <a href="{{ url_for('health-portals.messages_page') }}">View All</a>
-                </div>
-                <div class="panel-body">
-                    {% if recent_msgs %}
-                        {% for msg in recent_msgs %}
-                        <div class="list-item">
-                            <a href="{{ url_for('health-portals.message_detail', msg_id=msg.id) }}">
-                                <div class="title">{{ msg.subject }}</div>
-                                <div class="subtitle">{{ msg.sender_name }} &mdash; {{ msg.date[:10] }}</div>
-                            </a>
-                            {% if not msg.read and msg.recipient_id == user.id %}
-                                <span class="badge badge-unread">New</span>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty">No messages</div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header">
-                    <h3>Pending Bills</h3>
-                    <a href="{{ url_for('health-portals.billing_page') }}">View All</a>
-                </div>
-                <div class="panel-body">
-                    {% if pending_bills %}
-                        {% for bill in pending_bills %}
-                        <div class="list-item">
-                            <div>
-                                <div class="title">{{ bill.description }}</div>
-                                <div class="subtitle">{{ bill.date_of_service }} &mdash; ${{ "%.2f"|format(bill.patient_responsibility or bill.patient_copay) }}</div>
+            <!-- ===== Side column ===== -->
+            <div class="col-side">
+                <div class="portlet">
+                    <div class="portlet-head"><span>Your Care Team</span></div>
+                    <div class="portlet-body">
+                        {% if care_team %}
+                            {% for c in care_team %}
+                            <div class="ct-row">
+                                <div class="ct-badge">{{ c.full_name.split(' ')[-2][0] if c.full_name.split(' ')|length > 1 else c.full_name[0] }}{{ c.full_name.split(' ')[-1][0] }}</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div class="ct-nm">{{ c.full_name }}</div>
+                                    <div class="ct-sp">{{ c.specialty or c.department or 'Provider' }}</div>
+                                </div>
+                                {% if c.is_primary %}<span class="ct-pri">PCP</span>{% endif %}
                             </div>
-                            <span class="badge badge-pending">Pending</span>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty">No pending bills</div>
-                    {% endif %}
+                            {% endfor %}
+                        {% else %}<div class="empty">No care team on file.</div>{% endif %}
+                    </div>
                 </div>
-            </div>
 
-            <div class="panel">
-                <div class="panel-header">
-                    <h3>Quick Actions</h3>
+                <div class="portlet">
+                    <div class="portlet-head"><span>Current Medications</span><a href="{{ url_for('health-portals.prescriptions_page') }}">Manage &raquo;</a></div>
+                    <div class="portlet-body">
+                        {% if meds %}
+                            {% for m in meds %}
+                            <div class="rx">
+                                <div class="rx-nm">{{ m.medication }}</div>
+                                <div class="rx-dt">{{ m.dosage }} &middot; {{ m.frequency }}</div>
+                                <div class="rx-ft"><span>Dr. {{ m.prescriber_name.split(' ')[-1] }}</span><span>{{ m.refills_remaining }} refill{{ 's' if m.refills_remaining != 1 }} left</span></div>
+                            </div>
+                            {% endfor %}
+                        {% else %}<div class="empty">No active medications.</div>{% endif %}
+                    </div>
                 </div>
-                <div class="panel-body" style="padding: 1.2rem;">
-                    <div style="display: flex; flex-direction: column; gap: .6rem;">
-                        <a href="{{ url_for('health-portals.schedule_page') }}" style="display: block; padding: .7rem 1rem; background: #0d6e6e; color: #fff; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem;">Schedule Appointment</a>
-                        <a href="{{ url_for('health-portals.compose_page') }}" style="display: block; padding: .7rem 1rem; background: #fff; color: #0d6e6e; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem; border: 1.5px solid #0d6e6e;">Send Message</a>
-                        <a href="{{ url_for('health-portals.prescriptions_page') }}" style="display: block; padding: .7rem 1rem; background: #fff; color: #0d6e6e; text-decoration: none; border-radius: .4rem; text-align: center; font-weight: 600; font-size: .9rem; border: 1.5px solid #0d6e6e;">Request Refill</a>
+
+                {% if latest_vitals %}
+                <div class="portlet">
+                    <div class="portlet-head"><span>Latest Vitals</span></div>
+                    <div class="portlet-body">
+                        <table class="vt">
+                            {% if latest_vitals.blood_pressure_systolic %}<tr><td class="k">Blood Pressure</td><td class="v">{{ latest_vitals.blood_pressure_systolic }}/{{ latest_vitals.blood_pressure_diastolic }} mmHg</td></tr>{% endif %}
+                            {% if latest_vitals.heart_rate_bpm %}<tr><td class="k">Heart Rate</td><td class="v">{{ latest_vitals.heart_rate_bpm }} bpm</td></tr>{% endif %}
+                            {% if latest_vitals.temperature_f %}<tr><td class="k">Temperature</td><td class="v">{{ latest_vitals.temperature_f }} °F</td></tr>{% endif %}
+                            {% if latest_vitals.oxygen_saturation_pct %}<tr><td class="k">O₂ Saturation</td><td class="v">{{ latest_vitals.oxygen_saturation_pct }} %</td></tr>{% endif %}
+                            {% if latest_vitals.respiratory_rate %}<tr><td class="k">Respiratory Rate</td><td class="v">{{ latest_vitals.respiratory_rate }} /min</td></tr>{% endif %}
+                            {% if latest_vitals.bmi %}<tr><td class="k">BMI</td><td class="v">{{ latest_vitals.bmi }}</td></tr>{% endif %}
+                            {% if latest_vitals.weight_lbs %}<tr><td class="k">Weight</td><td class="v">{{ latest_vitals.weight_lbs }} lbs</td></tr>{% endif %}
+                        </table>
+                        {% if vitals_date %}<div style="font-size:10px;color:#8a99a0;margin-top:5px;">Recorded {{ vitals_date }}</div>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Allergies &amp; Alerts</span></div>
+                    <div class="portlet-body">
+                        {% if allergies %}
+                            {% for a in allergies %}<span class="allergy">⚠ {{ a }}</span>{% endfor %}
+                        {% else %}<div style="font-size:11px;color:#55636a;">No known drug allergies.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Account Balance</span><a href="{{ url_for('health-portals.billing_page') }}">Billing &raquo;</a></div>
+                    <div class="portlet-body">
+                        <div class="bal {{ 'zero' if total_due == 0 }}">${{ "%.2f"|format(total_due) }}</div>
+                        <div style="font-size:11px;color:#55636a;margin-top:2px;">{% if pending_bills %}{{ pending_bills|length }} statement{{ 's' if pending_bills|length != 1 }} due{% else %}Account paid in full.{% endif %}</div>
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Quick Links</span></div>
+                    <div class="portlet-body">
+                        <a class="btn primary block" href="{{ url_for('health-portals.schedule_page') }}">Request Appointment</a>
+                        <a class="btn block" href="{{ url_for('health-portals.compose_page') }}">Message Provider</a>
+                        <a class="btn block" href="{{ url_for('health-portals.prescriptions_page') }}">Request Refill</a>
+                        <a class="btn block" href="{{ url_for('health-portals.records_page') }}">View Medical Records</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="footer">
-        Lakeport Medical Center &mdash; 800 Health Plaza, Lakeport, WA 98401 &mdash; (555) 800-2200<br>
-        Patient Portal &copy; 2026. HIPAA Compliant. All rights reserved.
-    </div>
+    {% include "health-portals/_footer.html" %}
 </body>
 </html>

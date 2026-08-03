@@ -6,7 +6,7 @@ data from the live-streaming data source directory.
 Macros supported (20):
     navigate_by_semantic, navigate_by_dropdown, navigate_by_route,
     search_by_query, filter_by_dropdown, sort_by_dropdown,
-    create_by_timestamp, select_by_slider, play_by_timestamp,
+    select_by_slider, play_by_timestamp,
     play_by_playback, post_from_free_text, follow_by_toggle,
     share_by_dropdown, report_by_form, subscribe_by_toggle,
     join_by_toggle, pay_by_dropdown, redeem_by_dropdown,
@@ -34,6 +34,115 @@ blueprint = Blueprint(
     static_folder=str(SITE_DIR / "static"),
     static_url_path="/static",
 )
+
+# House ads promote real MiniWeb sites and link to them (/sites/<id>/).
+# Curated for a streaming/entertainment audience. `tagline` (not `copy`) —
+# `copy` collides with dict.copy in Jinja attribute lookups.
+_AD_POOL = [
+    {"site": "music", "brand": "SoundWave", "domain": "soundwave.fm",
+     "tagline": "Millions of songs, zero ads on Premium. First month free."},
+    {"site": "ticketing-events", "brand": "EventPass", "domain": "eventpass.live",
+     "tagline": "Concerts, esports finals & meetups near you. Grab tickets first."},
+    {"site": "e-commerce", "brand": "ShopWave", "domain": "shopwave.com",
+     "tagline": "Upgrade your streaming setup — mics, cams & lights up to 40% off."},
+    {"site": "sports-esports", "brand": "Lakeport Sports", "domain": "lakeportsports.com",
+     "tagline": "Live scores, brackets & highlights from every league in one place."},
+    {"site": "video", "brand": "StreamTube", "domain": "streamtube.tv",
+     "tagline": "On-demand shows and creators. Watch anytime, free to start."},
+]
+
+
+def _thumb_gradient(seed):
+    """Deterministic colorful 'thumbnail' gradient from a string seed.
+
+    Gives each stream/clip card a distinct simulated preview image without any
+    randomness at render time (stable across reloads / reproducible).
+    """
+    h = 0
+    for ch in str(seed):
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    h1 = h % 360
+    h2 = (h1 + 40 + (h >> 8) % 80) % 360
+    ang = 90 + (h >> 16) % 120
+    return (f"linear-gradient({ang}deg, "
+            f"hsl({h1},60%,28%) 0%, hsl({h2},55%,16%) 55%, #0e0e10 100%)")
+
+
+def _live_uptime_seconds(started_at):
+    """Seconds a live stream has been broadcasting, for the ticking uptime clock.
+
+    Seeded `started_at` values can be weeks old, which would render an absurd
+    uptime. Anchor instead to the most recent occurrence of the stream's
+    start time-of-day (UTC) so uptime stays a believable < 24h session that
+    still differs per stream and increases in real time.
+    """
+    from datetime import datetime, timezone, timedelta
+    if not started_at:
+        return 0
+    try:
+        sa = datetime.fromisoformat(str(started_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return 0
+    now = datetime.now(timezone.utc)
+    anchor = now.replace(hour=sa.hour, minute=sa.minute,
+                         second=sa.second, microsecond=0)
+    if anchor > now:
+        anchor -= timedelta(days=1)
+    return int((now - anchor).total_seconds())
+
+
+def _avatar_color(seed):
+    """Deterministic solid avatar color (Twitch-style initial bubbles)."""
+    h = 0
+    for ch in str(seed):
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    return f"hsl({h % 360}, 55%, 42%)"
+
+
+def _fmt_count(n):
+    """Twitch-style compact count: 8746 -> '8.7K', 1200000 -> '1.2M'."""
+    try:
+        n = int(n)
+    except (ValueError, TypeError):
+        return "0"
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M".replace(".0M", "M")
+    if n >= 1_000:
+        return f"{n/1_000:.1f}K".replace(".0K", "K")
+    return str(n)
+
+
+def _sidebar_channels(limit=8):
+    """Top live channels for the left rail (Twitch 'Recommended Channels')."""
+    live = db.query(SITE, "streams", where={"status": "live"},
+                    sort="-average_viewers", limit=limit)
+    out = []
+    for s in live:
+        u = _get_user(s["channel_id"])
+        name = u["display_name"] if u else "Unknown"
+        out.append({
+            "id": s["channel_id"],
+            "name": name,
+            "initial": (name[0] if name else "?").upper(),
+            "color": _avatar_color(s["channel_id"]),
+            "category": s.get("category", ""),
+            "live": True,
+            "viewers": _fmt_count(s.get("average_viewers", 0)),
+        })
+    return out
+
+
+@blueprint.context_processor
+def _inject_sidebar():
+    """Make the left-rail channel list available to every live/ template."""
+    from flask import request as _rq
+    if "/api/" in _rq.path:
+        return {}
+    try:
+        return {"sidebar_channels": _sidebar_channels(), "fmt_count": _fmt_count}
+    except Exception:
+        return {"sidebar_channels": [], "fmt_count": _fmt_count}
+
 
 # ---------------------------------------------------------------------------
 # Data helpers  (all queries use WHERE/LIMIT/OFFSET — never load full tables)
@@ -190,16 +299,33 @@ def index():
         past_s = [s for s in streams if s["status"] != "live"]
         streams = live_s + past_s
 
+    # Simulated per-stream preview thumbnail (deterministic gradient)
+    for s in streams:
+        s["thumb_css"] = _thumb_gradient(s.get("id", "") + s.get("category", ""))
+    if featured_stream:
+        featured_stream["thumb_css"] = _thumb_gradient(
+            featured_stream.get("id", "") + featured_stream.get("category", ""))
+
     # Build user lookup only for the streamers visible on this page
     channel_ids = list(set(s["channel_id"] for s in streams))
     user_map = {}
     for cid in channel_ids:
         u = _get_user(cid)
         if u:
+            u["avatar_color"] = _avatar_color(cid)
             user_map[cid] = u
+
+    if featured_streamer:
+        featured_streamer["avatar_color"] = _avatar_color(featured_streamer["id"])
+
+    featured_uptime = (_live_uptime_seconds(featured_stream.get("started_at"))
+                       if featured_stream and featured_stream.get("status") == "live" else None)
 
     categories = _get_categories()
     streamers_list = _get_streamers()
+
+    import random
+    ad = random.choice(_AD_POOL)
 
     return render_template(
         "live/index.html",
@@ -210,10 +336,11 @@ def index():
         selected_status=status,
         selected_streamer=streamer,
         selected_sort=sort,
-        q=q,
+        q=q, ad=ad,
         featured_stream=featured_stream,
         featured_streamer=featured_streamer,
         featured_chat_count=featured_chat_count,
+        featured_uptime=featured_uptime,
     )
 
 
@@ -255,12 +382,22 @@ def stream_detail(stream_id):
 
     chat_count = db.count(SITE, "chat_messages", where={"stream_id": stream_id})
 
+    stream["thumb_css"] = _thumb_gradient(stream.get("id", "") + stream.get("category", ""))
+    if streamer:
+        streamer["avatar_color"] = _avatar_color(streamer["id"])
+
+    uptime_seconds = _live_uptime_seconds(stream.get("started_at")) if stream["status"] == "live" else None
+
+    import random
+    ad = random.choice(_AD_POOL)
+
     return render_template(
         "live/stream.html",
         user=user, logged_in=logged_in,
         stream=stream, streamer=streamer,
         chat_messages=chat, user_map=user_map,
-        chat_count=chat_count,
+        chat_count=chat_count, ad=ad,
+        uptime_seconds=uptime_seconds,
         is_joined=is_joined, is_following=is_following,
     )
 
@@ -271,11 +408,18 @@ def channel_page(user_id):
     channel_user = _get_user(user_id)
     if not channel_user:
         abort(404)
+    channel_user["avatar_color"] = _avatar_color(user_id)
 
     streams = db.query(SITE, "streams",
                        where={"channel_id": user_id}, sort="-started_at", limit=50)
     clips = db.query(SITE, "clips",
                      where={"channel_id": user_id}, sort="-views", limit=50)
+
+    # Simulated preview thumbnails (deterministic gradients)
+    for s in streams:
+        s["thumb_css"] = _thumb_gradient(s.get("id", "") + s.get("category", ""))
+    for c in clips:
+        c["thumb_css"] = _thumb_gradient(c.get("id", "") + c.get("title", ""))
 
     # Check if current user is subscribed
     is_subscribed = False
@@ -319,8 +463,17 @@ def clips_page():
     user, logged_in = _get_browsing_user()
 
     channel = request.args.get("channel", "").strip()
+    q = request.args.get("q", "").strip()
     where = {"channel_id": channel} if channel else None
-    clips = db.query(SITE, "clips", where=where, sort="-views", limit=50)
+    if q:
+        # FTS5/BM25 title search (search_by_query); channel narrows via WHERE
+        clips = db.search(SITE, "clips", q, where=where or None, limit=50)
+    else:
+        clips = db.query(SITE, "clips", where=where, sort="-views", limit=50)
+
+    # Simulated per-clip preview thumbnail (deterministic gradient)
+    for c in clips:
+        c["thumb_css"] = _thumb_gradient(c.get("id", "") + c.get("title", ""))
 
     # Build user_map and stream_map from clip references
     cid_set = set(c["channel_id"] for c in clips)
@@ -329,6 +482,7 @@ def clips_page():
     for cid in cid_set:
         u = _get_user(cid)
         if u:
+            u["avatar_color"] = _avatar_color(cid)
             user_map[cid] = u
     stream_map = {}
     for sid in sid_set:
@@ -344,7 +498,7 @@ def clips_page():
         clips=clips, user_map=user_map,
         stream_map=stream_map,
         streamers=streamers_list,
-        selected_channel=channel,
+        selected_channel=channel, q=q,
     )
 
 
@@ -355,10 +509,12 @@ def clip_detail(clip_id):
     if not clip:
         abort(404)
 
+    clip["thumb_css"] = _thumb_gradient(clip.get("id", "") + clip.get("title", ""))
     stream = db.get_item(SITE, "streams", clip["stream_id"])
     channel_user = _get_user(clip["channel_id"])
     user_map = {}
     if channel_user:
+        channel_user["avatar_color"] = _avatar_color(channel_user["id"])
         user_map[channel_user["id"]] = channel_user
 
     return render_template(
@@ -382,6 +538,7 @@ def subscriptions_page():
     for cid in cid_set:
         u = _get_user(cid)
         if u:
+            u["avatar_color"] = _avatar_color(cid)
             user_map[cid] = u
 
     return render_template(
@@ -715,44 +872,6 @@ def api_clip_detail(clip_id):
     if not clip:
         return jsonify({"error": "Clip not found"}), 404
     return jsonify(clip)
-
-
-@blueprint.route("/api/clips", methods=["POST"])
-def api_clips_create():
-    """create_by_timestamp: create a clip at a specific timestamp in a stream."""
-    user = _get_current_user()
-    if not user:
-        return jsonify({"error": "Not logged in"}), 401
-
-    data = request.get_json(silent=True) or {}
-    stream_id = data.get("stream_id", "").strip()
-    title = data.get("title", "").strip()
-    duration = data.get("duration_seconds", 30)
-    timestamp_seconds = data.get("timestamp_seconds", 0)
-
-    stream = db.get_item(SITE, "streams", stream_id)
-    if not stream:
-        return jsonify({"error": "Stream not found"}), 404
-    if not title:
-        return jsonify({"error": "Title is required"}), 400
-
-    clip_id = f"clip-{uuid.uuid4().hex[:8]}"
-    new_clip = {
-        "id": clip_id,
-        "stream_id": stream_id,
-        "channel_id": stream["channel_id"],
-        "title": title,
-        "clipped_by": user["id"],
-        "clip_url": f"https://streamhub.tv/clips/{clip_id}",
-        "thumbnail_url": f"https://streamhub.tv/clips/thumbnails/{clip_id}.jpg",
-        "duration_seconds": int(duration),
-        "timestamp_seconds": int(timestamp_seconds),
-        "views": 0,
-        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"),
-    }
-
-    db.save_item(SITE, "clips", clip_id, new_clip)
-    return jsonify(new_clip), 201
 
 
 @blueprint.route("/api/channels/<user_id>", methods=["GET"])

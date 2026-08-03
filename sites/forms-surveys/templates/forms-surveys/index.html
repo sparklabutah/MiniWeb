@@ -41,6 +41,22 @@
             min-height: 100vh;
         }
 
+        /* ── Forms to fill out (respondent inbox) ─────────────── */
+        .tofill { max-width: 1100px; margin: 1.5rem auto 0; padding: 0 1.5rem; }
+        .tofill-head { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .9rem; flex-wrap: wrap; }
+        .tofill-head h2 { font-size: 1.05rem; font-weight: 600; color: var(--gray-900); }
+        .tofill-count { background: var(--purple-500); color: #fff; font-size: .72rem; font-weight: 700; padding: .1rem .5rem; border-radius: 99px; }
+        .tofill-sub { font-size: .82rem; color: var(--gray-600); }
+        .tofill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+        .tofill-card { display: flex; flex-direction: column; gap: .45rem; background: var(--white); border: 1px solid var(--gray-200); border-left: 4px solid var(--purple-500); border-radius: var(--radius); padding: 1rem 1.1rem; text-decoration: none; color: inherit; box-shadow: var(--shadow-sm); transition: box-shadow .15s, transform .15s; }
+        .tofill-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .tofill-pill { align-self: flex-start; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: .12rem .5rem; border-radius: 99px; background: var(--amber-bg); color: var(--amber-text); }
+        .tofill-title { font-size: .98rem; font-weight: 600; color: var(--gray-900); line-height: 1.3; }
+        .tofill-desc { font-size: .82rem; color: var(--gray-600); line-height: 1.4; }
+        .tofill-meta { display: flex; gap: .8rem; flex-wrap: wrap; font-size: .74rem; color: var(--gray-400); margin-top: auto; padding-top: .3rem; }
+        .tofill-cta { display: inline-flex; align-items: center; gap: .25rem; align-self: flex-start; margin-top: .5rem; background: var(--purple-500); color: #fff; font-size: .8rem; font-weight: 600; padding: .4rem .85rem; border-radius: var(--radius); }
+        .tofill-card:hover .tofill-cta { background: var(--purple-600); }
+
         /* ── Top navigation bar ─────────────────────────────────── */
         .topbar {
             background: #673ab7;
@@ -627,6 +643,33 @@
         </div>
     </section>
 
+    <!-- ── Forms to fill out (respondent inbox) ─────────── -->
+    {% if to_fill %}
+    <section class="tofill">
+        <div class="tofill-head">
+            <h2>Forms to fill out</h2>
+            <span class="tofill-count">{{ pending_count }}</span>
+            <span class="tofill-sub">Surveys shared with you that need a response</span>
+        </div>
+        <div class="tofill-grid">
+            {% for f in to_fill %}
+            <a class="tofill-card" href="{{ url_for('forms-surveys.respond_form', form_id=f.id) }}" title="Fill out {{ f.title }}">
+                <span class="tofill-pill">Needs response</span>
+                <div class="tofill-title">{{ f.title }}</div>
+                <div class="tofill-desc">{{ f.description[:90] if f.description else '' }}{% if f.description and f.description|length > 90 %}&hellip;{% endif %}</div>
+                <div class="tofill-meta">
+                    <span>From {{ f._owner_name }}</span>
+                    <span>{{ f._qcount }} question{{ 's' if f._qcount != 1 }}</span>
+                </div>
+                <span class="tofill-cta">Fill out
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 17l5-5-5-5v10z"/></svg>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     <!-- ── Main content ─────────────────────────────────── -->
     <main class="main">
         <!-- Toolbar -->
@@ -668,7 +711,7 @@
         {% if forms %}
         <div class="forms-grid" id="forms-container">
             {% for form in forms %}
-            <a class="form-card" data-status="{{ form.status }}" data-title="{{ form.title|lower }}" data-date="{{ form.created_at }}" href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}">
+            <div class="form-card" data-status="{{ form.status }}" data-title="{{ form.title|lower }}" data-date="{{ form.created_at }}" onclick="location.href='{{ url_for('forms-surveys.view_form', form_id=form.id) }}'">
                 <div class="form-card-banner {{ form.status }}"></div>
                 <div class="form-card-body">
                     <div class="form-card-title">{{ form.title }}</div>
@@ -685,7 +728,7 @@
                             {{ form.created_at[:10] }}
                         </span>
                     </div>
-                    <div class="form-card-actions" onclick="event.preventDefault(); event.stopPropagation();">
+                    <div class="form-card-actions" onclick="event.stopPropagation();">
                         <span class="badge {{ form.status }}">{{ form.status }}</span>
                         {% if form.status == 'active' %}
                         <a href="{{ url_for('forms-surveys.respond_form', form_id=form.id) }}" class="btn-action primary" title="Fill out this form">
@@ -702,7 +745,7 @@
                                 onclick="event.preventDefault();event.stopPropagation();var b=this;b.textContent='Deleting...';b.disabled=true;fetch('{{ url_for('forms-surveys.form_delete', form_id=form.id) }}',{method:'POST'}).then(function(r){if(!r.ok)throw 0;b.textContent='Deleted';location.reload()}).catch(function(){b.textContent='Delete';b.disabled=false})">Delete</button>
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
         {% else %}

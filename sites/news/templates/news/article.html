@@ -182,15 +182,17 @@
                         <button class="btn-action" id="btn-play" onclick="playArticle({{ article.id }})">Listen to Article</button>
 
                         <!-- save_by_toggle (bookmark) -->
+                        {% set bm_icon %}<svg width="12" height="15" viewBox="0 0 16 20" style="vertical-align:-2px;margin-right:5px;" fill="{{ 'currentColor' if is_bookmarked else 'none' }}" stroke="currentColor" stroke-width="1.6"><path d="M3 1h10a1 1 0 0 1 1 1v16l-6-4-6 4V2a1 1 0 0 1 1-1z"/></svg>{% endset %}
                         {% if user %}
                         <form method="post" action="{{ url_for('news.form_toggle_bookmark', article_id=article.id) }}" style="display:inline;">
                             <input type="hidden" name="next" value="{{ url_for('news.article_detail', article_id=article.id) }}">
-                            <button type="submit" class="btn-action {{ 'active' if is_bookmarked else '' }}">
-                                {% if is_bookmarked %}Saved{% else %}Save Article{% endif %}
+                            <button type="submit" class="btn-action {{ 'active' if is_bookmarked else '' }}"
+                                    title="{{ 'Remove bookmark' if is_bookmarked else 'Bookmark this article' }}">
+                                {{ bm_icon }}{% if is_bookmarked %}Bookmarked{% else %}Bookmark{% endif %}
                             </button>
                         </form>
                         {% else %}
-                        <a href="{{ url_for('news.login_page') }}" class="btn-action">Sign in to save</a>
+                        <a href="{{ url_for('news.login_page') }}" class="btn-action" title="Sign in to bookmark">{{ bm_icon }}Bookmark</a>
                         {% endif %}
 
                         {% if bookmark_note %}

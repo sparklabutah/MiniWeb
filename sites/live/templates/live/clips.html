@@ -3,93 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clips - LiveStream</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0e0e10; color: #efeff1; }
-        .header { background: #18181b; padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2f2f35; }
-        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
-        .header h1 a span { color: #9147ff; }
-        .header-right { display: flex; align-items: center; gap: 1rem; }
-        .header-right a { color: #dedee3; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
-        .header-right a:hover { background: #2f2f35; }
-        .header-right .user-badge { background: #9147ff; color: #fff; padding: .4rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        .filters { background: #18181b; border-radius: .5rem; padding: 1rem 1.2rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .filter-group { display: flex; flex-direction: column; gap: .3rem; }
-        .filter-group label { font-size: .75rem; color: #adadb8; text-transform: uppercase; font-weight: 600; }
-        .filter-group select { background: #0e0e10; color: #efeff1; border: 1px solid #3a3a44; padding: .45rem .7rem; border-radius: .3rem; font-size: .85rem; }
-        .btn { background: #9147ff; color: #fff; border: none; padding: .5rem 1rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
-        .btn:hover { background: #772ce8; }
-        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
-        .clip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
-        .clip-card { background: #18181b; border-radius: .5rem; overflow: hidden; }
-        .clip-card a { text-decoration: none; color: inherit; }
-        .clip-thumb { background: #26262c; height: 140px; display: flex; align-items: center; justify-content: center; position: relative; }
-        .clip-thumb .play-icon { font-size: 2rem; color: #5c5c6a; }
-        .clip-thumb .duration { position: absolute; bottom: .4rem; right: .4rem; background: rgba(0,0,0,.8); color: #fff; font-size: .7rem; padding: .15rem .4rem; border-radius: .2rem; }
-        .clip-info { padding: .7rem; }
-        .clip-info .title { font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
-        .clip-info .meta { font-size: .75rem; color: #737380; }
-        .no-results { text-align: center; padding: 3rem; color: #737380; }
-    </style>
+    <title>Clips - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
 </head>
 <body>
-    <div class="header">
-        <h1><a href="{{ url_for('live.index') }}">Stream<span>Hub</span></a></h1>
-        <div class="header-right">
-            <a href="{{ url_for('live.index') }}">Browse</a>
-            <a href="{{ url_for('live.clips_page') }}" style="color:#9147ff;font-weight:700;">Clips</a>
-            {% if logged_in %}
-                <a href="{{ url_for('live.subscriptions_page') }}">Subscriptions</a>
-                <span class="user-badge">{{ user.display_name }}</span>
-                <a href="{{ url_for('live.logout') }}">Logout</a>
-            {% else %}
-                <a href="{{ url_for('live.login_page') }}" class="btn">Log In</a>
-            {% endif %}
-        </div>
-    </div>
+    {% include "live/_topnav.html" %}
 
-    <div class="container">
-        <form class="filters" method="get" action="{{ url_for('live.clips_page') }}">
-            <div class="filter-group">
-                <label>Channel</label>
-                <select name="channel">
-                    <option value="">All Channels</option>
-                    {% for s in streamers %}
-                    <option value="{{ s.id }}" {{ 'selected' if selected_channel == s.id }}>{{ s.display_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="btn">Filter</button>
-        </form>
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
 
-        <h2 class="section-title">Clips <span style="font-weight:400;color:#737380;font-size:.85rem;">({{ clips|length }})</span></h2>
+        <main class="tw-main">
+            <div class="tw-content">
+                <div class="tw-page-head">
+                    <h1>{% if q %}Clip results for &ldquo;{{ q }}&rdquo;{% else %}Clips{% endif %} <span style="color:var(--text-dim);font-weight:500;font-size:1rem;">({{ clips|length }})</span></h1>
+                </div>
 
-        {% if clips %}
-        <div class="clip-grid">
-            {% for clip in clips %}
-            {% set channel = user_map.get(clip.channel_id) %}
-            <div class="clip-card">
-                <a href="{{ url_for('live.clip_detail', clip_id=clip.id) }}">
-                    <div class="clip-thumb">
-                        <span class="play-icon">&#9654;</span>
-                        <span class="duration">{{ clip.duration_seconds }}s</span>
+                <form class="tw-filters" method="get" action="{{ url_for('live.clips_page') }}" style="margin-bottom:1.4rem;">
+                    <div class="tw-fg">
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ q }}" placeholder="Search clips...">
                     </div>
-                    <div class="clip-info">
-                        <div class="title">{{ clip.title }}</div>
-                        <div class="meta">
-                            {{ channel.display_name if channel else 'Unknown' }}
-                            &middot; {{ "{:,}".format(clip.views) }} views
+                    <div class="tw-fg">
+                        <label>Channel</label>
+                        <select name="channel">
+                            <option value="">All Channels</option>
+                            {% for s in streamers %}
+                            <option value="{{ s.id }}" {{ 'selected' if selected_channel == s.id }}>{{ s.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="tw-btn">Search</button>
+                    {% if q or selected_channel %}
+                    <a href="{{ url_for('live.clips_page') }}" class="tw-btn-2">Clear</a>
+                    {% endif %}
+                </form>
+
+                {% if clips %}
+                <div class="tw-grid">
+                    {% for clip in clips %}
+                    {% set channel = user_map.get(clip.channel_id) %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.clip_detail', clip_id=clip.id) }}" style="background: {{ clip.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                <span class="tw-viewers">{{ fmt_count(clip.views) }} views</span>
+                                <span class="tw-dur">{{ clip.duration_seconds }}s</span>
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ channel.avatar_color if channel else '#9147ff' }};">{{ channel.display_name[0]|upper if channel else '?' }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.clip_detail', clip_id=clip.id) }}" title="{{ clip.title }}">{{ clip.title }}</a>
+                                <a class="tw-card-chan" href="{{ url_for('live.channel_page', user_id=clip.channel_id) }}">{{ channel.display_name if channel else 'Unknown' }}</a>
+                            </div>
                         </div>
                     </div>
-                </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>{% if q %}No clips match &ldquo;{{ q }}&rdquo;.{% else %}No clips found.{% endif %}</p></div>
+                {% endif %}
             </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="no-results"><p>No clips found.</p></div>
-        {% endif %}
+        </main>
     </div>
 </body>
 </html>
