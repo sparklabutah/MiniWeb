@@ -102,6 +102,17 @@ def _enrich_match(match, teams=None, leagues=None):
     return m
 
 
+@blueprint.context_processor
+def _inject_nav_leagues():
+    """League tabs for the shared SportsHub header on every page."""
+    try:
+        if "/api/" in request.path:
+            return {}
+        return {"nav_leagues": _load_leagues()[:8]}
+    except Exception:
+        return {"nav_leagues": []}
+
+
 # ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------

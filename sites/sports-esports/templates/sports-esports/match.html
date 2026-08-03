@@ -4,62 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ match.home_team.abbreviation }} vs {{ match.away_team.abbreviation }} - Lakeport Sports Hub</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
-        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.4rem; }
-        .header h1 span { color: #00d4aa; }
-        .nav { display: flex; gap: 1.2rem; align-items: center; }
-        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
-        .nav a:hover { color: #fff; }
-        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
-        .breadcrumb a { color: #3498db; text-decoration: none; }
-
-        .scoreboard { background: #fff; border-radius: .75rem; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.1); text-align: center; }
-        .scoreboard .league-info { font-size: .85rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 1rem; }
-        .scoreboard .matchup { display: flex; align-items: center; justify-content: center; gap: 2rem; }
-        .team-block { text-align: center; flex: 1; }
-        .team-block .logo { width: 72px; height: 72px; border-radius: 50%; margin: 0 auto .75rem; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 1.5rem; }
-        .team-block .name { font-weight: 700; font-size: 1.1rem; margin-bottom: .2rem; }
-        .team-block .name a { color: inherit; text-decoration: none; }
-        .team-block .name a:hover { color: #3498db; }
-        .team-block .record { color: #64748b; font-size: .85rem; }
-        .score-center { text-align: center; }
-        .score-center .big-score { font-size: 2.5rem; font-weight: 800; }
-        .score-center .game-status { font-size: .85rem; margin-top: .25rem; }
-        .score-center .game-status.live { color: #dc2626; font-weight: 700; }
-        .score-center .game-status.final { color: #16a34a; font-weight: 600; }
-        .score-center .game-status.scheduled { color: #2563eb; }
-
-        .match-details { background: #fff; border-radius: .75rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-        .detail-row { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
-        .detail-row:last-child { border-bottom: none; }
-        .detail-row .label { color: #64748b; }
-
-        .section-title { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 .75rem; }
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .75rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
-        th { background: #f8fafc; text-align: left; padding: .6rem 1rem; font-size: .75rem; text-transform: uppercase; color: #64748b; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; }
-        td { padding: .6rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .85rem; }
-        tr:last-child td { border-bottom: none; }
-        td a { color: #1a1a2e; text-decoration: none; font-weight: 600; }
-        td a:hover { color: #3498db; }
-    </style>
+    <link rel="stylesheet" href="/static/sportscenter.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Lakeport <span>Sports Hub</span></h1>
-        <div class="nav">
-            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
-            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
-            <a href="{{ url_for('sports-esports.compare_page') }}">Compare</a>
-            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
-            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
-            <a href="/">&larr; MiniWeb</a>
-        </div>
-    </div>
+    {% set active_nav = '' %}
+    {% include "sports-esports/_nav.html" %}
     <div class="container">
         <div class="breadcrumb">
             <a href="{{ url_for('sports-esports.index') }}">Home</a> /
@@ -67,13 +16,13 @@
             Match #{{ match.id }}
         </div>
 
-        <div class="scoreboard">
-            <div class="league-info">{{ match.league.name }} &middot; {{ match.league.sport }}</div>
-            <div class="matchup">
-                <div class="team-block">
-                    <div class="logo" style="background: {{ match.home_team.logo_color }}">{{ match.home_team.abbreviation }}</div>
+        <div class="scoreboard card" style="text-align:center;">
+            <div class="label" style="margin-bottom:1rem;">{{ match.league.name }} &middot; {{ match.league.sport }}</div>
+            <div class="matchup" style="display:flex;align-items:center;justify-content:center;gap:2rem;">
+                <div class="team-block" style="text-align:center;flex:1;">
+                    <div class="logo" style="background: {{ match.home_team.logo_color }};width:72px;height:72px;font-size:1.5rem;margin:0 auto .75rem;">{{ match.home_team.abbreviation }}</div>
                     <div class="name"><a href="{{ url_for('sports-esports.team_detail', team_id=match.home_team_id) }}">{{ match.home_team.name }}</a></div>
-                    <div class="record">{{ match.home_team.wins }}W - {{ match.home_team.losses }}L</div>
+                    <div class="meta">{{ match.home_team.wins }}W - {{ match.home_team.losses }}L</div>
                 </div>
                 <div class="score-center">
                     {% if match.status == 'scheduled' %}
@@ -82,21 +31,21 @@
                     {% else %}
                     <div class="big-score">{{ match.home_score }} - {{ match.away_score }}</div>
                     {% if match.status == 'live' %}
-                    <div class="game-status live">LIVE{% if match.quarter %} - {{ match.quarter }}{% endif %}{% if match.clock %} {{ match.clock }}{% endif %}</div>
+                    <div class="game-status"><span class="live">LIVE{% if match.quarter %} - {{ match.quarter }}{% endif %}{% if match.clock %} {{ match.clock }}{% endif %}</span></div>
                     {% else %}
                     <div class="game-status final">FINAL</div>
                     {% endif %}
                     {% endif %}
                 </div>
-                <div class="team-block">
-                    <div class="logo" style="background: {{ match.away_team.logo_color }}">{{ match.away_team.abbreviation }}</div>
+                <div class="team-block" style="text-align:center;flex:1;">
+                    <div class="logo" style="background: {{ match.away_team.logo_color }};width:72px;height:72px;font-size:1.5rem;margin:0 auto .75rem;">{{ match.away_team.abbreviation }}</div>
                     <div class="name"><a href="{{ url_for('sports-esports.team_detail', team_id=match.away_team_id) }}">{{ match.away_team.name }}</a></div>
-                    <div class="record">{{ match.away_team.wins }}W - {{ match.away_team.losses }}L</div>
+                    <div class="meta">{{ match.away_team.wins }}W - {{ match.away_team.losses }}L</div>
                 </div>
             </div>
         </div>
 
-        <div class="match-details">
+        <div class="match-details detail-card">
             <div class="detail-row"><span class="label">Date</span><span>{{ match.date }}</span></div>
             <div class="detail-row"><span class="label">Time</span><span>{{ match.time }}</span></div>
             <div class="detail-row"><span class="label">Venue</span><span>{{ match.venue }}</span></div>

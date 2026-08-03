@@ -4,61 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Standings - Lakeport Sports Hub</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
-        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.4rem; }
-        .header h1 span { color: #00d4aa; }
-        .nav { display: flex; gap: 1.2rem; align-items: center; }
-        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
-        .nav a:hover { color: #fff; }
-        .nav a.active { color: #00d4aa; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
-        .page-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; }
-
-        .league-section { margin-bottom: 2rem; }
-        .league-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
-        .league-title a { color: #1a1a2e; text-decoration: none; }
-        .league-title a:hover { color: #3498db; }
-        .league-badge { background: #e2e8f0; color: #475569; font-size: .7rem; padding: .15rem .5rem; border-radius: 1rem; font-weight: 600; }
-
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .75rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-        th { background: #f8fafc; text-align: left; padding: .7rem 1rem; font-size: .78rem; text-transform: uppercase; color: #64748b; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; }
-        td { padding: .7rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f8fafc; }
-        .rank { font-weight: 700; color: #64748b; width: 40px; }
-        .rank-1 { color: #f59e0b; }
-        .rank-2 { color: #94a3b8; }
-        .rank-3 { color: #b45309; }
-        .team-cell { display: flex; align-items: center; gap: .5rem; }
-        .team-cell a { color: #1a1a2e; text-decoration: none; font-weight: 600; }
-        .team-cell a:hover { color: #3498db; }
-        .team-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
-        .win-col { color: #16a34a; font-weight: 600; }
-        .loss-col { color: #dc2626; font-weight: 600; }
-        .pct-col { font-weight: 700; }
-    </style>
+    <link rel="stylesheet" href="/static/sportscenter.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Lakeport <span>Sports Hub</span></h1>
-        <div class="nav">
-            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
-            <a href="{{ url_for('sports-esports.standings_page') }}" class="active">Standings</a>
-            <a href="{{ url_for('sports-esports.compare_page') }}">Compare</a>
-            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
-            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
-            <a href="/">&larr; MiniWeb</a>
-        </div>
-    </div>
+    {% set active_nav = 'standings' %}
+    {% include "sports-esports/_nav.html" %}
     <div class="container">
         <div class="page-title">League Standings</div>
 
-        <div style="background:#fff;border-radius:.75rem;padding:.8rem 1.25rem;margin-bottom:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
-            <label style="font-size:.85rem;color:#64748b;font-weight:600;white-space:nowrap;">Min Wins: <span id="wins-slider-val">0</span></label>
+        <div class="card" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:.85rem;color:#6b7280;font-weight:600;white-space:nowrap;">Min Wins: <span id="wins-slider-val">0</span></label>
             <input type="range" id="wins-slider" min="0" max="50" step="1" value="0" oninput="document.getElementById('wins-slider-val').textContent=this.value;filterStandings(parseInt(this.value))" style="width:200px;accent-color:#00d4aa;">
         </div>
 
@@ -71,10 +26,10 @@
         </script>
 
         {% for league in leagues %}
-        <div class="league-section">
-            <div class="league-title">
+        <div class="league-section" style="margin-bottom:2rem;">
+            <div class="section-title">
                 <a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}">{{ league.name }}</a>
-                <span class="league-badge">{{ league.sport }}</span>
+                <span class="label">{{ league.sport }}</span>
             </div>
             <table>
                 <thead>
@@ -92,7 +47,7 @@
                     <tr data-wins="{{ team.wins }}">
                         <td class="rank {% if team.standing == 1 %}rank-1{% elif team.standing == 2 %}rank-2{% elif team.standing == 3 %}rank-3{% endif %}">{{ team.standing }}</td>
                         <td>
-                            <div class="team-cell">
+                            <div class="team-cell" style="display:flex;align-items:center;gap:.5rem;">
                                 <span class="team-dot" style="background: {{ team.logo_color }}"></span>
                                 <a href="{{ url_for('sports-esports.team_detail', team_id=team.id) }}">{{ team.name }}</a>
                             </div>
@@ -100,7 +55,7 @@
                         <td class="win-col">{{ team.wins }}</td>
                         <td class="loss-col">{{ team.losses }}</td>
                         <td>{{ team.wins + team.losses }}</td>
-                        <td class="pct-col">{{ "%.3f"|format(team.wins / (team.wins + team.losses)) if (team.wins + team.losses) > 0 else "0.000" }}</td>
+                        <td class="pct-col win-pct">{{ "%.3f"|format(team.wins / (team.wins + team.losses)) if (team.wins + team.losses) > 0 else "0.000" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

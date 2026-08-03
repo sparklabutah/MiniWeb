@@ -4,49 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Compare Teams - Lakeport Sports Hub</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
-        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.4rem; }
-        .header h1 span { color: #00d4aa; }
-        .nav { display: flex; gap: 1.2rem; align-items: center; }
-        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; }
-        .nav a:hover { color: #fff; }
-        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-        .page-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 1rem; }
-
-        .compare-form { background: #fff; border-radius: .75rem; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
-        .compare-form label { font-size: .75rem; text-transform: uppercase; color: #64748b; letter-spacing: .5px; font-weight: 600; display: block; margin-bottom: .3rem; }
-        .compare-form select { padding: .5rem .75rem; border: 1px solid #e2e8f0; border-radius: .4rem; font-size: .9rem; }
-        .compare-btn { padding: .5rem 1.25rem; background: #1a1a2e; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; }
-        .compare-btn:hover { background: #2a2a4e; }
-
-        .compare-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .75rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-        .compare-table th { background: #f8fafc; text-align: left; padding: .75rem 1rem; font-size: .8rem; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; }
-        .compare-table td { padding: .75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
-        .compare-table tr:last-child td { border-bottom: none; }
-    </style>
+    <link rel="stylesheet" href="/static/sportscenter.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Lakeport <span>Sports Hub</span></h1>
-        <div class="nav">
-            <a href="{{ url_for('sports-esports.index') }}">Scoreboard</a>
-            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
-            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
-            <a href="{{ url_for('sports-esports.compare_page') }}" style="color:#fff">Compare</a>
-            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
-            <a href="/">&larr; MiniWeb</a>
-        </div>
-    </div>
+    {% set active_nav = 'compare' %}
+    {% include "sports-esports/_nav.html" %}
     <div class="container">
         <div class="page-title">Compare Teams</div>
 
-        <form class="compare-form" method="get" action="{{ url_for('sports-esports.compare_page') }}">
-            <div>
-                <label>Team A</label>
+        <form class="add-form card" method="get" action="{{ url_for('sports-esports.compare_page') }}" style="align-items:end;">
+            <div class="form-group">
+                <label class="label">Team A</label>
                 <select name="team_a" id="team_a">
                     <option value="">Select team...</option>
                     {% for t in teams %}
@@ -54,8 +22,8 @@
                     {% endfor %}
                 </select>
             </div>
-            <div>
-                <label>Team B</label>
+            <div class="form-group">
+                <label class="label">Team B</label>
                 <select name="team_b" id="team_b">
                     <option value="">Select team...</option>
                     {% for t in teams %}
@@ -63,7 +31,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit" class="compare-btn" onclick="buildIds()">Compare</button>
+            <button type="submit" class="btn-primary" onclick="buildIds()">Compare</button>
         </form>
 
         {% if selected and selected|length >= 2 %}
