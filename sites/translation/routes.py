@@ -6,6 +6,7 @@ import csv
 import io
 import json
 import pathlib
+import re
 from collections import Counter
 from datetime import datetime
 
@@ -63,27 +64,44 @@ def _translate_text(text, source_lang, target_lang, user_glossary=None):
     if source_lang == target_lang:
         return text
 
-    # Build lookup: user glossary overrides built-in dict
-    lookup = dict(_DICTIONARIES.get(f"{source_lang}->{target_lang}", {}))
+    # User glossary entries take priority over built-in dictionaries.
+    glossary = {}
     if user_glossary and user_glossary.get("entries"):
         for entry in user_glossary["entries"]:
-            lookup[entry["source"].lower()] = entry["target"]
+            glossary[entry["source"].lower()] = entry["target"]
 
-    if not lookup:
-        tgt_name = _LANG_NAMES.get(target_lang, target_lang)
-        return f"[{tgt_name}] {text}"
+    # A direct dictionary for this pair (en->X, or an inverted X->en).
+    direct = _DICTIONARIES.get(f"{source_lang}->{target_lang}")
+    if direct is None:
+        direct = _REVERSE_DICTIONARIES.get(f"{source_lang}->{target_lang}")
+    # Pieces to pivot through English when there is no direct dictionary.
+    src_to_en = None if source_lang == "en" else _REVERSE_DICTIONARIES.get(f"{source_lang}->en")
+    en_to_tgt = None if target_lang == "en" else _DICTIONARIES.get(f"en->{target_lang}")
 
-    import re
+    def _resolve(low):
+        if low in glossary:
+            return glossary[low]
+        if direct and low in direct:
+            return direct[low]
+        # Pivot: source -> English -> target.
+        en_word = low if source_lang == "en" else (src_to_en.get(low) if src_to_en else None)
+        if en_word is None:
+            return None
+        if target_lang == "en":
+            return en_word
+        if en_to_tgt and en_word in en_to_tgt:
+            return en_to_tgt[en_word]
+        return None
+
     tokens = re.findall(r"[\w']+|[^\w\s]|\s+", text)
     result = []
     for token in tokens:
-        low = token.lower()
-        if low in lookup:
-            replacement = lookup[low]
-            # Preserve original capitalization
-            if token[0].isupper() and token[1:].islower() if len(token) > 1 else token.isupper():
-                replacement = replacement[0].upper() + replacement[1:] if replacement else replacement
-            elif token.isupper():
+        replacement = _resolve(token.lower())
+        if replacement:
+            # Preserve original capitalization for alphabetic scripts.
+            if len(token) > 1 and token[0].isupper() and token[1:].islower():
+                replacement = replacement[0].upper() + replacement[1:]
+            elif token.isupper() and token.isalpha():
                 replacement = replacement.upper()
             result.append(replacement)
         else:
@@ -192,7 +210,135 @@ _DICTIONARIES = {
         "week": "Woche", "deal": "Geschäft", "deals": "Geschäfte",
         "meeting": "Besprechung", "project": "Projekt", "report": "Bericht",
     },
+    "en->pt": {
+        "the": "o", "a": "um", "an": "um", "is": "é", "are": "são", "was": "era",
+        "have": "ter", "has": "tem", "and": "e", "but": "mas", "or": "ou",
+        "not": "não", "i": "eu", "you": "você", "he": "ele", "she": "ela",
+        "we": "nós", "they": "eles", "my": "meu", "your": "seu",
+        "this": "este", "that": "esse", "with": "com", "for": "para",
+        "from": "de", "in": "em", "on": "em", "at": "em", "to": "para",
+        "of": "de", "hello": "olá", "goodbye": "adeus", "please": "por favor",
+        "thank": "obrigado", "thanks": "obrigado", "yes": "sim", "no": "não",
+        "good": "bom", "great": "ótimo", "welcome": "bem-vindo", "sorry": "desculpe",
+        "love": "amor", "water": "água", "food": "comida", "friend": "amigo",
+        "day": "dia", "name": "nome", "morning": "manhã", "night": "noite",
+        "big": "grande", "small": "pequeno", "new": "novo", "old": "velho",
+        "happy": "feliz", "world": "mundo", "book": "livro", "house": "casa",
+        "time": "tempo", "today": "hoje", "tomorrow": "amanhã",
+        "week": "semana", "meeting": "reunião", "project": "projeto", "report": "relatório",
+    },
+    "en->it": {
+        "the": "il", "a": "un", "an": "un", "is": "è", "are": "sono", "was": "era",
+        "have": "avere", "has": "ha", "and": "e", "but": "ma", "or": "o",
+        "not": "non", "i": "io", "you": "tu", "he": "lui", "she": "lei",
+        "we": "noi", "they": "loro", "my": "mio", "your": "tuo",
+        "this": "questo", "that": "quello", "with": "con", "for": "per",
+        "from": "da", "in": "in", "on": "su", "at": "a", "to": "a",
+        "of": "di", "hello": "ciao", "goodbye": "arrivederci", "please": "per favore",
+        "thank": "grazie", "thanks": "grazie", "yes": "sì", "no": "no",
+        "good": "buono", "great": "ottimo", "welcome": "benvenuto", "sorry": "scusa",
+        "love": "amore", "water": "acqua", "food": "cibo", "friend": "amico",
+        "day": "giorno", "name": "nome", "morning": "mattina", "night": "notte",
+        "big": "grande", "small": "piccolo", "new": "nuovo", "old": "vecchio",
+        "happy": "felice", "world": "mondo", "book": "libro", "house": "casa",
+        "time": "tempo", "today": "oggi", "tomorrow": "domani",
+        "week": "settimana", "meeting": "riunione", "project": "progetto", "report": "rapporto",
+    },
+    "en->vi": {
+        "a": "một", "an": "một", "is": "là", "are": "là", "was": "đã",
+        "have": "có", "has": "có", "and": "và", "but": "nhưng", "or": "hoặc",
+        "not": "không", "i": "tôi", "you": "bạn", "he": "anh ấy", "she": "cô ấy",
+        "we": "chúng tôi", "they": "họ", "my": "của tôi", "your": "của bạn",
+        "this": "này", "that": "đó", "with": "với", "for": "cho",
+        "from": "từ", "in": "trong", "on": "trên", "at": "tại", "to": "đến",
+        "of": "của", "hello": "xin chào", "goodbye": "tạm biệt", "please": "làm ơn",
+        "thank": "cảm ơn", "thanks": "cảm ơn", "yes": "vâng", "no": "không",
+        "good": "tốt", "great": "tuyệt", "welcome": "chào mừng", "sorry": "xin lỗi",
+        "love": "yêu", "water": "nước", "food": "thức ăn", "friend": "bạn bè",
+        "day": "ngày", "name": "tên", "morning": "buổi sáng", "night": "đêm",
+        "big": "lớn", "small": "nhỏ", "new": "mới", "old": "cũ",
+        "happy": "vui", "world": "thế giới", "book": "sách", "house": "nhà",
+        "time": "thời gian", "today": "hôm nay", "tomorrow": "ngày mai",
+        "week": "tuần", "meeting": "cuộc họp", "project": "dự án", "report": "báo cáo",
+    },
+    "en->ja": {
+        "is": "です", "are": "です", "have": "持つ", "and": "と", "but": "しかし",
+        "or": "または", "not": "ない", "i": "私", "you": "あなた", "he": "彼",
+        "she": "彼女", "we": "私たち", "they": "彼ら", "my": "私の", "your": "あなたの",
+        "this": "これ", "that": "それ", "with": "と", "for": "のために",
+        "from": "から", "in": "に", "on": "に", "at": "に", "to": "へ", "of": "の",
+        "hello": "こんにちは", "goodbye": "さようなら", "please": "お願いします",
+        "thank": "ありがとう", "thanks": "ありがとう", "yes": "はい", "no": "いいえ",
+        "good": "良い", "great": "素晴らしい", "welcome": "ようこそ", "sorry": "ごめんなさい",
+        "love": "愛", "water": "水", "food": "食べ物", "friend": "友達",
+        "day": "日", "name": "名前", "morning": "朝", "night": "夜",
+        "big": "大きい", "small": "小さい", "new": "新しい", "old": "古い",
+        "happy": "幸せ", "world": "世界", "book": "本", "house": "家",
+        "time": "時間", "today": "今日", "tomorrow": "明日",
+        "week": "週", "meeting": "会議", "project": "プロジェクト", "report": "報告",
+    },
+    "en->zh": {
+        "is": "是", "are": "是", "have": "有", "has": "有", "and": "和", "but": "但是",
+        "or": "或", "not": "不", "i": "我", "you": "你", "he": "他", "she": "她",
+        "we": "我们", "they": "他们", "my": "我的", "your": "你的",
+        "this": "这", "that": "那", "with": "和", "for": "为", "from": "从",
+        "in": "在", "on": "在", "at": "在", "to": "到", "of": "的",
+        "hello": "你好", "goodbye": "再见", "please": "请", "thank": "谢谢",
+        "thanks": "谢谢", "yes": "是", "no": "不", "good": "好", "great": "很好",
+        "welcome": "欢迎", "sorry": "对不起", "love": "爱", "water": "水",
+        "food": "食物", "friend": "朋友", "day": "天", "name": "名字",
+        "morning": "早上", "night": "晚上", "big": "大", "small": "小",
+        "new": "新", "old": "旧", "happy": "快乐", "world": "世界",
+        "book": "书", "house": "房子", "time": "时间", "today": "今天", "tomorrow": "明天",
+        "week": "星期", "meeting": "会议", "project": "项目", "report": "报告",
+    },
+    "en->ko": {
+        "is": "입니다", "are": "입니다", "have": "있다", "and": "그리고", "but": "하지만",
+        "or": "또는", "not": "아니다", "i": "나", "you": "너", "he": "그", "she": "그녀",
+        "we": "우리", "they": "그들", "my": "나의", "your": "너의",
+        "this": "이것", "that": "저것", "with": "와", "for": "위해", "from": "부터",
+        "in": "안에", "on": "위에", "at": "에", "to": "에게", "of": "의",
+        "hello": "안녕하세요", "goodbye": "안녕히 가세요", "please": "제발",
+        "thank": "감사합니다", "thanks": "감사합니다", "yes": "네", "no": "아니요",
+        "good": "좋은", "great": "훌륭한", "welcome": "환영합니다", "sorry": "미안합니다",
+        "love": "사랑", "water": "물", "food": "음식", "friend": "친구",
+        "day": "날", "name": "이름", "morning": "아침", "night": "밤",
+        "big": "큰", "small": "작은", "new": "새로운", "old": "오래된",
+        "happy": "행복한", "world": "세계", "book": "책", "house": "집",
+        "time": "시간", "today": "오늘", "tomorrow": "내일",
+        "week": "주", "meeting": "회의", "project": "프로젝트", "report": "보고서",
+    },
+    "en->ar": {
+        "have": "يملك", "and": "و", "but": "لكن", "or": "أو", "not": "لا",
+        "i": "أنا", "you": "أنت", "he": "هو", "she": "هي", "we": "نحن", "they": "هم",
+        "my": "لي", "your": "لك", "this": "هذا", "that": "ذلك", "with": "مع",
+        "for": "لـ", "from": "من", "in": "في", "on": "على", "at": "في",
+        "to": "إلى", "of": "من", "hello": "مرحبا", "goodbye": "وداعا",
+        "please": "من فضلك", "thank": "شكرا", "thanks": "شكرا", "yes": "نعم",
+        "no": "لا", "good": "جيد", "great": "عظيم", "welcome": "أهلا", "sorry": "آسف",
+        "love": "حب", "water": "ماء", "food": "طعام", "friend": "صديق",
+        "day": "يوم", "name": "اسم", "morning": "صباح", "night": "ليل",
+        "big": "كبير", "small": "صغير", "new": "جديد", "old": "قديم",
+        "happy": "سعيد", "world": "عالم", "book": "كتاب", "house": "منزل",
+        "time": "وقت", "today": "اليوم", "tomorrow": "غدا",
+        "week": "أسبوع", "meeting": "اجتماع", "project": "مشروع", "report": "تقرير",
+    },
 }
+
+
+def _reverse_dictionaries():
+    """Build target->English dictionaries by inverting the en->X dicts, so
+    translation works in reverse and can pivot through English for any pair."""
+    rev = {}
+    for pair, mapping in _DICTIONARIES.items():
+        src, tgt = pair.split("->")
+        rmap = rev.setdefault(f"{tgt}->{src}", {})
+        for s, t in mapping.items():
+            rmap.setdefault(t.lower(), s)  # first English word wins
+    return rev
+
+
+_REVERSE_DICTIONARIES = _reverse_dictionaries()
 
 
 def _detect_language(text):
