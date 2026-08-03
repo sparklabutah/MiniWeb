@@ -1,263 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Meridian Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active = 'dashboard' %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
 
-        /* ── Top Bar (shared site chrome) ────────────────── */
-        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
-        .topbar a:hover { color: #fff; }
-        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
-        .topbar-nav a { color: #cbd5e1; }
-        .topbar-nav a.active { color: #fff; font-weight: 600; }
-        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
+{% macro badge_status(s) %}<span class="badge st-{{ s }}"><span class="bd"></span>{{ s|replace('_',' ')|title }}</span>{% endmacro %}
+{% macro irow(i) %}
+<a class="irow" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=i.id) }}">
+    <span class="ikey">{{ i.key }}</span>
+    <span class="ititle">{{ i.title }}</span>
+    <span class="imeta">
+        <span class="badge ty-{{ i.type }}">{{ i.type|title }}</span>
+        <span class="badge pr-{{ i.priority }}">{{ i.priority|title }}</span>
+        {{ badge_status(i.status) }}
+    </span>
+    <span class="idate">{{ (i.updated_at or i.created_at or '')[:10] }}</span>
+</a>
+{% endmacro %}
 
-        /* ── Layout ──────────────────────────────────────── */
-        .container { max-width: 1160px; margin: 0 auto; padding: 1.5rem; }
+<!-- KPI stat tiles -->
+<div class="kpi-row">
+    <div class="kpi k-total"><div class="kpi-label"><span class="dot"></span>Total Issues</div><div class="kpi-num">{{ kpis.total }}</div><div class="kpi-sub">across {{ project_stats|length }} projects</div></div>
+    <div class="kpi k-open"><div class="kpi-label"><span class="dot"></span>Open</div><div class="kpi-num">{{ kpis.open }}</div><div class="kpi-sub">to be picked up</div></div>
+    <div class="kpi k-prog"><div class="kpi-label"><span class="dot"></span>In Progress</div><div class="kpi-num">{{ kpis.in_progress }}</div><div class="kpi-sub">being worked on</div></div>
+    <div class="kpi k-review"><div class="kpi-label"><span class="dot"></span>In Review</div><div class="kpi-num">{{ kpis.review }}</div><div class="kpi-sub">awaiting review</div></div>
+    <div class="kpi k-done"><div class="kpi-label"><span class="dot"></span>Done</div><div class="kpi-num">{{ kpis.done }}</div><div class="kpi-sub">completed &amp; closed</div></div>
+    <div class="kpi k-crit"><div class="kpi-label"><span class="dot"></span>Critical Open</div><div class="kpi-num">{{ kpis.critical }}</div><div class="kpi-sub">need attention</div></div>
+    <div class="kpi k-mine"><div class="kpi-label"><span class="dot"></span>Assigned to Me</div><div class="kpi-num">{{ kpis.my_open }}</div><div class="kpi-sub">open on your plate</div></div>
+</div>
 
-        /* ── Project Selector Bar ────────────────────────── */
-        .projects-bar { display: flex; gap: .5rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
-        .project-tab { display: flex; align-items: center; gap: .45rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem 1rem; text-decoration: none; color: #475569; font-size: .82rem; font-weight: 500; transition: all .15s; }
-        .project-tab:hover { border-color: #3b82f6; color: #3b82f6; }
-        .project-tab .pt-key { font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; font-size: .68rem; color: #94a3b8; background: #f8fafc; padding: .1rem .35rem; border-radius: 4px; font-weight: 600; }
-        .project-tab .pt-stats { display: flex; gap: .5rem; font-size: .7rem; margin-left: .35rem; }
-        .project-tab .pt-stat { display: flex; align-items: center; gap: .2rem; }
-        .project-tab .pt-stat .pt-dot { width: 6px; height: 6px; border-radius: 50%; }
-        .project-tab .pt-stat .pt-dot.open { background: #3b82f6; }
-        .project-tab .pt-stat .pt-dot.done { background: #22C55E; }
-        .project-tab .pt-stat .pt-dot.critical { background: #EF4444; }
-        .project-tab .pt-progress { width: 48px; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin-left: .3rem; }
-        .project-tab .pt-progress-fill { height: 100%; background: #22C55E; border-radius: 2px; }
-
-        /* ── Section Title ───────────────────────────────── */
-        .section-title { font-size: .95rem; font-weight: 700; color: #1e293b; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
-        .section-title .count-badge { font-size: .7rem; background: #f8fafc; color: #64748b; padding: .15rem .5rem; border-radius: 10px; font-weight: 600; }
-
-        /* ── Filter Pills ────────────────────────────────── */
-        .filter-bar { display: flex; gap: .4rem; margin-bottom: 1rem; flex-wrap: wrap; }
-        .filter-pill { font-size: .72rem; font-weight: 500; padding: .3rem .65rem; border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; color: #475569; cursor: default; display: flex; align-items: center; gap: .3rem; }
-        .filter-pill .fp-dot { width: 7px; height: 7px; border-radius: 50%; }
-        .filter-pill.status-open        .fp-dot { background: #94a3b8; }
-        .filter-pill.status-in_progress .fp-dot { background: #3b82f6; }
-        .filter-pill.status-review      .fp-dot { background: #F59E0B; }
-        .filter-pill.status-done        .fp-dot { background: #22C55E; }
-        .filter-pill.status-closed      .fp-dot { background: #64748b; }
-        .filter-pill.prio-critical .fp-dot { background: #EF4444; }
-        .filter-pill.prio-high     .fp-dot { background: #F97316; }
-        .filter-pill.prio-medium   .fp-dot { background: #F59E0B; }
-        .filter-pill.prio-low      .fp-dot { background: #94a3b8; }
-
-        /* ── Two Column Grid ─────────────────────────────── */
-        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
-
-        /* ── Issue List ──────────────────────────────────── */
-        .issue-list { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
-        .issue-row { display: flex; align-items: center; padding: .6rem .85rem; border-bottom: 1px solid #f8fafc; transition: background .1s; gap: .6rem; }
-        .issue-row:last-child { border-bottom: none; }
-        .issue-row:hover { background: #f8fafc; }
-
-        /* Priority indicator */
-        .prio-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .prio-dot.critical { background: #EF4444; }
-        .prio-dot.high     { background: #F97316; }
-        .prio-dot.medium   { background: #F59E0B; }
-        .prio-dot.low      { background: #cbd5e1; }
-
-        /* Issue key */
-        .issue-key { font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; font-size: .75rem; color: #3b82f6; text-decoration: none; font-weight: 600; white-space: nowrap; min-width: 60px; }
-        .issue-key:hover { text-decoration: underline; }
-
-        /* Issue title */
-        .issue-title { flex: 1; min-width: 0; }
-        .issue-title a { color: #1e293b; text-decoration: none; font-size: .85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-        .issue-title a:hover { color: #3b82f6; }
-
-        /* Assignee avatar */
-        .assignee-avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; color: #fff; flex-shrink: 0; }
-        .assignee-avatar.c0 { background: #3b82f6; }
-        .assignee-avatar.c1 { background: #7C3AED; }
-        .assignee-avatar.c2 { background: #0284C7; }
-        .assignee-avatar.c3 { background: #059669; }
-        .assignee-avatar.c4 { background: #DC2626; }
-        .assignee-avatar.c5 { background: #D97706; }
-        .assignee-avatar.unassigned { background: #e2e8f0; color: #94a3b8; }
-
-        /* Status badge */
-        .status-badge { display: inline-flex; align-items: center; gap: .25rem; padding: .18rem .55rem; border-radius: 20px; font-size: .68rem; font-weight: 600; white-space: nowrap; }
-        .status-badge .sb-dot { width: 6px; height: 6px; border-radius: 50%; }
-        .status-badge.open        { background: #f8fafc; color: #64748b; }
-        .status-badge.open .sb-dot { background: #94a3b8; }
-        .status-badge.in_progress { background: #eff6ff; color: #3b82f6; }
-        .status-badge.in_progress .sb-dot { background: #3b82f6; }
-        .status-badge.review      { background: #FEF3C7; color: #D97706; }
-        .status-badge.review .sb-dot { background: #F59E0B; }
-        .status-badge.done        { background: #DCFCE7; color: #16A34A; }
-        .status-badge.done .sb-dot { background: #22C55E; }
-        .status-badge.closed      { background: #f8fafc; color: #64748b; }
-        .status-badge.closed .sb-dot { background: #64748b; }
-
-        /* Type badge */
-        .type-badge { font-size: .65rem; font-weight: 600; padding: .15rem .4rem; border-radius: 4px; text-transform: uppercase; letter-spacing: .03em; }
-        .type-badge.bug     { background: #FEF2F2; color: #DC2626; }
-        .type-badge.feature { background: #eff6ff; color: #2563eb; }
-        .type-badge.task    { background: #F0FDF4; color: #16A34A; }
-        .type-badge.story   { background: #FFFBEB; color: #D97706; }
-
-        /* Due date */
-        .issue-date { font-size: .72rem; color: #94a3b8; white-space: nowrap; }
-
-        /* ── Sprint Section ──────────────────────────────── */
-        .sprint-cards { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.5rem; }
-        .sprint-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: .85rem 1rem; }
-        .sprint-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
-        .sprint-header .sp-name { font-size: .88rem; font-weight: 600; color: #1e293b; }
-        .sprint-header .sp-count { font-size: .72rem; color: #94a3b8; }
-        .sprint-progress { display: flex; align-items: center; gap: .6rem; }
-        .sprint-progress-bar { flex: 1; height: 6px; background: #f8fafc; border-radius: 3px; overflow: hidden; }
-        .sprint-progress-bar .fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3b82f6, #22C55E); transition: width .3s; }
-        .sprint-progress .sp-pct { font-size: .75rem; font-weight: 600; color: #475569; min-width: 36px; text-align: right; }
-
-        /* ── Empty State ─────────────────────────────────── */
-        .empty-state { color: #94a3b8; font-size: .85rem; padding: 2rem; text-align: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
-
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <h1>Meridian Tracker</h1>
-        <div class="topbar-nav">
-            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}" class="active">Dashboard</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}">Backlog</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}">+ New Issue</a>
-            {% if user %}
-            <span class="user-badge">{{ user.name }}</span>
-            {% else %}
-            <a href="{{ url_for('project-mgmt-issue-tracking.login_page') }}">Log in</a>
-            {% endif %}
-            <a href="/">&larr; MiniWeb</a>
-        </div>
-    </div>
-
-    <div class="container">
-
-        <!-- ── Project Selector ─────────────────────────────── -->
-        <h2 class="section-title">Projects <span class="count-badge">{{ project_stats|length }}</span></h2>
-        <div class="projects-bar">
-            {% for ps in project_stats %}
-            <a class="project-tab" href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=ps.project.id) }}">
-                <span class="pt-key">{{ ps.project.key }}</span>
-                {{ ps.project.name }}
-                <div class="pt-stats">
-                    <span class="pt-stat"><span class="pt-dot open"></span>{{ ps.open }}</span>
-                    <span class="pt-stat"><span class="pt-dot done"></span>{{ ps.done }}</span>
-                    {% if ps.critical > 0 %}
-                    <span class="pt-stat"><span class="pt-dot critical"></span>{{ ps.critical }}</span>
-                    {% endif %}
-                </div>
-                {% if ps.total > 0 %}
-                <span class="pt-progress"><span class="pt-progress-fill" style="width: {{ (ps.done / ps.total * 100)|round|int }}%"></span></span>
-                {% endif %}
-            </a>
-            {% endfor %}
-        </div>
-
-        <!-- ── Two Column Layout ────────────────────────────── -->
-        <div class="two-col">
-
-            <!-- Left: My Open Issues -->
-            <div>
-                <h2 class="section-title">
-                    My Issues
-                    {% if my_issues %}<span class="count-badge">{{ my_issues|length }}</span>{% endif %}
-                </h2>
-
-                {% if my_issues %}
-                <!-- Filter pills showing what statuses/priorities are present -->
-                <div class="filter-bar">
-                    {% set statuses_seen = [] %}
-                    {% set prios_seen = [] %}
-                    {% for issue in my_issues %}
-                        {% if issue.status not in statuses_seen %}
-                            {% if statuses_seen.append(issue.status) %}{% endif %}
-                        {% endif %}
-                        {% if issue.priority not in prios_seen %}
-                            {% if prios_seen.append(issue.priority) %}{% endif %}
-                        {% endif %}
-                    {% endfor %}
-                    {% for st in statuses_seen %}
-                    <span class="filter-pill status-{{ st }}"><span class="fp-dot"></span>{{ st|replace('_', ' ')|title }}</span>
-                    {% endfor %}
-                    {% for pr in prios_seen %}
-                    <span class="filter-pill prio-{{ pr }}"><span class="fp-dot"></span>{{ pr|title }}</span>
-                    {% endfor %}
-                </div>
-
-                <div class="issue-list">
-                    {% for issue in my_issues %}
-                    <div class="issue-row">
-                        <span class="prio-dot {{ issue.priority }}" title="{{ issue.priority|title }} priority"></span>
-                        <a class="issue-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
-                        <div class="issue-title">
-                            <a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:65] }}{% if issue.title|length > 65 %}...{% endif %}</a>
-                        </div>
-                        {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
-                        <span class="assignee-avatar c{{ issue.assignee_id % 6 }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
-                        {% else %}
-                        <span class="assignee-avatar unassigned" title="Unassigned">?</span>
-                        {% endif %}
-                        <span class="status-badge {{ issue.status }}"><span class="sb-dot"></span>{{ issue.status|replace('_', ' ')|title }}</span>
-                        {% if issue.updated_at %}
-                        <span class="issue-date">{{ issue.updated_at[:10] }}</span>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">No open issues assigned to you.</div>
-                {% endif %}
-            </div>
-
-            <!-- Right: Recent Activity -->
-            <div>
-                <h2 class="section-title">
-                    Recent Activity
-                    {% if recent_issues %}<span class="count-badge">{{ recent_issues|length }}</span>{% endif %}
-                </h2>
-
-                {% if recent_issues %}
-                <div class="issue-list">
-                    {% for issue in recent_issues %}
-                    <div class="issue-row">
-                        <span class="prio-dot {{ issue.priority }}" title="{{ issue.priority|title }}"></span>
-                        <a class="issue-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
-                        <div class="issue-title">
-                            <a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:55] }}{% if issue.title|length > 55 %}...{% endif %}</a>
-                        </div>
-                        <span class="type-badge {{ issue.type }}">{{ issue.type }}</span>
-                        {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
-                        <span class="assignee-avatar c{{ issue.assignee_id % 6 }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
-                        {% else %}
-                        <span class="assignee-avatar unassigned" title="Unassigned">?</span>
-                        {% endif %}
-                        <span class="status-badge {{ issue.status }}"><span class="sb-dot"></span>{{ issue.status|replace('_', ' ')|title }}</span>
-                        <span class="issue-date">{{ issue.updated_at[:10] }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">No recent activity.</div>
-                {% endif %}
+<!-- Projects -->
+<div class="sec-h">Projects <span class="count">{{ project_stats|length }}</span></div>
+<div class="proj-grid">
+    {% for ps in project_stats %}
+    {% set pct = (ps.done / ps.total * 100) | round | int if ps.total else 0 %}
+    <a class="proj-card" href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=ps.project.id) }}">
+        <div class="proj-top">
+            <span class="proj-key">{{ ps.project.key | default(ps.project.name[:2]|upper) }}</span>
+            <div style="min-width:0;">
+                <div class="proj-name">{{ ps.project.name }}</div>
+                <div class="proj-owner">{% if ps.owner %}Lead: {{ ps.owner.name }}{% else %}No lead{% endif %}</div>
             </div>
         </div>
+        <div class="proj-desc">{{ ps.project.description | default('') }}</div>
+        <div class="pbar"><div class="pbar-fill" style="width: {{ pct }}%;"></div></div>
+        <div class="proj-stats">
+            <span>{{ pct }}% done</span>
+            <span><b>{{ ps.open }}</b> open</span>
+            <span><b>{{ ps.total }}</b> total</span>
+            {% if ps.critical %}<span class="crit">{{ ps.critical }} critical</span>{% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- My issues + activity -->
+<div class="dash-cols" style="margin-top:26px;">
+    <div class="panel">
+        <div class="panel-h">Assigned to Me <span class="count" style="font-size:.74rem;font-weight:700;color:var(--faint);background:#eef1f5;border-radius:10px;padding:1px 9px;">{{ my_issues|length }}</span></div>
+        {% for i in my_issues[:12] %}{{ irow(i) }}{% else %}<div class="empty">Nothing assigned to you. Nice and clear.</div>{% endfor %}
     </div>
-</body>
-</html>
+    <div class="panel">
+        <div class="panel-h">Recent Activity</div>
+        {% for i in recent_issues %}{{ irow(i) }}{% endfor %}
+    </div>
+</div>
+{% endblock %}

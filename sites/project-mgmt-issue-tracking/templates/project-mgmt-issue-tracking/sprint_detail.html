@@ -1,134 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ sprint.name }} - Meridian Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
-        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
-        .topbar a:hover { color: #fff; }
-        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
-        .topbar-nav a { color: #cbd5e1; }
-        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 1rem 1.5rem; }
-        .back-link { font-size: .85rem; color: #3b82f6; text-decoration: none; }
-        .back-link:hover { text-decoration: underline; }
-        .sprint-header { margin: 1rem 0; }
-        .sprint-header h2 { font-size: 1.3rem; }
-        .sprint-meta { font-size: .88rem; color: #64748b; margin: .25rem 0 .5rem; }
-        .sprint-goal { font-size: .92rem; color: #475569; margin-bottom: 1rem; line-height: 1.4; }
-        .sprint-status { display: inline-block; padding: .2rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; margin-left: .5rem; }
-        .sprint-status.active { background: #d1fae5; color: #059669; }
-        .sprint-status.closed { background: #f1f5f9; color: #64748b; }
-        .sprint-status.planned { background: #dbeafe; color: #1d4ed8; }
-        .sprint-stats-bar { display: flex; gap: 1.5rem; margin-bottom: 1rem; font-size: .88rem; }
-        .sprint-stats-bar .stat { display: flex; flex-direction: column; }
-        .sprint-stats-bar .stat .num { font-weight: 700; font-size: 1.1rem; }
-        .sprint-stats-bar .stat .lbl { color: #94a3b8; font-size: .78rem; }
-        .progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; max-width: 300px; margin-bottom: 1rem; }
-        .progress-bar .fill { height: 100%; background: #10b981; border-radius: 4px; }
-        .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: .75rem; min-height: 300px; }
-        .board-col { background: #f8fafc; border-radius: .5rem; padding: .5rem; min-height: 200px; }
-        .board-col-header { font-size: .75rem; font-weight: 700; text-transform: uppercase; color: #64748b; padding: .4rem .5rem; margin-bottom: .5rem; display: flex; justify-content: space-between; }
-        .board-col-header .count { background: #e2e8f0; color: #475569; padding: .1rem .4rem; border-radius: .2rem; font-size: .7rem; }
-        .board-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .75rem; margin-bottom: .5rem; transition: box-shadow .15s; }
-        .board-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.08); }
-        .board-card .card-key { font-family: monospace; font-size: .72rem; color: #3b82f6; text-decoration: none; font-weight: 600; }
-        .board-card .card-key:hover { text-decoration: underline; }
-        .board-card .card-title { font-size: .85rem; margin: .3rem 0; line-height: 1.3; }
-        .board-card .card-title a { color: #1e293b; text-decoration: none; }
-        .board-card .card-title a:hover { color: #3b82f6; }
-        .board-card .card-meta { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-        .badge { display: inline-block; padding: .1rem .4rem; border-radius: .2rem; font-size: .68rem; font-weight: 600; text-transform: uppercase; }
-        .badge-bug { background: #fef2f2; color: #dc2626; }
-        .badge-feature { background: #eff6ff; color: #2563eb; }
-        .badge-task { background: #f0fdf4; color: #16a34a; }
-        .badge-story { background: #fefce8; color: #ca8a04; }
-        .badge-critical { background: #fef2f2; color: #dc2626; }
-        .badge-high { background: #fff7ed; color: #ea580c; }
-        .badge-medium { background: #fefce8; color: #ca8a04; }
-        .badge-low { background: #f0fdf4; color: #16a34a; }
-        .avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: .65rem; font-weight: 600; color: #fff; }
-        .sp-badge { background: #f1f5f9; color: #475569; font-size: .68rem; padding: .1rem .35rem; border-radius: .2rem; }
-        .col-open .board-col-header { border-bottom: 2px solid #3b82f6; }
-        .col-in_progress .board-col-header { border-bottom: 2px solid #f59e0b; }
-        .col-review .board-col-header { border-bottom: 2px solid #8b5cf6; }
-        .col-done .board-col-header { border-bottom: 2px solid #10b981; }
-        .col-closed .board-col-header { border-bottom: 2px solid #94a3b8; }
-        .project-tag { display: inline-block; background: #f1f5f9; color: #475569; font-size: .75rem; padding: .15rem .4rem; border-radius: .2rem; }
-        @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <h1>Meridian Tracker</h1>
-        <div class="topbar-nav">
-            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Dashboard</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}">Backlog</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}">+ New Issue</a>
-            {% if user %}
-            <span class="user-badge">{{ user.name }}</span>
-            {% endif %}
-            <a href="/">&larr; MiniWeb</a>
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active = 'sprints' %}
+{% block title %}{{ sprint.name }} - Meridian Tracker{% endblock %}
+{% block topbar %}
+<div>
+    <div class="crumb"><a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a> / {{ sprint.name }}</div>
+    <h1>{{ sprint.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+
+{% set pct = ((done_points / total_points) * 100)|int if total_points > 0 else 0 %}
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+    <span class="badge st-{{ 'in_progress' if sprint.status == 'active' else ('done' if sprint.status == 'closed' else 'open') }}"><span class="bd"></span>{{ sprint.status|title }}</span>
+    {% if project %}<span class="chip">{{ project.name }}</span>{% endif %}
+    <span style="font-size:.85rem;color:var(--faint);">{{ sprint.start_date }} to {{ sprint.end_date }}</span>
+</div>
+{% if sprint.goal %}<div style="font-size:.9rem;color:var(--muted);margin-bottom:14px;line-height:1.45;">{{ sprint.goal }}</div>{% endif %}
+
+<div style="display:flex;gap:26px;font-size:.88rem;margin-bottom:10px;">
+    <div><span style="font-weight:700;font-size:1.1rem;">{{ done_points }}/{{ total_points }}</span> <span style="color:var(--faint);">Story Points</span></div>
+</div>
+{% if total_points > 0 %}
+<div class="pbar" style="max-width:320px;margin-bottom:20px;" title="{{ pct }}% complete"><div class="pbar-fill" style="width:{{ pct }}%;background:#16a34a;"></div></div>
+{% endif %}
+
+<div class="board">
+    {% for status in status_order %}
+    <div class="bcol col-{{ status }}">
+        <div class="bcol-h">
+            {{ status|replace('_', ' ') }}
+            <span class="n">{{ columns[status]|length }}</span>
         </div>
-    </div>
-
-    <div class="container">
-        <a class="back-link" href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">&larr; All Sprints</a>
-
-        <div class="sprint-header">
-            <h2>{{ sprint.name }}
-                <span class="sprint-status {{ sprint.status }}">{{ sprint.status }}</span>
-                {% if project %}
-                <span class="project-tag">{{ project.name }}</span>
+        {% for issue in columns[status] %}
+        <div class="bcard">
+            <a class="bk" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
+            <div class="bt"><a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:65] }}{% if issue.title|length > 65 %}...{% endif %}</a></div>
+            <div class="bmeta">
+                <span class="badge ty-{{ issue.type }}">{{ issue.type|title }}</span>
+                <span class="badge pr-{{ issue.priority }}">{{ issue.priority|title }}</span>
+                {% if issue.story_points %}<span class="sp-badge">{{ issue.story_points }} SP</span>{% endif %}
+                {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
+                <span class="avatar" style="width:22px;height:22px;font-size:.65rem;background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
                 {% endif %}
-            </h2>
-        </div>
-        <div class="sprint-meta">{{ sprint.start_date }} to {{ sprint.end_date }}</div>
-        <div class="sprint-goal">{{ sprint.goal }}</div>
-
-        <div class="sprint-stats-bar">
-            <div class="stat">
-                <span class="num">{{ done_points }}/{{ total_points }}</span>
-                <span class="lbl">Story Points</span>
             </div>
         </div>
-        {% if total_points > 0 %}
-        <div class="progress-bar" title="{{ ((done_points / total_points) * 100)|int }}% complete">
-            <div class="fill" style="width: {{ ((done_points / total_points) * 100)|int }}%"></div>
-        </div>
-        {% endif %}
-
-        <div class="board">
-            {% for status in status_order %}
-            <div class="board-col col-{{ status }}">
-                <div class="board-col-header">
-                    {{ status|replace('_', ' ')|upper }}
-                    <span class="count">{{ columns[status]|length }}</span>
-                </div>
-                {% for issue in columns[status] %}
-                <div class="board-card">
-                    <a class="card-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
-                    <div class="card-title"><a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:65] }}{% if issue.title|length > 65 %}...{% endif %}</a></div>
-                    <div class="card-meta">
-                        <span class="badge badge-{{ issue.type }}">{{ issue.type }}</span>
-                        <span class="badge badge-{{ issue.priority }}">{{ issue.priority }}</span>
-                        {% if issue.story_points %}<span class="sp-badge">{{ issue.story_points }} SP</span>{% endif %}
-                        {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
-                        <span class="avatar" style="background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endfor %}
-        </div>
+        {% endfor %}
     </div>
-</body>
-</html>
+    {% endfor %}
+</div>
+{% endblock %}

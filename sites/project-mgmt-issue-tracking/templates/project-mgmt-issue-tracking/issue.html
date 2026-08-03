@@ -1,368 +1,294 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ issue.key }} - {{ issue.title }} - Meridian Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
-        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
-        .topbar a:hover { color: #fff; }
-        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
-        .topbar-nav a { color: #cbd5e1; }
-        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
-        .back-link { font-size: .85rem; color: #3b82f6; text-decoration: none; }
-        .back-link:hover { text-decoration: underline; }
-        .issue-header { margin: 1rem 0; }
-        .issue-header .key { font-family: monospace; color: #64748b; font-size: 1rem; }
-        .issue-header h2 { font-size: 1.5rem; margin-top: .25rem; line-height: 1.3; }
-        .issue-layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; }
-        @media (max-width: 768px) { .issue-layout { grid-template-columns: 1fr; } }
-        .main-content { min-width: 0; }
-        .description-block { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.25rem; margin-bottom: 1.5rem; }
-        .description-block h3 { font-size: .9rem; color: #64748b; margin-bottom: .5rem; }
-        .description-block p { font-size: .95rem; line-height: 1.6; color: #334155; }
-        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-        .sidebar-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; }
-        .sidebar-card h4 { font-size: .8rem; color: #64748b; text-transform: uppercase; margin-bottom: .5rem; }
-        .detail-row { display: flex; justify-content: space-between; align-items: center; padding: .35rem 0; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
-        .detail-row:last-child { border-bottom: none; }
-        .detail-row .label { color: #64748b; font-size: .82rem; }
-        .detail-row .value { font-weight: 500; }
-        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; text-transform: uppercase; }
-        .badge-bug { background: #fef2f2; color: #dc2626; }
-        .badge-feature { background: #eff6ff; color: #2563eb; }
-        .badge-task { background: #f0fdf4; color: #16a34a; }
-        .badge-story { background: #fefce8; color: #ca8a04; }
-        .badge-open { background: #dbeafe; color: #1d4ed8; }
-        .badge-in_progress { background: #fef3c7; color: #d97706; }
-        .badge-review { background: #e9d5ff; color: #7c3aed; }
-        .badge-done { background: #d1fae5; color: #059669; }
-        .badge-closed { background: #f1f5f9; color: #64748b; }
-        .badge-critical { background: #fef2f2; color: #dc2626; }
-        .badge-high { background: #fff7ed; color: #ea580c; }
-        .badge-medium { background: #fefce8; color: #ca8a04; }
-        .badge-low { background: #f0fdf4; color: #16a34a; }
-        .label-tag { display: inline-block; background: #f1f5f9; color: #475569; font-size: .75rem; padding: .15rem .4rem; border-radius: .2rem; margin: .1rem .15rem .1rem 0; }
-        .avatar-inline { display: inline-flex; align-items: center; gap: .4rem; }
-        .avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: .7rem; font-weight: 600; color: #fff; }
-        .comments-section { margin-top: 1.5rem; }
-        .comments-section h3 { font-size: 1rem; margin-bottom: .75rem; }
-        .activity-section { margin-top: 1.5rem; }
-        .activity-section h3 { font-size: 1rem; margin-bottom: .75rem; }
-        .activity-feed { list-style: none; border-left: 2px solid #e2e8f0; margin-left: .5rem; }
-        .activity-item { display: flex; align-items: center; gap: .5rem; padding: .45rem 0 .45rem 1rem; position: relative; font-size: .86rem; color: #475569; }
-        .activity-item .avatar.sm { width: 22px; height: 22px; font-size: .72rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; margin-left: -1.7rem; border: 2px solid #f8fafc; }
-        .activity-item .activity-text { flex: 1; }
-        .activity-item .activity-text b { color: #1e293b; font-weight: 600; }
-        .activity-item .activity-time { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
-        .activity-empty { color: #94a3b8; font-size: .86rem; }
-        .comment { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; margin-bottom: .75rem; }
-        .comment-header { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
-        .comment-author { font-weight: 600; font-size: .88rem; }
-        .comment-date { color: #94a3b8; font-size: .8rem; }
-        .comment-text { font-size: .92rem; line-height: 1.5; color: #334155; }
-        .comment-form { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; margin-top: .75rem; }
-        .comment-form textarea { width: 100%; min-height: 80px; padding: .6rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .9rem; font-family: inherit; resize: vertical; }
-        .comment-form textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
-        .btn { display: inline-block; padding: .45rem .9rem; border-radius: .35rem; font-size: .85rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
-        .btn-primary { background: #3b82f6; color: #fff; }
-        .btn-primary:hover { background: #2563eb; }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .btn-danger:hover { background: #dc2626; }
-        .btn-sm { padding: .3rem .6rem; font-size: .78rem; }
-        .actions { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; }
-        .btn-watch { background: transparent; color: #3b82f6; border: 1px solid #3b82f6; }
-        .btn-watch:hover { background: #eff6ff; }
-        .btn-watch[aria-pressed="true"] { background: #3b82f6; color: #fff; }
-        .transition-form { display: inline; }
-        .transition-form select { padding: .3rem .5rem; border: 1px solid #cbd5e1; border-radius: .25rem; font-size: .82rem; }
-        .edit-section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
-        .edit-section h4 { font-size: .9rem; margin-bottom: .75rem; color: #475569; }
-        .form-row { display: flex; gap: .5rem; margin-bottom: .5rem; align-items: center; }
-        .form-row label { font-size: .82rem; color: #64748b; min-width: 80px; }
-        .form-row input, .form-row select, .form-row textarea { flex: 1; padding: .35rem .5rem; border: 1px solid #cbd5e1; border-radius: .25rem; font-size: .85rem; font-family: inherit; }
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <h1>Meridian Tracker</h1>
-        <div class="topbar-nav">
-            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Dashboard</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}">Backlog</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}">+ New Issue</a>
-            {% if user %}
-            <span class="user-badge">{{ user.name }}</span>
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% block title %}{{ issue.key }} - {{ issue.title }} - Meridian Tracker{% endblock %}
+{% block topbar %}
+<div>
+    <div class="crumb">
+        {% if project %}<a href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=project.id) }}">{{ project.name }}</a> / {% endif %}{{ issue.key }}
+    </div>
+    <h1>{{ issue.key }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<style>
+/* Activity feed + comment specifics (not in shared design system) */
+.activity-section { margin-top: 22px; }
+.activity-section h3 { font-size: 1rem; margin-bottom: 12px; font-weight: 800; }
+.activity-feed { list-style: none; border-left: 2px solid var(--line); margin-left: 8px; }
+.activity-item { display: flex; align-items: center; gap: 8px; padding: 7px 0 7px 16px; position: relative; font-size: .86rem; color: var(--muted); }
+.activity-item .avatar.sm { width: 22px; height: 22px; font-size: .72rem; margin-left: -1.7rem; border: 2px solid var(--bg); }
+.activity-item .activity-text { flex: 1; }
+.activity-item .activity-text b { color: var(--ink); font-weight: 600; }
+.activity-item .activity-time { color: var(--faint); font-size: .78rem; white-space: nowrap; }
+.activity-empty { color: var(--faint); font-size: .86rem; }
+.comments-section { margin-top: 22px; }
+.comments-section h3 { font-size: 1rem; margin-bottom: 12px; font-weight: 800; }
+.comment { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.comment-author { font-weight: 600; font-size: .88rem; }
+.comment-date { color: var(--faint); font-size: .8rem; }
+.comment-text { font-size: .92rem; line-height: 1.5; color: var(--ink); }
+.comment-form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 10px; }
+.comment-form textarea { min-height: 80px; resize: vertical; }
+.issue-layout { display: grid; grid-template-columns: 1fr 300px; gap: 22px; align-items: start; }
+@media (max-width: 768px) { .issue-layout { grid-template-columns: 1fr; } }
+.edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+.edit-row > label { font-size: .82rem; color: var(--muted); min-width: 84px; }
+</style>
+
+<div style="margin-bottom:16px;">
+    <span class="ikey" style="font-size:.95rem;">{{ issue.key }}</span>
+    <h2 style="font-size:1.5rem;margin-top:4px;line-height:1.3;">{{ issue.title }}</h2>
+</div>
+
+<div class="issue-layout">
+    <div style="min-width:0;">
+        <div class="card" style="margin-bottom:18px;">
+            <h3 style="font-size:.8rem;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Description</h3>
+            <p style="font-size:.95rem;line-height:1.6;color:var(--ink);white-space:pre-wrap;">{{ issue.description or 'No description provided.' }}</p>
+        </div>
+
+        <!-- Status transition -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+            <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_transition_issue', issue_id=issue.id) }}" style="display:inline;">
+                <select name="status" onchange="this.form.submit()" style="width:auto;">
+                    <option value="" disabled selected>Move to...</option>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </form>
+            <button class="btn" id="watch-toggle-btn" aria-pressed="false">Watch</button>
+            <button class="btn btn-danger" id="delete-issue-btn">Delete</button>
+        </div>
+
+        <!-- Edit section -->
+        <div class="card" style="margin-bottom:14px;">
+            <h4 style="font-size:.9rem;margin-bottom:12px;color:var(--muted);">Edit Issue</h4>
+            <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_edit_issue', issue_id=issue.id) }}">
+                <div class="edit-row">
+                    <label>Title</label>
+                    <input type="text" name="title" value="{{ issue.title }}">
+                </div>
+                <div class="edit-row">
+                    <label>Type</label>
+                    <select name="type">
+                        <option value="bug" {% if issue.type == 'bug' %}selected{% endif %}>Bug</option>
+                        <option value="feature" {% if issue.type == 'feature' %}selected{% endif %}>Feature</option>
+                        <option value="task" {% if issue.type == 'task' %}selected{% endif %}>Task</option>
+                        <option value="story" {% if issue.type == 'story' %}selected{% endif %}>Story</option>
+                    </select>
+                </div>
+                <div class="edit-row">
+                    <label>Priority</label>
+                    <select name="priority">
+                        <option value="critical" {% if issue.priority == 'critical' %}selected{% endif %}>Critical</option>
+                        <option value="high" {% if issue.priority == 'high' %}selected{% endif %}>High</option>
+                        <option value="medium" {% if issue.priority == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="low" {% if issue.priority == 'low' %}selected{% endif %}>Low</option>
+                    </select>
+                </div>
+                <div class="edit-row">
+                    <label>Assignee</label>
+                    <select name="assignee_id">
+                        <option value="">Unassigned</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {% if issue.assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="edit-row">
+                    <label>Reporter</label>
+                    <select name="reporter_id">
+                        <option value="">None</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {% if issue.reporter_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="edit-row">
+                    <label>Points</label>
+                    <input type="number" name="story_points" value="{{ issue.story_points or '' }}" min="0">
+                </div>
+                <div class="edit-row">
+                    <label>Labels</label>
+                    <input type="text" name="labels" value="{{ issue.labels|join(', ') }}">
+                </div>
+                <div class="edit-row" style="align-items:flex-start;">
+                    <label>Description</label>
+                    <textarea name="description" rows="3">{{ issue.description }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:6px;">Save Changes</button>
+            </form>
+        </div>
+
+        <!-- Activity -->
+        <div class="activity-section">
+            <h3>Activity</h3>
+            {% if issue.activity %}
+            <ul class="activity-feed">
+                {% for a in issue.activity | reverse %}
+                {% set actor = user_lookup.get(a.actor_id) %}
+                <li class="activity-item">
+                    <span class="avatar sm" style="background:{{ actor.avatar_color if actor else '#94a3b8' }}">{{ actor.name[0] if actor else '?' }}</span>
+                    <span class="activity-text"><b>{{ actor.name if actor else 'Someone' }}</b> {{ a.text }}</span>
+                    <span class="activity-time">{{ a.at[:16]|replace('T', ' ') }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="activity-empty">No activity yet. Changes to status, assignee, or reporter will appear here.</p>
             {% endif %}
-            <a href="/">&larr; MiniWeb</a>
+        </div>
+
+        <!-- Comments -->
+        <div class="comments-section">
+            <h3>Comments ({{ comments|length }})</h3>
+            {% for c in comments %}
+            <div class="comment">
+                <div class="comment-header">
+                    {% set commenter = user_lookup.get(c.user_id) %}
+                    {% if commenter %}
+                    <span class="avatar" style="width:24px;height:24px;font-size:.7rem;background:{{ commenter.avatar_color }}">{{ commenter.name[0] }}</span>
+                    <span class="comment-author">{{ commenter.name }}</span>
+                    {% else %}
+                    <span class="comment-author">User {{ c.user_id }}</span>
+                    {% endif %}
+                    <span class="comment-date">{{ c.created_at[:16]|replace('T', ' ') }}</span>
+                </div>
+                <div class="comment-text">{{ c.text }}</div>
+            </div>
+            {% endfor %}
+
+            <div class="comment-form">
+                <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_add_comment', issue_id=issue.id) }}">
+                    <textarea name="text" placeholder="Add a comment..." required></textarea>
+                    <button type="submit" class="btn btn-primary" style="margin-top:8px;">Comment</button>
+                </form>
+            </div>
         </div>
     </div>
 
-    <div class="container">
-        {% if project %}
-        <a class="back-link" href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=project.id) }}">&larr; {{ project.name }} Board</a>
-        {% endif %}
-
-        <div class="issue-header">
-            <span class="key">{{ issue.key }}</span>
-            <h2>{{ issue.title }}</h2>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+            <h4 style="font-size:.8rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Details</h4>
+            <div class="field-row">
+                <span class="k">Status</span>
+                <span class="badge st-{{ issue.status }}"><span class="bd"></span>{{ issue.status|replace('_', ' ')|title }}</span>
+            </div>
+            <div class="field-row">
+                <span class="k">Type</span>
+                <span class="badge ty-{{ issue.type }}">{{ issue.type|title }}</span>
+            </div>
+            <div class="field-row">
+                <span class="k">Priority</span>
+                <span class="badge pr-{{ issue.priority }}">{{ issue.priority|title }}</span>
+            </div>
+            <div class="field-row">
+                <span class="k">Story Points</span>
+                <span class="v">{{ issue.story_points or '-' }}</span>
+            </div>
         </div>
 
-        <div class="issue-layout">
-            <div class="main-content">
-                <div class="description-block">
-                    <h3>Description</h3>
-                    <p>{{ issue.description or 'No description provided.' }}</p>
-                </div>
-
-                <!-- Status transition -->
-                <div class="actions">
-                    <form class="transition-form" method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_transition_issue', issue_id=issue.id) }}">
-                        <select name="status" onchange="this.form.submit()">
-                            <option value="" disabled selected>Move to...</option>
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="review">Review</option>
-                            <option value="done">Done</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                    </form>
-                    <button class="btn btn-watch btn-sm" id="watch-toggle-btn" aria-pressed="false">Watch</button>
-                    <button class="btn btn-danger btn-sm" id="delete-issue-btn">Delete</button>
-                    <script>
-                    (function() {
-                        var watchBtn = document.getElementById('watch-toggle-btn');
-                        var currentUserId = {{ user.id if user else 1 }};
-                        function setState(watching) {
-                            watchBtn.setAttribute('aria-pressed', watching ? 'true' : 'false');
-                            watchBtn.textContent = watching ? 'Watching' : 'Watch';
-                        }
-                        fetch('{{ url_for("project-mgmt-issue-tracking.api_issue_watchers", issue_id=issue.id) }}')
-                            .then(function(r) { return r.json(); })
-                            .then(function(data) { setState(data.watchers.indexOf(currentUserId) !== -1); });
-                        watchBtn.addEventListener('click', function() {
-                            fetch('{{ url_for("project-mgmt-issue-tracking.api_toggle_watch", issue_id=issue.id) }}', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({user_id: currentUserId})
-                            }).then(function(r) { return r.json(); })
-                              .then(function(data) { setState(data.action === 'watched'); });
-                        });
-                    })();
-                    </script>
-                    <script>
-                    document.getElementById('delete-issue-btn').addEventListener('click', function() {
-                        var btn = this;
-                        btn.textContent = 'Deleting...';
-                        btn.disabled = true;
-                        fetch('{{ url_for("project-mgmt-issue-tracking.form_delete_issue", issue_id=issue.id) }}', {method: 'POST'})
-                            .then(function(r) { return r.ok ? r : Promise.reject(); })
-                            .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("project-mgmt-issue-tracking.index") }}'; })
-                            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
-                    });
-                    </script>
-                </div>
-
-                <!-- Edit section -->
-                <div class="edit-section">
-                    <h4>Edit Issue</h4>
-                    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_edit_issue', issue_id=issue.id) }}">
-                        <div class="form-row">
-                            <label>Title</label>
-                            <input type="text" name="title" value="{{ issue.title }}">
-                        </div>
-                        <div class="form-row">
-                            <label>Type</label>
-                            <select name="type">
-                                <option value="bug" {% if issue.type == 'bug' %}selected{% endif %}>Bug</option>
-                                <option value="feature" {% if issue.type == 'feature' %}selected{% endif %}>Feature</option>
-                                <option value="task" {% if issue.type == 'task' %}selected{% endif %}>Task</option>
-                                <option value="story" {% if issue.type == 'story' %}selected{% endif %}>Story</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Priority</label>
-                            <select name="priority">
-                                <option value="critical" {% if issue.priority == 'critical' %}selected{% endif %}>Critical</option>
-                                <option value="high" {% if issue.priority == 'high' %}selected{% endif %}>High</option>
-                                <option value="medium" {% if issue.priority == 'medium' %}selected{% endif %}>Medium</option>
-                                <option value="low" {% if issue.priority == 'low' %}selected{% endif %}>Low</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Assignee</label>
-                            <select name="assignee_id">
-                                <option value="">Unassigned</option>
-                                {% for u in users %}
-                                <option value="{{ u.id }}" {% if issue.assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Reporter</label>
-                            <select name="reporter_id">
-                                <option value="">None</option>
-                                {% for u in users %}
-                                <option value="{{ u.id }}" {% if issue.reporter_id == u.id %}selected{% endif %}>{{ u.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Points</label>
-                            <input type="number" name="story_points" value="{{ issue.story_points or '' }}" min="0">
-                        </div>
-                        <div class="form-row">
-                            <label>Labels</label>
-                            <input type="text" name="labels" value="{{ issue.labels|join(', ') }}">
-                        </div>
-                        <div class="form-row">
-                            <label>Description</label>
-                            <textarea name="description" rows="3">{{ issue.description }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.5rem;">Save Changes</button>
-                    </form>
-                </div>
-
-                <!-- Activity -->
-                <div class="activity-section">
-                    <h3>Activity</h3>
-                    {% if issue.activity %}
-                    <ul class="activity-feed">
-                        {% for a in issue.activity | reverse %}
-                        {% set actor = user_lookup.get(a.actor_id) %}
-                        <li class="activity-item">
-                            <span class="avatar sm" style="background:{{ actor.avatar_color if actor else '#94a3b8' }}">{{ actor.name[0] if actor else '?' }}</span>
-                            <span class="activity-text"><b>{{ actor.name if actor else 'Someone' }}</b> {{ a.text }}</span>
-                            <span class="activity-time">{{ a.at[:16]|replace('T', ' ') }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="activity-empty">No activity yet. Changes to status, assignee, or reporter will appear here.</p>
-                    {% endif %}
-                </div>
-
-                <!-- Comments -->
-                <div class="comments-section">
-                    <h3>Comments ({{ comments|length }})</h3>
-                    {% for c in comments %}
-                    <div class="comment">
-                        <div class="comment-header">
-                            {% set commenter = user_lookup.get(c.user_id) %}
-                            {% if commenter %}
-                            <span class="avatar" style="background:{{ commenter.avatar_color }}">{{ commenter.name[0] }}</span>
-                            <span class="comment-author">{{ commenter.name }}</span>
-                            {% else %}
-                            <span class="comment-author">User {{ c.user_id }}</span>
-                            {% endif %}
-                            <span class="comment-date">{{ c.created_at[:16]|replace('T', ' ') }}</span>
-                        </div>
-                        <div class="comment-text">{{ c.text }}</div>
-                    </div>
-                    {% endfor %}
-
-                    <div class="comment-form">
-                        <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_add_comment', issue_id=issue.id) }}">
-                            <textarea name="text" placeholder="Add a comment..." required></textarea>
-                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.5rem;">Comment</button>
-                        </form>
-                    </div>
-                </div>
+        <div class="card">
+            <h4 style="font-size:.8rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">People</h4>
+            <div class="field-row">
+                <span class="k">Assignee</span>
+                {% if assignee %}
+                <span class="v" style="display:inline-flex;align-items:center;gap:6px;">
+                    <span class="avatar" style="width:24px;height:24px;font-size:.7rem;background:{{ assignee.avatar_color }}">{{ assignee.name[0] }}</span>
+                    {{ assignee.name }}
+                </span>
+                {% else %}
+                <span class="v" style="color:var(--faint);">Unassigned</span>
+                {% endif %}
             </div>
-
-            <div class="sidebar">
-                <div class="sidebar-card">
-                    <h4>Details</h4>
-                    <div class="detail-row">
-                        <span class="label">Status</span>
-                        <span class="badge badge-{{ issue.status }}">{{ issue.status|replace('_', ' ') }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Type</span>
-                        <span class="badge badge-{{ issue.type }}">{{ issue.type }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Priority</span>
-                        <span class="badge badge-{{ issue.priority }}">{{ issue.priority }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Story Points</span>
-                        <span class="value">{{ issue.story_points or '-' }}</span>
-                    </div>
-                </div>
-
-                <div class="sidebar-card">
-                    <h4>People</h4>
-                    <div class="detail-row">
-                        <span class="label">Assignee</span>
-                        {% if assignee %}
-                        <span class="avatar-inline">
-                            <span class="avatar" style="background:{{ assignee.avatar_color }}">{{ assignee.name[0] }}</span>
-                            {{ assignee.name }}
-                        </span>
-                        {% else %}
-                        <span class="value" style="color:#94a3b8;">Unassigned</span>
-                        {% endif %}
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Reporter</span>
-                        {% if reporter %}
-                        <span class="avatar-inline">
-                            <span class="avatar" style="background:{{ reporter.avatar_color }}">{{ reporter.name[0] }}</span>
-                            {{ reporter.name }}
-                        </span>
-                        {% else %}
-                        <span class="value">-</span>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="sidebar-card">
-                    <h4>Context</h4>
-                    <div class="detail-row">
-                        <span class="label">Project</span>
-                        {% if project %}
-                        <a href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=project.id) }}" style="color:#3b82f6;text-decoration:none;font-size:.88rem;">{{ project.name }}</a>
-                        {% else %}
-                        <span class="value">-</span>
-                        {% endif %}
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Sprint</span>
-                        {% if sprint %}
-                        <a href="{{ url_for('project-mgmt-issue-tracking.sprint_detail', sprint_id=sprint.id) }}" style="color:#3b82f6;text-decoration:none;font-size:.88rem;">{{ sprint.name }}</a>
-                        {% else %}
-                        <span class="value" style="color:#94a3b8;">Backlog</span>
-                        {% endif %}
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Created</span>
-                        <span class="value" style="font-size:.82rem;">{{ issue.created_at[:10] }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Updated</span>
-                        <span class="value" style="font-size:.82rem;">{{ issue.updated_at[:10] }}</span>
-                    </div>
-                </div>
-
-                {% if issue.labels %}
-                <div class="sidebar-card">
-                    <h4>Labels</h4>
-                    <div>
-                        {% for label in issue.labels %}
-                        <span class="label-tag">{{ label }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
+            <div class="field-row">
+                <span class="k">Reporter</span>
+                {% if reporter %}
+                <span class="v" style="display:inline-flex;align-items:center;gap:6px;">
+                    <span class="avatar" style="width:24px;height:24px;font-size:.7rem;background:{{ reporter.avatar_color }}">{{ reporter.name[0] }}</span>
+                    {{ reporter.name }}
+                </span>
+                {% else %}
+                <span class="v">-</span>
                 {% endif %}
             </div>
         </div>
+
+        <div class="card">
+            <h4 style="font-size:.8rem;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Context</h4>
+            <div class="field-row">
+                <span class="k">Project</span>
+                {% if project %}
+                <a class="v" style="color:var(--accent);" href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=project.id) }}">{{ project.name }}</a>
+                {% else %}
+                <span class="v">-</span>
+                {% endif %}
+            </div>
+            <div class="field-row">
+                <span class="k">Sprint</span>
+                {% if sprint %}
+                <a class="v" style="color:var(--accent);" href="{{ url_for('project-mgmt-issue-tracking.sprint_detail', sprint_id=sprint.id) }}">{{ sprint.name }}</a>
+                {% else %}
+                <span class="v" style="color:var(--faint);">Backlog</span>
+                {% endif %}
+            </div>
+            <div class="field-row">
+                <span class="k">Created</span>
+                <span class="v" style="font-size:.82rem;">{{ issue.created_at[:10] }}</span>
+            </div>
+            <div class="field-row">
+                <span class="k">Updated</span>
+                <span class="v" style="font-size:.82rem;">{{ issue.updated_at[:10] }}</span>
+            </div>
+        </div>
+
+        {% if issue.labels %}
+        <div class="card">
+            <h4 style="font-size:.8rem;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Labels</h4>
+            <div>
+                {% for label in issue.labels %}
+                <span class="chip" style="margin:2px 3px 2px 0;">{{ label }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function() {
+    var watchBtn = document.getElementById('watch-toggle-btn');
+    var currentUserId = {{ user.id if user else 1 }};
+    function setState(watching) {
+        watchBtn.setAttribute('aria-pressed', watching ? 'true' : 'false');
+        watchBtn.textContent = watching ? 'Watching' : 'Watch';
+    }
+    fetch('{{ url_for("project-mgmt-issue-tracking.api_issue_watchers", issue_id=issue.id) }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { setState(data.watchers.indexOf(currentUserId) !== -1); });
+    watchBtn.addEventListener('click', function() {
+        fetch('{{ url_for("project-mgmt-issue-tracking.api_toggle_watch", issue_id=issue.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: currentUserId})
+        }).then(function(r) { return r.json(); })
+          .then(function(data) { setState(data.action === 'watched'); });
+    });
+})();
+</script>
+<script>
+document.getElementById('delete-issue-btn').addEventListener('click', function() {
+    var btn = this;
+    btn.textContent = 'Deleting...';
+    btn.disabled = true;
+    fetch('{{ url_for("project-mgmt-issue-tracking.form_delete_issue", issue_id=issue.id) }}', {method: 'POST'})
+        .then(function(r) { return r.ok ? r : Promise.reject(); })
+        .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("project-mgmt-issue-tracking.index") }}'; })
+        .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+});
+</script>
+{% endblock %}

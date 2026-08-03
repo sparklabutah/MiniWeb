@@ -239,6 +239,19 @@ def _sort_issues(issues, sort_key="priority"):
 # HTML routes
 # ---------------------------------------------------------------------------
 
+@blueprint.context_processor
+def _inject_chrome():
+    """Sidebar project list + current user for the shared tracker shell."""
+    try:
+        if "/api/" in request.path:
+            return {}
+        uid = session.get("user_id")
+        user = _get_user(uid) if uid else None
+        return {"chrome_user": user, "sidebar_projects": _load_projects()[:12]}
+    except Exception:
+        return {"chrome_user": None, "sidebar_projects": []}
+
+
 @blueprint.route("/")
 def index():
     """Dashboard — overview of all projects with issue counts and recent activity."""
@@ -277,10 +290,23 @@ def index():
                      and i["status"] not in ("done", "closed")]
         my_issues = _sort_issues(my_issues, "priority")
 
+    def _cnt(pred):
+        return sum(1 for i in issues if pred(i))
+    kpis = {
+        "total": len(issues),
+        "open": _cnt(lambda i: i["status"] == "open"),
+        "in_progress": _cnt(lambda i: i["status"] == "in_progress"),
+        "review": _cnt(lambda i: i["status"] == "review"),
+        "done": _cnt(lambda i: i["status"] in ("done", "closed")),
+        "critical": _cnt(lambda i: i["priority"] == "critical" and i["status"] not in ("done", "closed")),
+        "my_open": len(my_issues),
+    }
+
     return render_template("project-mgmt-issue-tracking/index.html",
                            project_stats=project_stats,
                            recent_issues=recent,
                            my_issues=my_issues,
+                           kpis=kpis,
                            user=user,
                            user_lookup=user_lookup,
                            project_lookup=_project_map())

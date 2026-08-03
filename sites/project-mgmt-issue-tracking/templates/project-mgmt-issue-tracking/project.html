@@ -1,157 +1,83 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ project.name }} - Meridian Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; }
-        .topbar { background: #1e293b; color: #fff; padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
-        .topbar h1 { font-size: 1.2rem; font-weight: 600; }
-        .topbar a { color: #94a3b8; text-decoration: none; font-size: .85rem; }
-        .topbar a:hover { color: #fff; }
-        .topbar-nav { display: flex; gap: 1.25rem; align-items: center; }
-        .topbar-nav a { color: #cbd5e1; }
-        .user-badge { background: #334155; padding: .3rem .6rem; border-radius: .25rem; font-size: .8rem; color: #e2e8f0; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 1rem 1.5rem; }
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page-header h2 { font-size: 1.3rem; }
-        .page-header .key-badge { background: #e2e8f0; color: #475569; font-size: .75rem; font-weight: 600; padding: .2rem .5rem; border-radius: .2rem; margin-left: .5rem; }
-        .filters { display: flex; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
-        .filters input, .filters select { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .85rem; background: #fff; }
-        .filters input { min-width: 200px; }
-        .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: .75rem; min-height: 400px; }
-        .board-col { background: #f8fafc; border-radius: .5rem; padding: .5rem; min-height: 300px; }
-        .board-col-header { font-size: .75rem; font-weight: 700; text-transform: uppercase; color: #64748b; padding: .4rem .5rem; margin-bottom: .5rem; display: flex; justify-content: space-between; }
-        .board-col-header .count { background: #e2e8f0; color: #475569; padding: .1rem .4rem; border-radius: .2rem; font-size: .7rem; }
-        .board-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .75rem; margin-bottom: .5rem; transition: box-shadow .15s; }
-        .board-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.08); }
-        .board-card .card-key { font-family: monospace; font-size: .72rem; color: #3b82f6; text-decoration: none; font-weight: 600; }
-        .board-card .card-key:hover { text-decoration: underline; }
-        .board-card .card-title { font-size: .85rem; margin: .3rem 0; line-height: 1.3; }
-        .board-card .card-title a { color: #1e293b; text-decoration: none; }
-        .board-card .card-title a:hover { color: #3b82f6; }
-        .board-card .card-meta { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-        .badge { display: inline-block; padding: .1rem .4rem; border-radius: .2rem; font-size: .68rem; font-weight: 600; text-transform: uppercase; }
-        .badge-bug { background: #fef2f2; color: #dc2626; }
-        .badge-feature { background: #eff6ff; color: #2563eb; }
-        .badge-task { background: #f0fdf4; color: #16a34a; }
-        .badge-story { background: #fefce8; color: #ca8a04; }
-        .badge-critical { background: #fef2f2; color: #dc2626; }
-        .badge-high { background: #fff7ed; color: #ea580c; }
-        .badge-medium { background: #fefce8; color: #ca8a04; }
-        .badge-low { background: #f0fdf4; color: #16a34a; }
-        .avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: .65rem; font-weight: 600; color: #fff; }
-        .sp-badge { background: #f1f5f9; color: #475569; font-size: .68rem; padding: .1rem .35rem; border-radius: .2rem; }
-        .col-open .board-col-header { border-bottom: 2px solid #3b82f6; }
-        .col-in_progress .board-col-header { border-bottom: 2px solid #f59e0b; }
-        .col-review .board-col-header { border-bottom: 2px solid #8b5cf6; }
-        .col-done .board-col-header { border-bottom: 2px solid #10b981; }
-        .col-closed .board-col-header { border-bottom: 2px solid #94a3b8; }
-        .btn { display: inline-block; padding: .4rem .8rem; border-radius: .35rem; font-size: .82rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
-        .btn-primary { background: #3b82f6; color: #fff; }
-        .btn-primary:hover { background: #2563eb; }
-        .btn-outline { background: transparent; color: #3b82f6; border: 1px solid #3b82f6; }
-        .btn-outline:hover { background: #eff6ff; }
-        @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
-        .project-desc { color: #64748b; font-size: .88rem; margin-bottom: 1rem; }
-        .back-link { font-size: .85rem; color: #3b82f6; text-decoration: none; }
-        .back-link:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <h1>Meridian Tracker</h1>
-        <div class="topbar-nav">
-            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Dashboard</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}">Sprints</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}">Backlog</a>
-            <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page', project=project.id) }}">+ New Issue</a>
-            {% if user %}
-            <span class="user-badge">{{ user.name }}</span>
-            {% endif %}
-            <a href="/">&larr; MiniWeb</a>
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active_project_id = project.id %}
+{% block title %}{{ project.name }} - Meridian Tracker{% endblock %}
+{% block topbar %}
+<div>
+    <div class="crumb"><a href="{{ url_for('project-mgmt-issue-tracking.index') }}">Projects</a> / {{ project.key }}</div>
+    <h1>{{ project.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+
+{% if project.description %}<div style="color:var(--muted);font-size:.9rem;margin-bottom:16px;">{{ project.description }}</div>{% endif %}
+
+<form class="filters" method="GET" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+    <input type="text" name="q" placeholder="Search issues..." value="{{ q }}" autocomplete="off" style="width:auto;min-width:200px;">
+    <select name="sprint" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Sprints</option>
+        {% for s in sprints %}
+        <option value="{{ s.id }}" {% if sprint_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="assignee" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Assignees</option>
+        {% for u in users %}
+        <option value="{{ u.id }}" {% if assignee == u.id %}selected{% endif %}>{{ u.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="type" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Types</option>
+        <option value="bug" {% if type_filter == 'bug' %}selected{% endif %}>Bug</option>
+        <option value="feature" {% if type_filter == 'feature' %}selected{% endif %}>Feature</option>
+        <option value="task" {% if type_filter == 'task' %}selected{% endif %}>Task</option>
+        <option value="story" {% if type_filter == 'story' %}selected{% endif %}>Story</option>
+    </select>
+    <select name="priority" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Priorities</option>
+        <option value="critical" {% if priority_filter == 'critical' %}selected{% endif %}>Critical</option>
+        <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>High</option>
+        <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
+        <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
+    </select>
+    <label for="date_from" style="font-size:.8rem;color:var(--muted);">Created from</label>
+    <input type="date" id="date_from" name="date_from" value="{{ date_from }}" style="width:auto;">
+    <label for="date_to" style="font-size:.8rem;color:var(--muted);">to</label>
+    <input type="date" id="date_to" name="date_to" value="{{ date_to }}" style="width:auto;">
+    <button type="submit" class="btn">Filter</button>
+</form>
+
+<form class="filters" method="GET" action="{{ url_for('project-mgmt-issue-tracking.api_export') }}" style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+    <input type="hidden" name="project_id" value="{{ project.id }}">
+    <label for="export-format" style="font-size:.8rem;color:var(--muted);">Export issues as</label>
+    <select id="export-format" name="format" style="width:auto;">
+        <option value="csv">CSV</option>
+        <option value="json">JSON</option>
+    </select>
+    <button type="submit" class="btn">Export</button>
+</form>
+
+<div class="board">
+    {% for status in status_order %}
+    <div class="bcol col-{{ status }}">
+        <div class="bcol-h">
+            {{ status|replace('_', ' ') }}
+            <span class="n">{{ columns[status]|length }}</span>
         </div>
-    </div>
-
-    <div class="container">
-        <a class="back-link" href="{{ url_for('project-mgmt-issue-tracking.index') }}">&larr; All Projects</a>
-        <div class="page-header">
-            <h2>{{ project.name }} <span class="key-badge">{{ project.key }}</span></h2>
-        </div>
-        <div class="project-desc">{{ project.description }}</div>
-
-        <form class="filters" method="GET">
-            <input type="text" name="q" placeholder="Search issues..." value="{{ q }}" autocomplete="off">
-            <select name="sprint" onchange="this.form.submit()">
-                <option value="">All Sprints</option>
-                {% for s in sprints %}
-                <option value="{{ s.id }}" {% if sprint_id == s.id %}selected{% endif %}>{{ s.name }}</option>
-                {% endfor %}
-            </select>
-            <select name="assignee" onchange="this.form.submit()">
-                <option value="">All Assignees</option>
-                {% for u in users %}
-                <option value="{{ u.id }}" {% if assignee == u.id %}selected{% endif %}>{{ u.name }}</option>
-                {% endfor %}
-            </select>
-            <select name="type" onchange="this.form.submit()">
-                <option value="">All Types</option>
-                <option value="bug" {% if type_filter == 'bug' %}selected{% endif %}>Bug</option>
-                <option value="feature" {% if type_filter == 'feature' %}selected{% endif %}>Feature</option>
-                <option value="task" {% if type_filter == 'task' %}selected{% endif %}>Task</option>
-                <option value="story" {% if type_filter == 'story' %}selected{% endif %}>Story</option>
-            </select>
-            <select name="priority" onchange="this.form.submit()">
-                <option value="">All Priorities</option>
-                <option value="critical" {% if priority_filter == 'critical' %}selected{% endif %}>Critical</option>
-                <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>High</option>
-                <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
-                <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
-            </select>
-            <label for="date_from" style="font-size:.8rem;color:#64748b;">Created from</label>
-            <input type="date" id="date_from" name="date_from" value="{{ date_from }}" style="min-width:0;">
-            <label for="date_to" style="font-size:.8rem;color:#64748b;">to</label>
-            <input type="date" id="date_to" name="date_to" value="{{ date_to }}" style="min-width:0;">
-            <button type="submit" class="btn btn-outline">Filter</button>
-        </form>
-
-        <form class="filters" method="GET" action="{{ url_for('project-mgmt-issue-tracking.api_export') }}">
-            <input type="hidden" name="project_id" value="{{ project.id }}">
-            <label for="export-format" style="font-size:.8rem;color:#64748b;">Export issues as</label>
-            <select id="export-format" name="format">
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-            </select>
-            <button type="submit" class="btn btn-outline">Export</button>
-        </form>
-
-        <div class="board">
-            {% for status in status_order %}
-            <div class="board-col col-{{ status }}">
-                <div class="board-col-header">
-                    {{ status|replace('_', ' ')|upper }}
-                    <span class="count">{{ columns[status]|length }}</span>
-                </div>
-                {% for issue in columns[status] %}
-                <div class="board-card">
-                    <a class="card-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
-                    <div class="card-title"><a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:65] }}{% if issue.title|length > 65 %}...{% endif %}</a></div>
-                    <div class="card-meta">
-                        <span class="badge badge-{{ issue.type }}">{{ issue.type }}</span>
-                        <span class="badge badge-{{ issue.priority }}">{{ issue.priority }}</span>
-                        {% if issue.story_points %}<span class="sp-badge">{{ issue.story_points }} SP</span>{% endif %}
-                        {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
-                        <span class="avatar" style="background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+        {% for issue in columns[status] %}
+        <div class="bcard">
+            <a class="bk" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a>
+            <div class="bt"><a href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.title[:65] }}{% if issue.title|length > 65 %}...{% endif %}</a></div>
+            <div class="bmeta">
+                <span class="badge ty-{{ issue.type }}">{{ issue.type|title }}</span>
+                <span class="badge pr-{{ issue.priority }}">{{ issue.priority|title }}</span>
+                {% if issue.story_points %}<span class="sp-badge">{{ issue.story_points }} SP</span>{% endif %}
+                {% if issue.assignee_id and user_lookup.get(issue.assignee_id) %}
+                <span class="avatar" style="width:22px;height:22px;font-size:.65rem;background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
+                {% endif %}
             </div>
-            {% endfor %}
         </div>
+        {% endfor %}
     </div>
-</body>
-</html>
+    {% endfor %}
+</div>
+{% endblock %}
