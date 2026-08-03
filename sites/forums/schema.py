@@ -18,6 +18,8 @@ TABLES = {
         ],
         "indexes": [
             "post_id",
+            "author",
+            "parent_comment_id",
         ],
     },
     "posts": {
@@ -39,6 +41,7 @@ TABLES = {
         ],
         "indexes": [
             "subreddit",
+            "author",
         ],
     },
     "messages": {

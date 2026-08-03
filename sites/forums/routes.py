@@ -338,6 +338,65 @@ def _semantic_score(query_tokens, text):
 # Template context
 # ---------------------------------------------------------------------------
 
+def _msg_read(m):
+    """True if a message has been read (handles int/str/bool overlay values)."""
+    return str(m.get("read", 0)).lower() not in ("0", "", "none", "false")
+
+
+def _unread_message_count(username):
+    """Count of unread inbox messages for a user (overlay-aware, small table)."""
+    return sum(1 for m in _load_messages()
+               if m.get("to_username") == username and not _msg_read(m))
+
+
+def _build_notifications(username, limit=10):
+    """Recent activity notifications: comments on your posts and replies to
+    your comments, newest first. Two index-friendly queries merged in Python
+    (a single OR-of-subqueries can't use the author/parent indexes)."""
+    ct = db.get_table_name(SITE, "comments")
+    pt = db.get_table_name(SITE, "posts")
+    if not ct or not pt:
+        return []
+
+    def _ids(sql, params):
+        return [r["id"] for r in db.execute(sql, params)]
+
+    # My most-recent posts and comments (bounded so the IN clause stays small).
+    my_posts = _ids(f"SELECT id FROM [{pt}] WHERE author=? ORDER BY created_utc DESC LIMIT 200",
+                    (username,))
+    my_comments = _ids(f"SELECT id FROM [{ct}] WHERE author=? ORDER BY created_utc DESC LIMIT 200",
+                       (username,))
+
+    def _select(id_col, ids, kind):
+        if not ids:
+            return []
+        ph = ",".join("?" * len(ids))
+        rows = db.execute(
+            f"""SELECT c.author AS actor, c.body AS body, c.post_id AS post_id,
+                       c.created_utc AS created_utc, c.id AS comment_id,
+                       p.title AS post_title, p.subreddit AS subreddit
+                FROM [{ct}] c LEFT JOIN [{pt}] p ON c.post_id = p.id
+                WHERE c.[{id_col}] IN ({ph}) AND c.author <> ?
+                ORDER BY c.created_utc DESC LIMIT ?""",
+            tuple(ids) + (username, limit),
+        )
+        return [dict(r, kind=kind) for r in rows]
+
+    merged = _select("post_id", my_posts, "comment") + _select("parent_comment_id", my_comments, "reply")
+    # Replies to my comments take precedence if a row appears in both sets.
+    seen, out = set(), []
+    for n in sorted(merged, key=lambda x: x.get("created_utc") or "", reverse=True):
+        cid = n.get("comment_id")
+        if cid in seen:
+            continue
+        seen.add(cid)
+        n["color"] = _avatar_color(n.get("actor") or "")
+        out.append(n)
+        if len(out) >= limit:
+            break
+    return out
+
+
 @blueprint.context_processor
 def _inject_helpers():
     user = _get_current_user()
@@ -346,12 +405,25 @@ def _inject_helpers():
         "format_time_ago": _format_time_ago,
         "all_subreddits": _get_subreddits,
         "avatar_color": _avatar_color,
+        "unread_messages": 0,
+        "notif_count": 0,
+        "notifications": [],
     }
-    # Nav rail data (skip on API/JSON routes to avoid needless queries)
+    # Nav rail + notification data (skip on API/JSON routes to avoid queries)
     try:
-        if "/api/" not in request.path:
+        if user and "/api/" not in request.path:
             ctx["nav_communities"] = _top_communities(12)
             ctx["my_communities"] = _my_communities(user)
+            me = user["username"]
+            ctx["unread_messages"] = _unread_message_count(me)
+            notifs = _build_notifications(me, limit=10)
+            ctx["notifications"] = notifs
+            seen_at = session.get("forums_notifs_seen_at", "")
+            ctx["notif_count"] = sum(1 for n in notifs
+                                     if (n.get("created_utc") or "") > seen_at)
+        elif "/api/" not in request.path:
+            ctx["nav_communities"] = _top_communities(12)
+            ctx["my_communities"] = []
     except Exception:
         ctx["nav_communities"] = []
         ctx["my_communities"] = []
@@ -654,8 +726,7 @@ def messages_page():
         msgs.sort(key=lambda m: m.get("created_utc", ""))
         last = msgs[-1]
         unread = sum(1 for m in msgs
-                     if m.get("to_username") == me
-                     and str(m.get("read", 0)) in ("0", "", "None", "False", "false"))
+                     if m.get("to_username") == me and not _msg_read(m))
         for m in msgs:
             m["_mine"] = m.get("from_username") == me
         conversations.append({
@@ -669,6 +740,14 @@ def messages_page():
         })
     conversations.sort(key=lambda c: c["last_utc"], reverse=True)
     total_unread = sum(c["unread"] for c in conversations)
+    # Mark inbox messages read now that they're being viewed. Done after the
+    # view context is built so this page still shows the "new" highlights,
+    # while the topbar badge (context processor, evaluated at render) clears.
+    for m in inbox:
+        if not _msg_read(m):
+            updated = dict(m)
+            updated["read"] = 1
+            db.save_item(SITE, "messages", m["id"], updated)
     return render_template("forums/messages.html", inbox=inbox, sent=sent,
                            conversations=conversations, total_unread=total_unread,
                            me=me)
@@ -888,6 +967,17 @@ def api_vote_comment(comment_id):
     db.save_item(SITE, "comments", comment_id, comment)
     return jsonify({"id": comment_id, "score": comment["score"],
                     "direction": direction, "user_vote": user_vote})
+
+
+@blueprint.route("/api/notifications/seen", methods=["POST"])
+def api_notifications_seen():
+    """Mark all notifications as seen — clears the topbar bell badge."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+    session["forums_notifs_seen_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    session.modified = True
+    return jsonify({"status": "ok", "count": 0})
 
 
 # ---------------------------------------------------------------------------

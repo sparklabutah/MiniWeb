@@ -13,7 +13,30 @@
             Create
         </a>
         {% if current_user %}
-            <a class="lnk" href="{{ url_for('forums.messages_page') }}">Messages</a>
+            <div class="rd-bell-wrap">
+                <button class="rd-iconbtn" id="rd-bell" onclick="toggleNotifs(event)" title="Notifications" aria-label="Notifications">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    {% if notif_count %}<span class="rd-badge" id="rd-notif-badge">{{ notif_count if notif_count < 100 else '99+' }}</span>{% endif %}
+                </button>
+                <div class="rd-notif-menu" id="rd-notif-menu">
+                    <div class="rd-notif-head">Notifications</div>
+                    <div class="rd-notif-body">
+                        {% for n in notifications %}
+                        <a class="rd-notif-item" href="{{ url_for('forums.post_detail', post_id=n.post_id) }}">
+                            <span class="av sm" style="background:{{ n.color }};">{{ n.actor[0]|upper }}</span>
+                            <span class="rd-notif-txt">
+                                <b>u/{{ n.actor }}</b> {{ 'replied to your comment' if n.kind == 'reply' else 'commented on your post' }}{% if n.post_title %} <span class="rd-notif-ctx">in “{{ n.post_title[:48] }}”</span>{% endif %}
+                                <span class="rd-notif-body-snip">{{ n.body[:80] }}</span>
+                                <span class="rd-notif-when">{{ format_time_ago(n.created_utc) }}</span>
+                            </span>
+                        </a>
+                        {% else %}
+                        <div class="rd-notif-empty">You're all caught up.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <a class="lnk rd-msg-lnk" href="{{ url_for('forums.messages_page') }}">Messages{% if unread_messages %} <span class="rd-badge inline">{{ unread_messages if unread_messages < 100 else '99+' }}</span>{% endif %}</a>
             <a class="lnk" href="{{ url_for('forums.logout') }}">Log Out</a>
             <a href="{{ url_for('forums.user_profile', username=current_user.username) }}" class="rd-uav" title="u/{{ current_user.username }}" style="background:{{ avatar_color(current_user.username) }};">{{ current_user.username[0]|upper }}</a>
         {% else %}
@@ -21,3 +44,20 @@
         {% endif %}
     </div>
 </div>
+<script>
+    function toggleNotifs(e) {
+        e.stopPropagation();
+        var menu = document.getElementById('rd-notif-menu');
+        var open = menu.classList.toggle('open');
+        if (open) {
+            // Clear the badge server-side once the tray is opened.
+            var badge = document.getElementById('rd-notif-badge');
+            fetch('{{ url_for("forums.index") }}api/notifications/seen', {method: 'POST'})
+                .then(function(){ if (badge) badge.remove(); }).catch(function(){});
+        }
+    }
+    document.addEventListener('click', function(e){
+        var wrap = e.target.closest && e.target.closest('.rd-bell-wrap');
+        if (!wrap) { var m = document.getElementById('rd-notif-menu'); if (m) m.classList.remove('open'); }
+    });
+</script>
