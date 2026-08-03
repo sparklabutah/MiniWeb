@@ -1,10 +1,11 @@
-"""Create + register the sports-esports `comments` table.
+"""Create + register the sports-esports runtime tables (`comments`,
+`subscriptions`).
 
-Match comments had no base table, so posted comments saved to the session
-overlay but `db.query` could never read them back (the collection wasn't
-registered) — they vanished. This creates and registers the table from the
-schema. Idempotent. Run with the miniweb conda python; re-run after any DB
-rebuild, then push the DB to railway.
+These collections had no base table, so writes saved to the session overlay
+but `db.query` could never read them back (the collection wasn't registered) —
+comments vanished and league notification subscriptions never persisted. This
+creates and registers them from the schema. Idempotent. Run with the miniweb
+conda python; re-run after any DB rebuild, then push the DB to railway.
 """
 import importlib.util
 import sys
@@ -18,15 +19,17 @@ spec.loader.exec_module(schema)
 
 
 def main():
-    c = schema.TABLES["comments"]
     app = create_app()
     with app.app_context():
         conn = db._get_conn()
-        db.create_site_table(conn, c["table_name"], c["columns"], c.get("indexes"))
-        db.register_table("sports-esports", "comments", c["table_name"], pk_column="id", conn=conn)
+        for coll in ("comments", "subscriptions"):
+            c = schema.TABLES[coll]
+            db.create_site_table(conn, c["table_name"], c["columns"], c.get("indexes"))
+            db.register_table("sports-esports", coll, c["table_name"], pk_column="id", conn=conn)
         conn.commit()
-        print(f"OK: {db.get_table_name('sports-esports', 'comments')} "
-              f"({db.count('sports-esports', 'comments')} rows)")
+        for coll in ("comments", "subscriptions"):
+            print(f"OK: {db.get_table_name('sports-esports', coll)} "
+                  f"({db.count('sports-esports', coll)} rows)")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,17 @@ TABLES = {
             "match_id",
         ],
     },
+    "subscriptions": {
+        "table_name": "sports_esports_subscriptions",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("league_ids", "TEXT NOT NULL DEFAULT '[]'"),
+        ],
+        "indexes": [
+            "user_id",
+        ],
+    },
     "favorites": {
         "table_name": "sports_esports_favorites",
         "columns": [

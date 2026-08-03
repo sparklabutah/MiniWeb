@@ -165,8 +165,14 @@ def league_detail(league_id):
     matches = [_enrich_match(m, all_teams, leagues)
                for m in _load_matches() if m["league_id"] == league_id]
     matches.sort(key=lambda m: m["date"], reverse=True)
+    user = _get_current_user()
+    is_subscribed = False
+    if user:
+        sub = next((s for s in _load_subscriptions() if s["user_id"] == user["id"]), None)
+        is_subscribed = bool(sub and league_id in (sub.get("league_ids") or []))
     return render_template("sports-esports/league.html",
-                           league=league, teams=teams, matches=matches)
+                           league=league, teams=teams, matches=matches,
+                           is_subscribed=is_subscribed)
 
 
 @blueprint.route("/team/<int:team_id>")

@@ -15,9 +15,36 @@
         <div class="detail-card">
             <div class="page-title">{{ league.name }}</div>
             <div class="meta">{{ league.sport }} &middot; {{ league.season }} &middot; {{ league.country }}</div>
-            <form action="{{ url_for('sports-esports.form_league_subscribe', league_id=league.id) }}" method="post" style="margin-top: .75rem;">
-                <button type="submit" id="subscribe-btn">Subscribe to Notifications</button>
-            </form>
+            <div style="margin-top:.75rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <button type="button" id="subscribe-btn" class="{{ 'subscribed' if is_subscribed }}" onclick="toggleSubscribe()">
+                    {{ '&#10003; Subscribed' | safe if is_subscribed else '&#128276; Subscribe to Notifications' | safe }}
+                </button>
+                <span id="subscribe-msg" style="font-size:.85rem;color:#00a88a;font-weight:600;"></span>
+            </div>
+            <script>
+            function toggleSubscribe() {
+                var btn = document.getElementById('subscribe-btn');
+                var msg = document.getElementById('subscribe-msg');
+                btn.disabled = true;
+                fetch('{{ url_for("sports-esports.api_league_subscribe", league_id=league.id) }}', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}
+                }).then(function(r) {
+                    if (r.status === 401) throw new Error('signin');
+                    return r.json();
+                }).then(function(d) {
+                    var on = d.action === 'subscribed';
+                    btn.innerHTML = on ? '&#10003; Subscribed' : '&#128276; Subscribe to Notifications';
+                    btn.classList.toggle('subscribed', on);
+                    msg.textContent = on ? "You'll be notified about {{ league.abbreviation }} games." : 'Notifications turned off.';
+                    msg.style.color = on ? '#00a88a' : '#6b7280';
+                    btn.disabled = false;
+                }).catch(function(e) {
+                    btn.disabled = false;
+                    msg.style.color = '#d50a0a';
+                    msg.textContent = e.message === 'signin' ? 'Please sign in to subscribe.' : 'Something went wrong. Try again.';
+                });
+            }
+            </script>
         </div>
 
         <div class="section-title">Standings</div>
