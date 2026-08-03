@@ -43,6 +43,28 @@
         .state-closed { color: #f85149; }
 
         .branch-tag { background: #1f6feb22; color: #58a6ff; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+
+        .file-table { width: 100%; border-collapse: collapse; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+        .file-table th { text-align: left; font-size: 12px; color: #8b949e; font-weight: 500; padding: 8px 16px; background: #161b22; border-bottom: 1px solid #30363d; }
+        .file-table td { padding: 7px 16px; font-size: 14px; border-bottom: 1px solid #21262d; }
+        .file-table tr:last-child td { border-bottom: none; }
+        .file-icon { fill: #8b949e; vertical-align: middle; margin-right: 8px; }
+        .file-name { color: #e6edf3; }
+        .file-name.dir { color: #58a6ff; font-weight: 500; }
+        .file-size { text-align: right; color: #8b949e; font-size: 12px; }
+        .readme-container { border: 1px solid #30363d; border-radius: 6px; margin-top: 20px; }
+        .readme-header { background: #161b22; padding: 8px 16px; border-bottom: 1px solid #30363d; font-size: 14px; font-weight: 600; }
+        .readme-body { padding: 24px 32px; font-size: 14px; line-height: 1.6; }
+        .readme-body pre { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; overflow-x: auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; margin: 12px 0; white-space: pre; }
+        .readme-body h1 { font-size: 24px; border-bottom: 1px solid #21262d; padding-bottom: 8px; margin: 4px 0 12px; }
+        .readme-body h2 { font-size: 18px; margin: 20px 0 8px; }
+        .readme-body code { background: #161b22; border-radius: 4px; padding: 2px 6px; font-size: 85%; font-family: ui-monospace, Menlo, Consolas, monospace; }
+        .commits-list { list-style: none; border: 1px solid #30363d; border-radius: 6px; }
+        .commit-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #21262d; }
+        .commit-item:last-child { border-bottom: none; }
+        .commit-msg { font-size: 14px; font-weight: 500; color: #e6edf3; }
+        .commit-meta { font-size: 12px; color: #8b949e; margin-top: 2px; }
+        .commit-sha { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #58a6ff; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 2px 8px; }
     </style>
 </head>
 <body>
@@ -82,6 +104,69 @@
             <span class="stat">Last active: {{ project.last_activity_at[:10] if project.last_activity_at else 'N/A' }}</span>
         </div>
     </div>
+
+    {% if files %}
+    <div class="section-title">Files <span class="count">main branch</span></div>
+    <table class="file-table">
+        <thead><tr><th style="width:55%">Name</th><th>Type</th><th style="text-align:right">Size</th></tr></thead>
+        <tbody>
+        {% for f in files %}
+        <tr>
+            <td>
+                {% if f.type == 'dir' %}
+                <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
+                <span class="file-name dir">{{ f.name }}</span>
+                {% else %}
+                <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Z"></path></svg>
+                <span class="file-name">{{ f.name }}</span>
+                {% endif %}
+            </td>
+            <td style="color:#484f58; font-size:13px;">{{ f.type }}</td>
+            <td class="file-size">{% if f.type == 'file' %}{{ f.size }} B{% else %}--{% endif %}</td>
+        </tr>
+        {% if f.type == 'dir' and f.children %}
+            {% for child in f.children %}
+            <tr>
+                <td style="padding-left:40px;">
+                    {% if child.type == 'dir' %}
+                    <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
+                    <span class="file-name dir">{{ child.name }}</span>
+                    {% else %}
+                    <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Z"></path></svg>
+                    <span class="file-name">{{ child.name }}</span>
+                    {% endif %}
+                </td>
+                <td style="color:#484f58; font-size:13px;">{{ child.type }}</td>
+                <td class="file-size">{% if child.type == 'file' %}{{ child.size }} B{% else %}--{% endif %}</td>
+            </tr>
+            {% endfor %}
+        {% endif %}
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if readme %}
+    <div class="readme-container">
+        <div class="readme-header">README.md</div>
+        <div class="readme-body"><p>{{ readme | replace('\n\n', '</p><p>') | replace('\n', '<br>') | safe }}</p></div>
+    </div>
+    {% endif %}
+
+    {% if commits %}
+    <div class="section-title">Recent commits <span class="count">{{ commits|length }}</span></div>
+    <ul class="commits-list">
+        {% for c in commits %}
+        <li class="commit-item">
+            <div>
+                <div class="commit-msg">{{ c.message }}</div>
+                <div class="commit-meta">{{ c.author }} committed on {{ c.date[:10] }} &middot; +{{ c.additions }} &minus;{{ c.deletions }}</div>
+            </div>
+            <span class="commit-sha">{{ c.sha }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
 
     <div class="section-title">
         Issues <span class="count">{{ issue_count }} total</span>

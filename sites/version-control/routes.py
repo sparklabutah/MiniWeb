@@ -7,7 +7,9 @@ and JSON APIs.  Session mutations are isolated per user via db.query().
 import json
 import pathlib
 import copy
-from datetime import datetime
+import hashlib
+import random
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, Response, abort, jsonify, redirect, render_template, request,
@@ -624,6 +626,172 @@ def _sort_repos(repos, sort_by="updated"):
 
 
 # ---------------------------------------------------------------------------
+# Synthetic repo content generator
+# ---------------------------------------------------------------------------
+# Most projects/repos have no hand-authored file tree, commits, or README, so
+# their detail pages looked empty. Generate realistic, stack-appropriate
+# content deterministically from the repo name so every page is populated and
+# stable across reloads.
+
+_STACKS = {
+    "python": {
+        "root": [("README.md", 3800), ("pyproject.toml", 1400), (".gitignore", 520),
+                 ("requirements.txt", 340), (".gitlab-ci.yml", 780), ("LICENSE", 1070)],
+        "src_dir": "src", "src": [("__init__.py", 60), ("main.py", 2400), ("config.py", 910),
+                                    ("models.py", 3100), ("utils.py", 1450)],
+        "subdir": ("api", [("routes.py", 2600), ("schemas.py", 1800)]),
+        "tests": [("test_main.py", 1700), ("test_models.py", 2050), ("conftest.py", 640)],
+        "ext": ".py",
+    },
+    "node": {
+        "root": [("README.md", 3600), ("package.json", 1250), (".gitignore", 480),
+                 ("tsconfig.json", 720), (".eslintrc.json", 410), ("LICENSE", 1070)],
+        "src_dir": "src", "src": [("index.ts", 1900), ("app.ts", 2600), ("router.ts", 1500),
+                                   ("db.ts", 1240)],
+        "subdir": ("components", [("Header.tsx", 1600), ("Layout.tsx", 2100)]),
+        "tests": [("app.test.ts", 1800), ("router.test.ts", 1350)],
+        "ext": ".ts",
+    },
+    "go": {
+        "root": [("README.md", 3400), ("go.mod", 320), ("go.sum", 4800),
+                 ("Makefile", 640), (".gitlab-ci.yml", 810), ("LICENSE", 1070)],
+        "src_dir": "cmd", "src": [("main.go", 2200), ("server.go", 3100)],
+        "subdir": ("internal", [("handler.go", 2700), ("store.go", 2400), ("config.go", 980)]),
+        "tests": [("server_test.go", 2050), ("handler_test.go", 1780)],
+        "ext": ".go",
+    },
+    "docs": {
+        "root": [("README.md", 4200), ("mkdocs.yml", 680), (".gitignore", 210),
+                 ("CONTRIBUTING.md", 1900), ("LICENSE", 1070)],
+        "src_dir": "docs", "src": [("index.md", 2400), ("getting-started.md", 3100),
+                                    ("configuration.md", 2800), ("faq.md", 1600)],
+        "subdir": ("guides", [("deployment.md", 2600), ("upgrading.md", 1900)]),
+        "tests": None,
+        "ext": ".md",
+    },
+}
+
+_COMMIT_VERBS = [
+    ("feat", ["add pagination to the results endpoint", "implement token refresh flow",
+              "add retry with exponential backoff", "support bulk import from CSV",
+              "add health-check and readiness probes", "introduce structured logging",
+              "add configurable rate limiting", "cache expensive lookups in Redis"]),
+    ("fix", ["handle null values in the parser", "correct off-by-one in pagination",
+             "resolve race condition on shutdown", "escape user input in query builder",
+             "prevent duplicate webhook deliveries", "fix timezone handling in reports"]),
+    ("refactor", ["extract client into its own module", "simplify config loading",
+                  "split the god object into services", "replace manual JSON with a schema"]),
+    ("chore", ["bump dependencies to latest patch", "update CI to the new runner image",
+               "tidy up imports and dead code", "add pre-commit hooks"]),
+    ("test", ["add integration tests for the API layer", "cover the error paths",
+              "add a benchmark for the hot path"]),
+    ("docs", ["expand the README with usage examples", "document the configuration options",
+              "add an architecture overview"]),
+]
+
+
+def _pick_stack(name, description):
+    text = (name + " " + (description or "")).lower()
+    if any(k in text for k in ("react", "vue", "node", "npm", "js", "typescript", "frontend", "web", "app", "ui")):
+        return "node"
+    if any(k in text for k in ("go", "golang", "gateway", "grpc", "kube", "k8s", "operator")):
+        return "go"
+    if any(k in text for k in ("doc", "docs", "wiki", "book", "guide", "handbook", "paper", "notes")):
+        return "docs"
+    return "python"  # sensible default (also covers ml/data/api)
+
+
+def _seeded(name):
+    return random.Random(int(hashlib.md5(name.encode()).hexdigest()[:8], 16))
+
+
+def _generate_file_tree(name, description):
+    stack = _STACKS[_pick_stack(name, description)]
+    tree = [{"name": n, "type": "file", "size": s} for n, s in stack["root"]]
+    src_children = [{"name": n, "type": "file", "size": s} for n, s in stack["src"]]
+    sub_name, sub_files = stack["subdir"]
+    src_children.append({
+        "name": sub_name + "/", "type": "dir",
+        "children": [{"name": n, "type": "file", "size": s} for n, s in sub_files],
+    })
+    tree.append({"name": stack["src_dir"] + "/", "type": "dir", "children": src_children})
+    if stack["tests"]:
+        tree.append({"name": "tests/", "type": "dir",
+                     "children": [{"name": n, "type": "file", "size": s} for n, s in stack["tests"]]})
+    return tree
+
+
+def _generate_commits(name, description, author, last_activity):
+    rnd = _seeded(name + "commits")
+    try:
+        base = datetime.strptime((last_activity or "")[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        base = datetime(2026, 6, 1)
+    authors = [a for a in [author, "alex.rivera", "marcus.chen", "aisha.patel", "natalie.kim"] if a]
+    commits = []
+    day_cursor = 0
+    for _ in range(rnd.randint(6, 9)):
+        prefix, msgs = rnd.choice(_COMMIT_VERBS)
+        day_cursor += rnd.randint(1, 6)
+        dt = base - timedelta(days=day_cursor, hours=rnd.randint(0, 20), minutes=rnd.randint(0, 59))
+        commits.append({
+            "sha": hashlib.md5((name + str(day_cursor) + prefix).encode()).hexdigest()[:7],
+            "message": f"{prefix}: {rnd.choice(msgs)}",
+            "author": rnd.choice(authors),
+            "date": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "files_changed": rnd.randint(1, 9),
+            "additions": rnd.randint(5, 400),
+            "deletions": rnd.randint(0, 180),
+        })
+    return commits
+
+
+def _generate_readme(name, description, namespace):
+    stack_key = _pick_stack(name, description)
+    desc = description or f"{name} is a project maintained by the {namespace or 'team'}."
+    install = {
+        "python": "pip install -e .",
+        "node": "npm install",
+        "go": "go build ./...",
+        "docs": "mkdocs serve",
+    }[stack_key]
+    run = {
+        "python": "python -m src.main",
+        "node": "npm run dev",
+        "go": "./bin/server",
+        "docs": "mkdocs build",
+    }[stack_key]
+    return (
+        f"# {name}\n\n"
+        f"{desc}\n\n"
+        f"## Getting started\n\n"
+        f"Clone the repository and install the dependencies:\n\n"
+        f"```\ngit clone git@meridiangit.dev:{namespace or 'team'}/{name}.git\ncd {name}\n{install}\n```\n\n"
+        f"## Running\n\n"
+        f"```\n{run}\n```\n\n"
+        f"## Contributing\n\n"
+        f"Open a merge request against `main`. Please make sure the test suite and "
+        f"the CI pipeline pass before requesting review.\n\n"
+        f"## License\n\n"
+        f"Released under the MIT License."
+    )
+
+
+def _generate_repo_content(repo):
+    """Return (files, commits, readme) generated deterministically for a repo."""
+    name = repo.get("name", "project")
+    description = repo.get("description", "")
+    namespace = repo.get("namespace") or repo.get("owner_username") or repo.get("creator_username") or "team"
+    author = repo.get("owner_username") or repo.get("creator_username") or "alex.rivera"
+    last_activity = repo.get("last_activity") or repo.get("last_activity_at") or ""
+    return (
+        _generate_file_tree(name, description),
+        _generate_commits(name, description, author, last_activity),
+        _generate_readme(name, description, namespace),
+    )
+
+
+# ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
@@ -761,9 +929,15 @@ def repo_detail(repo_id):
         repo = _enrich_repo(repo, users)
         issues = _ISSUES.get(repo_id, [])
 
-    files = _FILE_TREES.get(repo["name"], [])
-    commits = _COMMIT_HISTORIES.get(repo["name"], [])
-    readme = _READMES.get(repo["name"], "")
+    files = _FILE_TREES.get(repo["name"])
+    commits = _COMMIT_HISTORIES.get(repo["name"])
+    readme = _READMES.get(repo["name"])
+    # Fall back to generated content so no repo/project page is empty.
+    if not files or not commits or not readme:
+        gen_files, gen_commits, gen_readme = _generate_repo_content(repo)
+        files = files or gen_files
+        commits = commits or gen_commits
+        readme = readme or gen_readme
     starred = _get_starred(repo_id)
     return render_template(
         "version-control/repo_detail.html",
@@ -1101,6 +1275,13 @@ def project_detail(project_name):
     mr_count = db.count(SITE, "merge_requests_raw",
                         where={"project_name": project_name})
 
+    # Generate repository content (file tree, commits, README) so the project
+    # page shows actual code, not just issues/MRs.
+    creator = db.get_item(SITE, "users_raw", project.get("creator_id", 0))
+    if creator:
+        project["creator_username"] = creator.get("username", "")
+    files, commits, readme = _generate_repo_content(project)
+
     return render_template(
         "version-control/project_detail.html",
         project=project,
@@ -1108,6 +1289,9 @@ def project_detail(project_name):
         issue_count=issue_count,
         merge_requests=mrs,
         mr_count=mr_count,
+        files=files,
+        commits=commits,
+        readme=readme,
     )
 
 
