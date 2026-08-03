@@ -1473,6 +1473,8 @@ def api_send_message():
     messages = _load_messages()
     messages.append(msg)
     _save_messages(messages)
+    emit("message", from_user_id=user["root_user_id"],
+         to_user_id=target["root_user_id"], text=body, source_site="forums")
     return jsonify(msg), 201
 
 
