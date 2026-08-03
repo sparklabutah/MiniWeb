@@ -109,10 +109,41 @@ def _filter_links(links, args):
     return links
 
 
+def _normalize_url(raw):
+    """Normalize and validate a destination URL.
+
+    Accepts input without a scheme (``example.com`` -> ``https://example.com``)
+    since almost nobody types ``http://www`` anymore. Returns
+    ``(normalized_url, None)`` on success or ``(None, error_message)``.
+    """
+    from urllib.parse import urlparse, urlunparse
+    raw = (raw or "").strip()
+    if not raw:
+        return None, "URL is required"
+    # Add a scheme if the user omitted it.
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://", raw):
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https"):
+        return None, "URL must start with http:// or https://"
+    host = parsed.netloc.split("@")[-1].split(":")[0]
+    if not host:
+        return None, "Please enter a valid URL (e.g. example.com)"
+    # Require a dotted hostname with a TLD, or localhost.
+    if host != "localhost" and not re.match(r"^[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", host):
+        return None, "Please enter a valid URL (e.g. example.com)"
+    return urlunparse(parsed), None
+
+
 def _build_link(links, original_url, title, custom_code, owner_id,
                 expires_at=None, redirect_type="301", tags=None,
                 qr_enabled=True, utm_source="", utm_medium="", utm_campaign=""):
     """Build and append a new link record."""
+    original_url, url_err = _normalize_url(original_url)
+    if url_err:
+        return None, url_err
+    if not title:
+        title = original_url[:50]
     short_code = custom_code if custom_code else _generate_short_code()
     existing_codes = {l["short_code"] for l in links}
     if custom_code and custom_code in existing_codes:
@@ -277,7 +308,15 @@ def edit_link_form(link_id):
     link = next((l for l in links if l["id"] == link_id), None)
     if not link:
         abort(404)
-    for field in ("title", "original_url", "expires_at", "redirect_type",
+    # Validate the destination URL just like creation does.
+    new_url = request.form.get("original_url", "").strip()
+    if new_url:
+        normalized, url_err = _normalize_url(new_url)
+        if url_err:
+            return redirect(url_for("url-shorteners-qr.link_detail",
+                                    link_id=link_id, error=url_err))
+        link["original_url"] = normalized
+    for field in ("title", "expires_at", "redirect_type",
                   "utm_source", "utm_medium", "utm_campaign"):
         val = request.form.get(field, "").strip()
         if val:
@@ -468,7 +507,12 @@ def api_link_update(link_id):
     link = next((l for l in links if l["id"] == link_id), None)
     if not link:
         abort(404)
-    for field in ("title", "original_url", "is_active", "expires_at",
+    if "original_url" in data:
+        normalized, url_err = _normalize_url(data.get("original_url"))
+        if url_err:
+            return jsonify({"error": url_err}), 400
+        link["original_url"] = normalized
+    for field in ("title", "is_active", "expires_at",
                   "redirect_type", "qr_enabled",
                   "utm_source", "utm_medium", "utm_campaign"):
         if field in data:
