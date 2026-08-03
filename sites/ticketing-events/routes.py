@@ -126,12 +126,20 @@ def index():
     events = _load_events()
     categories = sorted(set(e["category"] for e in events))
     user, logged_in = _get_browsing_user()
+    # Bound the date-range pickers to the actual event dates so the calendar
+    # opens within the data and cannot drift to an empty month once the real
+    # "today" moves past the last event in this static dataset.
+    dates = sorted(e["date"] for e in events if e.get("date"))
+    date_min = dates[0] if dates else ""
+    date_max = dates[-1] if dates else ""
     return render_template(
         "ticketing-events/index.html",
         events=events,
         categories=categories,
         user=user,
         logged_in=logged_in,
+        date_min=date_min,
+        date_max=date_max,
     )
 
 
