@@ -1,0 +1,24 @@
+<aside class="rd-left">
+    <a class="rd-navitem {{ 'active' if active_nav == 'home' }}" href="{{ url_for('forums.index') }}">
+        <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></span> Home</a>
+    <a class="rd-navitem {{ 'active' if active_nav == 'popular' }}" href="{{ url_for('forums.index', sort='top') }}">
+        <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg></span> Popular</a>
+    <a class="rd-navitem {{ 'active' if active_nav == 'new' }}" href="{{ url_for('forums.index', sort='new') }}">
+        <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.5 6.5L21 10l-5 4 1.5 7L12 17l-5.5 4L8 14l-5-4 6.5-.5z"/></svg></span> Newest</a>
+    <a class="rd-navitem" href="{{ url_for('forums.submit_page') }}">
+        <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span> Create Post</a>
+
+    {% if my_communities %}
+    <div class="rd-divider"></div>
+    <div class="rd-sec">My Communities</div>
+    {% for c in my_communities %}
+    <a class="rd-comm" href="{{ url_for('forums.subreddit_view', subreddit_name=c.name) }}"><span class="av sm" style="background:{{ c.color }};">{{ c.name[0]|upper }}</span> r/{{ c.name }}</a>
+    {% endfor %}
+    {% endif %}
+
+    <div class="rd-divider"></div>
+    <div class="rd-sec">Popular Communities</div>
+    {% for c in nav_communities %}
+    <a class="rd-comm" href="{{ url_for('forums.subreddit_view', subreddit_name=c.name) }}"><span class="av sm" style="background:{{ c.color }};">{{ c.name[0]|upper }}</span> r/{{ c.name }}<span class="cnt">{{ "{:,}".format(c.post_count) }}</span></a>
+    {% endfor %}
+</aside>

@@ -3,102 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>r/{{ subreddit }} - ForumHub</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #dae0e6; color: #1c1c1c; }
-        a { color: #0079d3; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .header { background: #fff; border-bottom: 1px solid #edeff1; padding: 8px 20px; display: flex; align-items: center; gap: 16px; }
-        .header .logo { font-weight: 700; font-size: 20px; color: #ff4500; }
-        .header .nav-links { display: flex; gap: 12px; align-items: center; font-size: 14px; margin-left: auto; }
-        .sub-banner { background: #0079d3; color: #fff; padding: 24px 20px; }
-        .sub-banner h1 { max-width: 980px; margin: 0 auto; font-size: 28px; }
-        .container { max-width: 980px; margin: 16px auto; padding: 0 16px; }
-        .sort-bar { background: #fff; border-radius: 4px; border: 1px solid #ccc; padding: 10px 12px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
-        .sort-bar a { padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 700; color: #878a8c; }
-        .sort-bar a.active, .sort-bar a:hover { background: #f6f7f8; color: #1c1c1c; }
-        .sort-bar .join-btn { margin-left: auto; padding: 6px 16px; background: #0079d3; color: #fff; border: none; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 14px; }
-        .post-card { background: #fff; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; display: flex; }
-        .post-card:hover { border-color: #898989; }
-        .post-votes { width: 40px; background: #f8f9fa; display: flex; flex-direction: column; align-items: center; padding: 8px 4px; gap: 2px; }
-        .post-votes .score { font-size: 12px; font-weight: 700; }
-        .post-votes button { background: none; border: none; cursor: pointer; font-size: 16px; color: #878a8c; padding: 2px; }
-        .post-content { flex: 1; padding: 8px; }
-        .post-meta { font-size: 12px; color: #787c7e; margin-bottom: 4px; }
-        .post-title { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
-        .post-title a { color: #222; }
-        .post-actions { display: flex; gap: 4px; margin-top: 6px; }
-        .post-actions a { font-size: 12px; font-weight: 700; color: #878a8c; padding: 4px 8px; }
-        .flair { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; background: #edeff1; margin-left: 6px; }
-    </style>
+    <title>r/{{ subreddit }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
 </head>
 <body>
-    <div class="header">
-        <a href="{{ url_for('forums.index') }}" class="logo">ForumHub</a>
-        <div class="nav-links">
-            {% if current_user %}
-                <a href="{{ url_for('forums.user_profile', username=current_user.username) }}">u/{{ current_user.username }}</a>
-                <a href="{{ url_for('forums.logout') }}">Log Out</a>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <!-- community banner -->
+            <div class="postcard" style="display:flex;align-items:center;gap:14px;">
+                <span class="av lg" style="width:56px;height:56px;font-size:1.4rem;background:{{ community.color }};">{{ subreddit[0]|upper }}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:1.3rem;font-weight:800;">r/{{ subreddit }}</div>
+                    <div style="font-size:.8rem;color:var(--muted);">{{ "{:,}".format(community.post_count) }} posts</div>
+                </div>
+                <button class="btn-join" style="padding:8px 22px;" onclick="joinSub('{{ subreddit }}', this)">Join</button>
+            </div>
+
+            <div class="rd-sortbar">
+                <a class="{{ 'active' if sort == 'hot' }}" href="?sort=hot">🔥 Hot</a>
+                <a class="{{ 'active' if sort == 'new' }}" href="?sort=new">✦ New</a>
+                <a class="{{ 'active' if sort == 'top' }}" href="?sort=top">↑ Top</a>
+                <span class="sp"></span>
+            </div>
+
+            {% for post in posts %}
+            {% include "forums/_postcard.html" %}
             {% else %}
-                <a href="{{ url_for('forums.login_page') }}">Log In</a>
-            {% endif %}
-        </div>
-    </div>
-    <div class="sub-banner">
-        <h1>r/{{ subreddit }}</h1>
-    </div>
-    <div class="container">
-        <div class="sort-bar">
-            <a href="{{ url_for('forums.subreddit_view', subreddit_name=subreddit, sort='hot') }}" class="{{ 'active' if sort == 'hot' }}">Hot</a>
-            <a href="{{ url_for('forums.subreddit_view', subreddit_name=subreddit, sort='new') }}" class="{{ 'active' if sort == 'new' }}">New</a>
-            <a href="{{ url_for('forums.subreddit_view', subreddit_name=subreddit, sort='top') }}" class="{{ 'active' if sort == 'top' }}">Top</a>
-            <button class="join-btn" onclick="joinSub('{{ subreddit }}')">Join</button>
-        </div>
-        {% for post in posts %}
-        <div class="post-card" data-post-id="{{ post.id }}">
-            <div class="post-votes">
-                <button onclick="vote('{{ post.id }}', 'up')">&#9650;</button>
-                <span class="score">{{ post.score }}</span>
-                <button onclick="vote('{{ post.id }}', 'down')">&#9660;</button>
-            </div>
-            <div class="post-content">
-                <div class="post-meta">
-                    Posted by <a href="{{ url_for('forums.user_profile', username=post.author) }}">u/{{ post.author }}</a>
-                    &middot; {{ format_time_ago(post.created_utc) }}
-                    {% if post.flair %}<span class="flair">{{ post.flair }}</span>{% endif %}
-                </div>
-                <div class="post-title">
-                    <a href="{{ url_for('forums.post_detail', post_id=post.id) }}">{{ post.title }}</a>
-                </div>
-                <div class="post-actions">
-                    <a href="{{ url_for('forums.post_detail', post_id=post.id) }}">{{ post._comment_count }} Comments</a>
+            <div class="rd-empty">No posts in this community yet.</div>
+            {% endfor %}
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">About Community</div>
+                <div class="widget-pad">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                        <span class="av md" style="background:{{ community.color }};">{{ subreddit[0]|upper }}</span>
+                        <b>r/{{ subreddit }}</b>
+                    </div>
+                    {% if community.description %}<p style="margin-bottom:10px;">{{ community.description }}</p>{% endif %}
+                    <div class="about-stat"><span>Posts</span><b>{{ "{:,}".format(community.post_count) }}</b></div>
+                    <div style="margin-top:12px;"><a class="rd-btn" href="{{ url_for('forums.submit_page') }}?subreddit={{ subreddit }}" style="display:block;text-align:center;">Create Post</a></div>
                 </div>
             </div>
         </div>
-        {% endfor %}
-        {% if not posts %}
-        <div style="background:#fff;padding:20px;border-radius:4px;border:1px solid #ccc;">No posts in this community yet.</div>
-        {% endif %}
     </div>
-    <script>
-        function vote(postId, direction) {
-            fetch(`{{ url_for('forums.index') }}api/posts/${postId}/vote`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({direction})
-            }).then(r => r.json()).then(data => {
-                if (data.score !== undefined) {
-                    document.querySelector(`[data-post-id="${postId}"] .score`).textContent = data.score;
-                }
-            });
-        }
-        function joinSub(name) {
-            fetch(`{{ url_for('forums.index') }}api/subreddits/${name}/join`, {method: 'POST'})
-                .then(r => r.json()).then(data => {
-                    const btn = document.querySelector('.join-btn');
-                    btn.textContent = data.action === 'joined' ? 'Joined' : 'Join';
-                });
-        }
-    </script>
+
+    {% include "forums/_feedjs.html" %}
 </body>
 </html>

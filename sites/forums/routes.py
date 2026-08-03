@@ -137,6 +137,70 @@ def _get_subreddits():
     return [r["subreddit"] for r in rows if r.get("subreddit")]
 
 
+def _avatar_color(seed):
+    h = 0
+    for ch in str(seed):
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    return f"hsl({h % 360}, 55%, 45%)"
+
+
+def _top_communities(limit=12):
+    """Most-active communities (from the subreddits table) for the left rail."""
+    table = db.get_table_name(SITE, "subreddits")
+    if not table:
+        return []
+    rows = db.execute(
+        f"SELECT name, post_count FROM [{table}] ORDER BY post_count DESC LIMIT ?",
+        (limit,))
+    return [{"name": r["name"], "post_count": r.get("post_count") or 0,
+             "color": _avatar_color(r["name"])} for r in rows if r.get("name")]
+
+
+def _my_communities(user):
+    """The current user's subscribed communities, normalized to real names."""
+    if not user:
+        return []
+    subs = user.get("subscribed_subreddits") or []
+    if not isinstance(subs, list):
+        return []
+    known = {n.lower(): n for n in _get_subreddits()}
+    out, seen = [], set()
+    for s in subs:
+        bare = s[2:] if isinstance(s, str) and s.startswith("r/") else s
+        if not bare:
+            continue
+        name = known.get(bare.lower(), bare)
+        if name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        out.append({"name": name, "color": _avatar_color(name)})
+    return out[:15]
+
+
+_IMG_EXT = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+
+
+def _post_media(url):
+    """Classify a post's url for rendering: image / link / text."""
+    if not url:
+        return {"kind": "text"}
+    low = url.lower()
+    domain = low.split("//")[-1].split("/")[0].replace("www.", "")
+    if low.endswith(_IMG_EXT) or "i.redd.it" in low:
+        return {"kind": "image", "url": url, "domain": domain}
+    return {"kind": "link", "url": url, "domain": domain}
+
+
+def _attach_feed_meta(posts):
+    """Attach display helpers (media, comment count, avatar color) to posts."""
+    for p in posts:
+        p["_media"] = _post_media(p.get("url") or "")
+        p["_comment_count"] = p.get("num_comments") or 0
+        p["_av"] = _avatar_color(p.get("subreddit") or "")
+        p["_uav"] = _avatar_color(p.get("author") or "")
+    return posts
+
+
 def _hot_score(post):
     """Simple hot-ranking: score biased by recency."""
     score = int(post.get("score", 0) or 0)
@@ -276,11 +340,22 @@ def _semantic_score(query_tokens, text):
 
 @blueprint.context_processor
 def _inject_helpers():
-    return {
-        "current_user": _get_current_user(),
+    user = _get_current_user()
+    ctx = {
+        "current_user": user,
         "format_time_ago": _format_time_ago,
         "all_subreddits": _get_subreddits,
+        "avatar_color": _avatar_color,
     }
+    # Nav rail data (skip on API/JSON routes to avoid needless queries)
+    try:
+        if "/api/" not in request.path:
+            ctx["nav_communities"] = _top_communities(12)
+            ctx["my_communities"] = _my_communities(user)
+    except Exception:
+        ctx["nav_communities"] = []
+        ctx["my_communities"] = []
+    return ctx
 
 
 # ---------------------------------------------------------------------------
@@ -345,13 +420,21 @@ def index():
     else:
         posts = []
 
-    # num_comments is already a column — use it directly, no per-post DB query
-    for p in posts:
-        p["_comment_count"] = p.get("num_comments") or 0
+    _attach_feed_meta(posts)
+
+    # "Recent Posts" widget (right rail)
+    recent_posts = []
+    if table:
+        rp = db.execute(f"SELECT id, subreddit, title, score, num_comments, created_utc "
+                        f"FROM [{table}] ORDER BY [created_utc] DESC LIMIT 6")
+        for r in rp:
+            r["_av"] = _avatar_color(r.get("subreddit") or "")
+            recent_posts.append(r)
 
     subreddits = _get_subreddits()
     return render_template("forums/index.html", posts=posts, sort=sort,
-                           subreddits=subreddits)
+                           subreddits=subreddits, recent_posts=recent_posts,
+                           active_nav="home")
 
 
 @blueprint.route("/r/<subreddit_name>")
@@ -363,10 +446,23 @@ def subreddit_view(subreddit_name):
     sub_posts = _load_posts(where={"subreddit": subreddit_name}, sort=f"-{sort_col}", limit=50)
     if not sub_posts:
         abort(404)
-    for p in sub_posts:
-        p["_comment_count"] = _count_comments(where={"post_id": p["id"]})
+    _attach_feed_meta(sub_posts)
+
+    # Community "about" widget data
+    community = None
+    sub_table = db.get_table_name(SITE, "subreddits")
+    if sub_table:
+        rows = db.execute(
+            f"SELECT name, title, description, post_count FROM [{sub_table}] WHERE name = ? LIMIT 1",
+            (subreddit_name,))
+        community = rows[0] if rows else None
+    if not community:
+        community = {"name": subreddit_name, "title": subreddit_name,
+                     "description": "", "post_count": len(sub_posts)}
+    community["color"] = _avatar_color(subreddit_name)
+
     return render_template("forums/subreddit.html", posts=sub_posts, sort=sort,
-                           subreddit=subreddit_name)
+                           subreddit=subreddit_name, community=community)
 
 
 @blueprint.route("/post/<post_id>")
@@ -377,6 +473,8 @@ def post_detail(post_id):
     post_comments = _load_comments(where={"post_id": post_id})
     comment_tree = _build_comment_tree(post_comments, post_id)
     post["_comment_count"] = len(post_comments)
+    post["_media"] = _post_media(post.get("url") or "")
+    post["_av"] = _avatar_color(post.get("subreddit") or "")
     return render_template("forums/post_detail.html", post=post,
                            comment_tree=comment_tree)
 
@@ -413,6 +511,7 @@ def user_profile(username):
         c["_post_subreddit"] = parent_post["subreddit"] if parent_post else ""
     post_karma = sum(p.get("score", 0) for p in user_posts)
     comment_karma = sum(c.get("score", 0) for c in user_comments)
+    _attach_feed_meta(user_posts)
     return render_template("forums/user_profile.html", profile_user=user,
                            user_posts=user_posts, user_comments=user_comments,
                            post_karma=post_karma, comment_karma=comment_karma)
@@ -465,6 +564,7 @@ def search_page():
     results = []
     if q:
         results = db.search(SITE, "posts", q, limit=50)
+        _attach_feed_meta(results)
     return render_template("forums/search.html", query=q, results=results, sort=sort)
 
 

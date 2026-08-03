@@ -3,92 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - ForumHub</title>
+    <title>Messages — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #dae0e6; color: #1c1c1c; }
-        a { color: #0079d3; text-decoration: none; }
-        .header { background: #fff; border-bottom: 1px solid #edeff1; padding: 8px 20px; display: flex; align-items: center; gap: 16px; }
-        .header .logo { font-weight: 700; font-size: 20px; color: #ff4500; }
-        .header .nav-links { margin-left: auto; display: flex; gap: 12px; font-size: 14px; }
-        .container { max-width: 780px; margin: 16px auto; padding: 0 16px; }
-        h1 { font-size: 20px; margin-bottom: 16px; }
-        .compose-btn { padding: 8px 20px; background: #0079d3; color: #fff; border: none; border-radius: 20px; font-weight: 700; cursor: pointer; margin-bottom: 16px; font-size: 14px; }
-        .tab-bar { display: flex; gap: 0; margin-bottom: 16px; }
-        .tab-bar button { padding: 10px 20px; border: none; background: #fff; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 700; font-size: 14px; color: #878a8c; }
-        .tab-bar button.active { border-bottom-color: #0079d3; color: #0079d3; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .msg-item { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 12px 14px; margin-bottom: 8px; }
-        .msg-item .subject { font-weight: 600; font-size: 15px; }
-        .msg-item .meta { font-size: 12px; color: #787c7e; margin-top: 2px; }
-        .msg-item .body { font-size: 14px; margin-top: 6px; color: #1c1c1c; }
-        .msg-item.unread { border-left: 3px solid #ff4500; }
-        .empty { color: #787c7e; font-size: 14px; }
-        .compose-form { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 16px; margin-bottom: 16px; display: none; }
-        .compose-form.open { display: block; }
-        .compose-form .form-group { margin-bottom: 10px; }
-        .compose-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-        .compose-form input, .compose-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #edeff1; border-radius: 4px; font-size: 14px; font-family: inherit; }
-        .compose-form textarea { height: 100px; resize: vertical; }
-        .compose-form .send-btn { padding: 8px 20px; background: #0079d3; color: #fff; border: none; border-radius: 20px; font-weight: 700; cursor: pointer; }
+        .ms-tabs{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;margin-bottom:16px;}
+        .ms-tabs button{padding:8px 18px;border:none;background:none;border-radius:16px;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--muted);}
+        .ms-tabs button.active{background:var(--chip);color:var(--ink);}
+        .tab-content{display:none;}
+        .tab-content.active{display:block;}
+        .msg-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px;}
+        .msg-item .subject{font-weight:700;font-size:.95rem;}
+        .msg-item .meta{font-size:.78rem;color:var(--muted);margin-top:2px;}
+        .msg-item .body{font-size:.9rem;margin-top:8px;color:#333;line-height:1.5;white-space:pre-wrap;}
+        .msg-item.unread{border-left:3px solid var(--orange);}
+        .compose-form{display:none;}
+        .compose-form.open{display:block;}
     </style>
 </head>
 <body>
-    <div class="header">
-        <a href="{{ url_for('forums.index') }}" class="logo">ForumHub</a>
-        <div class="nav-links">
-            <a href="{{ url_for('forums.user_profile', username=current_user.username) }}">u/{{ current_user.username }}</a>
-            <a href="{{ url_for('forums.logout') }}">Log Out</a>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <div style="display:flex;align-items:center;margin-bottom:16px;">
+                <h1 style="font-size:1.3rem;font-weight:700;">Messages</h1>
+                <button class="rd-btn blue" style="margin-left:auto;" onclick="document.getElementById('compose-form').classList.toggle('open');">New Message</button>
+            </div>
+
+            <div id="compose-form" class="compose-form rd-panel" style="margin-bottom:16px;">
+                <div class="rd-field">
+                    <label for="msg-to">To (username)</label>
+                    <input type="text" id="msg-to" placeholder="Enter username">
+                </div>
+                <div class="rd-field">
+                    <label for="msg-subject">Subject</label>
+                    <input type="text" id="msg-subject" placeholder="Subject">
+                </div>
+                <div class="rd-field">
+                    <label for="msg-body">Message</label>
+                    <textarea id="msg-body" placeholder="Write your message..." style="height:100px;resize:vertical;"></textarea>
+                </div>
+                <button class="rd-btn blue" onclick="sendMessage()">Send</button>
+            </div>
+
+            <div class="ms-tabs">
+                <button class="active" onclick="showTab('inbox')">Inbox ({{ inbox | length }})</button>
+                <button onclick="showTab('sent')">Sent ({{ sent | length }})</button>
+            </div>
+
+            <div class="tab-content active" id="tab-inbox">
+                {% for msg in inbox %}
+                <div class="msg-item {{ 'unread' if not msg.read }}">
+                    <div class="subject">{{ msg.subject }}</div>
+                    <div class="meta">From: u/{{ msg.from_username }} · {{ msg.created_utc[:10] }}</div>
+                    <div class="body">{{ msg.body }}</div>
+                </div>
+                {% else %}
+                <div class="rd-empty">No messages in your inbox.</div>
+                {% endfor %}
+            </div>
+
+            <div class="tab-content" id="tab-sent">
+                {% for msg in sent %}
+                <div class="msg-item">
+                    <div class="subject">{{ msg.subject }}</div>
+                    <div class="meta">To: u/{{ msg.to_username }} · {{ msg.created_utc[:10] }}</div>
+                    <div class="body">{{ msg.body }}</div>
+                </div>
+                {% else %}
+                <div class="rd-empty">No sent messages.</div>
+                {% endfor %}
+            </div>
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">Direct Messages</div>
+                <div class="widget-pad">
+                    Send and receive private messages with other ForumHub members. Use New Message to start a conversation.
+                </div>
+            </div>
         </div>
     </div>
-    <div class="container">
-        <h1>Messages</h1>
-        <button class="compose-btn" onclick="document.getElementById('compose-form').classList.toggle('open');">New Message</button>
-        <div id="compose-form" class="compose-form">
-            <div class="form-group">
-                <label for="msg-to">To (username)</label>
-                <input type="text" id="msg-to" placeholder="Enter username">
-            </div>
-            <div class="form-group">
-                <label for="msg-subject">Subject</label>
-                <input type="text" id="msg-subject" placeholder="Subject">
-            </div>
-            <div class="form-group">
-                <label for="msg-body">Message</label>
-                <textarea id="msg-body" placeholder="Write your message..."></textarea>
-            </div>
-            <button class="send-btn" onclick="sendMessage()">Send</button>
-        </div>
-        <div class="tab-bar">
-            <button class="active" onclick="showTab('inbox')">Inbox ({{ inbox | length }})</button>
-            <button onclick="showTab('sent')">Sent ({{ sent | length }})</button>
-        </div>
-        <div class="tab-content active" id="tab-inbox">
-            {% for msg in inbox %}
-            <div class="msg-item {{ 'unread' if not msg.read }}">
-                <div class="subject">{{ msg.subject }}</div>
-                <div class="meta">From: u/{{ msg.from_username }} &middot; {{ msg.created_utc[:10] }}</div>
-                <div class="body">{{ msg.body }}</div>
-            </div>
-            {% endfor %}
-            {% if not inbox %}<p class="empty">No messages in your inbox.</p>{% endif %}
-        </div>
-        <div class="tab-content" id="tab-sent">
-            {% for msg in sent %}
-            <div class="msg-item">
-                <div class="subject">{{ msg.subject }}</div>
-                <div class="meta">To: u/{{ msg.to_username }} &middot; {{ msg.created_utc[:10] }}</div>
-                <div class="body">{{ msg.body }}</div>
-            </div>
-            {% endfor %}
-            {% if not sent %}<p class="empty">No sent messages.</p>{% endif %}
-        </div>
-    </div>
+
     <script>
         function showTab(name) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.ms-tabs button').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + name).classList.add('active');
             event.target.classList.add('active');
         }
