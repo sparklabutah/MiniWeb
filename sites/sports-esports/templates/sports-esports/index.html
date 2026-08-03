@@ -4,144 +4,182 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lakeport Sports Hub</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
-        .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-        .header h1 { font-size: 1.4rem; }
-        .header h1 span { color: #00d4aa; }
-        .nav { display: flex; gap: 1.2rem; align-items: center; }
-        .nav a { color: #b0b8c8; text-decoration: none; font-size: .9rem; transition: color .15s; }
-        .nav a:hover { color: #fff; }
-        .nav a.active { color: #00d4aa; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
-
-        .section-title { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .75rem; display: flex; align-items: center; gap: .5rem; }
-        .section-title .badge { background: #e74c3c; color: #fff; font-size: .7rem; padding: .15rem .5rem; border-radius: 1rem; font-weight: 600; }
-
-        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
-        .match-card { background: #fff; border-radius: .75rem; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .1s; display: block; }
-        .match-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); transform: translateY(-2px); }
-        .match-card.live { border-left: 4px solid #e74c3c; }
-        .match-card.final { border-left: 4px solid #27ae60; }
-        .match-card.scheduled { border-left: 4px solid #3498db; }
-        .match-league { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: .5rem; }
-        .match-teams { display: flex; justify-content: space-between; align-items: center; }
-        .match-team { display: flex; align-items: center; gap: .6rem; flex: 1; }
-        .team-color { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; }
-        .team-name { font-weight: 600; font-size: .95rem; }
-        .match-score { text-align: center; min-width: 80px; }
-        .match-score .score { font-size: 1.3rem; font-weight: 800; }
-        .match-score .status { font-size: .7rem; text-transform: uppercase; margin-top: .15rem; }
-        .match-score .status.live { color: #e74c3c; font-weight: 700; }
-        .match-score .status.final { color: #27ae60; }
-        .match-score .status.scheduled { color: #3498db; }
-        .match-meta { font-size: .78rem; color: #94a3b8; margin-top: .6rem; }
-
-        .league-pills { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-        .league-pill { display: inline-block; padding: .4rem .9rem; border-radius: 2rem; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; color: #334155; font-size: .85rem; font-weight: 500; transition: all .15s; }
-        .league-pill:hover { border-color: #00d4aa; color: #1a1a2e; background: #e6fff9; }
-    </style>
+    <link rel="stylesheet" href="/static/sportscenter.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Lakeport <span>Sports Hub</span></h1>
-        <div class="nav">
-            <a href="{{ url_for('sports-esports.index') }}" class="active">Scoreboard</a>
-            <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
-            <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
-            <a href="{{ url_for('sports-esports.favorites_page') }}">Favorites</a>
-            <a href="{{ url_for('sports-esports.compare_page') }}">Compare</a>
-            <a href="{{ url_for('sports-esports.login_page') }}">Login</a>
-            <a href="/">&larr; MiniWeb</a>
+
+    <!-- Scoreboard strip -->
+    <div class="sb-strip">
+        <div class="sb-lead">Top Events <span class="chev">&#9662;</span></div>
+        <div class="sb-scroll">
+            {% for m in scoreboard %}
+            {% set sched = m.status == 'scheduled' %}
+            {% set hwin = m.status == 'final' and m.home_score > m.away_score %}
+            {% set awin = m.status == 'final' and m.away_score > m.home_score %}
+            <a class="sb-game" href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}">
+                <div class="sb-glabel">
+                    <span>{{ m.league.abbreviation }}</span>
+                    {% if m.status == 'live' %}<span class="live">&#9679; LIVE</span>
+                    {% elif m.status == 'final' %}<span>Final</span>
+                    {% else %}<span>{{ m.time }}</span>{% endif %}
+                </div>
+                <div class="sb-team {{ 'win' if awin }}{{ 'lose' if hwin }}">
+                    <span class="dot" style="background:{{ m.away_team.logo_color }}"></span>
+                    <span class="ab">{{ m.away_team.abbreviation }}</span>
+                    <span class="sc">{% if sched %}{{ m.away_team.wins }}-{{ m.away_team.losses }}{% else %}{{ m.away_score }}{% endif %}</span>
+                </div>
+                <div class="sb-team {{ 'win' if hwin }}{{ 'lose' if awin }}">
+                    <span class="dot" style="background:{{ m.home_team.logo_color }}"></span>
+                    <span class="ab">{{ m.home_team.abbreviation }}</span>
+                    <span class="sc">{% if sched %}{{ m.home_team.wins }}-{{ m.home_team.losses }}{% else %}{{ m.home_score }}{% endif %}</span>
+                </div>
+            </a>
+            {% endfor %}
         </div>
     </div>
 
-    <div class="container">
-        <div class="league-pills">
-            {% for league in leagues %}
-            <a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}" class="league-pill">{{ league.abbreviation }}</a>
-            {% endfor %}
+    <!-- Header / league nav -->
+    <div class="sc-top">
+        <div class="sc-top-inner">
+            <a href="{{ url_for('sports-esports.index') }}" class="sc-logo">Sports<b>Hub</b></a>
+            <div class="sc-nav">
+                <a href="{{ url_for('sports-esports.index') }}" class="active">Scores</a>
+                {% for lg in leagues[:8] %}
+                <a href="{{ url_for('sports-esports.league_detail', league_id=lg.id) }}">{{ lg.abbreviation }}</a>
+                {% endfor %}
+            </div>
+            <div class="sc-right">
+                <a href="{{ url_for('sports-esports.standings_page') }}">Standings</a>
+                <a href="{{ url_for('sports-esports.players_page') }}">Players</a>
+                <a href="{{ url_for('sports-esports.compare_page') }}">Compare</a>
+                <a href="{{ url_for('sports-esports.favorites_page') }}" class="ic" title="Favorites">&#9733;</a>
+                <a href="{{ url_for('sports-esports.login_page') }}" class="ic" title="Account">&#128100;</a>
+            </div>
         </div>
-
-        {% if live_matches %}
-        <div class="section-title">Live Now <span class="badge">LIVE</span></div>
-        <div class="match-grid">
-            {% for m in live_matches %}
-            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card live">
-                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.league.sport }}</div>
-                <div class="match-teams">
-                    <div class="match-team">
-                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
-                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
-                    </div>
-                    <div class="match-score">
-                        <div class="score">{{ m.home_score }} - {{ m.away_score }}</div>
-                        <div class="status live">{{ m.quarter }}{% if m.clock %} {{ m.clock }}{% endif %}</div>
-                    </div>
-                    <div class="match-team" style="justify-content: flex-end;">
-                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
-                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
-                    </div>
-                </div>
-                <div class="match-meta">{{ m.venue }}</div>
-            </a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        {% if recent_matches %}
-        <div class="section-title">Recent Results</div>
-        <div class="match-grid">
-            {% for m in recent_matches %}
-            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card final">
-                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.date }}</div>
-                <div class="match-teams">
-                    <div class="match-team">
-                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
-                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
-                    </div>
-                    <div class="match-score">
-                        <div class="score">{{ m.home_score }} - {{ m.away_score }}</div>
-                        <div class="status final">Final</div>
-                    </div>
-                    <div class="match-team" style="justify-content: flex-end;">
-                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
-                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
-                    </div>
-                </div>
-                <div class="match-meta">{{ m.venue }}</div>
-            </a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        {% if upcoming_matches %}
-        <div class="section-title">Upcoming</div>
-        <div class="match-grid">
-            {% for m in upcoming_matches %}
-            <a href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}" class="match-card scheduled">
-                <div class="match-league">{{ m.league.abbreviation }} &middot; {{ m.date }}</div>
-                <div class="match-teams">
-                    <div class="match-team">
-                        <div class="team-color" style="background: {{ m.home_team.logo_color }}"></div>
-                        <span class="team-name">{{ m.home_team.abbreviation }}</span>
-                    </div>
-                    <div class="match-score">
-                        <div class="score">vs</div>
-                        <div class="status scheduled">{{ m.time }}</div>
-                    </div>
-                    <div class="match-team" style="justify-content: flex-end;">
-                        <span class="team-name">{{ m.away_team.abbreviation }}</span>
-                        <div class="team-color" style="background: {{ m.away_team.logo_color }}"></div>
-                    </div>
-                </div>
-                <div class="match-meta">{{ m.venue }}</div>
-            </a>
-            {% endfor %}
-        </div>
-        {% endif %}
     </div>
+
+    <!-- Body -->
+    <div class="sc-shell">
+
+        <!-- Left rail -->
+        <aside class="sc-left">
+            <div class="promo">
+                <h4>ALL OF SPORTS.<br><span>ALL IN ONE PLACE.</span></h4>
+                <a class="btn" href="{{ url_for('sports-esports.login_page') }}">Sign Up Now</a>
+            </div>
+            <div class="rail-card">
+                <div class="rail-h">Leagues</div>
+                {% for lg in leagues %}
+                <a class="rail-link" href="{{ url_for('sports-esports.league_detail', league_id=lg.id) }}">
+                    <span class="lg" style="background:#1a1a2e;">{{ lg.abbreviation[:3] }}</span>
+                    {{ lg.name }}
+                </a>
+                {% endfor %}
+            </div>
+            <div class="rail-card">
+                <div class="rail-h">Quick Links</div>
+                <a class="rail-link" href="{{ url_for('sports-esports.standings_page') }}">&#128202; Standings</a>
+                <a class="rail-link" href="{{ url_for('sports-esports.players_page') }}">&#127939; Players</a>
+                <a class="rail-link" href="{{ url_for('sports-esports.compare_page') }}">&#9878; Compare Players</a>
+                <a class="rail-link" href="{{ url_for('sports-esports.favorites_page') }}">&#9733; My Favorites</a>
+            </div>
+        </aside>
+
+        <!-- Center feed -->
+        <main class="sc-center">
+            {% set featured = live_matches[0] if live_matches else (recent_matches[0] if recent_matches else None) %}
+            {% if featured %}
+            {% set fh = featured.status == 'final' and featured.home_score > featured.away_score %}
+            {% set fa = featured.status == 'final' and featured.away_score > featured.home_score %}
+            <div class="hero">
+                <div class="hero-body">
+                    <div class="hero-league">
+                        {{ featured.league.name }}
+                        {% if featured.status == 'live' %}<span class="live">&#9679; LIVE{% if featured.clock %} · {{ featured.clock }}{% endif %}</span>
+                        {% elif featured.status == 'final' %}<span>· FINAL</span>{% endif %}
+                    </div>
+                    <div class="hero-match">
+                        <div class="hero-side">
+                            <span class="hero-badge" style="background:{{ featured.away_team.logo_color }}">{{ featured.away_team.abbreviation }}</span>
+                            <span class="nm">{{ featured.away_team.name }}</span>
+                            <span class="rec">{{ featured.away_team.wins }}-{{ featured.away_team.losses }}</span>
+                        </div>
+                        {% if featured.status == 'scheduled' %}
+                        <span class="hero-vs">@</span>
+                        {% else %}
+                        <span class="hero-score" style="{{ 'opacity:.55' if fh }}">{{ featured.away_score }}</span>
+                        <span class="hero-vs">-</span>
+                        <span class="hero-score" style="{{ 'opacity:.55' if fa }}">{{ featured.home_score }}</span>
+                        {% endif %}
+                        <div class="hero-side">
+                            <span class="hero-badge" style="background:{{ featured.home_team.logo_color }}">{{ featured.home_team.abbreviation }}</span>
+                            <span class="nm">{{ featured.home_team.name }}</span>
+                            <span class="rec">{{ featured.home_team.wins }}-{{ featured.home_team.losses }}</span>
+                        </div>
+                    </div>
+                    <div style="text-align:center;">
+                        {% if featured.status != 'scheduled' %}
+                        <a class="hero-cta" href="{{ url_for('sports-esports.match_highlights', match_id=featured.id) }}">&#9654; Watch Highlights</a>
+                        {% else %}
+                        <a class="hero-cta" href="{{ url_for('sports-esports.match_detail', match_id=featured.id) }}">Match Preview</a>
+                        {% endif %}
+                        <div class="hero-meta">{{ featured.venue }} · {{ featured.date }}{% if featured.time %} · {{ featured.time }}{% endif %}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if live_matches %}
+            <div class="feed-sec-h"><span class="pip live-pip"></span> Live Now</div>
+            <div class="card-list">
+                {% for m in live_matches %}{% include "sports-esports/_mcard.html" %}{% endfor %}
+            </div>
+            {% endif %}
+
+            {% if recent_matches %}
+            <div class="feed-sec-h"><span class="pip"></span> Latest Results</div>
+            <div class="card-list">
+                {% for m in recent_matches %}{% include "sports-esports/_mcard.html" %}{% endfor %}
+            </div>
+            {% endif %}
+
+            {% if upcoming_matches %}
+            <div class="feed-sec-h"><span class="pip"></span> Upcoming</div>
+            <div class="card-list">
+                {% for m in upcoming_matches %}{% include "sports-esports/_mcard.html" %}{% endfor %}
+            </div>
+            {% endif %}
+        </main>
+
+        <!-- Right rail -->
+        <aside class="sc-right-rail">
+            <div class="rail-card">
+                <div class="rail-h">Top Headlines</div>
+                {% for m in recent_matches %}
+                {% set win = m.home_team if m.home_score > m.away_score else m.away_team %}
+                {% set lose = m.away_team if m.home_score > m.away_score else m.home_team %}
+                {% set ws = m.home_score if m.home_score > m.away_score else m.away_score %}
+                {% set ls = m.away_score if m.home_score > m.away_score else m.home_score %}
+                <a class="headline" href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}">
+                    {{ win.name }} {{ 'defeat' if (ws - ls) > 3 else 'edge' }} {{ lose.name }} {{ ws }}&ndash;{{ ls }}
+                    <span class="src">{{ m.league.abbreviation }} · {{ m.date }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            <div class="rail-card">
+                <div class="rail-h">Standings Leaders</div>
+                {% for t in top_teams %}
+                <a class="stand-row" href="{{ url_for('sports-esports.team_detail', team_id=t.id) }}">
+                    <span class="rk">{{ loop.index }}</span>
+                    <span class="lg-dot" style="background:{{ t.logo_color }}">{{ t.abbreviation[:3] }}</span>
+                    <span class="nm">{{ t.name }}</span>
+                    <span class="wl">{{ t.wins }}-{{ t.losses }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </aside>
+    </div>
+
+    <div class="sc-foot">Lakeport Sports Hub · Scores, standings, and highlights across every league</div>
 </body>
 </html>

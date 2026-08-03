@@ -122,9 +122,22 @@ def index():
         key=lambda m: (m["date"], m["time"])
     )[:6]
 
+    # Scoreboard strip: live first, then upcoming, then recent finals.
+    scoreboard = (live_matches
+                  + upcoming[:8]
+                  + recent_final)[:20]
+    # Standings leaders for the right rail (top teams by wins).
+    league_by_id = {l["id"]: l for l in leagues}
+    top_teams = sorted(teams, key=lambda t: (t.get("wins", 0), -t.get("losses", 0)),
+                       reverse=True)[:8]
+    for t in top_teams:
+        lg = league_by_id.get(t.get("league_id"))
+        t["league_abbr"] = lg["abbreviation"] if lg else ""
+
     return render_template("sports-esports/index.html",
                            leagues=leagues, live_matches=live_matches,
-                           recent_matches=recent_final, upcoming_matches=upcoming)
+                           recent_matches=recent_final, upcoming_matches=upcoming,
+                           scoreboard=scoreboard, top_teams=top_teams)
 
 
 @blueprint.route("/league/<int:league_id>")
