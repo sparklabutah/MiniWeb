@@ -119,6 +119,9 @@ def _enrich_post(post, users_map, comments=None):
         post["comments_list"] = [c for c in comments if c["post_id"] == post["id"]]
         for c in post["comments_list"]:
             c["author"] = users_map.get(c["author_id"], {})
+        # Keep the displayed count in sync with the comments that actually
+        # exist, so "View all N comments" never disagrees with the thread.
+        post["comments_count"] = len(post["comments_list"])
     return post
 
 

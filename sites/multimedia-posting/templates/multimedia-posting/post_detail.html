@@ -14,8 +14,8 @@
         .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
         .top-nav .nav-links a { color: #262626; font-size: 14px; }
         .container { max-width: 935px; margin: 0 auto; padding: 20px; }
-        .post-detail { background: #fff; border: 1px solid #dbdbdb; display: flex; min-height: 500px; }
-        .post-media { flex: 1; background: #efefef; display: flex; align-items: center; justify-content: center; min-height: 500px; position: relative; }
+        .post-detail { background: #fff; border: 1px solid #dbdbdb; display: flex; height: calc(100vh - 120px); max-height: 720px; min-height: 460px; }
+        .post-media { flex: 1; background: #efefef; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
         .post-media .placeholder { font-size: 72px; color: #c7c7c7; }
         .post-media .type-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
         .post-sidebar { width: 340px; display: flex; flex-direction: column; border-left: 1px solid #dbdbdb; }
@@ -49,9 +49,10 @@
         .action-dropdown-content a:hover, .action-dropdown-content button:hover { background: #fafafa; text-decoration: none; }
         .action-dropdown-content .danger { color: #ed4956; }
         @media (max-width: 735px) {
-            .post-detail { flex-direction: column; }
+            .post-detail { flex-direction: column; height: auto; max-height: none; }
             .post-sidebar { width: 100%; }
             .post-media { min-height: 300px; }
+            .comments-section { max-height: 320px; }
         }
     </style>
 </head>
@@ -134,13 +135,13 @@
                         </div>
                     </div>
                     <span class="spacer"></span>
-                    {% if logged_in and user and user.id == post.author_id %}
-                    <button class="danger" id="delete-post-btn" onclick="deletePost()" title="Delete this post">&#128465; Delete</button>
-                    {% endif %}
                     <button id="save-btn" class="save-btn {{ 'active' if is_saved else '' }}" onclick="toggleSave()" title="Save">{% if is_saved %}&#9733;{% else %}&#9734;{% endif %}</button>
                     <div class="action-dropdown">
                         <button onclick="toggleMoreMenu()" title="More">&#8943;</button>
                         <div id="more-menu" class="action-dropdown-content">
+                            {% if logged_in and user and user.id == post.author_id %}
+                            <button class="danger" id="delete-post-btn" onclick="deletePost()">Delete Post</button>
+                            {% endif %}
                             <button class="danger" onclick="reportPost()">Report</button>
                             <button class="danger" onclick="blockUser()">Block User</button>
                         </div>
