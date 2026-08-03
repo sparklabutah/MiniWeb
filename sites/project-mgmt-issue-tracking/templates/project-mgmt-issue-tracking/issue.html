@@ -53,6 +53,15 @@
         .avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: .7rem; font-weight: 600; color: #fff; }
         .comments-section { margin-top: 1.5rem; }
         .comments-section h3 { font-size: 1rem; margin-bottom: .75rem; }
+        .activity-section { margin-top: 1.5rem; }
+        .activity-section h3 { font-size: 1rem; margin-bottom: .75rem; }
+        .activity-feed { list-style: none; border-left: 2px solid #e2e8f0; margin-left: .5rem; }
+        .activity-item { display: flex; align-items: center; gap: .5rem; padding: .45rem 0 .45rem 1rem; position: relative; font-size: .86rem; color: #475569; }
+        .activity-item .avatar.sm { width: 22px; height: 22px; font-size: .72rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; margin-left: -1.7rem; border: 2px solid #f8fafc; }
+        .activity-item .activity-text { flex: 1; }
+        .activity-item .activity-text b { color: #1e293b; font-weight: 600; }
+        .activity-item .activity-time { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
+        .activity-empty { color: #94a3b8; font-size: .86rem; }
         .comment { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; margin-bottom: .75rem; }
         .comment-header { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
         .comment-author { font-weight: 600; font-size: .88rem; }
@@ -196,6 +205,15 @@
                             </select>
                         </div>
                         <div class="form-row">
+                            <label>Reporter</label>
+                            <select name="reporter_id">
+                                <option value="">None</option>
+                                {% for u in users %}
+                                <option value="{{ u.id }}" {% if issue.reporter_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-row">
                             <label>Points</label>
                             <input type="number" name="story_points" value="{{ issue.story_points or '' }}" min="0">
                         </div>
@@ -209,6 +227,25 @@
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.5rem;">Save Changes</button>
                     </form>
+                </div>
+
+                <!-- Activity -->
+                <div class="activity-section">
+                    <h3>Activity</h3>
+                    {% if issue.activity %}
+                    <ul class="activity-feed">
+                        {% for a in issue.activity | reverse %}
+                        {% set actor = user_lookup.get(a.actor_id) %}
+                        <li class="activity-item">
+                            <span class="avatar sm" style="background:{{ actor.avatar_color if actor else '#94a3b8' }}">{{ actor.name[0] if actor else '?' }}</span>
+                            <span class="activity-text"><b>{{ actor.name if actor else 'Someone' }}</b> {{ a.text }}</span>
+                            <span class="activity-time">{{ a.at[:16]|replace('T', ' ') }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="activity-empty">No activity yet. Changes to status, assignee, or reporter will appear here.</p>
+                    {% endif %}
                 </div>
 
                 <!-- Comments -->

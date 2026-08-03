@@ -72,6 +72,22 @@ def _save_issues(issues):
     db.save_collection(SITE, "issues", issues)
 
 
+def _lbl(v):
+    """Human label for a status/priority/type value."""
+    return str(v or "None").replace("_", " ").title()
+
+
+def _log_activity(issue, actor_id, text):
+    """Append a change event to the issue's activity timeline."""
+    activity = issue.setdefault("activity", [])
+    activity.append({
+        "id": len(activity) + 1,
+        "actor_id": actor_id,
+        "text": text,
+        "at": datetime.now().isoformat(),
+    })
+
+
 def _load_comments():
     return db.query(SITE, "comments")
 
@@ -585,6 +601,14 @@ def form_edit_issue(issue_id):
     if not issue:
         abort(404)
 
+    # Snapshot the fields we track for the activity log.
+    um = _user_map()
+    old = {
+        "status": issue.get("status"), "priority": issue.get("priority"),
+        "type": issue.get("type"), "assignee_id": issue.get("assignee_id"),
+        "reporter_id": issue.get("reporter_id"),
+    }
+
     for field in ["title", "description", "type", "status", "priority"]:
         val = request.form.get(field)
         if val is not None and val.strip():
@@ -593,6 +617,29 @@ def form_edit_issue(issue_id):
     assignee_id = request.form.get("assignee_id")
     if assignee_id is not None:
         issue["assignee_id"] = int(assignee_id) if assignee_id else None
+
+    reporter_id = request.form.get("reporter_id")
+    if reporter_id is not None:
+        issue["reporter_id"] = int(reporter_id) if reporter_id else None
+
+    # Record change events for the notable fields.
+    actor = session.get("user_id")
+    def _uname(uid):
+        u = um.get(uid)
+        return u["name"] if u else "Unassigned"
+    if issue.get("assignee_id") != old["assignee_id"]:
+        if issue.get("assignee_id"):
+            _log_activity(issue, actor, "assigned this to %s" % _uname(issue["assignee_id"]))
+        else:
+            _log_activity(issue, actor, "removed the assignee")
+    if issue.get("reporter_id") != old["reporter_id"]:
+        _log_activity(issue, actor, "changed reporter to %s" % _uname(issue.get("reporter_id")))
+    if issue.get("status") != old["status"]:
+        _log_activity(issue, actor, "changed status from %s to %s" % (_lbl(old["status"]), _lbl(issue.get("status"))))
+    if issue.get("priority") != old["priority"]:
+        _log_activity(issue, actor, "changed priority from %s to %s" % (_lbl(old["priority"]), _lbl(issue.get("priority"))))
+    if issue.get("type") != old["type"]:
+        _log_activity(issue, actor, "changed type from %s to %s" % (_lbl(old["type"]), _lbl(issue.get("type"))))
 
     sprint_val = request.form.get("sprint")
     if sprint_val is not None:
@@ -672,9 +719,12 @@ def form_transition_issue(issue_id):
     if not issue:
         abort(404)
     new_status = request.form.get("status", "").strip()
-    if new_status and new_status in STATUS_ORDER:
+    old_status = issue.get("status")
+    if new_status and new_status in STATUS_ORDER and new_status != old_status:
         issue["status"] = new_status
         issue["updated_at"] = datetime.now().isoformat()
+        _log_activity(issue, session.get("user_id"),
+                      "changed status from %s to %s" % (_lbl(old_status), _lbl(new_status)))
         _save_issues(issues)
     return redirect(url_for("project-mgmt-issue-tracking.issue_detail",
                             issue_id=issue_id))
