@@ -1,124 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playlists - SoundWave</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
-        a { color: #1db954; text-decoration: none; }
-        a:hover { color: #1ed760; }
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}Playlists — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
 
-        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
-        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; }
-        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
-        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
-        .top-bar .nav-links a:hover { color: #fff; }
-        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+<h1 class="page-h">Playlists</h1>
+<p style="color:#b3b3b3;margin-bottom:22px;font-size:.95rem;">Browse playlists or create your own.</p>
 
-        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        h1 { font-size: 1.8rem; color: #fff; margin-bottom: .5rem; }
-        .subtitle { color: #888; margin-bottom: 1.5rem; font-size: .95rem; }
-
-        .playlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
-        .playlist-card { background: #181818; border-radius: .5rem; padding: 1.2rem; transition: background .2s; display: block; color: inherit; }
-        .playlist-card:hover { background: #282828; text-decoration: none; }
-        .playlist-card .pl-name { font-weight: 700; font-size: 1.05rem; color: #fff; margin-bottom: .3rem; }
-        .playlist-card .pl-desc { font-size: .85rem; color: #888; margin-bottom: .6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .playlist-card .pl-meta { font-size: .8rem; color: #666; display: flex; gap: .8rem; }
-        .playlist-card .pl-badge { display: inline-block; font-size: .7rem; padding: .1rem .4rem; border-radius: .2rem; text-transform: uppercase; font-weight: 600; }
-        .pl-badge.public { background: #1db954; color: #000; }
-        .pl-badge.private { background: #555; color: #ddd; }
-
-        .create-form { background: #181818; border-radius: .5rem; padding: 1.5rem; margin-bottom: 2rem; max-width: 500px; }
-        .create-form h3 { color: #fff; margin-bottom: 1rem; font-size: 1.1rem; }
-        .create-form label { display: block; font-size: .85rem; color: #888; margin-bottom: .3rem; }
-        .create-form input, .create-form textarea { width: 100%; padding: .5rem .8rem; border: 1px solid #333; border-radius: .3rem; background: #0a0a0a; color: #e0e0e0; font-size: .9rem; margin-bottom: .8rem; }
-        .create-form input:focus, .create-form textarea:focus { border-color: #1db954; outline: none; }
-        .create-form textarea { resize: vertical; min-height: 60px; }
-        .create-form .checkbox-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem; }
-        .create-form .checkbox-row input { width: auto; margin: 0; }
-        .create-form button { background: #1db954; color: #000; border: none; padding: .5rem 1.5rem; border-radius: 1rem; font-weight: 700; font-size: .9rem; cursor: pointer; }
-        .create-form button:hover { background: #1ed760; }
-        .form-msg { margin-top: .5rem; font-size: .85rem; }
-        .form-msg.success { color: #1db954; }
-        .form-msg.error { color: #e74c3c; }
-    </style>
-</head>
-<body>
-    <div class="top-bar">
-        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
-        <div class="nav-links">
-            <a href="{{ url_for('music.browse') }}">Browse</a>
-            <a href="{{ url_for('music.playlists_page') }}" style="color:#fff;font-weight:600">Playlists</a>
-            <a href="{{ url_for('music.library_page') }}">Library</a>
-            {% if user %}
-                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
-                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
-            {% else %}
-                <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
-            {% endif %}
-        </div>
+{% if user %}
+<div class="form-card" id="create-form" style="max-width:520px;margin:0 0 30px;">
+    <h3 style="color:#fff;margin-bottom:16px;font-size:1.1rem;">Create New Playlist</h3>
+    <div class="fg">
+        <label for="pl-name">Name</label>
+        <input type="text" id="pl-name" placeholder="My awesome playlist">
     </div>
-
-    <div class="container">
-        <h1>Playlists</h1>
-        <p class="subtitle">Browse playlists or create your own.</p>
-
-        {% if user %}
-        <div class="create-form" id="create-form">
-            <h3>Create New Playlist</h3>
-            <label for="pl-name">Name</label>
-            <input type="text" id="pl-name" placeholder="My awesome playlist">
-            <label for="pl-desc">Description</label>
-            <textarea id="pl-desc" placeholder="What is this playlist about?"></textarea>
-            <div class="checkbox-row">
-                <input type="checkbox" id="pl-public" checked>
-                <label for="pl-public" style="margin:0;color:#e0e0e0">Public</label>
-            </div>
-            <button onclick="createPlaylist()">Create Playlist</button>
-            <div class="form-msg" id="form-msg"></div>
-        </div>
-        {% endif %}
-
-        <div class="playlist-grid">
-            {% for pl in playlists %}
-            <a href="{{ url_for('music.playlist_detail', playlist_id=pl.id) }}" class="playlist-card">
-                <div class="pl-name">{{ pl.name }}</div>
-                <div class="pl-desc">{{ pl.description }}</div>
-                <div class="pl-meta">
-                    <span>{{ pl.owner_name }}</span>
-                    <span>{{ pl.total_tracks }} tracks</span>
-                    <span class="pl-badge {% if pl.is_public %}public{% else %}private{% endif %}">
-                        {% if pl.is_public %}Public{% else %}Private{% endif %}
-                    </span>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
+    <div class="fg">
+        <label for="pl-desc">Description</label>
+        <textarea id="pl-desc" placeholder="What is this playlist about?"></textarea>
     </div>
+    <div class="fg" style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="pl-public" checked style="width:auto;">
+        <label for="pl-public" style="margin:0;color:#e0e0e0;">Public</label>
+    </div>
+    <button class="btn-green" onclick="createPlaylist()">Create Playlist</button>
+    <div id="form-msg" style="margin-top:10px;font-size:.85rem;"></div>
+</div>
+{% endif %}
 
-    {% if user %}
-    <script>
-    function createPlaylist() {
-        const name = document.getElementById("pl-name").value.trim();
-        const desc = document.getElementById("pl-desc").value.trim();
-        const isPublic = document.getElementById("pl-public").checked;
-        const msg = document.getElementById("form-msg");
+<div class="grid">
+    {% for pl in playlists %}
+    <a href="{{ url_for('music.playlist_detail', playlist_id=pl.id) }}" class="card">
+        <div class="art" style="background:linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+        <div class="nm">{{ pl.name }}</div>
+        <div class="mt">{{ pl.description }}</div>
+        <div class="mt" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <span>{{ pl.owner_name }}</span>
+            <span>{{ pl.total_tracks }} tracks</span>
+            <span style="font-size:.7rem;padding:1px 6px;border-radius:3px;text-transform:uppercase;font-weight:600;{% if pl.is_public %}background:#1db954;color:#000;{% else %}background:#555;color:#ddd;{% endif %}">
+                {% if pl.is_public %}Public{% else %}Private{% endif %}
+            </span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
 
-        if (!name) { msg.textContent = "Name is required"; msg.className = "form-msg error"; return; }
+{% block scripts %}
+<script>
+function createPlaylist() {
+    const name = document.getElementById("pl-name").value.trim();
+    const desc = document.getElementById("pl-desc").value.trim();
+    const isPublic = document.getElementById("pl-public").checked;
+    const msg = document.getElementById("form-msg");
 
-        fetch("{{ url_for('music.api_create_playlist') }}", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({name: name, description: desc, is_public: isPublic})
-        }).then(r => r.json()).then(data => {
-            if (data.error) { msg.textContent = data.error; msg.className = "form-msg error"; }
-            else { msg.textContent = "Playlist created!"; msg.className = "form-msg success"; setTimeout(() => location.reload(), 500); }
-        });
-    }
-    </script>
-    {% endif %}
-</body>
-</html>
+    if (!name) { msg.textContent = "Name is required"; msg.style.color = "#e74c3c"; return; }
+
+    fetch("{{ url_for('music.api_create_playlist') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name: name, description: desc, is_public: isPublic})
+    }).then(r => r.json()).then(data => {
+        if (data.error) { msg.textContent = data.error; msg.style.color = "#e74c3c"; }
+        else { msg.textContent = "Playlist created!"; msg.style.color = "#1db954"; setTimeout(() => location.reload(), 500); }
+    });
+}
+</script>
+{% endblock %}

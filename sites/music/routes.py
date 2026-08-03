@@ -446,6 +446,20 @@ def _semantic_search(query, artists, albums, tracks, limit=20):
 # HTML routes
 # ---------------------------------------------------------------------------
 
+@blueprint.context_processor
+def _inject_shell():
+    """Sidebar playlists + current user for the shared Spotify-style shell."""
+    try:
+        if "/api/" in request.path:
+            return {}
+        uid = session.get("user_id")
+        user = _get_user(uid) if uid else None
+        pls = [p for p in _load_playlists() if p.get("user_id") == uid] if uid else []
+        return {"music_user": user, "sidebar_playlists": pls[:40]}
+    except Exception:
+        return {"music_user": None, "sidebar_playlists": []}
+
+
 @blueprint.route("/")
 def index():
     artists = _load_artists()
@@ -1251,8 +1265,16 @@ def api_play():
     playback_states.append(state)
     _save("playback", playback_states)
 
+    np = queue[0] if queue else None
     return jsonify({"status": "playing", "queue_length": len(queue),
-                    "now_playing": queue[0]["title"] if queue else None})
+                    "now_playing": np["title"] if np else None,
+                    "track": {
+                        "id": np.get("id"),
+                        "title": np.get("title", ""),
+                        "artist": np.get("artist_name", ""),
+                        "cover": np.get("album_cover_color", "#333"),
+                        "duration": np.get("duration_formatted", ""),
+                    } if np else None})
 
 
 @blueprint.route("/api/play/date_range", methods=["POST"])

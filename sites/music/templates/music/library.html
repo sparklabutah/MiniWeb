@@ -1,131 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Library - SoundWave</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
-        a { color: #1db954; text-decoration: none; }
-        a:hover { color: #1ed760; }
+{% extends "music/base.html" %}
+{% set active = 'library' %}
+{% block title %}Your Library — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
 
-        .top-bar { background: #111; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
-        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #1db954; }
-        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
-        .top-bar .nav-links a { color: #b0b0b0; font-size: .9rem; }
-        .top-bar .nav-links a:hover { color: #fff; }
-        .top-bar .btn-login { background: #1db954; color: #000; padding: .4rem 1rem; border-radius: 1rem; font-weight: 700; font-size: .85rem; }
+<h1 class="page-h">Your Library</h1>
 
-        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        h1 { font-size: 1.8rem; color: #fff; margin-bottom: 1rem; }
+<div class="pills">
+    <a href="{{ url_for('music.library_page', tab='tracks') }}" class="pill {% if tab == 'tracks' %}active{% endif %}">Liked Songs ({{ liked_tracks|length }})</a>
+    <a href="{{ url_for('music.library_page', tab='albums') }}" class="pill {% if tab == 'albums' %}active{% endif %}">Saved Albums ({{ liked_albums|length }})</a>
+    <a href="{{ url_for('music.library_page', tab='artists') }}" class="pill {% if tab == 'artists' %}active{% endif %}">Following ({{ followed_artists|length }})</a>
+</div>
 
-        .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #222; padding-bottom: .5rem; }
-        .tab { padding: .5rem 1rem; border-radius: .3rem; font-size: .9rem; color: #888; transition: all .15s; }
-        .tab:hover { color: #fff; text-decoration: none; }
-        .tab.active { color: #fff; background: #282828; font-weight: 600; }
-
-        .track-list { list-style: none; }
-        .track-row { display: flex; align-items: center; padding: .6rem .8rem; border-radius: .3rem; gap: .8rem; transition: background .15s; }
-        .track-row:hover { background: #1a1a1a; }
-        .track-num { width: 2rem; text-align: right; color: #888; font-size: .9rem; flex-shrink: 0; }
-        .track-cover-sm { width: 40px; height: 40px; border-radius: .2rem; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: rgba(255,255,255,.6); flex-shrink: 0; }
-        .track-info { flex: 1; min-width: 0; }
-        .track-title { font-size: .95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .track-title a { color: #fff; }
-        .track-title a:hover { color: #1db954; }
-        .track-artist { font-size: .8rem; color: #888; }
-        .track-artist a { color: #888; }
-        .track-artist a:hover { color: #1db954; }
-        .track-duration { color: #888; font-size: .85rem; min-width: 45px; text-align: right; }
-
-        .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; }
-        .album-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
-        .album-card:hover { background: #282828; text-decoration: none; }
-        .album-card .cover { width: 100%; aspect-ratio: 1; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: rgba(255,255,255,.7); margin-bottom: .8rem; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
-        .card-name { font-weight: 600; font-size: .95rem; color: #fff; margin-bottom: .2rem; }
-        .card-meta { font-size: .8rem; color: #888; }
-
-        .artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1.2rem; }
-        .artist-card { background: #181818; border-radius: .5rem; padding: 1rem; transition: background .2s; display: block; color: inherit; }
-        .artist-card:hover { background: #282828; text-decoration: none; }
-        .artist-card .avatar { width: 100%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: .8rem; }
-
-        .empty-msg { text-align: center; color: #666; padding: 3rem; font-size: 1rem; }
-    </style>
-</head>
-<body>
-    <div class="top-bar">
-        <a href="{{ url_for('music.index') }}" class="logo">SoundWave</a>
-        <div class="nav-links">
-            <a href="{{ url_for('music.browse') }}">Browse</a>
-            <a href="{{ url_for('music.playlists_page') }}">Playlists</a>
-            <a href="{{ url_for('music.library_page') }}" style="color:#fff;font-weight:600">Library</a>
-            {% if user %}
-                <span style="color:#888;font-size:.85rem">{{ user.display_name }}</span>
-                <a href="{{ url_for('music.logout') }}" style="font-size:.85rem;color:#888">Logout</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="container">
-        <h1>Your Library</h1>
-
-        <div class="tabs">
-            <a href="{{ url_for('music.library_page', tab='tracks') }}" class="tab {% if tab == 'tracks' %}active{% endif %}">Liked Songs ({{ liked_tracks|length }})</a>
-            <a href="{{ url_for('music.library_page', tab='albums') }}" class="tab {% if tab == 'albums' %}active{% endif %}">Saved Albums ({{ liked_albums|length }})</a>
-            <a href="{{ url_for('music.library_page', tab='artists') }}" class="tab {% if tab == 'artists' %}active{% endif %}">Following ({{ followed_artists|length }})</a>
-        </div>
-
-        {% if tab == 'tracks' %}
-            {% if liked_tracks %}
-            <ul class="track-list">
-                {% for track in liked_tracks %}
-                <li class="track-row">
-                    <span class="track-num">{{ loop.index }}</span>
-                    <div class="track-cover-sm" style="background: {{ track.album_cover_color }};">{{ track.title[0] }}</div>
-                    <div class="track-info">
-                        <div class="track-title"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
-                        <div class="track-artist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a> &middot; {{ track.album_title }}</div>
-                    </div>
-                    <span class="track-duration">{{ track.duration_formatted }}</span>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <div class="empty-msg">No liked songs yet. Start exploring and like tracks to build your collection.</div>
-            {% endif %}
-
-        {% elif tab == 'albums' %}
-            {% if liked_albums %}
-            <div class="album-grid">
-                {% for album in liked_albums %}
-                <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="album-card">
-                    <div class="cover" style="background: {{ album.cover_color }};">{{ album.title[0] }}</div>
-                    <div class="card-name">{{ album.title }}</div>
-                    <div class="card-meta">{{ album.artist_name }}</div>
-                </a>
-                {% endfor %}
+{% if tab == 'tracks' %}
+    {% if liked_tracks %}
+    <ul class="tracks">
+        {% for track in liked_tracks %}
+        <li class="trow">
+            <span class="tnum">{{ loop.index }}</span>
+            <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a> &middot; {{ track.album_title }}</div>
             </div>
-            {% else %}
-            <div class="empty-msg">No saved albums yet.</div>
-            {% endif %}
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">No liked songs yet. Start exploring and like tracks to build your collection.</div>
+    {% endif %}
 
-        {% elif tab == 'artists' %}
-            {% if followed_artists %}
-            <div class="artist-grid">
-                {% for artist in followed_artists %}
-                <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="artist-card">
-                    <div class="avatar" style="background: linear-gradient(135deg, #1db954, #191414);">{{ artist.name[0] }}</div>
-                    <div class="card-name">{{ artist.name }}</div>
-                    <div class="card-meta">{{ artist.genre }}</div>
-                </a>
-                {% endfor %}
+{% elif tab == 'albums' %}
+    {% if liked_albums %}
+    <div class="grid">
+        {% for album in liked_albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
             </div>
-            {% else %}
-            <div class="empty-msg">You are not following any artists yet.</div>
-            {% endif %}
-        {% endif %}
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.artist_name }}</div>
+        </a>
+        {% endfor %}
     </div>
-</body>
-</html>
+    {% else %}
+    <div class="empty-state">No saved albums yet.</div>
+    {% endif %}
+
+{% elif tab == 'artists' %}
+    {% if followed_artists %}
+    <div class="grid">
+        {% for artist in followed_artists %}
+        <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="card artist">
+            <div class="art" style="background: linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+            <div class="nm">{{ artist.name }}</div>
+            <div class="mt">{{ artist.genre }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">You are not following any artists yet.</div>
+    {% endif %}
+{% endif %}
+{% endblock %}
