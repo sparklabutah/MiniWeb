@@ -467,15 +467,31 @@ def index():
     tracks = _load_tracks()
 
     # Featured: top artists by listeners
-    featured_artists = sorted(artists, key=lambda a: -a["monthly_listeners"])[:6]
+    featured_artists = sorted(artists, key=lambda a: -a["monthly_listeners"])[:12]
     # New releases: most recent albums
-    new_releases = sorted(albums, key=lambda a: a["release_date"], reverse=True)[:6]
+    sorted_albums = sorted(albums, key=lambda a: a["release_date"], reverse=True)
+    new_releases = sorted_albums[:12]
     # Popular tracks
     enriched = [_enrich_track(t, artists, albums) for t in tracks]
-    popular_tracks = sorted(enriched, key=lambda t: -t["plays"])[:10]
+    enriched.sort(key=lambda t: -t["plays"])
+    popular_tracks = enriched[:12]
+    trending_tracks = enriched[12:24]
 
     # All genres for quick links
     genres = sorted(set(a["genre"] for a in artists))
+
+    # Featured playlists (denser home)
+    from collections import Counter
+    playlists = _load_playlists()
+    featured_playlists = [p for p in playlists if p.get("is_public")][:8]
+
+    # Genre shelves: a row of albums for each of the most-common genres
+    genre_counts = Counter(a["genre"] for a in albums)
+    genre_shelves = []
+    for g, _ in genre_counts.most_common(4):
+        g_albums = [a for a in sorted_albums if a["genre"] == g][:8]
+        if g_albums:
+            genre_shelves.append({"genre": g, "albums": g_albums})
 
     user = None
     if "user_id" in session:
@@ -485,6 +501,9 @@ def index():
                            featured_artists=featured_artists,
                            new_releases=new_releases,
                            popular_tracks=popular_tracks,
+                           trending_tracks=trending_tracks,
+                           featured_playlists=featured_playlists,
+                           genre_shelves=genre_shelves,
                            genres=genres,
                            user=user)
 
