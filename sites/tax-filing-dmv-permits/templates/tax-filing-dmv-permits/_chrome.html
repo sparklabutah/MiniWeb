@@ -1,0 +1,37 @@
+{# Shared Lakeport portal chrome: gov bar + header + main nav.
+   Pages set {% set active_nav = 'vehicles' %} before including to highlight a tab. #}
+{% set nav = active_nav | default('') %}
+<div class="gov-bar">
+    An official website of the City of Lakeport &mdash; <a href="{{ url_for('tax-filing-dmv-permits.index') }}">lakeport.gov</a>
+</div>
+<div class="header">
+    <div class="header-inner">
+        <div class="header-brand">
+            <div class="seal">LP</div>
+            <div>
+                <h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">City of Lakeport</a></h1>
+                <div class="subtitle">Government Services Portal</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('tax-filing-dmv-permits.search_page') }}">Search</a>
+            {% if logged_in %}
+            <span style="color:#6b7280">{{ user.display_name if user else '' }}</span>
+            <a href="{{ url_for('tax-filing-dmv-permits.logout') }}" style="color:#dc2626">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('tax-filing-dmv-permits.login_page') }}" class="btn-sign">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<div class="main-nav">
+    <div class="main-nav-inner">
+        <a href="{{ url_for('tax-filing-dmv-permits.index') }}" class="{{ 'active' if nav == 'home' }}">Home</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}" class="{{ 'active' if nav == 'filings' }}">File &amp; Pay</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.forms_page') }}" class="{{ 'active' if nav == 'forms' }}">Forms</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}" class="{{ 'active' if nav == 'vehicles' }}">Motor Vehicles</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}" class="{{ 'active' if nav == 'permits' }}">Permits</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}" class="{{ 'active' if nav == 'payments' }}">Payments</a>
+        <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}" class="{{ 'active' if nav == 'appointments' }}">Appointments</a>
+    </div>
+</div>

@@ -4,89 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forms & Publications - Lakeport Government Services</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1b1b1b; font-size: 15px; }
-        .gov-bar { background: #1b3a4b; padding: .4rem 0; text-align: center; font-size: .75rem; color: #a0c4b8; }
-        .gov-bar a { color: #fff; text-decoration: none; }
-        .header { background: #fff; border-bottom: 1px solid #dfe1e5; padding: 0 2rem; }
-        .header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: .8rem 0; }
-        .header-brand { display: flex; align-items: center; gap: .8rem; }
-        .header-brand .seal { width: 42px; height: 42px; border-radius: 50%; background: #1b3a4b; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
-        .header-brand h1 { font-size: 1.15rem; color: #1b3a4b; }
-        .header-brand h1 a { color: inherit; text-decoration: none; }
-        .header-brand .subtitle { font-size: .75rem; color: #6b7280; font-weight: 400; }
-        .header-right { display: flex; align-items: center; gap: 1rem; font-size: .85rem; }
-        .header-right a { color: #1b3a4b; text-decoration: none; font-weight: 500; }
-        .main-nav { background: #1b3a4b; }
-        .main-nav-inner { max-width: 1100px; margin: 0 auto; display: flex; }
-        .main-nav a { color: #c5ddd6; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .7rem 1.2rem; border-bottom: 3px solid transparent; }
-        .main-nav a:hover { color: #fff; background: rgba(255,255,255,.08); }
-        .main-nav a.active { color: #fff; border-bottom-color: #5db8a3; font-weight: 600; }
-
-        .content { max-width: 1100px; margin: 0 auto; padding: 2rem; }
-        .page-title { font-size: 1.5rem; font-weight: 700; color: #1b3a4b; margin-bottom: .3rem; }
-        .page-desc { font-size: .9rem; color: #6b7280; margin-bottom: 1.5rem; }
-
-        .filters { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
-        .filters select, .filters input { padding: .5rem .8rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; background: #fff; }
-        .filters select:focus, .filters input:focus { border-color: #1b3a4b; outline: none; }
-        .filters .search-input { flex: 1; min-width: 200px; }
-
-        .category-header { font-size: 1.1rem; font-weight: 700; color: #1b3a4b; margin: 2rem 0 .8rem; padding-bottom: .4rem; border-bottom: 2px solid #1b3a4b; }
-        .category-header:first-of-type { margin-top: 0; }
-
-        .form-list { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1rem; }
-        .form-item { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: 1rem 1.2rem; display: flex; justify-content: space-between; align-items: center; transition: box-shadow .15s; }
-        .form-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-        .form-info { flex: 1; }
-        .form-number { font-size: .95rem; font-weight: 700; color: #2563eb; margin-bottom: .15rem; }
-        .form-title { font-size: .9rem; font-weight: 600; color: #1b1b1b; margin-bottom: .2rem; }
-        .form-desc { font-size: .8rem; color: #6b7280; line-height: 1.4; }
-        .form-meta { font-size: .7rem; color: #9ca3af; margin-top: .3rem; }
-        .form-actions { display: flex; gap: .5rem; flex-shrink: 0; margin-left: 1rem; }
-        .btn-download { background: #1b3a4b; color: #fff; border: none; padding: .4rem 1rem; border-radius: .3rem; font-size: .8rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; }
-        .btn-download:hover { background: #274c5b; }
-        .btn-inst { background: #fff; color: #1b3a4b; border: 1px solid #d1d5db; padding: .4rem .8rem; border-radius: .3rem; font-size: .8rem; font-weight: 500; text-decoration: none; }
-        .btn-inst:hover { background: #f8fafc; }
-
-        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .78rem; border-top: 1px solid #e2e8f0; background: #fff; margin-top: 3rem; }
-    </style>
+    <link rel="stylesheet" href="/static/lakeport.css">
 </head>
 <body>
-    <div class="gov-bar">An official website of the City of Lakeport &mdash; <a href="{{ url_for('tax-filing-dmv-permits.index') }}">lakeport.gov</a></div>
-
-    <div class="header">
-        <div class="header-inner">
-            <div class="header-brand">
-                <div class="seal">LP</div>
-                <div>
-                    <h1><a href="{{ url_for('tax-filing-dmv-permits.index') }}">City of Lakeport</a></h1>
-                    <div class="subtitle">Government Services Portal</div>
-                </div>
-            </div>
-            <div class="header-right">
-                <a href="{{ url_for('tax-filing-dmv-permits.search_page') }}">Search</a>
-                {% if logged_in %}
-                <a href="{{ url_for('tax-filing-dmv-permits.logout') }}" style="color:#dc2626">Sign Out</a>
-                {% else %}
-                <a href="{{ url_for('tax-filing-dmv-permits.login_page') }}">Sign In</a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="main-nav">
-        <div class="main-nav-inner">
-            <a href="{{ url_for('tax-filing-dmv-permits.index') }}">Home</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">File & Pay</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.forms_page') }}" class="active">Forms</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">Motor Vehicles</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">Permits</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.payments_page') }}">Payments</a>
-            <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}">Appointments</a>
-        </div>
-    </div>
+    {% set active_nav = 'forms' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
 
     <div class="content">
         <h1 class="page-title">Forms & Publications</h1>
@@ -127,10 +49,7 @@
         {% endfor %}
     </div>
 
-    <div class="footer">
-        City of Lakeport &mdash; Government Services Portal &mdash; Forms & Publications<br>
-        &copy; 2026 Lakeport Municipal Government. All rights reserved.
-    </div>
+    {% include "tax-filing-dmv-permits/_footer.html" %}
 
     <script>
     function filterForms() {
