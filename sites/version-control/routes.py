@@ -1008,6 +1008,11 @@ def user_profile(user_id):
             r["forks"] = 0
         enriched_activities = []
 
+    # Attach a generated file tree to each repo so the author page can show
+    # each repository's structure inline.
+    for r in user_repos:
+        r["_tree"] = _generate_file_tree(r.get("name", ""), r.get("description", ""))
+
     return render_template(
         "version-control/user_profile.html",
         user=user,
