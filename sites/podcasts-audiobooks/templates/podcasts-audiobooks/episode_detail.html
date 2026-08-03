@@ -83,10 +83,10 @@
 
             <div class="player-bar">
                 <button class="play-btn" id="play-btn" onclick="togglePlay()">&#9654;</button>
-                <div class="progress-bar">
+                <div class="progress-bar" id="progress-bar" style="cursor:pointer;" title="Seek">
                     <div class="progress-fill" id="progress-fill"></div>
                 </div>
-                <div class="time-display">0:00 / {{ episode.duration_minutes }}:00</div>
+                <div class="time-display" id="time-display">0:00 / {{ episode.duration_minutes }}:00</div>
             </div>
 
             <div class="speed-control">
@@ -115,18 +115,35 @@
     </div>
 
     <script>
-    let playing = false;
-    function togglePlay() {
-        playing = !playing;
-        const btn = document.getElementById('play-btn');
-        btn.innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
-        if (playing) {
-            document.getElementById('progress-fill').style.width = '35%';
-        }
-        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({speed:1.0})});
+    // Fully simulated audio player: the progress bar advances in real time,
+    // honours playback speed, pauses/resumes, and is seekable by clicking.
+    let playing = false, pos = 0, speed = 1.0, timer = null;
+    const totalSec = {{ episode.duration_minutes }} * 60;
+    function fmtTime(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+    function renderPlayer() {
+        document.getElementById('progress-fill').style.width = (totalSec ? Math.min(100, pos / totalSec * 100) : 0) + '%';
+        document.getElementById('time-display').textContent = fmtTime(pos) + ' / ' + fmtTime(totalSec);
+        document.getElementById('play-btn').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
     }
+    function tickPlayer() { pos += speed; if (pos >= totalSec) { pos = totalSec; stopPlayer(); } renderPlayer(); }
+    function startPlayer() { playing = true; if (timer) clearInterval(timer); timer = setInterval(tickPlayer, 1000); renderPlayer(); }
+    function stopPlayer() { playing = false; if (timer) clearInterval(timer); timer = null; renderPlayer(); }
+    function togglePlay() {
+        if (playing) stopPlayer(); else startPlayer();
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({speed: speed})});
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        renderPlayer();
+        var bar = document.getElementById('progress-bar');
+        if (bar) bar.addEventListener('click', function (e) {
+            var r = bar.getBoundingClientRect();
+            pos = Math.round((e.clientX - r.left) / r.width * totalSec);
+            renderPlayer();
+        });
+    });
 
-    function setSpeed(speed) {
+    function setSpeed(speedVal) {
+        speed = parseFloat(speedVal);
         fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
