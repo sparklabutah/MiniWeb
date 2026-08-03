@@ -145,7 +145,15 @@
             fetch(`${BASE}api/posts/${POST_ID}/vote`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({direction: dir})
-            }).then(r => r.json()).then(d => { if(d.score !== undefined) document.getElementById('post-score').textContent = d.score; });
+            }).then(r => r.json()).then(d => {
+                if(d.score !== undefined) document.getElementById('post-score').textContent = d.score;
+                var pill = document.getElementById('post-score').closest('.vote-pill');
+                if(pill){
+                    var up = pill.querySelector('.up'), dn = pill.querySelector('.down');
+                    if(up) up.classList.toggle('active', d.user_vote === 'up');
+                    if(dn) dn.classList.toggle('active', d.user_vote === 'down');
+                }
+            });
         }
         function voteComment(cid, dir) {
             fetch(`${BASE}api/comments/${cid}/vote`, {

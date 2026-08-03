@@ -963,6 +963,37 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
     # Shared video player — enhances any [data-mini-player] container across all sites.
     _PLAYER_ASSETS = b'<link rel="stylesheet" href="/static/player.css"><script src="/static/player.js"></script>'
 
+    # ── Per-site logo fonts ──────────────────────────────────────────
+    # Self-hosted display fonts (app/static/brand-fonts.css) assigned so
+    # each site's wordmark uses a distinctive typeface instead of the
+    # shared system font. Applied to common logo/brand classes via a
+    # scoped <style> so no per-template edits are needed.
+    _BRAND_FONTS_CSS = b'<link rel="stylesheet" href="/static/brand-fonts.css">'
+    _LOGO_FONTS = [
+        ("Pacifico", "cursive"), ("Lobster", "cursive"), ("Righteous", "sans-serif"),
+        ("Bungee", "sans-serif"), ("Monoton", "cursive"), ("Orbitron", "sans-serif"),
+        ("Bebas Neue", "sans-serif"), ("Abril Fatface", "serif"),
+        ("Playfair Display", "serif"), ("Comfortaa", "sans-serif"), ("Anton", "sans-serif"),
+        ("Rubik Mono One", "monospace"), ("Caveat", "cursive"), ("Sacramento", "cursive"),
+        ("Audiowide", "sans-serif"), ("Shrikhand", "cursive"), ("Special Elite", "serif"),
+        ("Kanit", "sans-serif"), ("Archivo Black", "sans-serif"), ("Cinzel", "serif"),
+        ("Zilla Slab", "serif"), ("Fredoka", "sans-serif"),
+    ]
+    _LOGO_SELECTORS = (
+        ".logo,.nav-logo,.brand,.logo-text,.brand-text,.brand-name,.header-brand,"
+        ".navbar-brand,.topnav-brand,.topbar-brand,.header-logo,.footer-brand,"
+        ".login-logo,.login-brand,.site-logo,.site-name,.logo-area,.university-brand,"
+        ".team-logo,.phone-brand,.panel-logo,.card-brand,.rd-logo,.rh-logo,"
+        ".rh-logo-text,.tw-logo,.ft-brand,.lb-brand,.brand-title,.logo-title"
+    )
+
+    def _logo_font_style(site):
+        import zlib
+        family, generic = _LOGO_FONTS[zlib.crc32(site.encode()) % len(_LOGO_FONTS)]
+        css = (f"{_LOGO_SELECTORS}{{font-family:'{family}',{generic} !important;"
+               f"letter-spacing:.2px;}}")
+        return f"<style>{css}</style>".encode()
+
     @app.after_request
     def _inject_site_scripts(response):
         if (request.path.startswith("/sites/")
@@ -970,8 +1001,12 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
                 and "text/html" in response.content_type
                 and response.status_code == 200):
             data = response.get_data()
+            parts = request.path.split("/", 3)  # ['', 'sites', '<id>', ...]
+            site_id = parts[2] if len(parts) > 2 else ""
+            logo_css = (_BRAND_FONTS_CSS + _logo_font_style(site_id)) if site_id else b""
             inject = (_BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_PICKER_SCRIPT
-                      + b"\n" + _EXPORT_FEEDBACK_SCRIPT + b"\n" + _PLAYER_ASSETS)
+                      + b"\n" + _EXPORT_FEEDBACK_SCRIPT + b"\n" + _PLAYER_ASSETS
+                      + b"\n" + logo_css)
             idx = data.rfind(b"</body>")
             if idx != -1:
                 response.set_data(data[:idx] + inject + b"\n" + data[idx:])

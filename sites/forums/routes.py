@@ -636,12 +636,42 @@ def messages_page():
     user = _get_current_user()
     if not user:
         return redirect(url_for("forums.login_page"))
+    me = user["username"]
     messages = _load_messages()
-    inbox = sorted([m for m in messages if m["to_username"] == user["username"]],
+    mine = [m for m in messages if m.get("to_username") == me or m.get("from_username") == me]
+    inbox = sorted([m for m in mine if m.get("to_username") == me],
                    key=lambda m: m.get("created_utc", ""), reverse=True)
-    sent = sorted([m for m in messages if m["from_username"] == user["username"]],
+    sent = sorted([m for m in mine if m.get("from_username") == me],
                   key=lambda m: m.get("created_utc", ""), reverse=True)
-    return render_template("forums/messages.html", inbox=inbox, sent=sent)
+
+    # Group into conversation threads keyed by the other participant.
+    threads = {}
+    for m in mine:
+        partner = m["from_username"] if m["to_username"] == me else m["to_username"]
+        threads.setdefault(partner, []).append(m)
+    conversations = []
+    for partner, msgs in threads.items():
+        msgs.sort(key=lambda m: m.get("created_utc", ""))
+        last = msgs[-1]
+        unread = sum(1 for m in msgs
+                     if m.get("to_username") == me
+                     and str(m.get("read", 0)) in ("0", "", "None", "False", "false"))
+        for m in msgs:
+            m["_mine"] = m.get("from_username") == me
+        conversations.append({
+            "partner": partner,
+            "messages": msgs,
+            "last": last,
+            "last_utc": last.get("created_utc", ""),
+            "unread": unread,
+            "color": _avatar_color(partner),
+            "subject": msgs[0].get("subject", ""),
+        })
+    conversations.sort(key=lambda c: c["last_utc"], reverse=True)
+    total_unread = sum(c["unread"] for c in conversations)
+    return render_template("forums/messages.html", inbox=inbox, sent=sent,
+                           conversations=conversations, total_unread=total_unread,
+                           me=me)
 
 
 @blueprint.route("/logout")
@@ -792,46 +822,72 @@ def api_delete_post(post_id):
 # API routes - voting (react_by_toggle)
 # ---------------------------------------------------------------------------
 
+def _vote_value(v):
+    """Score contribution of a stored vote state."""
+    return 1 if v == "up" else (-1 if v == "down" else 0)
+
+
+def _apply_vote(kind, item_id, direction):
+    """Reddit-style toggle vote, tracked per-user in the session.
+
+    Returns (new_score, user_vote) where user_vote is "up"/"down"/None.
+    A repeated click in the same direction clears the vote; the opposite
+    direction flips it. One user can never stack more than a single vote.
+    """
+    uid = session.get("user_id")
+    votes = session.get("forums_votes") or {}
+    # Namespace by user so distinct sessions/users keep independent state.
+    key = f"{uid}:{kind}:{item_id}"
+    prev = votes.get(key)
+    new = None if direction == prev else direction
+    delta = _vote_value(new) - _vote_value(prev)
+    if new:
+        votes[key] = new
+    else:
+        votes.pop(key, None)
+    session["forums_votes"] = votes
+    session.modified = True
+    return delta, new
+
+
 @blueprint.route("/api/posts/<post_id>/vote", methods=["POST"])
 def api_vote_post(post_id):
-    """react_by_toggle: upvote/downvote a post."""
+    """react_by_toggle: upvote/downvote a post (one vote per user)."""
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
     data = request.get_json(silent=True) or {}
     direction = data.get("direction", "up")
+    if direction not in ("up", "down"):
+        return jsonify({"error": "direction must be 'up' or 'down'"}), 400
     post = _get_post(post_id)
     if not post:
         return jsonify({"error": "Post not found"}), 404
-    if direction == "up":
-        post["score"] = post.get("score", 0) + 1
-    elif direction == "down":
-        post["score"] = post.get("score", 0) - 1
-    else:
-        return jsonify({"error": "direction must be 'up' or 'down'"}), 400
+    delta, user_vote = _apply_vote("post", post_id, direction)
+    post["score"] = post.get("score", 0) + delta
     db.save_item(SITE, "posts", post_id, post)
-    return jsonify({"id": post_id, "score": post["score"], "direction": direction})
+    return jsonify({"id": post_id, "score": post["score"],
+                    "direction": direction, "user_vote": user_vote})
 
 
 @blueprint.route("/api/comments/<comment_id>/vote", methods=["POST"])
 def api_vote_comment(comment_id):
-    """react_by_toggle: upvote/downvote a comment."""
+    """react_by_toggle: upvote/downvote a comment (one vote per user)."""
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
     data = request.get_json(silent=True) or {}
     direction = data.get("direction", "up")
+    if direction not in ("up", "down"):
+        return jsonify({"error": "direction must be 'up' or 'down'"}), 400
     comment = _get_comment(comment_id)
     if not comment:
         return jsonify({"error": "Comment not found"}), 404
-    if direction == "up":
-        comment["score"] = comment.get("score", 0) + 1
-    elif direction == "down":
-        comment["score"] = comment.get("score", 0) - 1
-    else:
-        return jsonify({"error": "direction must be 'up' or 'down'"}), 400
+    delta, user_vote = _apply_vote("comment", comment_id, direction)
+    comment["score"] = comment.get("score", 0) + delta
     db.save_item(SITE, "comments", comment_id, comment)
-    return jsonify({"id": comment_id, "score": comment["score"], "direction": direction})
+    return jsonify({"id": comment_id, "score": comment["score"],
+                    "direction": direction, "user_vote": user_vote})
 
 
 # ---------------------------------------------------------------------------

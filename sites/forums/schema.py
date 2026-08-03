@@ -41,6 +41,22 @@ TABLES = {
             "subreddit",
         ],
     },
+    "messages": {
+        "table_name": "forums_messages",
+        "columns": [
+            ("id", "TEXT PRIMARY KEY"),
+            ("from_username", "TEXT NOT NULL DEFAULT ''"),
+            ("to_username", "TEXT NOT NULL DEFAULT ''"),
+            ("subject", "TEXT NOT NULL DEFAULT ''"),
+            ("body", "TEXT NOT NULL DEFAULT ''"),
+            ("created_utc", "TEXT NOT NULL DEFAULT ''"),
+            ("read", "INTEGER NOT NULL DEFAULT 0"),
+        ],
+        "indexes": [
+            "to_username",
+            "from_username",
+        ],
+    },
     "reddit_users": {
         "table_name": "forums_reddit_users",
         "columns": [

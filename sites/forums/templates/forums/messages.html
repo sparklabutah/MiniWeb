@@ -6,16 +6,40 @@
     <title>Messages — ForumHub</title>
     <link rel="stylesheet" href="/static/reddit.css">
     <style>
-        .ms-tabs{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;margin-bottom:16px;}
-        .ms-tabs button{padding:8px 18px;border:none;background:none;border-radius:16px;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--muted);}
-        .ms-tabs button.active{background:var(--chip);color:var(--ink);}
-        .tab-content{display:none;}
-        .tab-content.active{display:block;}
-        .msg-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px;}
-        .msg-item .subject{font-weight:700;font-size:.95rem;}
-        .msg-item .meta{font-size:.78rem;color:var(--muted);margin-top:2px;}
-        .msg-item .body{font-size:.9rem;margin-top:8px;color:#333;line-height:1.5;white-space:pre-wrap;}
-        .msg-item.unread{border-left:3px solid var(--orange);}
+        .dm-card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+                 display:grid;grid-template-columns:280px 1fr;height:72vh;min-height:460px;}
+        .dm-list{border-right:1px solid var(--line);overflow-y:auto;background:#fafafb;}
+        .dm-list-h{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);
+                   font-weight:800;font-size:.95rem;position:sticky;top:0;background:#fafafb;z-index:1;}
+        .dm-list-h .rd-btn{margin-left:auto;padding:5px 12px;font-size:.75rem;}
+        .conv{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
+        .conv:hover{background:#f1f2f4;}
+        .conv.active{background:#e9f0fb;}
+        .conv .who{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.88rem;}
+        .conv .prev{font-size:.8rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;
+                    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+        .conv .when{font-size:.72rem;color:var(--muted);margin-top:3px;}
+        .conv .badge{margin-left:auto;background:var(--orange);color:#fff;font-size:.68rem;font-weight:800;
+                     border-radius:10px;padding:1px 7px;min-width:18px;text-align:center;}
+        .dm-main{display:flex;flex-direction:column;min-width:0;}
+        .dm-thread{display:none;flex-direction:column;height:100%;}
+        .dm-thread.active{display:flex;}
+        .dm-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:800;}
+        .dm-head a{color:inherit;text-decoration:none;}
+        .dm-head a:hover{text-decoration:underline;}
+        .dm-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;background:#fff;}
+        .bubble{max-width:74%;padding:9px 13px;border-radius:16px;font-size:.9rem;line-height:1.45;
+                white-space:pre-wrap;word-wrap:break-word;}
+        .bubble .b-when{display:block;font-size:.68rem;opacity:.7;margin-top:4px;}
+        .row{display:flex;}
+        .row.them{justify-content:flex-start;}
+        .row.me{justify-content:flex-end;}
+        .row.them .bubble{background:#f0f1f3;color:var(--ink);border-bottom-left-radius:4px;}
+        .row.me .bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+        .dm-reply{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafafb;}
+        .dm-reply textarea{flex:1;resize:none;height:44px;border:1px solid var(--line);border-radius:20px;
+                           padding:10px 16px;font-family:inherit;font-size:.9rem;}
+        .dm-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.9rem;}
         .compose-form{display:none;}
         .compose-form.open{display:block;}
     </style>
@@ -28,7 +52,7 @@
 
         <main class="rd-feed">
             <div style="display:flex;align-items:center;margin-bottom:16px;">
-                <h1 style="font-size:1.3rem;font-weight:700;">Messages</h1>
+                <h1 style="font-size:1.3rem;font-weight:700;">Messages{% if total_unread %} <span style="color:var(--orange);font-size:.9rem;">({{ total_unread }} unread)</span>{% endif %}</h1>
                 <button class="rd-btn blue" style="margin-left:auto;" onclick="document.getElementById('compose-form').classList.toggle('open');">New Message</button>
             </div>
 
@@ -48,33 +72,51 @@
                 <button class="rd-btn blue" onclick="sendMessage()">Send</button>
             </div>
 
-            <div class="ms-tabs">
-                <button class="active" onclick="showTab('inbox')">Inbox ({{ inbox | length }})</button>
-                <button onclick="showTab('sent')">Sent ({{ sent | length }})</button>
-            </div>
-
-            <div class="tab-content active" id="tab-inbox">
-                {% for msg in inbox %}
-                <div class="msg-item {{ 'unread' if not msg.read }}">
-                    <div class="subject">{{ msg.subject }}</div>
-                    <div class="meta">From: u/{{ msg.from_username }} · {{ msg.created_utc[:10] }}</div>
-                    <div class="body">{{ msg.body }}</div>
+            <div class="dm-card">
+                <div class="dm-list">
+                    <div class="dm-list-h">Chats
+                        <button class="rd-btn blue" onclick="document.getElementById('compose-form').classList.toggle('open');">+ New</button>
+                    </div>
+                    {% for c in conversations %}
+                    <div class="conv {{ 'active' if loop.first }}" data-conv="{{ loop.index0 }}" onclick="selectConv({{ loop.index0 }})">
+                        <span class="av md" style="background:{{ c.color }};">{{ c.partner[0]|upper }}</span>
+                        <div style="min-width:0;flex:1;">
+                            <div class="who">u/{{ c.partner }}
+                                {% if c.unread %}<span class="badge">{{ c.unread }}</span>{% endif %}
+                            </div>
+                            <div class="prev">{% if c.last._mine %}You: {% endif %}{{ c.last.body }}</div>
+                            <div class="when">{{ c.last_utc[:10] }}</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="rd-empty" style="margin:16px;">No conversations yet.</div>
+                    {% endfor %}
                 </div>
-                {% else %}
-                <div class="rd-empty">No messages in your inbox.</div>
-                {% endfor %}
-            </div>
 
-            <div class="tab-content" id="tab-sent">
-                {% for msg in sent %}
-                <div class="msg-item">
-                    <div class="subject">{{ msg.subject }}</div>
-                    <div class="meta">To: u/{{ msg.to_username }} · {{ msg.created_utc[:10] }}</div>
-                    <div class="body">{{ msg.body }}</div>
+                <div class="dm-main">
+                    {% for c in conversations %}
+                    <div class="dm-thread {{ 'active' if loop.first }}" id="thread-{{ loop.index0 }}">
+                        <div class="dm-head">
+                            <span class="av sm" style="background:{{ c.color }};">{{ c.partner[0]|upper }}</span>
+                            <a href="{{ url_for('forums.user_profile', username=c.partner) }}">u/{{ c.partner }}</a>
+                        </div>
+                        <div class="dm-body" id="body-{{ loop.index0 }}">
+                            {% for m in c.messages %}
+                            <div class="row {{ 'me' if m._mine else 'them' }}">
+                                <div class="bubble">{{ m.body }}<span class="b-when">{{ m.created_utc[:10] }}</span></div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="dm-reply">
+                            <textarea id="reply-{{ loop.index0 }}" placeholder="Message u/{{ c.partner }}…"
+                                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();replyTo('{{ c.partner }}','{{ c.subject }}',{{ loop.index0 }});}"></textarea>
+                            <button class="rd-btn blue" onclick="replyTo('{{ c.partner }}','{{ c.subject }}',{{ loop.index0 }})">Send</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="dm-empty">Start a conversation with the New Message button.</div>
+                    {% endfor %}
                 </div>
-                {% else %}
-                <div class="rd-empty">No sent messages.</div>
-                {% endfor %}
             </div>
         </main>
 
@@ -82,32 +124,54 @@
             <div class="widget">
                 <div class="widget-h">Direct Messages</div>
                 <div class="widget-pad">
-                    Send and receive private messages with other ForumHub members. Use New Message to start a conversation.
+                    Your private conversations with other ForumHub members. Pick a chat on the left to read the full thread, or start a new one.
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        function showTab(name) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.ms-tabs button').forEach(b => b.classList.remove('active'));
-            document.getElementById('tab-' + name).classList.add('active');
-            event.target.classList.add('active');
+        const BASE = '{{ url_for("forums.index") }}';
+        function selectConv(i) {
+            document.querySelectorAll('.conv').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.dm-thread').forEach(t => t.classList.remove('active'));
+            const conv = document.querySelector('.conv[data-conv="' + i + '"]');
+            if (conv) conv.classList.add('active');
+            const thread = document.getElementById('thread-' + i);
+            if (thread) { thread.classList.add('active'); scrollBody(i); }
+        }
+        function scrollBody(i) {
+            const b = document.getElementById('body-' + i);
+            if (b) b.scrollTop = b.scrollHeight;
+        }
+        function replyTo(partner, subject, i) {
+            const ta = document.getElementById('reply-' + i);
+            const body = ta.value.trim();
+            if (!body) return;
+            ta.disabled = true;
+            fetch(BASE + 'api/messages', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({to: partner, subject: subject || ('Chat with ' + partner), body: body})
+            }).then(r => r.json()).then(d => {
+                if (d.id) { location.reload(); }
+                else { alert(d.error || 'Could not send'); ta.disabled = false; }
+            }).catch(() => { ta.disabled = false; });
         }
         function sendMessage() {
             const to = document.getElementById('msg-to').value.trim();
             const subject = document.getElementById('msg-subject').value.trim();
             const body = document.getElementById('msg-body').value.trim();
             if (!to || !body) { alert('Recipient and message body are required.'); return; }
-            fetch('{{ url_for("forums.index") }}api/messages', {
+            fetch(BASE + 'api/messages', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({to: to, subject: subject, body: body})
             }).then(r => r.json()).then(d => {
-                if (d.id) { alert('Message sent!'); location.reload(); }
+                if (d.id) { location.reload(); }
                 else alert(d.error);
             });
         }
+        // Scroll the first open thread to newest on load.
+        document.addEventListener('DOMContentLoaded', () => scrollBody(0));
     </script>
 </body>
 </html>
