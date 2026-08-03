@@ -279,6 +279,19 @@
             feedback.textContent = 'Error.';
         });
     }
+
+    // Open the chat at the bottom on the most recent messages, like any chat
+    // app, instead of the top with the oldest.
+    (function () {
+        if (new URLSearchParams(window.location.search).get('jump')) return;
+        function toBottom() {
+            var c = document.querySelector('.messages-container');
+            if (c) c.scrollTop = c.scrollHeight;
+        }
+        toBottom();
+        requestAnimationFrame(toBottom);
+        window.addEventListener('load', toBottom);
+    })();
     </script>
 </body>
 </html>

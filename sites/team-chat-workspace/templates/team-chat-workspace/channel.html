@@ -331,6 +331,20 @@
         return false;
     }
 
+    // Default view: open at the bottom on the most recent messages, like any
+    // chat app, instead of the top with the oldest. Skipped when jumping to a
+    // specific search result (handled below).
+    (function () {
+        if (new URLSearchParams(window.location.search).get('jump')) return;
+        function toBottom() {
+            var c = document.querySelector('.messages-container');
+            if (c) c.scrollTop = c.scrollHeight;
+        }
+        toBottom();
+        requestAnimationFrame(toBottom);   // after layout settles
+        window.addEventListener('load', toBottom);  // after images/fonts
+    })();
+
     // Jump-to-message: when arriving from a search result (?jump=<msg-id>),
     // scroll that message into view and flash it, then drop the param so a
     // reload/back doesn't re-trigger the highlight.
