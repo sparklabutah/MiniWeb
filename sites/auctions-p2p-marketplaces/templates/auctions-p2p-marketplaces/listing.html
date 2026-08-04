@@ -91,7 +91,7 @@
                     <button type="submit" class="btn btn-bid">Place Bid</button>
                 </form>
                 {% if product.buy_now_price %}
-                <button class="btn btn-buy" style="margin-top:.5rem" onclick="buyNow()">Buy It Now - ${{ "%.2f"|format(product.buy_now_price) }}</button>
+                <a class="btn btn-buy" style="margin-top:.5rem;display:inline-block;text-align:center" href="{{ url_for('auctions-p2p-marketplaces.checkout_page', listing_id=product.id) }}">Buy It Now - ${{ "%.2f"|format(product.buy_now_price) }}</a>
                 {% endif %}
                 {% endif %}
 
@@ -209,13 +209,5 @@
         {% endif %}
     </div>
 
-    <script>
-    function buyNow() {
-        var BASE = '{{ url_for("auctions-p2p-marketplaces.index") }}'.replace(/\/$/, '');
-        if (confirm('Buy this item now for ${{ "%.2f"|format(product.buy_now_price or 0) }}?')) {
-            window.location.href = BASE + '/listing/{{ product.id }}?checkout=true';
-        }
-    }
-    </script>
 </body>
 </html>

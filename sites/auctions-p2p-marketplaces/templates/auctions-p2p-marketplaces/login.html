@@ -34,9 +34,13 @@
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
+        {% if next %}
+        <div class="switch" style="margin-top:0;margin-bottom:1rem;color:#555;">Sign in to complete your purchase.</div>
+        {% endif %}
 
         {% if mode == 'register' %}
         <form method="POST" action="{{ url_for('auctions-p2p-marketplaces.register_submit') }}">
+            <input type="hidden" name="next" value="{{ next or '' }}">
             <div class="form-group">
                 <label for="name">Full Name</label>
                 <input type="text" id="name" name="name" placeholder="Your full name" required>
@@ -54,10 +58,11 @@
                 <input type="password" id="password" name="password" placeholder="Choose a password" required>
             </div>
             <button type="submit" class="btn-submit">Create Account</button>
-            <div class="switch">Already have an account? <a href="{{ url_for('auctions-p2p-marketplaces.login_page') }}">Sign In</a></div>
+            <div class="switch">Already have an account? <a href="{{ url_for('auctions-p2p-marketplaces.login_page', next=next) }}">Sign In</a></div>
         </form>
         {% else %}
         <form method="POST" action="{{ url_for('auctions-p2p-marketplaces.login_submit') }}">
+            <input type="hidden" name="next" value="{{ next or '' }}">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" placeholder="Enter your username" required>
@@ -67,7 +72,7 @@
                 <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
             <button type="submit" class="btn-submit">Sign In</button>
-            <div class="switch">New to BidMarket? <a href="{{ url_for('auctions-p2p-marketplaces.register_page') }}">Register</a></div>
+            <div class="switch">New to BidMarket? <a href="{{ url_for('auctions-p2p-marketplaces.register_page', next=next) }}">Register</a></div>
         </form>
         {% endif %}
     </div>

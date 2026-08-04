@@ -250,7 +250,7 @@ def listing_detail(listing_id):
         abort(404)
     listing_bids = db.query(SITE, "bids",
                             where={"listing_id": listing_id},
-                            sort="-amount")
+                            sort="-amount", limit=50)
     related = _build_product_query(cat=product["category"], limit=7)
     related = [p for p in related if p["id"] != listing_id][:6]
     user = None
@@ -327,28 +327,36 @@ def dashboard():
                            watched=watched, messages=my_messages)
 
 
+def _safe_next(value):
+    """Only allow same-site relative redirects."""
+    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+
+
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
+    return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login",
+                           next=request.args.get("next", ""))
 
 
 @blueprint.route("/register", methods=["GET"])
 def register_page():
-    return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="register")
+    return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="register",
+                           next=request.args.get("next", ""))
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
+    nxt = request.form.get("next", "")
     # users table is small (<20 rows)
     users = db.query(SITE, "users")
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         return render_template("auctions-p2p-marketplaces/login.html",
-                               error="Invalid username or password", mode="login")
+                               error="Invalid username or password", mode="login", next=nxt)
     session["user_id"] = user["id"]
-    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
+    return redirect(_safe_next(nxt) or url_for("auctions-p2p-marketplaces.dashboard"))
 
 
 @blueprint.route("/register", methods=["POST"])
@@ -357,14 +365,15 @@ def register_submit():
     password = request.form.get("password", "").strip()
     email = request.form.get("email", "").strip()
     name = request.form.get("name", "").strip()
+    nxt = request.form.get("next", "")
     if not username or not password or not email:
         return render_template("auctions-p2p-marketplaces/login.html",
-                               error="All fields are required", mode="register")
+                               error="All fields are required", mode="register", next=nxt)
     # users table is small (<20 rows)
     users = db.query(SITE, "users")
     if any(u["username"] == username for u in users):
         return render_template("auctions-p2p-marketplaces/login.html",
-                               error="Username already taken", mode="register")
+                               error="Username already taken", mode="register", next=nxt)
     new_id = _max_id("users") + 1
     new_user = {
         "id": new_id,
@@ -385,7 +394,7 @@ def register_submit():
     emit("signup", user_id=new_id, site_name="auctions-p2p-marketplaces",
          username=username, password=password, email=email)
     session["user_id"] = new_id
-    return redirect(url_for("auctions-p2p-marketplaces.dashboard"))
+    return redirect(_safe_next(nxt) or url_for("auctions-p2p-marketplaces.dashboard"))
 
 
 @blueprint.route("/logout")
@@ -499,25 +508,85 @@ def place_bid_form(listing_id):
     if not product or product["status"] != "active" or amount <= product["current_price"]:
         return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
 
-    new_bid_id = _max_id("bids", "bid_id") + 1
+    new_row_id = _max_id("bids", "row_id") + 1
     new_bid = {
-        "bid_id": new_bid_id,
+        "row_id": new_row_id,
+        "bid_id": _max_id("bids", "bid_id") + 1,
         "listing_id": listing_id,
         "bidder_id": user_id,
         "amount": amount,
         "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "auto_bid": False,
     }
-    # bids PK is row_id, so we need to use save_collection for append
-    bids = db.query(SITE, "bids", limit=50)
-    bids.append(new_bid)
-    db.save_collection(SITE, "bids", bids)
+    # bids PK is row_id — upsert a single row (never replace the whole table).
+    db.save_item(SITE, "bids", new_row_id, new_bid)
 
     product["current_price"] = amount
     product["num_bids"] += 1
     db.save_item(SITE, "products", listing_id, product)
 
     return redirect(url_for("auctions-p2p-marketplaces.listing_detail", listing_id=listing_id))
+
+
+@blueprint.route("/listing/<int:listing_id>/checkout", methods=["GET"])
+def checkout_page(listing_id):
+    product = _get_product(listing_id)
+    if not product:
+        abort(404)
+    checkout_url = url_for("auctions-p2p-marketplaces.checkout_page", listing_id=listing_id)
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page", next=checkout_url))
+    user = _get_user(session["user_id"])
+    price = product.get("buy_now_price") or product.get("current_price")
+    return render_template("auctions-p2p-marketplaces/checkout.html",
+                           product=product, user=user, price=price,
+                           done=False, order=None, error=None)
+
+
+@blueprint.route("/listing/<int:listing_id>/checkout", methods=["POST"])
+def checkout_submit(listing_id):
+    product = _get_product(listing_id)
+    if not product:
+        abort(404)
+    checkout_url = url_for("auctions-p2p-marketplaces.checkout_page", listing_id=listing_id)
+    if "user_id" not in session:
+        return redirect(url_for("auctions-p2p-marketplaces.login_page", next=checkout_url))
+    user = _get_user(session["user_id"])
+    price = product.get("buy_now_price") or product.get("current_price")
+
+    full_name = request.form.get("full_name", "").strip()
+    address = request.form.get("address", "").strip()
+    city = request.form.get("city", "").strip()
+    zip_code = request.form.get("zip", "").strip()
+    payment_method = request.form.get("payment_method", "Credit Card")
+    card_last4 = request.form.get("card_number", "").strip()[-4:]
+
+    if not (full_name and address and city and zip_code):
+        return render_template("auctions-p2p-marketplaces/checkout.html",
+                               product=product, user=user, price=price, done=False,
+                               order=None, error="Please fill in all shipping fields.")
+
+    if product["status"] == "active":
+        product["status"] = "ended"
+        product["winner_id"] = user["id"]
+        db.save_item(SITE, "products", listing_id, product)
+
+    emit("purchase", user_id=user["id"], amount=price, merchant="BidMarket",
+         item=product["name"], account_type="checking")
+
+    order = {
+        "id": f"ORD-{listing_id}-{user['id']}",
+        "full_name": full_name,
+        "address": address,
+        "city": city,
+        "zip": zip_code,
+        "payment_method": payment_method,
+        "card_last4": card_last4,
+        "total": price,
+    }
+    return render_template("auctions-p2p-marketplaces/checkout.html",
+                           product=product, user=user, price=price,
+                           done=True, order=order, error=None)
 
 
 @blueprint.route("/edit-listing/<int:listing_id>", methods=["POST"])
@@ -818,7 +887,7 @@ def api_export():
 def api_listing_bids(listing_id):
     listing_bids = db.query(SITE, "bids",
                             where={"listing_id": listing_id},
-                            sort="-amount")
+                            sort="-amount", limit=50)
     return jsonify(listing_bids)
 
 
@@ -838,8 +907,10 @@ def api_place_bid(listing_id):
     if float(amount) <= product["current_price"]:
         return jsonify({"error": "Bid must be higher than current price"}), 400
 
+    new_row_id = _max_id("bids", "row_id") + 1
     new_bid_id = _max_id("bids", "bid_id") + 1
     new_bid = {
+        "row_id": new_row_id,
         "bid_id": new_bid_id,
         "listing_id": listing_id,
         "bidder_id": bidder_id,
@@ -847,10 +918,8 @@ def api_place_bid(listing_id):
         "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "auto_bid": False,
     }
-    # bids PK is row_id, append via save_collection
-    bids = db.query(SITE, "bids", limit=50)
-    bids.append(new_bid)
-    db.save_collection(SITE, "bids", bids)
+    # bids PK is row_id — upsert a single row (never replace the whole table).
+    db.save_item(SITE, "bids", new_row_id, new_bid)
 
     # Update product
     product["current_price"] = float(amount)
