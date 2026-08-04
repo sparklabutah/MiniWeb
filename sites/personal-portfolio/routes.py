@@ -149,6 +149,7 @@ def _semantic_search(query):
             results.append({
                 "type": "blog",
                 "id": b["id"],
+                "blog_post_id": b.get("blog_post_id", b["id"]),
                 "title": b["title"],
                 "snippet": b.get("excerpt", ""),
                 "url": b.get("url", ""),
