@@ -18,8 +18,9 @@
         .q-header { margin-bottom: 16px; }
         .q-header h1 { font-size: 22px; margin-bottom: 8px; }
         .vote-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 50px; }
-        .vote-btn { background: none; border: 1px solid #babfc4; border-radius: 3px; cursor: pointer; padding: 4px 10px; font-size: 18px; }
+        .vote-btn { background: none; border: 1px solid #babfc4; border-radius: 3px; cursor: pointer; padding: 4px 10px; font-size: 18px; color: #6a737c; }
         .vote-btn:hover { background: #e3e6e8; }
+        .vote-btn.active { background: #f48024; border-color: #f48024; color: #fff; }
         .score { font-size: 20px; font-weight: 600; }
         .post-body { display: flex; gap: 16px; }
         .post-content { flex: 1; }
@@ -53,22 +54,7 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <a href="{{ url_for('qa-knowledge.index') }}" class="logo">KnowledgeHub</a>
-        <nav>
-            <a href="{{ url_for('qa-knowledge.index') }}">Questions</a>
-            <a href="{{ url_for('qa-knowledge.tags_page') }}">Tags</a>
-            <a href="{{ url_for('qa-knowledge.users_page') }}">Users</a>
-        </nav>
-        <div class="user-area">
-            {% if current_user %}
-                <a href="{{ url_for('qa-knowledge.dashboard') }}">{{ current_user.se_display_name }}</a> |
-                <a href="{{ url_for('qa-knowledge.logout') }}">Logout</a>
-            {% else %}
-                <a href="{{ url_for('qa-knowledge.login_page') }}">Log in</a>
-            {% endif %}
-        </div>
-    </div>
+    {% include "qa-knowledge/_header.html" %}
 
     <div class="container">
         <div class="q-header">
@@ -86,12 +72,12 @@
                 <div class="vote-cell">
                     <form method="post" action="{{ url_for('qa-knowledge.form_question_vote', qid=question.id) }}">
                         <input type="hidden" name="direction" value="up">
-                        <button class="vote-btn" title="Upvote">&#9650;</button>
+                        <button class="vote-btn {% if question_vote == 1 %}active{% endif %}" title="Upvote">&#9650;</button>
                     </form>
                     <div class="score">{{ question.score }}</div>
                     <form method="post" action="{{ url_for('qa-knowledge.form_question_vote', qid=question.id) }}">
                         <input type="hidden" name="direction" value="down">
-                        <button class="vote-btn" title="Downvote">&#9660;</button>
+                        <button class="vote-btn {% if question_vote == -1 %}active{% endif %}" title="Downvote">&#9660;</button>
                     </form>
                 </div>
                 <div class="post-content">
@@ -157,12 +143,12 @@
                     <div class="vote-cell">
                         <form method="post" action="{{ url_for('qa-knowledge.form_answer_vote', aid=a.id) }}">
                             <input type="hidden" name="direction" value="up">
-                            <button class="vote-btn" title="Upvote">&#9650;</button>
+                            <button class="vote-btn {% if answer_votes.get(a.id|string) == 1 %}active{% endif %}" title="Upvote">&#9650;</button>
                         </form>
                         <div class="score">{{ a.score }}</div>
                         <form method="post" action="{{ url_for('qa-knowledge.form_answer_vote', aid=a.id) }}">
                             <input type="hidden" name="direction" value="down">
-                            <button class="vote-btn" title="Downvote">&#9660;</button>
+                            <button class="vote-btn {% if answer_votes.get(a.id|string) == -1 %}active{% endif %}" title="Downvote">&#9660;</button>
                         </form>
                         {% if a.is_accepted %}
                         <div class="accepted-badge">&#10004; Accepted</div>

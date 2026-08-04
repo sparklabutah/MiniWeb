@@ -235,6 +235,52 @@ def _get_logged_in_user():
     return None
 
 
+def _user_votes(user, kind):
+    """Return the user's vote map for questions/answers as a dict.
+
+    Keys are stringified item ids, values are +1 (up) or -1 (down).
+    Stored on the user record so a user's vote survives page reloads.
+    """
+    field = "question_votes" if kind == "question" else "answer_votes"
+    votes = user.get(field)
+    if not isinstance(votes, dict):
+        votes = {}
+        user[field] = votes
+    return votes
+
+
+def _record_vote(item, kind, direction):
+    """Apply the current user's vote to a question/answer, once per user.
+
+    Enforces a single vote per user per item: voting the same direction again
+    toggles it off; switching direction flips it. The score delta is applied to
+    the item and the per-user vote is persisted on the voter's user record
+    (session-overlay via _save_users). Returns the item's new score.
+    """
+    voter = _get_logged_in_user()
+    if voter is None:
+        return item.get("score", 0)
+    field = "question_votes" if kind == "question" else "answer_votes"
+    key = str(item["id"])
+    users = _load_users()
+    urec = next((u for u in users
+                 if u["root_user_id"] == voter["root_user_id"]), None)
+    if urec is None:
+        return item.get("score", 0)
+    votes = _user_votes(urec, kind)
+    existing = votes.get(key, 0)
+    desired = 1 if direction == "up" else -1
+    new_vote = 0 if existing == desired else desired
+    item["score"] = item.get("score", 0) + (new_vote - existing)
+    if new_vote == 0:
+        votes.pop(key, None)
+    else:
+        votes[key] = new_vote
+    urec[field] = votes
+    _save_users(users)
+    return item["score"]
+
+
 def _keyword_score(query, question):
     """Simple keyword-overlap relevance score for semantic search."""
     terms = query.lower().split()
@@ -399,13 +445,22 @@ def question_detail(qid):
     # Check if user has saved or followed
     saved_ids = []
     followed_tags = []
+    question_vote = 0
+    answer_votes = {}
     if current_user:
         saved_ids = current_user.get("saved_questions", [])
         followed_tags = current_user.get("followed_tags", [])
+        q_votes = _user_votes(current_user, "question")
+        a_votes = _user_votes(current_user, "answer")
+        question_vote = q_votes.get(str(qid), 0)
+        # keyed by answer id (string) so the template can highlight the arrow
+        answer_votes = {str(a["id"]): a_votes.get(str(a["id"]), 0)
+                        for a in question.get("answers", [])}
     return render_template(
         "qa-knowledge/question_detail.html",
         question=question, current_user=current_user,
         saved_ids=saved_ids, followed_tags=followed_tags,
+        question_vote=question_vote, answer_votes=answer_votes,
     )
 
 
@@ -713,7 +768,7 @@ def form_question_vote(qid):
     direction = request.form.get("direction", "up")
     q = _get_question(qid)
     if q is not None:
-        q["score"] = q.get("score", 0) + (1 if direction == "up" else -1)
+        _record_vote(q, "question", direction)
         _save_question(q)
     return redirect(url_for("qa-knowledge.question_detail", qid=qid))
 
@@ -724,7 +779,7 @@ def form_answer_vote(aid):
     a = _get_answer(aid)
     if a is None:
         abort(404)
-    a["score"] = a.get("score", 0) + (1 if direction == "up" else -1)
+    _record_vote(a, "answer", direction)
     _save_answer(a)
     return redirect(url_for("qa-knowledge.question_detail", qid=a["question_id"]))
 
@@ -1039,7 +1094,7 @@ def api_question_vote(qid):
     q = _get_question(qid)
     if q is None:
         abort(404)
-    q["score"] = q.get("score", 0) + (1 if direction == "up" else -1)
+    _record_vote(q, "question", direction)
     _save_question(q)
     return jsonify({"id": qid, "score": q["score"]})
 
@@ -1142,7 +1197,7 @@ def api_answer_vote(aid):
     a = _get_answer(aid)
     if a is None:
         abort(404)
-    a["score"] = a.get("score", 0) + (1 if direction == "up" else -1)
+    _record_vote(a, "answer", direction)
     _save_answer(a)
     return jsonify({"id": aid, "score": a["score"]})
 
