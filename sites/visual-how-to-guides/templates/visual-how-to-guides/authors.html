@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authors - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+        .page-header { padding: 28px 0 20px; border-bottom: 1px solid #e0e0e0; margin-bottom: 24px; }
+        .page-header h1 { font-size: 28px; color: #333; }
+        .page-header p { font-size: 14px; color: #777; margin-top: 6px; }
+
+        .author-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding-bottom: 40px; }
+        .author-card { display: flex; align-items: center; gap: 16px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; transition: box-shadow 0.2s, transform 0.2s; }
+        .author-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .author-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #4CAF50, #388E3C); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; flex-shrink: 0; }
+        .author-card .info { flex: 1; min-width: 0; }
+        .author-card .info h3 { font-size: 17px; margin-bottom: 4px; }
+        .author-card .info h3 a { color: #333; }
+        .author-card .info h3 a:hover { color: #4CAF50; }
+        .author-card .info .count { font-size: 13px; color: #777; }
+        .following-pill { font-size: 12px; font-weight: 600; color: #4CAF50; border: 1px solid #4CAF50; border-radius: 12px; padding: 2px 10px; }
+
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.authors_directory') }}">Authors</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Authors</h1>
+            <p>Browse everyone who contributes step-by-step guides. Follow an author to track them from your dashboard.</p>
+        </div>
+
+        <div class="author-grid">
+            {% for a in authors %}
+            <div class="author-card">
+                <div class="author-avatar">{{ a.name[0] }}</div>
+                <div class="info">
+                    <h3><a href="{{ url_for('visual-how-to-guides.author_page', name=a.name) }}">{{ a.name }}</a></h3>
+                    <div class="count">{{ a.guide_count }} guide{{ 's' if a.guide_count != 1 else '' }}</div>
+                </div>
+                {% if a.name in followed %}
+                <span class="following-pill">Following</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+</body>
+</html>

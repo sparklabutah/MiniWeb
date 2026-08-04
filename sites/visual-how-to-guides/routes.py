@@ -98,6 +98,38 @@ def _get_user(user_id):
     return next((u for u in users if u["id"] == user_id), None)
 
 
+# ---------------------------------------------------------------------------
+# Author helpers
+#
+# Guides carry a text ``author`` byline (the real authorship data in the DB).
+# Authors are therefore keyed by that name string — there is no separate
+# author_id linkage in the data.
+# ---------------------------------------------------------------------------
+
+def _author_directory():
+    """Distinct guide authors with guide counts (SQL aggregate, not a table scan)."""
+    rows = db.execute(
+        "SELECT author, COUNT(*) AS guide_count "
+        "FROM visual_how_to_guides_guides "
+        "WHERE author != '' "
+        "GROUP BY author ORDER BY guide_count DESC, author ASC"
+    )
+    return [{"name": r["author"], "guide_count": r["guide_count"]} for r in rows]
+
+
+def _guides_by_author(name, limit=50, offset=0):
+    """Guides written by a given author — SQL WHERE/ORDER BY/LIMIT."""
+    return db.query(
+        SITE, "guides",
+        where={"author": name}, sort="-date_published",
+        limit=limit, offset=offset,
+    )
+
+
+def _author_guide_count(name):
+    return db.count(SITE, "guides", where={"author": name})
+
+
 def _get_current_user():
     if "user_id" in session:
         return _get_user(session["user_id"])
@@ -252,7 +284,7 @@ def guide_detail(guide_id):
 
     comments = db.query(SITE, "comments", where={"guide_id": guide_id}, sort="-date", limit=50)
 
-    author = db.get_item(SITE, "users", guide.get("author_id"))
+    author = guide.get("author")
 
     user = _get_current_user()
     bookmarks = _load_bookmarks()
@@ -346,26 +378,37 @@ def compare_page():
     )
 
 
-@blueprint.route("/author/<int:author_id>")
-def author_page(author_id):
-    """Author profile page with follow button (follow_by_dropdown)."""
-    users = _load_users()
-    author = next((u for u in users if u["id"] == author_id), None)
-    if not author:
+@blueprint.route("/authors")
+def authors_directory():
+    """Directory of all guide authors (discoverable follow targets)."""
+    authors = _author_directory()
+    user = _get_current_user()
+    followed = user.get("followed_authors", []) if user else []
+    return render_template(
+        "visual-how-to-guides/authors.html",
+        authors=authors, user=user, followed=followed,
+    )
+
+
+@blueprint.route("/author/<name>")
+def author_page(name):
+    """Author profile page with follow button (follow_by_dropdown).
+
+    Authors are keyed by the guide ``author`` byline string.
+    """
+    total = _author_guide_count(name)
+    if not total:
         abort(404)
 
-    guides = _load_guides()
-    author_guides = [g for g in guides if g.get("author_id") == author_id]
-    author_guides.sort(key=lambda g: g.get("created_at", ""), reverse=True)
+    author_guides = _guides_by_author(name, limit=50)
 
     user = _get_current_user()
-    is_following = False
-    if user:
-        is_following = author["display_name"] in user.get("followed_authors", [])
+    is_following = bool(user) and name in user.get("followed_authors", [])
 
     return render_template(
         "visual-how-to-guides/author.html",
-        author=author, guides=author_guides, user=user,
+        author={"name": name, "guide_count": total},
+        guides=author_guides, user=user,
         is_following=is_following,
     )
 
@@ -658,15 +701,14 @@ def form_react(comment_id):
     return redirect(url_for("visual-how-to-guides.index"))
 
 
-@blueprint.route("/author/<int:author_id>/follow", methods=["POST"])
-def form_follow_author(author_id):
-    """Toggle follow on an author (follow_by_dropdown)."""
+@blueprint.route("/author/<name>/follow", methods=["POST"])
+def form_follow_author(name):
+    """Toggle follow on an author by byline name (follow_by_dropdown)."""
     user = _get_current_user()
     if not user:
         return redirect(url_for("visual-how-to-guides.login_page"))
 
-    target = _get_user(author_id)
-    if not target:
+    if not _author_guide_count(name):
         abort(404)
 
     users = _load_users()
@@ -675,17 +717,16 @@ def form_follow_author(author_id):
         return redirect(url_for("visual-how-to-guides.login_page"))
 
     followed = current.setdefault("followed_authors", [])
-    author_name = target["display_name"]
-    if author_name in followed:
-        followed.remove(author_name)
+    if name in followed:
+        followed.remove(name)
     else:
-        followed.append(author_name)
+        followed.append(name)
     _save_users(users)
 
     referrer = request.form.get("redirect_to", "")
     if referrer:
         return redirect(referrer)
-    return redirect(url_for("visual-how-to-guides.author_page", author_id=author_id))
+    return redirect(url_for("visual-how-to-guides.author_page", name=name))
 
 
 # ---------------------------------------------------------------------------

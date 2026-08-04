@@ -78,36 +78,29 @@
 
     <div class="container">
         <div class="author-profile">
-            <div class="author-avatar-lg">{{ author.display_name[0] }}</div>
+            <div class="author-avatar-lg">{{ author.name[0] }}</div>
             <div class="author-details">
-                <h1>{{ author.display_name }}</h1>
-                <div class="username">@{{ author.username }}</div>
-                {% if author.bio %}
-                <div class="bio">{{ author.bio }}</div>
-                {% endif %}
+                <h1>{{ author.name }}</h1>
+                <div class="username"><a href="{{ url_for('visual-how-to-guides.authors_directory') }}">&larr; All authors</a></div>
                 <div class="author-stats">
                     <div class="stat">
-                        <div class="stat-value">{{ guides|length }}</div>
+                        <div class="stat-value">{{ author.guide_count }}</div>
                         <div class="stat-label">Guides</div>
                     </div>
-                    {% if author.followed_authors is defined %}
-                    <div class="stat">
-                        <div class="stat-value">{{ author.followed_authors|length }}</div>
-                        <div class="stat-label">Following</div>
-                    </div>
-                    {% endif %}
                 </div>
-                {% if user and user.id != author.id %}
-                <form action="{{ url_for('visual-how-to-guides.form_follow_author', author_id=author.id) }}" method="post" style="display:inline;">
+                {% if user %}
+                <form action="{{ url_for('visual-how-to-guides.form_follow_author', name=author.name) }}" method="post" style="display:inline;">
                     <button type="submit" class="follow-btn {% if is_following %}follow-btn-following{% else %}follow-btn-follow{% endif %}">
                         {% if is_following %}Following{% else %}Follow{% endif %}
                     </button>
                 </form>
+                {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}" class="follow-btn follow-btn-follow">Log in to follow</a>
                 {% endif %}
             </div>
         </div>
 
-        <h2 class="section-title">Guides by {{ author.display_name }}</h2>
+        <h2 class="section-title">Guides by {{ author.name }}</h2>
 
         {% if guides %}
         <div class="guide-grid">
