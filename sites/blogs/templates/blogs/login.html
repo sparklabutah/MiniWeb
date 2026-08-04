@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In — TumblrVibe</title>
+    <title>{% if mode == 'register' %}Sign Up{% else %}Sign In{% endif %} — TumblrVibe</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #1a1a2e; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -17,20 +17,39 @@
         .error { color: #e94560; font-size: .85rem; margin-bottom: .8rem; }
         .login-box .back { display: inline-block; margin-top: 1rem; font-size: .9rem; color: #7c83ff; font-weight: 600; padding: .4rem 1rem; border: 1px solid #7c83ff; border-radius: .4rem; }
         .login-box .back:hover { background: #7c83ff; color: #fff; }
+        .login-box .switch { font-size: .85rem; color: #888; margin-top: 1.2rem; }
+        .login-box .switch a { color: #7c83ff; font-weight: 600; }
     </style>
 </head>
 <body>
+    {% set is_register = (mode == 'register') %}
     <div class="login-box">
         <h1>TumblrVibe</h1>
-        <p>Sign in to your blog</p>
+        <p>{% if is_register %}Create your blog account{% else %}Sign in to your blog{% endif %}</p>
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
+        {% if is_register %}
+        <form method="post" action="{{ url_for('blogs.register_submit') }}">
+            <input type="hidden" name="next" value="{{ next }}">
+            <input type="text" name="username" placeholder="Username" required autocomplete="off">
+            <input type="text" name="display_name" placeholder="Display name" autocomplete="off">
+            <input type="email" name="email" placeholder="Email" required autocomplete="off">
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+        <p class="switch">Already have an account?
+            <a href="{{ url_for('blogs.login_page', next=next) }}">Sign in</a></p>
+        {% else %}
         <form method="post" action="{{ url_for('blogs.login_submit') }}">
+            <input type="hidden" name="next" value="{{ next }}">
             <input type="text" name="username" placeholder="Username" required autocomplete="off">
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit">Sign In</button>
         </form>
+        <p class="switch">No account yet?
+            <a href="{{ url_for('blogs.register_page', next=next) }}">Sign up</a></p>
+        {% endif %}
         <a href="{{ url_for('blogs.index') }}" class="back">Back to feed</a>
     </div>
 </body>

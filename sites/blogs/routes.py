@@ -284,10 +284,10 @@ def tag_page(tag_name):
 @blueprint.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
-        return render_template("blogs/login.html", error=None)
+        return render_template("blogs/login.html", error=None, mode="login", next="")
     user = _get_user(session["user_id"])
     if not user:
-        return render_template("blogs/login.html", error=None)
+        return render_template("blogs/login.html", error=None, mode="login", next="")
     # Fetch user's own posts
     my_posts = db.query(SITE, "posts", where={"author_username": user["username"]},
                         sort="-date", limit=50)
@@ -304,42 +304,92 @@ def dashboard():
                            saved_posts=saved, my_posts=my_posts)
 
 
+def _safe_next(value):
+    """Only allow same-site relative redirects."""
+    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+
+
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    return render_template("blogs/login.html", error=None)
+    return render_template("blogs/login.html", error=None, mode="login",
+                           next=request.args.get("next", ""))
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
+    nxt = request.form.get("next", "")
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
-        return render_template("blogs/login.html", error="Invalid username or password")
+        return render_template("blogs/login.html", error="Invalid username or password",
+                               mode="login", next=nxt)
     session["user_id"] = user["id"]
-    emit("signup", user_id=user["id"], site_name="blogs", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
-    return redirect(url_for("blogs.dashboard"))
+    return redirect(_safe_next(nxt) or url_for("blogs.dashboard"))
+
+
+@blueprint.route("/register", methods=["GET"])
+def register_page():
+    return render_template("blogs/login.html", error=None, mode="register",
+                           next=request.args.get("next", ""))
+
+
+@blueprint.route("/register", methods=["POST"])
+def register_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    display_name = request.form.get("display_name", "").strip()
+    email = request.form.get("email", "").strip()
+    nxt = request.form.get("next", "")
+    if not username or not password or not email:
+        return render_template("blogs/login.html",
+                               error="Username, password and email are required",
+                               mode="register", next=nxt)
+    users = _load_users()
+    if any(u["username"] == username for u in users):
+        return render_template("blogs/login.html", error="Username already taken",
+                               mode="register", next=nxt)
+    new_id = (db.execute("SELECT MAX([id]) AS mid FROM [blogs_users]", (), fetch="val") or 0) + 1
+    new_user = {
+        "id": new_id,
+        "root_user_id": new_id,
+        "username": username,
+        "password": password,
+        "display_name": display_name or username,
+        "bio": "",
+        "avatar": "/sites/blogs/static/images/avatars/default.jpg",
+        "followed_blogs": [],
+        "saved_posts": [],
+        "subscribed_tags": [],
+    }
+    db.save_item(SITE, "users", new_id, new_user)
+    emit("signup", user_id=new_id, site_name="blogs",
+         username=username, password=password, email=email)
+    session["user_id"] = new_id
+    return redirect(_safe_next(nxt) or url_for("blogs.dashboard"))
 
 
 @blueprint.route("/logout")
 def logout():
     session.pop("user_id", None)
-    return render_template("blogs/login.html", error=None)
+    return render_template("blogs/login.html", error=None, mode="login", next="")
 
 
 @blueprint.route("/compose", methods=["GET"])
 def compose_page():
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page", next=request.path))
     categories = _CATEGORIES
-    user = None
-    if "user_id" in session:
-        user = _get_user(session["user_id"])
+    user = _get_user(session["user_id"])
     return render_template("blogs/compose.html", categories=categories, user=user)
 
 
 @blueprint.route("/compose", methods=["POST"])
 def form_create_post():
     """Create post via HTML form POST."""
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page", next=url_for("blogs.compose_page")))
     title = request.form.get("title", "").strip()
     body = request.form.get("body", "").strip()
     category = request.form.get("category", "Lifestyle").strip()
