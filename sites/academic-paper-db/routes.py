@@ -334,6 +334,32 @@ def index():
                            total=total)
 
 
+def _bibtex(paper):
+    """Build a BibTeX entry for a paper."""
+    authors = paper.get("authors", []) or []
+    author_field = " and ".join(authors) if authors else "Unknown"
+    year = paper.get("year") or "n.d."
+    title = (paper.get("title") or "").strip()
+    first_last = (authors[0].split()[-1] if authors and authors[0].split() else "unknown").lower()
+    first_word = re.sub(r"[^a-z0-9]", "", (title.split()[0].lower() if title else "paper"))
+    key = f"{first_last}{year}{first_word}"
+    lines = ["@article{%s," % key,
+             "  title        = {%s}," % title,
+             "  author       = {%s}," % author_field,
+             "  year         = {%s}," % year]
+    if paper.get("arxiv_id"):
+        lines.append("  eprint       = {%s}," % paper["arxiv_id"])
+        lines.append("  archivePrefix= {arXiv},")
+    if paper.get("primary_category"):
+        lines.append("  primaryClass = {%s}," % paper["primary_category"])
+    if paper.get("journal_ref"):
+        lines.append("  journal      = {%s}," % paper["journal_ref"])
+    if paper.get("doi"):
+        lines.append("  doi          = {%s}," % paper["doi"])
+    lines.append("}")
+    return "\n".join(lines)
+
+
 @blueprint.route("/paper/<int:paper_id>")
 def paper_detail(paper_id):
     paper = _get_paper(paper_id)
@@ -344,7 +370,7 @@ def paper_detail(paper_id):
     if "user_id" in session:
         user = _get_user(session["user_id"])
     return render_template("academic-paper-db/paper.html", paper=paper,
-                           related=related, user=user)
+                           related=related, user=user, bibtex=_bibtex(paper))
 
 
 @blueprint.route("/category/<path:cat_name>")
@@ -435,9 +461,21 @@ def form_save_paper(paper_id):
     return redirect(url_for("academic-paper-db.paper_detail", paper_id=paper_id))
 
 
+def _paper_citations(paper):
+    """Deterministic synthetic citation count (arXiv metadata has none)."""
+    import zlib
+    key = str(paper.get("arxiv_id") or paper.get("id") or paper.get("title", ""))
+    base = zlib.crc32(key.encode()) % 240
+    try:
+        age = max(0, 2026 - int(paper.get("year") or 2020))
+    except (TypeError, ValueError):
+        age = 3
+    return int(base * (1 + age * 0.45))
+
+
 @blueprint.route("/author/<path:author_name>")
 def author_profile(author_name):
-    """Author profile page showing their publications."""
+    """Author profile page (Google Scholar style) with publications + stats."""
     # authors_parsed stores [["Last", "First", ""], ...] while author_name is
     # "First Last" — match the JSON layout directly in SQL.
     parts = author_name.strip().rsplit(" ", 1)
@@ -448,9 +486,35 @@ def author_profile(author_name):
     conn = db.get_conn()
     rows = conn.execute(
         f"SELECT rowid, * FROM [{_TABLE}] WHERE authors_parsed LIKE ? "
-        "ORDER BY update_date DESC LIMIT 10",
+        "ORDER BY update_date DESC LIMIT 100",
         (pattern,)).fetchall()
     author_papers = [_interpret_record(_deserialize_row(r), r["rowid"]) for r in rows]
+
+    # Citation-based stats (Google Scholar style).
+    for p in author_papers:
+        p["citations"] = _paper_citations(p)
+    cites = sorted((p["citations"] for p in author_papers), reverse=True)
+    h_index = 0
+    for n, c in enumerate(cites, 1):
+        if c >= n:
+            h_index = n
+        else:
+            break
+    stats = {
+        "papers": len(author_papers),
+        "citations": sum(cites),
+        "h_index": h_index,
+        "i10": sum(1 for c in cites if c >= 10),
+    }
+
+    # Collaborators (co-authors across the author's papers).
+    from collections import Counter
+    collab = Counter()
+    for p in author_papers:
+        for a in p.get("authors", []):
+            if a and a.strip() and a.strip() != author_name:
+                collab[a.strip()] += 1
+    collaborators = [{"name": n, "count": c} for n, c in collab.most_common(12)]
 
     user = None
     is_followed = False
@@ -461,7 +525,8 @@ def author_profile(author_name):
 
     return render_template("academic-paper-db/author.html",
                            author_name=author_name,
-                           papers=author_papers,
+                           papers=author_papers[:20],
+                           stats=stats, collaborators=collaborators,
                            user=user, is_followed=is_followed)
 
 

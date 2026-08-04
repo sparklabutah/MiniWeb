@@ -62,6 +62,7 @@
         </a>
         <div class="spacer"></div>
         {% if user %}
+        <a href="{{ url_for('academic-paper-db.author_profile', author_name=user.name) }}" class="nav">My Profile</a>
         <a href="{{ url_for('academic-paper-db.dashboard') }}" class="nav">My Library</a>
         <a href="{{ url_for('academic-paper-db.logout') }}" class="nav">Sign out</a>
         {% else %}
@@ -105,7 +106,7 @@
                 </button>
             </form>
             {% endif %}
-            <a href="{{ url_for('academic-paper-db.api_export', format='csv') }}" class="btn" >Cite</a>
+            <button type="button" class="btn" onclick="openCite()">Cite</button>
             {% else %}
             <a class="btn btn-blue" href="{{ url_for('academic-paper-db.login_page') }}">Sign in to save</a>
             {% endif %}
@@ -139,5 +140,37 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Cite / BibTeX modal -->
+    <div id="cite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeCite()">
+        <div style="background:#fff;border-radius:8px;width:min(560px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.28);overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #ebebeb;">
+                <span style="font-size:15px;font-weight:600;color:#222;">Cite &mdash; BibTeX</span>
+                <button onclick="closeCite()" aria-label="Close" style="border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#70757a;">&times;</button>
+            </div>
+            <div style="padding:16px 18px;">
+                <pre id="bibtex-text" style="background:#f8f9fa;border:1px solid #ebebeb;border-radius:6px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;color:#202124;white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto;">{{ bibtex }}</pre>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+                    <button id="bibtex-copy" onclick="copyBibtex()" class="btn btn-blue">Copy to clipboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    function openCite() { document.getElementById('cite-modal').style.display = 'flex'; }
+    function closeCite() { document.getElementById('cite-modal').style.display = 'none'; }
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeCite(); });
+    function copyBibtex() {
+        var txt = document.getElementById('bibtex-text').textContent;
+        var btn = document.getElementById('bibtex-copy');
+        navigator.clipboard.writeText(txt).then(function(){
+            btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy to clipboard'; }, 1600);
+        }).catch(function(){
+            // Fallback: select the text so the user can copy manually.
+            var r = document.createRange(); r.selectNodeContents(document.getElementById('bibtex-text'));
+            var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        });
+    }
+    </script>
 </body>
 </html>
