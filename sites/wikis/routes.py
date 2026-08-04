@@ -229,6 +229,37 @@ def _save_revisions(revisions):
     db.save_collection(SITE, "revisions", revisions)
 
 
+def _new_revision(revisions, *, page_id, editor_id, timestamp, summary,
+                  lines_added=0, lines_removed=0):
+    """Build a revision dict for a change made in THIS session.
+
+    Tagged with `_session_new` so Recent Changes can float the current
+    session's own edits to the very top — the seed revisions carry
+    hand-authored (and sometimes future-dated) timestamps, so ordering by
+    timestamp alone would bury a fresh edit below them.
+    """
+    return {
+        "id": max((r["id"] for r in revisions), default=0) + 1,
+        "page_id": page_id,
+        "editor_id": editor_id,
+        "timestamp": timestamp,
+        "summary": summary,
+        "diff_lines_added": lines_added,
+        "diff_lines_removed": lines_removed,
+        "_session_new": True,
+    }
+
+
+def _sort_recent_changes(revisions):
+    """Order revisions for Recent Changes: this session's own edits first
+    (newest first), then all seed revisions by timestamp descending."""
+    return sorted(
+        revisions,
+        key=lambda r: (bool(r.get("_session_new")), r.get("timestamp", ""), r["id"]),
+        reverse=True,
+    )
+
+
 def _load_categories():
     """Load categories: overlay categories + Wikipedia category.
 
@@ -414,19 +445,19 @@ def edit_page_submit(slug):
     page["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     _save_pages(overlay_pages)
 
-    # Create revision
+    # Create revision (tagged as a current-session edit so it surfaces at
+    # the top of Recent Changes immediately).
     revisions = _load_revisions()
-    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
     editor_id = session.get("user_id", 1)
-    revisions.append({
-        "id": new_rev_id,
-        "page_id": page["id"],
-        "editor_id": editor_id,
-        "timestamp": page["updated_at"],
-        "summary": summary,
-        "diff_lines_added": max(0, new_lines - old_lines + 2),
-        "diff_lines_removed": max(0, old_lines - new_lines + 1),
-    })
+    revisions.append(_new_revision(
+        revisions,
+        page_id=page["id"],
+        editor_id=editor_id,
+        timestamp=page["updated_at"],
+        summary=summary,
+        lines_added=max(0, new_lines - old_lines + 2),
+        lines_removed=max(0, old_lines - new_lines + 1),
+    ))
     _save_revisions(revisions)
 
     # Update user edit count
@@ -437,6 +468,8 @@ def edit_page_submit(slug):
         _save_users(users)
 
     _recount_categories()
+    emit("edit", user_id=editor_id, site_name=SITE, page_id=page["id"],
+         title=page["title"], slug=slug, summary=summary, source_site=SITE)
     return redirect(url_for("wikis.wiki_page", slug=slug))
 
 
@@ -487,18 +520,18 @@ def create_page_submit():
     overlay_pages.append(new_page)
     _save_pages(overlay_pages)
 
-    # Create revision
+    # Create revision (tagged as a current-session edit so it surfaces at
+    # the top of Recent Changes immediately).
     revisions = _load_revisions()
-    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
-    revisions.append({
-        "id": new_rev_id,
-        "page_id": new_id,
-        "editor_id": editor_id,
-        "timestamp": now,
-        "summary": f"Created article: {title}",
-        "diff_lines_added": content.count("\n") + 1,
-        "diff_lines_removed": 0,
-    })
+    revisions.append(_new_revision(
+        revisions,
+        page_id=new_id,
+        editor_id=editor_id,
+        timestamp=now,
+        summary=f"Created article: {title}",
+        lines_added=content.count("\n") + 1,
+        lines_removed=0,
+    ))
     _save_revisions(revisions)
 
     # Update user edit count
@@ -509,6 +542,8 @@ def create_page_submit():
         _save_users(users)
 
     _recount_categories()
+    emit("file_created", user_id=editor_id, filename=title, file_type="document",
+         source_site=SITE, source_id=str(new_id))
     return redirect(url_for("wikis.wiki_page", slug=slug))
 
 
@@ -535,7 +570,7 @@ def category_page(cat_id):
 @blueprint.route("/recent-changes")
 def recent_changes():
     revisions = _load_revisions()
-    revisions_sorted = sorted(revisions, key=lambda r: r["timestamp"], reverse=True)
+    revisions_sorted = _sort_recent_changes(revisions)[:50]
     pages = _load_overlay_pages()  # revisions are only for overlay pages
     users = _load_users()
     page_map = {p["id"]: p for p in pages}
@@ -696,19 +731,18 @@ def api_page_update(slug):
 
     new_lines = page["content"].count("\n")
 
-    # Create revision
+    # Create revision (tagged as a current-session edit).
     revisions = _load_revisions()
-    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
     editor_id = data.get("editor_id", session.get("user_id", 1))
-    revisions.append({
-        "id": new_rev_id,
-        "page_id": page["id"],
-        "editor_id": editor_id,
-        "timestamp": page["updated_at"],
-        "summary": summary,
-        "diff_lines_added": max(0, new_lines - old_lines + 2),
-        "diff_lines_removed": max(0, old_lines - new_lines + 1),
-    })
+    revisions.append(_new_revision(
+        revisions,
+        page_id=page["id"],
+        editor_id=editor_id,
+        timestamp=page["updated_at"],
+        summary=summary,
+        lines_added=max(0, new_lines - old_lines + 2),
+        lines_removed=max(0, old_lines - new_lines + 1),
+    ))
     _save_revisions(revisions)
 
     # Update user edit count
@@ -762,18 +796,17 @@ def api_page_create():
     overlay_pages.append(new_page)
     _save_pages(overlay_pages)
 
-    # Create revision
+    # Create revision (tagged as a current-session edit).
     revisions = _load_revisions()
-    new_rev_id = max((r["id"] for r in revisions), default=0) + 1
-    revisions.append({
-        "id": new_rev_id,
-        "page_id": new_id,
-        "editor_id": editor_id,
-        "timestamp": now,
-        "summary": f"Created article: {title}",
-        "diff_lines_added": content.count("\n") + 1,
-        "diff_lines_removed": 0,
-    })
+    revisions.append(_new_revision(
+        revisions,
+        page_id=new_id,
+        editor_id=editor_id,
+        timestamp=now,
+        summary=f"Created article: {title}",
+        lines_added=content.count("\n") + 1,
+        lines_removed=0,
+    ))
     _save_revisions(revisions)
 
     # Update user edit count
@@ -807,10 +840,9 @@ def api_categories():
 @blueprint.route("/api/recent-changes")
 def api_recent_changes():
     revisions = _load_revisions()
-    revisions_sorted = sorted(revisions, key=lambda r: r["timestamp"], reverse=True)
-    limit = request.args.get("limit", type=int)
-    if limit:
-        revisions_sorted = revisions_sorted[:limit]
+    revisions_sorted = _sort_recent_changes(revisions)
+    limit = request.args.get("limit", type=int) or 50
+    revisions_sorted = revisions_sorted[:limit]
     pages = _load_overlay_pages()  # revisions only reference overlay pages
     users = _load_users()
     page_map = {p["id"]: p for p in pages}
