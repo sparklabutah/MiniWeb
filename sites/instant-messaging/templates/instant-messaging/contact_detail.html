@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ contact.display_name }} - QuickChat</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; color: #e9edef; height: 100vh; overflow: hidden; }
+        .header { background: #202c33; padding: .6rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3942; }
+        .header h1 { font-size: 1.1rem; font-weight: 600; }
+        .header h1 a { color: #e9edef; text-decoration: none; }
+        .header h1 a span { color: #00a884; }
+        nav { background: #202c33; padding: .4rem 1.2rem; display: flex; gap: 1rem; border-bottom: 1px solid #2a3942; }
+        nav a { color: #8696a0; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .6rem; border-radius: .3rem; transition: all .15s; }
+        nav a:hover { color: #e9edef; background: #2a3942; }
+        nav a.active { color: #00a884; border-bottom: 2px solid #00a884; }
+
+        .detail-wrap { height: calc(100vh - 90px); overflow-y: auto; display: flex; justify-content: center; padding: 2rem 1rem; background: #0b141a; }
+        .detail-card { width: 100%; max-width: 480px; }
+        .back-link { display: inline-block; color: #8696a0; text-decoration: none; font-size: .82rem; margin-bottom: 1rem; }
+        .back-link:hover { color: #e9edef; }
+        .saved-note { background: rgba(0,168,132,.15); color: #00a884; padding: .5rem .8rem; border-radius: .5rem; font-size: .82rem; margin-bottom: 1rem; }
+
+        .detail-hero { background: #202c33; border-radius: .8rem; padding: 1.6rem; text-align: center; margin-bottom: 1rem; }
+        .detail-avatar { width: 96px; height: 96px; border-radius: 50%; background: #2a3942; display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 600; color: #aebac1; margin: 0 auto .8rem; position: relative; }
+        .detail-avatar.online::after { content: ''; position: absolute; bottom: 6px; right: 6px; width: 16px; height: 16px; background: #00a884; border-radius: 50%; border: 3px solid #202c33; }
+        .detail-name { font-size: 1.4rem; font-weight: 500; }
+        .detail-status { display: inline-block; margin-top: .4rem; font-size: .75rem; padding: .15rem .6rem; border-radius: .8rem; }
+        .detail-status.online { background: rgba(0,168,132,.15); color: #00a884; }
+        .detail-status.offline { background: #2a3942; color: #8696a0; }
+        .detail-phone { color: #8696a0; font-size: .85rem; margin-top: .5rem; }
+        .detail-about { color: #d1d7db; font-size: .9rem; margin-top: .6rem; line-height: 1.5; }
+        .detail-actions { margin-top: 1rem; display: flex; gap: .6rem; justify-content: center; }
+        .detail-actions a { text-decoration: none; padding: .5rem 1.1rem; border-radius: .5rem; font-size: .85rem; }
+        .msg-cta { background: #00a884; color: #fff; }
+        .msg-cta:hover { background: #00c897; }
+
+        .edit-panel { background: #202c33; border-radius: .8rem; padding: 1.4rem; }
+        .edit-panel h3 { font-size: .95rem; font-weight: 600; margin-bottom: 1rem; color: #e9edef; }
+        .field { margin-bottom: 1rem; }
+        .field label { display: block; font-size: .72rem; color: #8696a0; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .35rem; }
+        .field input, .field textarea { width: 100%; padding: .55rem .8rem; background: #111b21; border: 1px solid #2a3942; border-radius: .5rem; color: #e9edef; font-size: .88rem; outline: none; font-family: inherit; resize: vertical; }
+        .field input:focus, .field textarea:focus { border-color: #00a884; }
+        .save-btn { background: #00a884; color: #fff; border: none; padding: .6rem 1.4rem; border-radius: .5rem; font-size: .88rem; cursor: pointer; font-weight: 500; }
+        .save-btn:hover { background: #00c897; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('instant-messaging.index') }}">Quick<span>Chat</span></a></h1>
+        <span style="color:#8696a0;font-size:.8rem;">{{ users_map[current_user_id].display_name }}</span>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('instant-messaging.index') }}">Chats</a>
+        <a href="{{ url_for('instant-messaging.contacts_page') }}" class="active">Contacts</a>
+    </nav>
+
+    <div class="detail-wrap">
+        <div class="detail-card">
+            <a class="back-link" href="{{ url_for('instant-messaging.contacts_page') }}">&#8592; Back to Contacts</a>
+
+            {% if saved %}
+            <div class="saved-note">Contact updated.</div>
+            {% endif %}
+
+            <div class="detail-hero">
+                <div class="detail-avatar {% if contact.status == 'online' %}online{% endif %}">
+                    {{ contact.display_name[0] }}
+                </div>
+                <div class="detail-name">{{ contact.display_name }}</div>
+                <div class="detail-status {{ contact.status }}">{{ contact.status }}</div>
+                {% if contact.phone %}<div class="detail-phone">{{ contact.phone }}</div>{% endif %}
+                {% if contact.about %}<div class="detail-about">{{ contact.about }}</div>{% endif %}
+                <div class="detail-actions">
+                    <a class="msg-cta" href="{{ url_for('instant-messaging.open_with', user_id=contact.id) }}">Message</a>
+                </div>
+            </div>
+
+            <div class="edit-panel">
+                <h3>Edit Contact</h3>
+                <form method="POST" action="{{ url_for('instant-messaging.contact_edit', user_id=contact.id) }}">
+                    <div class="field">
+                        <label for="display_name">Display Name</label>
+                        <input type="text" id="display_name" name="display_name" value="{{ contact.display_name }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="phone">Phone</label>
+                        <input type="text" id="phone" name="phone" value="{{ contact.phone or '' }}">
+                    </div>
+                    <div class="field">
+                        <label for="about">Status / About</label>
+                        <textarea id="about" name="about" rows="2">{{ contact.about or '' }}</textarea>
+                    </div>
+                    <button type="submit" class="save-btn">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

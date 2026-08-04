@@ -61,6 +61,8 @@
         .contact-actions { display: flex; gap: .4rem; justify-content: flex-end; margin-top: .4rem; }
         .message-btn { background: #00a884; color: #fff; text-decoration: none; padding: .3rem .8rem; border-radius: .8rem; font-size: .72rem; cursor: pointer; transition: all .15s; }
         .message-btn:hover { background: #00c897; }
+        .view-btn { background: #2a3942; color: #e9edef; text-decoration: none; padding: .3rem .8rem; border-radius: .8rem; font-size: .72rem; cursor: pointer; transition: all .15s; }
+        .view-btn:hover { background: #374045; }
         .block-toggle { background: #2a3942; color: #8696a0; border: none; padding: .3rem .7rem; border-radius: .8rem; font-size: .72rem; cursor: pointer; transition: all .15s; }
         .block-toggle:hover { color: #e9edef; }
         .block-toggle.blocked { background: rgba(241,92,109,.15); color: #f15c6d; }
@@ -135,6 +137,7 @@
                         <div class="contact-status {{ contact.status }}">{{ contact.status }}</div>
                         <div class="contact-phone">{{ contact.phone }}</div>
                         <div class="contact-actions">
+                            <a class="view-btn" href="{{ url_for('instant-messaging.contact_detail_page', user_id=contact.id) }}" title="View or edit {{ contact.display_name }}">View</a>
                             <a class="message-btn" href="{{ url_for('instant-messaging.open_with', user_id=contact.id) }}" title="Message {{ contact.display_name }}">Message</a>
                             <button class="block-toggle {% if contact.blocked %}blocked{% endif %}" data-url="{{ url_for('instant-messaging.api_block_user', user_id=contact.id) }}" title="Block or unblock this contact">{% if contact.blocked %}Blocked{% else %}Block{% endif %}</button>
                         </div>
@@ -178,8 +181,10 @@
         });
 
         // Clicking a contact card opens (or starts) a chat with that person.
+        // Explicit links/buttons inside the card (View, Message, Block) handle
+        // their own navigation, so ignore clicks that land on them.
         document.addEventListener('click', function(e) {
-            if (e.target.closest('.block-toggle')) return;   // block button handles itself
+            if (e.target.closest('a, button')) return;
             var card = e.target.closest('.contact-card');
             if (!card || !card.dataset.open) return;
             window.location.href = card.dataset.open;

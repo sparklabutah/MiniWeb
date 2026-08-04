@@ -346,6 +346,42 @@ def contacts_page():
     )
 
 
+@blueprint.route("/contact/<user_id>")
+def contact_detail_page(user_id):
+    """View a single contact's details (with an inline edit form)."""
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
+    users_map = _user_map()
+    contact = users_map.get(user_id)
+    if not contact or user_id == CURRENT_USER_ID:
+        abort(404)
+    return render_template(
+        "instant-messaging/contact_detail.html",
+        contact=contact,
+        current_user_id=CURRENT_USER_ID,
+        users_map=users_map,
+        saved=request.args.get("saved"),
+    )
+
+
+@blueprint.route("/contact/<user_id>/edit", methods=["POST"])
+def contact_edit(user_id):
+    """Persist basic edits to a contact (display name, phone, about/status)."""
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
+    user = next((u for u in _get_users() if u["id"] == user_id), None)
+    if not user or user_id == CURRENT_USER_ID:
+        abort(404)
+    display_name = request.form.get("display_name", "").strip()
+    if display_name:
+        user["display_name"] = display_name
+    user["phone"] = request.form.get("phone", "").strip()
+    user["about"] = request.form.get("about", "").strip()
+    # Small table (users); save_item upserts one row into the session overlay.
+    db.save_item(SITE, "users", user_id, user)
+    return redirect(url_for("instant-messaging.contact_detail_page", user_id=user_id, saved=1))
+
+
 @blueprint.route("/login")
 def login_page():
     return render_template("instant-messaging/login.html")
