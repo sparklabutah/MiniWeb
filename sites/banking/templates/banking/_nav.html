@@ -1,0 +1,57 @@
+{# Shared SecureBank Online top navigation. Set `nav_active` before including
+   to highlight the current section, e.g. {% set nav_active = 'accounts' %}.
+   Styling is scoped under `.sb-nav` and emitted in-body so it renders
+   identically on every page regardless of that page's own nav CSS. #}
+<style>
+  .sb-nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff;
+            border-bottom: 1px solid #e2e8f0; display: flex; gap: .5rem; flex-wrap: wrap;
+            align-items: center; row-gap: .4rem; }
+  .sb-nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500;
+              padding: .3rem .5rem; border-radius: .3rem; display: inline-flex;
+              align-items: center; gap: .25rem; }
+  .sb-nav a:hover { background: #f0f4ff; }
+  .sb-nav a.active { background: #eef2ff; }
+  .sb-nav .nav-icon { font-size: .85rem; color: #64748b; }
+  .sb-nav a.active .nav-icon { color: #0a2463; }
+  .sb-nav .nav-divider { width: 1px; height: 16px; background: #e2e8f0; margin: 0 .2rem; }
+  .sb-nav .btn-logout { color: #dc2626; margin-left: auto; flex: 0 0 auto; width: auto; }
+  .sb-nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem;
+                       border-radius: .3rem; margin-left: auto; flex: 0 0 auto; width: auto; }
+</style>
+<nav class="sb-nav">
+    <a href="{{ url_for('banking.index') }}"{% if nav_active == 'dashboard' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9632;</span> Dashboard
+    </a>
+    <a href="{{ url_for('banking.accounts_page') }}"{% if nav_active == 'accounts' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9776;</span> Accounts
+    </a>
+    <a href="{{ url_for('banking.transactions_page') }}"{% if nav_active == 'transactions' %} class="active"{% endif %}>
+        <span class="nav-icon">&#8644;</span> Transactions
+    </a>
+    <div class="nav-divider"></div>
+    <a href="{{ url_for('banking.transfer_page') }}"{% if nav_active == 'transfer' %} class="active"{% endif %}>
+        <span class="nav-icon">&#10132;</span> Transfer
+    </a>
+    <a href="{{ url_for('banking.pay_bills_page') }}"{% if nav_active == 'paybills' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9993;</span> Pay Bills
+    </a>
+    <a href="{{ url_for('banking.payees_page') }}"{% if nav_active == 'payees' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9733;</span> Payees
+    </a>
+    <div class="nav-divider"></div>
+    <a href="{{ url_for('banking.loans_page') }}"{% if nav_active == 'loans' %} class="active"{% endif %}>
+        <span class="nav-icon">&#8453;</span> Loans
+    </a>
+    <a href="{{ url_for('banking.cc_index') }}"{% if nav_active == 'creditcard' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9646;</span> Credit Card
+    </a>
+    <div class="nav-divider"></div>
+    <a href="{{ url_for('banking.settings_page') }}"{% if nav_active == 'settings' %} class="active"{% endif %}>
+        <span class="nav-icon">&#9881;</span> Settings
+    </a>
+    {% if logged_in %}
+    <a href="{{ url_for('banking.logout') }}" class="btn-logout">Sign Out</a>
+    {% else %}
+    <a href="{{ url_for('banking.login_page') }}" class="btn-login">Sign In</a>
+    {% endif %}
+</nav>
