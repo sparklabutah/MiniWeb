@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In Call: {{ meeting.title }} - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e8eaf0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        .call-topbar { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.2rem; background: #161a24; border-bottom: 1px solid #232838; flex-shrink: 0; }
+        .call-topbar .meta { display: flex; align-items: center; gap: .9rem; min-width: 0; }
+        .call-topbar .brand { color: #fff; font-weight: 700; font-size: 1rem; text-decoration: none; white-space: nowrap; }
+        .call-topbar .brand span { color: #4fc3f7; }
+        .call-topbar .title { font-size: .92rem; color: #c7ccda; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .call-topbar .live { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 700; color: #ff5252; text-transform: uppercase; letter-spacing: .05em; }
+        .call-topbar .live .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5252; animation: pulse 1.6s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+        .call-topbar .right { display: flex; align-items: center; gap: 1rem; }
+        .call-topbar .timer { font-variant-numeric: tabular-nums; font-family: 'SFMono-Regular', ui-monospace, Menlo, monospace; font-size: .95rem; color: #fff; background: #232838; padding: .3rem .7rem; border-radius: .35rem; }
+
+        .stage-wrap { flex: 1; display: flex; min-height: 0; }
+        .stage { flex: 1; padding: 1.2rem; display: grid; gap: .9rem; align-content: center; justify-content: center; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); overflow-y: auto; }
+
+        .tile { position: relative; aspect-ratio: 16 / 10; background: #1c2130; border-radius: .7rem; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; min-width: 200px; }
+        .tile.you { border-color: #4fc3f7; }
+        .tile .avatar { width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; }
+        .tile .camera-feed { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+        .tile.cam-on .camera-feed { display: flex; }
+        .tile.cam-on .avatar { display: none; }
+        .tile .camera-feed .cam-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.9rem; font-weight: 700; color: rgba(255,255,255,.92); }
+        .tile .nametag { position: absolute; left: .55rem; bottom: .5rem; background: rgba(0,0,0,.55); color: #fff; font-size: .78rem; padding: .2rem .5rem; border-radius: .3rem; display: flex; align-items: center; gap: .35rem; max-width: calc(100% - 1.1rem); }
+        .tile .nametag .host-badge { background: #4fc3f7; color: #04263a; font-size: .62rem; font-weight: 700; padding: .05rem .3rem; border-radius: .2rem; text-transform: uppercase; }
+        .tile .mic-ind { position: absolute; right: .55rem; top: .55rem; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; font-size: .8rem; }
+        .tile .mic-ind.muted { background: #c62828; }
+
+        /* Chat side panel */
+        .chat-panel { width: 320px; background: #12151d; border-left: 1px solid #232838; display: none; flex-direction: column; flex-shrink: 0; }
+        .chat-panel.open { display: flex; }
+        .chat-panel h3 { font-size: .85rem; padding: .9rem 1rem; border-bottom: 1px solid #232838; color: #c7ccda; text-transform: uppercase; letter-spacing: .04em; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: .8rem 1rem; display: flex; flex-direction: column; gap: .6rem; }
+        .chat-messages .msg { font-size: .85rem; line-height: 1.35; }
+        .chat-messages .msg .who { font-weight: 700; color: #4fc3f7; font-size: .78rem; }
+        .chat-messages .msg .body { color: #d6dae6; }
+        .chat-messages .empty { color: #5c6478; font-size: .82rem; text-align: center; margin-top: 1rem; }
+        .chat-input { display: flex; gap: .4rem; padding: .7rem; border-top: 1px solid #232838; }
+        .chat-input input { flex: 1; padding: .5rem .6rem; background: #1c2130; border: 1px solid #2c3242; border-radius: .35rem; color: #e8eaf0; font-size: .85rem; }
+        .chat-input input:focus { outline: none; border-color: #4fc3f7; }
+        .chat-input button { padding: .5rem .8rem; background: #1976d2; color: #fff; border: none; border-radius: .35rem; font-weight: 600; cursor: pointer; font-size: .85rem; }
+
+        /* Control bar */
+        .controls { display: flex; align-items: center; justify-content: center; gap: .7rem; padding: .9rem; background: #161a24; border-top: 1px solid #232838; flex-shrink: 0; }
+        .ctrl { display: flex; flex-direction: column; align-items: center; gap: .25rem; background: none; border: none; cursor: pointer; color: #c7ccda; font-size: .68rem; font-weight: 600; }
+        .ctrl .glyph { width: 50px; height: 50px; border-radius: 50%; background: #2a3040; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: background .12s; }
+        .ctrl:hover .glyph { background: #343c4f; }
+        .ctrl.state-off .glyph { background: #c62828; color: #fff; }
+        .ctrl.leave .glyph { background: #e53935; color: #fff; }
+        .ctrl.leave:hover .glyph { background: #c62828; }
+        .ctrl.leave { color: #ff8a80; }
+        .count-pill { position: absolute; }
+        .participants-pill { color: #c7ccda; font-size: .8rem; margin-right: auto; padding-left: .6rem; }
+    </style>
+</head>
+<body
+    data-you-name="{{ user.display_name }}"
+    data-you-id="{{ user.id }}"
+    data-meeting-id="{{ meeting.id }}"
+    data-messages-url="{{ url_for('remote-calls.api_meeting_messages', meeting_id=meeting.id) }}"
+    data-leave-url="{{ url_for('remote-calls.meeting_detail', meeting_id=meeting.id) }}">
+
+    <div class="call-topbar">
+        <div class="meta">
+            <a class="brand" href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a>
+            <span class="live"><span class="dot"></span> Live</span>
+            <span class="title">{{ meeting.title }}</span>
+        </div>
+        <div class="right">
+            <span id="participant-count" style="font-size:.82rem;color:#9aa2b5;">{{ participant_count }} in call</span>
+            <span class="timer" id="call-timer">00:00</span>
+        </div>
+    </div>
+
+    <div class="stage-wrap">
+        <div class="stage" id="stage">
+            <!-- Local "you" tile -->
+            <div class="tile you" id="you-tile" data-mic="on" data-cam="off">
+                <div class="avatar" style="background:#4fc3f7;color:#04263a;">{{ you_initials }}</div>
+                <div class="camera-feed">
+                    <div class="cam-inner" style="background:linear-gradient(135deg,#0d47a1,#1976d2);">{{ you_initials }}</div>
+                </div>
+                <div class="nametag">
+                    You
+                    {% if you_is_host %}<span class="host-badge">Host</span>{% endif %}
+                </div>
+                <div class="mic-ind" id="you-mic-ind">&#127908;</div>
+            </div>
+
+            <!-- Remote participants (from meeting data) -->
+            {% for t in tiles %}
+            <div class="tile cam-on remote-tile" data-name="{{ t.name }}">
+                <div class="avatar" style="background:{{ t.color }};">{{ t.initials }}</div>
+                <div class="camera-feed">
+                    <div class="cam-inner" style="background:linear-gradient(135deg,{{ t.color }},#0f1117);">{{ t.initials }}</div>
+                </div>
+                <div class="nametag">
+                    {{ t.name }}
+                    {% if t.is_host %}<span class="host-badge">Host</span>{% endif %}
+                </div>
+                <div class="mic-ind">&#127908;</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="chat-panel" id="chat-panel">
+            <h3>In-call chat</h3>
+            <div class="chat-messages" id="chat-messages">
+                <div class="empty">No messages yet.</div>
+            </div>
+            <form class="chat-input" id="chat-form">
+                <input type="text" id="chat-text" placeholder="Send a message" autocomplete="off">
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="controls">
+        <span class="participants-pill">{{ meeting.title }}</span>
+        <button type="button" class="ctrl" id="mic-btn" onclick="toggleMic()">
+            <span class="glyph" id="mic-glyph">&#127908;</span>
+            <span id="mic-label">Mute</span>
+        </button>
+        <button type="button" class="ctrl state-off" id="cam-btn" onclick="toggleCam()">
+            <span class="glyph" id="cam-glyph">&#128247;</span>
+            <span id="cam-label">Start Video</span>
+        </button>
+        <button type="button" class="ctrl" id="chat-btn" onclick="toggleChat()">
+            <span class="glyph">&#128172;</span>
+            <span>Chat</span>
+        </button>
+        <button type="button" class="ctrl leave" onclick="leaveCall()">
+            <span class="glyph">&#128222;</span>
+            <span>Leave</span>
+        </button>
+    </div>
+
+    <script>
+    (function () {
+        var body = document.body;
+        var MEETING_ID = body.dataset.meetingId;
+        var YOU_NAME = body.dataset.youName;
+        var YOU_ID = body.dataset.youId;
+        var MESSAGES_URL = body.dataset.messagesUrl;
+        var LEAVE_URL = body.dataset.leaveUrl;
+
+        // --- Call timer (counts up while in the call) ---
+        var started = Date.now();
+        function tick() {
+            var s = Math.floor((Date.now() - started) / 1000);
+            var h = Math.floor(s / 3600);
+            var m = Math.floor((s % 3600) / 60);
+            var sec = s % 60;
+            var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+            var txt = (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(sec);
+            document.getElementById('call-timer').textContent = txt;
+        }
+        tick();
+        setInterval(tick, 1000);
+
+        // --- Mic toggle ---
+        var micOn = true;
+        window.toggleMic = function () {
+            micOn = !micOn;
+            var btn = document.getElementById('mic-btn');
+            var ind = document.getElementById('you-mic-ind');
+            var tile = document.getElementById('you-tile');
+            document.getElementById('mic-glyph').innerHTML = micOn ? '&#127908;' : '&#128263;';
+            document.getElementById('mic-label').textContent = micOn ? 'Mute' : 'Unmute';
+            btn.classList.toggle('state-off', !micOn);
+            ind.classList.toggle('muted', !micOn);
+            ind.innerHTML = micOn ? '&#127908;' : '&#128263;';
+            tile.dataset.mic = micOn ? 'on' : 'off';
+        };
+
+        // --- Camera toggle (avatar placeholder when off) ---
+        var camOn = false;
+        window.toggleCam = function () {
+            camOn = !camOn;
+            var btn = document.getElementById('cam-btn');
+            var tile = document.getElementById('you-tile');
+            document.getElementById('cam-label').textContent = camOn ? 'Stop Video' : 'Start Video';
+            btn.classList.toggle('state-off', !camOn);
+            tile.classList.toggle('cam-on', camOn);
+        };
+
+        // --- Chat side panel ---
+        var chatLoaded = false;
+        window.toggleChat = function () {
+            var panel = document.getElementById('chat-panel');
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open') && !chatLoaded) {
+                loadMessages();
+                chatLoaded = true;
+            }
+        };
+
+        function renderMessages(msgs) {
+            var box = document.getElementById('chat-messages');
+            if (!msgs || !msgs.length) {
+                box.innerHTML = '<div class="empty">No messages yet.</div>';
+                return;
+            }
+            box.innerHTML = '';
+            msgs.forEach(function (m) {
+                var el = document.createElement('div');
+                el.className = 'msg';
+                var who = document.createElement('div');
+                who.className = 'who';
+                who.textContent = m.sender_name || 'Unknown';
+                var b = document.createElement('div');
+                b.className = 'body';
+                b.textContent = m.text;
+                el.appendChild(who);
+                el.appendChild(b);
+                box.appendChild(el);
+            });
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function loadMessages() {
+            fetch(MESSAGES_URL)
+                .then(function (r) { return r.json(); })
+                .then(function (d) { renderMessages(d.messages || []); })
+                .catch(function () {});
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var input = document.getElementById('chat-text');
+            var text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            fetch(MESSAGES_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, sender_id: YOU_ID })
+            })
+            .then(function () { loadMessages(); })
+            .catch(function () {});
+        });
+
+        // --- Leave call ---
+        window.leaveCall = function () {
+            window.location.href = LEAVE_URL;
+        };
+    })();
+    </script>
+</body>
+</html>

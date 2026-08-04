@@ -555,6 +555,69 @@ def join_page():
     return render_template("remote-calls/join.html")
 
 
+@blueprint.route("/meeting/<meeting_id>/call")
+def call_room(meeting_id):
+    """In-call view: a simulated live call room for a meeting.
+
+    Every meeting (regardless of its scheduled time or status) can be joined
+    and is treated as an active room. Participant tiles are built from the
+    meeting's own data; the current user gets a local "you" tile. All in-call
+    state (mic/camera toggles, timer) is handled client-side.
+    """
+    user, redir = _require_login()
+    if redir:
+        return redir
+
+    meetings = _load_meetings()
+    meeting = next((m for m in meetings if m["id"] == meeting_id), None)
+    if not meeting:
+        abort(404)
+
+    host = _get_user_by_id(meeting["host_id"])
+    participants = [_get_user_by_id(pid) for pid in meeting.get("participants", [])]
+    participants = [p for p in participants if p]
+
+    # Ensure the current user is represented; the "you" tile is rendered
+    # separately, so remote tiles exclude the current user.
+    remote_participants = [p for p in participants if p["id"] != user["id"]]
+
+    # Deterministic colored initials avatar for each remote participant.
+    palette = [
+        "#1976d2", "#c62828", "#2e7d32", "#6a1b9a", "#e65100",
+        "#00838f", "#ad1457", "#4527a0", "#37474f", "#558b2f",
+    ]
+
+    def _initials(name):
+        parts = [p for p in name.split() if p]
+        if not parts:
+            return "?"
+        if len(parts) == 1:
+            return parts[0][:2].upper()
+        return (parts[0][0] + parts[-1][0]).upper()
+
+    tiles = []
+    for i, p in enumerate(remote_participants):
+        tiles.append({
+            "id": p["id"],
+            "name": p["display_name"],
+            "initials": _initials(p["display_name"]),
+            "color": palette[i % len(palette)],
+            "is_host": p["id"] == meeting["host_id"],
+        })
+
+    return render_template(
+        "remote-calls/call_room.html",
+        user=user,
+        meeting=meeting,
+        host=host,
+        tiles=tiles,
+        you_initials=_initials(user["display_name"]),
+        you_is_host=user["id"] == meeting["host_id"],
+        participant_count=len(participants),
+        parse_dt=_parse_dt,
+    )
+
+
 @blueprint.route("/settings")
 def settings_page():
     user, redir = _require_login()

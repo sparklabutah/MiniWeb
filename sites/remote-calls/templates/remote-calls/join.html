@@ -69,7 +69,11 @@
         .then(function(result) {
             if (result.status >= 200 && result.status < 300) {
                 msgEl.className = 'result-msg success';
-                msgEl.textContent = 'Joined "' + result.data.meeting.title + '" successfully! (' + result.data.meeting.participant_count + ' participants)';
+                msgEl.textContent = 'Joining "' + result.data.meeting.title + '"...';
+                msgEl.style.display = 'block';
+                var callUrl = '{{ url_for("remote-calls.call_room", meeting_id="__MID__") }}'.replace('__MID__', result.data.meeting.id);
+                window.location.href = callUrl;
+                return;
             } else {
                 msgEl.className = 'result-msg error';
                 msgEl.textContent = result.data.error || 'Failed to join meeting.';

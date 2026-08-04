@@ -54,6 +54,8 @@
         .btn-danger:hover { background: #b71c1c; }
         .btn-secondary { background: #e2e8f0; color: #334155; }
         .btn-secondary:hover { background: #cbd5e1; }
+        .btn-join-call { background: #2e7d32; color: #fff; }
+        .btn-join-call:hover { background: #1b5e20; }
     </style>
 </head>
 <body>
@@ -144,6 +146,9 @@
         {% endif %}
 
         <div class="actions">
+            {% if meeting.status != 'cancelled' %}
+            <a href="{{ url_for('remote-calls.call_room', meeting_id=meeting.id) }}" class="btn btn-join-call">&#128249; Join Call</a>
+            {% endif %}
             <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Back to Meetings</a>
             <button class="btn btn-primary" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Link Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
             {% if meeting.status == 'scheduled' %}
