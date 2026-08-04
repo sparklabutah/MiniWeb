@@ -415,21 +415,32 @@ def save_listing(listing_id):
 def submit_inquiry(listing_id):
     if "user_id" not in session:
         return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    message = request.form.get("message", "").strip()
+    if not message:
+        return redirect(url_for("real-estate-buy-rent.listing_detail",
+                                listing_id=listing_id, sent="empty"))
     inquiries = _load_inquiries()
     new_id = max(i["id"] for i in inquiries) + 1 if inquiries else 1
     inquiries.append({
         "id": new_id,
         "user_id": session["user_id"],
         "listing_id": listing_id,
-        "message": request.form.get("message", "").strip(),
+        "message": message,
         "date": datetime.now().strftime("%Y-%m-%d"),
         "status": "pending",
     })
     _save_inquiries(inquiries)
     listing = db.get_item(SITE, "listings", listing_id)
-    if listing:
-        emit("booking", user_id=session["user_id"], title=f"Property viewing: {listing.get('address', 'Listing')}", start=datetime.now().strftime("%Y-%m-%d"), location=listing.get("address", ""))
-    return redirect(url_for("real-estate-buy-rent.listing_detail", listing_id=listing_id))
+    title = listing.get("title", "Listing") if listing else "Listing"
+    agent = _get_agent(listing.get("agent_id")) if listing else None
+    agent_name = agent.get("name", "the agent") if agent else "the agent"
+    emit("message",
+         from_user_id=session["user_id"],
+         to_user_id=session["user_id"],
+         text=f"Inquiry sent to {agent_name} about \"{title}\": {message}",
+         source_site="real-estate-buy-rent")
+    return redirect(url_for("real-estate-buy-rent.listing_detail",
+                            listing_id=listing_id, sent="1"))
 
 
 # ---------------------------------------------------------------------------
