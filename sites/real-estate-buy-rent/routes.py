@@ -86,6 +86,8 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
         "date": "[listed_date] DESC",
         "price_low": "[price] ASC",
         "price_high": "[price] DESC",
+        "rent_low": "[rent_monthly] ASC",
+        "rent_high": "[rent_monthly] DESC",
         "sqft": "[sqft] DESC",
         "beds": "[bedrooms] DESC",
     }
@@ -144,14 +146,17 @@ def _save_inquiries(data):
 def index():
     """Homepage with featured listings."""
     featured_sale = _query_listings(status="for_sale", sort="price_high", limit=4)
-    featured_rent = _query_listings(status="for_rent", sort="price_high", limit=4)
+    featured_rent = _query_listings(status="for_rent", sort="rent_high", limit=4)
 
-    stats = db.execute(
-        f"SELECT [status], COUNT(*) as cnt, AVG(price) as avg_p "
-        f"FROM [{_LISTINGS_TABLE}] WHERE [status] IN ('for_sale','for_rent') "
-        f"GROUP BY [status]")
-    sale_stats = next((r for r in stats if r["status"] == "for_sale"), None)
-    rent_stats = next((r for r in stats if r["status"] == "for_rent"), None)
+    # Sale stats use price; rent stats use rent_monthly (rentals carry price=0).
+    sale_stats = db.execute(
+        f"SELECT COUNT(*) as cnt, AVG(price) as avg_p "
+        f"FROM [{_LISTINGS_TABLE}] WHERE [status] = 'for_sale' AND [price] > 0",
+        fetch="one")
+    rent_stats = db.execute(
+        f"SELECT COUNT(*) as cnt, AVG(rent_monthly) as avg_p "
+        f"FROM [{_LISTINGS_TABLE}] WHERE [status] = 'for_rent' AND [rent_monthly] > 0",
+        fetch="one")
 
     user = None
     if "user_id" in session:
@@ -596,10 +601,10 @@ def api_stats():
         f"FROM [{_LISTINGS_TABLE}] WHERE [status] = 'for_sale' AND [price] > 0",
         fetch="one")
 
-    # Rent price stats
+    # Rent price stats (rentals store the price in rent_monthly; price is 0)
     rent_row = db.execute(
-        f"SELECT COUNT(*) as cnt, AVG([price]) as avg_p, MIN([price]) as min_p, MAX([price]) as max_p "
-        f"FROM [{_LISTINGS_TABLE}] WHERE [status] = 'for_rent' AND [price] > 0",
+        f"SELECT COUNT(*) as cnt, AVG([rent_monthly]) as avg_p, MIN([rent_monthly]) as min_p, MAX([rent_monthly]) as max_p "
+        f"FROM [{_LISTINGS_TABLE}] WHERE [status] = 'for_rent' AND [rent_monthly] > 0",
         fetch="one")
 
     # Type counts
