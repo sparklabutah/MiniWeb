@@ -59,7 +59,9 @@
         '<div class="mp-seek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
           '<div class="mp-played"></div><div class="mp-knob"></div></div>' +
         '<div class="mp-row">' +
+          '<button class="mp-btn mp-skip mp-back" title="Back 10s" aria-label="Skip back 10 seconds">⏪</button>' +
           '<button class="mp-btn mp-pp" title="Play/pause">❚❚</button>' +
+          '<button class="mp-btn mp-skip mp-fwd" title="Forward 10s" aria-label="Skip forward 10 seconds">⏩</button>' +
           '<span class="mp-time"><span class="mp-cur">0:00</span> / <span class="mp-tot">' + fmt(duration) + '</span></span>' +
           '<span class="mp-spacer"></span>' + ccBtn +
           '<div class="mp-gear"><button class="mp-btn mp-gear-btn" title="Settings" aria-label="Settings">⚙</button>' +
@@ -73,7 +75,8 @@
     var screen = q('.mp-screen'), controls = q('.mp-controls'), seek = q('.mp-seek'),
         played = q('.mp-played'), knob = q('.mp-knob'), pp = q('.mp-pp'),
         curEl = q('.mp-cur'), totEl = q('.mp-tot'), gear = q('.mp-gear'),
-        gearBtn = q('.mp-gear-btn'), ccBtnEl = q('.mp-cc-btn');
+        gearBtn = q('.mp-gear-btn'), ccBtnEl = q('.mp-cc-btn'),
+        backBtn = q('.mp-back'), fwdBtn = q('.mp-fwd');
 
     var t = 0, playing = false, started = false, chapters = [], lastTs = null, rafOn = false;
     var speed = 1;
@@ -120,6 +123,13 @@
       else if (e.key === 'ArrowLeft') { t = Math.max(0, t - 5); render(); postSeek(); e.preventDefault(); }
     });
     pp.addEventListener('click', function () { playing ? pause() : play(); });
+    // Skip back / forward 10s — jump to an earlier/later timestamp.
+    function skip(delta) {
+      if (duration <= 0) return;
+      t = Math.min(duration, Math.max(0, t + delta)); render(); postSeek();
+    }
+    if (backBtn) backBtn.addEventListener('click', function () { skip(-10); });
+    if (fwdBtn) fwdBtn.addEventListener('click', function () { skip(10); });
 
     function addTicks() {
       el.querySelectorAll('.mp-tick').forEach(function (x) { x.remove(); });
