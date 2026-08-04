@@ -17,6 +17,12 @@ from app.events import emit
 SITE = "rating-review"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 
+# SQL table + FTS index names for the businesses collection, and how many
+# businesses to show per page on the browse listing.
+BIZ_TABLE = "rating_review_businesses"
+FTS_BIZ_TABLE = "fts_rating_review_businesses"
+PER_PAGE = 24
+
 blueprint = Blueprint(
     "rating-review",
     __name__,
@@ -87,14 +93,93 @@ def _compute_rating_distribution(reviews_list):
 
 
 def _all_categories():
-    cats = set()
-    for b in _businesses():
-        cats.add(b.get("category", "Other"))
-    return sorted(cats)
+    rows = db.execute(
+        f"SELECT DISTINCT category FROM {BIZ_TABLE} "
+        f"WHERE category IS NOT NULL AND category != '' ORDER BY category"
+    )
+    return [r["category"] for r in rows]
+
+
+def _category_counts():
+    """(category, count) pairs, most populous first — real counts for browse
+    pills and the category filter (Restaurants -> 86, etc.). SQL GROUP BY, so
+    the table is never loaded into Python."""
+    rows = db.execute(
+        f"SELECT category, COUNT(*) AS n FROM {BIZ_TABLE} "
+        f"WHERE category IS NOT NULL AND category != '' "
+        f"GROUP BY category ORDER BY n DESC, category ASC"
+    )
+    return [(r["category"], r["n"]) for r in rows]
 
 
 def _all_price_ranges():
     return ["$", "$$", "$$$", "$$$$", "Free"]
+
+
+def _search_businesses(*, category="", price="", min_rating="", search="",
+                       sort="rating", limit=PER_PAGE, offset=0):
+    """SQL-level filtered / sorted / paginated business query.
+
+    Returns ``(rows, total_count)``. All filtering, sorting, pagination and
+    full-text search happen in SQL — the full 175-row table is never loaded
+    into Python. When ``search`` is given, matches are found across the whole
+    table via the FTS5 index (not just the first slice) and ranked by
+    relevance unless the caller asks for an explicit sort.
+    """
+    filt_clauses, filt_params = [], []
+    if category:
+        filt_clauses.append("category = ?")
+        filt_params.append(category)
+    if price:
+        filt_clauses.append("price_range = ?")
+        filt_params.append(price)
+    if min_rating not in (None, ""):
+        try:
+            mr = float(min_rating)
+        except (TypeError, ValueError):
+            mr = None
+        if mr is not None:
+            filt_clauses.append("overall_rating >= ?")
+            filt_params.append(mr)
+
+    search = (search or "").strip()
+
+    if search:
+        fts_query = " ".join(f'"{t}"*' for t in search.split() if t)
+        base = (
+            f" FROM {BIZ_TABLE} t "
+            f"JOIN {FTS_BIZ_TABLE} f ON t.id = f.rowid "
+            f"WHERE {FTS_BIZ_TABLE} MATCH ?"
+        )
+        params = [fts_query]
+        for clause, val in zip(filt_clauses, filt_params):
+            base += f" AND t.{clause}"
+            params.append(val)
+        total = db.execute(f"SELECT COUNT(*){base}", tuple(params), fetch="val") or 0
+        order = {
+            "reviews": "t.review_count DESC",
+            "name": "t.name COLLATE NOCASE ASC",
+        }.get(sort, "f.rank")  # default: relevance
+        rows = db.execute(
+            f"SELECT t.*{base} ORDER BY {order} LIMIT ? OFFSET ?",
+            tuple(params) + (limit, offset),
+        )
+    else:
+        where_sql = (" WHERE " + " AND ".join(filt_clauses)) if filt_clauses else ""
+        total = db.execute(
+            f"SELECT COUNT(*) FROM {BIZ_TABLE}{where_sql}",
+            tuple(filt_params), fetch="val",
+        ) or 0
+        order = {
+            "reviews": "review_count DESC",
+            "name": "name COLLATE NOCASE ASC",
+        }.get(sort, "overall_rating DESC")
+        rows = db.execute(
+            f"SELECT * FROM {BIZ_TABLE}{where_sql} ORDER BY {order} LIMIT ? OFFSET ?",
+            tuple(filt_params) + (limit, offset),
+        )
+
+    return rows, total
 
 
 # ---------------------------------------------------------------------------
@@ -104,42 +189,34 @@ def _all_price_ranges():
 @blueprint.route("/")
 def index():
     """Homepage: featured businesses + search bar."""
-    businesses = _businesses()
-    reviews = _reviews()
-    photos = _photos()
-    users = _users()
+    # Featured: top-rated businesses (rating >= 4.5), most-reviewed first.
+    featured = db.execute(
+        f"SELECT * FROM {BIZ_TABLE} WHERE overall_rating >= 4.5 "
+        f"ORDER BY review_count DESC LIMIT 6"
+    )
 
-    # Featured: top-rated businesses (rating >= 4.5, sorted by review_count desc)
-    featured = sorted(
-        [b for b in businesses if b.get("overall_rating", 0) >= 4.5],
-        key=lambda b: b.get("review_count", 0),
-        reverse=True,
-    )[:6]
-
-    # Recent reviews
-    recent_reviews = sorted(reviews, key=lambda r: r.get("date", ""), reverse=True)[:5]
-    # Enrich recent reviews with business and user info
-    biz_map = {b["id"]: b for b in businesses}
-    user_map = {u["id"]: u for u in users}
+    # Recent reviews, newest first — enrich the handful shown with biz + user.
+    recent_reviews = db.execute(
+        "SELECT * FROM rating_review_reviews ORDER BY date DESC LIMIT 5"
+    )
     for r in recent_reviews:
-        r["_business"] = biz_map.get(r["business_id"])
-        r["_user"] = user_map.get(r["user_id"])
+        r["_business"] = db.get_item(SITE, "businesses", r.get("business_id"))
+        r["_user"] = db.get_item(SITE, "users", r.get("user_id"))
 
-    categories = _all_categories()
-
-    # Stats
+    # Real counts via SQL — never len() of a full table load.
     stats = {
-        "business_count": len(businesses),
-        "review_count": len(reviews),
-        "photo_count": len(photos),
-        "user_count": len(users),
+        "business_count": db.count(SITE, "businesses"),
+        "review_count": db.count(SITE, "reviews"),
+        "photo_count": db.count(SITE, "photos"),
+        "user_count": db.count(SITE, "users"),
     }
 
     return render_template(
         "rating-review/index.html",
         featured=featured,
         recent_reviews=recent_reviews,
-        categories=categories,
+        categories=_all_categories(),
+        category_counts=_category_counts(),
         stats=stats,
         user=_current_user(),
     )
@@ -147,51 +224,45 @@ def index():
 
 @blueprint.route("/businesses")
 def businesses_list():
-    """List businesses with filters."""
-    businesses = _businesses()
+    """Browse businesses — SQL-level filtering, full-text search, pagination.
 
-    # Filters
+    Every matching business is reachable by paging (LIMIT/OFFSET at the SQL
+    level); the page shows the true total so the full catalogue's breadth is
+    visible rather than a tiny fixed subset.
+    """
     category = request.args.get("category", "")
     price = request.args.get("price", "")
     min_rating = request.args.get("min_rating", "", type=str)
-    search = request.args.get("search", "")
+    search = (request.args.get("search", "") or "").strip()
     sort_by = request.args.get("sort", "rating")  # rating, reviews, name
 
-    filtered = list(businesses)
+    try:
+        page = int(request.args.get("page", "1"))
+    except (TypeError, ValueError):
+        page = 1
+    if page < 1:
+        page = 1
+    offset = (page - 1) * PER_PAGE
 
-    if category:
-        filtered = [b for b in filtered if b.get("category", "") == category]
-    if price:
-        filtered = [b for b in filtered if b.get("price_range", "") == price]
-    if min_rating:
-        try:
-            mr = float(min_rating)
-            filtered = [b for b in filtered if b.get("overall_rating", 0) >= mr]
-        except ValueError:
-            pass
-    if search:
-        q = search.lower()
-        filtered = [
-            b for b in filtered
-            if q in b.get("name", "").lower()
-            or q in b.get("category", "").lower()
-            or q in b.get("subcategory", "").lower()
-            or q in b.get("address", "").lower()
-            or any(q in attr.lower() for attr in b.get("attributes", []))
-        ]
+    rows, total = _search_businesses(
+        category=category, price=price, min_rating=min_rating,
+        search=search, sort=sort_by, limit=PER_PAGE, offset=offset,
+    )
 
-    # Sort
-    if sort_by == "reviews":
-        filtered.sort(key=lambda b: b.get("review_count", 0), reverse=True)
-    elif sort_by == "name":
-        filtered.sort(key=lambda b: b.get("name", "").lower())
-    else:  # default: rating
-        filtered.sort(key=lambda b: b.get("overall_rating", 0), reverse=True)
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    if page > total_pages:
+        page = total_pages
 
     return render_template(
         "rating-review/businesses.html",
-        businesses=filtered,
+        businesses=rows,
+        total=total,
+        page=page,
+        total_pages=total_pages,
+        per_page=PER_PAGE,
+        start_index=offset,
         categories=_all_categories(),
+        category_counts=_category_counts(),
         price_ranges=_all_price_ranges(),
         filters={"category": category, "price": price, "min_rating": min_rating,
                  "search": search, "sort": sort_by},
@@ -342,40 +413,30 @@ def logout():
 
 @blueprint.route("/api/businesses")
 def api_businesses():
-    """GET businesses with optional filters."""
-    businesses = _businesses()
+    """GET businesses with optional filters (SQL-level, paginated)."""
+    try:
+        limit = min(max(int(request.args.get("limit", PER_PAGE)), 1), 200)
+    except (TypeError, ValueError):
+        limit = PER_PAGE
+    try:
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (TypeError, ValueError):
+        offset = 0
 
-    category = request.args.get("category")
-    price = request.args.get("price")
-    min_rating = request.args.get("min_rating", type=float)
-    search = request.args.get("search")
-    sort_by = request.args.get("sort", "rating")
-
-    if category:
-        businesses = [b for b in businesses if b.get("category") == category]
-    if price:
-        businesses = [b for b in businesses if b.get("price_range") == price]
-    if min_rating is not None:
-        businesses = [b for b in businesses if b.get("overall_rating", 0) >= min_rating]
-    if search:
-        q = search.lower()
-        businesses = [
-            b for b in businesses
-            if q in b.get("name", "").lower()
-            or q in b.get("category", "").lower()
-            or q in b.get("subcategory", "").lower()
-            or q in b.get("address", "").lower()
-            or any(q in attr.lower() for attr in b.get("attributes", []))
-        ]
-
-    if sort_by == "reviews":
-        businesses.sort(key=lambda b: b.get("review_count", 0), reverse=True)
-    elif sort_by == "name":
-        businesses.sort(key=lambda b: b.get("name", "").lower())
-    else:
-        businesses.sort(key=lambda b: b.get("overall_rating", 0), reverse=True)
-
-    return jsonify(businesses)
+    rows, total = _search_businesses(
+        category=request.args.get("category", "") or "",
+        price=request.args.get("price", "") or "",
+        min_rating=request.args.get("min_rating", "") or "",
+        search=request.args.get("search", "") or "",
+        sort=request.args.get("sort", "rating"),
+        limit=limit, offset=offset,
+    )
+    return jsonify({
+        "businesses": rows,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    })
 
 
 @blueprint.route("/api/businesses/<int:business_id>")
@@ -741,32 +802,50 @@ def api_stats():
 
 @blueprint.route("/api/search")
 def api_search():
-    """search_by_query: keyword search across businesses and reviews."""
-    q = (request.args.get("q") or "").strip().lower()
+    """search_by_query: keyword search across businesses and reviews.
+
+    Uses the FTS5 indexes so matches are found across the whole tables, then
+    returns a page of results (limit/offset) plus true total counts.
+    """
+    q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
 
-    businesses = _businesses()
-    reviews = _reviews()
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (TypeError, ValueError):
+        offset = 0
 
-    biz_results = []
-    for b in businesses:
-        text = f"{b.get('name', '')} {b.get('category', '')} {b.get('subcategory', '')} {b.get('address', '')} {' '.join(b.get('attributes', []))}".lower()
-        if q in text:
-            biz_results.append(b)
+    fts_query = " ".join(f'"{t}"*' for t in q.split() if t)
 
-    review_results = []
-    for r in reviews:
-        text = f"{r.get('title', '')} {r.get('text', '')}".lower()
-        if q in text:
-            review_results.append(r)
+    biz_results = db.search(SITE, "businesses", q, limit=limit, offset=offset)
+    review_results = db.search(SITE, "reviews", q, limit=limit, offset=offset)
+
+    biz_total = db.execute(
+        f"SELECT COUNT(*) FROM {BIZ_TABLE} t "
+        f"JOIN {FTS_BIZ_TABLE} f ON t.id = f.rowid "
+        f"WHERE {FTS_BIZ_TABLE} MATCH ?",
+        (fts_query,), fetch="val",
+    ) or 0
+    review_total = db.execute(
+        "SELECT COUNT(*) FROM rating_review_reviews t "
+        "JOIN fts_rating_review_reviews f ON t.id = f.rowid "
+        "WHERE fts_rating_review_reviews MATCH ?",
+        (fts_query,), fetch="val",
+    ) or 0
 
     return jsonify({
         "query": q,
         "businesses": biz_results,
         "reviews": review_results,
-        "business_count": len(biz_results),
-        "review_count": len(review_results),
+        "business_count": biz_total,
+        "review_count": review_total,
+        "limit": limit,
+        "offset": offset,
     })
 
 

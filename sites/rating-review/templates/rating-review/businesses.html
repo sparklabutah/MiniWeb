@@ -37,7 +37,16 @@
         .sort-bar a.active { background: #d32323; color: #fff; border-color: #d32323; }
         .sort-bar a:hover { text-decoration: none; }
 
-        .result-count { font-size: 14px; color: #888; margin-bottom: 16px; }
+        .result-count { font-size: 14px; color: #666; margin-bottom: 16px; }
+        .result-count strong { color: #333; }
+
+        .pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 24px; }
+        .pagination a, .pagination span { display: inline-block; padding: 7px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #fff; color: #555; min-width: 38px; text-align: center; }
+        .pagination a:hover { background: #f5f5f5; text-decoration: none; }
+        .pagination .current { background: #d32323; color: #fff; border-color: #d32323; font-weight: 600; }
+        .pagination .disabled { color: #ccc; background: #fafafa; }
+        .pagination .gap { border: none; background: transparent; padding: 7px 4px; min-width: 0; }
+        .page-summary { font-size: 13px; color: #888; margin-top: 10px; }
 
         .biz-list-item { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 16px; }
         .biz-list-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
@@ -101,8 +110,8 @@
                         <h3>Category</h3>
                         <select name="category">
                             <option value="">All Categories</option>
-                            {% for cat in categories %}
-                                <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+                            {% for cat, n in category_counts %}
+                                <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }} ({{ n }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -140,11 +149,15 @@
                     <a href="{{ url_for('rating-review.businesses_list', category=filters.category, price=filters.price, min_rating=filters.min_rating, search=filters.search, sort='name') }}" class="{% if filters.sort == 'name' %}active{% endif %}">Name</a>
                 </div>
 
-                <div class="result-count">{{ businesses | length }} businesses found</div>
+                <div class="result-count">
+                    <strong>{{ total }}</strong> business{{ '' if total == 1 else 'es' }}
+                    {% if filters.search %}matching &ldquo;{{ filters.search }}&rdquo;{% elif filters.category %}in {{ filters.category }}{% endif %}
+                    {% if total_pages > 1 %}&middot; page {{ page }} of {{ total_pages }}{% endif %}
+                </div>
 
                 {% for biz in businesses %}
                 <div class="biz-list-item">
-                    <div class="biz-rank">{{ loop.index }}.</div>
+                    <div class="biz-rank">{{ start_index + loop.index }}.</div>
                     <div class="biz-info">
                         <h3><a href="{{ url_for('rating-review.business_detail', business_id=biz.id) }}">{{ biz.name }}</a></h3>
                         <div class="stars">
@@ -179,6 +192,36 @@
                 <div style="text-align:center; padding:40px; color:#888;">
                     <p style="font-size:18px;">No businesses found matching your criteria.</p>
                     <p style="margin-top:10px;"><a href="{{ url_for('rating-review.businesses_list') }}">View all businesses</a></p>
+                </div>
+                {% endif %}
+
+                {% if total_pages > 1 %}
+                {% set args = {'category': filters.category, 'price': filters.price, 'min_rating': filters.min_rating, 'search': filters.search, 'sort': filters.sort} %}
+                <nav class="pagination">
+                    {% if page > 1 %}
+                        <a href="{{ url_for('rating-review.businesses_list', page=page-1, **args) }}">&laquo; Prev</a>
+                    {% else %}
+                        <span class="disabled">&laquo; Prev</span>
+                    {% endif %}
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                            {% if p == page %}
+                                <span class="current">{{ p }}</span>
+                            {% else %}
+                                <a href="{{ url_for('rating-review.businesses_list', page=p, **args) }}">{{ p }}</a>
+                            {% endif %}
+                        {% elif p == page - 3 or p == page + 3 %}
+                            <span class="gap">&hellip;</span>
+                        {% endif %}
+                    {% endfor %}
+                    {% if page < total_pages %}
+                        <a href="{{ url_for('rating-review.businesses_list', page=page+1, **args) }}">Next &raquo;</a>
+                    {% else %}
+                        <span class="disabled">Next &raquo;</span>
+                    {% endif %}
+                </nav>
+                <div class="page-summary">
+                    Showing {{ start_index + 1 }}&ndash;{{ start_index + (businesses | length) }} of {{ total }} businesses
                 </div>
                 {% endif %}
             </div>
