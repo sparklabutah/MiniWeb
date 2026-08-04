@@ -55,8 +55,9 @@
 
         /* ── App Grid ── */
         .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
-        .app-card { text-decoration: none; color: inherit; transition: transform .15s; }
+        .app-card { position: relative; text-decoration: none; color: inherit; transition: transform .15s; }
         .app-card:hover { transform: translateY(-2px); }
+        .installed-badge { position: absolute; top: 8px; right: 8px; z-index: 2; display: inline-flex; align-items: center; gap: .2rem; background: #01875f; color: #fff; font-size: .68rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
         .app-icon {
             width: 100%; aspect-ratio: 1; border-radius: 20px;
             display: flex; align-items: center; justify-content: center;
@@ -179,6 +180,7 @@
             {% set card_colors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7b1fa2', '#c2185b', '#00897b', '#5c6bc0', '#f4511e', '#8d6e63', '#0097a7', '#689f38', '#e64a19', '#512da8', '#303f9f', '#c62828', '#00838f', '#4e342e', '#1565c0', '#2e7d32', '#f57f17', '#ad1457'] %}
             {% for app in apps %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ card_colors[loop.index0 % 24] }}, {{ card_colors[(loop.index0 + 7) % 24] }});">
                     {{ app.name[0] }}
                 </div>

@@ -116,6 +116,17 @@ def _get_community_reviews(app_name):
     return db.query(SITE, "app_reviews", where={"app": app_name}, limit=100)
 
 
+def _installed_app_ids(user_id):
+    """Return the set of app_ids the given user has installed (per-user,
+    small result set). Used to reflect installed state on listing/grid cards."""
+    if not user_id:
+        return set()
+    # Use db.query (session-overlay aware) so freshly installed/uninstalled
+    # apps are reflected; raw db.execute would only read the base table.
+    rows = db.query(SITE, "installed", where={"user_id": user_id}, limit=500)
+    return {r["app_id"] for r in rows}
+
+
 def _get_categories_from_db():
     """Get category counts via SQL aggregation."""
     rows = db.execute(
@@ -267,12 +278,15 @@ def index():
     ) or 0
 
     user = None
+    installed_ids = set()
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        installed_ids = _installed_app_ids(session["user_id"])
 
     return render_template(
         "software-marketplace/index.html",
         editors_choice=editors_choice,
+        installed_ids=installed_ids,
         trending=trending,
         top_rated=top_rated,
         new_updated=new_updated,
@@ -341,8 +355,10 @@ def apps_list():
     genres = _get_genres_from_db()
 
     user = None
+    installed_ids = set()
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        installed_ids = _installed_app_ids(session["user_id"])
 
     return render_template(
         "software-marketplace/apps.html",
@@ -350,7 +366,7 @@ def apps_list():
         q=q, cat=cat, genre=genre, min_rating=min_rating,
         max_price=max_price, price=price_type, sort=sort,
         page=page, total_pages=total_pages, total_results=total_results,
-        user=user,
+        user=user, installed_ids=installed_ids,
     )
 
 
@@ -391,17 +407,18 @@ def app_detail(app_id):
         user = _get_user(session["user_id"])
         uid = session["user_id"]
 
-        is_installed = db.execute(
-            "SELECT 1 FROM software_marketplace_installed "
-            "WHERE user_id = ? AND app_id = ? LIMIT 1",
-            (uid, app_id), fetch="val",
-        ) is not None
+        # Use db.query (session-overlay aware) so a just-installed app shows
+        # its installed state immediately; raw db.execute reads only the base
+        # table and would miss overlay mutations.
+        is_installed = len(db.query(
+            SITE, "installed",
+            where={"user_id": uid, "app_id": app_id}, limit=1,
+        )) > 0
 
-        in_wishlist = db.execute(
-            "SELECT 1 FROM software_marketplace_wishlists "
-            "WHERE user_id = ? AND app_id = ? LIMIT 1",
-            (uid, app_id), fetch="val",
-        ) is not None
+        in_wishlist = len(db.query(
+            SITE, "wishlists",
+            where={"user_id": uid, "app_id": app_id}, limit=1,
+        )) > 0
 
     return render_template(
         "software-marketplace/app_detail.html",
@@ -441,14 +458,17 @@ def category_page(cat):
     categories = _get_categories_from_db()
 
     user = None
+    installed_ids = set()
     if "user_id" in session:
         user = _get_user(session["user_id"])
+        installed_ids = _installed_app_ids(session["user_id"])
 
     return render_template(
         "software-marketplace/category.html",
         apps=apps, category=cat, categories=categories,
         genres=genre_list, genre=genre, sort=sort, user=user,
         page=page, total_pages=total_pages, total_results=total,
+        installed_ids=installed_ids,
     )
 
 
@@ -794,6 +814,8 @@ def form_install(app_id):
         i["user_id"] == session["user_id"] and i["app_id"] == app_id
         for i in installed
     )
+    # Only record + emit on a genuinely new install so repeat installs by the
+    # same user never double-count toward the installed total.
     if not already:
         new_id = max((i["id"] for i in installed), default=0) + 1
         installed.append({
@@ -804,9 +826,19 @@ def form_install(app_id):
         })
         db.save_collection(SITE, "installed", installed)
         _add_email(session["user_id"], "noreply@software-marketplace.lakeport.local",
-                   "Purchase confirmed",
+                   "Installation confirmed",
                    f'"{app["name"]}" has been installed successfully.')
+        emit(
+            "file_created",
+            user_id=session["user_id"],
+            filename=app["name"],
+            file_type="app",
+            source_site=SITE,
+            source_id=str(app_id),
+        )
 
+    # Redirect back re-renders the detail page in its installed state, giving
+    # immediate feedback without a manual refresh.
     return redirect(url_for("software-marketplace.app_detail", app_id=app_id))
 
 

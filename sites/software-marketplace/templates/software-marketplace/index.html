@@ -190,10 +190,13 @@
         .app-row::-webkit-scrollbar-thumb { background: var(--gp-border); border-radius: 4px; }
 
         .app-card {
+            position: relative;
             flex: 0 0 160px; text-decoration: none; color: inherit;
             transition: transform .15s;
         }
         .app-card:hover { transform: translateY(-2px); }
+        .editor-card { position: relative; }
+        .installed-badge { position: absolute; top: 8px; right: 8px; z-index: 3; display: inline-flex; align-items: center; gap: .2rem; background: var(--gp-green); color: #fff; font-size: .68rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
         .app-icon {
             width: 100%; aspect-ratio: 1; border-radius: 20px;
             display: flex; align-items: center; justify-content: center;
@@ -354,6 +357,7 @@
             {% set ec_colors = ['#174ea6', '#0d652d', '#8430ce', '#c5221f', '#e37400', '#137333'] %}
             {% for app in editors_choice %}
             <a class="editor-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="editor-banner" style="background: linear-gradient(135deg, {{ ec_colors[loop.index0 % 6] }}dd, {{ ec_colors[loop.index0 % 6] }}88);">
                     <span class="ec-badge">Editor's Choice</span>
                     <div class="ec-icon" style="background: {{ ec_colors[loop.index0 % 6] }};">{{ app.name[0] }}</div>
@@ -383,6 +387,7 @@
             {% set trend_colors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7b1fa2', '#c2185b', '#00897b', '#5c6bc0', '#f4511e', '#8d6e63'] %}
             {% for app in trending %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ trend_colors[loop.index0 % 12] }}, {{ trend_colors[(loop.index0 + 3) % 12] }});">
                     {{ app.name[0] }}
                 </div>
@@ -412,6 +417,7 @@
             {% set rated_colors = ['#0d652d', '#137333', '#1e8e3e', '#34a853', '#5bb974', '#81c995', '#174ea6', '#1a73e8', '#4285f4', '#669df6', '#8ab4f8', '#aecbfa'] %}
             {% for app in top_rated %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ rated_colors[loop.index0 % 12] }}, {{ rated_colors[(loop.index0 + 4) % 12] }});">
                     {{ app.name[0] }}
                 </div>
@@ -439,6 +445,7 @@
             {% set free_colors = ['#1a73e8', '#e8710a', '#d93025', '#188038', '#a142f4', '#f09300', '#1967d2', '#129eaf', '#e52592', '#9334e6', '#e37400', '#5f6368'] %}
             {% for app in top_free %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ free_colors[loop.index0 % 12] }}, {{ free_colors[(loop.index0 + 5) % 12] }});">
                     {{ app.name[0] }}
                 </div>
@@ -466,6 +473,7 @@
             {% set paid_colors = ['#c5221f', '#b31412', '#e8710a', '#f09300', '#fbbc04', '#f9ab00', '#ea4335', '#d93025', '#e37400', '#a50e0e', '#c61a09', '#b06000'] %}
             {% for app in top_paid %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ paid_colors[loop.index0 % 12] }}, {{ paid_colors[(loop.index0 + 3) % 12] }});">
                     {{ app.name[0] }}
                 </div>
@@ -493,6 +501,7 @@
             {% set new_colors = ['#7b1fa2', '#6a1b9a', '#8e24aa', '#9c27b0', '#ab47bc', '#ba68c8', '#4a148c', '#6a1b9a', '#8e24aa', '#ce93d8', '#e1bee7', '#f3e5f5'] %}
             {% for app in new_updated %}
             <a class="app-card" href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">
+                {% if installed_ids and app.id in installed_ids %}<span class="installed-badge">&#10003; Installed</span>{% endif %}
                 <div class="app-icon" style="background: linear-gradient(135deg, {{ new_colors[loop.index0 % 12] }}, {{ new_colors[(loop.index0 + 4) % 12] }});">
                     {{ app.name[0] }}
                 </div>
