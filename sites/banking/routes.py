@@ -111,6 +111,57 @@ def _keyword_score(query, text):
     return sum(1 for t in terms if t in text_l)
 
 
+def _dashboard_context(user):
+    """Rich summary data for the dashboard. Aggregates are anchored to the
+    latest transaction month in the data (site dates are intentionally static)."""
+    uid = user["id"]
+    accounts = _load_accounts(user_id=uid)
+    cc_user = _cc_get_user_for_banking(user)
+
+    deposits = sum(a["balance"] for a in accounts if a.get("type") in ("checking", "savings"))
+    loan_debt = sum(abs(a["balance"]) for a in accounts if a.get("type") == "loan")
+    cc_bal = (cc_user or {}).get("current_balance", 0) or 0
+    total_debt = loan_debt + cc_bal
+    net_worth = deposits - total_debt
+
+    latest = db.execute(
+        "SELECT MAX(date) FROM banking_transactions WHERE user_id=?", (uid,), fetch="val") or ""
+    month = latest[:7]
+    like = month + "%"
+    month_income = db.execute(
+        "SELECT COALESCE(SUM(amount),0) FROM banking_transactions "
+        "WHERE user_id=? AND type='credit' AND date LIKE ?", (uid, like), fetch="val") or 0
+    month_spending = db.execute(
+        "SELECT COALESCE(SUM(amount),0) FROM banking_transactions "
+        "WHERE user_id=? AND type='debit' AND category!='Transfer' AND date LIKE ?",
+        (uid, like), fetch="val") or 0
+    spend_rows = db.execute(
+        "SELECT category, SUM(amount) AS tot FROM banking_transactions "
+        "WHERE user_id=? AND type='debit' AND category!='Transfer' AND date LIKE ? "
+        "GROUP BY category ORDER BY tot DESC LIMIT 6", (uid, like))
+    top = max((r["tot"] for r in spend_rows), default=0) or 1
+    spending = [{"category": r["category"], "amount": r["tot"],
+                 "pct": round(r["tot"] / top * 100)} for r in spend_rows]
+
+    recent = _load_transactions(user_id=uid, limit=8)
+    bills = _load_bills(user_id=uid)
+    upcoming_bills = sorted(
+        [b for b in bills if b.get("status") == "due"],
+        key=lambda b: b.get("due_date", ""))[:4]
+
+    try:
+        month_label = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
+    except (ValueError, TypeError):
+        month_label = month
+
+    return dict(
+        accounts=accounts, cc_user=cc_user, net_worth=net_worth,
+        total_deposits=deposits, total_debt=total_debt,
+        month_label=month_label, month_income=month_income,
+        month_spending=month_spending, spending=spending,
+        recent=recent, upcoming_bills=upcoming_bills)
+
+
 # ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
@@ -119,10 +170,8 @@ def _keyword_score(query, text):
 def index():
 
     user, logged_in = _get_browsing_user()
-    accounts = _load_accounts(user_id=user["id"])
-    cc_user = _cc_get_user_for_banking(user)
-    return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=logged_in, cc_user=cc_user)
+    return render_template("banking/dashboard.html", user=user,
+                           logged_in=logged_in, **_dashboard_context(user))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -142,10 +191,8 @@ def login_submit():
                                error="Invalid username or password")
     session["user_id"] = user["id"]
     emit("signup", user_id=user["id"], site_name="banking", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
-    accounts = _load_accounts(user_id=user["id"])
-    cc_user = _cc_get_user_for_banking(user)
-    return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=True, cc_user=cc_user)
+    return render_template("banking/dashboard.html", user=user,
+                           logged_in=True, **_dashboard_context(user))
 
 
 @blueprint.route("/logout")
@@ -154,10 +201,8 @@ def logout():
     session.pop("identity_verified", None)
     # Redirect to dashboard (browse-only mode)
     user = _get_user(1)
-    accounts = _load_accounts(user_id=user["id"])
-    cc_user = _cc_get_user_for_banking(user)
-    return render_template("banking/dashboard.html", user=user, accounts=accounts,
-                           logged_in=False, cc_user=cc_user)
+    return render_template("banking/dashboard.html", user=user,
+                           logged_in=False, **_dashboard_context(user))
 
 
 @blueprint.route("/verify-identity", methods=["GET"])
