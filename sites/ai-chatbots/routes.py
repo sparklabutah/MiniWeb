@@ -1,30 +1,19 @@
-"""AI Chatbots Hub — chat interface backed by OpenAI API (gpt-5.4-nano-2026-03-17).
+"""AI Chatbots Hub — chat interface with a deterministic reply engine.
 
-Falls back to rule-based responses when no API key is available.
-Conversations are stored in-memory per session.
+Replies are generated locally from a rule-based engine (greeting/intent
+matching, RAG retrieval over the knowledge base + FAQ, and a hash-seeded
+response bank per persona). The same input always yields the same output and
+no external network / LLM call is ever made.
 """
 import json
-import os
 import pathlib
 import re
 import uuid
+import zlib
 from datetime import datetime, timezone
 
 from flask import (Blueprint, Response, abort, jsonify, redirect, render_template,
                    request, session, url_for)
-
-
-def _get_openai_key():
-    """Load API key lazily, handling 'export KEY=val' format in .env."""
-    env_path = pathlib.Path(__file__).resolve().parent.parent.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("export "):
-                line = line[7:]
-            if line.startswith("OPENAI_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return os.environ.get("OPENAI_API_KEY", "")
 
 from app import db
 from app.events import emit
@@ -153,43 +142,92 @@ _GREETINGS = {"hello", "hi", "hey", "greetings", "good morning", "good afternoon
               "good evening", "howdy", "sup", "what's up", "yo"}
 _FAREWELLS = {"bye", "goodbye", "see you", "later", "farewell", "quit", "exit"}
 
-_GENERIC_RESPONSES = [
-    "That's an interesting question! Let me think about that.",
-    "I'd be happy to help you explore that topic further.",
-    "Could you provide more details so I can give you a better answer?",
-    "That's a great topic! Here's what I can share based on my knowledge.",
-]
+# Per-persona flavor. Each bot has its own tone: a system-free, fully local
+# personality. `prefix` is prepended to RAG/KB answers, `generic` is the
+# hash-seeded response bank used when nothing else matches, and `lead` opens
+# the context-aware follow-up. Falls back to "Assistant" for unknown bots.
+_PERSONAS = {
+    "Assistant": {
+        "greeting": "Hello! I'm {bot}, your AI assistant. How can I help you today?",
+        "identity": ("I'm {bot}, a helpful AI assistant. I can answer questions, "
+                     "explain concepts, write code, and assist with a wide range "
+                     "of tasks. How can I help you?"),
+        "prefix": "",
+        "lead": ("Building on our conversation, that's a thoughtful follow-up. "
+                 "Could you tell me a bit more about the specific angle you'd like "
+                 "to explore so I can give you the most helpful answer?"),
+        "generic": [
+            "That's an interesting question. Let me share what I know about it.",
+            "I'd be happy to help you explore that topic further.",
+            "Could you provide a little more detail so I can give you a sharper answer?",
+            "Good question — here's how I'd approach it based on what I know.",
+        ],
+    },
+    "Creative": {
+        "greeting": "Hey there! I'm {bot} — let's make something imaginative together. What's on your mind?",
+        "identity": ("I'm {bot}, your creative companion. I love brainstorming ideas, "
+                     "spinning up stories, and looking at problems from unexpected "
+                     "angles. What shall we dream up?"),
+        "prefix": "Here's a spark of inspiration: ",
+        "lead": ("Ooh, that thread has real potential. Tell me a little more about "
+                 "the mood or direction you're imagining, and I'll run with it."),
+        "generic": [
+            "What a delightfully open-ended prompt! Let me riff on that a moment.",
+            "I love where your mind is going — let's paint outside the lines here.",
+            "Give me a few more brushstrokes of detail and I'll build a whole scene.",
+            "Interesting spark! Here's an imaginative angle to play with.",
+        ],
+    },
+    "Analyst": {
+        "greeting": "Hello. I'm {bot}. Share the question and I'll work through it methodically.",
+        "identity": ("I'm {bot}, an analytical assistant. I focus on structured "
+                     "reasoning, breaking problems into parts, and weighing the "
+                     "evidence. What would you like me to analyze?"),
+        "prefix": "Here's my assessment: ",
+        "lead": ("Noted. To analyze that precisely I need one more variable — "
+                 "which specific dimension should I prioritize? That will sharpen "
+                 "the conclusion."),
+        "generic": [
+            "Let me break that down systematically before drawing a conclusion.",
+            "Good question. Consider the key factors at play here.",
+            "To reason about this rigorously, I'd want to isolate the main variables.",
+            "Here's a structured take on the trade-offs involved.",
+        ],
+    },
+}
+
+
+def _persona(bot_name):
+    """Return the persona config for a bot, defaulting to Assistant."""
+    return _PERSONAS.get(bot_name, _PERSONAS["Assistant"])
+
+
+def _seeded_index(text, n):
+    """Deterministic index in [0, n) seeded by the message text (crc32)."""
+    if n <= 0:
+        return 0
+    return zlib.crc32(text.encode("utf-8")) % n
 
 
 def _generate_response(user_message, bot_name="Assistant", conversation_history=None):
-    """Generate response using Groq/Claude, with rule-based fallback."""
-    from app.llm import call_llm
+    """Generate a deterministic reply locally — no LLM, no network call.
 
-    # Build conversation context
-    hist_text = ""
-    if conversation_history:
-        for msg in conversation_history[-6:]:
-            hist_text += f"[{msg['role'].upper()}] {msg['content']}\n\n"
-
-    prompt = f"{hist_text}[USER] {user_message}" if hist_text else user_message
-    system = f"You are {bot_name}, a helpful AI assistant. Keep responses concise (2-3 paragraphs max)."
-
-    api_response = call_llm(prompt, system=system, max_tokens=500, temperature=0.7)
-    if api_response:
-        return api_response
-
-    # --- Fallback: rule-based response ---
+    The same (message, bot) input always produces the same output: intent
+    matching, RAG retrieval over the knowledge base + FAQ, and a hash-seeded
+    (crc32) selection from a per-persona response bank.
+    """
+    persona = _persona(bot_name)
     msg_lower = user_message.lower().strip()
     config = _load_config()
 
     # Greeting — only match if the message is purely a greeting
     words = set(msg_lower.replace("!", "").replace("?", "").replace(",", "").split())
     if words & _GREETINGS and len(words) <= 3:
-        return f"Hello! I'm {bot_name}, your AI assistant. How can I help you today?"
+        return persona["greeting"].format(bot=bot_name)
 
     # Farewell
     if words & _FAREWELLS and len(words) <= 4:
-        return f"Goodbye! It was great chatting with you. Feel free to come back anytime!"
+        return "Goodbye! It was great chatting with you. Feel free to come back anytime!"
 
     # Help
     if msg_lower in ("help", "what can you do", "what can you do?", "/help"):
@@ -205,41 +243,31 @@ def _generate_response(user_message, bot_name="Assistant", conversation_history=
 
     # Identity questions
     if any(q in msg_lower for q in ["who are you", "what are you", "your name"]):
-        return (f"I'm {bot_name}, an AI assistant powered by advanced language models. "
-                "I can help answer questions, explain concepts, write code, and assist "
-                "with a wide range of tasks. How can I help you?")
+        return persona["identity"].format(bot=bot_name)
 
     # RAG-augmented response
     kb_results = _rag_retrieve(user_message, top_k=config.get("rag_top_k", 3))
     faq_results = _rag_retrieve_faq(user_message, top_k=2)
 
     if faq_results:
-        best_faq = faq_results[0]
-        return best_faq["answer"]
+        return persona["prefix"] + faq_results[0]["answer"]
 
     if kb_results:
         best = kb_results[0]
-        response = best["content"]
+        response = persona["prefix"] + best["content"]
         if best.get("follow_up"):
             response += "\n\n" + best["follow_up"]
         return response
 
     # Context-aware fallback using conversation history
-    if conversation_history and len(conversation_history) > 0:
-        last_assistant = None
+    if conversation_history:
         for msg in reversed(conversation_history):
             if msg["role"] == "assistant":
-                last_assistant = msg["content"]
-                break
-        if last_assistant:
-            return (f"Building on our conversation, I'd say that's a thoughtful follow-up. "
-                    f"Could you tell me more specifically what aspect you'd like to explore? "
-                    f"I want to make sure I give you the most helpful answer.")
+                return persona["lead"]
 
-    # Generic fallback
-    import hashlib
-    idx = int(hashlib.md5(msg_lower.encode()).hexdigest(), 16) % len(_GENERIC_RESPONSES)
-    return _GENERIC_RESPONSES[idx]
+    # Generic fallback — hash-seeded so it varies by input yet is reproducible
+    bank = persona["generic"]
+    return bank[_seeded_index(msg_lower, len(bank))]
 
 
 # ---------------------------------------------------------------------------
