@@ -199,17 +199,8 @@
                         <span class="bookmark-note">Note: "{{ bookmark_note }}"</span>
                         {% endif %}
 
-                        <!-- share_by_dropdown -->
-                        <div class="share-wrapper">
-                            <span class="btn-action" id="share-btn">Share</span>
-                            <div class="share-dropdown" id="share-dropdown">
-                                <a href="#" onclick="shareArticle({{ article.id }}, 'email'); return false;">Email</a>
-                                <a href="#" onclick="shareArticle({{ article.id }}, 'twitter'); return false;">Twitter</a>
-                                <a href="#" onclick="shareArticle({{ article.id }}, 'facebook'); return false;">Facebook</a>
-                                <a href="#" onclick="shareArticle({{ article.id }}, 'linkedin'); return false;">LinkedIn</a>
-                                <a href="#" onclick="shareArticle({{ article.id }}, 'copy_link'); return false;">Copy Link</a>
-                            </div>
-                        </div>
+                        <!-- share (global MiniWebShare) -->
+                        <button type="button" class="btn-action" id="share-btn" data-miniweb-share data-share-title="{{ article.title }}">Share</button>
 
                         <!-- follow_by_dropdown -->
                         {% if user %}
@@ -307,23 +298,6 @@
                 btn.textContent = 'Playing (' + data.duration_seconds + 's)';
                 btn.classList.add('active');
             });
-    }
-    function shareArticle(articleId, platform) {
-        fetch('/sites/news/api/articles/' + articleId + '/share', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({platform: platform})
-        }).then(function(r) { return r.json(); })
-          .then(function(data) {
-              document.getElementById('share-dropdown').style.display = 'none';
-              if (platform === 'copy_link') {
-                  navigator.clipboard.writeText(window.location.href)
-                      .then(function() { alert('Link copied to clipboard!'); })
-                      .catch(function() { alert('Share link: ' + window.location.href); });
-              } else {
-                  alert('Shared via ' + platform);
-              }
-          });
     }
     function followTarget(type, target) {
         fetch('/sites/news/api/follow', {

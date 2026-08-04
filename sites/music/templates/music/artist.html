@@ -25,9 +25,10 @@
                 <button class="btn-outline" onclick="toggleDropdown('follow-menu')">More</button>
                 <div class="dropdown-menu" id="follow-menu" style="display:none;position:absolute;top:110%;left:0;background:#282828;border-radius:6px;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:50;overflow:hidden;">
                     <button class="dropdown-item" onclick="toggleFollow({{ artist.id }})" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">{% if is_following %}Unfollow{% else %}Follow{% endif %} Artist</button>
-                    <button class="dropdown-item" onclick="shareItem('artist', {{ artist.id }}, 'link')" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">Share Artist</button>
                 </div>
             </div>
+            <!-- Share (global MiniWebShare) -->
+            <button type="button" class="btn-outline" data-miniweb-share data-share-title="{{ artist.name }}">Share</button>
             <!-- Subscribe toggle (subscribe_by_toggle) -->
             <button type="button" class="btn-outline {% if is_subscribed %}subscribed{% endif %}" onclick="toggleSubscribe({{ artist.id }})" id="subscribe-btn"{% if is_subscribed %} style="background:#f59e0b;border-color:#f59e0b;color:#000;"{% endif %}>
                 {% if is_subscribed %}Subscribed{% else %}Subscribe{% endif %}
@@ -116,21 +117,6 @@ function toggleDropdown(menuId) {
     });
     var el = document.getElementById(menuId);
     el.style.display = (el.style.display === "block") ? "none" : "block";
-}
-function shareItem(type, id, platform) {
-    fetch("/sites/music/api/share", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({type: type, id: id, platform: platform})
-    }).then(r => r.json()).then(data => {
-        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
-        if (platform === 'link') {
-            var url = window.location.origin + data.share_url;
-            navigator.clipboard.writeText(url)
-                .then(() => alert('Link copied to clipboard!'))
-                .catch(() => alert('Share link: ' + url));
-        } else { alert('Shared via ' + platform); }
-    });
 }
 document.addEventListener("click", function(e) {
     if (!e.target.closest(".dropdown-wrap")) {

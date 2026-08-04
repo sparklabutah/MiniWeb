@@ -22,16 +22,8 @@
             <button class="btn-outline {% if is_liked %}liked{% endif %}" onclick="toggleLike({{ track.id }})" id="like-btn"{% if is_liked %} style="border-color:#1db954;color:#1db954;"{% endif %}>
                 {% if is_liked %}Liked{% else %}Like{% endif %}
             </button>
-            <!-- Share dropdown (share_by_dropdown) -->
-            <div class="dropdown-wrap" style="position:relative;display:inline-block;">
-                <button class="btn-outline" onclick="toggleDropdown('share-menu')">Share</button>
-                <div class="dropdown-menu" id="share-menu" style="display:none;position:absolute;top:110%;left:0;background:#282828;border-radius:6px;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:50;overflow:hidden;">
-                    <button class="dropdown-item" onclick="shareItem('track', {{ track.id }}, 'link')" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">Copy Link</button>
-                    <button class="dropdown-item" onclick="shareItem('track', {{ track.id }}, 'twitter')" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">Share on Twitter</button>
-                    <button class="dropdown-item" onclick="shareItem('track', {{ track.id }}, 'facebook')" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">Share on Facebook</button>
-                    <button class="dropdown-item" onclick="shareItem('track', {{ track.id }}, 'email')" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">Share via Email</button>
-                </div>
-            </div>
+            <!-- Share (global MiniWebShare) -->
+            <button class="btn-outline" data-miniweb-share data-share-title="{{ track.title }}">Share</button>
             <!-- Add to playlist dropdown (add_by_button / select_by_dropdown) -->
             {% if user and playlists %}
             <div class="dropdown-wrap" style="position:relative;display:inline-block;">
@@ -106,21 +98,6 @@ function toggleDropdown(menuId) {
     });
     var el = document.getElementById(menuId);
     el.style.display = (el.style.display === "block") ? "none" : "block";
-}
-function shareItem(type, id, platform) {
-    fetch("/sites/music/api/share", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({type: type, id: id, platform: platform})
-    }).then(r => r.json()).then(data => {
-        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
-        if (platform === 'link') {
-            var url = window.location.origin + data.share_url;
-            navigator.clipboard.writeText(url)
-                .then(() => alert('Link copied to clipboard!'))
-                .catch(() => alert('Share link: ' + url));
-        } else { alert('Shared via ' + platform); }
-    });
 }
 function addToPlaylist(playlistId, trackId) {
     fetch("/sites/music/api/playlists/" + playlistId + "/add_track", {

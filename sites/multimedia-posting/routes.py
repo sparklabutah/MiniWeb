@@ -438,6 +438,37 @@ def api_posts_create():
     return jsonify(post), 201
 
 
+@blueprint.route("/api/share", methods=["POST"])
+def api_share_receiver():
+    """Cross-site share target: create a post from shared content."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Not logged in"}), 401
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "Shared link").strip()
+    url = (data.get("url") or "").strip()
+    text = (data.get("text") or "").strip()
+    caption = title + ((" — " + text) if text else "") + (("\n" + url) if url else "")
+    posts = _load_posts()
+    new_id = _next_id("post", posts)
+    post = {
+        "id": new_id,
+        "author_id": user["id"],
+        "type": "photo",
+        "image_url": data.get("image") or f"https://pixshare.io/photos/{new_id}.jpg",
+        "caption": caption,
+        "location": "",
+        "likes_count": 0,
+        "comments_count": 0,
+        "created_at": _now_iso(),
+        "tags": re.findall(r"#(\w+)", caption),
+    }
+    posts.append(post)
+    _save_posts(posts)
+    return jsonify({"ok": True, "label": "PixShare",
+                    "view_url": url_for("multimedia-posting.post_detail", post_id=new_id)})
+
+
 @blueprint.route("/api/posts/<post_id>", methods=["GET"])
 def api_post_get(post_id):
     """Get single post with comments (extract_by_route)."""

@@ -172,29 +172,8 @@
                     <form method="post" action="{{ url_for('video.form_save_video', video_id=video.id) }}">
                         <button type="submit" class="action-btn" title="Save">&#128278; Save</button>
                     </form>
-                    <button class="action-btn" title="Share" onclick="openShareModal()">&#8599; Share</button>
+                    <button class="action-btn" title="Share" data-miniweb-share data-share-title="{{ video.title }}">&#8599; Share</button>
                     <button class="action-btn" title="Report" onclick="document.getElementById('report-section').style.display = document.getElementById('report-section').style.display === 'none' ? 'block' : 'none'; fetch('/sites/video/api/videos/{{ video.id }}/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:'other',details:'toggle'})})">&#9873; Report</button>
-                </div>
-            </div>
-
-            <!-- Share modal (popup, hidden by default) -->
-            <div id="share-modal" class="share-backdrop" style="display:none;" onclick="if(event.target===this)closeShareModal()">
-                <div class="share-dialog" role="dialog" aria-modal="true" aria-label="Share this video">
-                    <div class="share-dialog-head">
-                        <span>Share</span>
-                        <button class="share-x" onclick="closeShareModal()" title="Close" aria-label="Close">&times;</button>
-                    </div>
-                    <div class="share-platforms">
-                        <button class="share-plat" onclick="shareVideo('twitter')"><span class="spi" style="background:#1d9bf0;">&#120143;</span><span>Twitter</span></button>
-                        <button class="share-plat" onclick="shareVideo('facebook')"><span class="spi" style="background:#1877f2;">f</span><span>Facebook</span></button>
-                        <button class="share-plat" onclick="shareVideo('reddit')"><span class="spi" style="background:#ff4500;">&#128257;</span><span>Reddit</span></button>
-                        <button class="share-plat" onclick="shareVideo('email')"><span class="spi" style="background:#5b616a;">&#9993;</span><span>Email</span></button>
-                        <button class="share-plat" onclick="shareVideo('embed')"><span class="spi" style="background:#5b616a;">&lt;/&gt;</span><span>Embed</span></button>
-                    </div>
-                    <div class="share-link-row">
-                        <input id="share-link-input" readonly onclick="this.select()">
-                        <button class="share-copy-btn" onclick="shareVideo('link')">Copy</button>
-                    </div>
                 </div>
             </div>
 
@@ -374,39 +353,6 @@ function rateVideo(target, btn) {
     })(0);
     document.getElementById('like-btn').classList.toggle('active', rateState === 1);
     document.getElementById('dislike-btn').classList.toggle('active', rateState === -1);
-}
-function openShareModal() {
-    var inp = document.getElementById('share-link-input');
-    if (inp) inp.value = window.location.href;
-    document.getElementById('share-modal').style.display = 'flex';
-}
-function closeShareModal() {
-    document.getElementById('share-modal').style.display = 'none';
-}
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeShareModal();
-});
-function shareVideo(platform) {
-    var videoId = {{ video.id }};
-    fetch('/sites/video/api/videos/' + videoId + '/share', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({platform: platform})
-    }).then(function(r) { return r.json(); }).then(function(data) {
-        if (platform === 'link') {
-            navigator.clipboard.writeText(window.location.href).catch(function() {});
-            var btn = document.querySelector('.share-copy-btn');
-            if (btn) { btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy'; }, 1600); }
-        } else if (platform === 'embed') {
-            var embed = '<iframe src="' + window.location.href + '" width="640" height="360"></iframe>';
-            navigator.clipboard.writeText(embed)
-                .then(function() { alert('Embed code copied to clipboard!'); })
-                .catch(function() { alert('Embed: ' + embed); });
-        } else {
-            alert('Shared via ' + platform + '!');
-            closeShareModal();
-        }
-    }).catch(function() {});
 }
 </script>
 </body>

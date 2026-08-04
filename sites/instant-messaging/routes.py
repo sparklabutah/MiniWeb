@@ -523,6 +523,45 @@ def api_send_message(conv_id):
     return jsonify(new_msg), 201
 
 
+@blueprint.route("/api/share", methods=["POST"])
+def api_share_receiver():
+    """Cross-site share target: post the shared link into your most recent chat."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "Shared link").strip()
+    url = (data.get("url") or "").strip()
+    text = (data.get("text") or "").strip()
+    body = title + (("\n" + text) if text else "") + (("\n" + url) if url else "")
+
+    conversations = _get_conversations()
+    mine = [c for c in conversations if CURRENT_USER_ID in c.get("participants", [])]
+    if not mine:
+        return jsonify({"ok": False, "error": "No conversation to share into"}), 400
+    mine.sort(key=lambda c: c.get("last_message", ""), reverse=True)
+    conv = mine[0]
+
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_msg = {
+        "id": f"im-msg-{uuid.uuid4().hex[:8]}",
+        "conversation_id": conv["id"],
+        "sender_id": CURRENT_USER_ID,
+        "timestamp": now,
+        "text": body,
+        "read": False,
+        "media_id": None,
+    }
+    messages = _get_messages()
+    messages.append(new_msg)
+    db.save_collection(SITE, "messages", messages)
+    for c in conversations:
+        if c["id"] == conv["id"]:
+            c["last_message"] = now
+            c["message_count"] = c.get("message_count", 0) + 1
+            break
+    db.save_collection(SITE, "conversations", conversations)
+    return jsonify({"ok": True, "label": "Messages",
+                    "view_url": url_for("instant-messaging.conversation_page", conv_id=conv["id"])})
+
+
 @blueprint.route("/api/conversations", methods=["POST"])
 def api_create_conversation():
     data = request.get_json(silent=True) or {}

@@ -960,6 +960,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
     _RECORDER_SCRIPT = b'<script src="/static/recorder.js"></script>'
     _FILE_PICKER_SCRIPT = b'<script src="/static/file-picker.js"></script>'
     _EXPORT_FEEDBACK_SCRIPT = b'<script src="/static/export-feedback.js"></script>'
+    _SHARE_SCRIPT = b'<script src="/static/miniweb-share.js"></script>'
     # Shared video player — enhances any [data-mini-player] container across all sites.
     _PLAYER_ASSETS = b'<link rel="stylesheet" href="/static/player.css"><script src="/static/player.js"></script>'
 
@@ -1006,7 +1007,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
             logo_css = (_BRAND_FONTS_CSS + _logo_font_style(site_id)) if site_id else b""
             inject = (_BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_PICKER_SCRIPT
                       + b"\n" + _EXPORT_FEEDBACK_SCRIPT + b"\n" + _PLAYER_ASSETS
-                      + b"\n" + logo_css)
+                      + b"\n" + _SHARE_SCRIPT + b"\n" + logo_css)
             idx = data.rfind(b"</body>")
             if idx != -1:
                 response.set_data(data[:idx] + inject + b"\n" + data[idx:])

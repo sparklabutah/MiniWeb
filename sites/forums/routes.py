@@ -848,6 +848,36 @@ def api_create_post():
     return jsonify(new_post), 201
 
 
+@blueprint.route("/api/share", methods=["POST"])
+def api_share_receiver():
+    """Cross-site share target: create a link post from shared content."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Not logged in"}), 401
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "Shared link").strip()[:300]
+    url = (data.get("url") or "").strip()
+    text = (data.get("text") or "").strip()
+    subs = _get_subreddits()
+    subreddit = subs[0] if subs else "general"
+    new_post = {
+        "id": _next_post_id(),
+        "author_root_user_id": user["root_user_id"],
+        "author": user["username"],
+        "subreddit": subreddit,
+        "title": title,
+        "body": text,
+        "url": url,
+        "score": 1,
+        "num_comments": 0,
+        "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "flair": "Shared",
+    }
+    db.save_item(SITE, "posts", new_post["id"], new_post)
+    return jsonify({"ok": True, "label": "ForumHub",
+                    "view_url": url_for("forums.post_detail", post_id=new_post["id"])})
+
+
 @blueprint.route("/api/posts/<post_id>", methods=["GET"])
 def api_get_post(post_id):
     post = _get_post(post_id)
