@@ -116,11 +116,11 @@
                 </div>
                 <div class="filter-group">
                     <label>Date From</label>
-                    <input type="date" id="filterDateFrom" min="{{ date_min }}" max="{{ date_max }}">
+                    <input type="date" id="filterDateFrom" min="{{ date_min }}" max="{{ date_max }}" value="{{ date_min }}">
                 </div>
                 <div class="filter-group">
                     <label>Date To</label>
-                    <input type="date" id="filterDateTo" min="{{ date_min }}" max="{{ date_max }}">
+                    <input type="date" id="filterDateTo" min="{{ date_min }}" max="{{ date_max }}" value="{{ date_max }}">
                 </div>
                 <div class="filter-group">
                     <label>Min Price</label>
@@ -145,6 +145,9 @@
 
         <div class="sort-bar">
             <span class="count" id="eventCount">{{ events|length }} events</span>
+            {% if date_min and date_max %}
+            <span class="date-window-note" style="font-size:.8rem;color:#666;margin-left:.75rem;">Showing events for {{ date_min }} &ndash; {{ date_max }}</span>
+            {% endif %}
             <div style="display:flex;gap:.5rem;align-items:center;"> <label for="sortSelect" style="font-size:.85rem; color:#666;">Sort by: </label>
                 <select id="sortSelect" onchange="applyFilters()">
                     <option value="date">Date (Soonest)</option>
@@ -370,8 +373,8 @@
         function clearFilters() {
             document.getElementById('searchInput').value = '';
             document.getElementById('filterCategory').value = '';
-            document.getElementById('filterDateFrom').value = '';
-            document.getElementById('filterDateTo').value = '';
+            document.getElementById('filterDateFrom').value = '{{ date_min }}';
+            document.getElementById('filterDateTo').value = '{{ date_max }}';
             document.getElementById('filterPriceMin').value = '';
             document.getElementById('filterPriceMax').value = '';
             document.getElementById('filterStatus').value = '';
