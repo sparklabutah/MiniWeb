@@ -47,7 +47,8 @@
         /* All locations list */
         .all-locs-title { font-size: 1.1rem; font-weight: 600; color: #1565c0; margin-bottom: .8rem; margin-top: 1rem; }
         .all-locs-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 2rem; }
-        .all-locs-list .loc-tag { background: #e3f2fd; color: #1565c0; font-size: .8rem; padding: .3rem .7rem; border-radius: .3rem; }
+        .all-locs-list .loc-tag { background: #e3f2fd; color: #1565c0; font-size: .8rem; padding: .3rem .7rem; border-radius: .3rem; text-decoration: none; border: 1px solid transparent; }
+        .all-locs-list .loc-tag:hover { background: #bbdefb; border-color: #90caf9; }
         .all-locs-list .loc-tag.saved { background: #bbdefb; font-weight: 600; }
 
         .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
@@ -195,10 +196,11 @@
         </div>
 
         <h3 class="all-locs-title">All Available Locations</h3>
+        <p class="section-subtitle">Click any station to view its current conditions and 7-day forecast.</p>
         <div class="all-locs-list">
             {% set saved_ids = saved | map(attribute='id') | list %}
             {% for loc in all_locations %}
-            <span class="loc-tag {% if loc.id in saved_ids %}saved{% endif %}">{{ loc.name }}</span>
+            <a class="loc-tag {% if loc.id in saved_ids %}saved{% endif %}" href="{{ url_for('weather.index') }}?location={{ loc.name|urlencode }}">{{ loc.name }}</a>
             {% endfor %}
         </div>
     </div>

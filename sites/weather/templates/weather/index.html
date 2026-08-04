@@ -61,6 +61,14 @@
         .btn-blue:hover { background: #0d47a1; }
         .loc-error { background: #fce4ec; color: #c62828; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
 
+        /* Browse all locations (public, clickable) */
+        .browse-locs { margin-bottom: 1.5rem; }
+        .browse-locs .browse-label { font-size: .8rem; color: #64748b; font-weight: 600; margin-bottom: .5rem; }
+        .browse-locs .browse-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .browse-locs .browse-list a { background: #e3f2fd; color: #1565c0; font-size: .82rem; padding: .35rem .75rem; border-radius: .3rem; text-decoration: none; border: 1px solid transparent; }
+        .browse-locs .browse-list a:hover { background: #bbdefb; }
+        .browse-locs .browse-list a.active { background: #1565c0; color: #fff; font-weight: 600; }
+
         /* Unit toggle switch (filter_by_toggle) */
         .unit-toggle { display: flex; align-items: center; gap: .5rem; font-size: .85rem; font-weight: 600; }
         .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
@@ -125,6 +133,17 @@
         </form>
         {% if location_error %}
         <div class="loc-error">{{ location_error }}</div>
+        {% endif %}
+
+        {% if all_locations %}
+        <div class="browse-locs">
+            <div class="browse-label">Browse {{ all_locations|length }} locations</div>
+            <div class="browse-list">
+                {% for loc in all_locations %}
+                <a href="{{ url_for('weather.index') }}?location={{ loc.name|urlencode }}"{% if loc.id == selected_loc_id %} class="active"{% endif %}>{{ loc.name }}</a>
+                {% endfor %}
+            </div>
+        </div>
         {% endif %}
 
         <div class="current-card">

@@ -173,12 +173,16 @@ def index():
     # Each location has its own 7-day forecast (keyed by location_id)
     forecast = db.query(SITE, "forecast", where={"location_id": loc_id}, sort="date")
     alerts = db.query(SITE, "alerts")      # only 3 rows
+    # All stations, for the public browse list (locations table is small, <20 rows)
+    all_locations = db.query(SITE, "locations")
     user = _current_user()
     return render_template(
         "weather/index.html",
         current=current,
         forecast=forecast,
         alerts=alerts,
+        all_locations=all_locations,
+        selected_loc_id=loc_id,
         user=user,
         icon_for=_icon_for,
         location_error=location_error,
