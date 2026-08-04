@@ -4,6 +4,7 @@ Serves meetings, recordings, call logs, and user profiles from JSON data
 files in the data_sources directory.
 """
 import csv
+import hashlib
 import io
 import json
 import pathlib
@@ -335,6 +336,7 @@ def meeting_detail(meeting_id):
         host=host,
         participants=participants,
         recording=recording,
+        passcode=_meeting_passcode(meeting_id),
         format_duration_minutes=_format_duration_minutes,
         parse_dt=_parse_dt,
     )
@@ -555,6 +557,17 @@ def join_page():
     return render_template("remote-calls/join.html")
 
 
+def _meeting_passcode(meeting_id):
+    """Deterministically decide whether a meeting needs a join passcode, and
+    what it is. About half of meetings require one. Derived from the meeting id
+    (no schema/data change) so it's stable across requests. The passcode is
+    surfaced on the meeting detail page (like a Zoom invite) so it's findable."""
+    h = hashlib.sha1(("callhub:" + str(meeting_id)).encode()).hexdigest()
+    if int(h[:2], 16) % 2 != 0:
+        return None
+    return str(int(h[2:12], 16))[-6:].zfill(6)
+
+
 @blueprint.route("/meeting/<meeting_id>/call")
 def call_room(meeting_id):
     """In-call view: a simulated live call room for a meeting.
@@ -614,6 +627,7 @@ def call_room(meeting_id):
         you_initials=_initials(user["display_name"]),
         you_is_host=user["id"] == meeting["host_id"],
         participant_count=len(participants),
+        passcode=_meeting_passcode(meeting_id),
         parse_dt=_parse_dt,
     )
 

@@ -60,6 +60,39 @@
         .ctrl.leave { color: #ff8a80; }
         .count-pill { position: absolute; }
         .participants-pill { color: #c7ccda; font-size: .8rem; margin-right: auto; padding-left: .6rem; }
+
+        /* Active speaker + audio bars */
+        .tile.speaking { border-color: #43d17a; box-shadow: 0 0 0 3px rgba(67,209,122,.35); }
+        .audio-bars { position: absolute; left: .55rem; top: .55rem; display: none; align-items: flex-end; gap: 2px; height: 16px; }
+        .tile.speaking .audio-bars { display: flex; }
+        .audio-bars span { width: 3px; height: 4px; background: #43d17a; border-radius: 2px; animation: bars .6s ease-in-out infinite; }
+        .audio-bars span:nth-child(2) { animation-delay: .15s; }
+        .audio-bars span:nth-child(3) { animation-delay: .3s; }
+        .audio-bars span:nth-child(4) { animation-delay: .45s; }
+        @keyframes bars { 0%,100% { height: 4px; } 50% { height: 15px; } }
+        .active-speaker { font-size: .82rem; color: #43d17a; font-weight: 600; white-space: nowrap; }
+        .reaction-float { position: absolute; bottom: 14%; left: 50%; font-size: 1.7rem; animation: floatup 2.2s ease-out forwards; pointer-events: none; }
+        @keyframes floatup { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70px) scale(1.2); } }
+
+        /* Join / connecting overlay */
+        .join-overlay { position: fixed; inset: 0; background: #0b0d13; display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .join-overlay.hidden { display: none; }
+        .join-card { background: #161a24; border: 1px solid #232838; border-radius: 1rem; padding: 2.2rem 2.4rem; width: min(400px, 92vw); text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+        .join-brand { font-weight: 800; font-size: 1.3rem; color: #fff; margin-bottom: .3rem; }
+        .join-brand span { color: #4fc3f7; }
+        .join-title { color: #c7ccda; font-size: .95rem; margin-bottom: 1.4rem; }
+        .join-sub { color: #ffb74d; font-size: .84rem; margin-bottom: 1rem; }
+        #passcode-input { width: 100%; text-align: center; letter-spacing: .4em; font-size: 1.3rem; padding: .7rem; background: #0f1117; border: 1.5px solid #2c3242; border-radius: .5rem; color: #fff; font-family: ui-monospace, Menlo, monospace; }
+        #passcode-input:focus { outline: none; border-color: #4fc3f7; }
+        .passcode-err { color: #ff5252; font-size: .8rem; min-height: 1.1rem; margin: .55rem 0; }
+        .join-btn { width: 100%; padding: .75rem; background: #2e7d32; color: #fff; border: none; border-radius: .5rem; font-weight: 700; font-size: .95rem; cursor: pointer; }
+        .join-btn:hover { background: #1b5e20; }
+        .join-hint { color: #5c6478; font-size: .75rem; margin-top: 1rem; }
+        .spinner { width: 46px; height: 46px; border: 4px solid #2c3242; border-top-color: #4fc3f7; border-radius: 50%; margin: .3rem auto 1.1rem; animation: spin .9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .join-status { color: #c7ccda; font-size: .9rem; }
+        .shake { animation: shake .35s; }
+        @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
     </style>
 </head>
 <body
@@ -67,7 +100,31 @@
     data-you-id="{{ user.id }}"
     data-meeting-id="{{ meeting.id }}"
     data-messages-url="{{ url_for('remote-calls.api_meeting_messages', meeting_id=meeting.id) }}"
-    data-leave-url="{{ url_for('remote-calls.meeting_detail', meeting_id=meeting.id) }}">
+    data-leave-url="{{ url_for('remote-calls.meeting_detail', meeting_id=meeting.id) }}"
+    data-passcode="{{ passcode or '' }}">
+
+    <!-- Zoom-style join / connecting overlay -->
+    <div class="join-overlay" id="join-overlay">
+        <div class="join-card" id="join-card">
+            <div class="join-brand">Call<span>Hub</span></div>
+            <div class="join-title">{{ meeting.title }}</div>
+
+            <div id="passcode-step" style="display:none;">
+                <div class="join-sub">&#128274; This meeting is passcode-protected</div>
+                <form id="passcode-form" autocomplete="off">
+                    <input id="passcode-input" inputmode="numeric" maxlength="6" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;">
+                    <div class="passcode-err" id="passcode-err"></div>
+                    <button type="submit" class="join-btn">Join Meeting</button>
+                </form>
+                <div class="join-hint">The passcode is shown on the meeting details page.</div>
+            </div>
+
+            <div id="connecting-step" style="display:none;">
+                <div class="spinner"></div>
+                <div class="join-status" id="join-status">Connecting&hellip;</div>
+            </div>
+        </div>
+    </div>
 
     <div class="call-topbar">
         <div class="meta">
@@ -76,6 +133,7 @@
             <span class="title">{{ meeting.title }}</span>
         </div>
         <div class="right">
+            <span class="active-speaker" id="active-speaker"></span>
             <span id="participant-count" style="font-size:.82rem;color:#9aa2b5;">{{ participant_count }} in call</span>
             <span class="timer" id="call-timer">00:00</span>
         </div>
@@ -93,6 +151,7 @@
                     You
                     {% if you_is_host %}<span class="host-badge">Host</span>{% endif %}
                 </div>
+                <div class="audio-bars"><span></span><span></span><span></span><span></span></div>
                 <div class="mic-ind" id="you-mic-ind">&#127908;</div>
             </div>
 
@@ -107,6 +166,7 @@
                     {{ t.name }}
                     {% if t.is_host %}<span class="host-badge">Host</span>{% endif %}
                 </div>
+                <div class="audio-bars"><span></span><span></span><span></span><span></span></div>
                 <div class="mic-ind">&#127908;</div>
             </div>
             {% endfor %}
@@ -153,9 +213,10 @@
         var MESSAGES_URL = body.dataset.messagesUrl;
         var LEAVE_URL = body.dataset.leaveUrl;
 
-        // --- Call timer (counts up while in the call) ---
-        var started = Date.now();
+        // --- Call timer (starts once you've actually joined the call) ---
+        var started = null;
         function tick() {
+            if (started === null) return;
             var s = Math.floor((Date.now() - started) / 1000);
             var h = Math.floor(s / 3600);
             var m = Math.floor((s % 3600) / 60);
@@ -164,8 +225,7 @@
             var txt = (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(sec);
             document.getElementById('call-timer').textContent = txt;
         }
-        tick();
-        setInterval(tick, 1000);
+        function startTimer() { started = Date.now(); tick(); setInterval(tick, 1000); }
 
         // --- Mic toggle ---
         var micOn = true;
@@ -253,6 +313,85 @@
         window.leaveCall = function () {
             window.location.href = LEAVE_URL;
         };
+
+        // --- Simulated live meeting: active speaker, mic states, reactions ---
+        var remoteTiles = Array.prototype.slice.call(document.querySelectorAll('.remote-tile'));
+        function startSimulation() {
+            if (!remoteTiles.length) return;
+            // Roughly every third participant joins muted.
+            remoteTiles.forEach(function (tile, i) {
+                var muted = (i % 3 === 2);
+                tile.dataset.muted = muted ? '1' : '0';
+                var ind = tile.querySelector('.mic-ind');
+                if (muted && ind) { ind.classList.add('muted'); ind.innerHTML = '&#128263;'; }
+            });
+            var speakerEl = document.getElementById('active-speaker');
+            function rotateSpeaker() {
+                var candidates = remoteTiles.filter(function (t) { return t.dataset.muted !== '1'; });
+                remoteTiles.forEach(function (t) { t.classList.remove('speaking'); });
+                if (!candidates.length) { speakerEl.textContent = ''; return; }
+                var pick = candidates[Math.floor(Math.random() * candidates.length)];
+                pick.classList.add('speaking');
+                speakerEl.textContent = '🔊 ' + (pick.dataset.name || 'Someone') + ' is speaking';
+            }
+            rotateSpeaker();
+            setInterval(rotateSpeaker, 2600 + Math.floor(Math.random() * 1200));
+            // Occasional floating emoji reactions.
+            var EMOJI = ['👍', '😄', '❤️', '👏', '🎉'];
+            setInterval(function () {
+                if (!remoteTiles.length) return;
+                var tile = remoteTiles[Math.floor(Math.random() * remoteTiles.length)];
+                var r = document.createElement('div');
+                r.className = 'reaction-float';
+                r.innerHTML = EMOJI[Math.floor(Math.random() * EMOJI.length)];
+                tile.appendChild(r);
+                setTimeout(function () { r.remove(); }, 2200);
+            }, 5000 + Math.floor(Math.random() * 3000));
+        }
+
+        // --- Join flow: passcode gate + Zoom-style connecting delay ---
+        var PASSCODE = body.dataset.passcode || '';
+        function enterCall() {
+            document.getElementById('join-overlay').classList.add('hidden');
+            startTimer();
+            startSimulation();
+        }
+        function runConnecting() {
+            document.getElementById('passcode-step').style.display = 'none';
+            document.getElementById('connecting-step').style.display = 'block';
+            var statuses = ['Connecting…', 'Authenticating…', 'Joining meeting…'];
+            var i = 0;
+            var st = document.getElementById('join-status');
+            st.textContent = statuses[0];
+            var iv = setInterval(function () {
+                i++;
+                if (i < statuses.length) st.textContent = statuses[i];
+            }, 850);
+            setTimeout(function () { clearInterval(iv); enterCall(); }, 2700);
+        }
+        (function initJoin() {
+            if (PASSCODE) {
+                var step = document.getElementById('passcode-step');
+                step.style.display = 'block';
+                var inp = document.getElementById('passcode-input');
+                inp.focus();
+                document.getElementById('passcode-form').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var err = document.getElementById('passcode-err');
+                    if (inp.value.trim() === PASSCODE) {
+                        err.textContent = '';
+                        runConnecting();
+                    } else {
+                        err.textContent = 'Incorrect passcode. Check the meeting details.';
+                        var card = document.getElementById('join-card');
+                        card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+                        inp.select();
+                    }
+                });
+            } else {
+                runConnecting();
+            }
+        })();
     })();
     </script>
 </body>

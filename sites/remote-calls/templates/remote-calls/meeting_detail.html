@@ -105,6 +105,12 @@
                     <div class="value" style="font-family: monospace;">{{ meeting.id }}</div>
                 </div>
                 <div class="detail-field">
+                    <div class="label">Passcode</div>
+                    <div class="value" style="font-family: monospace;">
+                        {% if passcode %}<strong style="letter-spacing:1px;">{{ passcode }}</strong> <span style="color:#64748b;font-family:inherit;">&middot; required to join</span>{% else %}<span style="color:#64748b;">Not required</span>{% endif %}
+                    </div>
+                </div>
+                <div class="detail-field">
                     <div class="label">Recording Available</div>
                     <div class="value">{{ 'Yes' if meeting.recording_available else 'No' }}</div>
                 </div>
@@ -147,7 +153,7 @@
 
         <div class="actions">
             {% if meeting.status != 'cancelled' %}
-            <a href="{{ url_for('remote-calls.call_room', meeting_id=meeting.id) }}" class="btn btn-join-call">&#128249; Join Call</a>
+            <a href="{{ url_for('remote-calls.call_room', meeting_id=meeting.id) }}" class="btn btn-join-call">&#128249; Join Call{% if passcode %} &#128274;{% endif %}</a>
             {% endif %}
             <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Back to Meetings</a>
             <button class="btn btn-primary" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Link Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
