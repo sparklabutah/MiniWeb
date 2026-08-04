@@ -523,21 +523,36 @@ def api_send_message(conv_id):
     return jsonify(new_msg), 201
 
 
+@blueprint.route("/api/share_targets", methods=["GET"])
+def api_share_targets():
+    """List the current user's conversations so the share modal can pick a recipient."""
+    conversations = _get_conversations()
+    users_map = _user_map()
+    mine = [c for c in conversations if CURRENT_USER_ID in c.get("participants", [])]
+    mine.sort(key=lambda c: c.get("last_message", ""), reverse=True)
+    targets = [{"id": c["id"], "name": _conversation_display_name(c, users_map)} for c in mine]
+    return jsonify({"ok": True, "targets": targets})
+
+
 @blueprint.route("/api/share", methods=["POST"])
 def api_share_receiver():
-    """Cross-site share target: post the shared link into your most recent chat."""
+    """Cross-site share target: post the shared link into a chosen (or most recent) chat."""
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "Shared link").strip()
     url = (data.get("url") or "").strip()
     text = (data.get("text") or "").strip()
-    body = title + (("\n" + text) if text else "") + (("\n" + url) if url else "")
+    # `text` is the user-edited message; fall back to title + url when empty.
+    body = text if text else "\n".join(p for p in [title, url] if p)
 
     conversations = _get_conversations()
     mine = [c for c in conversations if CURRENT_USER_ID in c.get("participants", [])]
     if not mine:
         return jsonify({"ok": False, "error": "No conversation to share into"}), 400
-    mine.sort(key=lambda c: c.get("last_message", ""), reverse=True)
-    conv = mine[0]
+    conv_id = (data.get("conversation_id") or "").strip()
+    conv = next((c for c in mine if c["id"] == conv_id), None) if conv_id else None
+    if conv is None:
+        mine.sort(key=lambda c: c.get("last_message", ""), reverse=True)
+        conv = mine[0]
 
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     new_msg = {
