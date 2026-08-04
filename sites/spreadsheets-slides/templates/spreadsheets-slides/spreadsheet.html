@@ -31,7 +31,15 @@
         th { background: #f8f9fa; color: #5f6368; font-weight: 500; position: sticky; top: 0; z-index: 1; }
         .row-header { background: #f8f9fa; color: #80868b; font-weight: 400; text-align: center; min-width: 40px; width: 40px; }
         td:focus-within { outline: 2px solid #4285F4; outline-offset: -1px; }
-        input.cell-input { border: none; background: none; width: 100%; font-size: 0.85rem; padding: 0; outline: none; }
+        td:has(input.cell-input):hover { background: #f1f8f4; cursor: text; }
+        input.cell-input { border: none; background: none; width: 100%; font-size: 0.85rem; padding: 0; outline: none; cursor: text; }
+        input.cell-input:focus { background: #fff; }
+
+        .mode-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 1rem; font-size: 0.82rem; }
+        .mode-banner .mode-icon { font-weight: 700; }
+        .mode-banner.edit { background: #e6f4ea; color: #0b8043; border-bottom: 1px solid #ceead6; }
+        .mode-banner.readonly { background: #fef7e0; color: #a56900; border-bottom: 1px solid #feefc3; }
+        .mode-banner a { color: inherit; font-weight: 600; text-decoration: underline; }
 
         .share-section { padding: 1rem; border-top: 1px solid #dadce0; background: #f8f9fa; }
         .share-section h4 { font-size: 0.85rem; color: #5f6368; margin-bottom: 0.5rem; }
@@ -75,6 +83,27 @@
         <span>Shared with {{ ss.shared_with|length }} user{{ 's' if ss.shared_with|length != 1 else '' }}</span>
         {% endif %}
     </div>
+
+    {% if can_edit %}
+    <div class="mode-banner edit">
+        <span class="mode-icon">✎</span>
+        <span>You have edit access. Click any cell to type a value, then press <strong>Save Changes</strong> at the bottom to save your edits.</span>
+    </div>
+    {% elif user %}
+    <div class="mode-banner readonly">
+        <span class="mode-icon">🔒</span>
+        <span>Read-only &mdash; you have view access to this spreadsheet. Only the owner
+            ({{ user_map.get(ss.owner_id, {}).get('name', 'the owner') }}) and people granted edit access can change cells.
+            Ask the owner to share it with you for editing.</span>
+    </div>
+    {% else %}
+    <div class="mode-banner readonly">
+        <span class="mode-icon">🔒</span>
+        <span>Read-only &mdash;
+            <a href="{{ url_for('spreadsheets-slides.login_page', next=request.path) }}">sign in</a>
+            as the owner ({{ user_map.get(ss.owner_id, {}).get('name', 'the owner') }}) or a shared editor to change cells.</span>
+    </div>
+    {% endif %}
 
     {% if ss.sheets|length > 1 %}
     <div class="sheet-tabs">
