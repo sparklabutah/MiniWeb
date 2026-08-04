@@ -129,8 +129,17 @@
                 <a href="{{ url_for('news.category_page', slug=category.slug, sort='date') }}" class="{{ 'active' if sort == 'date' else '' }}">Most Recent</a>
                 <a href="{{ url_for('news.category_page', slug=category.slug, sort='popularity') }}" class="{{ 'active' if sort == 'popularity' else '' }}">Most Discussed</a>
             </div>
+            {% if topics %}
+            <div class="topic-filter" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.9rem 0 .3rem;">
+                <a href="{{ url_for('news.category_page', slug=category.slug, sort=sort) }}" style="padding:.28rem .75rem;border-radius:1rem;font-size:.82rem;text-decoration:none;border:1px solid #d1d5db;{% if not active_topic %}background:#0E7490;color:#fff;border-color:#0E7490;{% else %}color:#374151;background:#fff;{% endif %}">All Topics</a>
+                {% for t in topics %}
+                <a href="{{ url_for('news.category_page', slug=category.slug, sort=sort, topic=t.slug) }}" style="padding:.28rem .75rem;border-radius:1rem;font-size:.82rem;text-decoration:none;border:1px solid #d1d5db;{% if active_topic == t.slug %}background:#0E7490;color:#fff;border-color:#0E7490;{% else %}color:#374151;background:#fff;{% endif %}">{{ t.name }} <span style="opacity:.65;">{{ t.count }}</span></a>
+                {% endfor %}
+            </div>
+            {% endif %}
             <form class="date-filter" action="{{ url_for('news.category_page', slug=category.slug) }}" method="get">
                 <input type="hidden" name="sort" value="{{ sort }}">
+                <input type="hidden" name="topic" value="{{ active_topic }}">
                 <label for="date_from">From</label>
                 <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
                 <label for="date_to">To</label>
@@ -148,7 +157,7 @@
                 <div class="article-list">
                     {% for article in articles %}
                     <div class="article-item">
-                        <div class="article-num">{{ loop.index }}</div>
+                        <div class="article-num">{{ (page - 1) * 24 + loop.index }}</div>
                         <div class="article-info">
                             <h3><a href="{{ url_for('news.article_detail', article_id=article.id) }}">{{ article.title }}</a></h3>
                             <div class="meta">
@@ -168,6 +177,14 @@
                 {% else %}
                 <div class="no-results">
                     <p>No articles found in this category.</p>
+                </div>
+                {% endif %}
+
+                {% if pages > 1 %}
+                <div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1.5rem 0 .5rem;flex-wrap:wrap;">
+                    {% if page > 1 %}<a href="{{ url_for('news.category_page', slug=category.slug, sort=sort, topic=active_topic or none, date_from=date_from or none, date_to=date_to or none, page=page-1) }}" style="padding:.4rem .9rem;border:1px solid #d1d5db;border-radius:.35rem;text-decoration:none;color:#0E7490;font-size:.85rem;">&laquo; Prev</a>{% endif %}
+                    <span style="font-size:.85rem;color:#6b7280;">Page {{ page }} of {{ "{:,}".format(pages) }} &middot; {{ "{:,}".format(total) }} articles</span>
+                    {% if page < pages %}<a href="{{ url_for('news.category_page', slug=category.slug, sort=sort, topic=active_topic or none, date_from=date_from or none, date_to=date_to or none, page=page+1) }}" style="padding:.4rem .9rem;border:1px solid #d1d5db;border-radius:.35rem;text-decoration:none;color:#0E7490;font-size:.85rem;">Next &raquo;</a>{% endif %}
                 </div>
                 {% endif %}
             </main>

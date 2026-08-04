@@ -18,10 +18,12 @@ TABLES = {
             ("image_url", "TEXT NOT NULL DEFAULT ''"),
             ("word_count", "INTEGER NOT NULL DEFAULT 0"),
             ("comments_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("subcategory", "TEXT NOT NULL DEFAULT ''"),
         ],
         "indexes": [
             "category",
             "date",
+            "subcategory",
         ],
     },
     "bookmarks": {

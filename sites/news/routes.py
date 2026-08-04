@@ -214,6 +214,21 @@ def article_detail(article_id):
                            comments=article_comments)
 
 
+WORLD_TOPICS = {
+    "politics": "Politics & Government",
+    "conflict": "Conflict & Security",
+    "law_crime": "Law & Crime",
+    "business": "Business & Economy",
+    "science_tech": "Science & Technology",
+    "health": "Health",
+    "environment": "Environment & Disasters",
+    "sports": "Sports",
+    "culture": "Culture & Media",
+    "general": "General",
+}
+_CATEGORY_PER_PAGE = 24
+
+
 @blueprint.route("/category/<slug>")
 def category_page(slug):
     categories = _load_categories()
@@ -224,16 +239,58 @@ def category_page(slug):
         abort(404)
 
     sort_by = request.args.get("sort", "date")
-    date_from = request.args.get("date_from", "").strip()
-    date_to = request.args.get("date_to", "").strip()
     sort_map = {"popularity": "-comments_count", "title": "title"}
     sql_sort = sort_map.get(sort_by, "-date")
-    filtered = _load_articles(where={"category": slug}, sort=sql_sort, limit=50)
-    # Date range filter on the already-limited result set (same as api_articles)
+
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+
+    # Sub-topic filter (World News is further categorised so ~19k articles are
+    # browsable instead of a flat 50-item dump). Everything is filtered/paged at
+    # the SQL level so all articles are reachable.
+    topic = request.args.get("topic", "").strip()
+    table = db.get_table_name(SITE, "articles")
+    clauses, params = ["[category] = ?"], [slug]
+    if slug == "world" and topic in WORLD_TOPICS:
+        clauses.append("[subcategory] = ?"); params.append(topic)
+    else:
+        topic = ""
     if date_from:
-        filtered = [a for a in filtered if a.get("date", "") >= date_from]
+        clauses.append("[date] >= ?"); params.append(date_from)
     if date_to:
-        filtered = [a for a in filtered if a.get("date", "") <= date_to]
+        clauses.append("[date] <= ?"); params.append(date_to)
+    where_sql = " AND ".join(clauses)
+    order_sql = {"popularity": "[comments_count] DESC", "title": "[title] ASC"}.get(
+        sort_by, "[date] DESC")
+
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except (ValueError, TypeError):
+        page = 1
+    total = db.execute(f"SELECT COUNT(*) FROM [{table}] WHERE {where_sql}",
+                       tuple(params), fetch="val") or 0
+    pages = max(1, (total + _CATEGORY_PER_PAGE - 1) // _CATEGORY_PER_PAGE)
+    page = min(page, pages)
+    filtered = [dict(r) for r in db.execute(
+        f"SELECT * FROM [{table}] WHERE {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",
+        tuple(params) + (_CATEGORY_PER_PAGE, (page - 1) * _CATEGORY_PER_PAGE))]
+    for a in filtered:
+        if isinstance(a.get("tags"), str):
+            try:
+                a["tags"] = json.loads(a["tags"])
+            except (json.JSONDecodeError, TypeError):
+                a["tags"] = []
+
+    # Topic chips with real counts (World News only).
+    topics = []
+    if slug == "world":
+        rows = db.execute(
+            f"SELECT subcategory, COUNT(*) AS c FROM [{table}] "
+            f"WHERE category='world' AND subcategory<>'' "
+            f"GROUP BY subcategory ORDER BY c DESC")
+        topics = [{"slug": r["subcategory"],
+                   "name": WORLD_TOPICS.get(r["subcategory"], r["subcategory"].title()),
+                   "count": r["c"]} for r in rows]
 
     bookmarked_ids = set()
     if user:
@@ -244,7 +301,9 @@ def category_page(slug):
                            category=category, articles=filtered,
                            categories=categories, user=user,
                            sort=sort_by, bookmarked_ids=bookmarked_ids,
-                           date_from=date_from, date_to=date_to)
+                           date_from=date_from, date_to=date_to,
+                           topics=topics, active_topic=topic,
+                           page=page, pages=pages, total=total)
 
 
 @blueprint.route("/search")
