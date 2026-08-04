@@ -100,6 +100,19 @@ def _user_can_edit(doc, user_id):
     return perm in ("owner", "edit")
 
 
+def _accessible_where(uid):
+    """SQL WHERE fragment (and params) limiting rows to docs a user may access.
+
+    Access = the user owns the doc OR is listed in the collaborators JSON.
+    Returns (sql_fragment, params). If uid is None nothing is accessible.
+    """
+    if uid is None:
+        return "0", []
+    frag = ("(owner_id = ? OR EXISTS (SELECT 1 FROM json_each(collaborators) je "
+            "WHERE json_extract(je.value, '$.user_id') = ?))")
+    return frag, [uid, uid]
+
+
 # ---------------------------------------------------------------------------
 # Search helper
 # ---------------------------------------------------------------------------
@@ -124,7 +137,6 @@ def _search_documents(docs, query):
 def index():
     """Dashboard / document list showing all non-trashed documents."""
     user = _current_user()
-    docs = _load_documents()
     folders = _load_folders()
     users = _load_users()
     user_map = {u["id"]: u for u in users}
@@ -133,37 +145,67 @@ def index():
     folder_filter = request.args.get("folder_id", "", type=str).strip()
     owner_filter = request.args.get("owner_id", "", type=str).strip()
 
-    # Filter out trashed documents
-    visible = [d for d in docs if not d.get("is_trashed", False)]
+    uid = user["id"] if user else None
+
+    # Only documents the current user owns or has been shared with are listed.
+    access_frag, params = _accessible_where(uid)
+    where = ["is_trashed = 0", access_frag]
 
     if q:
-        visible = _search_documents(visible, q)
+        where.append("(LOWER(title) LIKE ? OR LOWER(content) LIKE ?)")
+        like = f"%{q.lower()}%"
+        params += [like, like]
 
+    fid = oid = None
     if folder_filter:
         try:
             fid = int(folder_filter)
-            visible = [d for d in visible if d.get("folder_id") == fid]
+            where.append("folder_id = ?")
+            params.append(fid)
         except ValueError:
             pass
-
     if owner_filter:
         try:
             oid = int(owner_filter)
-            visible = [d for d in visible if d["owner_id"] == oid]
+            where.append("owner_id = ?")
+            params.append(oid)
         except ValueError:
             pass
 
-    # Sorting
-    if sort == "title":
-        visible.sort(key=lambda d: d["title"].lower())
-    elif sort == "created":
-        visible.sort(key=lambda d: d.get("created_at", ""), reverse=True)
-    elif sort == "name_asc":
-        visible.sort(key=lambda d: d["title"].lower())
-    elif sort == "name_desc":
-        visible.sort(key=lambda d: d["title"].lower(), reverse=True)
-    else:  # "updated" default
-        visible.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+    # Sorting (last-modified DESC by default so recently edited docs float up).
+    order_sql, order_key = {
+        "title": ("LOWER(title) ASC", "title"),
+        "name_asc": ("LOWER(title) ASC", "title"),
+        "name_desc": ("LOWER(title) DESC", "-title"),
+        "created": ("created_at DESC", "-created_at"),
+    }.get(sort, ("updated_at DESC", "-updated_at"))
+
+    sql = (f"SELECT * FROM documents_documents WHERE {' AND '.join(where)} "
+           f"ORDER BY {order_sql} LIMIT 500")
+    base_rows = db.execute(sql, tuple(params))
+
+    # Merge this session's overlay edits, mirroring the SQL WHERE so a doc the
+    # user just renamed/edited re-sorts correctly (floats to the top).
+    ql = q.lower()
+
+    def _match(d):
+        if d.get("is_trashed"):
+            return False
+        if uid is None or not _user_can_access(d, uid):
+            return False
+        if q:
+            title = str(d.get("title", "")).lower()
+            content = str(d.get("content", "")).lower()
+            if ql not in title and ql not in content:
+                return False
+        if fid is not None and d.get("folder_id") != fid:
+            return False
+        if oid is not None and d.get("owner_id") != oid:
+            return False
+        return True
+
+    visible = db.merge_overlay(SITE, "documents", base_rows,
+                               match=_match, sort=order_key, limit=500)
 
     return render_template("documents/index.html",
                            documents=visible, folders=folders, user=user,
@@ -179,6 +221,8 @@ def editor(doc_id):
     if doc is None:
         abort(404)
     user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
     users = _load_users()
     user_map = {u["id"]: u for u in users}
     revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
@@ -198,6 +242,8 @@ def view_doc(doc_id):
     if doc is None:
         abort(404)
     user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
     users = _load_users()
     user_map = {u["id"]: u for u in users}
     revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
@@ -216,11 +262,20 @@ def folder_view(folder_id):
     if folder is None:
         abort(404)
     user = _current_user()
-    docs = _load_documents()
-    folder_docs = [d for d in docs if d.get("folder_id") == folder_id
-                   and not d.get("is_trashed", False)]
+    uid = user["id"] if user else None
+    access_frag, params = _accessible_where(uid)
+    base_rows = db.execute(
+        f"SELECT * FROM documents_documents WHERE is_trashed = 0 AND folder_id = ? "
+        f"AND {access_frag} ORDER BY updated_at DESC LIMIT 500",
+        tuple([folder_id] + params))
 
-    folder_docs.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+    def _match(d):
+        return (not d.get("is_trashed")
+                and d.get("folder_id") == folder_id
+                and uid is not None and _user_can_access(d, uid))
+
+    folder_docs = db.merge_overlay(SITE, "documents", base_rows,
+                                   match=_match, sort="-updated_at", limit=500)
     users = _load_users()
     user_map = {u["id"]: u for u in users}
 
