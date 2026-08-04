@@ -23,6 +23,9 @@
         .btn-save:hover { background: #6d28d9; }
         .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #52525b; }
         .btn-ghost:hover { border-color: #7c3aed; color: #7c3aed; }
+        .save-toast { position: fixed; top: 58px; right: 16px; background: #16a34a; color: #fff; padding: .5rem .9rem; border-radius: .4rem; font-size: .8rem; z-index: 100; opacity: 0; transform: translateY(-8px); transition: all .2s; pointer-events: none; }
+        .save-toast.show { opacity: 1; transform: translateY(0); }
+        .save-toast.err { background: #dc2626; }
 
         /* Main layout */
         .editor-layout { display: flex; height: calc(100vh - 48px); }
@@ -40,6 +43,8 @@
         .side-panel-header { padding: .7rem .8rem; font-size: .85rem; font-weight: 600; color: #d4d4d8; border-bottom: 1px solid #3f3f46; display: flex; align-items: center; justify-content: space-between; }
         .side-panel-header input { flex: 1; margin-left: .5rem; padding: .3rem .5rem; border: 1px solid #3f3f46; border-radius: .3rem; background: #1e1e1e; color: #e4e4e7; font-size: .8rem; }
         .side-panel-header input:focus { outline: none; border-color: #7c3aed; }
+        .side-hint { padding: .6rem .8rem; font-size: .72rem; color: #71717a; line-height: 1.5; border-bottom: 1px solid #3f3f46; }
+        .side-hint kbd { background: #1e1e1e; border: 1px solid #3f3f46; border-radius: .2rem; padding: 0 .3rem; font-size: .7rem; }
         .asset-list { overflow-y: auto; flex: 1; padding: .5rem; }
         .asset-item { padding: .5rem; border-radius: .4rem; cursor: pointer; display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #d4d4d8; transition: background .1s; margin-bottom: .2rem; }
         .asset-item:hover { background: #3f3f46; }
@@ -55,23 +60,42 @@
 
         /* Canvas area */
         .canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; background: #18181b; overflow: auto; position: relative; }
-        .canvas-container { position: relative; background: #ffffff; box-shadow: 0 4px 40px rgba(0,0,0,.4); }
-        .canvas-element { position: absolute; cursor: move; display: flex; align-items: center; justify-content: center; font-size: .8rem; border: 2px solid transparent; transition: border-color .1s; }
-        .canvas-element:hover { border-color: #7c3aed; }
-        .canvas-element.selected { border-color: #7c3aed; }
-        .el-text { color: #1a1a2e; background: rgba(124, 58, 237, .08); }
-        .el-shape { background: rgba(236, 72, 153, .25); }
-        .el-image { background: rgba(14, 165, 233, .15); border: 1px dashed #0ea5e9; }
-        .empty-canvas-msg { position: absolute; color: #71717a; font-size: .95rem; pointer-events: none; }
+        .canvas-container { position: relative; background: #ffffff; box-shadow: 0 4px 40px rgba(0,0,0,.4); user-select: none; }
+        .canvas-element { position: absolute; display: flex; align-items: center; justify-content: center; cursor: move; overflow: hidden; }
+        .canvas-element.el-text { color: #1a1a2e; text-align: left; align-items: flex-start; justify-content: flex-start; padding: 2px 4px; line-height: 1.2; }
+        .canvas-element.el-image { background: rgba(14, 165, 233, .12); border: 1px dashed #0ea5e9; color: #0ea5e9; font-size: .7rem; }
+        .empty-canvas-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #9ca3af; font-size: .95rem; pointer-events: none; text-align: center; }
+
+        /* Line svg layer */
+        .line-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+        .line-layer line { pointer-events: stroke; cursor: move; }
+
+        /* Selection overlay + handles */
+        .sel-overlay { position: absolute; border: 1.5px solid #7c3aed; pointer-events: none; z-index: 50; box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
+        .handle { position: absolute; width: 10px; height: 10px; background: #fff; border: 1.5px solid #7c3aed; border-radius: 2px; pointer-events: auto; z-index: 51; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+        .handle.h-nw { cursor: nwse-resize; }
+        .handle.h-ne { cursor: nesw-resize; }
+        .handle.h-sw { cursor: nesw-resize; }
+        .handle.h-se { cursor: nwse-resize; }
+        .handle.h-n  { cursor: ns-resize; }
+        .handle.h-s  { cursor: ns-resize; }
+        .handle.h-w  { cursor: ew-resize; }
+        .handle.h-e  { cursor: ew-resize; }
+        .handle.h-endpoint { border-radius: 50%; background: #7c3aed; border-color: #fff; cursor: grab; }
 
         /* Right panel (properties + layers) */
         .props-panel { width: 250px; background: #27272a; border-left: 1px solid #3f3f46; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
         .props-section { padding: .8rem; border-bottom: 1px solid #3f3f46; }
         .props-section h4 { font-size: .8rem; color: #a1a1aa; text-transform: uppercase; letter-spacing: .5px; margin-bottom: .6rem; }
         .prop-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; font-size: .8rem; }
-        .prop-label { color: #71717a; width: 50px; flex-shrink: 0; }
-        .prop-input { flex: 1; padding: .3rem .4rem; background: #1e1e1e; border: 1px solid #3f3f46; border-radius: .25rem; color: #e4e4e7; font-size: .8rem; }
+        .prop-label { color: #71717a; width: 62px; flex-shrink: 0; }
+        .prop-input { flex: 1; min-width: 0; padding: .3rem .4rem; background: #1e1e1e; border: 1px solid #3f3f46; border-radius: .25rem; color: #e4e4e7; font-size: .8rem; }
         .prop-input:focus { outline: none; border-color: #7c3aed; }
+        input[type=color].prop-input { height: 28px; padding: 2px; }
+        .prop-hidden { display: none !important; }
+        .props-empty { color: #52525b; font-size: .8rem; padding: .3rem 0; }
+        .btn-delete { width: 100%; margin-top: .3rem; padding: .4rem; background: transparent; color: #f87171; border: 1px solid #7f1d1d; border-radius: .3rem; cursor: pointer; font-size: .78rem; }
+        .btn-delete:hover { background: #7f1d1d; color: #fff; }
 
         /* Layers */
         .layers-list { list-style: none; }
@@ -82,6 +106,7 @@
         .li-text { background: #7c3aed; }
         .li-shape { background: #ec4899; }
         .li-image { background: #0ea5e9; }
+        .li-line { background: #a1a1aa; }
         .layer-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .layer-idx { font-size: .7rem; color: #52525b; }
         .no-layers { color: #52525b; font-size: .8rem; text-align: center; padding: 1rem .5rem; }
@@ -98,40 +123,38 @@
         <div class="topbar-right">
             <span class="dims-label">{{ project.dimensions }}</span>
             <a href="{{ url_for('design-creative.project_detail', project_id=project.id) }}" class="btn-sm btn-ghost">Details</a>
-            <form method="post" action="{{ url_for('design-creative.form_update_project', project_id=project.id) }}" style="display:inline">
-                <input type="hidden" name="title" value="{{ project.title }}">
-                <button type="submit" class="btn-sm btn-save">Save</button>
-            </form>
+            <button type="button" id="save-btn" class="btn-sm btn-save">Save</button>
         </div>
     </div>
+    <div class="save-toast" id="save-toast">Saved</div>
 
     <div class="editor-layout">
         <!-- Left Toolbar -->
         <div class="toolbar">
-            <button class="tool-btn active" title="Select" data-tool="select">
+            <button class="tool-btn active" title="Select / Move" data-tool="select">
                 <span class="tool-icon">&#9654;</span>
                 <span>Select</span>
             </button>
-            <button class="tool-btn" title="Text" data-tool="text">
+            <button class="tool-btn" title="Add Text" data-tool="text">
                 <span class="tool-icon">T</span>
                 <span>Text</span>
             </button>
-            <button class="tool-btn" title="Shape" data-tool="shape">
+            <button class="tool-btn" title="Add Rectangle" data-tool="rectangle">
                 <span class="tool-icon">&#9632;</span>
-                <span>Shape</span>
+                <span>Rect</span>
             </button>
-            <button class="tool-btn" title="Image" data-tool="image">
+            <button class="tool-btn" title="Add Ellipse" data-tool="circle">
+                <span class="tool-icon">&#9679;</span>
+                <span>Circle</span>
+            </button>
+            <button class="tool-btn" title="Add Image" data-tool="image">
                 <span class="tool-icon">&#9638;</span>
                 <span>Image</span>
             </button>
             <div class="tool-divider"></div>
-            <button class="tool-btn" title="Line" data-tool="line">
+            <button class="tool-btn" title="Add Line" data-tool="line">
                 <span class="tool-icon">/</span>
                 <span>Line</span>
-            </button>
-            <button class="tool-btn" title="Frame" data-tool="frame">
-                <span class="tool-icon">&#9633;</span>
-                <span>Frame</span>
             </button>
         </div>
 
@@ -140,6 +163,9 @@
             <div class="side-panel-header">
                 <span>Assets</span>
                 <input type="text" placeholder="Search assets..." id="asset-search">
+            </div>
+            <div class="side-hint">
+                Click a tool above to add an element. Drag elements to move; drag the corner <b>handles</b> to resize. Line endpoints are draggable. Press <kbd>Del</kbd> to remove the selection.
             </div>
             <div class="asset-list" id="asset-list">
                 {% if assets %}
@@ -161,7 +187,7 @@
         </div>
 
         <!-- Canvas Area -->
-        <div class="canvas-area">
+        <div class="canvas-area" id="canvas-area">
             {% set dims = project.dimensions.split('x') %}
             {% set w = dims[0]|int %}
             {% set h = dims[1]|int %}
@@ -173,24 +199,14 @@
             {% if scale > 1 %}{% set scale = 1 %}{% endif %}
             {% set cw = (w * scale)|int %}
             {% set ch = (h * scale)|int %}
-            <div class="canvas-container" id="canvas" style="width: {{ cw }}px; height: {{ ch }}px;" data-scale="{{ scale }}" data-project-id="{{ project.id }}">
-                {% if project.elements %}
-                    {% for el in project.elements %}
-                    {% set props = el.get('properties', {}) %}
-                    <div class="canvas-element el-{{ el.type }}"
-                         data-index="{{ loop.index0 }}"
-                         style="left: {{ ((props.get('x', 0)) * scale)|int }}px;
-                                top: {{ ((props.get('y', 0)) * scale)|int }}px;
-                                width: {{ ((props.get('width', 120)) * scale)|int }}px;
-                                height: {{ ((props.get('height', 40)) * scale)|int }}px;
-                                {% if props.get('color') %}background: {{ props.color }};{% endif %}
-                                {% if props.get('fontSize') %}font-size: {{ (props.fontSize * scale)|int }}px;{% endif %}">
-                        {% if el.type == 'text' %}{{ props.get('text', 'Text') }}{% elif el.type == 'image' %}IMG{% else %}{{ el.type[:4]|upper }}{% endif %}
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-canvas-msg">Click a tool on the left to add elements</div>
-                {% endif %}
+            <div class="canvas-container" id="canvas"
+                 style="width: {{ cw }}px; height: {{ ch }}px;"
+                 data-scale="{{ scale }}"
+                 data-design-w="{{ w }}"
+                 data-design-h="{{ h }}"
+                 data-project-id="{{ project.id }}">
+                <svg class="line-layer" id="line-layer"></svg>
+                <div class="empty-canvas-msg" id="empty-msg">Click a tool on the left to add elements</div>
             </div>
         </div>
 
@@ -198,249 +214,520 @@
         <div class="props-panel">
             <div class="props-section">
                 <h4>Properties</h4>
-                <div class="prop-row">
-                    <span class="prop-label">X</span>
-                    <input type="number" class="prop-input" id="prop-x" value="0">
-                </div>
-                <div class="prop-row">
-                    <span class="prop-label">Y</span>
-                    <input type="number" class="prop-input" id="prop-y" value="0">
-                </div>
-                <div class="prop-row">
-                    <span class="prop-label">W</span>
-                    <input type="number" class="prop-input" id="prop-w" value="120">
-                </div>
-                <div class="prop-row">
-                    <span class="prop-label">H</span>
-                    <input type="number" class="prop-input" id="prop-h" value="40">
-                </div>
-                <div class="prop-row">
-                    <span class="prop-label">Color</span>
-                    <input type="color" class="prop-input" id="prop-color" value="#7c3aed" style="height:28px;padding:2px;">
+                <div class="props-empty" id="props-empty">No element selected.</div>
+                <div id="props-body" class="prop-hidden">
+                    <div class="prop-row" data-for="pos"><span class="prop-label">X</span>
+                        <input type="number" class="prop-input" id="prop-x" value="0"></div>
+                    <div class="prop-row" data-for="pos"><span class="prop-label">Y</span>
+                        <input type="number" class="prop-input" id="prop-y" value="0"></div>
+                    <div class="prop-row" data-for="size"><span class="prop-label">Width</span>
+                        <input type="number" class="prop-input" id="prop-w" value="120"></div>
+                    <div class="prop-row" data-for="size"><span class="prop-label">Height</span>
+                        <input type="number" class="prop-input" id="prop-h" value="40"></div>
+                    <div class="prop-row" data-for="endpoints"><span class="prop-label">X2</span>
+                        <input type="number" class="prop-input" id="prop-x2" value="0"></div>
+                    <div class="prop-row" data-for="endpoints"><span class="prop-label">Y2</span>
+                        <input type="number" class="prop-input" id="prop-y2" value="0"></div>
+                    <div class="prop-row" data-for="text"><span class="prop-label">Text</span>
+                        <input type="text" class="prop-input" id="prop-text" value=""></div>
+                    <div class="prop-row" data-for="text"><span class="prop-label">Font</span>
+                        <select class="prop-input" id="prop-font">
+                            <option>Inter</option><option>Montserrat Bold</option><option>Poppins Semibold</option>
+                            <option>Playfair Display</option><option>Bebas Neue</option><option>Roboto Condensed</option>
+                            <option>Merriweather</option><option>Lora</option><option>Raleway</option><option>Source Sans Pro</option>
+                        </select></div>
+                    <div class="prop-row" data-for="text"><span class="prop-label">Font size</span>
+                        <input type="number" class="prop-input" id="prop-size" value="24" min="4" max="400"></div>
+                    <div class="prop-row" data-for="fill"><span class="prop-label" id="fill-label">Fill</span>
+                        <input type="color" class="prop-input" id="prop-fill" value="#7c3aed"></div>
+                    <div class="prop-row" data-for="stroke"><span class="prop-label">Stroke</span>
+                        <input type="color" class="prop-input" id="prop-stroke" value="#a1a1aa"></div>
+                    <div class="prop-row" data-for="stroke"><span class="prop-label">Weight</span>
+                        <input type="number" class="prop-input" id="prop-strokew" value="3" min="1" max="80"></div>
+                    <button type="button" class="btn-delete" id="prop-delete">Delete element</button>
                 </div>
             </div>
 
             <div class="props-section">
                 <h4>Layers</h4>
-                {% if project.elements %}
-                <ul class="layers-list">
-                    {% for el in project.elements|reverse %}
-                    {% set idx = project.elements|length - loop.index %}
-                    <li class="layer-item" data-index="{{ idx }}">
-                        <div class="layer-icon li-{{ el.type }}">{{ el.type[:1]|upper }}</div>
-                        <span class="layer-name">
-                            {% if el.type == 'text' %}{{ el.get('properties', {}).get('text', 'Text')[:20] }}{% else %}{{ el.type|capitalize }} {{ idx + 1 }}{% endif %}
-                        </span>
-                        <span class="layer-idx">#{{ idx }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="no-layers">No layers yet. Add elements using the toolbar.</div>
-                {% endif %}
+                <ul class="layers-list" id="layers-list"></ul>
+                <div class="no-layers" id="no-layers">No layers yet. Add elements using the toolbar.</div>
             </div>
         </div>
     </div>
 
+    <script id="init-elements" type="application/json">{{ project.elements|tojson }}</script>
     <script>
-    // Tool selection
-    document.querySelectorAll('.tool-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            // beacon handles tracking via recorder.js
-        });
-    });
+    (function () {
+        "use strict";
+        var canvas    = document.getElementById('canvas');
+        var lineLayer = document.getElementById('line-layer');
+        var canvasArea= document.getElementById('canvas-area');
+        var SCALE     = parseFloat(canvas.dataset.scale || '1') || 1;
+        var DESIGN_W  = parseInt(canvas.dataset.designW, 10) || 500;
+        var DESIGN_H  = parseInt(canvas.dataset.designH, 10) || 500;
+        var PROJECT_ID= canvas.dataset.projectId;
 
-    // Element selection on canvas
-    document.querySelectorAll('.canvas-element').forEach(function(el) {
-        el.addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.querySelectorAll('.canvas-element').forEach(function(e) { e.classList.remove('selected'); });
-            el.classList.add('selected');
-            // Highlight matching layer
-            var idx = el.dataset.index;
-            document.querySelectorAll('.layer-item').forEach(function(li) {
-                li.classList.toggle('selected', li.dataset.index === idx);
+        lineLayer.setAttribute('viewBox', '0 0 ' + DESIGN_W + ' ' + DESIGN_H);
+        lineLayer.setAttribute('preserveAspectRatio', 'none');
+
+        // ---- State: array of elements in DESIGN units -----------------
+        var elements = [];     // {id,type,x,y,width,height,x2,y2,text,font,size,fill,stroke,strokeWidth,shape,src}
+        var nextId   = 1;
+        var selectedId = null;
+        var currentTool = 'select';
+
+        function toDesign(px) { return px / SCALE; }
+
+        // ---- Normalize incoming saved elements ------------------------
+        function loadInitial() {
+            var raw = [];
+            try { raw = JSON.parse(document.getElementById('init-elements').textContent) || []; }
+            catch (e) { raw = []; }
+            raw.forEach(function (el) {
+                var p = el.properties || {};
+                var t = el.type;
+                if (t === 'text') {
+                    var size = p.size || p.fontSize || 24;
+                    elements.push({
+                        id: nextId++, type: 'text',
+                        x: p.x || 0, y: p.y || 0,
+                        width: p.width || Math.max(80, (p.text || 'Text').length * size * 0.55),
+                        height: p.height || Math.round(size * 1.4),
+                        text: p.text != null ? p.text : 'Text',
+                        font: p.font || 'Inter',
+                        size: size,
+                        fill: p.color || p.fill || '#1a1a2e'
+                    });
+                } else if (t === 'shape') {
+                    var shape = p.shape || 'rectangle';
+                    var w = p.width, h = p.height;
+                    if ((w == null || h == null) && p.radius != null) { w = h = p.radius * 2; }
+                    elements.push({
+                        id: nextId++, type: 'shape', shape: shape,
+                        x: p.x || 0, y: p.y || 0,
+                        width: w || 120, height: h || 80,
+                        fill: p.fill || p.color || '#ec4899'
+                    });
+                } else if (t === 'image') {
+                    elements.push({
+                        id: nextId++, type: 'image',
+                        x: p.x || 0, y: p.y || 0,
+                        width: p.width || 160, height: p.height || 110,
+                        src: p.src || ''
+                    });
+                } else if (t === 'line') {
+                    elements.push({
+                        id: nextId++, type: 'line',
+                        x: p.x || 0, y: p.y || 0,
+                        x2: (p.x2 != null ? p.x2 : (p.x || 0) + 160),
+                        y2: (p.y2 != null ? p.y2 : (p.y || 0)),
+                        stroke: p.stroke || p.color || '#a1a1aa',
+                        strokeWidth: p.strokeWidth || 3
+                    });
+                }
             });
-        });
-    });
+        }
 
-    // Layer click selects element
-    document.querySelectorAll('.layer-item').forEach(function(li) {
-        li.addEventListener('click', function() {
-            document.querySelectorAll('.layer-item').forEach(function(l) { l.classList.remove('selected'); });
-            li.classList.add('selected');
-            var idx = li.dataset.index;
-            document.querySelectorAll('.canvas-element').forEach(function(el) {
-                el.classList.toggle('selected', el.dataset.index === idx);
+        // ---- Serialize back to saved schema ---------------------------
+        function serialize() {
+            return elements.map(function (e) {
+                if (e.type === 'text') {
+                    return { type: 'text', properties: {
+                        text: e.text, x: Math.round(e.x), y: Math.round(e.y),
+                        width: Math.round(e.width), height: Math.round(e.height),
+                        font: e.font, size: Math.round(e.size), color: e.fill } };
+                }
+                if (e.type === 'shape') {
+                    var props = { shape: e.shape, x: Math.round(e.x), y: Math.round(e.y),
+                        width: Math.round(e.width), height: Math.round(e.height), fill: e.fill };
+                    if (e.shape === 'circle') { props.radius = Math.round(e.width / 2); }
+                    return { type: 'shape', properties: props };
+                }
+                if (e.type === 'image') {
+                    return { type: 'image', properties: {
+                        src: e.src, x: Math.round(e.x), y: Math.round(e.y),
+                        width: Math.round(e.width), height: Math.round(e.height) } };
+                }
+                return { type: 'line', properties: {
+                    x: Math.round(e.x), y: Math.round(e.y),
+                    x2: Math.round(e.x2), y2: Math.round(e.y2),
+                    stroke: e.stroke, strokeWidth: Math.round(e.strokeWidth) } };
             });
-        });
-    });
+        }
 
-    // Asset search filter
-    var searchInput = document.getElementById('asset-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            var q = this.value.toLowerCase();
-            document.querySelectorAll('.asset-item').forEach(function(item) {
-                var name = (item.dataset.name || '').toLowerCase();
-                var type = (item.dataset.type || '').toLowerCase();
-                item.style.display = (name.includes(q) || type.includes(q)) ? '' : 'none';
+        // ---- Rendering -------------------------------------------------
+        function elById(id) { for (var i=0;i<elements.length;i++) if (elements[i].id===id) return elements[i]; return null; }
+        function shortSrc(s) { var parts = String(s).split('/'); return parts[parts.length - 1]; }
+
+        function render() {
+            // Clear rendered nodes (keep svg + empty-msg)
+            Array.prototype.slice.call(canvas.querySelectorAll('.canvas-element,.sel-overlay')).forEach(function (n) { n.remove(); });
+            while (lineLayer.firstChild) lineLayer.removeChild(lineLayer.firstChild);
+
+            document.getElementById('empty-msg').style.display = elements.length ? 'none' : '';
+
+            elements.forEach(function (e) {
+                if (e.type === 'line') { renderLine(e); }
+                else { renderBox(e); }
             });
-        });
-    }
+            renderSelectionOverlay();
+            renderLayers();
+            renderProps();
+        }
 
-    // --- Interactive Canvas: add shapes, text, lines on click ---
-    var currentTool = 'select';
-    var canvas = document.getElementById('canvas');
-    var scale = parseFloat(canvas.dataset.scale || 1);
-    var elementCounter = document.querySelectorAll('.canvas-element').length;
-
-    document.querySelectorAll('.tool-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            currentTool = btn.dataset.tool || 'select';
-        });
-    });
-
-    if (canvas) {
-        // Remove empty canvas message on first add
-        canvas.addEventListener('click', function(e) {
-            if (currentTool === 'select') return;
-            var rect = canvas.getBoundingClientRect();
-            var x = Math.round((e.clientX - rect.left));
-            var y = Math.round((e.clientY - rect.top));
-            var el = null;
-
-            if (currentTool === 'text') {
-                var text = prompt('Enter text:', 'Hello World');
-                if (!text) return;
-                el = document.createElement('div');
-                el.className = 'canvas-element el-text selected';
-                el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:200px;height:40px;font-size:16px;display:flex;align-items:center;padding:4px 8px;cursor:move;';
-                el.textContent = text;
-                el.contentEditable = 'true';
-            } else if (currentTool === 'shape') {
-                el = document.createElement('div');
-                el.className = 'canvas-element el-shape selected';
-                var color = document.getElementById('prop-color').value || '#7c3aed';
-                el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:120px;height:80px;background:'+color+';border-radius:4px;cursor:move;';
-            } else if (currentTool === 'line') {
-                el = document.createElement('div');
-                el.className = 'canvas-element selected';
-                el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:150px;height:3px;background:#a1a1aa;cursor:move;';
-            } else if (currentTool === 'frame') {
-                el = document.createElement('div');
-                el.className = 'canvas-element selected';
-                el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:200px;height:150px;border:2px dashed #7c3aed;background:transparent;cursor:move;';
-            } else if (currentTool === 'image') {
-                el = document.createElement('div');
-                el.className = 'canvas-element el-image selected';
-                el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:150px;height:100px;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#0ea5e9;cursor:move;';
-                el.textContent = 'Image Placeholder';
+        function renderBox(e) {
+            var node = document.createElement('div');
+            node.className = 'canvas-element el-' + e.type;
+            node.dataset.id = e.id;
+            node.style.left   = (e.x * SCALE) + 'px';
+            node.style.top    = (e.y * SCALE) + 'px';
+            node.style.width  = (e.width * SCALE) + 'px';
+            node.style.height = (e.height * SCALE) + 'px';
+            if (e.type === 'text') {
+                node.style.fontSize = (e.size * SCALE) + 'px';
+                node.style.fontFamily = e.font + ', sans-serif';
+                node.style.color = e.fill;
+                node.textContent = e.text;
+            } else if (e.type === 'shape') {
+                node.style.background = e.fill;
+                if (e.shape === 'circle' || e.shape === 'arc') node.style.borderRadius = '50%';
+            } else if (e.type === 'image') {
+                // Render a placeholder box (project image srcs are non-existent
+                // placeholders and CSP blocks remote hosts anyway).
+                node.textContent = e.src ? ('🖼 ' + shortSrc(e.src)) : 'Image';
             }
+            node.addEventListener('mousedown', function (ev) { startDrag(ev, e.id); });
+            canvas.appendChild(node);
+        }
 
-            if (el) {
-                // Remove empty message
-                var msg = canvas.querySelector('.empty-canvas-msg');
-                if (msg) msg.remove();
-                // Deselect others
-                document.querySelectorAll('.canvas-element').forEach(function(e) { e.classList.remove('selected'); });
-                el.dataset.index = elementCounter++;
-                canvas.appendChild(el);
-                // Make draggable
-                makeDraggable(el);
-                // Add layer entry
-                addLayerEntry(el, currentTool);
-                // Update properties panel
-                updateProps(el);
+        function renderLine(e) {
+            var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            ln.setAttribute('x1', e.x);  ln.setAttribute('y1', e.y);
+            ln.setAttribute('x2', e.x2); ln.setAttribute('y2', e.y2);
+            ln.setAttribute('stroke', e.stroke);
+            ln.setAttribute('stroke-width', e.strokeWidth);
+            ln.setAttribute('stroke-linecap', 'round');
+            ln.dataset.id = e.id;
+            ln.addEventListener('mousedown', function (ev) { startDrag(ev, e.id); });
+            lineLayer.appendChild(ln);
+        }
+
+        // ---- Selection overlay + handles ------------------------------
+        var HANDLES = [
+            ['nw',0,0],['n',.5,0],['ne',1,0],
+            ['w',0,.5],['e',1,.5],
+            ['sw',0,1],['s',.5,1],['se',1,1]
+        ];
+
+        function renderSelectionOverlay() {
+            var e = elById(selectedId);
+            if (!e) return;
+            if (e.type === 'line') { renderLineHandles(e); return; }
+            var ov = document.createElement('div');
+            ov.className = 'sel-overlay';
+            var x = e.x * SCALE, y = e.y * SCALE, w = e.width * SCALE, h = e.height * SCALE;
+            ov.style.left = x + 'px'; ov.style.top = y + 'px';
+            ov.style.width = w + 'px'; ov.style.height = h + 'px';
+            HANDLES.forEach(function (hd) {
+                var dot = document.createElement('div');
+                dot.className = 'handle h-' + hd[0];
+                dot.style.left = (hd[1] * w - 5) + 'px';
+                dot.style.top  = (hd[2] * h - 5) + 'px';
+                dot.addEventListener('mousedown', function (ev) { startResize(ev, e.id, hd[0]); });
+                ov.appendChild(dot);
+            });
+            canvas.appendChild(ov);
+        }
+
+        function renderLineHandles(e) {
+            [['a', e.x, e.y], ['b', e.x2, e.y2]].forEach(function (pt) {
+                var dot = document.createElement('div');
+                dot.className = 'handle h-endpoint';
+                dot.style.left = (pt[1] * SCALE - 5) + 'px';
+                dot.style.top  = (pt[2] * SCALE - 5) + 'px';
+                dot.addEventListener('mousedown', function (ev) { startEndpoint(ev, e.id, pt[0]); });
+                canvas.appendChild(dot);
+            });
+        }
+
+        // ---- Interaction: drag / resize / endpoint --------------------
+        function startDrag(ev, id) {
+            ev.preventDefault(); ev.stopPropagation();
+            select(id);
+            var e = elById(id);
+            var sx = ev.clientX, sy = ev.clientY;
+            var ox = e.x, oy = e.y, ox2 = e.x2, oy2 = e.y2;
+            function move(m) {
+                var dx = toDesign(m.clientX - sx), dy = toDesign(m.clientY - sy);
+                e.x = ox + dx; e.y = oy + dy;
+                if (e.type === 'line') { e.x2 = ox2 + dx; e.y2 = oy2 + dy; }
+                render();
             }
-        });
-    }
+            endWith(move);
+        }
 
-    function makeDraggable(el) {
-        var startX, startY, origLeft, origTop;
-        el.addEventListener('mousedown', function(e) {
-            if (currentTool !== 'select' && !el.contentEditable) return;
-            e.stopPropagation();
-            document.querySelectorAll('.canvas-element').forEach(function(e) { e.classList.remove('selected'); });
-            el.classList.add('selected');
-            updateProps(el);
-            startX = e.clientX; startY = e.clientY;
-            origLeft = parseInt(el.style.left) || 0;
-            origTop = parseInt(el.style.top) || 0;
-            function onMove(e) {
-                el.style.left = (origLeft + e.clientX - startX) + 'px';
-                el.style.top = (origTop + e.clientY - startY) + 'px';
+        function startResize(ev, id, dir) {
+            ev.preventDefault(); ev.stopPropagation();
+            var e = elById(id);
+            var sx = ev.clientX, sy = ev.clientY;
+            var ox = e.x, oy = e.y, ow = e.width, oh = e.height;
+            function move(m) {
+                var dx = toDesign(m.clientX - sx), dy = toDesign(m.clientY - sy);
+                var x = ox, y = oy, w = ow, h = oh;
+                if (dir.indexOf('e') > -1) { w = ow + dx; }
+                if (dir.indexOf('s') > -1) { h = oh + dy; }
+                if (dir.indexOf('w') > -1) { w = ow - dx; x = ox + dx; }
+                if (dir.indexOf('n') > -1) { h = oh - dy; y = oy + dy; }
+                if (w < 8) { w = 8; if (dir.indexOf('w') > -1) x = ox + ow - 8; }
+                if (h < 8) { h = 8; if (dir.indexOf('n') > -1) y = oy + oh - 8; }
+                e.x = x; e.y = y; e.width = w; e.height = h;
+                render();
             }
-            function onUp() {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-                updateProps(el);
+            endWith(move);
+        }
+
+        function startEndpoint(ev, id, which) {
+            ev.preventDefault(); ev.stopPropagation();
+            var e = elById(id);
+            var sx = ev.clientX, sy = ev.clientY;
+            var ox = which === 'a' ? e.x : e.x2, oy = which === 'a' ? e.y : e.y2;
+            function move(m) {
+                var nx = ox + toDesign(m.clientX - sx), ny = oy + toDesign(m.clientY - sy);
+                if (which === 'a') { e.x = nx; e.y = ny; } else { e.x2 = nx; e.y2 = ny; }
+                render();
             }
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        });
-        el.addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.querySelectorAll('.canvas-element').forEach(function(e) { e.classList.remove('selected'); });
-            el.classList.add('selected');
-            updateProps(el);
-        });
-    }
+            endWith(move);
+        }
 
-    function updateProps(el) {
-        document.getElementById('prop-x').value = parseInt(el.style.left) || 0;
-        document.getElementById('prop-y').value = parseInt(el.style.top) || 0;
-        document.getElementById('prop-w').value = parseInt(el.style.width) || 120;
-        document.getElementById('prop-h').value = parseInt(el.style.height) || 40;
-        if (el.style.background) document.getElementById('prop-color').value = el.style.background;
-    }
+        function endWith(move) {
+            function up() {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', up);
+            }
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+        }
 
-    function addLayerEntry(el, type) {
-        var list = document.querySelector('.layers-list');
-        if (!list) {
-            var noLayers = document.querySelector('.no-layers');
-            if (noLayers) {
-                list = document.createElement('ul');
-                list.className = 'layers-list';
-                noLayers.parentNode.replaceChild(list, noLayers);
+        // ---- Selection -------------------------------------------------
+        function select(id) { selectedId = id; render(); }
+        function deselect() { selectedId = null; render(); }
+
+        // ---- Add elements ---------------------------------------------
+        function centerX(w) { return Math.max(0, Math.round((DESIGN_W - w) / 2)); }
+        function centerY(h) { return Math.max(0, Math.round((DESIGN_H - h) / 2)); }
+
+        function addElement(tool) {
+            var e;
+            if (tool === 'text') {
+                var size = Math.max(16, Math.round(DESIGN_H * 0.06));
+                e = { id: nextId++, type: 'text', text: 'Double-click to edit',
+                      x: centerX(DESIGN_W*0.5), y: centerY(size*1.4),
+                      width: Math.round(DESIGN_W*0.5), height: Math.round(size*1.4),
+                      font: 'Inter', size: size, fill: '#1a1a2e' };
+            } else if (tool === 'rectangle') {
+                var rw = Math.round(DESIGN_W*0.3), rh = Math.round(DESIGN_H*0.22);
+                e = { id: nextId++, type: 'shape', shape: 'rectangle',
+                      x: centerX(rw), y: centerY(rh), width: rw, height: rh, fill: '#7c3aed' };
+            } else if (tool === 'circle') {
+                var d = Math.round(Math.min(DESIGN_W, DESIGN_H) * 0.3);
+                e = { id: nextId++, type: 'shape', shape: 'circle',
+                      x: centerX(d), y: centerY(d), width: d, height: d, fill: '#ec4899' };
+            } else if (tool === 'image') {
+                var iw = Math.round(DESIGN_W*0.3), ih = Math.round(DESIGN_H*0.24);
+                e = { id: nextId++, type: 'image', x: centerX(iw), y: centerY(ih),
+                      width: iw, height: ih, src: '' };
+            } else if (tool === 'line') {
+                var y = Math.round(DESIGN_H/2);
+                e = { id: nextId++, type: 'line', x: Math.round(DESIGN_W*0.2), y: y,
+                      x2: Math.round(DESIGN_W*0.8), y2: y, stroke: '#a1a1aa', strokeWidth: 3 };
+            } else { return; }
+            elements.push(e);
+            selectedId = e.id;
+            render();
+        }
+
+        function deleteSelected() {
+            if (selectedId == null) return;
+            elements = elements.filter(function (e) { return e.id !== selectedId; });
+            selectedId = null;
+            render();
+        }
+
+        // ---- Layers ----------------------------------------------------
+        function renderLayers() {
+            var list = document.getElementById('layers-list');
+            var none = document.getElementById('no-layers');
+            list.innerHTML = '';
+            if (!elements.length) { none.style.display = ''; return; }
+            none.style.display = 'none';
+            // top layer first
+            for (var i = elements.length - 1; i >= 0; i--) {
+                (function (e, idx) {
+                    var li = document.createElement('li');
+                    li.className = 'layer-item' + (e.id === selectedId ? ' selected' : '');
+                    var typeMap = { text:'T', shape:'S', image:'I', line:'L' };
+                    var colorMap = { text:'li-text', shape:'li-shape', image:'li-image', line:'li-line' };
+                    var name = e.type === 'text' ? (e.text || 'Text').slice(0, 20)
+                             : (e.shape ? e.shape : e.type).charAt(0).toUpperCase() + (e.shape ? e.shape : e.type).slice(1) + ' ' + (idx + 1);
+                    li.innerHTML = '<div class="layer-icon ' + (colorMap[e.type]||'li-text') + '">' + (typeMap[e.type]||'?') + '</div>' +
+                                   '<span class="layer-name"></span><span class="layer-idx">#' + idx + '</span>';
+                    li.querySelector('.layer-name').textContent = name;
+                    li.addEventListener('click', function () { select(e.id); });
+                    list.appendChild(li);
+                })(elements[i], i);
             }
         }
-        if (!list) return;
-        var li = document.createElement('li');
-        li.className = 'layer-item';
-        li.dataset.index = el.dataset.index;
-        var typeMap = {text:'T',shape:'S',line:'L',frame:'F',image:'I'};
-        var colorMap = {text:'li-text',shape:'li-shape',image:'li-image'};
-        li.innerHTML = '<div class="layer-icon '+(colorMap[type]||'li-text')+'">'+(typeMap[type]||'?')+'</div><span class="layer-name">'+type.charAt(0).toUpperCase()+type.slice(1)+' '+el.dataset.index+'</span>';
-        list.insertBefore(li, list.firstChild);
-    }
 
-    // Make existing elements draggable
-    document.querySelectorAll('.canvas-element').forEach(function(el) { makeDraggable(el); });
-
-    // Property inputs update selected element
-    ['prop-x','prop-y','prop-w','prop-h','prop-color'].forEach(function(id) {
-        var input = document.getElementById(id);
-        if (input) input.addEventListener('change', function() {
-            var sel = document.querySelector('.canvas-element.selected');
-            if (!sel) return;
-            if (id === 'prop-x') sel.style.left = input.value + 'px';
-            if (id === 'prop-y') sel.style.top = input.value + 'px';
-            if (id === 'prop-w') sel.style.width = input.value + 'px';
-            if (id === 'prop-h') sel.style.height = input.value + 'px';
-            if (id === 'prop-color') sel.style.background = input.value;
+        // ---- Properties panel -----------------------------------------
+        var propRows = {};
+        Array.prototype.slice.call(document.querySelectorAll('#props-body .prop-row')).forEach(function (r) {
+            var key = r.dataset.for;
+            (propRows[key] = propRows[key] || []).push(r);
         });
-    });
-
-    // Delete selected element with Delete/Backspace key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Delete' || (e.key === 'Backspace' && !e.target.matches('input,textarea,[contenteditable]'))) {
-            var sel = document.querySelector('.canvas-element.selected');
-            if (sel) { sel.remove(); }
+        function showRows(keys) {
+            for (var k in propRows) {
+                var vis = keys.indexOf(k) > -1;
+                propRows[k].forEach(function (r) { r.classList.toggle('prop-hidden', !vis); });
+            }
         }
-    });
+
+        function renderProps() {
+            var e = elById(selectedId);
+            var empty = document.getElementById('props-empty');
+            var body  = document.getElementById('props-body');
+            if (!e) { empty.style.display = ''; body.classList.add('prop-hidden'); return; }
+            empty.style.display = 'none'; body.classList.remove('prop-hidden');
+
+            if (e.type === 'line') {
+                showRows(['pos','endpoints','stroke']);
+                setVal('prop-x', Math.round(e.x)); setVal('prop-y', Math.round(e.y));
+                setVal('prop-x2', Math.round(e.x2)); setVal('prop-y2', Math.round(e.y2));
+                setVal('prop-stroke', toHex(e.stroke)); setVal('prop-strokew', Math.round(e.strokeWidth));
+                return;
+            }
+            var keys = ['pos','size'];
+            if (e.type === 'text') keys.push('text');
+            keys.push('fill');
+            showRows(keys);
+            document.getElementById('fill-label').textContent = e.type === 'text' ? 'Color' : 'Fill';
+            setVal('prop-x', Math.round(e.x)); setVal('prop-y', Math.round(e.y));
+            setVal('prop-w', Math.round(e.width)); setVal('prop-h', Math.round(e.height));
+            setVal('prop-fill', toHex(e.fill));
+            if (e.type === 'text') {
+                setVal('prop-text', e.text);
+                setVal('prop-font', e.font);
+                setVal('prop-size', Math.round(e.size));
+            }
+        }
+        function setVal(id, v) { var el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; }
+        function toHex(c) {
+            if (!c) return '#000000';
+            if (c[0] === '#') { return c.length === 4 ? '#' + c[1]+c[1]+c[2]+c[2]+c[3]+c[3] : c.slice(0,7); }
+            var m = c.match(/\d+/g);
+            if (!m) return '#000000';
+            return '#' + m.slice(0,3).map(function (n) { return ('0'+parseInt(n,10).toString(16)).slice(-2); }).join('');
+        }
+
+        function bindProp(id, apply) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var ev = (el.type === 'color' || el.tagName === 'SELECT') ? 'change' : 'input';
+            el.addEventListener(ev, function () {
+                var e = elById(selectedId); if (!e) return;
+                apply(e, el.value); render();
+            });
+        }
+        bindProp('prop-x',  function (e,v){ e.x = parseFloat(v)||0; });
+        bindProp('prop-y',  function (e,v){ e.y = parseFloat(v)||0; });
+        bindProp('prop-w',  function (e,v){ e.width = Math.max(1, parseFloat(v)||1); });
+        bindProp('prop-h',  function (e,v){ e.height = Math.max(1, parseFloat(v)||1); });
+        bindProp('prop-x2', function (e,v){ e.x2 = parseFloat(v)||0; });
+        bindProp('prop-y2', function (e,v){ e.y2 = parseFloat(v)||0; });
+        bindProp('prop-text', function (e,v){ e.text = v; });
+        bindProp('prop-font', function (e,v){ e.font = v; });
+        bindProp('prop-size', function (e,v){ e.size = Math.max(1, parseFloat(v)||1); });
+        bindProp('prop-fill', function (e,v){ e.fill = v; });
+        bindProp('prop-stroke', function (e,v){ e.stroke = v; });
+        bindProp('prop-strokew', function (e,v){ e.strokeWidth = Math.max(1, parseFloat(v)||1); });
+        document.getElementById('prop-delete').addEventListener('click', deleteSelected);
+
+        // ---- Toolbar ---------------------------------------------------
+        document.querySelectorAll('.tool-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.tool-btn').forEach(function (b) { b.classList.remove('active'); });
+                var tool = btn.dataset.tool || 'select';
+                if (tool === 'select') {
+                    currentTool = 'select'; btn.classList.add('active'); return;
+                }
+                addElement(tool);
+                // fall back to Select so the new element can be manipulated immediately
+                currentTool = 'select';
+                document.querySelector('.tool-btn[data-tool="select"]').classList.add('active');
+            });
+        });
+
+        // Click empty canvas -> deselect
+        canvas.addEventListener('mousedown', function (ev) {
+            if (ev.target === canvas || ev.target === lineLayer || ev.target.id === 'empty-msg') deselect();
+        });
+
+        // Double-click a text element to edit inline
+        canvas.addEventListener('dblclick', function (ev) {
+            var node = ev.target.closest && ev.target.closest('.el-text');
+            if (!node) return;
+            var e = elById(parseInt(node.dataset.id, 10));
+            if (!e) return;
+            var val = prompt('Edit text:', e.text);
+            if (val != null) { e.text = val; render(); }
+        });
+
+        // Keyboard delete
+        document.addEventListener('keydown', function (ev) {
+            if ((ev.key === 'Delete' || ev.key === 'Backspace') &&
+                !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+                if (selectedId != null) { ev.preventDefault(); deleteSelected(); }
+            }
+        });
+
+        // ---- Save ------------------------------------------------------
+        var toast = document.getElementById('save-toast');
+        function showToast(msg, isErr) {
+            toast.textContent = msg; toast.classList.toggle('err', !!isErr);
+            toast.classList.add('show');
+            setTimeout(function () { toast.classList.remove('show'); }, 1800);
+        }
+        document.getElementById('save-btn').addEventListener('click', function () {
+            var btn = this; btn.disabled = true; btn.textContent = 'Saving...';
+            fetch('{{ url_for("design-creative.api_update_project", project_id=project.id) }}', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ elements: serialize() })
+            }).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            }).then(function () { showToast('Design saved'); })
+              .catch(function (err) { showToast('Save failed: ' + err.message, true); })
+              .then(function () { btn.disabled = false; btn.textContent = 'Save'; });
+        });
+
+        // Asset search filter (unchanged behaviour)
+        var searchInput = document.getElementById('asset-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                var q = this.value.toLowerCase();
+                document.querySelectorAll('.asset-item').forEach(function (item) {
+                    var name = (item.dataset.name || '').toLowerCase();
+                    var type = (item.dataset.type || '').toLowerCase();
+                    item.style.display = (name.includes(q) || type.includes(q)) ? '' : 'none';
+                });
+            });
+        }
+
+        // ---- Boot ------------------------------------------------------
+        loadInitial();
+        render();
+    })();
     </script>
 </body>
 </html>
