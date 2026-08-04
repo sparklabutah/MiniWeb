@@ -203,10 +203,9 @@ def article_detail(article_id):
             is_bookmarked = True
             bookmark_note = bm.get("note")
 
-    # Load comments for this article
-    comments = _load_comments()
-    article_comments = [c for c in comments if c["article_id"] == article_id]
-    article_comments.sort(key=lambda c: c.get("posted_at", ""), reverse=True)
+    # Load comments for this article (SQL-filtered, ordered, limited)
+    article_comments = db.query(SITE, "comments", where={"article_id": article_id},
+                                sort="-posted_at", limit=100)
 
     return render_template("news/article.html",
                            article=article, categories=categories,
@@ -572,8 +571,7 @@ def api_toggle_bookmark(article_id):
     if not user:
         return jsonify({"error": "Login required"}), 401
 
-    articles = _load_articles()
-    article = next((a for a in articles if a["id"] == article_id), None)
+    article = db.get_item(SITE, "articles", article_id)
     if article is None:
         return jsonify({"error": "Article not found"}), 404
 
@@ -674,14 +672,43 @@ def api_stats():
 # post_from_free_text (comment)
 # ---------------------------------------------------------------------------
 
+def _add_comment(article, user, body):
+    """Persist a single comment to the session overlay (no whole-table load).
+
+    Returns the created comment dict. Also bumps the article's comments_count
+    and emits a cross-site content event.
+    """
+    # Highest existing comment id (base + overlay), fetched with LIMIT 1.
+    top = db.query(SITE, "comments", sort="-id", limit=1)
+    new_id = (top[0]["id"] if top else 0) + 1
+    comment = {
+        "id": new_id,
+        "article_id": article["id"],
+        "user_id": user["id"],
+        "username": user["username"],
+        "display_name": user["display_name"],
+        "body": body,
+        "posted_at": datetime.utcnow().isoformat() + "Z",
+    }
+    db.save_item(SITE, "comments", new_id, comment)
+
+    # Keep the article's displayed comment count in sync (session overlay).
+    article["comments_count"] = (article.get("comments_count") or 0) + 1
+    db.save_item(SITE, "articles", article["id"], article)
+
+    emit("message", from_user_id=user["id"], to_user_id=user["id"],
+         text=f'You commented on "{article["title"]}"',
+         source_site="news", source_id=str(article["id"]))
+    return comment
+
+
 @blueprint.route("/api/articles/<int:article_id>/comment", methods=["POST"])
 def api_post_comment(article_id):
     user = _current_user()
     if not user:
         return jsonify({"error": "Login required"}), 401
 
-    articles = _load_articles()
-    article = next((a for a in articles if a["id"] == article_id), None)
+    article = db.get_item(SITE, "articles", article_id)
     if article is None:
         return jsonify({"error": "Article not found"}), 404
 
@@ -690,19 +717,7 @@ def api_post_comment(article_id):
     if not body:
         return jsonify({"error": "Comment body is required"}), 400
 
-    comments = _load_comments()
-    new_id = max((c["id"] for c in comments), default=0) + 1
-    comment = {
-        "id": new_id,
-        "article_id": article_id,
-        "user_id": user["id"],
-        "username": user["username"],
-        "display_name": user["display_name"],
-        "body": body,
-        "posted_at": datetime.utcnow().isoformat() + "Z"
-    }
-    comments.append(comment)
-    db.save_collection(SITE, "comments", comments)
+    comment = _add_comment(article, user, body)
     return jsonify({"action": "posted", "comment": comment}), 201
 
 
@@ -712,25 +727,13 @@ def form_post_comment(article_id):
     if not user:
         return redirect(url_for("news.login_page"))
 
-    articles = _load_articles()
-    article = next((a for a in articles if a["id"] == article_id), None)
+    article = db.get_item(SITE, "articles", article_id)
     if article is None:
         abort(404)
 
     body = request.form.get("body", "").strip()
     if body:
-        comments = _load_comments()
-        new_id = max((c["id"] for c in comments), default=0) + 1
-        comments.append({
-            "id": new_id,
-            "article_id": article_id,
-            "user_id": user["id"],
-            "username": user["username"],
-            "display_name": user["display_name"],
-            "body": body,
-            "posted_at": datetime.utcnow().isoformat() + "Z"
-        })
-        db.save_collection(SITE, "comments", comments)
+        _add_comment(article, user, body)
 
     return redirect(url_for("news.article_detail", article_id=article_id))
 
@@ -1005,8 +1008,7 @@ def form_toggle_bookmark(article_id):
     if not user:
         return redirect(url_for("news.login_page"))
 
-    articles = _load_articles()
-    article = next((a for a in articles if a["id"] == article_id), None)
+    article = db.get_item(SITE, "articles", article_id)
     if article is None:
         abort(404)
 
