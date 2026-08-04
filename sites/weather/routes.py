@@ -120,6 +120,26 @@ def _location_id_from_request(default_id=1):
     return default_id, name, f"Location '{name}' not found"
 
 
+def _current_for_location(loc):
+    """Return the current-conditions row for a location dict (or the default).
+
+    Each location has its own row in weather_current, keyed by the location
+    NAME.  Falls back to the default Lakeport row when ``loc`` is None or has no
+    matching current row.  The returned dict is enriched with lat/lng from the
+    location record for map/coordinate consumers.
+    """
+    name = loc["name"] if loc else "Lakeport, WA"
+    rows = db.query(SITE, "current", where={"location": name}, limit=1)
+    if not rows:
+        rows = db.query(SITE, "current", where={"location": "Lakeport, WA"}, limit=1)
+    current = rows[0]
+    if loc:
+        current["location"] = loc["name"]
+        current["lat"] = loc["lat"]
+        current["lng"] = loc["lng"]
+    return current
+
+
 # ---------------------------------------------------------------------------
 # Condition icon helper
 # ---------------------------------------------------------------------------
@@ -156,20 +176,20 @@ def _icon_for(conditions):
 @blueprint.route("/")
 def index():
     """Landing page -- current conditions + 7-day summary."""
-    current = db.query(SITE, "current", limit=1)[0]
     # Optional ?location= query navigates to another location's conditions
     location_name = request.args.get("location", "").strip()
     location_error = None
     loc_id = 1  # default: Lakeport
+    loc = None
     if location_name:
         loc = _get_location_by_name(location_name)
         if loc:
-            current["location"] = loc["name"]
-            current["lat"] = loc["lat"]
-            current["lng"] = loc["lng"]
             loc_id = loc["id"]
         else:
             location_error = f"Location '{location_name}' not found"
+    # Load the selected location's own current conditions (keyed by name),
+    # falling back to the default Lakeport row when none exists.
+    current = _current_for_location(loc)
     # Each location has its own 7-day forecast (keyed by location_id)
     forecast = db.query(SITE, "forecast", where={"location_id": loc_id}, sort="date")
     alerts = db.query(SITE, "alerts")      # only 3 rows
@@ -207,14 +227,20 @@ def forecast_page():
 
 @blueprint.route("/hourly")
 def hourly_page():
-    """24-hour hourly forecast page."""
-    hourly = db.query(SITE, "hourly")      # only 24 rows
-    current = db.query(SITE, "current", limit=1)[0]
+    """24-hour hourly forecast page (per-location via ?location=)."""
+    loc_id, loc_name, location_error = _location_id_from_request()
+    loc = _get_location_by_id(loc_id)
+    # Each location has its own 24-hour series (keyed by location_id)
+    hourly = db.query(SITE, "hourly", where={"location_id": loc_id}, sort="row_id")
+    if not hourly:
+        hourly = db.query(SITE, "hourly", where={"location_id": 1}, sort="row_id")
+    current = _current_for_location(loc)
     user = _current_user()
     return render_template(
         "weather/hourly.html",
         hourly=hourly,
         current=current,
+        location_error=location_error,
         user=user,
         icon_for=_icon_for,
     )
@@ -352,14 +378,11 @@ def api_current():
         location  -- location name (default: Lakeport, WA)
     """
     location_name = request.args.get("location", "Lakeport, WA")
-    current = db.query(SITE, "current", limit=1)[0]
     loc = _get_location_by_name(location_name)
-    if loc:
-        current["location"] = loc["name"]
-        current["lat"] = loc["lat"]
-        current["lng"] = loc["lng"]
-    elif location_name.lower() != current["location"].lower():
+    if not loc and location_name.lower() != "lakeport, wa":
         return jsonify({"error": f"Location '{location_name}' not found"}), 404
+    # Load the matched location's own current conditions (keyed by name).
+    current = _current_for_location(loc)
     return jsonify(current)
 
 
@@ -397,12 +420,16 @@ def api_hourly():
         location -- location name (default: Lakeport, WA)
     """
     location_name = request.args.get("location", "Lakeport, WA")
-    hourly = db.query(SITE, "hourly")  # only 24 rows
     loc = _get_location_by_name(location_name)
     if loc:
+        hourly = db.query(SITE, "hourly", where={"location_id": loc["id"]},
+                          sort="row_id")
+        if not hourly:
+            hourly = db.query(SITE, "hourly", where={"location_id": 1}, sort="row_id")
         return jsonify({"location": loc["name"], "hourly": hourly})
     elif location_name.lower() != "lakeport, wa":
         return jsonify({"error": f"Location '{location_name}' not found"}), 404
+    hourly = db.query(SITE, "hourly", where={"location_id": 1}, sort="row_id")
     return jsonify({"location": "Lakeport, WA", "hourly": hourly})
 
 

@@ -81,6 +81,7 @@ TABLES = {
             ("precip_pct", "INTEGER NOT NULL DEFAULT 0"),
             ("wind_mph", "INTEGER NOT NULL DEFAULT 0"),
             ("humidity", "INTEGER NOT NULL DEFAULT 0"),
+            ("location_id", "INTEGER DEFAULT 1"),
         ],
     },
     "locations": {
