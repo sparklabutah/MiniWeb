@@ -564,9 +564,9 @@
     <!-- Storage meter -->
     <div class="storage-meter">
         <div class="storage-bar-bg">
-            <div class="storage-bar-fill" style="width: 34%;" id="storageBar"></div>
+            <div class="storage-bar-fill" style="width: {{ storage_pct }}%;" id="storageBar"></div>
         </div>
-        <div class="storage-text" id="storageText">Loading...</div>
+        <div class="storage-text" id="storageText">{{ storage_used_human }} of {{ storage_quota_gb }} GB used</div>
         <a href="#" class="storage-link" onclick="return false;">Buy storage</a>
     </div>
 </aside>
@@ -760,6 +760,9 @@
                         <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}" class="dropdown-item">
                             <span class="di-icon">&#128065;</span> Preview
                         </a>
+                        <a href="{{ url_for('cloud-storage-file-transfer.file_download', file_id=file.id) }}" download="{{ file.name }}" data-download-name="{{ file.name }}" class="dropdown-item">
+                            <span class="di-icon">&#8595;</span> Download
+                        </a>
                         {% if file.source_site and file.source_site in open_in_urls %}
                         <a href="{% if file.type == 'presentation' %}{{ open_in_presentation_url.replace('{source_id}', file.source_id|string) }}{% else %}{{ open_in_urls[file.source_site].replace('{source_id}', file.source_id|string) }}{% endif %}" class="dropdown-item">
                             <span class="di-icon">&#8599;</span> Open in {{ open_in_labels.get(file.source_site, file.source_site) }}
@@ -944,25 +947,10 @@
         });
     });
 
-    /* ── Storage meter (fetch from API) ───────────────────────── */
-    (function() {
-        fetch("{{ url_for('cloud-storage-file-transfer.api_storage_usage') }}")
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                var totalGB = 15; // free tier
-                var usedBytes = d.total_bytes || 0;
-                var usedGB = usedBytes / (1024*1024*1024);
-                var pct = Math.min(Math.round((usedGB / totalGB) * 100), 100);
-                var bar = document.getElementById('storageBar');
-                var txt = document.getElementById('storageText');
-                if (bar) bar.style.width = pct + '%';
-                if (txt) txt.textContent = d.total_human + ' of ' + totalGB + ' GB used';
-            })
-            .catch(function() {
-                var txt = document.getElementById('storageText');
-                if (txt) txt.textContent = 'Storage info unavailable';
-            });
-    })();
+    /* ── Storage meter ─────────────────────────────────────────────
+       Rendered server-side from the current user's own file sizes vs. their
+       quota (see index() route). Left server-rendered so it stays correct
+       after mutations (e.g. delete) without an all-users total overflowing. */
 
     document.addEventListener('click', function(e) {
         var btn = e.target.closest('.csft-trash-btn');
