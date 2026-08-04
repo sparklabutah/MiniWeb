@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
 from app import db
+from app.events import emit
 from app.handlers.email_handler import _add_email
 
 SITE = "calendar-todo"
@@ -93,6 +94,27 @@ def _get_user(user_id):
 def _next_event_id():
     max_id = db.execute("SELECT MAX(id) FROM [calendar_todo_events]", (), fetch="val")
     return (max_id or 0) + 1
+
+
+def _next_user_id():
+    max_id = db.execute("SELECT MAX(id) FROM [calendar_todo_users]", (), fetch="val")
+    return (max_id or 0) + 1
+
+
+def _safe_next(value):
+    """Only allow same-site relative redirects."""
+    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+
+
+def _require_login():
+    """Return a redirect to the login page (preserving the target as `next`)
+    when no user is logged in, else None."""
+    if "user_id" not in session:
+        target = request.full_path
+        if target.endswith("?"):
+            target = target[:-1]
+        return redirect(url_for("calendar-todo.login_page", next=target))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +206,9 @@ def _month_range(year, month):
 @blueprint.route("/")
 def index():
     """Main calendar view — defaults to week view of simulated today."""
+    gate = _require_login()
+    if gate:
+        return gate
     today = _simulated_today()
     events = _load_events()
     users = _load_users()
@@ -313,6 +338,9 @@ def index():
 
 @blueprint.route("/day/<date_str>")
 def day_view(date_str):
+    gate = _require_login()
+    if gate:
+        return gate
     events = _load_events()
     d = _parse_date(date_str)
     if not d:
@@ -329,6 +357,9 @@ def day_view(date_str):
 
 @blueprint.route("/week/<date_str>")
 def week_view(date_str):
+    gate = _require_login()
+    if gate:
+        return gate
     events = _load_events()
     ws, we = _week_range(date_str)
     week_events = [e for e in events if _event_date(e) and ws <= _event_date(e) <= we]
@@ -349,6 +380,9 @@ def week_view(date_str):
 
 @blueprint.route("/event/<int:event_id>")
 def event_detail(event_id):
+    gate = _require_login()
+    if gate:
+        return gate
     events = _load_events()
     event = next((e for e in events if e["id"] == event_id), None)
     if event is None:
@@ -365,10 +399,10 @@ def event_detail(event_id):
 @blueprint.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
-        return render_template("calendar-todo/login.html", error=None)
+        return render_template("calendar-todo/login.html", error=None, next="")
     user = _get_user(session["user_id"])
     if not user:
-        return render_template("calendar-todo/login.html", error=None)
+        return render_template("calendar-todo/login.html", error=None, next="")
     events = _load_events()
     my_events = [e for e in events if e["user_id"] == user["id"]]
     my_events = _sort_events(my_events, "date")
@@ -382,28 +416,64 @@ def dashboard():
 
 @blueprint.route("/login", methods=["GET"])
 def login_page():
-    return render_template("calendar-todo/login.html", error=None)
+    return render_template("calendar-todo/login.html", error=None,
+                           next=request.args.get("next", ""))
 
 
 @blueprint.route("/login", methods=["POST"])
 def login_submit():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "").strip()
+    nxt = request.form.get("next", "")
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
     if not user or user.get("password") != password:
         return render_template("calendar-todo/login.html",
-                               error="Invalid username or password")
+                               error="Invalid username or password", next=nxt)
     session["user_id"] = user["id"]
-    events = _load_events()
-    my_events = [e for e in events if e["user_id"] == user["id"]]
-    my_events = _sort_events(my_events, "date")
-    today = _simulated_today()
-    today_d = _parse_date(today)
-    upcoming = [e for e in my_events if _event_date(e) and _event_date(e) >= today_d]
-    return render_template("calendar-todo/dashboard.html", user=user,
-                           events=my_events, upcoming=upcoming,
-                           today=today)
+    return redirect(_safe_next(nxt) or url_for("calendar-todo.dashboard"))
+
+
+@blueprint.route("/register", methods=["GET"])
+def register_page():
+    return render_template("calendar-todo/register.html", error=None,
+                           next=request.args.get("next", ""))
+
+
+@blueprint.route("/register", methods=["POST"])
+def register_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    email = request.form.get("email", "").strip()
+    name = request.form.get("name", "").strip()
+    nxt = request.form.get("next", "")
+    if not username or not password or not email:
+        return render_template("calendar-todo/register.html",
+                               error="All fields are required", next=nxt)
+    # users table is small (<20 rows)
+    users = _load_users()
+    if any(u["username"] == username for u in users):
+        return render_template("calendar-todo/register.html",
+                               error="Username already taken", next=nxt)
+    new_id = _next_user_id()
+    new_user = {
+        "id": new_id,
+        "root_user_id": 0,
+        "username": username,
+        "password": password,
+        "name": name or username,
+        "email": email,
+        "calendars": ["Work", "Personal", "Health"],
+        "shared_calendars": [],
+        "settings": {"default_view": "week", "timezone": "America/Los_Angeles",
+                     "week_start": "monday"},
+        "avatar": "",
+    }
+    db.save_item(SITE, "users", new_id, new_user)
+    emit("signup", user_id=new_id, site_name=SITE,
+         username=username, password=password, email=email)
+    session["user_id"] = new_id
+    return redirect(_safe_next(nxt) or url_for("calendar-todo.dashboard"))
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +490,10 @@ def form_create_event():
     if user_id is None:
         return "User ID is required", 400
 
+    # Parse invited attendees (comma-separated names/emails).
+    attendees = [a.strip() for a in request.form.get("attendees", "").split(",")
+                 if a.strip()]
+
     event = {
         "id": _next_event_id(),
         "user_id": user_id,
@@ -435,7 +509,7 @@ def form_create_event():
         "reminder_minutes": int(request.form.get("reminder_minutes", 15)),
         "priority": request.form.get("priority", "medium"),
         "status": "confirmed",
-        "attendees": [],
+        "attendees": attendees,
         "color": request.form.get("color", "#4285f4"),
         "created_at": datetime.now().isoformat(),
     }
@@ -511,7 +585,7 @@ def form_toggle_event(event_id):
 @blueprint.route("/logout")
 def logout():
     session.pop("user_id", None)
-    return render_template("calendar-todo/login.html", error=None)
+    return render_template("calendar-todo/login.html", error=None, next="")
 
 
 # ---------------------------------------------------------------------------
