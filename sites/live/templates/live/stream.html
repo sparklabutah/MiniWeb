@@ -6,9 +6,18 @@
     <title>{{ stream.title }} - PulseLive</title>
     <link rel="stylesheet" href="/static/twitch.css">
     <style>
-        .tw-stream-layout { display: flex; flex: 1; min-width: 0; }
+        /* align-items:flex-start so the player column keeps its own (aspect-ratio)
+           height and never stretches to match the tall chat column as messages
+           accumulate. */
+        .tw-stream-layout { display: flex; flex: 1; min-width: 0; align-items: flex-start; }
         .tw-chat-col { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; height: calc(100vh - var(--topnav-h)); position: sticky; top: var(--topnav-h); }
         .tw-chat-col .tw-chat { flex: 1; min-height: 0; }
+        /* min-height:0 lets the message list actually scroll inside its fixed-height
+           column instead of expanding it (and, with the row no longer stretching,
+           the video player can't grow vertically as chat fills up). */
+        .tw-chat-col .tw-chat-msgs { min-height: 0; }
+        /* Pin the player to its 16:9 box — never grow/shrink via flex. */
+        .tw-stream-main > .tw-player { flex: 0 0 auto; }
         .tw-player.playing .poster { cursor: default; }
         .wave-bars { display: none; position: absolute; bottom: 1.4rem; left: 50%; transform: translateX(-50%); gap: 4px; align-items: flex-end; height: 54px; z-index: 2; }
         .tw-player.playing .wave-bars { display: flex; }
