@@ -1,0 +1,53 @@
+{# Reusable MiniWeb sponsored-ad component.
+   Expects `ads` (list from product_ads()). Optional vars:
+     ad_title  — section heading (default "Sponsored")
+     ad_layout — "row" (responsive grid, default) or "rail" (vertical column)
+   Renders real ShopHub products as image ad cards. Self-contained styles
+   (emitted once per page via the id guard). #}
+{% if ads %}
+<style id="mw-ads-css">
+  .mw-ads { margin: 1.5rem 0; }
+  .mw-ads-head { display:flex; align-items:center; gap:.5rem; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.62rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#9aa3af; margin:0 0 .55rem; }
+  .mw-ads-head::after { content:""; flex:1; height:1px; background:#e6e8ec; }
+  .mw-ads-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:.9rem; }
+  .mw-ads.rail .mw-ads-grid { grid-template-columns:1fr; }
+  .mw-ad { display:flex; flex-direction:column; background:#fff; border:1px solid #e6e8ec; border-radius:.6rem; overflow:hidden; text-decoration:none; color:inherit; transition:box-shadow .15s, transform .15s, border-color .15s; }
+  .mw-ad:hover { box-shadow:0 6px 20px rgba(0,0,0,.10); transform:translateY(-2px); border-color:#d4d7dd; }
+  .mw-ad-img { position:relative; height:180px; background:#f6f7f9; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mw-ad-img img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+  .mw-ad-badge { position:absolute; top:.4rem; left:.4rem; background:rgba(17,24,39,.72); color:#fff; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.12rem .4rem; border-radius:.25rem; }
+  .mw-ad-body { padding:.6rem .7rem .75rem; display:flex; flex-direction:column; gap:.25rem; flex:1; }
+  .mw-ad-title { font-size:.82rem; font-weight:600; line-height:1.3; color:#1f2937; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .mw-ad-meta { display:flex; align-items:center; justify-content:space-between; margin-top:auto; padding-top:.35rem; }
+  .mw-ad-price { font-size:1rem; font-weight:800; color:#0b7a3b; }
+  .mw-ad-stars { font-size:.7rem; color:#f5a623; white-space:nowrap; }
+  .mw-ad-stars .cnt { color:#9aa3af; margin-left:.15rem; }
+  .mw-ad-brand { font-size:.68rem; color:#9aa3af; }
+  .mw-ad-cta { margin-top:.4rem; font-size:.72rem; font-weight:700; color:#1565c0; }
+  .mw-ad:hover .mw-ad-cta { text-decoration:underline; }
+</style>
+<div class="mw-ads {{ ad_layout | default('row') }}">
+  <div class="mw-ads-head">{{ ad_title | default('Sponsored') }}</div>
+  <div class="mw-ads-grid">
+    {% for ad in ads %}
+    <a class="mw-ad" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
+      <div class="mw-ad-img">
+        <span class="mw-ad-badge">Ad</span>
+        <img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy">
+      </div>
+      <div class="mw-ad-body">
+        <div class="mw-ad-title">{{ ad.title }}</div>
+        <div class="mw-ad-brand">{{ ad.brand }}</div>
+        <div class="mw-ad-meta">
+          <span class="mw-ad-price">${{ '%.2f' | format(ad.price) }}</span>
+          {% if ad.rating and ad.rating > 0 %}
+          <span class="mw-ad-stars">&#9733; {{ '%.1f' | format(ad.rating) }}{% if ad.reviews %}<span class="cnt">({{ ad.reviews }})</span>{% endif %}</span>
+          {% endif %}
+        </div>
+        <div class="mw-ad-cta">Shop on ShopHub &rarr;</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

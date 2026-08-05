@@ -476,6 +476,13 @@ def create_app():
             return send_from_directory(data_static / sub, filename)
         return send_from_directory(_Path(app.static_folder) / sub, filename)
 
+    # Reusable in-network ads — expose product_ads() to every template so any
+    # site can render MiniWeb (ShopHub) sponsored image cards with no route
+    # changes:  {% set ads = product_ads(3, seed=request.path) %}
+    #           {% include "ads/_product_ads.html" %}
+    from app.ads import product_ads as _product_ads
+    app.jinja_env.globals["product_ads"] = _product_ads
+
     # Session cookie config for production (behind reverse proxy / HTTPS)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
