@@ -494,11 +494,13 @@ def index():
 
     _attach_feed_meta(posts)
 
-    # "Recent Posts" widget (right rail)
+    # "Recent Posts" widget (right rail). Raw SQL reads the base table only,
+    # so merge in this session's overlay (deletes/edits/new posts) — otherwise
+    # a post the user just deleted still lingers here.
     recent_posts = []
     if table:
-        rp = db.execute(f"SELECT id, subreddit, title, score, num_comments, created_utc "
-                        f"FROM [{table}] ORDER BY [created_utc] DESC LIMIT 6")
+        rp = db.execute(f"SELECT * FROM [{table}] ORDER BY [created_utc] DESC LIMIT 12")
+        rp = db.merge_overlay(SITE, "posts", rp, sort="-created_utc", limit=6)
         for r in rp:
             r["_av"] = _avatar_color(r.get("subreddit") or "")
             recent_posts.append(r)
@@ -810,6 +812,28 @@ def api_list_posts():
 
     sql += " LIMIT 50"
     posts = db.execute(sql, tuple(params))
+
+    # Raw SQL reads the base table only — merge in this session's overlay so
+    # deleted/edited/new posts are reflected here too.
+    def _match(p):
+        if sub:
+            bare = sub[2:] if sub.startswith("r/") else sub
+            if p.get("subreddit") not in (bare, f"r/{bare}"):
+                return False
+        if user and p.get("author") != user:
+            return False
+        if date_from and (p.get("created_utc") or "") < date_from:
+            return False
+        if date_to and (p.get("created_utc") or "") > date_to:
+            return False
+        if flair and (p.get("flair") or "").lower() != flair.lower():
+            return False
+        return True
+
+    posts = db.merge_overlay(
+        SITE, "posts", posts, match=_match,
+        sort="-created_utc" if sort == "new" else "-score", limit=50,
+    )
     return jsonify(posts)
 
 
