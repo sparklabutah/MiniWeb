@@ -17,9 +17,9 @@ sources round-robin, deterministically by `seed`, so different pages show
 different, varied ads. Name kept as `product_ads` for backwards compatibility;
 `ads` is an alias.
 """
-import hashlib
 import importlib
 import json
+import random
 
 from flask import url_for
 from app import db
@@ -36,12 +36,6 @@ _ACCENT = {
     "TechCompare": "#2563eb",
     "HowToHub": "#0d9488",
 }
-
-
-def _seeded_order(items, seed, keyfn):
-    """Deterministic shuffle: sort by hash(seed + item-key)."""
-    return sorted(items, key=lambda it: hashlib.md5(
-        (str(seed) + "|" + keyfn(it)).encode()).hexdigest())
 
 
 def _is_real_img(u):
@@ -276,38 +270,52 @@ _PROVIDERS = {
 _DEFAULT_SOURCES = ("shop", "auction", "video", "book", "pixshare", "techcompare", "howto")
 
 
-def product_ads(n=3, seed="", sources=None):
-    """Return up to `n` mixed sponsored ads, balanced across sources.
+_POOL_CACHE = {}
 
-    `sources` optionally restricts which providers to draw from (subset of
-    'shop','auction','video','book'). Deterministic given the same seed.
+
+def _pool(name):
+    """Candidate list for a source, cached (the underlying data is static)."""
+    if name not in _POOL_CACHE:
+        try:
+            _POOL_CACHE[name] = _PROVIDERS[name]() or []
+        except Exception:
+            _POOL_CACHE[name] = []
+    return _POOL_CACHE[name]
+
+
+def product_ads(n=3, seed=None, sources=None):
+    """Fill an ad slot with up to `n` ads, RANDOMLY assigning sources each call.
+
+    The banner/grid/rail positions are predefined per site; this decides which
+    advertisers fill them, freshly randomised on every render — so the same
+    slot shows different sources (ShopHub, BidBarn, TechCompare, …) on
+    different visits, and no single advertiser dominates.
+
+    `sources` optionally restricts which providers to draw from.
+    `seed` is accepted for backwards compatibility but ignored (source
+    assignment is random, not seeded).
     """
     names = [s for s in (sources or _DEFAULT_SOURCES) if s in _PROVIDERS]
-    # Per-source seeded queues.
-    queues = []
-    for s in names:
-        pool = _PROVIDERS[s]()
-        if pool:
-            queues.append(_seeded_order(pool, seed, lambda it: it["_key"]))
+    # Random source order this render; round-robin so multiple sources appear.
+    random.shuffle(names)
+    queues = [list(_pool(s)) for s in names]
+    queues = [q for q in queues if q]
     if not queues:
         return []
-    # Round-robin interleave so no single source dominates; order the sources
-    # themselves by seed too, so the lead advertiser varies per page.
-    queues = _seeded_order(queues, seed, lambda q: q[0]["_key"])
-    out, i = [], 0
-    while len(out) < int(n) and any(queues):
-        q = queues[i % len(queues)]
+
+    out, guard = [], 0
+    want = int(n)
+    while len(out) < want and queues and guard < want * (len(queues) + 2):
+        guard += 1
+        qi = guard % len(queues)
+        q = queues[qi]
         if q:
-            ad = q.pop(0)
-            ad = {k: v for k, v in ad.items() if k != "_key"}
+            ad = dict(q.pop(random.randrange(len(q))))  # random item from source
+            ad.pop("_key", None)
             ad["accent"] = _ACCENT.get(ad["source"], "#1565c0")
             out.append(ad)
-        i += 1
-        # drop empty queues to avoid infinite loop
-        if i % len(queues) == 0:
-            queues = [q for q in queues if q]
-            if not queues:
-                break
+        if not q:
+            queues.pop(qi)
     return out
 
 
