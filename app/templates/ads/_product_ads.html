@@ -1,53 +1,135 @@
-{# Reusable MiniWeb sponsored-ad component.
-   Expects `ads` (list from product_ads()). Optional vars:
-     ad_title  — section heading (default "Sponsored")
-     ad_layout — "row" (responsive grid, default) or "rail" (vertical column)
-   Renders real ShopHub products as image ad cards. Self-contained styles
-   (emitted once per page via the id guard). #}
+{# Reusable MiniWeb sponsored-ad component. Real ShopHub products, several
+   ad FORMATS so different sites look different. Set `ad_format` before include:
+     'grid'   — responsive row of image cards (default)
+     'banner' — one wide leaderboard strip (thumbnail + copy + CTA button)
+     'rail'   — vertical stack of compact cards (for sidebars)
+     'native' — a single "sponsored" content row that blends into a feed/list
+   Also honours `ad_title` (section label; '' hides it).
+   Expects `ads` from product_ads(). Styles are self-contained (emitted once). #}
 {% if ads %}
+{% set _fmt = ad_format | default('grid') %}
 <style id="mw-ads-css">
-  .mw-ads { margin: 1.5rem 0; }
-  .mw-ads-head { display:flex; align-items:center; gap:.5rem; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.62rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#9aa3af; margin:0 0 .55rem; }
+  .mw-ads { margin: 1.4rem 0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+  .mw-ads-head { display:flex; align-items:center; gap:.5rem; font-size:.6rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#9aa3af; margin:0 0 .5rem; }
   .mw-ads-head::after { content:""; flex:1; height:1px; background:#e6e8ec; }
-  .mw-ads-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:.9rem; }
-  .mw-ads.rail .mw-ads-grid { grid-template-columns:1fr; }
-  .mw-ad { display:flex; flex-direction:column; background:#fff; border:1px solid #e6e8ec; border-radius:.6rem; overflow:hidden; text-decoration:none; color:inherit; transition:box-shadow .15s, transform .15s, border-color .15s; }
-  .mw-ad:hover { box-shadow:0 6px 20px rgba(0,0,0,.10); transform:translateY(-2px); border-color:#d4d7dd; }
-  .mw-ad-img { position:relative; height:180px; background:#f6f7f9; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-  .mw-ad-img img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
-  .mw-ad-badge { position:absolute; top:.4rem; left:.4rem; background:rgba(17,24,39,.72); color:#fff; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.12rem .4rem; border-radius:.25rem; }
-  .mw-ad-body { padding:.6rem .7rem .75rem; display:flex; flex-direction:column; gap:.25rem; flex:1; }
-  .mw-ad-title { font-size:.82rem; font-weight:600; line-height:1.3; color:#1f2937; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .mw-ad-meta { display:flex; align-items:center; justify-content:space-between; margin-top:auto; padding-top:.35rem; }
-  .mw-ad-price { font-size:1rem; font-weight:800; color:#0b7a3b; }
-  .mw-ad-stars { font-size:.7rem; color:#f5a623; white-space:nowrap; }
-  .mw-ad-stars .cnt { color:#9aa3af; margin-left:.15rem; }
-  .mw-ad-brand { font-size:.68rem; color:#9aa3af; }
-  .mw-ad-cta { margin-top:.4rem; font-size:.72rem; font-weight:700; color:#1565c0; }
-  .mw-ad:hover .mw-ad-cta { text-decoration:underline; }
+  .mw-ad-badge { background:rgba(17,24,39,.72); color:#fff; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.12rem .4rem; border-radius:.25rem; }
+
+  /* ---- grid: row of cards ---- */
+  .mw-ads-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:.9rem; }
+  .mw-card { display:flex; flex-direction:column; background:#fff; border:1px solid #e6e8ec; border-radius:.6rem; overflow:hidden; text-decoration:none; color:inherit; transition:box-shadow .15s, transform .15s, border-color .15s; }
+  .mw-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.10); transform:translateY(-2px); border-color:#d4d7dd; }
+  .mw-card-img { position:relative; height:170px; background:#f6f7f9; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mw-card-img img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+  .mw-card-img .mw-ad-badge { position:absolute; top:.4rem; left:.4rem; }
+  .mw-card-body { padding:.55rem .7rem .7rem; display:flex; flex-direction:column; gap:.22rem; flex:1; }
+  .mw-card-title { font-size:.82rem; font-weight:600; line-height:1.3; color:#1f2937; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .mw-card-brand { font-size:.68rem; color:#9aa3af; }
+  .mw-card-meta { display:flex; align-items:center; justify-content:space-between; margin-top:auto; padding-top:.35rem; }
+  .mw-price { font-size:1rem; font-weight:800; color:#0b7a3b; }
+  .mw-stars { font-size:.7rem; color:#f5a623; white-space:nowrap; }
+  .mw-stars .cnt { color:#9aa3af; margin-left:.15rem; }
+  .mw-card-cta { margin-top:.35rem; font-size:.72rem; font-weight:700; color:#1565c0; }
+  .mw-card:hover .mw-card-cta { text-decoration:underline; }
+
+  /* ---- banner: wide leaderboard ---- */
+  .mw-banner { display:flex; align-items:center; gap:1rem; background:linear-gradient(90deg,#0f172a,#1e293b); border-radius:.7rem; padding:.7rem 1rem; text-decoration:none; color:#fff; overflow:hidden; }
+  .mw-banner:hover { filter:brightness(1.08); }
+  .mw-banner .mw-b-img { width:74px; height:74px; flex-shrink:0; background:#fff; border-radius:.5rem; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mw-banner .mw-b-img img { max-width:100%; max-height:100%; object-fit:contain; padding:4px; }
+  .mw-banner .mw-b-txt { flex:1; min-width:0; }
+  .mw-banner .mw-b-label { font-size:.55rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#94a3b8; margin-bottom:.15rem; }
+  .mw-banner .mw-b-title { font-size:.95rem; font-weight:700; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mw-banner .mw-b-sub { font-size:.78rem; color:#cbd5e1; margin-top:.1rem; }
+  .mw-banner .mw-b-price { color:#4ade80; font-weight:800; }
+  .mw-banner .mw-b-cta { flex-shrink:0; background:#f5b301; color:#0f172a; font-size:.8rem; font-weight:800; padding:.5rem 1.1rem; border-radius:.4rem; white-space:nowrap; }
+
+  /* ---- rail: vertical compact cards ---- */
+  .mw-rail { display:flex; flex-direction:column; gap:.6rem; }
+  .mw-rail-item { display:flex; gap:.6rem; align-items:center; background:#fff; border:1px solid #e6e8ec; border-radius:.5rem; padding:.5rem; text-decoration:none; color:inherit; }
+  .mw-rail-item:hover { border-color:#c9ccd2; box-shadow:0 3px 10px rgba(0,0,0,.07); }
+  .mw-rail-img { width:56px; height:56px; flex-shrink:0; background:#f6f7f9; border-radius:.35rem; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mw-rail-img img { max-width:100%; max-height:100%; object-fit:contain; }
+  .mw-rail-txt { min-width:0; flex:1; }
+  .mw-rail-title { font-size:.76rem; font-weight:600; color:#1f2937; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .mw-rail-price { font-size:.82rem; font-weight:800; color:#0b7a3b; margin-top:.15rem; }
+
+  /* ---- native: single blended row ---- */
+  .mw-native { display:flex; gap:.9rem; align-items:center; background:#fbfbfc; border:1px solid #ececf0; border-left:3px solid #f5b301; border-radius:.5rem; padding:.75rem .9rem; text-decoration:none; color:inherit; }
+  .mw-native:hover { background:#f6f7f9; }
+  .mw-native-img { width:84px; height:84px; flex-shrink:0; background:#fff; border:1px solid #eee; border-radius:.4rem; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .mw-native-img img { max-width:100%; max-height:100%; object-fit:contain; padding:3px; }
+  .mw-native-txt { flex:1; min-width:0; }
+  .mw-native-label { font-size:.58rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#b0932f; margin-bottom:.2rem; }
+  .mw-native-title { font-size:.95rem; font-weight:700; color:#1f2937; line-height:1.3; }
+  .mw-native-sub { font-size:.8rem; color:#6b7280; margin-top:.25rem; }
+  .mw-native-price { color:#0b7a3b; font-weight:800; }
+  .mw-native-cta { flex-shrink:0; font-size:.78rem; font-weight:700; color:#1565c0; white-space:nowrap; }
 </style>
-<div class="mw-ads {{ ad_layout | default('row') }}">
+
+<div class="mw-ads">
+  {% if ad_title is not defined or ad_title %}
   <div class="mw-ads-head">{{ ad_title | default('Sponsored') }}</div>
-  <div class="mw-ads-grid">
-    {% for ad in ads %}
-    <a class="mw-ad" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
-      <div class="mw-ad-img">
-        <span class="mw-ad-badge">Ad</span>
-        <img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy">
-      </div>
-      <div class="mw-ad-body">
-        <div class="mw-ad-title">{{ ad.title }}</div>
-        <div class="mw-ad-brand">{{ ad.brand }}</div>
-        <div class="mw-ad-meta">
-          <span class="mw-ad-price">${{ '%.2f' | format(ad.price) }}</span>
-          {% if ad.rating and ad.rating > 0 %}
-          <span class="mw-ad-stars">&#9733; {{ '%.1f' | format(ad.rating) }}{% if ad.reviews %}<span class="cnt">({{ ad.reviews }})</span>{% endif %}</span>
-          {% endif %}
-        </div>
-        <div class="mw-ad-cta">Shop on ShopHub &rarr;</div>
-      </div>
+  {% endif %}
+
+  {% if _fmt == 'banner' %}
+    {% set ad = ads[0] %}
+    <a class="mw-banner" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
+      <span class="mw-b-img"><img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy"></span>
+      <span class="mw-b-txt">
+        <span class="mw-b-label">Ad &middot; {{ ad.brand }}</span>
+        <div class="mw-b-title">{{ ad.title }}</div>
+        <div class="mw-b-sub">Now <span class="mw-b-price">${{ '%.2f' | format(ad.price) }}</span> on ShopHub{% if ad.rating and ad.rating > 0 %} &middot; &#9733; {{ '%.1f' | format(ad.rating) }}{% endif %}</div>
+      </span>
+      <span class="mw-b-cta">Shop now</span>
     </a>
-    {% endfor %}
-  </div>
+
+  {% elif _fmt == 'rail' %}
+    <div class="mw-rail">
+      {% for ad in ads %}
+      <a class="mw-rail-item" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
+        <span class="mw-rail-img"><img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy"></span>
+        <span class="mw-rail-txt">
+          <div class="mw-rail-title">{{ ad.title }}</div>
+          <div class="mw-rail-price">${{ '%.2f' | format(ad.price) }}</div>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+
+  {% elif _fmt == 'native' %}
+    {% set ad = ads[0] %}
+    <a class="mw-native" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
+      <span class="mw-native-img"><img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy"></span>
+      <span class="mw-native-txt">
+        <div class="mw-native-label">Sponsored &middot; {{ ad.brand }}</div>
+        <div class="mw-native-title">{{ ad.title }}</div>
+        <div class="mw-native-sub"><span class="mw-native-price">${{ '%.2f' | format(ad.price) }}</span> on ShopHub{% if ad.rating and ad.rating > 0 %} &middot; &#9733; {{ '%.1f' | format(ad.rating) }} ({{ ad.reviews }}){% endif %}</div>
+      </span>
+      <span class="mw-native-cta">Shop &rarr;</span>
+    </a>
+
+  {% else %}
+    <div class="mw-ads-grid">
+      {% for ad in ads %}
+      <a class="mw-card" href="{{ ad.url }}" rel="nofollow sponsored" title="{{ ad.title }}">
+        <span class="mw-card-img">
+          <span class="mw-ad-badge">Ad</span>
+          <img src="{{ ad.image }}" alt="{{ ad.title }}" loading="lazy">
+        </span>
+        <span class="mw-card-body">
+          <span class="mw-card-title">{{ ad.title }}</span>
+          <span class="mw-card-brand">{{ ad.brand }}</span>
+          <span class="mw-card-meta">
+            <span class="mw-price">${{ '%.2f' | format(ad.price) }}</span>
+            {% if ad.rating and ad.rating > 0 %}
+            <span class="mw-stars">&#9733; {{ '%.1f' | format(ad.rating) }}{% if ad.reviews %}<span class="cnt">({{ ad.reviews }})</span>{% endif %}</span>
+            {% endif %}
+          </span>
+          <span class="mw-card-cta">Shop on ShopHub &rarr;</span>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
 {% endif %}
