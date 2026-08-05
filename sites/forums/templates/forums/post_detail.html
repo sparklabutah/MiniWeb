@@ -141,6 +141,31 @@
     <script>
         const BASE = '{{ url_for("forums.index") }}';
         const POST_ID = '{{ post.id }}';
+
+        // In-page confirmation. Native confirm()/alert()/prompt() are suppressed
+        // inside the sandboxed portal iframe (no allow-modals), so they silently
+        // return false — which used to make Delete do nothing. This modal works
+        // regardless of the iframe sandbox.
+        function uiConfirm(message, confirmLabel) {
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#fff;color:#1a1a1b;border-radius:10px;max-width:340px;width:90%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.3);font-family:inherit;';
+                box.innerHTML = '<div style="font-size:15px;margin-bottom:16px;line-height:1.4;">' + message + '</div>' +
+                    '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+                    '<button data-act="cancel" style="padding:7px 16px;border:1px solid #ccc;background:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Cancel</button>' +
+                    '<button data-act="ok" style="padding:7px 16px;border:none;background:#d93a00;color:#fff;border-radius:18px;font-weight:600;cursor:pointer;">' + (confirmLabel || 'Confirm') + '</button>' +
+                    '</div>';
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                function done(val) { if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(val); }
+                box.querySelector('[data-act="cancel"]').onclick = function () { done(false); };
+                box.querySelector('[data-act="ok"]').onclick = function () { done(true); };
+                ov.onclick = function (e) { if (e.target === ov) done(false); };
+            });
+        }
+
         function votePost(dir) {
             fetch(`${BASE}api/posts/${POST_ID}/vote`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -179,8 +204,10 @@
             }).then(r => r.json()).then(() => location.reload());
         }
         function deleteComment(cid) {
-            if (!confirm('Delete this comment?')) return;
-            fetch(`${BASE}api/comments/${cid}`, {method: 'DELETE'}).then(() => location.reload());
+            uiConfirm('Delete this comment?', 'Delete').then(function (ok) {
+                if (!ok) return;
+                fetch(`${BASE}api/comments/${cid}`, {method: 'DELETE'}).then(() => location.reload());
+            });
         }
         function savePost() {
             var btn = document.querySelector('.post-actions button[onclick="savePost()"]');
@@ -204,9 +231,19 @@
             });
         }
         function deletePost() {
-            if (!confirm('Delete this post?')) return;
-            fetch(`${BASE}api/posts/${POST_ID}`, {method: 'DELETE'})
-                .then(() => window.location.href = '{{ url_for("forums.index") }}');
+            uiConfirm('Delete this post? This cannot be undone.', 'Delete').then(function (ok) {
+                if (!ok) return;
+                fetch(`${BASE}api/posts/${POST_ID}`, {method: 'DELETE'})
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d && d.status === 'deleted') {
+                            window.location.href = '{{ url_for("forums.index") }}';
+                        } else {
+                            uiConfirm((d && d.error) || 'Could not delete this post.', 'OK');
+                        }
+                    })
+                    .catch(() => uiConfirm('Could not delete this post.', 'OK'));
+            });
         }
         function showEditPost() { document.getElementById('edit-post-form').style.display = 'block'; }
         function saveEditPost() {
