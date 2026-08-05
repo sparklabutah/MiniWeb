@@ -10,6 +10,19 @@
         .hero-eq { position: absolute; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; opacity: .18; z-index: 1; }
         .hero-eq span { flex: 1; background: #9147ff; border-radius: 2px 2px 0 0; animation: eq 1.8s ease-in-out infinite; }
         @keyframes eq { 0%,100%{ height: 10%; } 50%{ height: 80%; } }
+
+        /* The featured hero puts the player (aspect-ratio 16:9) and the chat in
+           a flex row. The chat has no fixed height, so as messages piled up it
+           grew the row and — via align-items:stretch — stretched the video
+           player taller and taller. Keep the player at its own 16:9 height
+           (flex-start) and give the chat a bounded height so it scrolls
+           internally instead. Desktop only; the mobile layout (<=860px) stacks
+           the columns and sets its own chat height. */
+        @media (min-width: 861px) {
+            .tw-hero { align-items: flex-start; }
+            .tw-hero-chat { height: min(56vh, 480px); }
+        }
+        .tw-hero-chat .tw-chat-msgs { min-height: 0; }
     </style>
 </head>
 <body>
