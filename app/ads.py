@@ -32,6 +32,9 @@ _ACCENT = {
     "BidBarn": "#c2410c",
     "StreamHub": "#db2777",
     "PageTurner": "#7c3aed",
+    "PixShare": "#d6249f",
+    "TechCompare": "#2563eb",
+    "HowToHub": "#0d9488",
 }
 
 
@@ -184,13 +187,93 @@ def _book_pool():
     return out
 
 
+def _pixshare_pool():
+    t = db.get_table_name("multimedia-posting", "posts")
+    if not t:
+        return []
+    try:
+        rows = db.execute(
+            f'SELECT id,caption,image_url,likes_count,location FROM "{t}" '
+            f'WHERE image_url LIKE "/static/%" LIMIT 500')
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        if not _is_real_img(r.get("image_url")):
+            continue
+        cap = _trim(r.get("caption") or "New post on PixShare", 60)
+        out.append({
+            "source": "PixShare", "kind": "post", "_key": str(r["id"]),
+            "title": cap, "image": r["image_url"],
+            "url": _safe_url("multimedia-posting.post_detail", "/sites/multimedia-posting/", post_id=r["id"]),
+            "price": f"{_fmt_int(r.get('likes_count'))} likes",
+            "meta": (r.get("location") or "on PixShare"),
+            "cta": "View post", "rating": 0, "reviews": 0,
+        })
+    return out
+
+
+def _techcompare_pool():
+    t = db.get_table_name("comparison-aggregators", "phones")
+    if not t:
+        return []
+    try:
+        rows = db.execute(
+            f'SELECT id,name,brand,picture,price,os FROM "{t}" '
+            f'WHERE picture LIKE "http%" AND name!="" ORDER BY id DESC LIMIT 500')
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        if not _is_real_img(r.get("picture")):
+            continue
+        price = (r.get("price") or "").replace("About ", "").strip()
+        out.append({
+            "source": "TechCompare", "kind": "phone", "_key": str(r["id"]),
+            "title": _trim(r.get("name")), "image": r["picture"],
+            "url": _safe_url("comparison-aggregators.phone_detail", "/sites/comparison-aggregators/", phone_id=r["id"]),
+            "price": price if price else "Compare specs",
+            "meta": " · ".join(x for x in [r.get("brand"), r.get("os")] if x) or "Smartphones",
+            "cta": "Compare", "rating": 0, "reviews": 0,
+        })
+    return out
+
+
+def _howto_pool():
+    t = db.get_table_name("visual-how-to-guides", "guides")
+    if not t:
+        return []
+    try:
+        rows = db.execute(
+            f'SELECT id,title,cover_image,category,views,rating FROM "{t}" '
+            f'WHERE cover_image LIKE "http%" ORDER BY views DESC LIMIT 500')
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        if not _is_real_img(r.get("cover_image")):
+            continue
+        out.append({
+            "source": "HowToHub", "kind": "guide", "_key": str(r["id"]),
+            "title": _trim(r.get("title")), "image": r["cover_image"],
+            "url": _safe_url("visual-how-to-guides.guide_detail", "/sites/visual-how-to-guides/", guide_id=r["id"]),
+            "price": f"{_fmt_int(r.get('views'))} views",
+            "meta": (r.get("category") or "How-to guide"),
+            "cta": "Read guide", "rating": r.get("rating") or 0, "reviews": 0,
+        })
+    return out
+
+
 _PROVIDERS = {
     "shop": _shop_pool,
     "auction": _auction_pool,
     "video": _video_pool,
     "book": _book_pool,
+    "pixshare": _pixshare_pool,
+    "techcompare": _techcompare_pool,
+    "howto": _howto_pool,
 }
-_DEFAULT_SOURCES = ("shop", "auction", "video", "book")
+_DEFAULT_SOURCES = ("shop", "auction", "video", "book", "pixshare", "techcompare", "howto")
 
 
 def product_ads(n=3, seed="", sources=None):
