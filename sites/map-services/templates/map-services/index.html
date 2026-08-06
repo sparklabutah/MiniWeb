@@ -185,7 +185,7 @@
 </div>
 
 <script>
-var map = L.map('map', {zoomControl: false}).setView([45.5231, -122.6765], 13);
+var map = L.map('map', {zoomControl: false, zoomSnap: 0.5}).setView([45.5231, -122.6765], 13);
 L.control.zoom({position: 'topright'}).addTo(map);
 
 L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}.png', {
@@ -254,11 +254,34 @@ function updateLabels() {
 map.on('zoomend', updateLabels);
 updateLabels();
 
-// Fit bounds to show all markers
-if (locations.length > 0) {
-    var lats = locations.filter(function(l){return l.lat&&l.lng;}).map(function(l){return [l.lat,l.lng];});
-    if (lats.length > 0) map.fitBounds(lats, {padding: [30, 30], maxZoom: 14});
-}
+// Initial framing. The DEFAULT browse view intentionally frames only the
+// central ~half of the results, so the rest sit off-screen and must be
+// reached by panning/zooming — this is what makes the spatial-navigation
+// (pan/zoom) macros actually necessary rather than decorative. When the user
+// has searched or filtered, we instead fit ALL matches, so a deliberately
+// narrowed set stays fully usable.
+(function initFraming() {
+    var pts = locations.filter(function(l){ return l.lat && l.lng; });
+    if (!pts.length) return;
+    var narrowed = {{ 'true' if (search_query or selected_category or (min_rating is not none) or open_now == '1' or request.args.get('sort')) else 'false' }};
+    if (narrowed || pts.length <= 8) {
+        map.fitBounds(pts.map(function(l){ return [l.lat, l.lng]; }), {padding: [30, 30], maxZoom: 16});
+        return;
+    }
+    // Frame the central cluster (markers nearest the centroid) tightly enough
+    // that only ~half of all markers land in the initial viewport; the rest
+    // fall off the edges and require panning to reach. Fitting the inner 40%
+    // with half-step zoom lands the map at ~zoom 13.5 (~54% of pins visible).
+    var clat = 0, clng = 0;
+    pts.forEach(function(l){ clat += l.lat; clng += l.lng; });
+    clat /= pts.length; clng /= pts.length;
+    var inner = pts.slice().sort(function(a, b){
+        var da = (a.lat-clat)*(a.lat-clat) + (a.lng-clng)*(a.lng-clng);
+        var db = (b.lat-clat)*(b.lat-clat) + (b.lng-clng)*(b.lng-clng);
+        return da - db;
+    }).slice(0, Math.ceil(pts.length * 0.4));
+    map.fitBounds(inner.map(function(l){ return [l.lat, l.lng]; }), {padding: [20, 20], maxZoom: 16});
+})();
 
 function panTo(lat, lng, id) {
     map.setView([lat, lng], 16);
