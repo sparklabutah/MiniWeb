@@ -195,32 +195,28 @@ L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}
 }).addTo(map);
 
 var locations = {{ locations | tojson }};
-var markers = {};
 var catColors = {{ {'restaurant':'#ea4335','cafe':'#795548','hospital':'#f44336','park':'#4caf50','bank':'#3f51b5','hotel':'#673ab7','school':'#2196f3','gas_station':'#607d8b','grocery':'#8bc34a','government':'#3f51b5','library':'#ff5722','gym':'#e91e63','pharmacy':'#00bcd4','bakery':'#ff7043','brewery':'#ffc107','bar':'#9c27b0','fast_food':'#ff9800','fire_station':'#d32f2f','police':'#1565c0','entertainment':'#9c27b0','transportation':'#009688','office':'#607d8b','community_center':'#ff9800','post_office':'#78909c','bookstore':'#5d4037'} | tojson }};
 
-var labels = {};  // id -> L.tooltip marker for runtime labels
+var mapEl = document.getElementById('map');
+var markers = {};   // id -> marker CURRENTLY on the map (in view only)
+var labels = {};    // id -> label tooltip currently attached
+var locById = {};
+locations.forEach(function(l){ locById[l.id] = l; });
 
-locations.forEach(function(loc) {
-    if (!loc.lat || !loc.lng) return;
+function makeMarker(loc) {
     var color = catColors[loc.category] || '#9e9e9e';
-    var isBusStop = loc.category === 'bus_stop';
-    var marker;
-    if (isBusStop) {
-        marker = L.circleMarker([loc.lat, loc.lng], {
-            radius: 4, fillColor: '#009688', color: '#fff', weight: 1, fillOpacity: 0.8
-        }).addTo(map);
+    var m;
+    if (loc.category === 'bus_stop') {
+        m = L.circleMarker([loc.lat, loc.lng], {radius: 4, fillColor: '#009688', color: '#fff', weight: 1, fillOpacity: 0.8});
     } else {
-        // Use a real marker icon div for better visibility
         var icon = L.divIcon({
             className: 'map-pin',
             html: '<div style="background:'+color+';width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:12px;">'+loc.name[0]+'</span></div>',
-            iconSize: [28, 28],
-            iconAnchor: [14, 28],
-            popupAnchor: [0, -28]
+            iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
         });
-        marker = L.marker([loc.lat, loc.lng], {icon: icon}).addTo(map);
+        m = L.marker([loc.lat, loc.lng], {icon: icon});
     }
-    marker.bindPopup(
+    m.bindPopup(
         '<b>' + loc.name + '</b><br>' +
         (loc.rating ? '<span style="color:#fbbc04">&#9733;</span> ' + loc.rating + ' &middot; ' : '') +
         loc.category.replace(/_/g,' ') +
@@ -228,68 +224,102 @@ locations.forEach(function(loc) {
         '<br><a href="/sites/map-services/place/' + loc.id + '" style="font-size:12px">View details</a>' +
         '<br><a href="/sites/map-services/directions?to=' + encodeURIComponent(loc.address || loc.name) + '" style="font-size:12px">Directions</a>'
     );
-    markers[loc.id] = marker;
+    return m;
+}
 
-    // Runtime label tooltip (shown at zoom 15+)
-    if (!isBusStop) {
-        var label = L.tooltip({permanent: true, direction: 'right', offset: [8, 0],
-            className: 'map-label', opacity: 1})
+function addMarker(loc) {
+    if (markers[loc.id]) return;
+    markers[loc.id] = makeMarker(loc).addTo(map);
+    if (loc.category !== 'bus_stop') {
+        labels[loc.id] = L.tooltip({permanent: true, direction: 'right', offset: [8, 0], className: 'map-label', opacity: 1})
             .setContent(loc.name.length > 22 ? loc.name.substring(0,22) + '...' : loc.name)
             .setLatLng([loc.lat, loc.lng]);
-        labels[loc.id] = label;
     }
-});
+}
+function removeMarker(id) {
+    if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+    if (labels[id]) { if (map.hasLayer(labels[id])) map.removeLayer(labels[id]); delete labels[id]; }
+}
 
-// Show/hide labels based on zoom
+// Render ONLY the markers inside the current viewport, adding/removing as the
+// map moves. The map's marker DOM therefore holds just what's in view, so an
+// off-screen place genuinely has to be panned to — the map, not the markup,
+// is the source of spatial truth.
+function syncInView() {
+    var b = map.getBounds();
+    locations.forEach(function(loc) {
+        if (!loc.lat || !loc.lng) return;
+        var inside = b.contains([loc.lat, loc.lng]);
+        if (inside && !markers[loc.id]) addMarker(loc);
+        else if (!inside && markers[loc.id]) removeMarker(loc.id);
+    });
+    updateLabels();
+}
+
+// Runtime labels appear at zoom 15+ (in-view markers only).
 function updateLabels() {
     var z = map.getZoom();
     for (var id in labels) {
-        if (z >= 15) {
-            if (!map.hasLayer(labels[id])) labels[id].addTo(map);
-        } else {
-            if (map.hasLayer(labels[id])) map.removeLayer(labels[id]);
-        }
+        if (z >= 15) { if (!map.hasLayer(labels[id])) labels[id].addTo(map); }
+        else { if (map.hasLayer(labels[id])) map.removeLayer(labels[id]); }
     }
 }
-map.on('zoomend', updateLabels);
-updateLabels();
 
-// Initial framing. The DEFAULT browse view intentionally frames only the
-// central ~half of the results, so the rest sit off-screen and must be
-// reached by panning/zooming — this is what makes the spatial-navigation
-// (pan/zoom) macros actually necessary rather than decorative. When the user
-// has searched or filtered, we instead fit ALL matches, so a deliberately
-// narrowed set stays fully usable.
-(function initFraming() {
+// Viewport persistence: record the map's center+zoom on the container as
+// data-map-view. outerHTML serializes attributes, so the recorded trajectory
+// snapshot carries it and a reconstructed / replayed page restores the exact
+// pan+zoom the annotator moved to — otherwise playback snaps back to the
+// default frame and the panned-to content is lost.
+function persistView() {
+    var c = map.getCenter();
+    mapEl.setAttribute('data-map-view', c.lat.toFixed(6) + ',' + c.lng.toFixed(6) + ',' + map.getZoom());
+}
+
+map.on('moveend', function(){ syncInView(); persistView(); });
+map.on('zoomend', updateLabels);
+
+// Initial view: restore a persisted viewport if one is present (replay), else
+// frame the DEFAULT browse view on only the central ~half of the results so
+// the rest sit off-screen and must be panned to — this is what makes the
+// pan/zoom macros necessary rather than decorative. A searched/filtered set
+// is fit in full so a deliberately narrowed result stays usable.
+(function initView() {
+    var saved = mapEl.getAttribute('data-map-view');
+    if (saved) {
+        var p = saved.split(',');
+        if (p.length === 3 && p.every(function(v){ return v !== '' && !isNaN(parseFloat(v)); })) {
+            map.setView([parseFloat(p[0]), parseFloat(p[1])], parseFloat(p[2]));
+            syncInView(); persistView(); return;
+        }
+    }
     var pts = locations.filter(function(l){ return l.lat && l.lng; });
-    if (!pts.length) return;
+    if (!pts.length) { persistView(); return; }
     var narrowed = {{ 'true' if (search_query or selected_category or (min_rating is not none) or open_now == '1' or request.args.get('sort')) else 'false' }};
     if (narrowed || pts.length <= 8) {
         map.fitBounds(pts.map(function(l){ return [l.lat, l.lng]; }), {padding: [30, 30], maxZoom: 16});
-        return;
+    } else {
+        var clat = 0, clng = 0;
+        pts.forEach(function(l){ clat += l.lat; clng += l.lng; });
+        clat /= pts.length; clng /= pts.length;
+        var inner = pts.slice().sort(function(a, b){
+            var da = (a.lat-clat)*(a.lat-clat) + (a.lng-clng)*(a.lng-clng);
+            var db = (b.lat-clat)*(b.lat-clat) + (b.lng-clng)*(b.lng-clng);
+            return da - db;
+        }).slice(0, Math.ceil(pts.length * 0.4));
+        map.fitBounds(inner.map(function(l){ return [l.lat, l.lng]; }), {padding: [20, 20], maxZoom: 16});
     }
-    // Frame the central cluster (markers nearest the centroid) tightly enough
-    // that only ~half of all markers land in the initial viewport; the rest
-    // fall off the edges and require panning to reach. Fitting the inner 40%
-    // with half-step zoom lands the map at ~zoom 13.5 (~54% of pins visible).
-    var clat = 0, clng = 0;
-    pts.forEach(function(l){ clat += l.lat; clng += l.lng; });
-    clat /= pts.length; clng /= pts.length;
-    var inner = pts.slice().sort(function(a, b){
-        var da = (a.lat-clat)*(a.lat-clat) + (a.lng-clng)*(a.lng-clng);
-        var db = (b.lat-clat)*(b.lat-clat) + (b.lng-clng)*(b.lng-clng);
-        return da - db;
-    }).slice(0, Math.ceil(pts.length * 0.4));
-    map.fitBounds(inner.map(function(l){ return [l.lat, l.lng]; }), {padding: [20, 20], maxZoom: 16});
+    syncInView();
+    persistView();
 })();
 
 function panTo(lat, lng, id) {
     map.setView([lat, lng], 16);
+    if (!markers[id] && locById[id]) addMarker(locById[id]);   // target may be off the current window
     if (markers[id]) markers[id].openPopup();
-    // Highlight active result
     document.querySelectorAll('.result-item').forEach(function(el) { el.classList.remove('active'); });
     var el = document.querySelector('[data-id="' + id + '"]');
     if (el) el.classList.add('active');
+    persistView();
 }
 </script>
 </body>
