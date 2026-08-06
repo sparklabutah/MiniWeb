@@ -78,13 +78,21 @@
         gearBtn = q('.mp-gear-btn'), ccBtnEl = q('.mp-cc-btn'),
         backBtn = q('.mp-back'), fwdBtn = q('.mp-fwd');
 
-    var t = 0, playing = false, started = false, chapters = [], lastTs = null, rafOn = false;
+    // Resume from a persisted position. player.js rebuilds its inner DOM on
+    // every load, so the seek state has to live on the ROOT element as a
+    // data-* attribute (data-mp-pos) — outerHTML serializes attributes, so it
+    // travels with the recorded trajectory snapshot and a reconstructed page
+    // re-reads it here, restoring the frame the annotator actually scrubbed to
+    // instead of snapping back to 0:00.
+    var t = parseFloat(d.mpPos || '0') || 0, playing = false, started = false, chapters = [], lastTs = null, rafOn = false;
     var speed = 1;
 
     function render() {
       var frac = duration > 0 ? t / duration : 0;
       played.style.width = (frac * 100) + '%'; knob.style.left = (frac * 100) + '%';
       curEl.textContent = fmt(t); seek.setAttribute('aria-valuenow', Math.round(frac * 100));
+      // persist position on the root so it survives a reload / trajectory replay
+      el.setAttribute('data-mp-pos', Math.round(t));
     }
     function loop(ts) {
       if (playing) {
@@ -157,6 +165,9 @@
         });
       } else { go(); }
     }
+    // Paint the initial frame so a resumed position (data-mp-pos) shows on
+    // load without waiting for an interaction.
+    render();
     screen.addEventListener('click', start);
 
     // ---- settings menu ----
