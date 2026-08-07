@@ -5,12 +5,15 @@ two-axis model (base macro + optional reasoning operation).
 For every data/annotations/<ann>/<task>/task.json (additive + backed up):
   - each old macro name resolves to a NEW base macro (+ operation when the map
     carries one, e.g. extract_by_extremum -> reasoning_on_page.extremum);
-  - `macros` becomes the deduped new base names; `macro_operations` = {base: op};
-  - `macro_spans` / `macro_subtasks` / `macro_edges` are re-keyed to the new
-    bases (colliding spans merged min/max, subtasks joined, edges deduped);
-  - macros whose verdict was DELETE are dropped and recorded in
-    `macro_migration.dropped` for a human re-tag; the original names are kept in
-    `macro_migration.from`.
+  - `macro_tags` (authoritative) = ONE entry per original tagged span:
+    {macro, op, span, subtask, from}. Each annotator span is preserved exactly
+    and NOT merged — so a base that occurs twice (e.g. two form submissions)
+    stays two tags with their own spans. `macros` = deduped base names,
+    `macro_operations` = {base: op} (summaries). `macro_spans`/`macro_subtasks`
+    are deprecated (emptied) in favour of `macro_tags`.
+  - deleted-but-actually-reasoning extract/compute tags recover to
+    reasoning_on_page + an instruction-inferred op; other DELETE verdicts drop
+    into `macro_migration.dropped` for a human re-tag (originals in `.from`).
 
 Uses docs/macro_migration.csv (+ old sub-aliases + new-base identity).
 Run: PYTHONPATH=. ~/.conda/envs/miniweb/bin/python scripts/migrate_macros_to_v2.py
@@ -98,36 +101,35 @@ def main():
         edges = d.get("macro_edges") or []
 
         instr = d.get("instruction") or ""
-        remap = {}            # old -> base (or None if dropped)
-        new_ops = {}
+        remap = {}
         dropped = []
+        # macro_tags: one entry PER original tagged span (preserves repeats and
+        # each annotator span exactly — no merging). This is the authoritative
+        # per-occurrence tagging in the two-axis model.
+        tags = []
         for om in old_macros:
-            base, op, disp = resolve(om, instr)
+            base, op, _disp = resolve(om, instr)
             remap[om] = base
             if base is None:
                 dropped.append(om)
-            elif op:
-                new_ops[base] = op
+                continue
+            sp = spans.get(om)
+            tags.append({
+                "macro": base,
+                "op": op,
+                "span": list(sp) if (isinstance(sp, list) and len(sp) == 2) else None,
+                "subtask": subs.get(om, ""),
+                "from": om,
+            })
+        # keep the tags in trajectory order where a span exists
+        tags.sort(key=lambda t: (t["span"][0] if t["span"] else 1e9))
 
-        new_macros = list(dict.fromkeys(b for b in remap.values() if b))
-        # re-key spans (merge collisions min/max)
-        new_spans = {}
-        for om, sp in spans.items():
-            b = remap.get(om) or (resolve(om, instr)[0])
-            if not b or not (isinstance(sp, list) and len(sp) == 2):
-                continue
-            if b in new_spans:
-                new_spans[b] = [min(new_spans[b][0], sp[0]), max(new_spans[b][1], sp[1])]
-            else:
-                new_spans[b] = list(sp)
-        # re-key subtasks (join collisions)
-        new_subs = {}
-        for om, txt in subs.items():
-            b = remap.get(om) or (resolve(om, instr)[0])
-            if not b or not txt:
-                continue
-            new_subs[b] = (new_subs[b] + " ; " + txt) if b in new_subs else txt
-        # re-key edges
+        new_macros = list(dict.fromkeys(t["macro"] for t in tags))
+        new_ops = {}
+        for t in tags:
+            if t["op"] and t["macro"] not in new_ops:
+                new_ops[t["macro"]] = t["op"]
+        # re-key edges to base names (dedup; base-level graph)
         new_edges, seen = [], set()
         for e in edges:
             a, b = remap.get(e.get("from")), remap.get(e.get("to"))
@@ -136,10 +138,13 @@ def main():
 
         d["macros"] = new_macros
         d["macro_operations"] = new_ops
-        d["macro_spans"] = new_spans
-        d["macro_subtasks"] = new_subs
+        d["macro_tags"] = tags
         d["macro_edges"] = new_edges
         d["macro_migration"] = {"from": old_macros, "dropped": dropped}
+        # deprecated by macro_tags (kept empty so stale readers don't get a
+        # lossy merged span)
+        d["macro_spans"] = {}
+        d["macro_subtasks"] = {}
         if dropped:
             flagged += 1
         if not new_macros:
