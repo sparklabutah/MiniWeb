@@ -848,6 +848,7 @@ def annotate():
             "macro_edges": task.get("macro_edges", []),
             "macro_positions": task.get("macro_positions", {}),
             "macro_subtasks": task.get("macro_subtasks", {}),
+            "macro_operations": task.get("macro_operations", {}),
             "qa_answers": task.get("qa_answers", {}),
             "starting_url": task.get("starting_url", ""),
             "requires_login": task.get("requires_login", True),
@@ -862,7 +863,12 @@ def annotate():
                            prompt=prompt,
                            rerecord=rerecord,
                            macro_descriptions=_MACRO_DESCRIPTIONS,
-                           macro_locations=_canonical_macro_locations())
+                           macro_locations=_canonical_macro_locations(),
+                           operations=_registry.operations(),
+                           all_macros=[{"key": m,
+                                        "group": _registry.group_of(m),
+                                        "description": (_MACRO_DESCRIPTIONS.get(m) or {}).get("description", m)}
+                                       for m in _registry.all_canonical()])
 
 
 @annotation_bp.route("/review")
@@ -931,6 +937,28 @@ def accounts_page():
 
 
 # --- Macro template builder ------------------------------------------------
+
+@annotation_bp.route("/api/macro_sheet.csv")
+def api_macro_sheet_csv():
+    """Download the current macro + reasoning-op set as a CSV (same columns as
+    docs/refined_macro_set.csv), generated live from the registry."""
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["category", "group", "tag", "description", "span_start", "span_end"])
+    group_order = list(_registry.groups().keys())
+    for m in sorted(_registry.all_canonical(),
+                    key=lambda m: (group_order.index(_registry.group_of(m)), m)):
+        e = _registry.entry(m)
+        w.writerow(["base macro", e.get("group", ""), m, e.get("description", ""),
+                    e.get("span_start", ""), e.get("span_end", "")])
+    for op, info in _registry.operations().items():
+        w.writerow(["reasoning op", "reasoning", op, info.get("desc", ""), "", ""])
+    from flask import Response
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=refined_macro_set.csv"})
+
 
 @annotation_bp.route("/macro-templates")
 def macro_templates_page():
@@ -1402,6 +1430,24 @@ def api_create_task():
             return jsonify({"error": "macro dependencies incomplete",
                             "unconnected_macros": orphans}), 400
 
+    # Register any proposed (new-to-registry) macros into data/macros.yaml so
+    # they become real, reusable macros — not just per-task strings.
+    global _MACRO_DESCRIPTIONS
+    registered, reg_errors = [], {}
+    _defs = data.get("proposed_macro_defs") or {}
+    for nm in (data.get("proposed_macros") or []):
+        if _registry.is_known(nm):
+            continue
+        d = _defs.get(nm) or {}
+        try:
+            _registry.register_macro(nm, d.get("group", ""), d.get("description", ""),
+                                     d.get("span_start", ""), d.get("span_end", ""))
+            registered.append(nm)
+        except (ValueError, OSError) as e:
+            reg_errors[nm] = str(e)
+    if registered:
+        _MACRO_DESCRIPTIONS = _registry.descriptions()  # refresh derived cache
+
     sites_list = data.get("sites", [])
     task = {
         "task_id": f"{'_'.join(s['id'] if isinstance(s, dict) else s for s in sites_list[:2])}_{uuid.uuid4().hex[:6]}",
@@ -1419,6 +1465,9 @@ def api_create_task():
         "macro_positions": data.get("macro_positions", {}),
         "macro_subtasks": data.get("macro_subtasks", {}),
         "macro_spans": data.get("macro_spans", {}),
+        "macro_operations": data.get("macro_operations", {}),
+        "proposed_macros": data.get("proposed_macros", []),
+        "proposed_macro_defs": data.get("proposed_macro_defs", {}),
         "qa_answers": data.get("qa_answers", {}),
         "starting_url": data.get("starting_url", ""),
         "requires_login": data.get("requires_login", True),
@@ -1496,7 +1545,9 @@ def api_create_task():
     for macro in na_macros:
         _save_na_report(site_ids, macro, annotator)
 
-    return jsonify({"task_id": task_id, "status": "saved"})
+    return jsonify({"task_id": task_id, "status": "saved",
+                    "registered_macros": registered,
+                    "macro_errors": reg_errors})
 
 
 @annotation_bp.route("/api/sites")

@@ -48,13 +48,14 @@ rows = db.execute(
 
 ## Macro System
 
-Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical interaction, e.g. `create_by_form`, `filter_by_slider`, `toggle_relationship`) + an optional **reasoning operation** (`read/extremum/count/compute/compare/verify`). Pure reasoning uses the op-only base `reasoning_on_page`. The canonical registry is `data/macros.yaml` (loaded via `annotation/macros.py`) — the single source of truth; do not duplicate macro facts elsewhere, edit the registry.
+Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical interaction, e.g. `create_by_form`, `filter_by_slider`, `toggle_relationship`) + an optional **reasoning operation** (`read/extremum/count/compute/compare/verify`). Reasoning that the agent must **output to the human** uses the op-only base `report_information` (this REPLACED `reasoning_on_page`, which is now an alias). Intermediate reasoning is NOT its own tag — its op folds onto the base macro it is part of. The canonical registry is `data/macros.yaml` (loaded via `annotation/macros.py`) — the single source of truth; do not duplicate macro facts elsewhere, edit the registry.
 
-- **~38 base macros + 6 operations** in `data/macros.yaml` (`groups:` / `operations:` / `macros:`). Retired flat `verb_by_modality` names fold in as `aliases:` so `canon()` migrates them (`docs/macro_migration.csv` is the old→new map; the old 121 → 38, 31 deleted).
+- **39 base macros + 6 operations** in `data/macros.yaml` (`groups:` / `operations:` / `macros:`). Retired flat `verb_by_modality` names fold in as `aliases:` so `canon()` migrates them. `compare_by_form` and `report_information` were added during review; `reasoning_on_page` retired into `report_information`'s aliases. Annotators can register new macros from the annotate UI (persisted to `data/macros.yaml` under the `unassigned` group). Download the current set as CSV from the Macro Template Builder.
+- **Op definitions:** `read`=info is on the page · `extremum`=get max/min · `count`=count · `compute`=compute a NEW value from on-page values · `compare`=compare 2 on-page values · `verify`=compare an on-page value against a value in the instruction.
 - `_MACRO_DESCRIPTIONS`/`_canon` in `annotation/app.py` derive from `annotation/macros.py` — edit the registry, not those.
 - Navigation macros (`navigate_by_route`) are NOT sampled for tasks — agents start on the target page
 - `tests/test_macro_registry.py` guards registry drift.
-- **In progress (branch `refined-macro-set`):** wiring the operation axis into `annotation/app.py`, the two-axis picker into `annotate.html`, the recorded-task migration, and re-keying `annotation/macro_locations.py`.
+- Per-site macro→UI-location data lives in **`data/macro_locations.yaml`** (canonical-macro-keyed; drives coverage/sampling). `annotation/macro_locations.py` is now just a loader — edit the YAML, not the module.
 
 ## Key Architecture
 

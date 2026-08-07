@@ -29,31 +29,34 @@ groups:
   reasoning:
     weight: 3
     desc: produce an answer by reading/reasoning over the page
+  unassigned:
+    weight: 1
+    desc: proposed macro; family to be assigned later
 operations:
   read:
     weight: 0
-    desc: locate and read a value that is present on the page (baseline / filler)
+    desc: 'read/memorize: the info is present on the page — locate and read it (baseline / filler)'
     check: answer appears verbatim on a visited page
   extremum:
     weight: 3
-    desc: derive the min/max among items by reasoning, without using a sort control
+    desc: get the max/min among on-page items without using a sort control
     check: chosen item is the argmax/argmin of the candidate set
   count:
     weight: 3
-    desc: count how many items match a condition
+    desc: count the on-page items that match a condition
     check: count matches the true number of matching items
   compute:
     weight: 3
-    desc: combine on-page data through a computation to get a value not shown
+    desc: compute a new value from values on the page (a value not itself shown)
     check: recompute from source data and compare
   compare:
     weight: 3
-    desc: weigh two or more candidates against each other
-    check: the stated relation holds over the named items
+    desc: compare two values on the page against each other
+    check: the stated relation holds over the named values
   verify:
     weight: 2
-    desc: confirm a condition, threshold, or state (yes/no)
-    check: evaluate the predicate against page state
+    desc: compare a value on the page against a value given in the instruction
+    check: the on-page value satisfies the instruction's stated value/condition
 macros:
   create_by_form:
     group: form
@@ -84,6 +87,12 @@ macros:
       - edit_by_date_range
       - edit_by_dropdown
       - edit_by_query
+  compare_by_form:
+    group: form
+    description: Compare items by selecting them through form controls (e.g. dropdowns) that render a side-by-side view
+    example: Pick two products in the compare dropdowns and read which has more reviews
+    span_start: open/enter the compare view
+    span_end: both items selected and the comparison is visible
   pay_by_form:
     group: form
     description: Make a payment via a form
@@ -361,13 +370,14 @@ macros:
     span_end: result shown
     aliases:
       - compute_by_slider
-  reasoning_on_page:
+  report_information:
     group: reasoning
-    description: Reason over the current page with no interaction; pair with one operation (read/extremum/count/compute/compare/verify)
-    example: What is the cheapest flight? (extremum)
-    span_start: the answer page is in view
-    span_end: answer produced
+    description: Report the answer back to the human. Always the terminal tag — span the last action(s) where the answer is on screen; carries the reasoning op. Intermediate reasoning folds onto its own macro instead.
+    example: What is the meeting ID of the earliest upcoming meeting? — report_information.read
+    span_start: the answer is located/surfaced on the page
+    span_end: the answer is reported
     aliases:
+      - reasoning_on_page
       - compare_by_date_range
       - compare_by_dropdown
       - compare_by_query

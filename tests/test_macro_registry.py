@@ -41,9 +41,11 @@ def test_aliases_resolve_and_dont_collide():
         assert R.canon(target) == target, f"canon of base {target} not idempotent"
 
 
-def test_reasoning_on_page_is_op_only():
-    e = R.entry("reasoning_on_page")
+def test_report_information_is_op_only():
+    """report_information is the reasoning output base (replaces reasoning_on_page)."""
+    e = R.entry("report_information")
     assert e.get("op_only") is True and e.get("group") == "reasoning"
+    assert R.canon("reasoning_on_page") == "report_information"
 
 
 if __name__ == "__main__":

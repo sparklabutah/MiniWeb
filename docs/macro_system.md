@@ -11,9 +11,15 @@ A macro tag has **two axes**:
   `verify`. Every operation has a **deterministic check** so it can grade and
   reward, not just label.
 
-Pure-reasoning tasks (no interaction) use the op-only base **`reasoning_on_page`**
-carrying one operation — e.g. "what is the cheapest flight?" = `reasoning_on_page
-. extremum`.
+Reasoning the agent must **output to the human** (the answer/report) uses the
+op-only base **`report_information`** carrying one operation — e.g. "what is the
+cheapest flight?" = `report_information.extremum`. This replaced the old
+`reasoning_on_page` (now an alias). **Intermediate** reasoning is never its own
+tag: its operation folds onto the base macro it is part of (a macro carries one
+op). Op meanings: `read`=info is on the page; `extremum`=get max/min;
+`count`=count; `compute`=compute a new value from on-page values; `compare`=compare
+two on-page values; `verify`=compare an on-page value against a value in the
+instruction.
 
 ## The registry (`data/macros.yaml`)
 
@@ -35,15 +41,17 @@ The old flat taxonomy had **121 `verb_by_modality` macros** that conflated the
 *outcome*, the *widget*, and reasoning into one name. The refined set separates
 them: the widget/intent is the base macro (one per real interaction, with the
 form/filter/etc. families collapsed by intent), and the reasoning is the operation
-axis. 121 → **38 base macros + 6 operations**; every old name maps to a new base
-via `aliases` (see `docs/macro_migration.csv`), with 31 deleted (too
-compositional / too primitive / not a real interaction).
+axis. 121 → **39 base macros + 6 operations**; every old name maps to a new base
+via `aliases`, with the rest deleted (too compositional / too primitive / not a
+real interaction).
 
-## Status / remaining wiring
+## Wiring
 
-Done: the registry, `annotation/macros.py` accessors, the drift test
-(`tests/test_macro_registry.py`), and the migration map. Still to wire onto the
-new vocabulary: `annotation/app.py` (coverage/sampling/persist the operation
-axis), the annotation UI (two-axis picker in `annotate.html`), the recorded
-task.json tags (`docs/macro_migration.csv` → a migration script), and
-`annotation/macro_locations.py` (re-key to the new base names).
+The two-axis model is wired throughout: `annotation/macros.py` accessors, the
+drift test (`tests/test_macro_registry.py`), the annotation UI (per-node
+reasoning-op picker + add/propose-macro panel in `annotate.html`), `annotation/
+app.py` (persists `macro_operations`, registers proposed macros to the registry),
+and `data/macro_locations.yaml` (per-site UI locations, canonical-macro-keyed;
+loaded via `annotation/macro_locations.py`). Annotators can propose new macros
+from the UI (saved to `data/macros.yaml` under the `unassigned` group) and
+download the full set as CSV from the Macro Template Builder.

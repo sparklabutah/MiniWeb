@@ -60,7 +60,7 @@ Each site is a self-contained Flask blueprint under `sites/<id>/`:
 
 ### Macro System (121 canonical macros)
 
-Macros are primitive UI skills that agents must perform, defined in the canonical registry `data/macros.yaml` (see `docs/macro_taxonomy.md` for the two-layer model). Each macro is tagged with a difficulty category:
+Macros are primitive UI skills that agents must perform, defined in the canonical registry `data/macros.yaml` (see `docs/macro_system.md` for the two-axis model). Each macro is tagged with a difficulty category:
 
 | Category | Macros | Weight | Description |
 |----------|--------|--------|-------------|

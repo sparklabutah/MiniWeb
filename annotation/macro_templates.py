@@ -483,8 +483,12 @@ def list_macros() -> list:
         for m in {_canon(x) for x in (data.get("macros") or [])}:
             task_counts[m] = task_counts.get(m, 0) + 1
 
+    from annotation import macros as _reg
+    # every registry macro (incl. newly proposed/registered ones), plus any
+    # site-mapped names, so the builder never hides a real macro.
+    all_macros = mapped_macros() | set(_reg.all_canonical())
     out = []
-    for macro in mapped_macros():
+    for macro in all_macros:
         meta = _MACRO_DESCRIPTIONS.get(macro, {})
         tree = templates.get(macro)
         out.append({

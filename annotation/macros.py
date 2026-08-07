@@ -40,6 +40,48 @@ def reload():
     _data.cache_clear()
 
 
+def register_macro(name, group, description, span_start="", span_end="", example=""):
+    """Append a new base macro to data/macros.yaml and hot-reload the registry.
+
+    Raises ValueError if the name collides (as a macro or alias) or the group is
+    unknown. The YAML file is edited by appending under the `macros:` block
+    (which is last in the file), so existing comments/formatting are preserved.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("macro name required")
+    group = group or "unassigned"   # family assigned later
+    macros, groups, alias = _load()
+    if name in macros:
+        raise ValueError(f"{name!r} is already a macro")
+    if name in alias:
+        raise ValueError(f"{name!r} is an alias of {alias[name]!r}")
+    if group not in groups:
+        raise ValueError(f"unknown group {group!r} (expected one of {sorted(groups)})")
+    if not (description or "").strip():
+        raise ValueError("description required")
+
+    entry = {"group": group, "description": description.strip()}
+    if example:
+        entry["example"] = example.strip()
+    if span_start:
+        entry["span_start"] = span_start.strip()
+    if span_end:
+        entry["span_end"] = span_end.strip()
+
+    block = yaml.safe_dump({name: entry}, sort_keys=False, allow_unicode=True,
+                           default_flow_style=False, width=1000)
+    indented = "".join("  " + line + "\n" for line in block.splitlines())
+    with open(REGISTRY_PATH) as f:
+        cur = f.read()
+    if not cur.endswith("\n"):
+        cur += "\n"
+    with open(REGISTRY_PATH, "w") as f:
+        f.write(cur + indented)
+    reload()
+    return name
+
+
 # --- identity / aliases ----------------------------------------------------
 
 def canon(name):
