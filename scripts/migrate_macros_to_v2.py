@@ -45,13 +45,37 @@ MAP.update({
 })
 
 
-def resolve(old):
+import re
+# deleted-but-actually-reasoning macros: recover to reasoning_on_page + an op
+# inferred from the instruction, instead of dropping.
+RECOVER = {"extract_by_query", "extract_by_route", "extract_by_dropdown",
+           "extract_by_date_range", "extract_by_semantic", "extract_by_ranking",
+           "extract_by_toggle", "extract_by_code", "compute_by_dropdown", "compute_by_route"}
+_COUNT = re.compile(r"\b(how many|number of|count)\b", re.I)
+_COMPUTE = re.compile(r"\b(combined|total|sum|average|mean|difference between|convert|how much)\b", re.I)
+_EXT = re.compile(r"\b(highest|lowest|oldest|newest|latest|cheapest|priciest|most|least|"
+                  r"biggest|smallest|largest|longest|shortest|best|worst|top|greatest|fewest)\b", re.I)
+
+
+def infer_op(instr):
+    if _COUNT.search(instr):
+        return "count"
+    if _COMPUTE.search(instr):
+        return "compute"
+    if _EXT.search(instr):
+        return "extremum"
+    return "read"
+
+
+def resolve(old, instr=""):
     """(base, op|None, disposition)."""
     if M.is_canonical(old):
         return old, None, "identity"
     if old in MAP:
         base, _, op = MAP[old].partition(".")
         return base, (op or None), "mapped"
+    if old in RECOVER:
+        return "reasoning_on_page", infer_op(instr), "recovered"
     if old in DELETE:
         return None, None, "deleted"
     return None, None, "unknown"
@@ -73,11 +97,12 @@ def main():
         subs = d.get("macro_subtasks") or {}
         edges = d.get("macro_edges") or []
 
+        instr = d.get("instruction") or ""
         remap = {}            # old -> base (or None if dropped)
         new_ops = {}
         dropped = []
         for om in old_macros:
-            base, op, disp = resolve(om)
+            base, op, disp = resolve(om, instr)
             remap[om] = base
             if base is None:
                 dropped.append(om)
@@ -88,7 +113,7 @@ def main():
         # re-key spans (merge collisions min/max)
         new_spans = {}
         for om, sp in spans.items():
-            b = remap.get(om) or (resolve(om)[0])
+            b = remap.get(om) or (resolve(om, instr)[0])
             if not b or not (isinstance(sp, list) and len(sp) == 2):
                 continue
             if b in new_spans:
@@ -98,7 +123,7 @@ def main():
         # re-key subtasks (join collisions)
         new_subs = {}
         for om, txt in subs.items():
-            b = remap.get(om) or (resolve(om)[0])
+            b = remap.get(om) or (resolve(om, instr)[0])
             if not b or not txt:
                 continue
             new_subs[b] = (new_subs[b] + " ; " + txt) if b in new_subs else txt
