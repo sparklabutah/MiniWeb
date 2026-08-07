@@ -70,6 +70,19 @@ def infer_op(instr):
     return "read"
 
 
+# deleted macro names that still have ONE clear new base (the old name was
+# compositional/wrong, but the interaction obviously maps somewhere).
+CLEAR = {
+    "navigate_from_table": "navigate_by_route",
+    "play_by_route": "play_by_playback", "play_by_dropdown": "play_by_playback",
+    "filter_by_radio": "filter_by_options", "filter_by_toggle": "filter_by_options",
+    "react_by_gesture": "feedback_by_react",
+    "verify_by_slider": "reasoning_on_page.verify",
+    "verify_by_dropdown": "reasoning_on_page.verify",
+    "verify_by_toggle": "reasoning_on_page.verify",
+}
+
+
 def resolve(old, instr=""):
     """(base, op|None, disposition)."""
     if M.is_canonical(old):
@@ -79,6 +92,9 @@ def resolve(old, instr=""):
         return base, (op or None), "mapped"
     if old in RECOVER:
         return "reasoning_on_page", infer_op(instr), "recovered"
+    if old in CLEAR:
+        base, _, op = CLEAR[old].partition(".")
+        return base, (op or None), "cleared"
     if old in DELETE:
         return None, None, "deleted"
     return None, None, "unknown"
