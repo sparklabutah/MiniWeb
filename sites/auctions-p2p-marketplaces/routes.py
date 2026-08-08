@@ -566,6 +566,18 @@ def checkout_submit(listing_id):
                                product=product, user=user, price=price, done=False,
                                order=None, error="Please fill in all shipping fields.")
 
+    # Loose charge: any card number is accepted, but a recognized SecureBank
+    # card must carry the correct CVV (wrong CVV on a known card => declined).
+    from app.bank_charges import charge_card
+    pay = charge_card(request.form.get("card_number", ""), request.form.get("cvc", ""),
+                      request.form.get("expiry", ""), price, "BidMarket",
+                      category="shopping", description=f"Purchase — {product['name']}",
+                      strict=False)
+    if not pay["ok"]:
+        return render_template("auctions-p2p-marketplaces/checkout.html",
+                               product=product, user=user, price=price, done=False,
+                               order=None, error=pay["error"])
+
     if product["status"] == "active":
         product["status"] = "ended"
         product["winner_id"] = user["id"]

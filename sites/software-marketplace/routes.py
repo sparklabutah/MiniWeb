@@ -662,6 +662,20 @@ def checkout_page():
 
             final_total = round(max(0, subtotal - actual_discount), 2)
 
+            # Loose charge: any card number is accepted, but a recognized
+            # SecureBank card must carry the correct CVV (else declined).
+            from app.bank_charges import charge_card
+            pay = charge_card(card_number, request.form.get("cvv", ""), card_expiry,
+                              final_total, "Meridian App Store", category="software",
+                              description="App Store purchase", strict=False)
+            if not pay["ok"]:
+                return render_template(
+                    "software-marketplace/checkout.html",
+                    cart_items=cart_items, subtotal=subtotal,
+                    discount=actual_discount, total=final_total,
+                    promo_error=pay["error"], promo_applied=None, user=user,
+                )
+
             purchases = db.query(SITE, "purchases") if db.get_table_name(SITE, "purchases") else []
             installed = db.query(SITE, "installed")
             new_purchase_id = max((p["id"] for p in purchases), default=0) + 1

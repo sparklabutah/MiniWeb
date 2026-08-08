@@ -45,22 +45,43 @@ def find_card(card_number):
 
 
 def charge_card(card_number, cvv, expiry, amount, merchant,
-                category="general", description="", require_expiry=True):
+                category="general", description="", require_expiry=True, strict=True):
     """Validate a card and post a charge. Returns a dict with ok/error.
 
-    Declines an unrecognised card, wrong CVV/expiry, a frozen card, a bad
-    amount, or insufficient available credit.
+    strict=True (default): declines an unrecognised card, wrong CVV/expiry, a
+    frozen card, a bad amount, or insufficient available credit.
+
+    strict=False (loose): accepts ANY card number so checkout is never blocked
+    for an external card — EXCEPT that a recognised SecureBank number must carry
+    the correct CVV (wrong CVV on a known card => declined). An unrecognised
+    number is accepted with no bank charge; a recognised number + correct CVV
+    records the charge (expiry/limit not enforced). Returns ok with a
+    ``charged`` flag, or ok=False + error on a declined known card.
     """
     card = find_card(card_number)
-    if not card:
-        return {"ok": False, "error": "Card declined — number not recognized"}
-    if card.get("card_frozen"):
-        return {"ok": False, "error": "Card declined — card is frozen"}
-    if str(cvv or "").strip() != str(card.get("cvv") or "").strip():
-        return {"ok": False, "error": "Card declined — invalid security code (CVV)"}
-    if require_expiry and card.get("card_expiry"):
-        if _norm_exp(expiry) != _norm_exp(card.get("card_expiry")):
-            return {"ok": False, "error": "Card declined — invalid or expired card"}
+
+    if not strict:
+        if not card:
+            # any other card number is accepted; nothing to charge to the bank
+            return {"ok": True, "charged": False, "external": True,
+                    "note": "external card accepted — no bank charge recorded"}
+        if card.get("card_frozen"):
+            return {"ok": False, "error": "Card declined — card is frozen"}
+        # recognised card => the CVV must match
+        if str(cvv or "").strip() != str(card.get("cvv") or "").strip():
+            return {"ok": False, "error": "Card declined — invalid security code (CVV)"}
+        # recognised + correct CVV: fall through to record the charge
+    else:
+        if not card:
+            return {"ok": False, "error": "Card declined — number not recognized"}
+        if card.get("card_frozen"):
+            return {"ok": False, "error": "Card declined — card is frozen"}
+        if str(cvv or "").strip() != str(card.get("cvv") or "").strip():
+            return {"ok": False, "error": "Card declined — invalid security code (CVV)"}
+        if require_expiry and card.get("card_expiry"):
+            if _norm_exp(expiry) != _norm_exp(card.get("card_expiry")):
+                return {"ok": False, "error": "Card declined — invalid or expired card"}
+
     try:
         amt = round(float(amount), 2)
     except (TypeError, ValueError):
@@ -68,7 +89,7 @@ def charge_card(card_number, cvv, expiry, amount, merchant,
     if amt <= 0:
         return {"ok": False, "error": "Invalid amount"}
     avail = float(card.get("available_credit") or 0)
-    if amt > avail:
+    if strict and amt > avail:
         return {"ok": False, "error": "Card declined — insufficient available credit"}
 
     txid = 700000 + (uuid.uuid4().int % 100000)
@@ -87,7 +108,7 @@ def charge_card(card_number, cvv, expiry, amount, merchant,
     updated["available_credit"] = round(avail - amt, 2)
     db.save_item(BANK, "cc_users", card["id"], updated)
 
-    return {"ok": True, "transaction_id": txid,
+    return {"ok": True, "charged": True, "transaction_id": txid,
             "card_last4": card.get("card_number_last4"),
             "cardholder": card.get("name"), "merchant": merchant, "amount": amt,
             "available_credit": updated["available_credit"]}

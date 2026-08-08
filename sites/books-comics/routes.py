@@ -274,6 +274,16 @@ def checkout_page():
             return render_template("books-comics/checkout.html", user=user,
                                    cart_items=cart_items, total=total,
                                    error="All fields are required.")
+        # Loose charge: any card number is accepted, but a recognized SecureBank
+        # card must carry the correct CVV (else declined).
+        from app.bank_charges import charge_card
+        pay = charge_card(card, request.form.get("cvv", ""), "", total, "BookVerse",
+                          category="shopping", description=f"{len(cart_items)} book(s)",
+                          strict=False)
+        if not pay["ok"]:
+            return render_template("books-comics/checkout.html", user=user,
+                                   cart_items=cart_items, total=total,
+                                   error=pay["error"])
         account_type = request.form.get("account_type", "checking")
         # Clear cart after checkout
         users = _load_users()
