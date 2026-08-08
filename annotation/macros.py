@@ -8,14 +8,43 @@ compute/compare/verify). Retired flat `verb_by_modality` names are folded in as
 """
 import functools
 import os
+import shutil
 
 import yaml
 
-REGISTRY_PATH = os.environ.get(
-    "MINIWEB_MACROS",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 "data", "macros.yaml"),
-)
+# Repo-bundled defaults (seed copies).
+_REPO_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+
+
+def macro_data_dir():
+    """Directory that holds the macro YAMLs.
+
+    Set ``MINIWEB_MACRO_DIR`` to a persistent volume in deployment so that
+    annotator-registered macros (written to macros.yaml) and per-site locations
+    survive redeploys. Defaults to the repo's ``data/`` directory.
+    """
+    return os.environ.get("MINIWEB_MACRO_DIR", _REPO_DATA_DIR)
+
+
+def macro_data_path(filename, file_env=None):
+    """Resolve a macro YAML path, seeding a fresh persistent dir from the repo.
+
+    Precedence: an explicit full-path override in ``file_env`` (if set), else
+    ``<MINIWEB_MACRO_DIR>/<filename>``. If the resolved file doesn't exist yet
+    (e.g. a brand-new volume), it is seeded by copying the repo's bundled copy.
+    """
+    path = (os.environ.get(file_env) if file_env else None) or os.path.join(macro_data_dir(), filename)
+    if not os.path.exists(path):
+        seed = os.path.join(_REPO_DATA_DIR, filename)
+        if os.path.exists(seed) and os.path.abspath(path) != os.path.abspath(seed):
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            shutil.copy2(seed, path)
+    return path
+
+
+# macros.yaml — MINIWEB_MACROS overrides the exact path; otherwise it lives in
+# MINIWEB_MACRO_DIR (persistent volume) or the repo's data/ dir.
+REGISTRY_PATH = macro_data_path("macros.yaml", "MINIWEB_MACROS")
 
 
 @functools.lru_cache(maxsize=1)

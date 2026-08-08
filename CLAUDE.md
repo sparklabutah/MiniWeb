@@ -56,6 +56,7 @@ Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical int
 - Navigation macros (`navigate_by_route`) are NOT sampled for tasks — agents start on the target page
 - `tests/test_macro_registry.py` guards registry drift.
 - Per-site macro→UI-location data lives in **`data/macro_locations.yaml`** (canonical-macro-keyed; drives coverage/sampling). `annotation/macro_locations.py` is now just a loader — edit the YAML, not the module.
+- **Persistence (deploy):** annotators register macros by *writing* to `macros.yaml`, so in production point the YAMLs at a persistent volume via **`MINIWEB_MACRO_DIR`** (dir holding both `macros.yaml` + `macro_locations.yaml`). Per-file overrides: **`MINIWEB_MACROS`**, **`MINIWEB_MACRO_LOCATIONS`**. A fresh volume is auto-seeded from the repo's bundled copies (both are committed). Defaults to the repo `data/` dir when unset.
 
 ## Key Architecture
 

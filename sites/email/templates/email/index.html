@@ -100,6 +100,7 @@
             <div style="display:flex;gap:6px;align-items:center;padding:4px 0;flex-wrap:wrap;">
                 <form method="get" action="{{ url_for('email.index') }}" style="display:flex;gap:6px;align-items:center;">
                     <input type="hidden" name="folder" value="{{ folder }}">
+                    <input type="hidden" name="sort" value="{{ request.args.get('sort', 'date') }}">
                     <label style="font-size:.82rem;color:#5f6368;">From:</label>
                     <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:3px 6px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;">
                     <label style="font-size:.82rem;color:#5f6368;">To:</label>
@@ -111,7 +112,7 @@
                 <input type="checkbox" id="select-all" title="Select all" style="width:14px;height:14px;accent-color:#1a73e8;cursor:pointer;">
                 <span>{{ folder|capitalize }}</span>
                 <span>{{ total }} messages</span>
-                <select onchange="location.href='?folder={{ folder }}&sort='+this.value" style="padding:3px 8px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;background:#fff;color:#5f6368;">
+                <select onchange="location.href='?folder={{ folder }}&date_from={{ request.args.get('date_from','') }}&date_to={{ request.args.get('date_to','') }}&sort='+this.value" style="padding:3px 8px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;background:#fff;color:#5f6368;">
                     <option value="date" {{ 'selected' if request.args.get('sort', 'date') == 'date' }}>Sort: Date</option>
                     <option value="subject" {{ 'selected' if request.args.get('sort') == 'subject' }}>Sort: Subject</option>
                     <option value="from" {{ 'selected' if request.args.get('sort') == 'from' }}>Sort: From</option>

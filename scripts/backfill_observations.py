@@ -153,8 +153,35 @@ class Capturer:
         axtree = page.locator("body").aria_snapshot()
         if dropdown:
             _draw_open_dropdown(page, dropdown)
-        # full_page: the viewport is 1280x720 but pages are taller, so a
-        # viewport shot silently cropped whatever the annotator scrolled to.
+        # full_page fixes HEIGHT cropping, but content that overflows to the
+        # RIGHT was still omitted — either at the page level, or (more often)
+        # inside a horizontal scroll container (`overflow-x:auto`, how wide
+        # tables like the tax/DMV records are built). The annotator can't scroll
+        # a container into a single frame, so we reveal it for the render:
+        # unclip every horizontal scroll container, then widen the viewport to
+        # the resulting full content width. full_page then captures everything.
+        try:
+            page.evaluate("""() => {
+              for (const el of document.querySelectorAll('*')) {
+                const cs = getComputedStyle(el);
+                if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll' || cs.overflowX === 'hidden')
+                    && el.scrollWidth > el.clientWidth + 2) {
+                  el.style.overflowX = 'visible';
+                  el.style.width = 'max-content';
+                  el.style.maxWidth = 'none';
+                }
+              }
+            }""")
+            full_w = page.evaluate(
+                "Math.ceil(Math.max("
+                "  document.documentElement.scrollWidth,"
+                "  document.body ? document.body.scrollWidth : 0))")
+            if full_w and full_w > VIEWPORT["width"]:
+                page.set_viewport_size({"width": min(int(full_w), 4000),
+                                        "height": VIEWPORT["height"]})
+                page.wait_for_timeout(50)
+        except Exception:  # noqa: BLE001 — never let sizing break the capture
+            pass
         shot = page.screenshot(full_page=True)
         return html, axtree, shot
 

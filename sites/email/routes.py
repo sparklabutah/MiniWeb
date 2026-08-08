@@ -492,7 +492,34 @@ def index():
         return redirect(url_for("email.login_page"))
     folder = request.args.get("folder", "inbox")
     page = request.args.get("page", 1, type=int)
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    sort = request.args.get("sort", "date").strip()
     all_emails = _user_emails(user["id"], folder=folder)
+
+    # Date-range filter (date inputs are YYYY-MM-DD; email `date` is an ISO
+    # string that starts YYYY-MM-DD, so a lexicographic compare on the first 10
+    # chars is a correct inclusive range test).
+    if date_from or date_to:
+        def _in_range(e):
+            d = (e.get("date") or "")[:10]
+            if not d:
+                return False
+            if date_from and d < date_from:
+                return False
+            if date_to and d > date_to:
+                return False
+            return True
+        all_emails = [e for e in all_emails if _in_range(e)]
+
+    # Sort (toolbar dropdown). Default is most-recent-first by date.
+    if sort == "subject":
+        all_emails.sort(key=lambda e: (e.get("subject") or "").lower())
+    elif sort == "from":
+        all_emails.sort(key=lambda e: (e.get("from_addr") or "").lower())
+    else:
+        all_emails.sort(key=lambda e: e.get("date_sort", 0), reverse=True)
+
     total = len(all_emails)
     total_pages = max(1, (total + EMAILS_PER_PAGE - 1) // EMAILS_PER_PAGE)
     page = max(1, min(page, total_pages))
