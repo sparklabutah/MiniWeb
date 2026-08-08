@@ -86,8 +86,15 @@ def _get_user(user_id):
 
 
 def _get_current_user():
-    if "health_user_id" in session:
-        return _get_user(session["health_user_id"])
+    # Prefer an explicit health-portals login; otherwise honor the global
+    # MiniWeb auto-login (session["user_id"], set for /sites/* requests) so an
+    # already-logged-in user isn't treated as an anonymous browser (which made
+    # actions like paying a bill bounce to the login page).
+    uid = session.get("health_user_id")
+    if uid is None:
+        uid = session.get("user_id")
+    if uid is not None:
+        return _get_user(uid)
     return None
 
 
