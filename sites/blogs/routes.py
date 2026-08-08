@@ -173,10 +173,11 @@ def index():
         results = db.merge_overlay(SITE, "posts", results, match=_overlay_match,
                                    sort=db_sort, limit=per_page + 1)
 
-    # Count total for pagination
-    if q and not (date_from or date_to or tag):
-        total_count = db.count(SITE, "posts", where=where if where else None)
-    elif date_from or date_to or tag:
+    # Count total for pagination. Whenever there's a text query OR a
+    # date/tag filter, the count MUST include those — previously a text-only
+    # search fell through to db.count(where=...), which ignores q and always
+    # returned the whole-site total (e.g. 1215).
+    if q or date_from or date_to or tag:
         count_clauses = []
         count_params = []
         if q:

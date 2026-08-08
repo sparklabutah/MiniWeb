@@ -900,13 +900,22 @@ def repo_detail(repo_id):
         abort(404)
 
     if is_raw:
-        # Enrich raw project with creator info from users_raw
+        # The OWNER is the project's namespace (the GitLab owner path the listing
+        # shows), NOT its creator_id: in the imported GitLab data most projects
+        # were "created" by the built-in `root` admin, so creator_id resolves to
+        # root. Resolve owner from namespace to match the listing; keep creator
+        # info separately for reference.
         creator = db.get_item(SITE, "users_raw", repo.get("creator_id", 0))
         repo["creator_username"] = creator["username"] if creator else "unknown"
         repo["creator_name"] = creator["name"] if creator else "Unknown"
-        repo["owner_user_id"] = repo.get("creator_id", 0)
-        repo["owner_username"] = repo.get("creator_username", "unknown")
-        repo["owner_name"] = repo.get("creator_name", "Unknown")
+        ns = (repo.get("namespace") or "").strip()
+        ns_hits = db.query(SITE, "users_raw", where={"username": ns}, limit=1) if ns else []
+        ns_user = ns_hits[0] if ns_hits else None
+        repo["owner_username"] = ns or repo["creator_username"]
+        repo["owner_name"] = ns_user["name"] if ns_user else (ns or repo["creator_name"])
+        repo["owner_user_id"] = ns_user["id"] if ns_user else repo.get("creator_id", 0)
+        # namespace that isn't a personal user -> it's a group/instance
+        repo["owner_is_group"] = bool(ns) and ns_user is None
         repo["stars"] = repo.get("star_count", 0)
         repo["visibility"] = "public" if repo.get("visibility_level", 0) == 20 else ("internal" if repo.get("visibility_level", 0) == 10 else "private")
         repo["last_activity"] = repo.get("last_activity_at", "")
@@ -949,6 +958,25 @@ def repo_detail(repo_id):
         starred=starred,
         is_raw=is_raw,
     )
+
+
+@blueprint.route("/group/<path:name>")
+def group_page(name):
+    """Lightweight page for a namespace that isn't a personal user (a GitLab
+    group / instance): lists the repositories under that namespace."""
+    repos = db.query(SITE, "projects_raw", where={"namespace": name},
+                     sort="-last_activity_at", limit=100)
+    if not repos:
+        abort(404)
+    total_stars = 0
+    for r in repos:
+        r["stars"] = r.get("star_count", 0)
+        total_stars += r["stars"]
+        vl = r.get("visibility_level", 0)
+        r["visibility"] = "public" if vl == 20 else ("internal" if vl == 10 else "private")
+        r["last_activity"] = r.get("last_activity_at", "")
+    return render_template("version-control/group.html", name=name, repos=repos,
+                           repo_count=len(repos), total_stars=total_stars)
 
 
 @blueprint.route("/user/<int:user_id>")
@@ -996,9 +1024,12 @@ def user_profile(user_id):
             "root_user_id": raw_user["id"],
             "created_at": raw_user.get("created_at", ""),
         }
-        # Show projects from projects_raw
+        # Show projects OWNED by this user — i.e. under their namespace (the
+        # owner path). Filtering by creator_id would be wrong: in the imported
+        # GitLab data most projects were created by the `root` admin, so a real
+        # user's own repos carry creator_id=root but namespace=their username.
         user_repos = db.query(SITE, "projects_raw",
-                              where={"creator_id": user_id},
+                              where={"namespace": raw_user["username"]},
                               sort="-last_activity_at", limit=30)
         for r in user_repos:
             r["stars"] = r.get("star_count", 0)
