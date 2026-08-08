@@ -635,20 +635,34 @@ def pay_bill_submit(bill_id):
 
     card_number = request.form.get("card_number", "").strip()
     card_name = request.form.get("card_name", "").strip()
-    if not card_number or not card_name:
+    cvv = request.form.get("cvv", "").strip()
+    expiry = request.form.get("expiry", "").strip()
+    amount = bill.get("patient_responsibility") or bill.get("patient_copay", 0)
+
+    def _fail(msg):
         bill["provider_name"] = _get_provider_name(bill["provider_id"])
-        amount = bill.get("patient_responsibility") or bill.get("patient_copay", 0)
-        return render_template("health-portals/pay.html",
-                               user=user, logged_in=logged_in,
-                               bill=bill, amount=amount,
-                               error="All payment fields are required", success=False)
+        return render_template("health-portals/pay.html", user=user, logged_in=logged_in,
+                               bill=bill, amount=amount, error=msg, success=False)
+
+    if not (card_number and card_name and cvv):
+        return _fail("All payment fields are required")
+
+    # Secure charge: validate the card against the bank and post the charge to
+    # the cardholder's credit card (Lakeport Medical Center as the merchant).
+    from app.bank_charges import charge_card
+    result = charge_card(card_number, cvv, expiry, amount,
+                         merchant="Lakeport Medical Center", category="Medical",
+                         description=f"Medical bill #{bill_id} — {_get_provider_name(bill['provider_id'])}")
+    if not result["ok"]:
+        return _fail(result["error"])
 
     bill["payment_status"] = "paid_in_full"
     bill["date_patient_paid"] = datetime.now().strftime("%Y-%m-%d")
-    bill["payment_method"] = f"card ending {card_number[-4:]}"
+    bill["payment_method"] = f"card ending {result['card_last4']}"
+    bill["payment_confirmation"] = result["transaction_id"]
     _save_billing(billing)
-    amount = bill.get("patient_responsibility") or bill.get("patient_copay", 0)
-    emit("payment", user_id=user["id"], recipient="Lakeport Medical Center", amount=float(amount), category="Medical")
+    emit("payment", user_id=user["id"], recipient="Lakeport Medical Center",
+         amount=float(amount), category="Medical")
     bill["provider_name"] = _get_provider_name(bill["provider_id"])
     return render_template("health-portals/pay.html",
                            user=user, logged_in=logged_in,

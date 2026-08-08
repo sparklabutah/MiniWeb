@@ -76,13 +76,29 @@
     <div class="container">
         <div class="card-preview">
             <div class="card-name">SecureBank {{ cc_user.card_tier }}</div>
-            <div class="card-number">**** **** **** {{ cc_user.card_number_last4 }}</div>
+            <div class="card-number" id="cc-num" data-full="{{ cc_user.card_number }}">**** **** **** {{ cc_user.card_number_last4 }}</div>
             <div class="card-holder">{{ cc_user.name }}</div>
             <div class="card-tier">{{ cc_user.card_tier }}</div>
             {% if cc_user.card_frozen %}
             <div class="frozen-badge">FROZEN</div>
             {% endif %}
         </div>
+        <div style="display:flex;gap:24px;align-items:center;margin:-8px 0 16px;font-size:.9rem;color:#4a5568;">
+            <span>Card number: <strong id="cc-num-text" class="mono" style="font-family:ui-monospace,Menlo,monospace">**** **** **** {{ cc_user.card_number_last4 }}</strong></span>
+            <span>Expires: <strong>{{ cc_user.card_expiry }}</strong></span>
+            <span>CVV: <strong id="cc-cvv" data-full="{{ cc_user.cvv }}">***</strong></span>
+            <button type="button" onclick="_revealCard()" id="cc-reveal" style="padding:4px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;">Reveal</button>
+        </div>
+        <script>
+        function _revealCard(){
+            var num=document.getElementById('cc-num'), numT=document.getElementById('cc-num-text'),
+                cvv=document.getElementById('cc-cvv'), btn=document.getElementById('cc-reveal');
+            var showing = btn.textContent==='Hide';
+            if(showing){ numT.textContent='**** **** **** '+numT.dataset.last4; cvv.textContent='***'; btn.textContent='Reveal'; }
+            else { numT.textContent=num.dataset.full; num.textContent=num.dataset.full; cvv.textContent=cvv.dataset.full; btn.textContent='Hide'; }
+        }
+        document.getElementById('cc-num-text').dataset.last4='{{ cc_user.card_number_last4 }}';
+        </script>
 
         <div class="kpi-grid">
             <div class="kpi-card">
