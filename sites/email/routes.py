@@ -411,6 +411,10 @@ def _user_emails(user_id, folder=None):
         if e["user_id"] == user_id:
             emails.append(e)
 
+    # Apply per-session state overrides (delete->trash, move, star, read) BEFORE
+    # the folder filter, so a moved/deleted email lands in the right folder.
+    emails = _apply_states(emails)
+
     if folder:
         emails = [e for e in emails if e.get("folder") == folder]
     emails.sort(key=lambda e: e.get("date_sort", 0), reverse=True)
@@ -429,6 +433,39 @@ def _folder_counts(user_id):
         if not e.get("is_read", False):
             counts[f]["unread"] += 1
     return counts
+
+
+# --- Per-session email state overrides (folder / starred / read) ------------
+# Delete/move/star/read persist here (session overlay) and are applied on read,
+# so they survive across requests, stay isolated per session, and work for
+# every email source (overlay, Enron/static, composed) — not just 'sent'.
+_STATE_KEYS = ("folder", "is_starred", "is_read")
+
+
+def _get_email_states():
+    return {r["email_id"]: r for r in db.query(SITE, "email_state")}
+
+
+def _set_email_state(email_id, **changes):
+    cur = dict(_get_email_states().get(email_id) or {})
+    cur.update(changes)
+    cur["email_id"] = email_id
+    db.save_item(SITE, "email_state", email_id, cur)
+
+
+def _apply_states(emails, states=None):
+    """Return emails with per-session overrides applied (copying only the ones
+    that have an override, so shared source dicts are never mutated)."""
+    states = _get_email_states() if states is None else states
+    if not states:
+        return emails
+    out = []
+    for e in emails:
+        st = states.get(e["id"])
+        if st:
+            e = {**e, **{k: st[k] for k in _STATE_KEYS if st.get(k) is not None}}
+        out.append(e)
+    return out
 
 
 def _find_email(email_id, user_id=None):
@@ -540,15 +577,11 @@ def message_detail(email_id):
     email, source = _find_email(email_id, user["id"])
     if email is None:
         abort(404)
-    # Mark as read
+    email = _apply_states([email])[0]
+    # Mark as read (persist to the session state overlay)
     if not email.get("is_read"):
-        email["is_read"] = True
-        if source == "sent":
-            sent = _load_sent()
-            for s in sent:
-                if s["id"] == email_id:
-                    s["is_read"] = True
-            _save_sent(sent)
+        _set_email_state(email_id, is_read=1)
+        email["is_read"] = 1
     counts = _folder_counts(user["id"])
     return render_template("email/message.html", user=user, email=email, counts=counts)
 
@@ -694,14 +727,8 @@ def form_star(email_id):
         return redirect(url_for("email.login_page"))
     email, source = _find_email(email_id, user["id"])
     if email:
-        new_val = not email.get("is_starred", False)
-        email["is_starred"] = new_val
-        if source == "sent":
-            sent = _load_sent()
-            for s in sent:
-                if s["id"] == email_id:
-                    s["is_starred"] = new_val
-            _save_sent(sent)
+        eff = _apply_states([email])[0]
+        _set_email_state(email_id, is_starred=(0 if eff.get("is_starred") else 1))
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
@@ -713,13 +740,7 @@ def form_move(email_id):
     target_folder = request.form.get("folder", "inbox").strip()
     email, source = _find_email(email_id, user["id"])
     if email:
-        email["folder"] = target_folder
-        if source == "sent":
-            sent = _load_sent()
-            for s in sent:
-                if s["id"] == email_id:
-                    s["folder"] = target_folder
-            _save_sent(sent)
+        _set_email_state(email_id, folder=target_folder)
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
@@ -730,13 +751,7 @@ def form_delete(email_id):
         return redirect(url_for("email.login_page"))
     email, source = _find_email(email_id, user["id"])
     if email:
-        email["folder"] = "trash"
-        if source == "sent":
-            sent = _load_sent()
-            for s in sent:
-                if s["id"] == email_id:
-                    s["folder"] = "trash"
-            _save_sent(sent)
+        _set_email_state(email_id, folder="trash")
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
@@ -758,29 +773,11 @@ def form_bulk_action():
         if not email:
             continue
         if action == "delete":
-            email["folder"] = "trash"
-            if source == "sent":
-                sent = _load_sent()
-                for s in sent:
-                    if s["id"] == eid:
-                        s["folder"] = "trash"
-                _save_sent(sent)
+            _set_email_state(eid, folder="trash")
         elif action == "mark_read":
-            email["is_read"] = True
-            if source == "sent":
-                sent = _load_sent()
-                for s in sent:
-                    if s["id"] == eid:
-                        s["is_read"] = True
-                _save_sent(sent)
+            _set_email_state(eid, is_read=1)
         elif action == "mark_unread":
-            email["is_read"] = False
-            if source == "sent":
-                sent = _load_sent()
-                for s in sent:
-                    if s["id"] == eid:
-                        s["is_read"] = False
-                _save_sent(sent)
+            _set_email_state(eid, is_read=0)
     return redirect(url_for("email.index", folder=folder))
 
 
@@ -792,13 +789,7 @@ def form_mark_read(email_id):
     email, source = _find_email(email_id, user["id"])
     if email:
         mark = request.form.get("mark", "read")
-        email["is_read"] = (mark == "read")
-        if source == "sent":
-            sent = _load_sent()
-            for s in sent:
-                if s["id"] == email_id:
-                    s["is_read"] = (mark == "read")
-            _save_sent(sent)
+        _set_email_state(email_id, is_read=(1 if mark == "read" else 0))
     return redirect(request.form.get("redirect_to", url_for("email.index")))
 
 
@@ -910,6 +901,7 @@ def api_messages():
         for sm in _load_sent():
             if sm.get("id") not in overlay_ids:
                 emails.append(sm)
+        emails = _apply_states(emails)
         if folder:
             emails = [e for e in emails if e.get("folder") == folder]
 
@@ -943,7 +935,7 @@ def api_message(email_id):
     email, _ = _find_email(email_id, user_id)
     if email is None:
         abort(404)
-    return jsonify(email)
+    return jsonify(_apply_states([email])[0])
 
 
 @blueprint.route("/api/messages/compose", methods=["POST"])
