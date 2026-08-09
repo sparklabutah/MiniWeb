@@ -52,6 +52,23 @@ _AD_POOL = [
 ]
 
 
+_STREAM_SORT_KEYS = {
+    "viewers": (lambda s: s.get("total_views", 0) or 0, True),
+    "newest": (lambda s: s.get("started_at", "") or "", True),
+    "oldest": (lambda s: s.get("started_at", "") or "", False),
+    "duration": (lambda s: s.get("duration_minutes", 0) or 0, True),
+}
+
+
+def _sort_streams(streams, sort):
+    """Apply the sort-dropdown order to a list of streams (used for the search
+    path, since db.search() ranks by relevance and ignores the SQL sort)."""
+    key = _STREAM_SORT_KEYS.get(sort)
+    if key:
+        streams = sorted(streams, key=key[0], reverse=key[1])
+    return streams
+
+
 def _thumb_gradient(seed):
     """Deterministic colorful 'thumbnail' gradient from a string seed.
 
@@ -290,6 +307,7 @@ def index():
 
     if q:
         streams = db.search(SITE, "streams", q, where=where or None, limit=50)
+        streams = _sort_streams(streams, sort)   # db.search ignores sort_col
     else:
         streams = db.query(SITE, "streams", where=where, sort=sort_col, limit=50)
 
@@ -712,6 +730,7 @@ def api_streams():
 
     if q:
         streams = db.search(SITE, "streams", q, where=where or None, limit=50)
+        streams = _sort_streams(streams, sort)   # db.search ignores sort_col
     else:
         streams = db.query(SITE, "streams", where=where, sort=sort_col, limit=50)
 
