@@ -14,6 +14,7 @@ from flask import Blueprint, Response, abort, jsonify, redirect, render_template
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.security import safe_next
 
 SITE = "calendar-todo"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -102,8 +103,7 @@ def _next_user_id():
 
 
 def _safe_next(value):
-    """Only allow same-site relative redirects."""
-    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+    return safe_next(value)
 
 
 def _require_login():

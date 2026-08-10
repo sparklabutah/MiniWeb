@@ -153,6 +153,24 @@
         </form>
     </div>
 
+    {% if can_edit %}
+    <div class="add-row-section" style="padding:0.75rem 1rem;border-top:1px solid #e8eaed;background:#f8f9fa;">
+        <h4 style="font-size:0.85rem;color:#5f6368;margin-bottom:0.5rem;">Add a new row</h4>
+        <form method="post" action="{{ url_for('spreadsheets-slides.form_add_row', sid=ss.id) }}"
+              style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:flex-end;">
+            <input type="hidden" name="sheet" value="{{ sheet_index }}">
+            {% for col_idx in range(current_sheet.data[0]|length) %}
+            <div style="display:flex;flex-direction:column;">
+                <label style="font-size:0.7rem;color:#80868b;margin-bottom:0.15rem;">{{ current_sheet.data[0][col_idx] or ("Col " ~ col_idx) }}</label>
+                <input type="text" name="col_{{ col_idx }}" placeholder="{{ current_sheet.data[0][col_idx] }}"
+                       style="padding:0.3rem;border:1px solid #dadce0;border-radius:4px;font-size:0.8rem;min-width:90px;">
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-green">Add Row</button>
+        </form>
+    </div>
+    {% endif %}
+
     <div class="share-section">
         <h4>Share via Email</h4>
         <form style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem" onsubmit="event.preventDefault();var e=this.querySelector('input[name=email]');var msg=document.getElementById('share-msg');msg.textContent='Invite sent to '+e.value;msg.style.display='block';e.value='';setTimeout(function(){msg.style.display='none'},3000)">

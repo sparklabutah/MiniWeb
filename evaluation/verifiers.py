@@ -28,13 +28,13 @@ whole task) and naming one check type plus its arguments.
       ]
     }
 
-Run it:
+Run it (per-task macro verifier — {task_id, macros: {macro: AND/OR check tree}}):
 
-    from evaluation.verifiers import verify
-    report = verify(spec, trajectory, answer="Priya Sharma")
+    from evaluation.verifiers import verify_task
+    report = verify_task(spec, trajectory, answer="Priya Sharma")
     report["passed"]        -> bool
-    report["checks"]        -> per-check results
     report["by_macro"]      -> {macro: passed}
+    report["macros"]        -> per-macro nested check results
 
 Adding a check type = subclass Check, set `type`, implement run(). Nothing else.
 """
@@ -74,11 +74,20 @@ def _parse_body(raw):
     return {}
 
 
+def _compact(s) -> str:
+    """Normalized, with spaces/dashes stripped — so identifier values that differ
+    only in formatting compare equal (card '4539 1337 5013 4821' == '4539133750134821',
+    phone '(555) 123-4567' == '5551234567')."""
+    return re.sub(r"[\s\-]+", "", _norm(s))
+
+
 def _dict_subset(want: dict, got: dict) -> bool:
     """Every field in `want` matches (normalized) in `got`. Extra fields in
-    `got` (csrf, timestamps) are ignored."""
+    `got` (csrf, timestamps) are ignored. Value match tolerates benign formatting
+    differences (whitespace/dashes) so identifiers aren't brittle."""
     for k, v in (want or {}).items():
-        if _norm(got.get(k)) != _norm(v):
+        gv = got.get(k)
+        if _norm(gv) != _norm(v) and _compact(gv) != _compact(v):
             return False
     return True
 
@@ -395,15 +404,24 @@ class QAAnswer(Check):
             ok, why = reasoning()
             return ok, "chained → reasoning: " + why
 
-        # leaf (or unknown): the answer IS the deliverable, so check it when the
-        # trajectory reports one. With none recorded (e.g. a human gold with no
-        # saved answer), fall back to reasoning — which passes humans by the
-        # perfect-trace assumption and checks the agent's reasoning otherwise.
-        if str(answer or "").strip():
+        # leaf (terminal): the reported answer IS the deliverable — check it, and
+        # a MISSING answer is a failure (an agent that reports nothing must not
+        # pass). Do NOT fall back to reasoning here, or an empty answer would pass
+        # vacuously via the human perfect-trace assumption.
+        if leaf is True:
+            if not str(answer or "").strip():
+                return False, "terminal → no reported answer"
             ok, why = _match_answer(answer, expected, mode)
             return ok, "terminal → answer: " + why
+
+        # leaf unknown: try the reported answer; with none recorded (e.g. a human
+        # gold with no saved answer) fall back to reasoning (passes humans by the
+        # perfect-trace assumption, checks the agent's reasoning otherwise).
+        if str(answer or "").strip():
+            ok, why = _match_answer(answer, expected, mode)
+            return ok, "terminal? → answer: " + why
         ok, why = reasoning()
-        return ok, "terminal (no reported answer) → reasoning: " + why
+        return ok, "unknown-leaf, no answer → reasoning: " + why
 
 
 # ---------------------------------------------------------------------------
@@ -468,37 +486,3 @@ def verify_task(spec: dict, trajectory: list, answer: str = "") -> dict:
     }
 
 
-def verify(spec: dict, trajectory: list, answer: str = "") -> dict:
-    """Run a verifier spec against a trajectory.
-
-    Returns {passed, checks: [...], by_macro: {macro: passed}}.
-    An unknown check type fails loudly rather than being skipped silently.
-    """
-    results = []
-    for raw in spec.get("checks", []):
-        cls = CHECKS.get(raw.get("type"))
-        if cls is None:
-            results.append({
-                "type": raw.get("type"), "macro": raw.get("macro", ""),
-                "passed": False, "reason": f"unknown check type {raw.get('type')!r}",
-                "spec": raw,
-            })
-            continue
-        check = cls(raw)
-        try:
-            passed, reason = check.run(trajectory, answer)
-        except Exception as exc:  # a broken check is a failed check, not a crash
-            passed, reason = False, f"check raised {type(exc).__name__}: {exc}"
-        results.append(check.result(passed, reason))
-
-    by_macro = {}
-    for r in results:
-        m = r["macro"] or "_task"
-        by_macro[m] = by_macro.get(m, True) and r["passed"]
-
-    return {
-        "task_id": spec.get("task_id", ""),
-        "passed": all(r["passed"] for r in results) if results else False,
-        "checks": results,
-        "by_macro": by_macro,
-    }

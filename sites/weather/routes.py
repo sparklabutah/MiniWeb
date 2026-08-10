@@ -22,6 +22,7 @@ from flask import (
 )
 from app import db
 from app.handlers.email_handler import _add_email
+from helpers.geo import haversine
 
 SITE = "weather"
 
@@ -615,14 +616,7 @@ def api_stats():
 
 
 def _haversine(lat1, lng1, lat2, lng2):
-    """Return distance in miles between two lat/lng points."""
-    R = 3958.8  # Earth radius in miles
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return haversine(lat1, lng1, lat2, lng2, unit="mi")
 
 
 def _f_to_c(f):

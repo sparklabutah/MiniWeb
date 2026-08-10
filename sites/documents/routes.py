@@ -37,8 +37,6 @@ def _load_users():
     return db.query(SITE, "users")
 
 
-def _save_users(users):
-    db.save_collection(SITE, "users", users)
 
 
 def _load_folders():

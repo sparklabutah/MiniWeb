@@ -1408,6 +1408,64 @@ def form_submit_spreadsheet(sid):
     return redirect(url_for("spreadsheets-slides.spreadsheet_view", sid=sid, sheet=sheet_idx))
 
 
+@blueprint.route("/spreadsheet/<int:sid>/row", methods=["POST"])
+def form_add_row(sid):
+    """Add a new row to a spreadsheet sheet via form submission.
+
+    Form fields: sheet (index) + col_<i>=value for each column (col_0, col_1, ...).
+    The new row's values are POSTed in the request body so the mutation is
+    captured server-side and a verifier can assert what was added. Supports the
+    add-row (create_by_form) macro.
+    """
+    spreadsheets = _load_spreadsheets()
+    ss = next((s for s in spreadsheets if s["id"] == sid), None)
+    if not ss:
+        abort(404)
+
+    sheet_idx = request.form.get("sheet", 0, type=int)
+    sheets = ss.get("sheets", [])
+    if sheet_idx < 0 or sheet_idx >= len(sheets):
+        abort(400)
+
+    grid = sheets[sheet_idx]["data"]
+    header = grid[0] if grid else []
+    width = len(header) if header else ss.get("cols", 10)
+
+    # Build the new row from posted col_<i> fields (read via request.form so the
+    # request body is logged).
+    new_row = [""] * width
+    for key, value in request.form.items():
+        if not key.startswith("col_"):
+            continue
+        try:
+            idx = int(key[4:])
+        except ValueError:
+            continue
+        while idx >= len(new_row):
+            new_row.append("")
+        new_row[idx] = value.strip()
+
+    # Place the row in the first fully-empty row (spreadsheets are padded with
+    # blank rows); if none is free, append a new row.
+    target = None
+    for i, row in enumerate(grid):
+        if i == 0:
+            continue  # never overwrite the header row
+        if all(not str(c).strip() for c in row):
+            target = i
+            break
+    if target is not None:
+        grid[target] = new_row
+    else:
+        grid.append(new_row)
+        ss["rows"] = len(grid)
+
+    ss["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_spreadsheets(spreadsheets)
+
+    return redirect(url_for("spreadsheets-slides.spreadsheet_view", sid=sid, sheet=sheet_idx))
+
+
 @blueprint.route("/api/spreadsheets/<int:sid>/batch", methods=["PUT"])
 def api_spreadsheet_batch_update(sid):
     """Batch update multiple cells in a spreadsheet.

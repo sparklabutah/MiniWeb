@@ -29,7 +29,7 @@ _lock = threading.Lock()   # one browser at a time
 
 def complete_task_observations(task_dir, base_url):
     """Repair + reconstruct observations for one task. Returns a stats dict."""
-    from scripts.process_annotations import process_task
+    from annotation.process_annotations import process_task
     return process_task(Path(task_dir), base_url)
 
 

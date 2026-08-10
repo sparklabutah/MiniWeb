@@ -1,5 +1,7 @@
 # Extracting Data from Docker Images on CHPC Compute Nodes
 
+> NOTE: the one-time `extract_*` scripts referenced here were archived to `../MiniWeb-archive/cleanup-20260810/scripts/` (data already built). Restore from there to re-run.
+
 **NEVER run these on the login node (granite1).** The wiki ZIM is 89 GB and the
 GitLab tar is 73 GB — loading/extracting them on a shared login node will OOM
 and kill your session.
@@ -150,7 +152,7 @@ pip install libzim
 ### Extract articles (streaming, low memory)
 
 ```python
-# Run with: python scripts/extract_wiki_from_zim.py
+# Run with: python scripts/extract_wiki_sample.py
 # (Create this script or run interactively)
 
 from libzim.reader import Archive

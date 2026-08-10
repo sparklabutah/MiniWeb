@@ -10,6 +10,7 @@ from flask import Blueprint, abort, jsonify, redirect, render_template, request,
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.security import safe_next
 
 SITE = "blogs"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -306,8 +307,7 @@ def dashboard():
 
 
 def _safe_next(value):
-    """Only allow same-site relative redirects."""
-    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+    return safe_next(value)
 
 
 @blueprint.route("/login", methods=["GET"])

@@ -25,6 +25,7 @@ from flask import (
     render_template_string, request, session, url_for,
 )
 from app import db
+from helpers.auth import current_user, browsing_user
 
 SITE = "url-shorteners-qr"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -60,15 +61,10 @@ def _get_user(user_id):
     return db.get_item(SITE, "users", user_id)
 
 def _get_current_user():
-    if "user_id" in session:
-        return _get_user(session["user_id"])
-    return None
+    return current_user(_get_user)
 
 def _get_browsing_user():
-    user = _get_current_user()
-    if user:
-        return user, True
-    return _get_user(1), False
+    return browsing_user(_get_user, fallback=1)
 
 def _generate_short_code(length=6):
     chars = string.ascii_lowercase + string.digits

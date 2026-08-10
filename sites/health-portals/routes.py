@@ -30,6 +30,7 @@ from flask import (
 )
 from app import db
 from app.events import emit
+from helpers.auth import current_user, browsing_user
 
 SITE = "health-portals"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -90,20 +91,12 @@ def _get_current_user():
     # MiniWeb auto-login (session["user_id"], set for /sites/* requests) so an
     # already-logged-in user isn't treated as an anonymous browser (which made
     # actions like paying a bill bounce to the login page).
-    uid = session.get("health_user_id")
-    if uid is None:
-        uid = session.get("user_id")
-    if uid is not None:
-        return _get_user(uid)
-    return None
+    return current_user(_get_user, session_keys=("health_user_id", "user_id"))
 
 
 def _get_browsing_user():
     """Return logged-in user, or fall back to patient 1 for browse-only mode."""
-    user = _get_current_user()
-    if user:
-        return user, True
-    return _get_user(1), False
+    return browsing_user(_get_user, session_keys=("health_user_id", "user_id"), fallback=1)
 
 
 @blueprint.context_processor
@@ -142,8 +135,6 @@ def _save_users(data):
     db.save_collection(SITE, "users", data)
 
 
-def _save_records(data):
-    db.save_collection(SITE, "medical_records", data)
 
 
 def _text_match(text, query):

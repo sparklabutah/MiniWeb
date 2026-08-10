@@ -160,6 +160,7 @@ class BrowserUseAgent:
             llm=self.llm,
             browser_session=self._session,
             use_vision=self.use_vision,
+            use_judge=False,  # our verify_task is authoritative; skip browser-use's self-judge LLM call
             save_conversation_path=str(task_dir / "conversations"),
             max_steps=self.max_steps,
             available_file_paths=self.available_file_paths,
@@ -514,3 +515,53 @@ class ChatLLM:
         return ChatInvokeCompletion(
             completion=parsed, usage=usage, stop_reason="end_turn",
         )
+
+
+# ── unified agent factory (replaces the per-runner AGENT_FACTORIES) ───────────
+
+def build_browser_llm(model: str, *, native: bool = False):
+    """LLM object for the browser agent.
+
+    Default: ChatLLM — routes every call through helpers.llm.LLMClient, so it
+    works with any configured provider (incl. Vertex Gemini and Ollama) and its
+    tokens land in LLMClient.GLOBAL. It serializes messages to text, so it drives
+    the agent from the text DOM.
+
+    native=True builds browser-use's provider-native class instead (needs that
+    provider's own API key in env) — use it when you want true vision/multimodal.
+    """
+    if native:
+        from helpers.llm import resolve_provider
+        paths = {
+            "openai": "browser_use.llm.openai.chat:ChatOpenAI",
+            "gemini": "browser_use.llm.google.chat:ChatGoogle",
+            "anthropic": "browser_use.llm.anthropic.chat:ChatAnthropic",
+            "ollama": "browser_use.llm.ollama.chat:ChatOllama",
+            "groq": "browser_use.llm.groq.chat:ChatGroq",
+        }
+        cp = paths.get(resolve_provider(model))
+        if cp:
+            mod, cls = cp.split(":")
+            LLM = getattr(__import__(mod, fromlist=[cls]), cls)
+            name = model.split("/", 1)[-1] if resolve_provider(model) == "ollama" else model
+            return LLM(model=name)
+    return ChatLLM(model)
+
+
+# Friendly shorthands the older runners accepted, mapped to real model ids.
+MODEL_ALIASES = {
+    "gemini-flash": "gemini-3.5-flash", "gemini-pro": "gemini-2.5-pro",
+    "gpt": "gpt-4o", "gpt-5.4": "gpt-5", "gpt-5.5": "gpt-5",
+    "llm": "auto", "groq": "llama-3.3-70b-versatile", "groq-70b": "llama-3.3-70b-versatile",
+}
+
+
+def build_agent(model: str, *, native_llm: bool = False, **opts):
+    """Construct an agent runner for a model name (or a friendly alias, or
+    "mock"). opts: use_vision, max_steps, timeout, headless, available_file_paths.
+    The single factory shared by every runner (run_agent_verify, run_eval, ...).
+    """
+    if model == "mock":
+        return MockAgent(**opts)
+    model = MODEL_ALIASES.get(model, model)
+    return BrowserUseAgent(build_browser_llm(model, native=native_llm), **opts)

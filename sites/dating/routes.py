@@ -11,6 +11,7 @@ from flask import (Blueprint, Response, abort, jsonify, redirect, render_templat
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.auth import current_user
 
 SITE = "dating"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -48,9 +49,7 @@ def _get_user(user_id):
 
 
 def _get_current_user():
-    if "user_id" not in session:
-        return None
-    return _get_user(session["user_id"])
+    return current_user(_get_user)
 
 
 def _safe_user(u):

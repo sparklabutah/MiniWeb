@@ -70,8 +70,6 @@ def _load_users():
     return users
 
 
-def _load_comments():
-    return db.query(SITE, "comments")
 
 
 def _load_follows():

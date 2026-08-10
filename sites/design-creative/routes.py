@@ -12,6 +12,7 @@ from flask import Blueprint, Response, abort, jsonify, redirect, render_template
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.auth import current_user
 
 SITE = "design-creative"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -57,9 +58,7 @@ def _get_user(user_id):
 
 
 def _get_current_user():
-    if "user_id" in session:
-        return _get_user(session["user_id"])
-    return None
+    return current_user(_get_user)
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +342,22 @@ def form_invite(project_id):
     """Invite a collaborator to a project via email."""
     _email = request.form.get("email", "").strip()
     return redirect(url_for("design-creative.project_detail", project_id=project_id))
+
+
+@blueprint.route("/assets/upload", methods=["POST"])
+def form_upload_asset():
+    """Upload a file as an asset. Reads the identifying fields (filename / name)
+    from the form body so the action reports *what* was uploaded."""
+    if "user_id" not in session:
+        return redirect(url_for("design-creative.login_page"))
+    filename = request.form.get("filename", "").strip()
+    name = request.form.get("name", "").strip() or filename
+    asset_type = request.form.get("type", "").strip()
+    if filename:
+        emit("file_created", user_id=session["user_id"], filename=filename,
+             file_type=asset_type or "asset", source_site="design-creative",
+             source_id=name)
+    return redirect(url_for("design-creative.assets_page"))
 
 
 @blueprint.route("/template/<int:template_id>/favorite", methods=["POST"])

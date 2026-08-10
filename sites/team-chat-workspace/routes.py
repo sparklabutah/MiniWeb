@@ -126,12 +126,6 @@ def _enrich_messages(msgs):
     return enriched
 
 
-def _format_timestamp(ts_str):
-    """Parse ISO timestamp string to datetime."""
-    try:
-        return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return datetime.now()
 
 
 # ---------------------------------------------------------------------------

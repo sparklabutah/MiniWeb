@@ -62,90 +62,12 @@ _RAW_TRACKS: list = []
 _RAW_DATA_LOADED: bool = False
 
 
-def _color_from_title(title: str) -> str:
-    """Generate a deterministic hex color from a string (album title)."""
-    h = hashlib.md5(title.encode("utf-8")).hexdigest()
-    return "#" + h[:6]
 
 
-def _best_genre(genres: list, tags: list) -> str:
-    """Pick the most-voted genre name from MusicBrainz genres/tags lists."""
-    candidates = []
-    for g in (genres or []):
-        candidates.append((g.get("count", 0), g.get("name", "")))
-    if not candidates:
-        for t in (tags or []):
-            candidates.append((t.get("count", 0), t.get("name", "")))
-    if not candidates:
-        return "Other"
-    candidates.sort(key=lambda x: -x[0])
-    name = candidates[0][1]
-    # Title-case for display
-    return name.title() if name else "Other"
 
 
-def _make_bio(raw_artist: dict) -> str:
-    """Compose a short bio from MusicBrainz artist metadata."""
-    parts = []
-    atype = raw_artist.get("type") or "Artist"
-    country = raw_artist.get("country") or ""
-    area_name = ""
-    area = raw_artist.get("area")
-    if area:
-        area_name = area.get("name", "")
-
-    # Opening
-    if atype == "Person":
-        if area_name and country:
-            parts.append(f"Solo artist from {area_name} ({country}).")
-        elif country:
-            parts.append(f"Solo artist from {country}.")
-        else:
-            parts.append("Solo artist.")
-    elif atype == "Group":
-        if area_name and country:
-            parts.append(f"Musical group from {area_name} ({country}).")
-        elif country:
-            parts.append(f"Musical group from {country}.")
-        else:
-            parts.append("Musical group.")
-    else:
-        parts.append(f"{atype}." if atype else "Artist.")
-
-    # Genre summary
-    genres = raw_artist.get("genres", [])
-    top_genres = sorted(genres, key=lambda g: -g.get("count", 0))[:3]
-    genre_names = [g["name"].title() for g in top_genres if g.get("name")]
-    if genre_names:
-        parts.append("Known for " + ", ".join(genre_names) + ".")
-
-    # Life span
-    lifespan = raw_artist.get("life-span", {})
-    begin = lifespan.get("begin", "")
-    if begin:
-        parts.append(f"Active since {begin[:4]}.")
-        if lifespan.get("ended") and lifespan.get("end"):
-            parts[-1] = f"Active {begin[:4]}–{lifespan['end'][:4]}."
-
-    disambiguation = raw_artist.get("disambiguation", "")
-    if disambiguation:
-        parts.append(disambiguation.capitalize() + ".")
-
-    return " ".join(parts)
 
 
-def _parse_release_date(date_str: str) -> str:
-    """Normalize a MusicBrainz date (YYYY, YYYY-MM, YYYY-MM-DD, '') to YYYY-MM-DD."""
-    if not date_str:
-        return "2000-01-01"
-    date_str = date_str.strip()
-    if len(date_str) == 4:
-        return f"{date_str}-01-01"
-    if len(date_str) == 7:
-        return f"{date_str}-01"
-    if len(date_str) >= 10:
-        return date_str[:10]
-    return "2000-01-01"
 
 
 def _init_raw_data():

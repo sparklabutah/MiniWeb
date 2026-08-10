@@ -921,14 +921,3 @@ def _apply_sort(items: list, sort: str | None) -> list:
     return sorted(items, key=lambda x: (x.get(col) is None, x.get(col)), reverse=desc)
 
 
-def _detect_id_field(items: list) -> str:
-    """Detect the primary key field name from a list of dicts."""
-    if not items:
-        return "id"
-    sample = items[0] if isinstance(items[0], dict) else {}
-    if "id" in sample:
-        return "id"
-    for candidate in ("Id", "ID", "pageid", "item_id", "entry_id", "slug"):
-        if candidate in sample:
-            return candidate
-    return "id"

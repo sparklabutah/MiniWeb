@@ -539,28 +539,6 @@ def _browse_by_letter(entries, letter):
 # Statistics helpers (file-based fallback)
 # ---------------------------------------------------------------------------
 
-def _compute_stats(entries):
-    """Compute aggregate statistics about the dictionary."""
-    total = len(entries)
-    pos_counts = Counter(e["pos"] for e in entries)
-    letter_counts = Counter(e["first_letter"] for e in entries)
-    with_ipa = sum(1 for e in entries if e["ipa"])
-    with_etymology = sum(1 for e in entries if e["etymology"])
-    with_synonyms = sum(1 for e in entries if e["synonyms"])
-    total_defs = sum(e["num_definitions"] for e in entries)
-    avg_defs = round(total_defs / total, 2) if total > 0 else 0
-
-    return {
-        "total_words": total,
-        "total_definitions": total_defs,
-        "avg_definitions_per_word": avg_defs,
-        "words_with_pronunciation": with_ipa,
-        "words_with_etymology": with_etymology,
-        "words_with_synonyms": with_synonyms,
-        "pos_distribution": dict(pos_counts.most_common()),
-        "letter_distribution": {k: letter_counts[k] for k in sorted(letter_counts.keys())},
-        "unique_letters": len(letter_counts),
-    }
 
 
 # ---------------------------------------------------------------------------

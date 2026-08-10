@@ -37,6 +37,7 @@ from flask import (
     url_for,
 )
 from app import db
+from helpers.auth import current_user
 from app.events import emit
 
 SITE = "health-fitness-tracking"
@@ -71,11 +72,11 @@ def _load_goals(*, where=None):
 def _load_users():
     return db.query(SITE, "users")
 
+def _get_user(user_id):
+    return db.get_item(SITE, "users", user_id)
+
 def _get_current_user():
-    uid = session.get("user_id")
-    if uid is None:
-        return None
-    return db.get_item(SITE, "users", uid)
+    return current_user(_get_user, session_keys=("user_id",))
 
 def _today():
     return datetime.now().strftime("%Y-%m-%d")

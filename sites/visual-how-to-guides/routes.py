@@ -17,6 +17,7 @@ from flask import (
     Blueprint, abort, jsonify, redirect, render_template, request, session, url_for,
 )
 from app import DATA_SOURCES_DIR, db
+from helpers.auth import current_user
 
 SITE = "visual-how-to-guides"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -131,9 +132,7 @@ def _author_guide_count(name):
 
 
 def _get_current_user():
-    if "user_id" in session:
-        return _get_user(session["user_id"])
-    return None
+    return current_user(_get_user)
 
 
 def _recalc_category_counts():

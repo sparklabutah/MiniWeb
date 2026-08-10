@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
 from app.events import emit
+from helpers.security import safe_next
 
 SITE = "auctions-p2p-marketplaces"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -328,8 +329,7 @@ def dashboard():
 
 
 def _safe_next(value):
-    """Only allow same-site relative redirects."""
-    return value if (value and value.startswith("/") and not value.startswith("//")) else None
+    return safe_next(value)
 
 
 @blueprint.route("/login", methods=["GET"])

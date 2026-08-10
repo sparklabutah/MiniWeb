@@ -36,10 +36,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from scripts.backfill_observations import (   # noqa: E402
+from annotation.backfill_observations import (   # noqa: E402
     Capturer, _pair_events, _is_yaml_axtree, _free_port, _start_app,
     ANNOTATIONS_DIR)
-from scripts.repair_form_state import repair_task  # noqa: E402
+from annotation.repair_form_state import repair_task  # noqa: E402
 
 
 def is_complete(task_dir: Path) -> bool:
@@ -82,7 +82,7 @@ def process_task(task_dir: Path, base_url: str, cap: Capturer = None) -> dict:
     if own_browser:
         cap = Capturer(base_url)
     try:
-        from scripts.backfill_observations import process_task as _reconstruct
+        from annotation.backfill_observations import process_task as _reconstruct
         stats = _reconstruct(task_dir, cap)
     finally:
         if own_browser:

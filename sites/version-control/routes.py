@@ -64,8 +64,6 @@ def _save_repos(repos):
     db.save_collection(SITE, "repositories", repos)
 
 
-def _save_activities(activities):
-    db.save_collection(SITE, "activities", activities)
 
 
 def _user_by_id(user_id):
@@ -601,14 +599,6 @@ def _toggle_star(repo_id):
     return new_state
 
 
-def _format_size(size_bytes):
-    """Format byte size to human readable."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 def _sort_repos(repos, sort_by="updated"):

@@ -260,15 +260,6 @@ def _get_user(user_id):
 # Helper: format result for display
 # ---------------------------------------------------------------------------
 
-def _fmt(value):
-    """Format a numeric result for display: use up to 6 decimal places, strip trailing zeros."""
-    if value is None:
-        return "N/A"
-    if isinstance(value, float):
-        # Round to 6 decimal places then strip trailing zeros
-        formatted = f"{value:.6f}".rstrip("0").rstrip(".")
-        return formatted
-    return str(value)
 
 
 # ---------------------------------------------------------------------------

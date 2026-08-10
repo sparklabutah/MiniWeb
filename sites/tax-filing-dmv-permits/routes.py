@@ -25,6 +25,7 @@ from flask import (
 )
 from app import db
 from app.events import emit
+from helpers.auth import current_user, browsing_user
 
 SITE = "tax-filing-dmv-permits"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -82,17 +83,12 @@ def _get_user(user_id):
 
 
 def _get_current_user():
-    if "user_id" in session:
-        return _get_user(session["user_id"])
-    return None
+    return current_user(_get_user)
 
 
 def _get_browsing_user():
     """Return logged-in user, or fall back to user 1 for browse-only mode."""
-    user = _get_current_user()
-    if user:
-        return user, True
-    return _get_user(1), False
+    return browsing_user(_get_user, fallback=1)
 
 
 def _search_text(record, query):

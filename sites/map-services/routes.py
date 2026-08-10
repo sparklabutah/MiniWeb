@@ -26,6 +26,7 @@ from flask import (
 )
 from app import db
 from app.events import emit
+from helpers.geo import haversine
 
 SITE = "map-services"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -50,14 +51,7 @@ def _current_user():
 
 
 def _haversine(lat1, lng1, lat2, lng2):
-    """Distance in km between two lat/lng points."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return haversine(lat1, lng1, lat2, lng2)
 
 
 def _get_categories_from_db():

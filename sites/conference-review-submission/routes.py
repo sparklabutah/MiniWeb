@@ -15,6 +15,7 @@ from app import db
 from app.db import _deserialize_row
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.auth import current_user
 
 SITE = "conference-review-submission"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -281,10 +282,7 @@ _SESSION_KEY = "conf_review_uid"
 
 
 def _get_current_user():
-    uid = session.get(_SESSION_KEY)
-    if uid is not None:
-        return _get_user(uid)
-    return None
+    return current_user(_get_user, session_keys=(_SESSION_KEY,))
 
 
 def _is_logged_in():
@@ -322,11 +320,6 @@ def _can_see_reviews(venue, user, paper):
 # Search helpers
 # ---------------------------------------------------------------------------
 
-def _keyword_score(query, paper):
-    terms = query.lower().split()
-    text = (paper["title"] + " " + paper["abstract"] + " " +
-            " ".join(paper["authors"])).lower()
-    return sum(1 for t in terms if t in text)
 
 
 # ---------------------------------------------------------------------------

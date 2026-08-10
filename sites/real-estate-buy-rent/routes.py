@@ -420,6 +420,11 @@ def save_listing(listing_id):
 def submit_inquiry(listing_id):
     if "user_id" not in session:
         return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    # The listing id is posted in the form body (hidden field) so the request
+    # payload identifies the target listing; fall back to the URL path param.
+    form_listing_id = request.form.get("listing_id", type=int)
+    if form_listing_id is not None:
+        listing_id = form_listing_id
     message = request.form.get("message", "").strip()
     if not message:
         return redirect(url_for("real-estate-buy-rent.listing_detail",

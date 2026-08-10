@@ -153,13 +153,6 @@ def _query_papers(q="", cat="", checked_cats=None, date_from=None, date_to=None,
     return [_interpret_record(_deserialize_row(r), r["rowid"]) for r in rows]
 
 
-def _get_paper_by_id(arxiv_id):
-    """Look up a single paper by its arxiv ID."""
-    conn = db.get_conn()
-    row = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE id = ?", (str(arxiv_id),)).fetchone()
-    if not row:
-        return None
-    return _interpret_record(_deserialize_row(row), row["rowid"])
 
 
 def _get_paper_by_row(paper_id):

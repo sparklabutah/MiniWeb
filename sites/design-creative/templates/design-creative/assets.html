@@ -103,12 +103,26 @@
 
         <div class="result-count">{{ assets|length }} asset{{ 's' if assets|length != 1 }} found</div>
 
-        <div class="upload-area" onclick="document.getElementById('file-upload').click()">
-            <div class="upload-icon">+</div>
-            <p>Drag and drop files here or click to upload</p>
-            <span class="upload-btn">Upload Asset</span>
-            <input type="file" id="file-upload" style="display:none" multiple>
-        </div>
+        <form id="asset-upload-form" method="post" action="{{ url_for('design-creative.form_upload_asset') }}">
+            <input type="hidden" name="filename" id="asset-filename" value="">
+            <input type="hidden" name="name" id="asset-name" value="">
+            <div class="upload-area" onclick="document.getElementById('file-upload').click()">
+                <div class="upload-icon">+</div>
+                <p>Drag and drop files here or click to upload</p>
+                <span class="upload-btn">Upload Asset</span>
+                <input type="file" id="file-upload" style="display:none">
+            </div>
+        </form>
+        <script>
+        document.getElementById('file-upload').addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                var fn = this.files[0].name;
+                document.getElementById('asset-filename').value = fn;
+                document.getElementById('asset-name').value = fn.replace(/\.[^.]+$/, '');
+                document.getElementById('asset-upload-form').submit();
+            }
+        });
+        </script>
 
         {% if assets %}
         <div class="asset-grid">

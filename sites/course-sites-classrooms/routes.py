@@ -59,8 +59,6 @@ def _save_discussions(discs):
     db.save_collection(SITE, "discussions", discs)
 
 
-def _save_users(users):
-    db.save_collection(SITE, "users", users)
 
 
 # ---------------------------------------------------------------------------
@@ -75,10 +73,6 @@ def _find(collection, **kwargs):
     return None
 
 
-def _filter(collection, **kwargs):
-    """Return all items matching all kwargs."""
-    return [item for item in collection
-            if all(item.get(k) == v for k, v in kwargs.items())]
 
 
 def _current_user():

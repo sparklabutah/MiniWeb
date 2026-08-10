@@ -23,6 +23,7 @@ from flask import (
     url_for,
 )
 from app import db
+from helpers.geo import haversine
 
 SITE = "transit-directions"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -91,8 +92,6 @@ def _load_users():
     return db.query(SITE, "users")
 
 
-def _save_users(users):
-    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
@@ -100,14 +99,7 @@ def _get_user(user_id):
 
 
 def _haversine(lat1, lng1, lat2, lng2):
-    """Return distance in km between two lat/lng points."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return haversine(lat1, lng1, lat2, lng2)
 
 
 def _get_route_by_id(route_id):

@@ -222,21 +222,6 @@ def _task_site_ids(task):
     return ids
 
 
-def _get_site_macro_coverage(site_id):
-    """Count SINGLE-SITE tasks covering each macro for one site.
-
-    Used for the per-site coverage floor: every site should have at least
-    one single-site task per supported macro.
-    """
-    from annotation.storage import list_tasks
-    coverage = {}
-    for t in list_tasks():
-        if _task_site_ids(t) != [site_id]:
-            continue
-        for m in t.get("macros", []):
-            m = _canon(m)
-            coverage[m] = coverage.get(m, 0) + 1
-    return coverage
 
 
 # Coverage floor: each macro should be demonstrated on K distinct sites via
@@ -901,6 +886,44 @@ def verify():
                            tasks=tasks,
                            task=task,
                            macro_descriptions=_MACRO_DESCRIPTIONS)
+
+
+@annotation_bp.route("/verifiers")
+def verifiers_review():
+    """Read-only review of every per-task macro verifier (verifier.json)."""
+    return render_template("verifier_review.html")
+
+
+@annotation_bp.route("/api/verifier_index")
+def api_verifier_index():
+    """Lightweight index of every task + whether it has a verifier.json, for the
+    verifier-review UI. The verifier tree itself is fetched per-task via
+    /api/task_verifier/<annotator>/<task_id>."""
+    from annotation.storage import ANNOTATIONS_DIR
+    out = []
+    for ann_dir in sorted(ANNOTATIONS_DIR.iterdir()):
+        if not ann_dir.is_dir() or ann_dir.name.startswith("."):
+            continue
+        for td in sorted(ann_dir.iterdir()):
+            tj = td / "task.json"
+            if not tj.exists():
+                continue
+            try:
+                t = json.loads(tj.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            sites = [s["id"] if isinstance(s, dict) else s for s in (t.get("sites") or [])]
+            out.append({
+                "annotator": ann_dir.name,
+                "task_id": td.name,
+                "site": sites[0] if sites else "",
+                "instruction": t.get("instruction", ""),
+                "expected_answer": t.get("expected_answer", ""),
+                "macros": [_canon(m) for m in (t.get("macros") or [])],
+                "has_verifier": (td / "verifier.json").exists(),
+            })
+    out.sort(key=lambda r: (r["site"], r["task_id"]))
+    return jsonify({"count": len(out), "tasks": out})
 
 
 @annotation_bp.route("/graph")
@@ -2257,7 +2280,6 @@ def api_add_graph_edge():
 @annotation_bp.route("/api/graph/edges/<int:edge_id>", methods=["DELETE"])
 def api_delete_graph_edge(edge_id):
     """Delete a custom edge."""
-    None
     return jsonify({"status": "deleted"})
 
 
@@ -2270,8 +2292,6 @@ def api_graph_positions():
 @annotation_bp.route("/api/graph/positions", methods=["POST"])
 def api_save_graph_positions():
     """Save node positions."""
-    data = request.get_json(silent=True) or {}
-    None
     return jsonify({"status": "saved"})
 
 
@@ -2319,7 +2339,6 @@ def api_seed_graph():
     ]
     count = 0
     for src, tgt, evt in builtin_edges:
-        None
         count += 1
     return jsonify({"seeded": count})
 
@@ -3403,148 +3422,6 @@ def _enrich_trajectory(trajectory, request_log):
 
         enriched.append({**action, "api_calls": api_calls})
     return enriched
-
-
-# --- Verifier system prompt ---
-_VERIFIER_SYSTEM_PROMPT = """You are a verifier builder for MiniWeb, a web benchmark platform.
-
-Given a task's instruction, trajectory (with API calls), macro spans, and expected answer,
-generate a JSON array of verifier configs — one per macro span.
-
-Each verifier config has this schema:
-{
-  "macro": "macro_name",
-  "span": [start_action_idx, end_action_idx],
-  "checks": [
-    {
-      "type": "grounding|state_query|answer_match|record_exists|record_absent|count_equals|field_equals|action_performed",
-      "description": "Human-readable description of what this checks",
-      ... type-specific fields ...
-    }
-  ]
-}
-
-Check type schemas:
-
-1. grounding — verify the agent visited required pages
-   {"type": "grounding", "required_urls": ["/sites/banking/transactions"], "description": "..."}
-
-2. state_query — query /_admin/data/<site>/<collection> and assert a condition
-   {"type": "state_query", "endpoint": "/_admin/data/banking/transactions", "params": {"user_id": "1"}, "check": "count_gt|count_equals|count_gte|equals|contains|not_empty", "expected": ..., "field": "optional_field_name", "description": "..."}
-
-3. answer_match — compare the agent's answer against expected
-   {"type": "answer_match", "expected": "42", "match_type": "string|number|boolean|date", "alternatives": [], "description": "..."}
-
-4. record_exists — verify a record matching params exists
-   {"type": "record_exists", "endpoint": "/_admin/data/<site>/<collection>", "params": {...}, "description": "..."}
-
-5. record_absent — verify no record matches
-   {"type": "record_absent", "endpoint": "/_admin/data/<site>/<collection>", "params": {...}, "description": "..."}
-
-6. count_equals — verify exact count
-   {"type": "count_equals", "endpoint": "...", "params": {...}, "expected": 5, "description": "..."}
-
-7. field_equals — verify a field on a record
-   {"type": "field_equals", "endpoint": "...", "params": {...}, "field": "status", "expected": "completed", "description": "..."}
-
-8. action_performed — verify the trajectory contains a specific action
-   {"type": "action_performed", "action": "click|type|select|navigate|tab_switch", "target_contains": "optional text in target", "description": "..."}
-
-Rules:
-- Generate one verifier per macro span
-- Always include at least one grounding check (from URLs visited in the trajectory)
-- For macros that change state (create, edit, delete, pay, submit), include state_query or record_exists checks
-- For macros that extract/compute information, include answer_match if this macro produces the final answer
-- Use the API calls in the trajectory to understand what endpoints were hit and what data exists
-- The /_admin/data/<site>/<collection> endpoint returns a JSON array of records
-- Available collections per site are listed in admin_schemas
-- Output ONLY the JSON array, no explanation or markdown
-
-IMPORTANT — Fix mode:
-If the input contains "mode": "fix" with "existing_configs" and "feedback", do NOT regenerate from scratch.
-Instead, take the existing_configs as your starting point and apply ONLY the changes described in the feedback.
-Keep everything that isn't mentioned in the feedback unchanged. Output the full corrected JSON array."""
-
-
-def _call_openai_verifiers(context):
-    """Generate verifier configs via the shared LLM helper."""
-    from app.llm import call_llm
-
-    trimmed_ctx = _trim_context(context)
-    prompt = json.dumps(trimmed_ctx)
-
-    text = call_llm(prompt, system=_VERIFIER_SYSTEM_PROMPT, max_tokens=4000, temperature=0.2)
-    if not text:
-        return None
-
-    try:
-        text = text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        if "```" in text:
-            text = text.split("```")[0]
-        return json.loads(text.strip())
-    except Exception:
-        import traceback
-        traceback.print_exc()
-        return None
-
-
-def _trim_context(context):
-    """Trim trajectory and schemas to fit within token limits."""
-    trimmed = dict(context)
-
-    # Limit trajectory to actions + their api_calls (drop observations/html)
-    if "trajectory" in trimmed:
-        actions = []
-        for entry in trimmed["trajectory"]:
-            slim = {
-                "action_idx": entry.get("action_idx", 0),
-                "action": entry.get("action", ""),
-                "target": entry.get("target", ""),
-                "url": entry.get("url", ""),
-            }
-            # Include key details per action type
-            for key in ("text", "value", "option_text", "key", "checked",
-                        "from_tab", "to_tab"):
-                if key in entry and entry[key]:
-                    slim[key] = entry[key]
-            # Include API calls (trimmed)
-            api_calls = entry.get("api_calls", [])
-            slim_calls = []
-            for call in api_calls[:5]:  # max 5 per action
-                sc = {
-                    "method": call.get("method"),
-                    "path": call.get("path"),
-                    "status": call.get("status"),
-                }
-                if "body" in call:
-                    sc["body"] = call["body"]
-                if "response" in call:
-                    resp = call["response"]
-                    # Truncate large responses
-                    if isinstance(resp, list) and len(resp) > 3:
-                        sc["response"] = resp[:3]
-                        sc["response_truncated"] = len(resp)
-                    else:
-                        sc["response"] = resp
-                elif "response_preview" in call:
-                    sc["response_preview"] = call["response_preview"][:100]
-                slim_calls.append(sc)
-            slim["api_calls"] = slim_calls
-            actions.append(slim)
-        trimmed["trajectory"] = actions
-
-    # Limit schema to collection names only (not full records)
-    if "admin_schemas" in trimmed:
-        for site in trimmed["admin_schemas"]:
-            schema = trimmed["admin_schemas"][site]
-            if isinstance(schema, list):
-                trimmed["admin_schemas"][site] = schema[:20]
-
-    return trimmed
 
 
 # --- Website Review ---

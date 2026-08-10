@@ -22,6 +22,7 @@ from flask import (
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.auth import current_user
 
 SITE = "petitions-voting-info"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -58,9 +59,7 @@ def _save_users(users):
     db.save_collection(SITE, "users", users)
 
 def _get_current_user():
-    if "user_id" in session:
-        return db.get_item(SITE, "users", session["user_id"])
-    return None
+    return current_user(lambda uid: db.get_item(SITE, "users", uid))
 
 def _now_iso():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")

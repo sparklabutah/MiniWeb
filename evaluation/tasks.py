@@ -61,6 +61,17 @@ def run_verifier(verifier_mod, verifier_name: str, server_url: str) -> tuple[boo
         return False, f"Verifier exception: {e}"
 
 
+def _fetch_recorder_actions(server_url: str) -> list:
+    """The agent's recorded UI actions from the server's recorder stream."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(server_url + "/_admin/record?all=1", timeout=15) as r:
+            entries = json.loads(r.read()).get("entries", [])
+        return [e for e in entries if e.get("type") == "action"]
+    except Exception:
+        return []
+
+
 async def run_task(
     task: dict,
     agent_runner,
@@ -68,7 +79,7 @@ async def run_task(
     site_id: str,
     task_dir: Path,
     use_judge: bool = False,
-    judge_model: str = "gpt-4.1-nano",
+    judge_model: str = "auto",
 ) -> dict:
     """Run a single task: execute the agent, then verify. Returns result dict."""
     task_id = task["task_id"]
@@ -86,7 +97,10 @@ async def run_task(
         rubric = task.get("rubric", "Check that the agent completed the task correctly.")
         verdict = judge_task(
             instruction=task["instruction"],
-            trajectory=result.history if hasattr(result, "history") else [],
+            # the agent's recorded action trace (AgentResult carries no trajectory;
+            # the recorder stream on the server does — action/target/url, exactly
+            # what the judge's format_trajectory expects).
+            trajectory=_fetch_recorder_actions(server_url),
             expected_answer=task.get("expected_answer") or "",
             rubric=rubric,
             agent_answer=result.final_result or "",

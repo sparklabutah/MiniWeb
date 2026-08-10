@@ -15,12 +15,6 @@ _TYPE_MAP = {
 }
 
 # Maps source_site to the URL pattern for opening files
-OPEN_IN_URLS = {
-    "documents": "/sites/documents/editor/{source_id}",
-    "spreadsheets-slides": "/sites/spreadsheets-slides/spreadsheet/{source_id}",
-    "handwritten-notes-whiteboards": "/sites/handwritten-notes-whiteboards/note/{source_id}",
-    "code-editor-execution": "/sites/code-editor-execution/editor?snippet_id={source_id}",
-}
 
 
 @on("file_created")

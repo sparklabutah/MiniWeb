@@ -13,6 +13,7 @@ from flask import (
     session, url_for,
 )
 from app import db
+from helpers.auth import current_user, browsing_user
 
 SITE = "personal-portfolio"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -58,18 +59,15 @@ def _save_blog_links(links):
 def _load_users():
     return db.query(SITE, "users")
 
+def _get_user(user_id):
+    return db.get_item(SITE, "users", user_id)
+
 def _get_current_user():
-    if "user_id" in session:
-        return db.get_item(SITE, "users", session["user_id"])
-    return None
+    return current_user(_get_user, session_keys=("user_id",))
 
 def _get_browsing_user():
     """Return the logged-in user, or fall back to user 1 for browse-only mode."""
-    user = _get_current_user()
-    if user:
-        return user, True
-    users = _load_users()
-    return next((u for u in users if u["id"] == 1), None), False
+    return browsing_user(_get_user, session_keys=("user_id",), fallback=1)
 
 def _is_owner():
     """Check if the current session user is the portfolio owner."""

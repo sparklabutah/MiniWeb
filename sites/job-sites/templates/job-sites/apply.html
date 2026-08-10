@@ -93,6 +93,13 @@
             <form class="form-card" method="post" enctype="multipart/form-data">
                 <h3>Submit Your Application</h3>
 
+                {# identifying fields so the submission body carries WHAT was applied to #}
+                <input type="hidden" name="job_id" value="{{ job.row_id or job.id }}">
+                <input type="hidden" name="job_title" value="{{ job.job_title }}">
+                <input type="hidden" name="company" value="{{ job.company }}">
+                {# populated from the file input so the resume upload is captured in the POST body #}
+                <input type="hidden" name="resume_filename" id="resume_filename" value="">
+
                 <div class="form-group">
                     <label for="cover_letter">Cover Letter</label>
                     <textarea name="cover_letter" id="cover_letter" placeholder="Tell the employer why you're a great fit for this role..."></textarea>
@@ -101,7 +108,8 @@
 
                 <div class="form-group">
                     <label for="resume">Upload Resume</label>
-                    <input type="file" name="resume" id="resume" accept=".pdf,.doc,.docx,.txt">
+                    <input type="file" name="resume" id="resume" accept=".pdf,.doc,.docx,.txt"
+                           onchange="document.getElementById('resume_filename').value = (this.files && this.files[0]) ? this.files[0].name : '';">
                     <div class="help-text">Accepted formats: PDF, DOC, DOCX, TXT (max 5MB)</div>
                 </div>
 

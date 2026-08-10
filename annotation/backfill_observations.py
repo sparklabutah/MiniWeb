@@ -365,7 +365,7 @@ def _same_page(url_a, url_b):
 
 def _carry_forward(prev_html, action):
     """Previous page's HTML with this action's effect applied. None if not possible."""
-    from scripts.repair_form_state import _find_input_by_selector, _inject_value
+    from annotation.repair_form_state import _find_input_by_selector, _inject_value
 
     if action.get("action") not in CARRY_SAFE_ACTIONS:
         return None

@@ -17,6 +17,7 @@ from flask import (
 )
 from app import db
 from app.events import emit
+from helpers.auth import current_user
 
 SITE = "forums"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -76,8 +77,6 @@ def _load_posts(*, where=None, sort=None, limit=None, offset=0):
     return db.query(SITE, "posts", where=where, sort=sort, limit=limit, offset=offset)
 
 
-def _save_posts(posts):
-    db.save_collection(SITE, "posts", posts)
 
 
 def _get_post(post_id):
@@ -88,8 +87,6 @@ def _load_comments(*, where=None, sort=None, limit=None, offset=0):
     return db.query(SITE, "comments", where=where, sort=sort, limit=limit, offset=offset)
 
 
-def _save_comments(comments):
-    db.save_collection(SITE, "comments", comments)
 
 
 def _get_comment(comment_id):
@@ -118,10 +115,7 @@ def _save_reports(reports):
 
 def _get_current_user():
     """Return the logged-in user dict or None."""
-    uid = session.get("user_id")
-    if uid is None:
-        return None
-    return _get_user_by_root_id(uid)
+    return current_user(_get_user_by_root_id)
 
 
 def _get_subreddits():
@@ -214,13 +208,6 @@ def _hot_score(post):
     return sign * order - age_hours / 500
 
 
-def _sort_posts(posts, sort="hot"):
-    if sort == "new":
-        return sorted(posts, key=lambda p: p.get("created_utc", ""), reverse=True)
-    elif sort == "top":
-        return sorted(posts, key=lambda p: p.get("score", 0), reverse=True)
-    else:  # hot
-        return sorted(posts, key=_hot_score, reverse=True)
 
 
 def _format_time_ago(iso_str):
@@ -321,17 +308,6 @@ def _next_report_id():
     return f"rd_report_{max_num + 1:03d}"
 
 
-def _semantic_score(query_tokens, text):
-    """Simple keyword-overlap scoring for semantic search."""
-    text_lower = text.lower()
-    text_tokens = set(text_lower.split())
-    score = 0
-    for qt in query_tokens:
-        if qt in text_lower:
-            score += 2  # substring match
-        if qt in text_tokens:
-            score += 1  # exact token match
-    return score
 
 
 # ---------------------------------------------------------------------------

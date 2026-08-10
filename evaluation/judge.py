@@ -18,8 +18,6 @@ Usage:
 
 import json
 import os
-import subprocess
-import urllib.request
 from pathlib import Path
 
 
@@ -82,63 +80,6 @@ def format_trajectory(trajectory):
     return "\n".join(lines) if lines else "(no actions recorded)"
 
 
-def generate_rubric(task):
-    """Generate a rubric from a task's macros and instruction.
-
-    The rubric is a checklist that the judge uses to evaluate the agent.
-    """
-    instruction = task.get("instruction", "")
-    macros = task.get("macros", [])
-    expected = task.get("expected_answer", "")
-    difficulty = task.get("difficulty", "easy")
-
-    criteria = []
-
-    for macro in macros:
-        verb = macro.split("_")[0]
-        modality = "_".join(macro.split("_")[1:]) if "_" in macro else ""
-
-        if verb in ("navigate", "browse"):
-            criteria.append(f"Agent navigated to the correct page ({modality.replace('_', ' ')})")
-        elif verb in ("search",):
-            criteria.append(f"Agent performed a search using the correct method ({modality.replace('_', ' ')})")
-        elif verb in ("filter",):
-            criteria.append(f"Agent applied the correct filter ({modality.replace('_', ' ')})")
-        elif verb in ("sort",):
-            criteria.append(f"Agent sorted results correctly ({modality.replace('_', ' ')})")
-        elif verb in ("extract", "compute", "count", "compare", "verify", "calculate"):
-            criteria.append(f"Agent extracted/computed the correct value")
-        elif verb in ("create", "submit", "post", "message", "register", "apply", "book"):
-            criteria.append(f"Agent created/submitted the required content ({modality.replace('_', ' ')})")
-        elif verb in ("edit", "update", "configure"):
-            criteria.append(f"Agent modified the correct item ({modality.replace('_', ' ')})")
-        elif verb in ("delete", "cancel"):
-            criteria.append(f"Agent deleted/cancelled the correct item")
-        elif verb in ("authenticate", "login"):
-            criteria.append(f"Agent logged in successfully")
-        elif verb in ("share", "save", "follow", "subscribe", "react", "rate", "star", "bookmark"):
-            criteria.append(f"Agent performed the social action: {verb} ({modality.replace('_', ' ')})")
-        elif verb in ("pay", "checkout", "add", "redeem"):
-            criteria.append(f"Agent completed the transaction: {verb}")
-        elif verb in ("upload", "export", "play"):
-            criteria.append(f"Agent performed media action: {verb} ({modality.replace('_', ' ')})")
-        elif verb in ("select",):
-            criteria.append(f"Agent selected the correct option ({modality.replace('_', ' ')})")
-        elif verb == "tab":
-            criteria.append(f"Agent switched to the correct tab/site")
-        else:
-            criteria.append(f"Agent performed: {macro}")
-
-    if expected and expected.lower() not in ("done", ""):
-        criteria.append(f"Agent's answer matches expected: \"{expected}\"")
-    elif expected and expected.lower() == "done":
-        criteria.append("Agent completed the action (no specific answer required, just confirmation)")
-
-    rubric = "Checklist — ALL must be satisfied:\n"
-    for i, c in enumerate(criteria, 1):
-        rubric += f"{i}. {c}\n"
-
-    return rubric
 
 
 def _parse_json_response(text):
@@ -201,13 +142,3 @@ def judge_task(instruction, trajectory, expected_answer, rubric,
         return {"pass": False, "score": 0.0, "reasoning": f"Judge error: {e}"}
 
 
-def generate_all_rubrics(site_id):
-    """Generate rubrics for all tasks in a site's tasks.json."""
-    tasks_file = Path(__file__).resolve().parent.parent / "sites" / site_id / "tasks.json"
-    if not tasks_file.exists():
-        return []
-
-    tasks = json.loads(tasks_file.read_text())
-    for task in tasks:
-        task["rubric"] = generate_rubric(task)
-    return tasks

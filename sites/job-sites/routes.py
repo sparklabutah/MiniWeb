@@ -24,6 +24,7 @@ from flask import (
 from app import db
 from app.events import emit
 from app.handlers.email_handler import _add_email
+from helpers.auth import current_user, browsing_user
 
 SITE = "job-sites"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -146,17 +147,12 @@ def _get_user(user_id):
 
 
 def _get_current_user():
-    if "job_sites_user_id" in session:
-        return _get_user(session["job_sites_user_id"])
-    return None
+    return current_user(_get_user, session_keys=("job_sites_user_id",))
 
 
 def _get_browsing_user():
     """Return logged-in user or fall back to user 1 for browse-only mode."""
-    user = _get_current_user()
-    if user:
-        return user, True
-    return _get_user(1), False
+    return browsing_user(_get_user, session_keys=("job_sites_user_id",), fallback=1)
 
 
 # ---------------------------------------------------------------------------
@@ -543,6 +539,13 @@ def _apply_flow(user, logged_in, job):
     cover_letter = request.form.get("cover_letter", "").strip()
     now = datetime.now().strftime("%Y-%m-%d")
 
+    # Identifying fields posted with the application so the request body records
+    # WHAT was applied to (job id / title / company) and the resume that was
+    # attached.  The URL-derived `job` remains the source of truth; these only
+    # need to match it.
+    posted_job_id = request.form.get("job_id", "").strip()
+    posted_resume_name = request.form.get("resume_filename", "").strip()
+
     # Handle resume upload (upload_by_upload)
     resume_filename = f"{user['username']}_resume.pdf"
     resume_file = request.files.get("resume")
@@ -551,6 +554,10 @@ def _apply_flow(user, logged_in, job):
         safe_name = re.sub(r'[^\w.\-]', '_', resume_file.filename)
         resume_filename = f"{user['id']}_{safe_name}"
         resume_file.save(str(UPLOAD_DIR / resume_filename))
+    elif posted_resume_name:
+        # No file bytes reached the server, but the applicant named a resume in
+        # the form -- record that name so the attachment is still tracked.
+        resume_filename = re.sub(r'[^\w.\-]', '_', posted_resume_name)
 
     new_app = {
         "id": max(a["id"] for a in applications) + 1 if applications else 1,

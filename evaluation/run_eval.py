@@ -33,56 +33,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
 
-from agents import AgentResult, BrowserUseAgent, MockAgent, ChatLLM
+from agents import build_agent
 from server import start_server, stop_server, wait_for_server
 from tasks import TASK_TIMEOUT, filter_tasks, load_tasks, run_task
 
 load_dotenv()
 
-# ── Agent factories ──────────────────────────────────────────────────────────
-
-def _make_browser_use_agent(llm_factory, **kw):
-    llm = llm_factory()
-    return BrowserUseAgent(llm, **kw)
-
-
-AGENT_FACTORIES = {
-    "gemini-flash": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.google.chat", fromlist=["ChatGoogle"]
-        ).ChatGoogle(model="gemini-3-flash-preview"),
-        **kw,
-    ),
-    "gemini-pro": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.google.chat", fromlist=["ChatGoogle"]
-        ).ChatGoogle(model="gemini-3-pro-preview"),
-        **kw,
-    ),
-    "gpt": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.openai.chat", fromlist=["ChatOpenAI"]
-        ).ChatOpenAI(model="gpt-4o"),
-        **kw,
-    ),
-    "gpt-5.4": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.openai.chat", fromlist=["ChatOpenAI"]
-        ).ChatOpenAI(model="gpt-5.4"),
-        **kw,
-    ),
-    "gpt-5.5": lambda **kw: _make_browser_use_agent(
-        lambda: __import__(
-            "browser_use.llm.openai.chat", fromlist=["ChatOpenAI"]
-        ).ChatOpenAI(model="gpt-5.5"),
-        **kw,
-    ),
-    "mock": lambda **kw: MockAgent(**kw),
-    "llm": lambda **kw: _make_browser_use_agent(
-        lambda: ChatLLM(),
-        **kw,
-    ),
-}
+# ── Agent factory: shared build_agent (agents.py) — one factory for all runners.
 
 # ── ANSI colors ──────────────────────────────────────────────────────────────
 
@@ -104,7 +61,7 @@ async def worker(
     results: list,
     results_lock: asyncio.Lock,
     *,
-    agent_factory,
+    model: str,
     server_url: str,
     site_id: str,
     run_dir: Path,
@@ -117,7 +74,8 @@ async def worker(
     tag = f"{DIM}[W{worker_id}]{RESET}"
 
     from generate_fixtures import ensure_fixtures
-    agent = agent_factory(
+    agent = build_agent(
+        model,
         use_vision=use_vision,
         max_steps=max_steps,
         timeout=TASK_TIMEOUT,
@@ -292,7 +250,7 @@ async def run_eval(args):
                 task_queue=task_queue,
                 results=results,
                 results_lock=results_lock,
-                agent_factory=AGENT_FACTORIES[args.model],
+                model=args.model,
                 server_url=server_url,
                 site_id=site_id,
                 run_dir=rep_dir,
@@ -375,7 +333,8 @@ async def run_eval(args):
 def main():
     parser = argparse.ArgumentParser(description="MiniWeb browser-agent evaluation")
     parser.add_argument("--site", required=True, help="Site ID to evaluate (e.g. bookstore)")
-    parser.add_argument("--model", choices=list(AGENT_FACTORIES.keys()), default="gemini-flash")
+    parser.add_argument("--model", default="gemini-flash",
+                        help="model id or alias (gemini-flash, gpt, mock, gemini-3.5-flash, ...)")
     parser.add_argument("--task-id", default=None, help="Comma-separated task IDs to run")
     parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default=None)
     parser.add_argument("--workers", type=int, default=1, help="Parallel workers")

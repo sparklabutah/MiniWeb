@@ -273,11 +273,6 @@ def _db_get_phone_by_item_id(item_id):
     return _interpret_record(raw, raw.get("id", 0))
 
 
-def _db_count_phones():
-    conn = _db_conn()
-    return conn.execute(
-        "SELECT COUNT(*) FROM comparison_aggregators_phones"
-    ).fetchone()[0]
 
 
 # Brand and OS family caches (computed once from DB)

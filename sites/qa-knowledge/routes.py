@@ -150,12 +150,6 @@ def _build_user_map():
     return {u["root_user_id"]: u for u in _load_users()}
 
 
-def _parse_dt(dt_str):
-    """Parse an ISO datetime string."""
-    try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-    except Exception:
-        return datetime.min
 
 
 def _strip_html(html_text):
@@ -281,14 +275,6 @@ def _record_vote(item, kind, direction):
     return item["score"]
 
 
-def _keyword_score(query, question):
-    """Simple keyword-overlap relevance score for semantic search."""
-    terms = query.lower().split()
-    body_text = question.get("body_excerpt") or _strip_html(question.get("body", ""))
-    text = (question.get("title", "") + " " +
-            body_text + " " +
-            " ".join(question.get("tags", []))).lower()
-    return sum(1 for t in terms if t in text)
 
 
 def _serialize_user(u):

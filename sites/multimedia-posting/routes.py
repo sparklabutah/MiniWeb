@@ -71,8 +71,6 @@ def _save_follows(follows):
 def _load_users():
     return db.query(SITE, "users")
 
-def _save_users(users):
-    db.save_collection(SITE, "users", users)
 
 
 def _get_user(user_id):
