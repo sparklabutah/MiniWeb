@@ -407,13 +407,15 @@ def _generate_prompt(sites, coverage, force_single=False):
         uncovered = all_macros - covered
         site_uncovered[sid] = uncovered
 
-    # --- 1. Pick site: prefer sites with most uncovered macros ---
+    # --- 1. Pick site: prefer sites whose uncovered macros are globally RARE (not
+    # just numerous) — a site with 2 uncovered rare macros is more valuable for
+    # global balance than one with 8 uncovered ubiquitous ones. ---
     site_weights = []
     for s in site_pool:
         sid = s["id"]
-        n_uncovered = len(site_uncovered.get(sid, set()))
-        if n_uncovered > 0:
-            site_weights.append(float(n_uncovered))
+        uncov = site_uncovered.get(sid, set())
+        if uncov:
+            site_weights.append(sum(1.0 / (coverage.get(m, 0) + 1) for m in uncov))
         else:
             site_weights.append(0.1)  # small weight for fully covered sites
 
@@ -580,15 +582,17 @@ def _generate_prompt(sites, coverage, force_single=False):
     if not macro_pool:
         return None
 
-    # Weight: strongly prefer uncovered macros for this site, all macros equal
+    # Weight: prefer macros that are uncovered on this site AND globally rare. The
+    # uncovered boost is scaled by GLOBAL scarcity (1/(cov+1)), so a ubiquitous macro
+    # that's merely uncovered on this one site (e.g. search at cov 51) doesn't out-
+    # weigh a globally-rare macro (e.g. edit_by_cell at cov 0) — otherwise the common,
+    # every-site macros dominate the corpus.
     site_uncov = site_uncovered.get(seed["id"], set())
     edge_macro_set = set(edge_macros)
     macro_weights = []
     for m in macro_pool:
-        if m in site_uncov:
-            w = 10.0  # uncovered on this site — strong priority
-        else:
-            w = 1.0 / (coverage.get(m, 0) + 1)
+        scarcity = 1.0 / (coverage.get(m, 0) + 1)
+        w = (10.0 * scarcity) if m in site_uncov else scarcity
         if m in edge_macro_set:
             w *= 3.0  # boost edge-implied macros
         macro_weights.append(w)

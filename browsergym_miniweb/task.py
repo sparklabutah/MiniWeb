@@ -84,27 +84,24 @@ def _site_brand(sid):
 
 
 def _nav_preamble(task):
-    """Orient the agent: it operates MiniWeb through a browser-style portal and
-    navigates with the portal's OWN controls (search bar, site tiles, tab bar) —
-    there is no goto tool. Just names the site(s) this task uses."""
-    lines = []
-    for s in (task.get("sites") or []):
-        sid = s.get("id") if isinstance(s, dict) else s
-        if sid:
-            lines.append(f"  - {_site_brand(sid)}")
-    sites_block = (" This task uses these site(s):\n" + "\n".join(lines) + "\n\n"
-                   if lines else " ")
-    return ("You are operating MiniWeb, a sandbox that hosts many websites inside a "
-            "browser-style portal. You start on the portal home; open and switch "
-            "between sites using the portal itself — its search bar, the site tiles, "
-            "and the tab bar." + sites_block +
-            "When you have completed the task and know the answer, call "
-            "report_answer(<answer>) to submit it — this ends the task. Use "
-            "send_msg_to_user only for progress notes, not for the final answer.\n\n"
-            "Task: ")
+    """Natural, assistant-style orientation (kept free of evaluation cues so the
+    agent behaves as it would for a real user): describes the browser home page and
+    how to move between the user's sites, and how to wrap up. No goto tool — the
+    agent uses the page's own controls (search bar, site shortcuts, tab bar)."""
+    names = [_site_brand(s.get("id") if isinstance(s, dict) else s)
+             for s in (task.get("sites") or []) if (s.get("id") if isinstance(s, dict) else s)]
+    sites_block = (" You may need: " + ", ".join(names) + ".\n\n") if names else " "
+    return ("You are a helpful assistant operating the user's web browser. You are on "
+            "the user's home page, which lists their websites — open and move between "
+            "them using the page's search box, the site shortcuts, and the tab bar." +
+            sites_block +
+            "When you have done what the user asked, call finish_task() to wrap up. If "
+            "they asked a question, reply with report_answer(<answer>) instead. Use "
+            "send_msg_to_user only for brief progress updates.\n\n"
+            "The user says: ")
 
 
-from browsergym_miniweb.actions import FINAL_ANSWER_PREFIX
+from browsergym_miniweb.actions import FINAL_ANSWER_PREFIX, TASK_DONE_PREFIX
 
 
 def _agent_texts(chat_messages):
@@ -128,17 +125,24 @@ def _agent_texts(chat_messages):
 
 
 def _final_answer(chat_messages):
-    """The agent's explicitly-reported final answer via the report_answer tool (last
-    marked message, marker stripped). '' if the agent never used the tool."""
+    """The agent's explicitly-reported final answer, via report_answer (last marked
+    message, marker stripped). '' if the agent never reported one."""
     for t in reversed(_agent_texts(chat_messages)):
         if FINAL_ANSWER_PREFIX in t:
             return t.split(FINAL_ANSWER_PREFIX, 1)[1].strip()
     return ""
 
 
+def _task_finished(chat_messages):
+    """True once the agent has declared it is done — via finish_task (no answer) or
+    report_answer (with an answer). Both end the task; grading runs at that point."""
+    return any(FINAL_ANSWER_PREFIX in t or TASK_DONE_PREFIX in t
+               for t in _agent_texts(chat_messages))
+
+
 def _collect_answer(chat_messages):
-    """Fallback for agents that don't use report_answer: everything the agent said to
-    the human, joined (so a multi-part answer split across messages is graded whole)."""
+    """Fallback for agents that don't report an explicit answer: everything the agent
+    said to the human, joined (so a multi-part answer split across messages is whole)."""
     return "\n".join(_agent_texts(chat_messages)).strip()
 
 
@@ -169,18 +173,23 @@ class MiniWebTask(AbstractBrowserTask):
         return goal, {"task_id": self.task_id}
 
     def validate(self, page, chat_messages):
-        # The agent's answer: its explicit report_answer value if used, else its
-        # messages to the human (BrowserGym's seed greeting is excluded).
+        # The agent's answer: its explicit report_answer/finish_task value if given,
+        # else its messages to the human (BrowserGym's seed greeting is excluded).
         answer = _final_answer(chat_messages) or _collect_answer(chat_messages)
         traj = fetch_session_trajectory(page, self.base)
         report = verify_task(self.verifier, traj, answer,
                              question=self.task.get("instruction", ""))
         passed = report["passed"]
-        # Terminate only when the task is solved; otherwise let the agent run to the
-        # step limit (BrowserGym truncates). No clever early-stop heuristics.
+        # The agent ends the task by calling finish_task (or report_answer); grading
+        # runs at that point, pass or fail. A solved task also ends immediately.
+        # Otherwise the agent keeps going until the step limit (BrowserGym truncates).
+        finished = _task_finished(chat_messages)
+        done = passed or finished
         reward = 1.0 if passed else 0.0
-        return reward, passed, "", {"task_id": self.task_id,
-                                    "by_macro": report["by_macro"]}
+        return reward, done, "", {"task_id": self.task_id,
+                                  "by_macro": report["by_macro"],
+                                  "ended_by": "verifier" if passed else
+                                              ("agent" if finished else "")}
 
     def teardown(self):
         pass

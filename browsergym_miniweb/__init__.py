@@ -104,9 +104,10 @@ def register_report_answer():
     subset's function list — every action set that includes 'chat' then gets it.
     Idempotent."""
     from browsergym.core.action.highlevel import ACTION_SUBSETS
-    from browsergym_miniweb.actions import report_answer
-    if report_answer not in ACTION_SUBSETS.get("chat", []):
-        ACTION_SUBSETS["chat"].append(report_answer)
+    from browsergym_miniweb.actions import report_answer, finish_task
+    for fn in (report_answer, finish_task):
+        if fn not in ACTION_SUBSETS.get("chat", []):
+            ACTION_SUBSETS["chat"].append(fn)
 
 
 register_report_answer()

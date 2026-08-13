@@ -16,13 +16,14 @@ The docstring is parsed by BrowserGym's strict action-docstring grammar (a plain
 one-line description, then an `Examples:` block) -- keep it ASCII and in that shape.
 """
 
-# The marker task.py looks for. Kept in sync with the literal inside report_answer.
+# Markers task.py looks for. Kept in sync with the literals inside the actions.
 FINAL_ANSWER_PREFIX = "[FINAL ANSWER]"
+TASK_DONE_PREFIX = "[TASK COMPLETE]"
 
 
 def report_answer(answer: str):
     """
-    Reports your FINAL answer to the task and ends the task. Call this exactly once, only after you have completed everything the task asks for and are confident in the answer. For progress notes or anything that is not the final answer, use send_msg_to_user instead.
+    Gives the user your final answer to their request (the specific value they asked for, e.g. a name, a number, or yes/no) and wraps up. Call this once you are confident you have the answer. For short progress updates, use send_msg_to_user instead.
 
     Examples:
         report_answer("Geralt of Rivia")
@@ -30,3 +31,14 @@ def report_answer(answer: str):
         report_answer("Yes, it exists.")
     """
     send_message_to_user("[FINAL ANSWER] " + str(answer))
+
+
+def finish_task():
+    """
+    Lets the user know you have finished their request and wraps up. Call this once you have done everything they asked and there is no specific answer to give back. If the request asked a question, use report_answer(<answer>) instead.
+
+    Examples:
+        finish_task()
+    """
+    send_message_to_user("[TASK COMPLETE]")
+
