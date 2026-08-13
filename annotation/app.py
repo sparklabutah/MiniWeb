@@ -889,7 +889,7 @@ def verify():
     annotator = request.args.get("annotator")
     # Always list every annotator's tasks — `annotator` only scopes task loading.
     sort = request.args.get("sort", "newest")
-    tasks = list_tasks(annotator=annotator, newest_first=(sort != "oldest"))
+    tasks = list_tasks(newest_first=(sort != "oldest"))
     for t in tasks:
         vf = ANNOTATIONS_DIR / (t.get("annotator") or "anonymous") / t.get("task_id", "") / "verifier.json"
         t["has_verifier"] = vf.exists()
@@ -917,6 +917,7 @@ def verify():
     return render_template("verify.html",
                            tasks=tasks,
                            task=task,
+                           sort=sort,
                            annotator_counts=annotator_counts,
                            op_labels={op: info.get("label", op)
                                       for op, info in _registry.operations().items()},

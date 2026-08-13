@@ -101,7 +101,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                  data-tag="{{ t_tag }}"
                  data-annotator="{{ t.annotator|default('') }}"
                  data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag)|lower }}"
-                 onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}'">
+                 onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}&sort={{ sort }}'">
                 <div class="tc-id">{{ t.task_id }}
                     {% if t_tag == 'verified' %}<span style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; verified</span>
                     {% elif t_tag == 'stale' %}<span style="font-size:.58rem;background:#ffedd5;color:#ea580c;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">stale</span>{% endif %}
@@ -376,7 +376,9 @@ for (var _i = 0; _i < _trajData.length; _i++) {
 var _playIdx = -1;
 var _playTimer = null;
 
-document.getElementById('playback-counter').textContent = '0 / ' + _steps.length;
+// playback UI only exists when a task is selected — don't kill the script without one
+var _pcEl = document.getElementById('playback-counter');
+if (_pcEl) _pcEl.textContent = '0 / ' + _steps.length;
 
 function playbackStep(dir) {
     playbackGo(_playIdx + dir);
@@ -418,8 +420,8 @@ function playbackGo(idx) {
 
     if (obs && obs.screenshot) {
         // Show screenshot image
-        var taskId = {{ task.task_id | tojson if task else '""' }};
-        var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+        var taskId = {{ (task.task_id if task else "") | tojson }};
+        var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
         var imgUrl = '/annotate/api/screenshot/' + annotator + '/' + taskId + '/' + obs.screenshot;
         // full-width (zoomed) screenshot; taller than the pane, so the user
         // scrolls up/down instead of squinting at a shrink-to-fit image
@@ -516,6 +518,7 @@ function filterTasks(q) {
 
 // --- Sidebar state persists across page loads (selection is a full navigation) ---
 var SB_KEY = 'verifySidebarState';
+var _sortOrder = {{ sort | default('newest') | tojson }};   // server-rendered sort of THIS page
 
 function saveSidebarState() {
     try {
@@ -523,6 +526,7 @@ function saveSidebarState() {
             q: document.getElementById('task-search').value,
             tag: _tagFilter,
             ann: _annFilter,
+            sort: _sortOrder,
             scroll: document.querySelector('.sidebar').scrollTop
         }));
     } catch (e) {}
@@ -531,6 +535,15 @@ function saveSidebarState() {
 function restoreSidebarState() {
     var st = {};
     try { st = JSON.parse(sessionStorage.getItem(SB_KEY) || '{}'); } catch (e) {}
+    // remembered sort order: if this page was loaded WITHOUT an explicit ?sort=
+    // and the remembered order differs from what the server rendered, reload once
+    // with the remembered order (the param then keeps it explicit from there on).
+    var params = new URLSearchParams(window.location.search);
+    if (!params.get('sort') && st.sort && st.sort !== _sortOrder) {
+        params.set('sort', st.sort);
+        window.location.replace('/annotate/verify?' + params.toString());
+        return;
+    }
     if (st.tag) {
         var btn = document.querySelector('#tag-filter-row .tagf[data-tagf="' + st.tag + '"]');
         if (btn) {
@@ -566,10 +579,10 @@ function restoreSidebarState() {
 restoreSidebarState();
 
 // --- Delete / Re-record (task header buttons) ---
-var _reviewTaskId = {{ task.task_id | tojson if task else '""' }};
-var _reviewAnnotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+var _reviewTaskId = {{ (task.task_id if task else "") | tojson }};
+var _reviewAnnotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
 
-var _reviewCurTag = {{ (task.review_tag.tag if task.review_tag else '') | tojson if task else '""' }};
+var _reviewCurTag = {{ ((task.review_tag.tag if task.review_tag else '') if task else "") | tojson }};
 var _reviewerName = {{ session.get('annotator_name', 'anonymous') | tojson }};
 
 function toggleSortOrder() {
@@ -617,7 +630,7 @@ function deleteTask() {
 }
 
 function generateAmbiguous() {
-    var original = {{ task.instruction | tojson if task else '""' }};
+    var original = {{ (task.instruction if task else "") | tojson }};
     if (!original) return;
     var btn = document.getElementById('ambig-btn');
     var status = document.getElementById('ambig-status');
@@ -652,8 +665,8 @@ function generateAmbiguous() {
 }
 
 function suggestTags() {
-    var taskId = {{ task.task_id | tojson if task else '""' }};
-    var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+    var taskId = {{ (task.task_id if task else "") | tojson }};
+    var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
     if (!taskId) return;
     var btn = document.getElementById('suggest-tags-btn');
     var status = document.getElementById('suggest-tags-status');
@@ -707,8 +720,8 @@ function suggestTags() {
 }
 
 function applyTagSuggestion(macro, span) {
-    var taskId = {{ task.task_id | tojson if task else '""' }};
-    var annotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+    var taskId = {{ (task.task_id if task else "") | tojson }};
+    var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
     // Load current macro_spans, update, save
     fetch('/annotate/api/update_task_field', {
         method: 'POST',
@@ -740,9 +753,9 @@ function saveAmbiguous(taskId, annotator, value) {
 // parent window — the same channel the annotation workspace uses — so this
 // panel captures a second, independent trajectory of the same task.
 
-var vwTaskId    = {{ task.task_id | tojson if task else '""' }};
-var vwAnnotator = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
-var vwStartUrl  = {{ (task.starting_url or '') | tojson if task else '""' }};
+var vwTaskId    = {{ (task.task_id if task else "") | tojson }};
+var vwAnnotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+var vwStartUrl  = {{ ((task.starting_url or '') if task else "") | tojson }};
 var vwSites     = {{ (task.sites or []) | tojson if task else '[]' }};
 var vwTrajectory = [];
 var vwRecording = false;
@@ -864,8 +877,8 @@ function vwReview(status) {
 }
 
 // --- Task Verifier Builder (fill macro templates from this trajectory) ---
-var TV_TASK = {{ task.task_id | tojson if task else '""' }};
-var TV_ANN  = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
+var TV_TASK = {{ (task.task_id if task else "") | tojson }};
+var TV_ANN  = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
 var TV_MACROS = {};   // macro -> filled tree (editable model)
 var TV_FEEDBACK = {}; // macro -> NL feedback for the later coding-agent fix pass
 var TV_OPS = {{ task.macro_operations | tojson if task and task.macro_operations else '{}' }};  // macro -> reasoning op (stored key)

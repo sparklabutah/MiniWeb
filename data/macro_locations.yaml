@@ -481,332 +481,334 @@ code-editor-execution:
   - 'Snippet detail page (/snippet/<id>) -> yellow ''Share'' button, and Editor page (/editor?snippet_id=<id>) -> purple ''Share Snippet'' button (only shown when a snippet is loaded). Both call GET /api/share/<id>, which returns a share_token and a share_url (/sites/code-editor-execution/editor?snippet_id=<id>); the link is copied to the clipboard and displayed. Example: on snippet #2 ''Fibonacci Sequence'', click ''Share'' to generate its shareable editor link.'
 comparison-aggregators:
   filter_by_dropdown:
-  - '''PhoneCompare'' page -> brand and OS dropdowns in the filter bar'
+  - 'Browse/index page (/sites/comparison-aggregators/) -> filter toolbar ''Brand'' <select> (default ''All Brands'' + 116 real brands e.g. Apple, Samsung, BlackBerry, Nokia) and ''OS'' <select> (default ''All OS'' + families: Android, iOS, Windows, Symbian, BlackBerry, Feature phone, Other); pick a value and press the ''Filter'' button. OUTCOME: reloads the spec table showing only matching phones with the result count ''N phones found''. EXAMPLE: Brand=''Apple'' + OS=''iOS'' -> list narrows to Apple iPhones (e.g. Apple iPhone 11).'
   filter_by_options:
-  - Phone detail page -> 'Favorite'/'Unfavorite' and 'Add/Remove from Compare' toggles
-  - '''PhoneCompare'' page -> ''Features:'' checkboxes (NFC, GPS, Dual SIM, Fingerprint) in the filter toolbar'
+  - 'Phone detail page (/phone/<id>) -> top-right ''phone-actions'' buttons (only shown when logged in): a ''Favorite''/''Unfavorite'' toggle (POST .../favorite) and an ''Add to Compare''/''Remove from Compare'' toggle (POST .../compare-add). OUTCOME: adds/removes the phone from the user''s favorites or compare list and re-renders the page with the flipped button label. EXAMPLE: on Samsung Galaxy S10 5G (id 9523) click ''Add to Compare'' -> button becomes ''Remove from Compare'' and the phone appears on the Compare List in the Dashboard.'
+  - 'Browse/index page -> filter toolbar ''Features:'' checkboxes (name=''feature''): NFC, GPS, Dual SIM, Fingerprint; check any combination and press ''Filter''. OUTCOME: keeps only phones whose raw spec matches (nfc LIKE ''Yes%'', gps LIKE ''Yes%'', sim LIKE ''%Dual%'', sensors LIKE ''%Fingerprint%''). EXAMPLE: check ''NFC'' + ''Fingerprint'' -> table shows only phones offering both, e.g. modern Samsung/Apple flagships.'
   filter_by_slider:
-  - '''PhoneCompare'' page -> ''Max Price'' slider, in the filter bar'
-  - '''PhoneCompare'' page -> ''Min Battery'' slider, below the price slider'
+  - 'Browse/index page -> filter toolbar ''Max Price'' range slider (name=''price_max'', min 0, max 2000, step 50; label shows ''$<value>'' or ''Any'' at 2000), then press ''Filter''. OUTCOME: keeps only phones whose parsed USD/EUR price is <= the slider value. EXAMPLE: drag to $350 -> excludes pricier models (Apple iPhone 12 Pro Max at $1099.00 drops out; Samsung Galaxy S10 5G at $339.00 stays).'
+  - 'Browse/index page -> filter toolbar ''Min Battery'' range slider (name=''battery_min'', min 0, max 7000 mAh, step 500; label shows ''<value> mAh'' or ''Any'' at 0), positioned right after the Max Price slider, then press ''Filter''. OUTCOME: keeps only phones with battery capacity >= the slider value. EXAMPLE: set 4000 mAh -> Samsung Galaxy S10 5G (4500 mAh) stays; Samsung Galaxy S4 (2600 mAh) is filtered out.'
   navigate_by_route:
-  - '''PhoneCompare'' page -> click phone card to view specs'
-  - Phone detail page -> click brand name in breadcrumb to browse brand's phones
+  - 'Browse/index page -> phone spec-table rows: click a phone name link in the ''Phone'' column to open its detail page (/phone/<id>). OUTCOME: loads that phone''s full specification page. EXAMPLE: click ''Samsung I9505 Galaxy S4'' -> /phone/5322 detail page.'
+  - 'Phone detail page -> breadcrumb (''Home > <Brand> > <Name>'') click the brand link to open the brand page (/brand/<brand>). OUTCOME: shows that brand''s phone list with the brand sidebar. EXAMPLE: on Apple iPhone 11, click ''Apple'' -> /brand/Apple listing all Apple phones.'
   report_information:
-  - '''PhoneCompare'' page -> brand/OS dropdown returns filtered phone list'
-  - '''PhoneCompare'' page -> phone specs cards'
-  - Phone detail page -> specifications table
-  - '''Compare'' page -> side-by-side comparison table'
-  - Brand page -> brand's phones list
-  - Phone detail page -> full specifications, reviews, pricing
-  - '''PhoneCompare'' page -> phone cards with rating/price, sortable via sort dropdown'
-  - '''PhoneCompare'' page -> sort by price/rating to find extremes'
-  - '''Compare'' page -> side-by-side comparison of two selected phones'
-  - '''Compare'' page -> phone1 and phone2 dropdowns, then side-by-side table'
-  - '''Compare'' page -> comparison table of selected phones'
-  - Phone detail page -> 'Add to Compare' button
+  - 'Browse/index page -> after applying Brand/OS dropdowns, read the resulting spec table and the ''N phones found'' count as the filtered phone list. OUTCOME: the on-page answer to ''which/how many phones match''. EXAMPLE: Brand=''Samsung'' shows the Samsung result count and rows.'
+  - 'Phone detail page -> ''Key Features'' boxes (Display, Camera, RAM, Battery, Storage) summarizing the phone''s headline specs. OUTCOME: read a single spec value from the page. EXAMPLE: Samsung Galaxy S10 5G shows 6.7" display, 16 MP camera, 8 GB RAM, 4500 mAh.'
+  - 'Phone detail page -> the stacked spec-card tables (Display, Performance, Camera, Battery, Design & Build, Connectivity). OUTCOME: read any detailed spec field. EXAMPLE: Galaxy S4 (id 5322) Performance card lists its chipset, RAM (2 GB RAM) and OS (Android 4.2.2 Jelly Bean).'
+  - 'Compare page (/compare) -> the side-by-side ''compare-table'' with one column per selected phone and rows grouped by section. OUTCOME: read each phone''s spec in aligned rows for comparison. EXAMPLE: /compare?ids=5322,9523 compares Galaxy S4 vs Galaxy S10 5G.'
+  - 'Brand page (/brand/<brand>) -> the brand''s phone spec table (columns Phone, Year, Display, Camera, RAM, Battery, OS, Price) plus the ''N phones'' count. OUTCOME: read the roster of one brand. EXAMPLE: /brand/Apple lists all Apple models with years and prices.'
+  - 'Phone detail page -> full specification cards plus the price banner (parsed USD price + raw price string); note there are NO user reviews on this site. OUTCOME: read specs and pricing for one phone. EXAMPLE: Apple iPhone 11 (id 9783) price banner shows $518.99 with raw ''$ 518.99 / € 539.00 / £ 400.99''.'
+  - 'Browse/index page -> the phone spec table (columns Phone, Brand, Display, Camera, RAM, Battery, Price; no star rating), re-orderable via the ''Sort'' dropdown. OUTCOME: read phones ranked by the chosen key. EXAMPLE: sort ''Price: High-Low'' surfaces the most expensive models first.'
+  - 'Browse/index page -> use the ''Sort'' dropdown (Price: Low-High / Price: High-Low / Battery) to bring an extreme to the top row, then read it. OUTCOME: identify the max/min phone by price or battery (no rating field exists). EXAMPLE: ''Battery'' sort puts the largest-battery phone (e.g. a 7300 mAh Galaxy Tab) at the top.'
+  - 'Compare page -> the side-by-side table of two selected phones with the better spec cell highlighted green (''spec-winner'': larger display/RAM/camera/battery, lower price). OUTCOME: read which of the two phones wins each spec. EXAMPLE: comparing Galaxy S4 vs Galaxy S10 5G highlights the S10 5G''s larger battery and the cheaper phone''s price.'
+  - 'Compare page -> the ''Phone 1'' and ''Phone 2'' <select> dropdowns (each ''-- Select Phone --'' + ''<Brand> <Name>'' options); choose two and press ''Compare'' to render the side-by-side table (URL /compare?ids=id1,id2). OUTCOME: read the assembled two-phone comparison. EXAMPLE: pick Apple iPhone 11 and Apple iPhone 12 Pro Max -> comparison table.'
+  - 'Compare page -> read the comparison table populated from the selected phones (via the ?ids= query, the selector form, or the user''s saved compare list). OUTCOME: read the aligned specs of the chosen phones. EXAMPLE: Dashboard ''Compare All'' link opens /compare?ids=... for every phone on the compare list.'
+  - 'Phone detail page -> the ''Add to Compare'' / ''Remove from Compare'' button label reports whether this phone is currently on the logged-in user''s compare list. OUTCOME: read the phone''s compare-list membership state. EXAMPLE: if Galaxy S10 5G is already added, the button reads ''Remove from Compare''.'
   search:
-  - '''PhoneCompare'' page -> ''Search phones...'' field at top'
-  - '''PhoneCompare'' page -> search with brand/OS/sort filter dropdowns'
+  - 'Browse/index page -> the ''Search phones...'' text input (name=''q'') at the left of the filter toolbar; type a query and press ''Filter''. OUTCOME: FTS5/BM25 full-text search over name/brand/os/chipset, re-rendering the spec table with matches. EXAMPLE: search ''Galaxy S4'' -> Samsung I9505 Galaxy S4 (id 5322) and related Galaxy S4 variants.'
+  - 'Browse/index page -> the ''Search phones...'' field combined with the Brand/OS dropdowns and Sort dropdown in the same toolbar form. OUTCOME: full-text search narrowed by brand/OS and reordered by the sort key. EXAMPLE: q=''Pro Max'' + Brand=''Apple'' -> Apple iPhone 11 Pro Max, iPhone 12 Pro Max, etc.'
   sort_by_form:
-  - '''PhoneCompare'' page -> sort dropdown (Newest, Name A-Z, Price, Battery)'
+  - 'Browse/index page -> the ''Sort'' <select> in the filter toolbar with options Newest, Name A-Z, Price: Low-High, Price: High-Low, Battery; choose one and press ''Filter'' (the Brand page has its own sort bar: Newest First, Oldest First, Name A-Z, Price: Low-High, Price: High-Low, Battery: Largest). OUTCOME: re-orders the spec table by the chosen key. EXAMPLE: ''Name A-Z'' orders phones alphabetically (Acer... Apple iPhone 11... Samsung...).'
   toggle_relationship:
-  - Phone detail page -> 'Favorite'/'Unfavorite' toggle button
-  - Phone detail page -> 'Add to Favorites' button
-  - '''Dashboard'' page -> ''Remove from Favorites'' button'
+  - 'Phone detail page -> the ''Favorite''/''Unfavorite'' button (btn-fav, POST .../favorite), shown when logged in. OUTCOME: toggles the phone in the user''s favorites and flips the button label. EXAMPLE: on Apple iPhone 11 (id 9783) click ''Favorite'' -> label becomes ''Unfavorite'' and it appears under Dashboard Favorites.'
+  - 'Phone detail page -> the same favorites toggle when the phone is not yet saved shows the button text ''Favorite'' (adds to favorites). OUTCOME: adds the phone to the logged-in user''s favorites list. EXAMPLE: clicking ''Favorite'' on Samsung Galaxy S10 5G (id 9523) adds it to favorites.'
+  - 'Dashboard page (/dashboard) and Favorites page -> each favorite card''s ''Remove'' button (btn-remove, POST /dashboard/remove-favorite/<id>) un-favorites the phone (compare-list cards have a matching ''Remove'' -> /dashboard/remove-compare/<id>). OUTCOME: removes the phone from the list and reloads. EXAMPLE: on the Dashboard Favorites grid, click ''Remove'' on Apple iPhone 11 to drop it from favorites.'
 conference-review-submission:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/login, header ''PeerPortal'') -> the ''Username'' text field (name=username, placeholder ''Enter your username'') and ''Password'' field (name=password, placeholder ''Enter your password''), then the ''Sign In'' button. OUTCOME: sets the conf_review_uid session and redirects to /console; wrong credentials re-render the form with ''Invalid username or password''. Real accounts (username / password): author_arivera / pass123 (Alex Rivera, reviewer), reviewer_psharma / pass456, chair_knguyen / pass321 (chair). EXAMPLE: sign in as author_arivera / pass123 to reach the reviewer console.'
   create_by_form:
-  - Review page -> title input, recommendation/confidence dropdowns, comments textarea
-  - Paper detail page -> 'Bid'/'Unbid' button to declare review interest
-  - Review form -> review text textarea, strengths/weaknesses fields
-  - Login page -> username and password form for authentication
+  - 'Review form (/paper/<id>/review, ''Submit Review'', reached via the ''Submit Review''/''Write Review'' button) -> ''Review Title'' text input (name=title), ''Recommendation'' dropdown (name=recommendation, options 1-10, e.g. ''10: Top 5% of accepted papers, seminal'', ''6: Marginally above threshold'', ''3: Clear reject''), ''Confidence'' dropdown (name=confidence, options 1-5, e.g. ''5: Absolutely certain (expert)'', ''3: Fairly confident''), and a ''Review'' comments textarea. OUTCOME: POST stores the review under the user''s bids[paper_id] and fires a ''Review submitted'' email, then redirects to the paper page. EXAMPLE: on paper 304 ''Making Neural Programming Architectures Generalize...'' pick recommendation ''8: Top 50%, clear accept'', confidence ''4: Quite confident''.'
+  - 'Paper detail page (/paper/<id>) -> the bid button in the action bar, labelled ''Bid to Review'' when you have not bid and ''Withdraw Bid'' when you have (POST /paper/<id>/bid). OUTCOME: toggles an entry in your bids map declaring review interest and redirects back to the paper. EXAMPLE: click ''Bid to Review'' on paper 305 ''End-to-end Optimized Image Compression'' (ICLR 2017).'
+  - 'Review form (/paper/<id>/review) -> the single ''Review'' comments textarea (name=comments, required). Its placeholder is a Markdown template with ''## Summary'', ''## Strengths'', ''## Weaknesses'', ''## Questions'' and ''## Minor Comments'' section headers (these are NOT separate form fields), and the hint reads ''Provide detailed comments on strengths, weaknesses, clarity, novelty, significance...''. OUTCOME: the free-text is saved as the review''s comments. EXAMPLE: type a strengths/weaknesses write-up for paper 306 ''Optimization as a Model for Few-Shot Learning''.'
+  - 'Login page (/login) -> the username + password sign-in form (POST /login). OUTCOME: authenticates and creates the reviewer/author session, landing on /console. EXAMPLE: submit chair_knguyen / pass321 to sign in as chair Karen Nguyen.'
   delete_from_table:
-  - Paper detail page -> 'Withdraw Submission' button in the Submission Details metadata grid
+  - 'Paper detail page (/paper/<id>) -> in the ''Submission Details'' metadata grid, the ''Withdraw'' row''s ''Withdraw Submission'' button (id=withdraw-btn, red text, POST /paper/<id>/withdraw with a JS confirm ''Withdraw this submission? It will be removed from the venue.''). OUTCOME: calls db.delete_item on the paper, removing it from its venue, then redirects to /console. EXAMPLE: withdraw paper 307 ''Learning End-to-End Goal-Oriented Dialog'' from ICLR 2017.'
   edit_by_form:
-  - Paper detail page -> 'Bid'/'Unbid' toggle button
+  - 'Paper detail page (/paper/<id>) -> the toggle bid button, which reads ''Bid to Review'' before you bid and flips to ''Withdraw Bid'' after (POST /paper/<id>/bid, the same button re-labels on reload). OUTCOME: adds or removes your interest entry in the bids map and redirects back to the paper. EXAMPLE: on paper 308 ''Towards Principled Methods for Training Generative Adversarial...'' the button toggles between ''Bid to Review'' and ''Withdraw Bid''.'
   navigate_by_route:
-  - '''PeerPortal'' page -> click venue name to view papers'
-  - Venue page -> click paper title to view details
+  - 'PeerPortal landing / Venues page (/ or /venues, heading ''PeerPortal'') -> click a venue-card name link to open that venue''s paper list (/venue/<venue_id>); the link is only active when the venue has papers (paper_count > 0). OUTCOME: loads the venue submissions page. EXAMPLE: click ''ICLR 2017'' (349 papers) to open /venue/iclr-2017, or ''NeurIPS 2016''.'
+  - 'Venue page (/venue/<venue_id>) -> click a paper title link in the submissions list to open its detail page (/paper/<paper_id>). OUTCOME: shows the paper''s abstract, reviews and scores. EXAMPLE: in ICLR 2017, click ''End-to-end Optimized Image Compression'' to reach /paper/305.'
   report_information:
-  - Search returns matching papers with titles and scores
-  - Stats page -> statistics tables (acceptance rates, score distributions)
-  - Paper detail page -> full paper info, reviews, scores
+  - 'Venue page (/venue/<venue_id>) search results -> the filtered submissions list renders each matching paper''s title, author string, decision badge (Accept/Reject) and average score (when review_visibility is public or the viewer is a chair/admin). OUTCOME: the agent reads/reports the matching papers and their scores. EXAMPLE: searching ''compression'' in ICLR 2017 surfaces ''End-to-end Optimized Image Compression'' with its avg score.'
+  - 'Stats page (/venue/<venue_id>/stats, ''Statistics'') -> stat cards (Total Reviews, Avg Score), a ''Score Comparison'' row (''Avg Score (Accepted)'', ''Avg Score (Rejected)'', ''Median Score''), and a ''Score Distribution'' table (Score / Count / Distribution bar). OUTCOME: the agent reports acceptance rate, average and score-bucket counts. EXAMPLE: ICLR 2017 shows 349 papers, 139 accepted, acceptance rate 39.8%.'
+  - 'Paper detail page (/paper/<id>) -> the paper header (title, authors, decision badge, average score) plus the reviews section listing each reviewer''s recommendation (1-10) and confidence (1-5), gated by the venue''s review_visibility. OUTCOME: the agent reads/reports the paper''s info, reviews and scores. EXAMPLE: paper 304 ''Making Neural Programming Architectures Generalize...'' shows decision Accept, avg score 8.33 across 12 reviews.'
   search:
-  - Venue page -> 'Search by title or keyword...' field at top of paper list
-  - Venue page -> search with keyword matching across paper titles
+  - 'Venue page (/venue/<venue_id>) -> the ''Search by title or keyword...'' text field (name=q) at the top of the filter panel, submitted with the ''Apply Filters'' button. OUTCOME: runs an FTS5/BM25 full-text search over the venue''s papers and re-renders the list with matches (combinable with the Accepted/Rejected status radios and score_min/score_max 1-10 range). EXAMPLE: search ''dialog'' within ICLR 2017 to find ''Learning End-to-End Goal-Oriented Dialog''.'
+  - 'Venue page (/venue/<venue_id>) search (name=q, also exposed at /api/papers/search) -> BM25-ranked keyword matching over paper titles and abstracts, scoped to the current venue_id. OUTCOME: returns ranked matching papers that can then be sorted via the ''Sort'' radios (Title, Score high/low first, Most reviewed). EXAMPLE: searching ''generative adversarial'' in ICLR 2017 ranks ''Towards Principled Methods for Training Generative Adversarial...'' first.'
   upload_file:
-  - Console page -> paper upload form accepting .pdf, .doc, .docx, .tex files
+  - 'Console page (/console, ''Submit a Paper'' section) -> the file input (name=file, accept=''.pdf,.doc,.docx,.tex'') plus the ''Upload Paper'' button (POST /upload-paper, multipart form). OUTCOME: accepts the chosen manuscript file and redirects back to the console. EXAMPLE: while signed in as Alex Rivera, choose a .pdf and click ''Upload Paper''.'
 converters-calculators:
   create_by_form:
-  - Converter/Calculator -> save conversion result form
+  - 'Any converter page (/converter/<tool_id>) or calculator page (/calculator/<tool_id>) -> green ''Save to Dashboard'' button inside the result box (POST /save-conversion). OUTCOME: appends the just-computed result to the logged-in user''s saved_conversions AND history, then redirects back; the row then shows on /dashboard. The button only renders when signed in (default auto-login = user 1 ''Alex Rivera''). Fields are hidden inputs auto-filled by JS after Convert/Calculate: tool (the tool id, e.g. length/currency/bmi/mortgage/tip), from_value, from_unit, to_unit, result, redirect_to. EXAMPLE: on the Length Converter, convert 1 Mile -> Kilometer (result 1.609344), click ''Save to Dashboard'' -> dashboard gains the saved row ''length: 1 mile = 1.609344 kilometer''.'
   navigate_by_route:
-  - '''CalcTools'' page -> click tool card (Length, Weight, Temperature, BMI, Mortgage, Tip)'
+  - 'Home page ''/'' (''CalcTools'') -> click a tool card title link. OUTCOME: loads that tool''s dedicated page. Two labeled grids: ''Unit Converters'' (8 cards -> Length Converter /converter/length, Weight Converter /converter/weight, Temperature Converter /converter/temperature, Currency Converter /converter/currency, Volume Converter /converter/volume, Area Converter /converter/area, Speed Converter /converter/speed, Number Base Converter /converter/base) and ''Calculators'' (3 cards -> BMI Calculator /calculator/bmi, Mortgage Calculator /calculator/mortgage, Tip Calculator /calculator/tip). Header nav also routes: Home, Dashboard, Logout/Sign In, MiniWeb. EXAMPLE: click the ''Currency Converter'' card to open /sites/converters-calculators/converter/currency.'
   report_information:
-  - Converter page -> conversion result display with from/to dropdowns
-  - Dashboard page -> saved conversions list for comparison
-  - Calculator page -> expression input for computation
-  - Converter page -> from-unit and to-unit dropdowns (Length, Weight, Temperature, etc.)
-  - Base Converter -> from-base and to-base dropdowns (2-36)
+  - 'Converter page (e.g. /converter/length) -> result box shown after clicking the blue ''Convert'' button. OUTCOME: reads back the computed number (rounded to 6 dp; currency to 2 dp) plus the sentence label ''VALUE FROM_UNIT = RESULT TO_UNIT''. EXAMPLE: on Length Converter, 1 Mile -> Kilometer displays result ''1.609344'' with label ''1 Mile (mi) = 1.609344 Kilometer (km)''.'
+  - 'Dashboard page (/dashboard, requires login) -> two stat cards (''Saved Conversions'' count, ''History Items'' count) plus a ''Saved Conversions (N)'' list and a ''Conversion History (N)'' list; each row reads ''tool: from_value from_unit = result to_unit''. OUTCOME: read/compare saved rows across the list. Content is per-user (default auto-login user 1 ''Alex Rivera'' has 0 saved/0 history). EXAMPLE: user 4 ''Priya Sharma'' (priya_convert, 13 saved / 83 history) shows rows like ''currency: 19129 EUR = 3104362.24 JPY'' and ''temperature: 263 kelvin = -10.15 celsius''.'
+  - 'Calculator page (/calculator/<bmi|mortgage|tip>) -> result box shown after the red ''Calculate'' button. OUTCOME: reads back the computed figures (there is NO free-form expression input; each calculator has fixed labeled fields). BMI: weight (kg) + height (m) -> BMI value + category (Underweight / Normal weight / Overweight / Obese). Mortgage: loan amount ($) + annual rate (%) + term (years) -> monthly payment, total payment, total interest. Tip: bill ($) + tip (%) + split people -> tip amount, total, per person. EXAMPLE: BMI with weight 70 kg, height 1.75 m -> ''22.86'' with ''Category: Normal weight''; Mortgage $300000 at 6.5% for 30 yrs -> ''$1,896.2/mo'' (total interest $382,633.47).'
+  - 'Converter page -> the two <select> dropdowns ''From'' (id=from-unit) and ''To'' (id=to-unit), each option labeled ''Name (symbol)''; ''To'' defaults to the 2nd option. OUTCOME: read/choose the available units for the category. REAL option sets: Length = Meter (m), Kilometer (km), Centimeter (cm), Millimeter (mm), Mile (mi), Yard (yd), Foot (ft), Inch (in); Weight = Kilogram (kg), Gram (g), Milligram (mg), Pound (lb), Ounce (oz), Stone (st), Metric Ton (t), US Ton (ton); Temperature = Celsius (C), Fahrenheit (F), Kelvin (K); Currency = USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY (each option shows ''USD (USD)'' style); Volume = Liter (L), Milliliter (mL), US Gallon (gal), US Quart (qt), US Cup (cup), US Fluid Ounce (fl oz), US Tablespoon (tbsp), US Teaspoon (tsp); Area = Square Meter (m2), Square Kilometer (km2), Square Foot (ft2), Square Yard (yd2), Acre (ac), Hectare (ha), Square Mile (mi2); Speed = Meters per Second (m/s), Kilometers per Hour (km/h), Miles per Hour (mph), Knots (kn), Feet
+    per Second (ft/s). EXAMPLE: on the Currency Converter pick From=EUR, To=JPY to read the conversion of euros into yen.'
+  - 'Number Base Converter page (/converter/base) -> a text ''Number'' input (default 255) plus two dropdowns ''From Base'' (default Decimal) and ''To Base'' (default Binary). OUTCOME: read/choose the numeral base. Each dropdown has exactly 4 options: Decimal (10), Binary (2), Octal (8), Hexadecimal (16) -- ONLY bases 2, 8, 10, 16 are supported (not an arbitrary 2-36 range). Result box shows the converted string and its decimal value. EXAMPLE: 255 from Decimal (10) to Binary (2) displays ''11111111'' with label ''255 (base 10) = 11111111 (base 2) [decimal: 255]''.'
   search:
-  - '''CalcTools'' page -> converter category links for navigation'
-  - '''CalcTools'' page -> category navigation with direct links'
+  - 'Home page ''/'' (''CalcTools''), ''Unit Converters'' section -> locate a converter by scanning its 8 tool cards (Length, Weight, Temperature, Currency, Volume, Area, Speed, Number Base). NOTE: the site has NO free-text search input anywhere; tool discovery is done by browsing this labeled card grid, and each card title is a direct link to that tool''s page. OUTCOME: find and open the intended converter. EXAMPLE: scan the grid to find the ''Speed Converter'' card and click it to reach /converter/speed.'
+  - 'Home page ''/'' (''CalcTools''), ''Calculators'' section -> locate a calculator by scanning its 3 tool cards (BMI Calculator, Mortgage Calculator, Tip Calculator). NOTE: there is no search box and no separate category pages -- these are anchor links within the single index page, so ''searching'' means browsing the two labeled sections. OUTCOME: find and open the intended calculator. EXAMPLE: scan the ''Calculators'' section to find the ''Mortgage Calculator'' card and click it to reach /calculator/mortgage.'
 course-sites-classrooms:
   edit_by_cell:
-  - Course page -> Gradebook -> inline-editable score grid (cell per student x assignment, '+ Add row' adds a student, 'Save Changes')
+  - 'Gradebook page (Course > Gradebook tab, /course/<id>/gradebook) -> inline-editable score grid: one numeric <input name=''cell_<student_id>_<assignment_id>''> per student row x assignment column, each capped ''out of <points_possible>'' (e.g. out of 50). ''+ Add row'' appends a blank row with a ''New student name'' text field + score cells (name=''newrow_<n>_...''); ''Save Changes'' POSTs all cells to /gradebook/save. OUTCOME: entered scores upsert graded submissions and recompute the Weighted Avg % + letter grade columns; new-row names create+enroll a student. EXAMPLE: in ''Engineering Leadership for Technical Managers'' (course 1) gradebook, set the ''Manager vs IC Reflection'' cell for a student to 47 and click Save Changes.'
   create_by_form:
-  - Discussions page -> new discussion form (title and body textarea)
-  - Assignment page -> submit assignment form (text content)
-  - Assignment page -> grade submission form (score input)
-  - Assignment page -> form submit to turn in assignment
-  - Discussions page -> reply form textarea
+  - 'Discussions page (Course > Discussions tab, /course/<id>/discussions) -> ''Start a New Discussion'' form with a ''Title'' text input (name=title, required) and a ''Content'' textarea (name=content, required); ''Post Discussion'' button POSTs to /discussions/new. OUTCOME: adds an unpinned thread authored by the current user, shown at top of the thread list. EXAMPLE: in ''Creative Writing Workshop'' (course 2) post title ''Feedback swap thread?'' with a body.'
+  - 'Assignment detail page (/course/<id>/assignment/<aid>, student role only) -> ''Your Submission'' textarea (name=content, required) inside the multipart submit form; ''Submit Assignment'' button POSTs to /assignment/<aid>/submit. OUTCOME: creates a submission with status ''submitted'' (score None) and emails the student a confirmation. EXAMPLE: on ''Manager vs IC Reflection'' (assignment 1, course 1) type your reflection text and click Submit Assignment.'
+  - 'Assignment detail page (instructor/admin only) -> ''Grade a Submission'' form with ''Student ID'' number input (name=student_id), ''Score'' number input (name=score, step 0.1, max=points_possible) and ''Feedback'' textarea (name=feedback); ''Grade'' button POSTs to /assignment/<aid>/grade. OUTCOME: sets that student''s submission score, status=''graded'', and feedback. EXAMPLE: as instructor Priya Sharma, grade student 3 on ''Manager vs IC Reflection'' with score 45 (max 50).'
+  - 'Assignment detail page (student role) -> ''Submit Assignment'' button (btn-primary) at the bottom of the submission form that turns in the assignment via POST /assignment/<aid>/submit. OUTCOME: records the turn-in (status ''submitted'') and redirects back to the assignment page where it appears in the Submissions table. EXAMPLE: submit ''Leadership Case Study Analysis'' (project, 100 pts, course 1).'
+  - 'Discussions page -> per-thread ''Write a reply...'' reply form (reply-form, text input name=content, required) under each discussion card; ''Reply'' button POSTs to /discussion/<disc_id>/reply. OUTCOME: appends a reply authored by the current user to that thread. EXAMPLE: reply to the pinned thread ''Book Recommendations for New Managers?'' (discussion 2, course 1).'
   navigate_by_route:
-  - '''EduPortal LMS'' page -> course listings with navigation links'
-  - '''Welcome back, Alex!'' page -> click course card to view course'
-  - Course page -> click assignment to view details
+  - 'Dashboard ''EduPortal LMS'' home (index, /) -> course catalog of clickable card titles under ''My Courses'' and ''Browse Courses'' sections, each linking to /course/<id>. OUTCOME: opens that course''s Overview page. EXAMPLE: click ''Statistics for Data Science'' (course 6, Data Science dept) to view it.'
+  - 'Dashboard ''Welcome back, <first name>!'' banner page -> click a course-card title or its ''View & Enroll'' link to open the course. OUTCOME: navigates to /course/<id> Overview. EXAMPLE: from Alex Rivera''s dashboard, click the ''Introduction to Data Visualization'' (course 3) card.'
+  - 'Course Overview page (/course/<id>) -> ''Assignments (<n>)'' section list where each assignment title links to /course/<id>/assignment/<aid>. OUTCOME: opens the assignment detail page (instructions, submissions table, submit/grade form). EXAMPLE: on course 1, click ''Leadership Case Study Analysis'' (assignment 3) to view its details.'
   play_by_playback:
-  - Course page -> lecture lesson title links that load the chosen lecture into the Lecture Player section
-  - Course page -> 'Lecture Player' section with Play/Pause toggle and elapsed-time counter
+  - 'Course Overview page -> ''Modules & Lessons'' section: lessons of type ''lecture'' render as blue links (class lecture-link) that navigate to ?lecture=<module>-<lesson>#lecture-player and load that lecture into the shared Lecture Player. OUTCOME: the chosen lecture''s title + duration is loaded into the player below. EXAMPLE: on course 1 click the lecture ''IC vs Manager: Different Games'' (key 0-0) or ''The SBI Feedback Model'' (key 1-0).'
+  - 'Course Overview page -> ''Lecture Player'' section (#lecture-player, a MiniPlayer widget with Lecture badge) exposing a Play/Pause toggle and an elapsed-time counter for the loaded lecture. OUTCOME: plays/pauses simulated lecture playback and advances the timer. EXAMPLE: after loading ''The SBI Feedback Model'' into course 1''s player, press Play then Pause.'
   report_information:
-  - Course page -> assignments, discussions, and gradebook links
-  - Course page -> course content sections with materials
-  - Course detail page -> course info, assignments, materials
-  - Assignment detail page -> assignment instructions and submission form
-  - Assignment page -> 'From'/'To' date inputs with 'Filter by date' button filtering the submissions table
+  - 'Course Overview page -> tab bar and section headers reporting counts: ''Gradebook'' tab, ''Discussions (<n>)'' tab, and ''Assignments (<n>)'' / ''Enrolled Students (<n>)'' section headings. OUTCOME: reader states the counts/links available. EXAMPLE: report that course 6 ''Statistics for Data Science'' has 15 enrolled students.'
+  - 'Course Overview page -> content sections: ''Course Description'', ''Modules & Lessons'' (module titles + lesson type tags lecture/lab/reading/video + minutes), and ''Grade Weights'' (homework/exams/projects/quizzes percentages). OUTCOME: reader reports the on-page materials/weights. EXAMPLE: report course 1''s grade weights (homework 30%, exams 20%, projects 40%, quizzes 10%).'
+  - 'Course Overview page -> header meta line (instructor name, semester, credits, department badge) plus the Assignments list (title, category tag, due date, points). OUTCOME: reader reports course info and assignment facts. EXAMPLE: report that course 1 is taught by Priya Sharma in Fall 2025, and ''Manager vs IC Reflection'' is homework worth 50 pts due 2025-09-22.'
+  - 'Assignment detail page -> assignment header (category badge homework/exam/project/quiz, Due date, Points, Course) and description, plus the Submissions table (Submitted, Content, Score as raw/max (pct), Status, Feedback). OUTCOME: reader reports assignment instructions and/or a submission''s graded score. EXAMPLE: report the score shown for a graded submission on ''Manager vs IC Reflection'' (out of 50).'
+  - 'Assignment detail page -> Submissions filter: ''From'' and ''To'' date inputs (#sub-date-from / #sub-date-to) with a ''Filter by date'' button (and ''Clear''); it client-side hides submission rows outside the range and prints ''<n> submission(s) in range''. OUTCOME: reader reports the count/rows falling in the chosen date window. EXAMPLE: filter submissions on assignment 3 (course 1) to a From/To window and report how many remain.'
   search:
-  - '''EduPortal LMS'' dashboard -> search input with ''Search'' button filtering the course catalog by title, code, or department'
+  - 'Dashboard ''EduPortal LMS'' home (index) -> ''Search courses by title, code, or department...'' search box (form#course-search-form, input name=q) with a ''Search'' button; submits GET ?q=<term> and case-insensitively filters the catalog by course title, code, or department. OUTCOME: page re-renders showing only matching course cards with a ''Showing courses matching "..."'' notice. EXAMPLE: search ''Data Science'' to list that department''s courses (e.g. ''Statistics for Data Science'', ''SQL for Analytics''), or search ''Writing'' for the Writing & Communication courses.'
   toggle_relationship:
-  - Course page -> enrollment toggle button ('Enroll in Course' / 'Enrolled — Leave Course') in the course header
-  - '''EduPortal LMS'' page -> ''View & Enroll'' link on course cards'
+  - 'Course Overview page -> enrollment toggle button (#enrollment-toggle) in the course header: shows ''Enroll in Course'' (navy) when not enrolled and ''Enrolled — Leave Course'' (red) when enrolled; each is a one-click form POST to /enroll or /unenroll for the current user. OUTCOME: adds/removes the user from the course''s enrolled_students and flips the button. EXAMPLE: on ''Introduction to Data Visualization'' (course 3), click ''Enroll in Course'' to join (or ''Enrolled — Leave Course'' to drop).'
+  - 'Dashboard ''EduPortal LMS'' home -> ''View & Enroll'' link on each Browse-Courses card, which opens the course page where the enrollment toggle lives. OUTCOME: routes to /course/<id> so the user can then enroll. EXAMPLE: from the dashboard, click ''View & Enroll'' on the ''Python for Data Analysis'' (course 5) card.'
   upload_file:
-  - Assignment page -> file upload for assignment submission
+  - 'Assignment detail page (student role) -> ''Attach File (optional)'' file input (input#submission_file, name=file) inside the multipart ''Submit Assignment'' form. OUTCOME: attaches a file alongside the text submission when the assignment is turned in. EXAMPLE: on ''Leadership Case Study Analysis'' (assignment 3, course 1), attach a document then click Submit Assignment.'
 crm:
   edit_by_cell:
-  - '''Contacts'' page -> inline-editable contacts grid (name/title/email/phone cells per row, ''+ Add row'', ''Save Changes'')'
+  - '''Contacts'' page (/sites/crm/contacts) -> inline-editable data grid. Each row''s Name, Title, Email, Phone cells are <input class=cell-input> boxes (Company is a link, not editable; Created and the Delete button are read-only). Edit any cell then click the blue ''Save Changes'' button (POST /contacts/save); ''+ Add row'' appends a blank editable row. OUTCOME: edited cell values persist to the session overlay for those contacts. Example: change Derek Holloway''s (id 1) Title cell from ''VP of Operations'' to ''SVP of Operations'' and Save.'
   create_by_form:
-  - '''Activities'' page -> create activity form (type dropdown, description, date)'
-  - '''Activities'' page -> activity type dropdown (call, meeting, email, note, task)'
-  - '''Activities'' page -> create activity form with contact, deal, type, date, and description'
+  - '''Activities'' page (/sites/crm/activities) ''Log New Activity'' form (shown only when logged in) -> fields Type (dropdown), Contact ID (number), Deal ID (number), Date (date), Duration (min) (number), Description (textarea); the ''Log Activity'' button POSTs /activity/create. OUTCOME: appends a new activity row. Example: Type=Call, Contact ID=1, Deal ID=1, Date=2026-08-13, Duration=30, Description=''Follow-up on MeridianLens proposal'' logs a call against deal ''Cascade Timber - MeridianLens Expansion''.'
+  - '''Activities'' page ''Log New Activity'' -> Type dropdown; options are Call, Meeting, Email, Note (values call/meeting/email/note). NOTE: there is NO ''task'' option. OUTCOME: sets the created activity''s type; type=call or meeting also emits a calendar booking. Example: pick ''Meeting'' to log a meeting activity.'
+  - 'Create-activity form combining Contact ID, Deal ID, Type, Date, Duration and Description. Appears on the ''Activities'' page and (pre-filled) as the ''Log Activity'' form on a deal detail page (/sites/crm/deal/<id>, hidden deal_id + contact_id). OUTCOME: appends an activity linked to that contact/deal. Example: on deal 1 ''Cascade Timber - MeridianLens Expansion'' log a call dated 2026-08-13.'
   delete_from_table:
-  - '''Contacts'' page -> ''Delete'' button per contact row'
+  - '''Contacts'' page (/sites/crm/contacts) -> red ''Delete'' button in the Actions column of every contact row (fetch POST /contact/<id>/delete, then the page reloads). OUTCOME: removes that contact from the contacts collection/grid. Example: click Delete on the Derek Holloway (id 1) row to remove him from the contacts table.'
   edit_by_form:
-  - Deal detail page -> update stage form (stage dropdown, submit)
-  - Deal detail page -> log activity form (type dropdown, notes, submit)
+  - 'Deal detail page (/sites/crm/deal/<id>) -> ''Update Stage:'' form: a stage <select> (Prospecting, Qualification, Proposal, Negotiation, Closed_won, Closed_lost) + ''Update'' button (POST /deal/<id>/update-stage). OUTCOME: changes the deal''s stage and auto-sets its probability (prospecting=10, qualification=25, proposal=50, negotiation=75, closed_won=100, closed_lost=0). Example: move deal 1 ''Cascade Timber - MeridianLens Expansion'' from Proposal to Negotiation.'
+  - 'Deal detail page ''Log Activity'' form -> Type <select> (Call, Email, Meeting, Note), Date, Duration (min), and a Description textarea, ''Log Activity'' button (POST /activity/create with hidden deal_id + contact_id). OUTCOME: appends an activity to that deal''s Activity Timeline. Example: on deal 2 ''Puget Sound CU - MeridianVault Renewal'' log an email dated 2026-08-13.'
   export:
-  - '''Pipeline Overview'' dashboard -> ''Export CSV'' link in Deals section header'
+  - 'Dashboard (/sites/crm/, ''Pipeline Overview'') -> blue ''Export CSV'' button in the top-right toolbar (right of the ''Sort Deals'' dropdown); links to /api/export?format=csv&type=deals. OUTCOME: downloads all deals as deals.csv (columns from the deal records: id, name, company_id, contact_id, owner_id, product, stage, amount, probability, ...). Example: click ''Export CSV'' to download the full deals pipeline including ''Cascade Timber - MeridianLens Expansion'' ($85,000, proposal).'
   filter_by_date_range:
-  - '''Activities'' page -> From/To date inputs + Filter button in the toolbar'
+  - '''Activities'' page (/sites/crm/activities) toolbar -> ''From'' and ''To'' <input type=date> boxes (params date_from/date_to) + ''Filter'' button (GET /activities). OUTCOME: restricts the activities table to rows whose date is within [From, To] inclusive (string date compare), paginated 50/page. Example: From=2026-02-01, To=2026-02-28 shows February activities such as the 2026-02-12 ''Discovery call with Cascade Timber''.'
   filter_by_dropdown:
-  - '''Contacts'' page -> company dropdown filter'
-  - '''Companies'' page -> industry dropdown filter'
-  - '''Deals'' page -> stage dropdown (prospecting, qualification, proposal, etc.), owner dropdown'
-  - '''Activities'' page -> type dropdown (call, meeting, email, note, task)'
+  - '''Contacts'' page (/sites/crm/contacts) toolbar -> company <select> (''All Companies'' + every company name, e.g. Cascade Timber Holdings, Puget Sound Credit Union, Northshore Medical Group), applied with the ''Search'' button (param company_id). OUTCOME: shows only contacts whose company_id matches. Example: pick ''Cascade Timber Holdings'' to list its contacts (Derek Holloway, Lisa Engstrom).'
+  - '''Companies'' page (/sites/crm/companies) toolbar -> industry <select> (''All Industries'' + the distinct industries in data: Agriculture, Construction, Education, Energy & Utilities, Finance, Financial Services, Food & Beverage, Forestry & Natural Resources, Healthcare, Logistics, Logistics & Transportation, Manufacturing, Research & Environmental, Retail, SaaS). OUTCOME: filters the companies table to that exact industry. Example: ''Healthcare'' shows Northshore Medical Group.'
+  - '''Deals'' page (/sites/crm/deals) toolbar -> stage <select> (''All Stages'' + Prospecting, Qualification, Proposal, Negotiation, Closed_won, Closed_lost) and owner <select> (''All Owners'' + Alex Rivera, Ryan Tanaka, Jessica Okafor, Tom Bradley, Karen Nguyen), applied with ''Filter'' (params stage, owner_id). OUTCOME: filters the kanban pipeline by stage and/or owner. Example: stage=Negotiation + owner=Ryan Tanaka.'
+  - '''Activities'' page (/sites/crm/activities) toolbar -> type <select> (''All Types'' + Call, Meeting, Email, Note; values call/meeting/email/note). NOTE: NO ''task'' option (and the underlying data also contains ''demo'' activities the dropdown cannot select). OUTCOME: filters the activities table to that type. Example: ''Call'' shows call activities like ''Discovery call with Cascade Timber''.'
   navigate_by_route:
-  - '''Contacts'' page -> click contact row to view details'
-  - '''Companies'' page -> click company row to view details'
-  - '''Deals'' page -> click deal row to view details'
-  - '''Pipeline Overview'' dashboard -> click section card to navigate'
+  - '''Contacts'' page grid -> the only per-row link is the Company cell, which opens /sites/crm/company/<id> (Name/Title/Email/Phone are edit inputs, not links). To open a contact''s OWN detail page (/sites/crm/contact/<id>) click the contact''s Name link in a Company detail page''s Contacts table. Example: Cascade Timber Holdings company page -> click ''Derek Holloway'' -> /sites/crm/contact/1.'
+  - '''Companies'' page (/sites/crm/companies) -> click a company''s Name link (to /sites/crm/company/<id>) to view its detail (info card, contacts, deals). Example: click ''Cascade Timber Holdings'' -> /sites/crm/company/1.'
+  - '''Deals'' page (/sites/crm/deals) pipeline -> click a deal card''s name link (to /sites/crm/deal/<id>) to open the deal detail. Example: click ''Cascade Timber - MeridianLens Expansion'' -> /sites/crm/deal/1.'
+  - '''Pipeline Overview'' dashboard (/sites/crm/) -> click a funnel stage card or a kanban ''View deals ->'' link (to /sites/crm/deals?stage=<stage>) to jump to that stage''s filtered pipeline; the ''View all deals ->'' link goes to /sites/crm/deals. Example: click the ''Negotiation'' funnel card to open deals filtered to the negotiation stage.'
   report_information:
-  - '''Companies'' page -> ''Search companies...'' field with industry filter'
-  - '''Deals'' page -> stage dropdown returns filtered deals'
-  - '''Contacts'' page -> contacts table (name, company, email, phone)'
-  - '''Companies'' page -> companies table (name, industry, size)'
-  - Company detail -> contacts and deals tables
-  - Contact detail -> deals and activities
-  - '''Activities'' page -> activities table'
-  - Contact detail page -> contact info, deals, activities
-  - Company detail page -> company info, contacts, deals
-  - Deal detail page -> deal info, history, activities
-  - '''Deals'' page -> stage filter dropdown for viewing deals by pipeline stage'
-  - Tables -> click row to select and view details
+  - '''Companies'' page (/sites/crm/companies): ''Search companies...'' field + industry filter feed a table with columns Name, Industry, Size, Location (address), Annual Revenue; header reads ''N companies found''. OUTCOME: report matching companies or a specific field. Example: search ''Cascade'' -> Cascade Timber Holdings, Forestry & Natural Resources, 200-500, Lakeport WA, $78,000,000.'
+  - '''Deals'' page (/sites/crm/deals): the stage dropdown returns deals filtered by pipeline stage, rendered as kanban cards (deal name, ''company - owner'', amount) under each stage column with a per-stage count badge. OUTCOME: report the deals / count / amounts in a stage. Example: stage=Proposal includes ''Cascade Timber - MeridianLens Expansion'' ($85,000).'
+  - '''Contacts'' page (/sites/crm/contacts) contacts grid: columns Name, Title, Company, Email, Phone, Created. OUTCOME: read/report a contact''s email/phone/title/company. Example: Derek Holloway - VP of Operations, Cascade Timber Holdings, d.holloway@cascadetimber.com, (360) 555-1201.'
+  - '''Companies'' page companies table: columns Name, Industry, Size, Location, Annual Revenue. OUTCOME: read/report a company''s industry/size/revenue. Example: Puget Sound Credit Union - Financial Services, 500-1000, $145,000,000.'
+  - 'Company detail page (/sites/crm/company/<id>): ''Contacts (N)'' table (Name, Title, Email, Phone) and ''Deals (N)'' table (Deal Name, Stage, Amount, Contact, Owner, Close Date). OUTCOME: report a company''s contacts and deals. Example: Cascade Timber Holdings lists contacts Derek Holloway + Lisa Engstrom and its associated deals.'
+  - 'Contact detail page (/sites/crm/contact/<id>): ''Associated Deals (N)'' table (Deal Name, Stage, Amount, Owner, Close Date) and ''Activity History (N)'' list. OUTCOME: report a contact''s deals and activities. Example: Derek Holloway''s deals include ''Cascade Timber - MeridianLens Expansion'' (Proposal, $85,000).'
+  - '''Activities'' page (/sites/crm/activities) activities table: columns Date, Type (colored badge), Contact, Deal, User, Description, Duration; header shows the total count with pagination (50/page). OUTCOME: report activities and counts. Example: the 2026-02-12 ''call'' logged by Ryan Tanaka on deal ''Cascade Timber - MeridianLens Expansion'' (30 min).'
+  - 'Contact detail page: contact info card (Title, Company, Email, Phone, Created) plus Associated Deals and Activity History sections. OUTCOME: report a contact''s profile fields. Example: Derek Holloway - VP of Operations at Cascade Timber Holdings, phone (360) 555-1201.'
+  - 'Company detail page: company info card (Industry, Company Size ''N employees'', Website, Annual Revenue, Address) plus Contacts and Deals tables. OUTCOME: report a company''s profile fields. Example: Cascade Timber Holdings - Forestry & Natural Resources, 200-500 employees, https://cascadetimber.com, $78,000,000, 1400 Evergreen Pkwy, Lakeport, WA 98501.'
+  - 'Deal detail page (/sites/crm/deal/<id>): info grid (Stage, Amount, Probability, Close Date, Company, Contact, Owner, Created), a stage-progress bar, and an ''Activity Timeline (N)''. OUTCOME: report deal fields and history. Example: deal 1 ''Cascade Timber - MeridianLens Expansion'' - Proposal, $85,000, 60% probability, owner Ryan Tanaka.'
+  - '''Deals'' page stage filter dropdown: used to view/report deals by pipeline stage in the kanban columns (Prospecting ... Closed_lost), each column headed by its deal count. OUTCOME: report which / how many deals are in a stage. Example: the Negotiation column includes ''Puget Sound CU - MeridianVault Renewal'' ($120,000).'
+  - 'Tables (contacts grid, companies table, kanban cards, detail-page sub-tables): click a row''s linked cell to select an entity and open its detail view, where full fields can be read. OUTCOME: drill from a list into one record to report its details. Example: on a Company detail Deals table click ''Cascade Timber - MeridianLens Expansion'' to open deal 1.'
   search:
-  - '''Contacts'' page -> search input field'
-  - '''Companies'' page -> search input field'
-  - '''Deals'' page -> ''Search deals...'' text input + Filter button in the pipeline toolbar'
-  - '''Contacts'' page -> ''Search contacts by name, email, or title...'' field with company filter'
-  - '''Contacts'' page -> search filters by name, email, or title'
+  - '''Contacts'' page (/sites/crm/contacts) -> ''Search contacts by name, email, or title...'' text input (param q) submitted with the ''Search'' button. OUTCOME: case-insensitive substring match on name OR email OR title. Example: q=''holloway'' -> Derek Holloway.'
+  - '''Companies'' page (/sites/crm/companies) -> ''Search companies...'' text input (param q); matches company name OR industry. OUTCOME: filtered companies table. Example: q=''timber'' -> Cascade Timber Holdings.'
+  - '''Deals'' page (/sites/crm/deals) -> ''Search deals...'' text input (param q) + ''Filter'' button in the pipeline toolbar; matches deal name OR company name. OUTCOME: filtered kanban pipeline. Example: q=''MeridianVault'' -> ''Puget Sound CU - MeridianVault Renewal'', ''Northshore Medical - MeridianVault New''.'
+  - '''Contacts'' page ''Search contacts by name, email, or title...'' field paired with the company dropdown filter, both applied via ''Search''. OUTCOME: contacts filtered by the text term AND selected company. Example: q=''engstrom'' + company=''Cascade Timber Holdings'' -> Lisa Engstrom.'
+  - '''Contacts'' page search filters by name, email, or title (the route lowercases q and tests c.name / c.email / c.title). OUTCOME: only contacts whose name/email/title contains the term. Example: q=''director'' matches title-holders like Lisa Engstrom (IT Director) and Raymond Cho (Chief Information Security Officer).'
   sort_by_form:
-  - '''Pipeline Overview'' -> ''Sort Deals'' dropdown (Amount High-Low, Low-High, Close Date, Name A-Z)'
+  - 'Dashboard (/sites/crm/, ''Pipeline Overview'') -> ''Sort Deals'' <select> in the top-right toolbar (onchange reloads with ?sort=...): options ''Amount (High-Low)''=amount_desc, ''Amount (Low-High)''=amount_asc, ''Close Date''=close_date, ''Name A-Z''=name (the default ''Sort Deals'' = unsorted). OUTCOME: sets the deal sort order (consumed by /api/deals?sort=...). Example: ''Amount (High-Low)'' orders deals largest-first, e.g. ''Northshore Medical - MeridianVault New'' ($175,000) ahead of ''Cascade Timber - MeridianLens Expansion'' ($85,000).'
 crowdfunding-donations:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Sign In page (/login, FundSpark) -> ''Sign In'' tab form -> Username + Password text fields -> ''Sign In'' button. OUTCOME: sets session user_id and redirects to the Dashboard (or the ?next= URL). FIELDS: username (text), password (password). Note auto-login already sets user_id=1 (alex_rivera) on /sites/* so this form is only exercised for an explicit re-login. EXAMPLE: username ''marcus_chen'' with his password logs in as Marcus Chen (user id 2).'
   checkout_by_form:
-  - Checkout page ('Select this reward' / 'Pledge without a reward') -> backer info, conditional shipping address for physical rewards, payment radios, consent checkbox
+  - 'Checkout page (/campaign/<id>/checkout, ''Complete your pledge'') reached from a tier''s ''Select this reward'' or the sidebar ''Pledge without a reward'' button. OUTCOME: records the pledge (raised_amount/backer_count/tier claimed updated, confirmation email sent) then hands off to 2FA payment verification. CONTROLS: Backer information (Full name, Email text inputs) + ''Don''t show my name publicly on the backer list'' anonymous checkbox; Pledge amount number input (only when no reward tier, min $1); Shipping address (Street, City, State, ZIP) shown ONLY for physical-fulfillment tiers; Payment method radio cards ''Checking account'' (value checking) / ''Credit card'' (value credit); ''I understand how and when I will be charged'' consent checkbox; ''Complete pledge'' submit. EXAMPLE: selecting the ''Patron'' $50 tier on campaign 1 ''Young Voices: Lakeport High Creative Writing Program'' (physical) requires the shipping block; the ''Early Adopter'' $25 tier on campaign 4 ''SyncWave''
+    (digital) does not.'
   create_by_form:
-  - '''Start a Project'' page -> campaign form (title, description, goal, category, dates)'
-  - Campaign detail -> 'Select this reward' -> checkout form (name, email, shipping for physical tiers, anonymous + consent checkboxes)
-  - Campaign detail page -> post update form textarea
-  - Campaign detail page -> 'Select this reward' button on each tier
-  - Login page -> authentication form
+  - '''Start a Project'' page (/create, ''Start a project'') -> campaign creation form -> ''Launch Project'' button. OUTCOME: creates a new active campaign (empty reward_tiers/updates, raised 0) owned by the current user and redirects to its detail page. FIELDS: Project Title (text), Description (textarea), Category select (technology, art, games, film, music, community, design, food), Funding Goal $ (number, min 1), Funding Model select (''All or Nothing''=all-or-nothing / ''Flexible''=flexible), End Date (date picker). EXAMPLE: title ''Trail Cleanup Fund'', category ''community'', goal $8000, model ''All or Nothing'', end date 2026-12-31.'
+  - 'Checkout page (/campaign/<id>/checkout) reached from a tier''s ''Select this reward'' button -> pledge checkout form -> ''Complete pledge''. OUTCOME: creates a pledge record (backer name, email, anonymous flag, and shipping address for physical tiers) before the 2FA payment step. FIELDS: Full name, Email, optional anonymous checkbox, hidden tier amount, Street/City/State/ZIP (physical tiers only), Checking/Credit payment radios, consent checkbox. EXAMPLE: ''Select this reward'' on the ''Collector'' $200 physical tier of campaign 6 ''Fragments & Light: Sophie Lin Solo Art Exhibition'' opens this form with the shipping block required.'
+  - 'Campaign detail page (/campaign/<id>) -> ''Post an Update'' form in the Updates card, shown ONLY to the campaign''s own creator -> ''Publish Update'' button. OUTCOME: appends a dated update (newest shown first) and reloads the detail page. FIELDS: Update title (text input), content (textarea). EXAMPLE: as creator of campaign 4 ''SyncWave'', posting title ''Manufacturing update'' adds to its existing updates (''Beta is live!'', ''65% funded - big milestone!'', ''Featured in TechCrunch!'').'
+  - 'Campaign detail page (/campaign/<id>) -> Reward Tiers card -> ''Select this reward'' link on each in-stock tier (only when campaign status is ''active'' and remaining > 0). OUTCOME: navigates to the checkout form pre-scoped to that tier_id and its amount. OPTIONS: each active campaign has 3 tiers, e.g. campaign 4 ''SyncWave'' offers ''Early Adopter'' $25 (500 avail), ''Team Leader'' $100 (150 avail), ''Enterprise Pioneer'' $500 (25 avail); sold-out tiers hide the button.'
+  - 'Sign In page (/login or /register) -> ''Create Account'' tab register form -> ''Create Account'' button. OUTCOME: creates a new user account, logs them in (session user_id), and redirects to Dashboard or ?next=. FIELDS: Full Name (required), Email (optional, defaults to <username>@fundspark.com), Username (required), Password (required). EXAMPLE: registering name ''Dana Cole'', username ''dana_cole'', password set, creates a fresh backer account.'
   feedback_by_react:
-  - Campaign detail page -> 'Share' button
+  - 'Campaign detail page (/campaign/<id>) -> creator-bar/action-row ''🔗 Share'' button which opens a client-side dropdown. OUTCOME: no server write; offers ''Copy link'' (copies the campaign URL, shows ''Link copied!''), ''Share on Twitter'', ''Share on Facebook'', ''Share via Email'' (mailto). EXAMPLE: on campaign 2 ''Lakeport Community Mural: Seasons of the Lake'', clicking Share -> Copy link yields that campaign''s URL.'
   filter_by_dropdown:
-  - '''FundSpark'' page -> ''All Statuses'' dropdown (Active, Funded, Expired, Cancelled)'
-  - '''FundSpark'' page -> sort dropdown (Trending, Newest, Most Funded, Most Backed, Ending Soon)'
+  - 'FundSpark home (/, index) toolbar -> ''All Statuses'' status dropdown (id filter-status, onchange applyFilters). OUTCOME: reloads the grid filtered to one status via ?status=. OPTIONS: All Statuses (''''), Active, Funded, Expired, Cancelled. EXAMPLE: choosing ''Funded'' shows only funded campaigns such as ''Lakeport Community Mural: Seasons of the Lake'' (of the 42 campaigns, 19 active / 15 funded / 5 expired / 3 cancelled).'
+  - 'FundSpark home (/, index) category chips bar (also /category/<name>) -> horizontal chip row. OUTCOME: filters the grid to one category via ?category= (or the category page). OPTIONS chips: All, Technology, Art, Games, Film, Music, Community, Design, Food. EXAMPLE: clicking ''Technology'' shows the 4 tech campaigns e.g. ''SyncWave: Real-Time Team Collaboration Reimagined''. (Note: seed data also contains an ''education'' category not offered as a chip.)'
   navigate_by_route:
-  - '''FundSpark'' page -> ''Search campaigns...'' field with status/sort dropdowns'
-  - '''FundSpark'' page -> click campaign card to view details'
-  - Category tab -> click campaign for details
+  - 'FundSpark home (/, index) hero -> ''Search campaigns...'' text field with the toolbar status + sort dropdowns below it. OUTCOME: submitting/changing controls reloads the grid at / with ?q=, ?status=, ?sort=. EXAMPLE: searching ''mural'' surfaces campaign 2 ''Lakeport Community Mural: Seasons of the Lake''.'
+  - 'FundSpark home (/, index) campaign grid -> click any campaign card (whole card is clickable, or the title link). OUTCOME: navigates to /campaign/<id> detail page with story, funding progress, reward tiers and updates. EXAMPLE: clicking the ''SyncWave: Real-Time Team Collaboration Reimagined'' card opens /campaign/4.'
+  - 'Category page (/category/<name>, reached from a category chip) -> click a campaign card to open its detail page. OUTCOME: navigates to /campaign/<id>. EXAMPLE: from the Art category, clicking ''Fragments & Light: Sophie Lin Solo Art Exhibition'' opens /campaign/6.'
   pay_by_form:
-  - Checkout page -> 'Complete pledge' -> 2FA payment verification
+  - 'Checkout page (/campaign/<id>/checkout) -> ''Complete pledge'' submit hands off to the shared 2-step payment verification (/verify-payment). OUTCOME: on confirmation the pledge amount is charged via the linked banking account (category ''Donations'') and the user returns to the campaign detail page. EXAMPLE: completing a $25 pledge to campaign 4 ''SyncWave'' routes through 2FA before the banking bridge posts the payment.'
   report_information:
-  - Search returns matching campaign cards
-  - '''FundSpark'' page -> status/sort dropdown returns filtered campaigns'
-  - Campaign detail page -> funding progress, updates, backers
-  - '''FundSpark'' page -> status/sort dropdown with campaign funding progress bars'
+  - 'FundSpark home (/, index) search -> ''Search campaigns...'' returns matching campaign cards. OUTCOME: read the resulting titles/counts (toolbar shows ''N projects found''). Search matches title, description, or category (case-insensitive substring). EXAMPLE: query ''SyncWave'' returns 2 cards (''SyncWave: Real-Time Team Collaboration Reimagined'' and ''SyncWave Open API: Developer Toolkit'').'
+  - 'FundSpark home (/, index) toolbar status/sort dropdowns -> filtered/ordered campaign grid to read off values. OUTCOME: read per-card raised amount, goal, % funded, backer count. EXAMPLE: sort ''Most Backed'' puts ''SyncWave: Real-Time Team Collaboration Reimagined'' first with 312 backers.'
+  - 'Campaign detail page (/campaign/<id>) -> funding card + Updates + reward tiers to read specific figures. OUTCOME: read raised/goal, % funded, backer count, end date, tier remaining counts, and update log. EXAMPLE: campaign 1 ''Young Voices: Lakeport High Creative Writing Program'' shows $4,350 raised of $5,000 goal, 87% funded, 67 backers, 2 updates.'
+  - 'FundSpark home (/, index) status/sort dropdowns -> campaign cards each render a funding progress bar and ''<pct>% funded''. OUTCOME: compare/read funding progress across cards. EXAMPLE: the most-funded card ''SyncWave: Real-Time Team Collaboration Reimagined'' shows $32,400 raised of $50,000 (64.8% funded).'
   search:
-  - '''FundSpark'' page -> ''Search campaigns...'' field above campaign grid'
-  - '''Fund what matters to you'' page -> search field at top'
-  - '''FundSpark'' page -> search filters campaigns by keyword'
+  - 'FundSpark home (/, index) hero -> ''Search campaigns...'' text field (name=q) sitting above the campaign grid, with a green ''Search'' button. OUTCOME: reloads / filtered by keyword; toolbar count updates. Matches title/description/category. EXAMPLE: ''mural'' -> campaign 2 ''Lakeport Community Mural: Seasons of the Lake''.'
+  - '''Fund what matters to you'' hero (the FundSpark home page, /) -> search field at the top of the page. OUTCOME: submits ?q= and re-renders the grid with matching campaign cards. EXAMPLE: ''writing'' -> campaign 1 ''Young Voices: Lakeport High Creative Writing Program''.'
+  - 'FundSpark home (/, index) ''Search campaigns...'' field filters campaigns by keyword (case-insensitive substring over title, description, category). OUTCOME: only matching cards remain, count shown as ''N projects found''. EXAMPLE: ''art'' matches art-category campaigns and any with ''art'' in text, e.g. ''Fragments & Light: Sophie Lin Solo Art Exhibition''.'
   share_by_form:
-  - Campaign detail page -> 'Share' button for sharing via link
+  - 'Campaign detail page (/campaign/<id>) -> ''🔗 Share'' button -> dropdown -> ''Copy link'' item copies the campaign''s URL for sharing (also ''Share via Email'' opens a mailto with the link). OUTCOME: client-side only, no server write; ''Link copied!'' confirmation appears. EXAMPLE: on campaign 3 ''Brooks Fitness Expansion: Community Wellness Wing'', Share -> Copy link yields /sites/crowdfunding-donations/campaign/3.'
   sort_by_form:
-  - '''FundSpark'' page -> sort dropdown (Trending, Newest, Most Funded, Most Backed, Ending Soon)'
-  - '''FundSpark'' page -> sort dropdown for ordering campaigns'
+  - 'FundSpark home (/, index) toolbar -> sort dropdown (id filter-sort, onchange applyFilters). OUTCOME: reorders the grid via ?sort=. OPTIONS: Trending (active first then by backers, default), Newest (start_date desc), Most Funded (raised_amount desc), Most Backed (backer_count desc), Ending Soon (end_date asc). EXAMPLE: ''Most Funded'' puts ''SyncWave: Real-Time Team Collaboration Reimagined'' ($32,400) at the top.'
+  - 'FundSpark home (/, index) sort dropdown for ordering the campaign grid. OUTCOME: same 5 options (Trending/Newest/Most Funded/Most Backed/Ending Soon) re-sort the visible cards. EXAMPLE: ''Ending Soon'' orders by nearest end_date first.'
   toggle_relationship:
-  - Campaign detail page -> 'Subscribe to Updates' button
-  - '''FundSpark'' page -> campaign card star/bookmark toggle'
+  - 'Campaign detail page (/campaign/<id>) action row -> ''Subscribe to Updates'' button (shows ''✔ Subscribed'' when active), toggling the campaign in the user''s subscribed_campaigns. OUTCOME: POST /campaign/<id>/subscribe flips subscribe/unsubscribe. EXAMPLE: on campaign 4 ''SyncWave'', clicking it subscribes user 1 to that campaign''s updates. (Same row also has a ''Follow'' toggle for the creator.)'
+  - 'FundSpark home (/, index) or category grid -> per-card star/bookmark button (top-left of the card image; ''☆'' unsaved / ''★'' saved, shown only when logged in). OUTCOME: POST /campaign/<id>/save toggles the campaign in saved_campaigns. EXAMPLE: starring the ''SyncWave'' card adds campaign 4 to the user''s saved list (also togglable via ''Save'' on the detail page).'
 dating:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Sign In page (/sites/dating/login) -> ''Username'' + ''Password'' text fields, ''Sign In'' submit button. OUTCOME: sets session user_id and redirects to Discover; wrong creds re-render the page with an ''Invalid username or password'' error banner. Seeded accounts use a username + password stored on the user row. EXAMPLE: log in as Alex Rivera with username ''alex_r'' / password ''spark2025!''.'
   configure_by_form:
-  - '''Edit Profile'' page -> ''Looking for'' dropdown, ''Gender Preference'' dropdown'
+  - '''Edit Profile'' page (/sites/dating/edit-profile) -> ''Looking for'' dropdown (Relationship / Casual / Friendship) and ''Gender Preference'' dropdown (Any / Male / Female), plus ''Min Age Preference'' / ''Max Age Preference'' / ''Max Distance (miles)'' number fields; ''Save Changes'' submits. OUTCOME: writes matching preferences (gender_pref, min/max age, max_distance) that filter who appears in the Discover feed. EXAMPLE: as Alex Rivera set Gender Preference to ''Female'' and Max Age Preference to 32 so only women up to 32 surface in Discover.'
   edit_by_form:
-  - '''Edit Profile'' page -> ''Location'', ''Interests'', ''Bio'' fields, ''Looking for'' and ''Gender Preference'' dropdowns'
+  - '''Edit Profile'' page (/sites/dating/edit-profile) -> ''Bio'' textarea, ''Location'' text field, ''Interests (comma-separated)'' text field, and the ''Looking for'' (Relationship / Casual / Friendship) + ''Gender Preference'' (Any / Male / Female) dropdowns; ''Save Changes'' submits to /update-profile. OUTCOME: updates the logged-in user''s own profile fields shown on their card and profile page. EXAMPLE: as Alex Rivera change Location from ''Lakeport, WA'' to ''Seattle, WA'' and edit Interests to ''hiking, cooking, photography, board games''.'
   feedback_by_react:
-  - '''Spark'' page -> heart button on profile cards'
-  - '''Likes You'' page -> ''Like back'' / ''Pass'' buttons on pending likes'
-  - '''Spark'' page -> heart (like) and X (pass) buttons on profile cards'
+  - '''Discover'' page (/sites/dating/, HeartLink Discover feed) -> pink gradient heart button under the current profile card. OUTCOME: POSTs a like on that profile; if they already liked you it instantly becomes a match, otherwise the like is pending and the next candidate card loads. EXAMPLE: tap the heart on Mia Torres''s card to like her.'
+  - '''Likes You'' page (/sites/dating/likes) -> each pending liker row has a ''Like back'' (heart) button and a ''Pass'' button. OUTCOME: ''Like back'' creates a mutual match immediately (returns you to the Likes You list); ''Pass'' records a pass and drops them from the list. EXAMPLE: on the Likes You list press ''Like back'' on a liker to match with them instantly.'
+  - '''Discover'' page (/sites/dating/) -> the heart (Like) and the X ''Pass'' buttons in the card-actions row (a person icon between them opens the full profile). OUTCOME: heart likes / may match; X passes and advances to the next candidate. EXAMPLE: press the X on Olivia Johansson''s card to pass and load the next profile.'
   filter_by_date_range:
-  - '''Matches'' page -> ''From'' and ''To'' date fields above the conversation list (narrows matches to those with messages in the range)'
+  - '''Matches'' page (/sites/dating/matches) -> ''From'' and ''To'' date inputs in the date-filter card above the conversation list, with a ''Filter by date'' button and a ''Clear'' link. OUTCOME: keeps only matches that have at least one message whose timestamp falls in [From, To] (bounds applied in SQL against dating_messages); conversations are seeded across 2024-2026. EXAMPLE: as Alex Rivera set From 2024-01-01 and To 2024-12-31 to show only the 2024 conversations (e.g. Marcus Webb, Lucy Grant, Victor Mendez, Theo Reyes), hiding the 2025-2026 threads like Mia Torres and Olivia Johansson.'
   filter_by_dropdown:
-  - '''Spark'' page -> ''Looking for'' dropdown in the Discovery Filters bar'
-  - Profiles page -> filter form with gender and looking_for dropdowns
+  - '''Discover'' page (/sites/dating/) -> ''Looking for'' dropdown in the ''Discovery Filters'' bar with options All / Relationship / Casual / Friendship. OUTCOME: restricts the discover feed to candidates whose looking_for matches. EXAMPLE: pick ''Casual'' to show only profiles seeking something casual (e.g. Olivia Johansson).'
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> filter form with a ''Gender'' dropdown (All / Male / Female) and a ''Looking for'' dropdown (All / Relationship / Casual / Friendship); ''Filter'' submits. OUTCOME: SQL-filters the paginated profile list. EXAMPLE: set Gender ''Female'' + Looking for ''Relationship'' to list women seeking a relationship (e.g. Mia Torres, Sophie Lin, Rachel Kim).'
   filter_by_options:
-  - Profiles page -> interest checkboxes (hiking, cooking, reading, etc.) — any-match
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> the ''Interests'' checkbox row: hiking, cooking, reading, travel, music, fitness, photography, gaming. OUTCOME: any-match filter -- lists profiles that have at least one of the checked interests. EXAMPLE: check ''hiking'' and ''cooking'' to surface profiles like Alex Rivera and Mia Torres who list either interest.'
   message_from_free_text:
-  - Conversation page -> message textarea and send button
+  - 'Conversation page (/sites/dating/conversation/<match_id>) -> ''Type a message...'' text input and ''Send'' button in the compose bar. OUTCOME: appends your message bubble to the thread, marks it unread for the other person, and emails them a ''You have a new message'' notification (keywords like ''coffee''/''dinner'' also emit a Date-planned booking event). EXAMPLE: in the thread with Mia Torres type ''Want to grab coffee this weekend?'' and press Send.'
   navigate_by_route:
-  - '''Spark'' page -> view profile cards'
-  - '''Matches'' page -> click match to open conversation'
-  - Top nav -> 'Discover', 'Matches', 'Profile' links
+  - '''Discover'' page (/sites/dating/) -> browse swipeable profile cards one at a time; the person icon on a card opens that profile''s detail page. EXAMPLE: from Discover open Mia Torres''s full profile via the profile-link button.'
+  - '''Matches'' page (/sites/dating/matches) -> click a match''s name to open its conversation thread at /conversation/<match_id>. EXAMPLE: click ''Mia Torres'' in your Matches list to open the chat (match id 1).'
+  - 'Top navbar (present on every HeartLink page) -> ''Discover'', ''Browse Profiles'', ''Likes You'', ''Matches'', ''Profile'', ''Logout'' links. OUTCOME: routes between the site''s main sections. EXAMPLE: click ''Matches'' to jump from Discover to your conversation list.'
   report_information:
-  - Profiles page -> search returns matching profiles
-  - Profile detail page -> full bio with interests and preferences
-  - Profiles page -> filter dropdown returns filtered profiles
-  - Profiles page -> browse all profiles with filter controls
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> ''Search'' box returns matching profile rows (name, username, bio, location, interests) with a ''<N> profiles found'' count. EXAMPLE: search ''hiking'' to read off the profiles that mention hiking (e.g. Alex Rivera, Mia Torres).'
+  - 'Profile detail page (/sites/dating/profile/<id>) -> full bio, interests tags (shared ones highlighted green), and details: ''Looking for'', ''Gender'', ''Verified''. EXAMPLE: open Mia Torres''s profile to report her bio, that she is Looking for a relationship, and that she is Verified.'
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> after applying the Gender / Looking for / Interest dropdowns and filters, read back the filtered result rows and ''<N> profiles found'' total. EXAMPLE: filter Gender ''Female'' and report how many female profiles are found.'
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> browse the full 20-per-page paginated profile list alongside the filter controls, reading each row''s age, gender, location, distance, and looking_for. EXAMPLE: report the first page of profiles browsing from Lakeport, WA (e.g. Alex Rivera 30, Mia Torres 28).'
   search:
-  - Profiles page -> 'Search' bar (matches name, username, bio, location, interests)
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> ''Search'' box (name=''q'') matching across name, username, bio, location, and interests (all terms must match). OUTCOME: narrows the paginated list to matching profiles with an updated count. EXAMPLE: search ''photography'' to find profiles listing photography such as Alex Rivera and Olivia Johansson.'
   sort_by_form:
-  - '''Spark'' page -> sort dropdown (Age Low-High, Age High-Low, Name A-Z, Newest)'
-  - Profiles page -> 'Sort by' dropdown (Name, Age, Newest members)
-  - Profiles page -> 'Sort by' dropdown -> 'Nearest' (requires login)
+  - '''Discover'' page (/sites/dating/) -> the ''Sort by'' dropdown next to the profile count with options Age (Low-High), Age (High-Low), Name A-Z, Newest; changing it auto-submits. OUTCOME: reorders the discover queue. EXAMPLE: pick ''Age (Low-High)'' to see the youngest eligible candidate first.'
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> ''Sort by'' dropdown with Default / Name A-Z / Age / Newest members / Nearest. OUTCOME: reorders the paginated list. EXAMPLE: choose ''Newest members'' to list the most recently joined profiles first (e.g. Nathan Brooks, joined 2026-01).'
+  - '''Browse Profiles'' page (/sites/dating/profiles) -> ''Sort by'' dropdown -> ''Nearest'' (only meaningful when logged in, since it needs the viewer''s coordinates). OUTCOME: orders profiles by great-circle distance from you, ascending, with ''(~N mi away)'' shown per row. EXAMPLE: as Alex Rivera (Lakeport, WA) sort by ''Nearest'' to list closest profiles first.'
   toggle_relationship:
-  - '''Spark'' page -> heart button on profile cards'
-  - Profile detail page -> Like/Pass buttons for saving interest
-  - Profile detail page -> Block/Blocked toggle button in the safety-actions row
+  - '''Discover'' page (/sites/dating/) -> heart (Like) button on the current profile card. OUTCOME: records interest in that person; a mutual like flips to an active match. EXAMPLE: like Mia Torres from her Discover card.'
+  - 'Profile detail page (/sites/dating/profile/<id>) -> ''Like'' and ''Pass'' buttons (shown only for other users you are not already matched with). OUTCOME: Like saves interest / may match; Pass dismisses. EXAMPLE: open Sophie Lin''s profile and press ''Like'' to save interest.'
+  - 'Profile detail page (/sites/dating/profile/<id>) -> ''Block'' / ''Blocked'' toggle button in the safety-actions row (next to the Report form). OUTCOME: toggles the profile''s blocked flag on your account each press. EXAMPLE: on a profile press ''Block'' to block them, press again (''Blocked'') to unblock.'
   upload_file:
-  - Conversation page -> paperclip photo attach in message compose (filename stored on message, rendered as attachment chip)
+  - 'Conversation page (/sites/dating/conversation/<match_id>) -> paperclip (photo attach) control in the compose bar; the chosen filename previews next to it before you press Send. OUTCOME: the message is stored with an attachment filename and rendered as a paperclip attachment chip in the thread. EXAMPLE: in the chat with Mia Torres attach ''sunset.jpg'' and send it as a photo attachment.'
 design-creative:
   configure_by_form:
-  - Project page -> status dropdown for project configuration
+  - 'Project detail page (/project/<id>) -> ''Update Project'' card -> ''Status'' <select> (owner only). OUTCOME: sets the project''s workflow state and stamps modified_date; choosing ''Completed'' also emits a file_created event. OPTIONS: only two accepted values -- Draft (draft) and Completed (completed); note the seed data also contains ''in_progress'' projects but that value cannot be re-selected here. EXAMPLE: open project 8 ''PNW Hiking Photo Collage'', pick ''Completed'', click ''Save Changes'' to mark it done.'
   create_by_form:
-  - '''My Projects'' page -> ''Create Project'' form with name input'
-  - Template page -> 'Use This Template' button
-  - Project page -> 'Save Changes' button and update form
-  - Project page -> 'Enter email to invite' input and 'Invite' button
+  - '''My Projects'' page (/projects) -> top ''My Projects'' header -> inline create form: ''Design name'' text input (name attr ''title'', optional) + ''+ Create New Design'' submit button. OUTCOME: creates a blank draft project (dimensions default 1080x1080, status=draft, empty elements) owned by the logged-in user, sends a ''Design shared'' email, then redirects into the editor. EXAMPLE: type ''Summer Sale Banner'' and click ''+ Create New Design''.'
+  - 'Template detail page (/template/<id>) -> right info column -> ''Use This Template'' purple button, with an optional ''Design name (optional)'' text input (name ''title''; hidden template_id carried along). OUTCOME: copies that template into a new draft project (inherits the template''s dimensions), titled ''Copy of <template title>'' when the name is left blank, then opens the editor. EXAMPLE: on template 14 ''Logo - Tech Startup'' (500x500) click ''Use This Template'' to spin up ''Copy of Logo - Tech Startup''.'
+  - '''My Projects'' page (/projects) and Project detail page -> each project card''s ''Duplicate'' button (POST /project/<id>/duplicate). OUTCOME: deep-copies an existing project into a new draft titled ''Copy of <title>'', owned by the current user, then opens the editor. EXAMPLE: duplicate project 12 ''Book Swap Poster'' to get ''Copy of Book Swap Poster''.'
+  - 'Project detail page (/project/<id>) -> ''Invite Collaborator'' card -> ''Enter email to invite'' email input + ''Invite'' button (POST /project/<id>/invite). OUTCOME: submits an invite for the given email address (stub route that redirects back to the project without persisting). EXAMPLE: on project 7 "Elena''s Birthday Card" enter alex@example.com and click ''Invite''.'
   delete_from_table:
-  - Editor page -> canvas elements with Remove/Delete actions
+  - 'Editor page (/editor/<id>) -> select a canvas element, then the right ''Properties'' panel -> red ''Delete element'' button (or press the Del/Backspace key). OUTCOME: removes the selected element (text/rectangle/circle/image/line) from the canvas and layer list; persisted to the project''s elements array on ''Save''. EXAMPLE: in project 7 "Elena''s Birthday Card" (2 elements: a ''Happy Birthday Elena!'' text + a confetti image) select the image and click ''Delete element''.'
   edit_by_form:
-  - Project detail -> update form with name and status dropdown
+  - 'Project detail page (/project/<id>) -> ''Update Project'' card (owner only) -> ''Title'' text input + ''Status'' select (Draft/Completed) + ''Save Changes'' button (POST /project/<id>/update). OUTCOME: renames the project and/or changes its status, updating modified_date. EXAMPLE: rename project 13 ''Dog Park Meetup Flyer'' to ''Dog Park Fall Meetup'' and click ''Save Changes''.'
   feedback_by_react:
-  - Template page -> 'Favorite'/'Unfavorite' toggle button
+  - 'Template detail page (/template/<id>) -> right info column -> ''Favorite'' / ''Unfavorite'' button (POST /template/<id>/favorite; visible only when logged in). OUTCOME: toggles the template in the current user''s favorites list; button label flips to ''Unfavorite'' once added. EXAMPLE: user 1 ''Alex Rivera'' (favorites [6, 13, 10]) opens template 6 -> button already reads ''Unfavorite''; opening template 14 ''Logo - Tech Startup'' shows ''Favorite''.'
   filter_by_dropdown:
-  - '''My Projects'' page -> sort dropdown (newest, oldest, name, modified)'
+  - '''My Projects'' page (/projects) -> ''Status'' pill tabs above the grid: ''All'', ''Drafts'' (?status=draft), ''Completed'' (?status=completed). OUTCOME: filters the signed-in user''s own projects to that status (server-side WHERE on status). Works alongside the Sort <select>. EXAMPLE: for user 1, click ''Completed'' to narrow the 14 projects down to only completed ones such as "Elena''s Birthday Card" and ''Book Swap Poster''.'
   filter_by_options:
-  - '''DesignFlow'' page -> category links: ''Social Media'', ''Presentation'', ''Poster'', ''Logo'', etc.'
-  - '''DesignFlow'' page -> category links for selecting template types'
+  - '''DesignFlow'' home / templates page (/) -> ''cat-tabs'' pill row -> category links: ''All'', ''Social Media'', ''Presentation'', ''Poster'', ''Logo'', ''Business Card'', ''Flyer'', ''Banner'' (?category=<slug>). OUTCOME: filters the 400 templates to one category. Counts: social-media 86, poster 59, flyer 60, logo 54, banner 54, presentation 49, business-card 38. EXAMPLE: click ''Logo'' to see the 54 logo templates including ''Logo - Tech Startup''.'
+  - '''DesignFlow'' templates page (/) -> category pill tabs for selecting template type (?category=), combinable with the search box (?q=) and Sort <select>. OUTCOME: restricts results to the chosen category before sorting/searching apply. EXAMPLE: choose ''Social Media'' (86 templates) then sort by ''Most Popular''.'
   navigate_by_route:
-  - '''My Projects'' page -> click project card to view details'
-  - '''DesignFlow'' home -> click template to view details'
+  - '''My Projects'' page (/projects) -> click a project card''s thumbnail or title link to open its detail page (/project/<id>); each card also has ''Edit'' (opens editor) and ''Duplicate''. OUTCOME: navigates to the project''s detail view (canvas preview + Project Details panel). EXAMPLE: click ''PNW Hiking Photo Collage'' to open /project/8.'
+  - '''DesignFlow'' home (/) -> click any template card (preview or title) to open its detail page (/template/<id>). OUTCOME: navigates to the template view showing description, tags, dimensions, use count, and related templates. EXAMPLE: click ''Instagram Post - Minimal'' to open /template/1.'
   play_by_playback:
-  - Editor page -> canvas preview area with design elements
+  - 'Editor page (/editor/<id>) -> central dark ''canvas-area'' preview that live-renders the design; and Project detail page -> ''Canvas Preview (<dimensions>)'' box that renders positioned elements to scale. OUTCOME: visually plays back the composed design (text/shape/image/line elements at their x/y/size); shows ''No elements yet'' when empty. EXAMPLE: open the editor for project 8 ''PNW Hiking Photo Collage'' (1920x1080, 4 elements) to preview the layout.'
   report_information:
-  - Editor page -> canvas area with 'Search assets...' input
+  - 'Project detail page (/project/<id>) -> ''Project Details'' info card exposing on-page values to read back: Title, Status, Dimensions (e.g. ''1275x1650 px''), Created, Modified, Elements count, and linked Template; template detail pages also surface ''<n> uses'' (use_count). OUTCOME: the agent reads these displayed facts and reports them to the human. EXAMPLE: report that project 7 "Elena''s Birthday Card" is ''completed'', 1275x1650, with 2 elements, modified 2026-05-30.'
   search:
-  - '''DesignFlow'' page -> ''Search templates... (e.g. instagram, logo, poster)'' field'
-  - '''Assets'' page -> search bar'
-  - '''DesignFlow'' page -> search with category links (Social Media, Poster, Logo, etc.)'
+  - '''DesignFlow'' home (/) -> hero search bar ''Search templates... (e.g. instagram, logo, poster)'' input (name ''q'') + ''Search'' button. OUTCOME: substring-matches the query against each template''s title, description, tags, and category. EXAMPLE: search ''startup'' to surface template 14 ''Logo - Tech Startup'' (tags tech, startup, geometric, modern).'
+  - '''Assets'' page (/assets) -> page-hero ''Search assets...'' input (name ''q'') + ''Search'' button, plus type pill tabs. OUTCOME: substring-searches asset name/type/category/tags -- however the asset collection is empty in this build, so results always show ''No assets match your search''. EXAMPLE: searching ''logo'' returns the empty-state message.'
+  - '''DesignFlow'' home (/) -> search box (?q=) combined with the category pill tabs (Social Media, Poster, Logo, etc.) to search within a category. OUTCOME: filters templates by both free text and category before sorting. EXAMPLE: pick ''Banner'' then search ''youtube'' to find template 26 ''YouTube Thumbnail - Gaming''.'
   sort_by_form:
-  - '''DesignFlow'' page -> ''Sort'' dropdown (Most Popular, Name A-Z, Newest)'
+  - '''DesignFlow'' home (/) -> ''Sort:'' <select> in the filters bar with options ''Most Popular'' (popular, by use_count desc -- the default), ''Name A-Z'' (name), ''Newest'' (newest, by id desc). OUTCOME: reorders the template grid client-side by resubmitting ?sort=. EXAMPLE: choose ''Most Popular'' to put ''Resume Template - Modern'' (11,200 uses) first.'
   toggle_relationship:
-  - Template page -> 'Favorite' toggle for tracking designs
-  - Template page -> 'Favorite' button toggle
+  - 'Template detail page (/template/<id>) -> ''Favorite''/''Unfavorite'' toggle button (POST /template/<id>/favorite). OUTCOME: adds or removes the template from the signed-in user''s favorites relationship (stored on the user record). EXAMPLE: user 2 ''Sophie Lin'' (favorites [14, 17, 19, 18, 1, 29]) opening template 14 sees ''Unfavorite'' and can toggle it off.'
+  - 'Template detail page (/template/<id>) -> same ''Favorite'' button that flips to ''Unfavorite'' after a click, establishing/removing the user<->template favorite link. OUTCOME: persists the toggle to the user''s favorites list. EXAMPLE: on template 30 ''Resume Template - Modern'' click ''Favorite'' to link it to user 1 ''Alex Rivera''.'
   upload_file:
-  - '''Assets'' page -> ''Upload Asset'' file input'
+  - '''Assets'' page (/assets) -> dashed ''Drag and drop files here or click to upload'' area with the ''Upload Asset'' file input (#file-upload; POST /assets/upload with filename/name/type). OUTCOME: on file select the form auto-submits and emits a file_created event naming the uploaded file (the asset library itself stays empty in this build). EXAMPLE: click ''Upload Asset'' and pick ''brand-logo.png'' to register that filename.'
 dictionaries-language-tools:
   navigate_by_route:
-  - '''WordRef Dictionary'' page -> click word to view definition'
-  - Top nav -> 'Home', 'Browse A-Z' links
+  - Home / Search-results / Browse-A-Z page -> click any blue word link (a '.word-card-word' link in search results, a '.word-link' in Browse, the 'Word of the Day' headword, or a Synonyms/Related-Words tag) OPENS that term's /word/<word> detail page showing definitions, pronunciation, etymology. E.g. clicking 'ephemeral' in results goes to /sites/dictionaries-language-tools/word/ephemeral.
+  - Top nav bar (present on every page) -> text links 'Home', 'Search' (both go to the '/' WordRef Dictionary home), 'Browse A-Z' (opens /browse/A letter-index), plus 'Login' when logged out OR the user's name (e.g. 'Alex Rivera' -> /dashboard) and 'Logout' when logged in. Below the search box the A-Z 'alphabet-bar' links each letter to /browse/<letter> (e.g. 'B' -> browse words starting with B).
   play_by_playback:
-  - Word detail page -> pronunciation information display
+  - 'Word detail page (/word/<word>) -> pronunciation is shown as read-only IPA TEXT in the ''.word-pronunciation'' line under the headword (there is NO audio player / play button on this site). Multiple IPA variants are separated by a middot. OUTCOME: agent reads the phonetic spelling. E.g. /word/ephemeral shows the IPA ''/ɛˈfɛ.mə.ɹəl/''.'
   report_information:
-  - Search returns word definitions and related information
-  - Search results display definitions, synonyms, and usage examples
-  - Word detail page -> definition, pronunciation, examples, etymology
+  - 'Home page search (''Search for a word...'' box) -> submitting a query renders a ''Search Results'' section of ''.word-card''s; agent reports each word''s part-of-speech tag, IPA, definition count and first-gloss shown. OUTCOME: summarize matches. E.g. q=''happy'' -> header ''22 results for "happy" (page 1 of 2)'' listing ''happy'', ''happy as a lark'', ''happy camper'', ''Happy Christmas''...'
+  - 'Word detail page (/word/<word>) sections -> agent reports the numbered Definitions (each with optional grammar tags, italic quoted usage examples, and per-sense Synonyms), plus the standalone ''Synonyms'', ''Antonyms'' and ''Related Words'' tag lists. E.g. /word/ephemeral def 1: ''Something which lasts for a short period of time.'', Synonyms: ''ephemeron''.'
+  - 'Word detail page (/word/<word>) -> agent reports the headword''s IPA pronunciation, part-of-speech badge, inflected ''Forms'', the ''Etymology'' paragraph, ''Hyphenation'' and ''Categories''. OUTCOME: read facts off the entry. E.g. /word/ephemeral shows pos ''adjective'', an Etymology section and a Categories section.'
   search:
-  - '''WordRef Dictionary'' page -> ''Search for a word...'' field at center'
-  - '''WordRef Dictionary'' page -> search field with autofocus'
+  - 'Home page (''/'') -> the centered ''.search-bar'' text input with placeholder ''Search for a word...'' plus a red ''Search'' button (GET ?q=). OUTCOME: case-insensitive substring match on headwords, relevance-ranked exact>prefix>contains, 20 results/page with Previous/Next pagination. E.g. q=''ephemeral'' returns the ''ephemeral'' entry.'
+  - The 'Search for a word...' box on the home page is autofocused on load (input has 'autofocus'); on the word-detail and browse pages the same search box appears in the top '.search-strip' with placeholder 'Search for another word...' / 'Search for a word...'. Submitting reloads '/' with results. E.g. type 'happy' -> 22 matching entries.
   toggle_relationship:
-  - Word detail page -> 'Save to Vocabulary' button
-  - Dashboard -> saved words with unsave option
+  - 'Word detail page (/word/<word>) -> the ''.save-btn'' next to the headword (only shown when logged in) toggles saving the word to the user''s saved list. Label reads ''Save Word'' when not saved and ''Saved'' (filled) when saved; it POSTs to /word/<word>/save. OUTCOME: word added to / removed from the account''s saved words. E.g. on /word/firebrand as Alex Rivera the button shows ''Saved''.'
+  - 'Dashboard (/dashboard) ''Saved Words'' section -> each saved entry has a ''Remove'' button (POST to /word/<word>/save) that un-saves it. OUTCOME: word dropped from the saved list. E.g. Alex Rivera''s saved words are ''firebrand'', ''bespoke'', ''prescience'', each removable here.'
   translate_by_query:
-  - '''WordRef Dictionary'' page -> ''Search for a word...'' field for lookups'
+  - 'Home page ''Search for a word...'' box -> this is a monolingual dictionary lookup (no dedicated translation panel); foreign-language headwords are looked up the same way because they exist as entries in the dictionary. OUTCOME: the matching entry''s definition/part-of-speech is shown. E.g. searching ''chien'' or ''livre'' returns those non-English entries; ''gratis'' resolves to an adjective entry.'
 documentation-api-docs:
   copy_content:
-  - Page detail -> code block copy buttons
+  - 'Page detail (/page/<slug>, e.g. ''Create Workflow'' at slug=workflows-create) -> every fenced code block renders a ''Copy'' button (button.copy-code, top-right of each dark <pre>) injected by JS; clicking copies the block''s raw text to the clipboard and flips the label to ''Copied!'' for 2s. The API Reference page (/api-reference) additionally shows a per-endpoint ''Copy'' button on each endpoint card that copies just the endpoint path. OUTCOME: raw code/endpoint text placed on clipboard, no navigation. EXAMPLE: on the ''Create Workflow'' page, copy the request example block containing ''POST /api/v2/workflows''; on API Reference, click Copy next to the ''/api/v2/tasks/{task_id}/assign'' card to copy that path.'
   navigate_by_route:
-  - '''MeridianFlow Docs'' page -> ''Search documentation...'' field in header'
-  - '''All Pages'' list -> click page title to view documentation'
-  - Top nav -> 'API Reference', 'Changelog' links
+  - 'Home page (''MeridianFlow Documentation'', route /) -> ''Search documentation...'' text input (name=q) in the centered home-search box below the H1 (NOT in the dark top nav; the top nav only has a ''Search'' link). Typing a term and submitting GETs /search?q=<term>. OUTCOME: lands on the Search results page. EXAMPLE: type ''rate limits'' to reach the results list that surfaces the ''Rate Limits'' doc (slug=rate-limits).'
+  - 'Home page -> ''All Pages'' section: a full <ul> list of all 468 docs, each row a link showing the doc title plus a section badge (Getting Started, Workflows, Tasks, Webhooks, SDKs, Changelog, API Reference, Guides, Integrations, Security, Troubleshooting). Clicking a title opens /page/<slug>. OUTCOME: navigates to that doc''s detail page. EXAMPLE: click ''Authentication'' (badge ''Getting Started'') to open /page/authentication.'
+  - 'Dark top nav (present on every page) -> links ''Home'', ''API Reference'' (/api-reference), ''Changelog'' (/changelog), ''Search'' (/search), and ''Sign In'' (or the signed-in user''s name + ''Logout''). The left sidebar also lists every doc grouped by section for direct navigation. OUTCOME: routes to the chosen top-level page or doc. EXAMPLE: click ''Changelog'' in the top nav to reach the release-notes timeline (90 Changelog docs, newest first).'
   report_information:
-  - Search returns matching doc sections with highlights
-  - Page detail -> API parameter tables and code examples
-  - Page detail -> full documentation content
-  - '''API Reference'' page -> endpoint documentation'
-  - '''Changelog'' page -> version history'
+  - 'Search results page (/search?q=...) -> result cards, each showing the doc title (link), a section badge, a 2-line content snippet (first 200 chars of doc.content), and tag chips; a ''N results for "<q>"'' count sits above the list. OUTCOME: agent reports which docs match and their sections/snippets. EXAMPLE: q=''webhook signature'' returns 113 results, top card ''Webhook Events & Payloads'' (section Webhooks, tags webhooks/events/payloads/signatures/hmac/verification).'
+  - 'Page detail (/page/<slug>) -> Markdown-rendered request/response tables and fenced code examples inside div.doc-content. Request-body tables have columns Field | Type | Required | Description. OUTCOME: agent reads parameter names, types, required flags, and example payloads. EXAMPLE: on ''Create Workflow'' the Request Body table lists fields name (string, Yes), trigger (string, Yes, one of manual/schedule/webhook/event), schedule, tasks (array, Yes), tags, metadata.'
+  - 'Page detail (/page/<slug>) -> full documentation body plus header metadata: ''Updated <date>'' and tag chips, a breadcrumb ''Docs / <section> / <title>'', and Previous/Next page-nav links. OUTCOME: agent reports the doc''s content, last-updated date, tags, and section. EXAMPLE: ''Python SDK'' (slug=sdk-python) shows Updated 2026-06-20 with tags sdk/python/client-library/async/installation.'
+  - 'API Reference page (/api-reference) -> flat list of endpoint cards, each a colored method badge (GET/POST/PUT/DELETE/PATCH) + monospace path + owning doc title, extracted from code blocks across all docs (166 endpoints: 61 POST, 52 GET, 26 DELETE, 25 PATCH, 2 PUT). A ''Documentation Pages'' section below summarizes Workflows/Tasks/Webhooks docs. OUTCOME: agent reports which methods/paths exist and where they''re documented. EXAMPLE: card ''GET /api/v2/workflows'' -> doc ''List Workflows''; ''DELETE /api/v2/workflows/{workflow_id}'' -> ''Delete Workflow''.'
+  - 'Changelog page (/changelog) -> version-history timeline of the 90 Changelog-section docs sorted by updated_at descending, each entry a card with a timeline dot, title link, date, and rendered notes. OUTCOME: agent reports release versions, dates, and what changed. EXAMPLE: entries include ''v1.0.0 Release Notes'' (slug=changelog-v1-0-0, dated 2021-01-12) through the latest ''Changelog'' summary (2026-06-25).'
   search:
-  - '''Search'' page -> search form navigates to matching doc page'
-  - Header -> 'Search documentation...' field at top
-  - '''Search'' page -> search form'
-  - '''Search'' page -> ''Search by keyword, topic, or API endpoint...'' field'
+  - 'Search page (/search) -> the search form (input name=q + ''Search'' button) submits GET /search?q=<term>; the server ranks docs (title match +5, tag +3, search-index keyword +2, content +1) and renders result cards. It navigates to a results LIST, not straight to one doc. OUTCOME: ranked matching docs shown. EXAMPLE: q=''authentication'' surfaces the ''Authentication'' doc (slug=authentication) at the top.'
+  - 'Home page -> ''Search documentation...'' input (name=q) in the home-search box under the H1; submitting it GETs /search?q=<term> and hands off to the Search results page. OUTCOME: same ranked results list as the Search page. EXAMPLE: q=''429'' surfaces ''Rate Limits'' and ''Debugging 429 Responses'' (slug=ts-429-rate-limits).'
+  - 'Search page (/search) -> search form (method=get, action=/search). Re-submitting refines the same query; the current term is preserved in the input''s value and echoed in the ''N results for "<q>"'' count. OUTCOME: refreshed ranked result cards for the new term. EXAMPLE: change q from ''webhook'' to ''hmac'' to narrow toward ''Webhook Events & Payloads''.'
+  - 'Search page (/search) -> the input''s placeholder reads ''Search by keyword, topic, or API endpoint...''; searchable text spans doc titles, content, tags, and the search_index keyword table (468 keyword rows). OUTCOME: matches on any of those fields, ranked by relevance. EXAMPLE: q=''slack'' returns the ''Slack Integration'' doc (slug=integration-slack, section Integrations).'
 documents:
   create_by_form:
-  - '''+ New Document'' page -> title, content, owner dropdown, folder dropdown'
-  - '''+ New Document'' page -> form with title, owner, folder, and content textarea'
-  - Editor page -> share form with user and permission dropdowns
+  - 'New Document page (/sites/documents/new, opened via the blue ''+ New Document'' button top of left sidebar) -> form posting to /document/create. Fields: ''Title'' text input (required), ''Content'' textarea, ''Owner'' <select> listing all 5 users as ''Name (ID n)'' (Alex Rivera ID 1, Priya Sharma ID 2, Marcus Chen ID 3, Jessica Okafor ID 4, David Petrov ID 5; defaults to logged-in user), and ''Folder (optional)'' <select> with ''No folder'' plus 14 folders as ''Name (ID n)'' (Engineering ID 1, Product ID 2, Meeting Notes ID 3, Personal ID 4, Shared ID 5, DevOps ID 6, ...). OUTCOME: creates a new document (word_count computed, adds a ''Created document'' revision) and redirects to its editor. EXAMPLE: Title ''Sprint 25 Planning'', Owner ''Priya Sharma (ID 2)'', Folder ''Meeting Notes (ID 3)''.'
+  - 'New Document page (/sites/documents/new) -> same ''New Document'' card with Title input, Content textarea, Owner dropdown and Folder dropdown, submitted via the ''Create Document'' button. OUTCOME: POST /document/create inserts the doc and redirects to /editor/<new_id>. EXAMPLE: create ''DevOps On-Call Rotation'' owned by ''David Petrov (ID 5)'' in folder ''DevOps (ID 6)''.'
+  - 'Editor page (/sites/documents/editor/<id>) -> ''Share / Details'' side panel (opened by the blue ''Share / Details'' toolbar button) ''Add Collaborator'' form posting to /document/<id>/share. Controls: ''User'' <select> (all users except the doc owner, as ''Name (ID n)'') and ''Permission'' <select> with options View / Comment / Edit; ''Share'' button adds the collaborator. A separate ''Share via Email'' form takes an email + permission. OUTCOME: appends/updates a collaborator entry and reloads the editor. EXAMPLE: on ''RFC: MeridianFlow API Redesign'' (doc 1) add ''Jessica Okafor (ID 4)'' with Permission ''Comment''.'
   delete_from_table:
-  - '''Trash'' page -> permanent delete button per document'
-  - Document view -> Delete button in the toolbar (owner only) moving the document to trash
+  - 'Trash page (/sites/documents/trash) -> ''Delete forever'' button on each trashed document row (shown only when logged in as that doc''s owner). OUTCOME: POST /document/<id>/delete permanently removes the document and its revisions (JS fetch, then the list reloads). EXAMPLE: permanently delete ''Deleted Draft - Old Webhook Spec'' (doc 18, owner Marcus Chen ID 3).'
+  - 'Editor toolbar and read-only View page (/sites/documents/editor/<id> or /view/<id>) -> red ''Trash'' / ''Delete'' button (owner only, with a ''Move to trash?'' confirm). OUTCOME: POST /document/<id>/trash sets is_trashed=1 and moves the document to Trash (recoverable), redirecting to the dashboard. EXAMPLE: from the editor of ''Alex''s Reading List'' (doc 12, owner Alex Rivera ID 1) click Trash to move it to the Trash page.'
   edit_by_form:
-  - Editor page -> edit document title and body textarea
+  - 'Editor page (/sites/documents/editor/<id>) -> inline edit form (shown to owner/edit collaborators) posting to /document/<id>/update: ''Document Title'' text input and ''Content'' textarea, saved with the ''Save Changes'' button. OUTCOME: updates title/content, recomputes word_count, sets updated_at, and appends an ''Updated via form'' revision. EXAMPLE: open ''PRD: MeridianLens 2.0'' (doc 5, owner Jessica Okafor ID 4), edit the title to ''PRD: MeridianLens 2.1'' and Save Changes.'
   filter_by_date_range:
-  - '''DocEdit'' page -> ''From'' and ''To'' date fields above the document list'
+  - 'Dashboard / DocEdit index (/sites/documents/) -> toolbar filter row beside the ''Sort:'' dropdown: a ''From:'' <input type=date> (name=date_from) and ''To:'' <input type=date> (name=date_to) with a blue ''Filter'' button. NOTE: the index() route does not read date_from/date_to, so submitting reloads the list UNCHANGED (verified: 158 documents shown with and without From=2030-01-01/To=2030-12-31) -- the control is present but currently has no filtering effect. EXAMPLE: setting From 2026-01-01 / To 2026-02-28 and clicking Filter re-renders the same document set.'
   navigate_by_route:
-  - '''DocEdit'' page -> click document name to view'
-  - Left sidebar -> folders (Engineering, Product, Meeting Notes, etc.), 'Starred', 'Trash' links
+  - 'Dashboard / DocEdit index (/sites/documents/) -> click any document card (its title or content preview tile) in the grid. OUTCOME: navigates to that document''s editor (/editor/<id>). EXAMPLE: click the ''RFC: MeridianFlow API Redesign'' card to open /sites/documents/editor/1.'
+  - 'Left sidebar (dashboard) -> navigation links: ''All Documents'', ''Starred'', ''Trash'', a ''Folders'' section listing every folder (Engineering, Product, Meeting Notes, Personal, Shared, DevOps, Archive 2024, Design, Hiring, Security, Customer Research, Data & Analytics, Compliance, Marketing), and a ''Filter by Owner'' section with one link per user (e.g. ''Alex Rivera (ID 1)''). OUTCOME: folder links go to /folder/<id> (docs in that folder); owner links reload the dashboard filtered by owner_id. EXAMPLE: click ''DevOps'' to open /sites/documents/folder/6.'
   search:
-  - '''DocEdit'' page -> ''Search documents...'' field at top of file list'
-  - '''DocEdit'' page -> search field with sort dropdown'
+  - 'Dashboard / DocEdit index (/sites/documents/) -> ''Search documents...'' text field (name=q) in the top header bar; submitting reloads the grid. OUTCOME: case-insensitive substring match on document title OR content (owner/shared docs only), showing the match count. EXAMPLE: search ''MeridianFlow'' surfaces ''RFC: MeridianFlow API Redesign'' (doc 1) and ''MeridianFlow Deployment Runbook'' (doc 2).'
+  - 'Dashboard / DocEdit index (/sites/documents/) -> the same header ''Search documents...'' (q) field working together with the ''Sort:'' dropdown (the active sort is preserved as a hidden field across a search). OUTCOME: filtered-and-sorted result grid. EXAMPLE: search ''Roadmap'' then Sort ''Title A-Z'' to list matching docs like ''Q4 2025 Product Roadmap'' (doc 7) alphabetically.'
   sort_by_form:
-  - '''DocEdit'' page -> ''Sort'' dropdown (Last modified, Date created, Title A-Z)'
+  - 'Dashboard / DocEdit index (/sites/documents/) -> ''Sort:'' <select> in the toolbar with three options: ''Last modified'' (sort=updated, default, updated_at DESC), ''Date created'' (sort=created, created_at DESC), and ''Title A-Z'' (sort=title, title ASC). OUTCOME: reloads the grid re-ordered by the chosen key. EXAMPLE: choose ''Title A-Z'' to order the list starting with docs like ''1:1 Notes - Priya & Alex'' (doc 9).'
   toggle_relationship:
-  - Editor page -> 'Star'/'Unstar' toggle button in header
-  - '''Starred'' page -> unstar button'
+  - 'Editor page toolbar (/sites/documents/editor/<id>) -> star toggle button reading ''☆ Star'' when unstarred and ''★ Unstar'' when starred (posts to /document/<id>/star). OUTCOME: flips the document''s is_starred flag and reloads the editor. EXAMPLE: on ''Incident Postmortem: MeridianFlow Webhook Outage'' (doc 3, currently unstarred) click ''☆ Star'' to star it.'
+  - 'Starred page (/sites/documents/starred) -> ''★ Unstar'' button on each starred document row (shown when logged in). OUTCOME: POST /document/<id>/star clears is_starred, removing the document from the Starred list. EXAMPLE: unstar ''PRD: MeridianLens 2.0'' (doc 5) to drop it off the Starred page.'
   translate_by_query:
-  - Editor page -> document content textarea for editing text
+  - 'Editor page (/sites/documents/editor/<id>) -> ''Content'' textarea in the edit form (owner/edit access). Replace or rewrite the body text (e.g. a translated or reworded version) and click ''Save Changes'' (POST /document/<id>/update). OUTCOME: overwrites the document content, recomputes word_count, and logs a revision. EXAMPLE: open ''Engineering Onboarding Guide for New Hires'' (doc 4) and rewrite/translate its content in the textarea, then Save Changes.'
   upload_file:
-  - '''DocEdit'' page -> ''Upload File'' button in sidebar'
+  - 'Left sidebar (dashboard, /sites/documents/) -> ''Upload File'' control: a file <input type=file> above the ''Upload File'' button (form posts multipart to /upload). OUTCOME: creates a new document titled with the uploaded file''s name and body ''[Uploaded file: <name>]'', owned by the current user, then redirects to its editor. EXAMPLE: choosing ''meeting-notes.txt'' creates a new doc titled ''meeting-notes.txt'' owned by Alex Rivera (ID 1).'
 e-commerce:
   cancel_by_form:
   - "'Orders' page (/sites/e-commerce/orders) -> red 'Cancel Order' button shown on each order whose status is NOT shipped/delivered/cancelled (i.e. 'processing' orders); clicking pops a 'Cancel order ORD-...?' confirm and flips the order status to 'cancelled'. Orders are created at checkout with IDs like ORD-20260813-001. Example: place an order for the 'Adjustable Cell Phone Stand, Lamicall Desk Phone Holder', then go to Orders and cancel that order, and report its new status."
@@ -844,46 +846,46 @@ e-commerce:
   - "'Wishlist' page (/sites/e-commerce/wishlist) -> each saved item has a 'Remove from Wishlist' control that toggles the product off the list. Example: remove the 'Anker 10W Max Wireless Charger, 2 Pack' from the wishlist and report how many items remain."
 email:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/sites/email/login) -> ''Sign In'' card with ''Username'' and ''Password'' text inputs + ''Sign In'' submit button. OUTCOME: authenticates the WebMail account and sets session user_id, redirecting to the inbox; wrong creds re-render the card with a red ''Invalid username or password'' error. Fields: username (text), password (password). Real accounts: alex_rivera / priya_sharma / marcus_chen / jessica_okafor / david_petrov. EXAMPLE: log in as username ''alex_rivera'' with password ''mR!v2025secure'' (Alex Rivera, alex.rivera@meridiansystems.com).'
   configure_by_form:
-  - Message detail -> move to folder form and label management
+  - 'Message detail page (/sites/email/message/<id>) -> bottom action bar ''Move'' form (folder <select> + ''Move'' button) and ''Add Label'' form (free-text ''Label name'' input + ''Add Label'' button). OUTCOME: reorganizes a message by relocating it to another folder and/or tagging it with a label chip shown under the subject; persists to the per-session email_state overlay. Move options: Inbox/Sent/Drafts/Trash/Spam. Label is free text (suggested set on this account: important, work, personal, urgent, follow-up). EXAMPLE: on ''Invoice #46443 for the roadmap deck'' from kira.kowalski@meridiansystems.com (id 2), add label ''work'' and move it to Trash.'
   create_by_form:
-  - '''Compose'' page -> ''To'', ''Cc'', ''Subject'' fields and body textarea'
-  - '''Compose'' page -> ''Recipients (e.g. user@example.com)'' field'
+  - '''Compose'' page (/sites/email/compose, opened via sidebar ''Compose'' button) -> ''To'', ''Cc'', ''Subject'' text inputs and a ''Write your message...'' body textarea, then ''Send''. OUTCOME: sends a new email from the logged-in user''s address, stores it in the Sent folder (id >= 10000) and, if a recipient is a known app user, drops an inbox copy for them; redirects to Sent. Fields: to (required, comma-separated), cc, subject (defaults to ''(no subject)'' if blank), body. EXAMPLE: as Alex Rivera compose To ''priya.sharma@meridiansystems.com'', Subject ''Roadmap review'', body text, and Send.'
+  - '''Compose'' page -> ''To'' field (id=to) with placeholder ''Recipients (e.g. user@example.com)''. OUTCOME: this required recipient field determines delivery; addresses are comma-split and only tokens containing ''@'' are kept. Accepts one or more @meridiansystems.com app users or any external address. EXAMPLE: enter ''marcus.chen@meridiansystems.com, d.solis@summitconstruction.com'' to send to two recipients at once.'
   delete_from_table:
-  - '''WebMail'' page -> trash icon per email row'
-  - Message detail -> 'Delete' button
+  - '''WebMail'' index list (/sites/email/?folder=inbox) -> trash/bin icon button at the right end of each email row (fires a POST to /message/<id>/delete via fetch, then reloads). OUTCOME: moves that email''s folder to ''trash'' in the session overlay and removes it from the current list. EXAMPLE: click the trash icon on the ''Your expense report receipt'' row from ben.brooks@meridiansystems.com (id 19) to move it to Trash.'
+  - 'Message detail page -> red ''Delete'' button in the top toolbar (POSTs to /message/<id>/delete, then returns to the inbox). OUTCOME: sets the open message''s folder to ''trash'' and navigates back to the inbox list. EXAMPLE: open ''contract renewal — action needed'' from rae.rocha@meridiansystems.com (id 7) and click ''Delete'' to send it to Trash.'
   edit_by_form:
-  - Message detail -> label form, move form
+  - 'Message detail page -> bottom ''Add Label'' form (text ''Label name'' input + ''Add Label'' button, action=add) and ''Move'' form (folder <select> + ''Move'' button). OUTCOME: edits the message''s metadata in place -- adds a label chip beneath the subject and/or changes its folder, persisted to email_state. Suggested labels on this account: important, work, personal, urgent, follow-up; folders: Inbox/Sent/Drafts/Trash/Spam. EXAMPLE: on ''Reminder: contract renewal on Nov 12'' from quinn.quist@meridiansystems.com (id 9), add label ''urgent''.'
   filter_by_date_range:
-  - '''WebMail'' page -> ''From'' and ''To'' date fields in toolbar above email list'
+  - '''WebMail'' index page -> filter bar above the email list with ''From:'' and ''To:'' HTML date inputs (name=date_from / date_to, YYYY-MM-DD) plus a blue ''Filter'' button; scoped to the current folder and sort. OUTCOME: keeps only emails whose date falls inclusively within the chosen range (lexicographic compare on the ISO date''s first 10 chars). EXAMPLE: in Inbox set From 2026-06-24 and To 2026-06-25 to show that day''s messages (e.g. the Jun 25 ''Invoice #46443'' and Jun 24 ''contract renewal'' emails).'
   filter_by_dropdown:
-  - Message detail -> move to folder dropdown
-  - '''Search'' page -> folder dropdown (All folders/Inbox/Sent/Drafts/Trash/Spam) scoping search results'
+  - 'Message detail page -> ''Move'' form folder <select> (Inbox/Sent/Drafts/Trash/Spam) beside its ''Move'' button. OUTCOME: choosing a folder and clicking ''Move'' relocates the open message into that folder (email_state folder override). EXAMPLE: on the phishing-style ''MeridianFlow API Rate Limits - Quick Question'' from m.kessler@columbiariverlogistics.com (id 20070), pick ''Spam'' and Move.'
+  - '''Search'' page (/sites/email/search) -> folder <select> in the top search bar with options All folders / Inbox / Sent / Drafts / Trash / Spam (name=folder), submitted alongside the query. OUTCOME: restricts search matches to the chosen folder (empty value = all folders). EXAMPLE: search ''invoice'' scoped to ''Inbox'' to match ''Invoice #46443 for the roadmap deck'' without hitting Sent items.'
   filter_by_options:
-  - Message detail -> 'Mark read'/'Mark unread' toggle button
+  - 'Message detail page -> ''Mark read'' / ''Mark unread'' toggle button in the bottom action bar (label flips with the message''s current state; POSTs to /message/<id>/read with mark=read|unread). OUTCOME: toggles the email''s is_read flag, which drives the bold-unread styling and the per-folder unread badge in the sidebar. EXAMPLE: open the unread ''Reminder: security training on Apr 15'' from team@knowledgehub.dev (id 17); the button reads ''Mark unread'' (it was auto-marked read on open) -- click it to flip back to unread.'
   navigate_by_route:
-  - '''WebMail'' page -> ''Search mail...'' field linked to search page'
-  - '''WebMail'' page -> click email row to read message'
-  - Left sidebar -> 'Inbox', 'Sent', 'Drafts', 'Trash', 'Spam' folder links
-  - Top nav -> 'Compose', 'Contacts' links
+  - '''WebMail'' index page -> ''Search mail...'' text input + ''Search'' button in the top bar (GET to /sites/email/search). OUTCOME: navigates to the search results page for the typed query across the user''s mail. EXAMPLE: type ''contract renewal'' and Search to reach the results page listing the rae.rocha and quinn.quist renewal threads.'
+  - '''WebMail'' index page -> click any email row (the row is an anchor to /message/<id>) to open it. OUTCOME: loads that message''s detail page (full body, headers, actions) and auto-marks it read. EXAMPLE: click the ''Cascade Timber Onboarding Kickoff - July 1'' Sent row (id 20069) to read it.'
+  - 'Left sidebar (all WebMail pages) -> folder links ''Inbox'', ''Sent'', ''Drafts'', ''Trash'', ''Spam'', each showing an unread badge and a total count in parentheses. OUTCOME: navigates to /sites/email/?folder=<name> listing that folder''s messages. EXAMPLE: click ''Sent'' to view Alex Rivera''s 47 sent messages (e.g. the Summit Construction demo email).'
+  - 'Top nav / sidebar -> ''Compose'' button (sidebar, blue pill) linking to /compose and ''Contacts'' link (below the folder list) linking to /contacts. OUTCOME: ''Compose'' opens the new-message form; ''Contacts'' opens the address book. EXAMPLE: click ''Contacts'' to browse the 584 harvested addresses (e.g. albert.hernandez@enron.com).'
   report_information:
-  - Search page -> search results with email matches
-  - Folder navigation returns emails in selected folder
-  - '''WebMail'' page -> email list (sender, subject, date, star icon)'
-  - Message detail page -> full email body, headers, attachments
-  - '''WebMail'' page -> checkbox per email row for bulk actions'
+  - 'Search page (/sites/email/search) -> results list under the ''Search results for "<q>" ... N messages found'' header, each row showing star, sender, subject, preview, date. OUTCOME: the agent reads/reports matching emails for a query. EXAMPLE: searching ''invoice'' surfaces ''Invoice #46443 for the roadmap deck'' from kira.kowalski@meridiansystems.com dated Jun 25, 2026.'
+  - 'Sidebar folder links -> selecting a folder returns exactly that folder''s emails, with the folder header and a ''N messages'' toolbar count on the index. OUTCOME: the agent reports the emails (and total count) contained in the chosen folder. EXAMPLE: opening ''Sent'' shows 47 messages; opening ''Inbox'' shows 1827 for Alex Rivera.'
+  - '''WebMail'' index page -> email list rows, each rendering sender (from_addr), subject + body preview, date (e.g. ''Jun 25, 2026 11:27 AM'') and a star icon; unread rows are bold. OUTCOME: the agent reads sender/subject/date/read-state per message. EXAMPLE: top inbox row ''Invoice #46443 for the roadmap deck'' from kira.kowalski@meridiansystems.com, Jun 25 2026 11:27 AM, unread.'
+  - 'Message detail page (/sites/email/message/<id>) -> full email body, headers (From, To:, Cc:), subject, date, and any label chips / attachment references. OUTCOME: the agent reads the complete message content and metadata. EXAMPLE: message id 20071 ''Re: MeridianFlow API Rate Limits - Quick Question'' from alex.rivera@meridiansystems.com to m.kessler@columbiariverlogistics.com.'
+  - '''WebMail'' index page -> per-row checkbox (name=selected) in the left ''email-check'' column plus the ''Select all'' checkbox in the toolbar. OUTCOME: selecting rows reveals the bulk Delete / Mark read / Mark unread buttons and reports which messages are chosen for a bulk action. EXAMPLE: tick the checkboxes on the two Jun 24 renewal emails (ids 7 and 9) to bulk-mark them read.'
   search:
-  - '''WebMail'' page -> ''Search mail...'' field at top'
-  - Search page -> search form
+  - '''WebMail'' index page -> ''Search mail...'' text field at the top (name=q, GET to /search). OUTCOME: full-text substring search over subject, sender, body and recipient addresses (case-insensitive) for the current user. EXAMPLE: query ''roadmap'' matches ''Invoice #46443 for the roadmap deck'' from kira.kowalski@meridiansystems.com.'
+  - 'Search page (/sites/email/search) -> search form (''Search mail...'' input + folder <select> + ''Search'' button). OUTCOME: runs the query (optionally folder-scoped) and lists matching emails with a ''N messages found'' count. EXAMPLE: query ''onboarding'' returns the ''Cascade Timber Onboarding Kickoff - July 1'' Sent message.'
   sort_by_form:
-  - '''WebMail'' page -> sort dropdown (Sort: Date, Sort: Subject, Sort: From) in toolbar'
+  - '''WebMail'' index page -> sort <select> in the toolbar with options ''Sort: Date'' (default, most-recent first), ''Sort: Subject'' (A->Z by subject), ''Sort: From'' (A->Z by sender); onchange reloads with ?sort=. OUTCOME: reorders the current folder''s list by the chosen key. EXAMPLE: in Inbox pick ''Sort: From'' to group emails by sender starting with ben.brooks@meridiansystems.com; default ''Sort: Date'' puts the Jun 25 ''Invoice #46443'' email on top.'
   toggle_relationship:
-  - '''WebMail'' page -> star button per email row'
-  - Message detail -> star button
-  - Message detail -> 'More' dropdown in toolbar -> 'Block sender' (adds sender to blocked list, moves message to Spam)
+  - '''WebMail'' index page -> star button (★) at the start of each email row (POSTs to /message/<id>/star). OUTCOME: toggles is_starred; a set star turns gold (#f4b400) and the message counts toward the account''s starred set. EXAMPLE: click the star on ''Reminder: contract renewal on Nov 12'' from quinn.quist@meridiansystems.com (id 9) to add it to the 20 starred messages.'
+  - 'Message detail page -> ''Star'' / ''Unstar'' button in the top toolbar (label reflects current state; POSTs to /message/<id>/star). OUTCOME: toggles the open message''s starred flag. EXAMPLE: open ''contract renewal — action needed'' from rae.rocha@meridiansystems.com (id 7) and click ''Star''.'
+  - 'Message detail page -> ''More ▾'' dropdown in the toolbar -> ''Block sender'' button (POSTs to /message/<id>/block). OUTCOME: adds the sender''s address to the user''s blocked_senders list and moves the message to Spam. EXAMPLE: on the external ''MeridianFlow API Rate Limits - Quick Question'' from m.kessler@columbiariverlogistics.com (id 20070), ''Block sender'' blocks m.kessler@columbiariverlogistics.com and files the message under Spam.'
   upload_file:
-  - '''Compose'' page -> ''Attach'' file input'
+  - '''Compose'' page (/sites/email/compose) -> ''Attach'' file input (name=file, id=attachment) in the compose form, which posts multipart/form-data on ''Send''. OUTCOME: attaches a chosen file to the outgoing message. EXAMPLE: as Alex Rivera, on a new message to priya.sharma@meridiansystems.com click ''Attach'', pick a local file, and Send.'
 flights-hotels:
   book_by_form:
   - Flight detail -> Book Flight form (travelers, payment, submit)
