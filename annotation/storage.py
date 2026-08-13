@@ -175,7 +175,7 @@ def list_tasks(annotator: str = None) -> list[dict]:
 
                     if not task:
                         continue
-                    
+
                     # Don't include trajectory in list view
                     task.pop("trajectory", None)
 
@@ -188,7 +188,7 @@ def list_tasks(annotator: str = None) -> list[dict]:
 
     def last_modified(task):
         saved_at = task.get("saved_at", "")
-        review_at = task.get("review_tag", {}).get("at", "")
+        review_at = (task.get("review_tag") or {}).get("at", "")
         return max(saved_at, review_at)
 
     return sorted(tasks, key=last_modified, reverse=True)
