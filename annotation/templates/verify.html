@@ -594,6 +594,17 @@ function toggleSortOrder() {
     window.location.href = '/annotate/verify?' + params.toString();
 }
 
+function _nextTaskCard() {
+    // the next VISIBLE card below the active one (respects search/annotator/tag
+    // filters) — with the "Unreviewed" filter on, this is a pure triage queue
+    var cards = Array.from(document.querySelectorAll('.task-card'));
+    var i = cards.indexOf(document.querySelector('.task-card.active'));
+    if (i < 0) return null;
+    for (var j = i + 1; j < cards.length; j++)
+        if (cards[j].style.display !== 'none') return cards[j];
+    return null;
+}
+
 function setReviewTag(tag) {
     if (!_reviewTaskId) return;
     // clicking the active tag clears it
@@ -604,8 +615,12 @@ function setReviewTag(tag) {
         body: JSON.stringify({task_id: _reviewTaskId, annotator: _reviewAnnotator,
                               field: 'review_tag', value: value})
     }).then(r => r.json()).then(d => {
-        if (d.status === 'ok') location.reload();
-        else alert('Tag failed: ' + (d.error || 'unknown'));
+        if (d.status !== 'ok') { alert('Tag failed: ' + (d.error || 'unknown')); return; }
+        // tagging = done with this task -> advance to the next one in the list
+        // (the sidebar re-renders with the fresh pill). Clearing a tag stays put.
+        var next = value && _nextTaskCard();
+        if (next) next.click();
+        else location.reload();
     }).catch(e => alert('Tag failed: ' + e));
 }
 
@@ -623,8 +638,10 @@ function deleteTask() {
           + '?annotator=' + encodeURIComponent(_reviewAnnotator), {method: 'DELETE'})
         .then(r => r.json())
         .then(d => {
-            if (d.status === 'trashed') location.href = '/annotate/verify';
-            else alert('Delete failed: ' + (d.error || 'unknown error'));
+            if (d.status !== 'trashed') { alert('Delete failed: ' + (d.error || 'unknown error')); return; }
+            var next = _nextTaskCard();
+            if (next) next.click();
+            else location.href = '/annotate/verify';
         })
         .catch(e => alert('Delete failed: ' + e));
 }
