@@ -888,7 +888,8 @@ def verify():
     task_id = request.args.get("task_id")
     annotator = request.args.get("annotator")
     # Always list every annotator's tasks — `annotator` only scopes task loading.
-    tasks = list_tasks()
+    sort = request.args.get("sort", "newest")
+    tasks = list_tasks(annotator=annotator, newest_first=(sort != "oldest"))
     for t in tasks:
         vf = ANNOTATIONS_DIR / (t.get("annotator") or "anonymous") / t.get("task_id", "") / "verifier.json"
         t["has_verifier"] = vf.exists()

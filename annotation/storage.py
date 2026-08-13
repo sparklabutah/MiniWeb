@@ -146,7 +146,7 @@ def load_task(annotator: str, task_id: str) -> dict | None:
     return task
 
 
-def list_tasks(annotator: str = None) -> list[dict]:
+def list_tasks(annotator: str = None, newest_first: bool = True) -> list[dict]:
     """List all tasks, optionally filtered by annotator.
 
     Returns lightweight metadata (no trajectory).
@@ -191,7 +191,7 @@ def list_tasks(annotator: str = None) -> list[dict]:
         review_at = (task.get("review_tag") or {}).get("at", "")
         return max(saved_at, review_at)
 
-    return sorted(tasks, key=last_modified, reverse=True)
+    return sorted(tasks, key=last_modified, reverse=newest_first)
 
 
 def delete_task(annotator: str, task_id: str) -> bool:
