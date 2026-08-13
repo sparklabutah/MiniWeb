@@ -561,6 +561,17 @@ const macroDescriptions = {{ macro_descriptions | tojson }};
 const macroLocations = {{ macro_locations | tojson }};
 const OPERATIONS = {{ operations | tojson }};      // {op: {desc, ...}} reasoning axis
 const ALL_MACROS = {{ all_macros | tojson }};       // [{key, group, description}] full registry
+const MACRO_COVERAGE = {{ macro_coverage | tojson }};  // {macro: #tasks} — how covered each macro is
+
+// A small badge showing how represented a macro is, so annotators can prefer the
+// under-covered ones. 0 = red (none yet), 1-3 = amber (needs more), else gray.
+function _covBadge(key) {
+    const n = MACRO_COVERAGE[key] || 0;
+    let bg = '#f1f5f9', fg = '#64748b', label = n + ' task' + (n === 1 ? '' : 's');
+    if (n === 0) { bg = '#fee2e2'; fg = '#b91c1c'; label = '⚠ none yet'; }
+    else if (n <= 3) { bg = '#fef3c7'; fg = '#92400e'; label = n + ' – needs more'; }
+    return `<span title="${n} annotated task(s) use this macro" style="background:${bg};color:${fg};padding:0 .35rem;border-radius:.25rem;font-size:.6rem;font-weight:600;white-space:nowrap">${label}</span>`;
+}
 const rerecordTask = {{ rerecord | tojson }};   // set when replacing an existing task
 let currentPrompt = {{ prompt | tojson }};
 let currentStep = 1;
@@ -1345,7 +1356,10 @@ function showMacroSearch(q) {
               onmousedown="addMacroFromSearch('${m.key}')"
               onmouseenter="this.style.background='#eff6ff'"
               onmouseleave="this.style.background=''">
-            <div style="font-weight:500;color:#1e293b">${escHtml(m.desc)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem">
+              <div style="font-weight:500;color:#1e293b">${escHtml(m.desc)}</div>
+              ${_covBadge(m.key)}
+            </div>
             <div style="font-size:.65rem;color:#94a3b8">${m.key}</div>
         </div>`
     ).join('');
@@ -1440,9 +1454,14 @@ function renderAddMacroPanel(filter) {
     Object.keys(groups).forEach(g => {
         html += `<div style="padding:.25rem .55rem 0;font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;font-weight:700">${g}</div>
             <div style="display:flex;flex-wrap:wrap;gap:.25rem;padding:.2rem .5rem .35rem">`;
-        html += groups[g].map(m =>
-            `<span class="macro-chip" title="${escHtml(m.description)}"
-                onmousedown="addMacroFromSearch('${m.key}')">${m.key}</span>`).join('');
+        html += groups[g].map(m => {
+            const n = MACRO_COVERAGE[m.key] || 0;
+            const ring = n === 0 ? 'box-shadow:inset 0 0 0 1.5px #fca5a5;'
+                       : n <= 3 ? 'box-shadow:inset 0 0 0 1.5px #fcd34d;' : '';
+            return `<span class="macro-chip" title="${escHtml(m.description)} — ${n} annotated task(s)"
+                style="${ring}display:inline-flex;align-items:center;gap:.25rem"
+                onmousedown="addMacroFromSearch('${m.key}')">${m.key} ${_covBadge(m.key)}</span>`;
+        }).join('');
         html += `</div>`;
     });
     // propose-new-macro form — ALL fields required (a proposed macro must be a
@@ -1531,7 +1550,10 @@ function _renderMacroResults(items, mode) {
               onmousedown="addMacroFromSearch('${m.key}')"
               onmouseenter="this.style.background='#eff6ff'"
               onmouseleave="this.style.background=''">
-            <div style="font-weight:500;color:#1e293b">${escHtml(m.description || m.key)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem">
+              <div style="font-weight:500;color:#1e293b">${escHtml(m.description || m.key)}</div>
+              ${_covBadge(m.key)}
+            </div>
             <div style="font-size:.65rem;color:#94a3b8">${m.key}${meta ? ' — ' + escHtml(meta) : ''}</div>
         </div>`;
     }).join('');
@@ -1549,11 +1571,19 @@ function runSemanticMacroSearch(q) {
     })
         .then(r => r.json())
         .then(d => {
-            if (d.error) { _renderMacroResults([], 'keyword'); return; }
-            _renderMacroResults(d.results || [], d.mode || 'keyword');
+            // If the LLM (semantic) path is unavailable, the backend returns
+            // keyword results — tell the user so they know AI search is down, but
+            // still show the keyword matches (with a notice).
+            if (d.mode !== 'semantic' || d.error) {
+                const note = '<div style="padding:.35rem .6rem;color:#b45309;background:#fef3c7;font-size:.62rem;border-bottom:1px solid #fde68a">⚠ AI (semantic) search unavailable — showing keyword matches. If this persists, restart the annotation server (LLM creds not loaded).</div>';
+                _renderMacroResults(d.results || [], 'keyword');
+                results.insertAdjacentHTML('afterbegin', note);
+                return;
+            }
+            _renderMacroResults(d.results || [], 'semantic');
         })
         .catch(() => {
-            // network/LLM failure: fall back to the instant substring search
+            results.innerHTML = '<div style="padding:.5rem .6rem;color:#b91c1c">⚠ AI search request failed — falling back to keyword.</div>';
             showMacroSearch(q);
         });
 }
@@ -1591,15 +1621,21 @@ function generateInstruction() {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({instruction: prompt, sites: [], macros: []})
     }).then(r => r.json()).then(d => {
-        document.getElementById('refine-status').textContent = '';
         if (d.refined) {
+            document.getElementById('refine-status').textContent = '';
             // Shown as a read-only, non-copyable reference — the annotator
             // must type the instruction in their own words (keeps phrasing
             // diversity; no copy-paste monoculture).
             document.getElementById('combined-suggestion-text').textContent = d.refined;
             document.getElementById('combined-suggestion-box').style.display = 'block';
+        } else {
+            // LLM returned nothing (unavailable / not configured) — say so instead
+            // of silently doing nothing.
+            document.getElementById('refine-status').textContent =
+                '⚠ LLM unavailable (check judge/model creds; restart the server if stale)';
         }
-    }).catch(() => { document.getElementById('refine-status').textContent = 'Error'; });
+    }).catch(() => { document.getElementById('refine-status').textContent =
+        '⚠ LLM request failed'; });
 }
 
 function _topologicalSort(macros, edges) {

@@ -15,6 +15,9 @@ os.environ["MINIWEB_URL"] = f"http://localhost:{PORT}"
 # a bare name like "qwen3.5:27b" resolves to the groq catch-all and fails on a
 # missing key.
 os.environ["OLLAMA_API_BASE"] = "http://localhost:11434"
+# keep AgentLab study dirs inside the repo (gitignored) instead of ~/agentlab_results
+os.environ.setdefault("AGENTLAB_EXP_ROOT",
+                      os.path.abspath("evaluation/results/agentlab"))
 
 # The verifier's fuzzy answer check uses an LLM judge (default gemini-3.5-flash).
 # Importing app loads .env (Gemini/Vertex creds); fail FAST if the judge is not

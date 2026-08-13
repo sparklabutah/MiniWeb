@@ -8,6 +8,9 @@ os.chdir(pathlib.Path(__file__).resolve().parent.parent)
 PORT = 8124
 os.environ["MINIWEB_URL"] = f"http://localhost:{PORT}"
 os.environ["OLLAMA_API_BASE"] = "http://localhost:11434"   # local ollama (no API key)
+# keep AgentLab study dirs inside the repo (gitignored) instead of ~/agentlab_results
+os.environ.setdefault("AGENTLAB_EXP_ROOT",
+                      os.path.abspath("evaluation/results/agentlab"))
 
 # judge preflight (loads .env → Vertex/Gemini creds); fail fast if not reachable
 import app  # noqa: F401

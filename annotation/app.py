@@ -862,6 +862,7 @@ def annotate():
                            macro_descriptions=_MACRO_DESCRIPTIONS,
                            macro_locations=_canonical_macro_locations(),
                            operations=_registry.operations(),
+                           macro_coverage=_get_macro_coverage(),
                            all_macros=[{"key": m,
                                         "group": _registry.group_of(m),
                                         "description": (_MACRO_DESCRIPTIONS.get(m) or {}).get("description", m)}
