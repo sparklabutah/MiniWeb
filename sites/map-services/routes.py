@@ -338,10 +338,7 @@ def form_save_place(place_id):
     else:
         loc = db.get_item(SITE, "locations", place_id)
         if loc:
-            max_id_val = db.execute(
-                f"SELECT MAX(id) FROM [{db.get_table_name(SITE, 'saved_places')}]",
-                fetch="val") or 0
-            new_id = max_id_val + 1
+            new_id = db.next_id(SITE, "saved_places")
             db.save_item(SITE, "saved_places", new_id, {
                 "id": new_id, "user_id": user["id"], "location_id": place_id,
                 "name": loc["name"], "label": "favorite",
@@ -397,10 +394,7 @@ def form_share_place(place_id):
                        where={"user_id": target["id"], "location_id": place_id},
                        limit=1)
     if not already:
-        max_id_val = db.execute(
-            f"SELECT MAX(id) FROM [{db.get_table_name(SITE, 'saved_places')}]",
-            fetch="val") or 0
-        new_id = max_id_val + 1
+        new_id = db.next_id(SITE, "saved_places")
         db.save_item(SITE, "saved_places", new_id, {
             "id": new_id, "user_id": target["id"], "location_id": place_id,
             "name": loc["name"], "label": "shared",
@@ -532,9 +526,7 @@ def api_location_detail(location_id):
 def api_location_create():
     """create_from_free_text: add a new location/POI."""
     data = request.get_json(force=True)
-    table = db.get_table_name(SITE, "locations")
-    max_id = db.execute(f"SELECT MAX(id) FROM [{table}]", fetch="val") or 0
-    new_id = max_id + 1
+    new_id = db.next_id(SITE, "locations")
     new_loc = {
         "id": new_id,
         "name": data.get("name", ""),
@@ -599,9 +591,7 @@ def api_routes_list():
 def api_route_create():
     """route_by_query / route_by_route: compute and save a route."""
     data = request.get_json(force=True)
-    table = db.get_table_name(SITE, "routes")
-    max_id = db.execute(f"SELECT MAX(id) FROM [{table}]", fetch="val") or 0
-    new_id = max_id + 1
+    new_id = db.next_id(SITE, "routes")
     user = _current_user()
     uid = user["id"] if user else data.get("user_id", 1)
 
@@ -816,9 +806,7 @@ def api_saved_place_create():
         db.delete_item(SITE, "saved_places", existing[0]["id"])
         return jsonify({"action": "unsaved", "id": existing[0]["id"], "location_id": location_id})
 
-    table = db.get_table_name(SITE, "saved_places")
-    max_id_val = db.execute(f"SELECT MAX(id) FROM [{table}]", fetch="val") or 0
-    new_id = max_id_val + 1
+    new_id = db.next_id(SITE, "saved_places")
     new_saved = {
         "id": new_id,
         "user_id": uid,
@@ -860,9 +848,7 @@ def api_search():
 
     user = _current_user()
     if user and results:
-        sh_table = db.get_table_name(SITE, "search_history")
-        max_id_val = db.execute(f"SELECT MAX(id) FROM [{sh_table}]", fetch="val") or 0
-        new_id = max_id_val + 1
+        new_id = db.next_id(SITE, "search_history")
         db.save_item(SITE, "search_history", new_id, {
             "id": new_id,
             "user_id": user["id"],
@@ -980,9 +966,7 @@ def api_share_place():
         return jsonify({"action": "already_shared", "location_id": location_id,
                         "target_user": target_username})
 
-    table = db.get_table_name(SITE, "saved_places")
-    max_id_val = db.execute(f"SELECT MAX(id) FROM [{table}]", fetch="val") or 0
-    new_id = max_id_val + 1
+    new_id = db.next_id(SITE, "saved_places")
     new_saved = {
         "id": new_id, "user_id": target["id"], "location_id": location_id,
         "name": loc["name"], "label": "shared",

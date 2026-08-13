@@ -35,17 +35,16 @@ DEFAULT_MODEL = os.environ.get("LLM_MODEL") or "gemini-2.5-flash"
 # prefix, so this is a convenience/allow-list, not an exhaustive gate.
 MODELS = {
     "anthropic": [
-        "claude-opus-4-8", "claude-opus-5", "claude-sonnet-5",
-        "claude-haiku-4-5-20251001", "claude-3-7-sonnet-latest",
+        "claude-opus-5", "claude-opus-4-8", "claude-sonnet-5",
+        "claude-haiku-4-5", "claude-fable-5",
     ],
     "openai": [
-        "gpt-5", "gpt-5-mini", "gpt-5-nano",
-        "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-        "o3", "o4-mini", "gpt-4o", "gpt-4o-mini",
+        "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "gpt-5.5", "gpt-5.4", "gpt-5", "gpt-4.1", "o3", "gpt-4o",
     ],
     "gemini": [
-        "gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-3.1-pro-preview",
-        "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+        "gemini-3.6-flash", "gemini-3-pro", "gemini-3-flash",
+        "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.5-flash",
     ],
     "ollama": [
         "llama3.3", "llama3.2", "qwen2.5", "qwen2.5-coder",

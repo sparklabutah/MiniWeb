@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Editor — FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+    <style>
+        .grid-wrap { overflow-x: auto; background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; }
+        table.log-grid { border-collapse: collapse; width: 100%; font-size: .82rem; }
+        table.log-grid th, table.log-grid td { border: 1px solid #eceff3; padding: 0; }
+        table.log-grid th { background: #f6f8fa; padding: .5rem .6rem; text-align: left; font-weight: 600; color: #37474f; white-space: nowrap; }
+        table.log-grid td.row-header { background: #fafbfc; padding: .4rem .6rem; color: #90a4ae; text-align: center; width: 32px; }
+        td:has(input.cell-input):hover { background: #f1f8f4; cursor: text; }
+        input.cell-input { border: none; background: none; width: 100%; box-sizing: border-box; font-size: .82rem; padding: .45rem .6rem; outline: none; cursor: text; }
+        input.cell-input:focus { background: #eef7f0; box-shadow: inset 0 0 0 2px #3aa76d; }
+        .editor-actions { display: flex; gap: .6rem; align-items: center; margin-top: .8rem; flex-wrap: wrap; }
+        .btn-addrow { border: 1px solid #cfd8dc; background: #fff; color: #37474f; padding: .5rem .9rem; border-radius: 6px; cursor: pointer; font-size: .82rem; }
+        .btn-save { border: none; background: #3aa76d; color: #fff; padding: .5rem 1.1rem; border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 600; }
+        .editor-hint { font-size: .72rem; color: #90a4ae; }
+        .editor-note { background: #eef7f0; border: 1px solid #cfe8d6; color: #2f7a54; padding: .55rem .8rem; border-radius: 8px; font-size: .78rem; margin-bottom: .8rem; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'trends' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
+
+    <div class="ft-shell">
+        <div class="ft-page-title">
+            <div>
+                <h1>Daily Log Editor</h1>
+                <div class="sub">Edit your recent daily stats inline, or add a new day</div>
+            </div>
+            <div class="ft-tabs">
+                <a href="{{ url_for('health-fitness-tracking.stats_page') }}">Back to Trends</a>
+            </div>
+        </div>
+
+        <div class="editor-note">
+            Click any cell to type a value, use <strong>+ Add row</strong> to log a new day, then press
+            <strong>Save Changes</strong> to save your edits.
+        </div>
+
+        <form method="post" action="{{ url_for('health-fitness-tracking.stats_editor_save') }}">
+        <div class="grid-wrap">
+            <table class="log-grid">
+                <thead>
+                    <tr>
+                        <th class="row-header">#</th>
+                        {% for field, label, ftype in cols %}
+                        <th>{{ label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="log-grid-body" data-cols="{{ cols|length }}">
+                    {% for row in rows %}
+                    {% set row_idx = loop.index0 %}
+                    <tr>
+                        <td class="row-header">{{ loop.index }}</td>
+                        <input type="hidden" name="rowid_{{ row_idx }}" value="{{ row.row_id }}">
+                        {% for field, label, ftype in cols %}
+                        <td>
+                            <input type="text" class="cell-input"
+                                   name="cell_{{ row_idx }}_{{ loop.index0 }}"
+                                   value="{{ row[field] }}">
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="btn-addrow" onclick="logAddRow()">+ Add row</button>
+            <button type="submit" class="btn-save">Save Changes</button>
+            <span class="editor-hint">New rows are added as fresh daily entries.</span>
+        </div>
+        </form>
+    </div>
+
+    <script>
+    // Append an empty, editable row. Its cells post as cell_<row>_<col>, which the
+    // save endpoint auto-expands into a brand-new daily-stats entry (no hidden
+    // rowid means "create"). Column order matches the header.
+    function logAddRow() {
+        var body = document.getElementById('log-grid-body');
+        var cols = parseInt(body.dataset.cols, 10) || 0;
+        var r = body.querySelectorAll('tr').length;   // next 0-based row index
+        var tr = document.createElement('tr');
+        var rh = document.createElement('td');
+        rh.className = 'row-header';
+        rh.textContent = r + 1;
+        tr.appendChild(rh);
+        for (var c = 0; c < cols; c++) {
+            var td = document.createElement('td');
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'cell-input';
+            inp.name = 'cell_' + r + '_' + c;
+            td.appendChild(inp);
+            tr.appendChild(td);
+        }
+        body.appendChild(tr);
+        var first = tr.querySelector('input');
+        if (first) first.focus();
+    }
+    </script>
+
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard</div>
+</body>
+</html>

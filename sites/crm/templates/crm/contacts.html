@@ -28,6 +28,13 @@
         td a { color: #2b6cb0; text-decoration: none; }
         td a:hover { text-decoration: underline; }
         .badge { background: #ebf8ff; color: #2b6cb0; padding: .15rem .5rem; border-radius: 4px; font-size: .78rem; }
+        .cell-input { width: 100%; border: 1px solid transparent; background: transparent; padding: .35rem .4rem; border-radius: 4px; font-size: .88rem; font-family: inherit; color: #2d3748; }
+        .cell-input:hover { border-color: #e2e8f0; }
+        .cell-input:focus { border-color: #3182ce; background: #fff; outline: none; }
+        .grid-actions { display: flex; gap: .6rem; margin-top: 1rem; }
+        .grid-actions .add-row { background: #fff; color: #2b6cb0; border: 1.5px solid #bee3f8; border-radius: 6px; padding: .5rem 1rem; font-size: .9rem; cursor: pointer; }
+        .grid-actions .save-btn { background: #2b6cb0; color: #fff; border: none; border-radius: 6px; padding: .5rem 1.2rem; font-size: .9rem; cursor: pointer; }
+        .grid-actions .save-btn:hover { background: #2c5282; }
     </style>
 </head>
 <body>
@@ -59,30 +66,54 @@
             </select>
             <button type="submit">Search</button>
         </form>
-        <div class="result-count">{{ contacts|length }} contact{{ 's' if contacts|length != 1 else '' }} found</div>
+        <div class="result-count">{{ contacts|length }} contact{{ 's' if contacts|length != 1 else '' }} found &middot; edit any cell inline, then Save</div>
+        <form method="POST" action="{{ url_for('crm.form_save_contacts') }}" id="contacts-form">
         <table>
             <thead>
                 <tr><th>Name</th><th>Title</th><th>Company</th><th>Email</th><th>Phone</th><th>Created</th><th>Actions</th></tr>
             </thead>
-            <tbody>
+            <tbody id="contacts-tbody">
             {% for c in contacts %}
                 <tr>
-                    <td><a href="{{ url_for('crm.contact_detail', contact_id=c.id) }}">{{ c.name }}</a></td>
-                    <td>{{ c.title }}</td>
+                    <td><input class="cell-input" name="cell_{{ c.id }}_name" value="{{ c.name }}"></td>
+                    <td><input class="cell-input" name="cell_{{ c.id }}_title" value="{{ c.title }}"></td>
                     <td><a href="{{ url_for('crm.company_detail', company_id=c.company_id) }}">{{ c._company_name }}</a></td>
-                    <td>{{ c.email }}</td>
-                    <td>{{ c.phone }}</td>
+                    <td><input class="cell-input" name="cell_{{ c.id }}_email" value="{{ c.email }}"></td>
+                    <td><input class="cell-input" name="cell_{{ c.id }}_phone" value="{{ c.phone }}"></td>
                     <td>{{ c.created_date }}</td>
                     <td>
-                        <button class="crm-contact-delete-btn" data-url="{{ url_for('crm.form_delete_contact', contact_id=c.id) }}" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
+                        <button type="button" class="crm-contact-delete-btn" data-url="{{ url_for('crm.form_delete_contact', contact_id=c.id) }}" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
                     </td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        <div class="grid-actions">
+            <button type="button" class="add-row" id="add-row-btn">+ Add row</button>
+            <button type="submit" class="save-btn">Save Changes</button>
+        </div>
+        </form>
     </div>
     <script>
+    var newRowIdx = 0;
+    document.getElementById('add-row-btn').addEventListener('click', function() {
+        var tbody = document.getElementById('contacts-tbody');
+        var tr = document.createElement('tr');
+        var n = newRowIdx++;
+        tr.innerHTML =
+            '<td><input class="cell-input" name="new_' + n + '_name" placeholder="Name"></td>' +
+            '<td><input class="cell-input" name="new_' + n + '_title" placeholder="Title"></td>' +
+            '<td><span style="color:#a0aec0;font-size:.8rem;">—</span></td>' +
+            '<td><input class="cell-input" name="new_' + n + '_email" placeholder="Email"></td>' +
+            '<td><input class="cell-input" name="new_' + n + '_phone" placeholder="Phone"></td>' +
+            '<td><span class="badge">new</span></td>' +
+            '<td><button type="button" class="crm-row-remove-btn" style="background:#fff;color:#c53030;border:1px solid #feb2b2;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Remove</button></td>';
+        tbody.appendChild(tr);
+        tr.querySelector('input').focus();
+    });
     document.addEventListener('click', function(e) {
+        var rm = e.target.closest('.crm-row-remove-btn');
+        if (rm) { rm.closest('tr').remove(); return; }
         var btn = e.target.closest('.crm-contact-delete-btn');
         if (!btn) return;
         btn.textContent = 'Deleting...';

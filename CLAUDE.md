@@ -53,7 +53,6 @@ Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical int
 - **39 base macros + 6 operations** in `data/macros.yaml` (`groups:` / `operations:` / `macros:`). Retired flat `verb_by_modality` names fold in as `aliases:` so `canon()` migrates them. `compare_by_form` and `report_information` were added during review; `reasoning_on_page` retired into `report_information`'s aliases. Annotators can register new macros from the annotate UI (persisted to `data/macros.yaml` under the `unassigned` group). Download the current set as CSV from the Macro Template Builder.
 - **Op definitions:** `read`=info is on the page · `extremum`=get max/min · `count`=count · `compute`=compute a NEW value from on-page values · `compare`=compare 2 on-page values · `verify`=compare an on-page value against a value in the instruction.
 - `_MACRO_DESCRIPTIONS`/`_canon` in `annotation/app.py` derive from `annotation/macros.py` — edit the registry, not those.
-- Navigation macros (`navigate_by_route`) are NOT sampled for tasks — agents start on the target page
 - `tests/test_macro_registry.py` guards registry drift.
 - Per-site macro→UI-location data lives in **`data/macro_locations.yaml`** (canonical-macro-keyed; drives coverage/sampling). `annotation/macro_locations.py` is now just a loader — edit the YAML, not the module.
 - **Persistence (deploy):** annotators register macros by *writing* to `macros.yaml`, so in production point the YAMLs at a persistent volume via **`MINIWEB_MACRO_DIR`** (dir holding both `macros.yaml` + `macro_locations.yaml`). Per-file overrides: **`MINIWEB_MACROS`**, **`MINIWEB_MACRO_LOCATIONS`**. A fresh volume is auto-seeded from the repo's bundled copies (both are committed). Defaults to the repo `data/` dir when unset.
@@ -71,4 +70,3 @@ Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical int
 - NEVER run `build_db.py` — the DB has been modified post-build
 - NEVER delete data without asking the user first
 - NEVER load entire tables into Python for filtering
-- NEVER add `navigate_by_route` as a macro to tasks

@@ -533,6 +533,7 @@ def backlog():
     user_lookup = _user_map()
     project_lookup = _project_map()
     projects = _load_projects()
+    users = _load_users()
 
     user = None
     if "user_id" in session:
@@ -541,6 +542,7 @@ def backlog():
     return render_template("project-mgmt-issue-tracking/backlog.html",
                            issues=backlog_issues,
                            projects=projects,
+                           users=users,
                            user=user,
                            user_lookup=user_lookup,
                            project_lookup=project_lookup,
@@ -687,6 +689,75 @@ def form_edit_issue(issue_id):
                    f'Issue "{issue["title"]}" ({issue["key"]}) has been assigned to you.')
     return redirect(url_for("project-mgmt-issue-tracking.issue_detail",
                             issue_id=issue_id))
+
+
+@blueprint.route("/backlog/save", methods=["POST"])
+def form_backlog_save():
+    """Persist inline cell edits (and an optional new issue) from the backlog grid.
+
+    Editable cells are POSTed as ``cell_<issue_id>_<field>`` and an optional new
+    issue via the ``new_*`` fields. Everything travels in the request body so the
+    mutation is captured by /_admin/log and is gradeable. Supports the
+    edit_by_cell (data-grid cell editing) + create_by_form macros.
+    """
+    issues = _load_issues()
+    by_id = {i["id"]: i for i in issues}
+    editable = {"title", "type", "status", "priority", "assignee_id", "story_points"}
+    int_fields = {"assignee_id", "story_points"}
+    changed = False
+
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_", 2)  # ["cell", "<id>", "<field>"]
+        if len(parts) != 3:
+            continue
+        _, sid_str, field = parts
+        if field not in editable:
+            continue
+        try:
+            iid = int(sid_str)
+        except ValueError:
+            continue
+        issue = by_id.get(iid)
+        if not issue:
+            continue
+        val = value.strip()
+        new_val = (int(val) if val else None) if field in int_fields else val
+        if issue.get(field) != new_val:
+            issue[field] = new_val
+            issue["updated_at"] = datetime.now().isoformat()
+            changed = True
+
+    # Optional new issue added via the "+ Add row" button.
+    new_title = request.form.get("new_title", "").strip()
+    new_project_id = request.form.get("new_project_id", type=int)
+    if new_title and new_project_id:
+        assignee_id = request.form.get("new_assignee_id", type=int)
+        sp = request.form.get("new_story_points", type=int)
+        issue = {
+            "id": db.next_id(SITE, "issues"),
+            "project_id": new_project_id,
+            "key": _next_issue_key(new_project_id),
+            "title": new_title,
+            "description": "",
+            "type": request.form.get("new_type", "task"),
+            "status": request.form.get("new_status", "open"),
+            "priority": request.form.get("new_priority", "medium"),
+            "assignee_id": assignee_id if assignee_id else None,
+            "reporter_id": session.get("user_id", 1),
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "labels": [],
+            "story_points": sp if sp else None,
+            "sprint": None,
+        }
+        issues.append(issue)
+        changed = True
+
+    if changed:
+        _save_issues(issues)
+    return redirect(url_for("project-mgmt-issue-tracking.backlog"))
 
 
 @blueprint.route("/issue/<int:issue_id>/comment", methods=["POST"])

@@ -39,3 +39,15 @@ grade: verifier              # + max_steps/timeout/headless defaults; agents may
 ```
 Prints a pass/fail matrix + per-agent pass rate and token totals, and writes `results.json`
 to `evaluation/results/config_<ts>/`. See `evaluation/configs/example.yaml`.
+
+## Harness — browser-use vs native computer-use
+Commercial models can drive the browser with their **own computer-use tool** (screenshots +
+click/type) instead of browser-use's DOM loop:
+```
+python evaluation/run_agent_verify.py --task-id job-sites_3c5414 --model claude-sonnet-5 --harness computer-use
+```
+`--harness browser-use` (default, all providers) · `computer-use` (native tool: gemini/openai/
+anthropic — needs that provider's key + a computer-use-capable model) · `auto` (computer-use for
+commercial providers, browser-use otherwise). In a config, set `harness:` per agent. The native
+loop lives in `evaluation/computer_use.py`; it drives the same real browser, so trajectory capture
+and grading are identical.

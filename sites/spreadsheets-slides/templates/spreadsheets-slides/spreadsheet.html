@@ -127,7 +127,7 @@
                     {% endfor %}
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="ss-grid-body" data-cols="{{ current_sheet.data[0]|length }}">
                 {% for row in current_sheet.data %}
                 {% set row_idx = loop.index0 %}
                 <tr>
@@ -146,29 +146,39 @@
             </tbody>
         </table>
         {% if can_edit %}
-        <div style="padding: 0.5rem 1rem;">
+        <div style="padding: 0.5rem 1rem; display:flex; gap:0.5rem; align-items:center;">
+            <button type="button" class="btn" onclick="ssAddRow()"
+                    style="border:1px solid #dadce0;background:#fff;color:#3c4043;">+ Add row</button>
             <button type="submit" class="btn btn-green">Save Changes</button>
+            <span style="font-size:0.72rem;color:#80868b;">Type into cells (or a new row), then Save Changes.</span>
         </div>
         {% endif %}
         </form>
     </div>
 
     {% if can_edit %}
-    <div class="add-row-section" style="padding:0.75rem 1rem;border-top:1px solid #e8eaed;background:#f8f9fa;">
-        <h4 style="font-size:0.85rem;color:#5f6368;margin-bottom:0.5rem;">Add a new row</h4>
-        <form method="post" action="{{ url_for('spreadsheets-slides.form_add_row', sid=ss.id) }}"
-              style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:flex-end;">
-            <input type="hidden" name="sheet" value="{{ sheet_index }}">
-            {% for col_idx in range(current_sheet.data[0]|length) %}
-            <div style="display:flex;flex-direction:column;">
-                <label style="font-size:0.7rem;color:#80868b;margin-bottom:0.15rem;">{{ current_sheet.data[0][col_idx] or ("Col " ~ col_idx) }}</label>
-                <input type="text" name="col_{{ col_idx }}" placeholder="{{ current_sheet.data[0][col_idx] }}"
-                       style="padding:0.3rem;border:1px solid #dadce0;border-radius:4px;font-size:0.8rem;min-width:90px;">
-            </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-green">Add Row</button>
-        </form>
-    </div>
+    <script>
+    // Append an empty, editable row to the grid — realistic spreadsheet add-row:
+    // the new row's cells post as cell_<row>_<col>, which the save endpoint
+    // auto-expands the grid to persist (no bespoke per-column form).
+    function ssAddRow() {
+        var body = document.getElementById('ss-grid-body');
+        var cols = parseInt(body.dataset.cols, 10) || 0;
+        var r = body.querySelectorAll('tr').length;      // next 0-based row index
+        var tr = document.createElement('tr');
+        var rh = document.createElement('td');
+        rh.className = 'row-header'; rh.textContent = r + 1; tr.appendChild(rh);
+        for (var c = 0; c < cols; c++) {
+            var td = document.createElement('td');
+            var inp = document.createElement('input');
+            inp.type = 'text'; inp.className = 'cell-input';
+            inp.name = 'cell_' + r + '_' + c;
+            td.appendChild(inp); tr.appendChild(td);
+        }
+        body.appendChild(tr);
+        var first = tr.querySelector('input'); if (first) first.focus();
+    }
+    </script>
     {% endif %}
 
     <div class="share-section">

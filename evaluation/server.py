@@ -37,8 +37,11 @@ def kill_port(port: int):
         pass
 
 
-def start_server(port: int) -> subprocess.Popen:
+def start_server(port: int, env_extra: dict | None = None) -> subprocess.Popen:
     """Start the MiniWeb Flask server on the given port.
+
+    `env_extra` overlays extra environment variables for this server (e.g.
+    MINIWEB_NO_AUTOLOGIN=1 so an authenticate_by_form task starts logged out).
 
     Server output goes to a log file, NOT a pipe: with PIPE and no reader,
     the request log fills the 64KB pipe buffer after a few hundred requests
@@ -47,6 +50,8 @@ def start_server(port: int) -> subprocess.Popen:
     kill_port(port)
     env = os.environ.copy()
     env["FLASK_RUN_PORT"] = str(port)
+    if env_extra:
+        env.update({k: str(v) for k, v in env_extra.items()})
     log = open(os.path.join(str(PROJECT_ROOT), "evaluation", f"server_{port}.log"), "w")
     return subprocess.Popen(
         [sys.executable, "run.py"],

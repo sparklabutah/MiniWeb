@@ -59,6 +59,10 @@ _EXTRA_CHROME_ARGS = [
     "--disable-software-rasterizer",
     "--disable-extensions",
     "--no-sandbox",
+    # OFFLINE: fail DNS for every host except localhost, so the agent physically
+    # cannot reach the outside web (127.0.0.1 is an IP, not DNS-resolved, so it's
+    # unaffected). Keeps the eval self-contained and reproducible.
+    "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost",
 ]
 
 _RETRYABLE_ERRORS = ("Timeout", "ReadTimeout", "ConnectionError", "WebSocket", "CDP")
@@ -101,6 +105,9 @@ class BrowserUseAgent:
                 headless=self.headless,
                 keep_alive=True,
                 args=_EXTRA_CHROME_ARGS,
+                # agent-level guard: only localhost is navigable (belt to the
+                # host-resolver-rules braces — gives a clean refusal, not a DNS error)
+                allowed_domains=["localhost", "127.0.0.1"],
             )
             try:
                 await self._session.start()
@@ -124,6 +131,14 @@ class BrowserUseAgent:
         self._server_url = server_url
         await self._start_session()
         page = await self._session.get_current_page()
+        # Explicitly reset this task's session (clears any overlay/login residue)
+        # before starting — session-scoped, so parallel evals don't interfere.
+        try:
+            from urllib.parse import urlparse
+            o = urlparse(server_url)
+            await page.goto(f"{o.scheme}://{o.netloc}/_reset_data")
+        except Exception:
+            pass
         await page.goto(server_url)
         await asyncio.sleep(2)
 
@@ -556,12 +571,25 @@ MODEL_ALIASES = {
 }
 
 
-def build_agent(model: str, *, native_llm: bool = False, **opts):
-    """Construct an agent runner for a model name (or a friendly alias, or
-    "mock"). opts: use_vision, max_steps, timeout, headless, available_file_paths.
-    The single factory shared by every runner (run_agent_verify, run_eval, ...).
+def build_agent(model: str, *, native_llm: bool = False, harness: str = "browser-use", **opts):
+    """Construct an agent runner for a model name (or a friendly alias, or "mock").
+
+    harness:
+      "browser-use" (default) — browser-use's DOM/text loop via ChatLLM (all providers).
+      "computer-use"          — the provider's NATIVE computer-use tool (screenshots +
+                                click/type), for commercial models only (gemini/openai/
+                                anthropic). See evaluation/computer_use.py.
+      "auto"                  — computer-use for commercial providers, else browser-use.
+    opts: use_vision, max_steps, timeout, headless, available_file_paths.
     """
     if model == "mock":
         return MockAgent(**opts)
     model = MODEL_ALIASES.get(model, model)
+    if harness == "auto":
+        from helpers.llm import resolve_provider
+        harness = "computer-use" if resolve_provider(model) in ("anthropic", "openai", "gemini") \
+            else "browser-use"
+    if harness == "computer-use":
+        from computer_use import ComputerUseAgent
+        return ComputerUseAgent(model, **opts)
     return BrowserUseAgent(build_browser_llm(model, native=native_llm), **opts)

@@ -78,14 +78,25 @@
         <div class="post-detail">
             <div class="post-media">
                 {% if post.type == 'video' %}
-                <span class="type-badge">VIDEO</span>
-                {% elif post.type == 'carousel' %}
+                <div data-mini-player
+                     data-badge="Video"
+                     data-accent="#e1306c"
+                     data-title="{{ (post.caption or 'Video post')[:60]|e }}"
+                     data-subtitle="{{ post.author.username if post.author else post.author_id }}"
+                     data-duration="{{ post.video_duration or 30 }}"
+                     data-qualities="auto,1080p,720p,480p"
+                     data-play-url="/sites/multimedia-posting/api/posts/{{ post.id }}/play"
+                     data-seek-url="/sites/multimedia-posting/api/posts/{{ post.id }}/seek"
+                     style="width:100%;height:100%"></div>
+                {% else %}
+                {% if post.type == 'carousel' %}
                 <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>
                 {% endif %}
                 {% if post.image_url %}
                 <img src="{{ post.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover">
                 {% else %}
                 <span class="placeholder">&#128247;</span>
+                {% endif %}
                 {% endif %}
             </div>
             <div class="post-sidebar">

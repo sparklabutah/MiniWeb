@@ -504,7 +504,7 @@ textarea#instruction:focus {
                 </div>
                 <div style="display:grid;grid-template-columns:auto 1fr;gap:.5rem .5rem;align-items:start">
                     <span style="font-weight:700;color:#2563eb">①</span><span><b>Add each interaction</b> the task performs — type in <span style="font-family:ui-monospace,monospace">+ add macro</span> or open <b>＋ Add macro</b> to browse by family (form, filter, search, toggle, media, …).</span>
-                    <span style="font-weight:700;color:#7c3aed">②</span><span><b>Set the reasoning op</b> on any macro that reads/derives a value: <span style="font-family:ui-monospace,monospace">read · extremum · count · compute · compare · verify</span>. The single value you <b>report back to the human</b> is a <b>report_information</b> macro — place it <b>last</b>, where the answer is on screen.</span>
+                    <span style="font-weight:700;color:#7c3aed">②</span><span><b>Set the reasoning op</b> on any macro that reads/derives a value: <span style="font-family:ui-monospace,monospace">read/memorize · extremum · count · compute · compare · verify · spatial</span> <a onclick="openOpsReference()" style="cursor:pointer;color:#2563eb;text-decoration:underline;font-size:.8em">what do these mean?</a>. The single value you <b>report back to the human</b> is a <b>report_information</b> macro — place it <b>last</b>, where the answer is on screen.</span>
                     <span style="font-weight:700;color:#0d9488">③</span><span><b>Draw dependencies</b> — drag from a node's <span style="color:#2563eb">➡</span> handle onto another node to order the steps (all macros must connect into one flow).</span>
                     <span style="font-weight:700;color:#d97706">④</span><span><b>Tag spans</b> — in <b>Record</b> (Step 2), select the action range for each macro and assign it.</span>
                     <span style="font-weight:700;color:#8b5cf6">＋</span><span><b>Macro not in the list?</b> <b>＋ Add macro → Propose a new macro</b> — name + description + span start / span end required.</span>
@@ -513,6 +513,29 @@ textarea#instruction:focus {
         </div>
     </div>
 </div><!-- /main-layout -->
+
+<!-- Spatial-macro design warning -->
+<div id="spatial-warning-modal" class="skip-overlay" style="display:none">
+    <div class="skip-modal" style="border-top:4px solid #f59e0b">
+        <h3 style="color:#b45309">&#9888; Tasks design notes based on sampled macros</h3>
+        <div id="spatial-warning-body" style="font-size:.82rem;color:#374151;line-height:1.45;max-height:50vh;overflow-y:auto"></div>
+        <div style="display:flex;margin-top:.8rem;justify-content:flex-end">
+            <button class="btn btn-primary" onclick="closeSpatialWarning()">Got it</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reasoning-op reference (what each op means) -->
+<div id="ops-reference-modal" class="skip-overlay" style="display:none">
+    <div class="skip-modal" style="border-top:4px solid #7c3aed;max-width:640px">
+        <h3 style="color:#6d28d9">Reasoning operations — what each one means</h3>
+        <p style="font-size:.78rem;color:#64748b;margin:.2rem 0 .6rem">The reasoning op is the operation the agent performs on values it reads from the page. Set it on any macro that reads or derives a value.</p>
+        <div id="ops-reference-body" style="font-size:.82rem;color:#374151;line-height:1.4;max-height:55vh;overflow-y:auto"></div>
+        <div style="display:flex;margin-top:.8rem;justify-content:flex-end">
+            <button class="btn btn-primary" onclick="closeOpsReference()">Got it</button>
+        </div>
+    </div>
+</div>
 
 <!-- Skip Modal -->
 <div id="skip-modal" class="skip-overlay" style="display:none">
@@ -684,9 +707,10 @@ function renderSiteLabels() {
     if (!container || !currentPrompt || !currentPrompt.sites) { return; }
     const bgs = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#e0e7ff'];
     const fgs = ['#1e40af','#9d174d','#065f46','#92400e','#3730a3'];
-    container.innerHTML = currentPrompt.sites.map((s, i) =>
-        `<span style="display:inline-block;padding:.15rem .5rem;border-radius:1rem;font-size:.75rem;font-weight:600;background:${bgs[i%5]};color:${fgs[i%5]};margin-right:.3rem">${s.name}</span>`
-    ).join('');
+    container.innerHTML = currentPrompt.sites.map((s, i) => {
+        const kind = s.type || s.category;
+        return `<span style="display:inline-block;padding:.15rem .5rem;border-radius:1rem;font-size:.75rem;font-weight:600;background:${bgs[i%5]};color:${fgs[i%5]};margin-right:.3rem">${s.name}${kind ? ` <span style="font-weight:400;opacity:.75">(${kind})</span>` : ''}</span>`;
+    }).join('');
 }
 
 // --- Re-record mode: hydrate the editor from the saved task -----------------
@@ -951,6 +975,7 @@ function renderMacroList() {
             <span class="mn-arrow-handle" onmousedown="startArrowDrag(event,'${m}')" title="Drag to another node to draw arrow">&#x27A1;</span>
             <span class="mn-name" title="${escHtml(macroDesc)}">${escHtml(m)}</span>
             ${isQA ? '<span style="font-size:.7rem;color:#2563eb;background:#eff6ff;padding:.05rem .3rem;border-radius:.15rem">QA</span>' : ''}
+            ${macroDesc && macroDescriptions[m] && macroDescriptions[m].warning ? `<span title="${escHtml(macroDescriptions[m].warning)}" style="font-size:.7rem;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:.05rem .3rem;border-radius:.15rem;cursor:help">&#9888; spatial</span>` : ''}
             ${proposedMacros[m] ? '<span title="proposed new macro" style="font-size:.7rem;color:#6d28d9;background:#f5f3ff;border:1px solid #c4b5fd;padding:.05rem .3rem;border-radius:.15rem">NEW</span>' : ''}
         </div>`;
 
@@ -973,10 +998,16 @@ function renderMacroList() {
         if (!excluded) {
             const opOpts = ['<option value="">— no reasoning —</option>'].concat(
                 Object.keys(OPERATIONS).map(op =>
-                    `<option value="${op}" ${op === curOp ? 'selected' : ''}>${op}</option>`)).join('');
-            html += `<select class="mn-op ${curOp ? 'set' : ''}" title="Reasoning operation on this macro"
-                onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
-                onchange="setMacroOp('${m}', this.value)">${opOpts}</select>`;
+                    `<option value="${op}" ${op === curOp ? 'selected' : ''}>${(OPERATIONS[op] && OPERATIONS[op].label) || op}</option>`)).join('');
+            html += `<div class="mn-op-row" style="display:flex;align-items:center;gap:.35rem">
+                <select class="mn-op ${curOp ? 'set' : ''}" title="Reasoning operation on this macro"
+                    onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
+                    onchange="setMacroOp('${m}', this.value)">${opOpts}</select>
+                <span class="mn-op-help" title="What do the reasoning ops mean?"
+                    onmousedown="event.stopPropagation()"
+                    onclick="event.stopPropagation();openOpsReference()"
+                    style="cursor:pointer;font-size:.7rem;color:#2563eb;white-space:nowrap;border:1px solid #bfdbfe;background:#eff6ff;border-radius:.3rem;padding:.1rem .35rem">&#9432; ops guide</span>
+            </div>`;
             if (curOp && OPERATIONS[curOp]) {
                 html += `<div class="mn-op-hint">${escHtml(OPERATIONS[curOp].desc || '')}</div>`;
             }
@@ -1065,6 +1096,50 @@ function renderMacroList() {
 
     _resizeGraph();
     _drawArrows();
+    maybeShowSpatialWarnings();
+}
+
+// --- Spatial-macro design warnings ---------------------------------------
+// Some macros are graded spatially (where the signature lands, what pan/zoom
+// reveals, what a timestamp holds). When such a macro enters the working set,
+// pop the registry's design guidance once per distinct warned-set.
+let _spatialWarned = '';
+
+function maybeShowSpatialWarnings() {
+    const warned = (selectedMacros || []).filter(m => (macroDescriptions[m] || {}).warning);
+    const key = warned.slice().sort().join(',');
+    if (!key || key === _spatialWarned) { _spatialWarned = key; return; }
+    _spatialWarned = key;
+    document.getElementById('spatial-warning-body').innerHTML = warned.map(m =>
+        `<div style="margin-bottom:.7rem">
+            <b style="font-family:ui-monospace,monospace">${escHtml(m)}</b>
+            <div style="margin-top:.2rem">${escHtml(macroDescriptions[m].warning)}</div>
+        </div>`).join('');
+    document.getElementById('spatial-warning-modal').style.display = 'flex';
+}
+
+function closeSpatialWarning() {
+    document.getElementById('spatial-warning-modal').style.display = 'none';
+}
+
+// --- Reasoning-op reference (what each op means) --------------------------
+function openOpsReference() {
+    const rows = Object.entries(OPERATIONS || {}).map(function(entry) {
+        const op = entry[0], info = entry[1] || {};
+        const label = info.label || op;
+        return `<div style="margin-bottom:.7rem;padding-bottom:.6rem;border-bottom:1px solid #eef2f7">
+            <b style="font-family:ui-monospace,monospace;color:#6d28d9">${escHtml(label)}</b>
+            <div style="margin-top:.15rem">${escHtml(info.desc || '')}</div>
+            ${info.check ? `<div style="margin-top:.15rem;color:#64748b;font-size:.92em"><b>graded by:</b> ${escHtml(info.check)}</div>` : ''}
+        </div>`;
+    }).join('');
+    document.getElementById('ops-reference-body').innerHTML = rows ||
+        '<div style="color:#64748b">No reasoning operations loaded.</div>';
+    document.getElementById('ops-reference-modal').style.display = 'flex';
+}
+
+function closeOpsReference() {
+    document.getElementById('ops-reference-modal').style.display = 'none';
 }
 
 function _resizeGraph() {
@@ -1707,7 +1782,9 @@ async function _populateSitePicker() {
             const f = floors[s.id] || {covered: 0, total: 0};
             const opt = document.createElement('option');
             opt.value = s.id;
-            opt.textContent = `${s.name || s.id} (${f.covered}/${f.total})`;
+            const kind = s.type || s.category;
+            const kindStr = kind ? ` (${kind})` : '';
+            opt.textContent = `${s.name || s.id}${kindStr} — ${f.covered}/${f.total}`;
             picker.appendChild(opt);
         }
         picker.value = current;
@@ -1730,6 +1807,7 @@ function reshufflePrompt() {
             }
             currentPrompt = prompt;
             selectedMacros = prompt.macros.slice();
+            _spatialWarned = '';   // new prompt — re-show spatial design warnings if sampled
             macrosNotApplicable = {};
             macrosSkipped = {};
             qaAnswers = {};

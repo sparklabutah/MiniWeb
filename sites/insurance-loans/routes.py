@@ -68,6 +68,59 @@ def _get_browsing_user():
 
 
 # ---------------------------------------------------------------------------
+# Signature helpers (sign_by_freeformdrawing)
+# ---------------------------------------------------------------------------
+
+def _to_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _valid_signature_drawing(drawing, points):
+    """A drawn signature counts when it's a PNG data URL of plausible size backed
+    by enough stroke points that a stray dot doesn't pass as a signature."""
+    if not (isinstance(drawing, str) and drawing.startswith("data:image/png;base64,")):
+        return False
+    if len(points or []) < 8:
+        return False
+    import base64
+    try:
+        return len(base64.b64decode(drawing.split(",", 1)[1])) > 500
+    except Exception:
+        return False
+
+
+def _needs_signature(rec):
+    """A newly-created agreement that requires the user's signature and hasn't
+    been signed yet. Pre-existing seed records (no requires_signature flag) are
+    left untouched."""
+    return bool(rec.get("requires_signature")) and not rec.get("signed")
+
+
+def _awaiting_signature_docs(user_id):
+    """Policies and loans belonging to the user that still need a signature,
+    surfaced as small dicts for the dashboard alert bar."""
+    docs = []
+    for p in db.query(SITE, "policies", where={"user_id": user_id}):
+        if _needs_signature(p):
+            docs.append({
+                "kind": "policy",
+                "number": p["policy_number"],
+                "sign_url": url_for("insurance-loans.policy_sign_page", policy_id=p["id"]),
+            })
+    for l in db.query(SITE, "loans", where={"user_id": user_id}):
+        if _needs_signature(l):
+            docs.append({
+                "kind": "loan",
+                "number": l["loan_number"],
+                "sign_url": url_for("insurance-loans.loan_sign_page", loan_id=l["id"]),
+            })
+    return docs
+
+
+# ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
@@ -95,6 +148,9 @@ def index():
     total_monthly_loan = sum(l.get("monthly_payment", 0) for l in active_loans)
     total_loan_balance = sum(l.get("current_balance", 0) for l in active_loans)
 
+    # Agreements awaiting the user's signature — surfaced up front (DocuSign-style)
+    awaiting_signature = _awaiting_signature_docs(user["id"])
+
     return render_template(
         "insurance-loans/index.html",
         user=user, logged_in=logged_in,
@@ -105,6 +161,7 @@ def index():
         total_monthly_premiums=total_monthly_premiums,
         total_monthly_loan=total_monthly_loan,
         total_loan_balance=total_loan_balance,
+        awaiting_signature=awaiting_signature,
     )
 
 
@@ -208,6 +265,106 @@ def policy_document(policy_id):
         "insurance-loans/policy_document.html",
         policy=policy, coverage=coverage, vehicle=vehicle,
         user=user, logged_in=logged_in,
+    )
+
+
+@blueprint.route("/policies/new", methods=["GET"])
+def buy_policy_page():
+    """Quote-and-enroll form for a brand new policy."""
+    user, logged_in = _get_browsing_user()
+    return render_template(
+        "insurance-loans/buy_policy.html",
+        user=user, logged_in=logged_in,
+        today=datetime.now().strftime("%Y-%m-%d"),
+    )
+
+
+@blueprint.route("/policies/new", methods=["POST"])
+def buy_policy_submit():
+    """Create a new policy. Every new policy is issued 'awaiting_signature' and
+    requires the policyholder's drawn signature before it takes effect."""
+    user, logged_in = _get_browsing_user()
+
+    policy_type = (request.form.get("type", "") or "auto").strip()
+    holder = (request.form.get("policyholder_name", "") or user["display_name"]).strip()
+    premium_monthly = _to_float(request.form.get("premium_monthly"), 120.0)
+    deductible = int(_to_float(request.form.get("deductible"), 500))
+    coverage_amount = _to_float(request.form.get("coverage_amount"), 100000)
+    effective = (request.form.get("effective_date", "") or datetime.now().strftime("%Y-%m-%d")).strip()
+
+    new_id = db.next_id(SITE, "policies")
+    today = datetime.now().strftime("%Y-%m-%d")
+    policy_number = f"POL-{datetime.now().year}-{new_id:05d}"
+
+    new_policy = {
+        "id": new_id,
+        "policy_number": policy_number,
+        "user_id": user["id"],
+        "root_user_id": user.get("root_user_id", user["id"]),
+        "policyholder_name": holder,
+        "type": policy_type,
+        "subtype": "standard",
+        # not in force until signed
+        "status": "awaiting_signature",
+        "requires_signature": True,
+        "signed": False,
+        "effective_date": effective,
+        "renewal_date": "",
+        "expiration_date": "",
+        "premium_monthly": round(premium_monthly, 2),
+        "premium_annual": round(premium_monthly * 12, 2),
+        "deductible": deductible,
+        "coverage": {"liability": coverage_amount},
+        "vehicle": {},
+        "agent": "Cascadia Direct",
+        "agent_phone": "1-800-555-0199",
+        "underwriter": "Cascadia Mutual Insurance Company",
+        "notes": "Policy purchased online. Awaiting signature.",
+        "property_address": "",
+        "landlord_name": "",
+        "autopay_enabled": False,
+        "paperless_billing": False,
+        "email_notifications": True,
+        "sms_alerts": False,
+    }
+    db.save_item(SITE, "policies", new_id, new_policy)
+    # policy isn't in force until it's signed — take the user straight to signing
+    return redirect(url_for("insurance-loans.policy_sign_page", policy_id=new_id))
+
+
+@blueprint.route("/policy/<int:policy_id>/sign", methods=["GET"])
+def policy_sign_page(policy_id):
+    """DocuSign-style signing surface for a policy (sign_by_freeformdrawing)."""
+    user, logged_in = _get_browsing_user()
+    policy = db.get_item(SITE, "policies", policy_id)
+    if not policy:
+        abort(404)
+    summary = [
+        ("Policy Number", policy["policy_number"]),
+        ("Policyholder", policy.get("policyholder_name", "")),
+        ("Policy Type", (policy.get("type", "") or "").replace("_", " ").title()),
+        ("Monthly Premium", "${:,.2f}".format(policy.get("premium_monthly", 0) or 0)),
+        ("Deductible", "${:,.0f}".format(policy.get("deductible", 0) or 0)),
+        ("Effective Date", policy.get("effective_date", "") or "--"),
+        ("Status", (policy.get("status", "") or "").replace("_", " ").title()),
+    ]
+    return render_template(
+        "insurance-loans/sign_document.html",
+        user=user, logged_in=logged_in,
+        kind="policy",
+        title="Insurance Policy Agreement",
+        number=policy["policy_number"],
+        signer_name=policy.get("policyholder_name", user["display_name"]),
+        signed=bool(policy.get("signed")),
+        signed_date=policy.get("signed_date", ""),
+        summary=summary,
+        cert_text=(
+            "By signing below, I accept the terms and conditions of this insurance "
+            "policy and authorize Cascadia Mutual Insurance Company to place it in "
+            "force. I certify that the information provided is true and complete."
+        ),
+        sign_url=url_for("insurance-loans.api_policy_sign", policy_id=policy_id),
+        detail_url=url_for("insurance-loans.policy_detail", policy_id=policy_id),
     )
 
 
@@ -841,25 +998,48 @@ def api_policy_update(policy_id):
 
 @blueprint.route("/api/policies/<int:policy_id>/sign", methods=["POST"])
 def api_policy_sign(policy_id):
+    """Electronically sign a policy (sign_by_freeformdrawing).
+
+    DocuSign-style single "Sign here" field: the policyholder DRAWS their
+    signature on a canvas. A valid drawn signature (PNG data URL + stroke points)
+    places the policy in force. The saved record + response carry the signed flag
+    so the trajectory network log makes the action gradeable.
+    """
     data = request.get_json(silent=True) or {}
-    policies = _load_policies()
-    policy = next((p for p in policies if p["id"] == policy_id), None)
+    policy = db.get_item(SITE, "policies", policy_id)
     if not policy:
         abort(404)
 
-    signer = data.get("signer_name", "").strip()
-    if not signer:
-        return jsonify({"error": "signer_name required"}), 400
+    drawing = data.get("signature_drawing") or ""
+    points = data.get("signature_points") or []
+    typed_name = (data.get("typed_name") or "").strip()
+    valid_drawing = _valid_signature_drawing(drawing, points)
+    # sign by DRAWING (sign_by_freeformdrawing) or by TYPING your name (sign_by_text)
+    if not valid_drawing and not typed_name:
+        return jsonify({"error": "Draw your signature, or type your full legal name, to continue."}), 400
+    method = "drawn" if valid_drawing else "typed"
 
+    signer = typed_name or (data.get("signature") or data.get("signer_name") or "").strip() \
+        or policy.get("policyholder_name", "")
     policy["signed"] = True
     policy["signed_by"] = signer
+    policy["signature"] = signer
     policy["signed_date"] = datetime.now().strftime("%Y-%m-%d")
-    _save_policies(policies)
+    policy["signed_method"] = method
+    policy["signed_with_drawing"] = valid_drawing
+    policy["signature_drawing"] = drawing if valid_drawing else ""
+    # signing places an awaiting-signature policy in force
+    if policy.get("requires_signature") or policy.get("status") == "awaiting_signature":
+        policy["status"] = "active"
+    db.save_item(SITE, "policies", policy_id, policy)
     return jsonify({
+        "status": "signed",
         "policy_id": policy_id,
         "signed": True,
         "signed_by": signer,
         "signed_date": policy["signed_date"],
+        "signed_method": method,
+        "signed_with_drawing": valid_drawing,
     })
 
 
@@ -970,8 +1150,7 @@ def api_loan_apply():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    loans = _load_loans()
-    new_id = max(l["id"] for l in loans) + 1 if loans else 1
+    new_id = db.next_id(SITE, "loans")
     today = datetime.now().strftime("%Y-%m-%d")
     loan_number = f"LN-APP-{datetime.now().year}-{new_id:05d}"
 
@@ -983,7 +1162,10 @@ def api_loan_apply():
         "borrower_name": user["display_name"],
         "type": loan_type,
         "subtype": data.get("subtype", "standard"),
-        "status": "pending_approval",
+        # a new loan agreement isn't complete until the borrower signs it
+        "status": "awaiting_signature",
+        "requires_signature": True,
+        "signed": False,
         "lender": "Cascadia Federal Credit Union",
         "servicer": "Cascadia Federal Credit Union",
         "original_amount": amount,
@@ -1001,11 +1183,90 @@ def api_loan_apply():
         "autopay_enabled": False,
         "autopay_account_last_four": None,
         "collateral": data.get("collateral"),
-        "notes": "Application submitted online. Awaiting review.",
+        "notes": "Application submitted online. Awaiting signature.",
     }
-    loans.append(new_loan)
-    _save_loans(loans)
-    return jsonify(new_loan), 201
+    db.save_item(SITE, "loans", new_id, new_loan)
+    result = dict(new_loan)
+    result["sign_url"] = url_for("insurance-loans.loan_sign_page", loan_id=new_id)
+    return jsonify(result), 201
+
+
+@blueprint.route("/loan/<int:loan_id>/sign", methods=["GET"])
+def loan_sign_page(loan_id):
+    """DocuSign-style signing surface for a loan agreement (sign_by_freeformdrawing)."""
+    user, logged_in = _get_browsing_user()
+    loan = db.get_item(SITE, "loans", loan_id)
+    if not loan:
+        abort(404)
+    summary = [
+        ("Loan Number", loan["loan_number"]),
+        ("Borrower", loan.get("borrower_name", "")),
+        ("Loan Type", (loan.get("type", "") or "").replace("_", " ").title()),
+        ("Amount", "${:,.2f}".format(loan.get("original_amount", 0) or 0)),
+        ("Interest Rate", "{}%".format(loan.get("interest_rate", 0))),
+        ("Term", "{} months".format(loan.get("term_months", 0))),
+        ("Monthly Payment", "${:,.2f}".format(loan.get("monthly_payment", 0) or 0)),
+    ]
+    return render_template(
+        "insurance-loans/sign_document.html",
+        user=user, logged_in=logged_in,
+        kind="loan",
+        title="Loan Agreement & Promissory Note",
+        number=loan["loan_number"],
+        signer_name=loan.get("borrower_name", user["display_name"]),
+        signed=bool(loan.get("signed")),
+        signed_date=loan.get("signed_date", ""),
+        summary=summary,
+        cert_text=(
+            "By signing below, I agree to the terms of this loan agreement and "
+            "promissory note, including the interest rate, repayment schedule, and "
+            "monthly payment shown above. I promise to repay the amounts owed to "
+            "Cascadia Federal Credit Union."
+        ),
+        sign_url=url_for("insurance-loans.api_loan_sign", loan_id=loan_id),
+        detail_url=url_for("insurance-loans.loan_detail", loan_id=loan_id),
+    )
+
+
+@blueprint.route("/api/loans/<int:loan_id>/sign", methods=["POST"])
+def api_loan_sign(loan_id):
+    """Electronically sign a loan agreement (sign_by_freeformdrawing)."""
+    data = request.get_json(silent=True) or {}
+    loan = db.get_item(SITE, "loans", loan_id)
+    if not loan:
+        abort(404)
+
+    drawing = data.get("signature_drawing") or ""
+    points = data.get("signature_points") or []
+    typed_name = (data.get("typed_name") or "").strip()
+    valid_drawing = _valid_signature_drawing(drawing, points)
+    # sign by DRAWING (sign_by_freeformdrawing) or by TYPING your name (sign_by_text)
+    if not valid_drawing and not typed_name:
+        return jsonify({"error": "Draw your signature, or type your full legal name, to continue."}), 400
+    method = "drawn" if valid_drawing else "typed"
+
+    signer = typed_name or (data.get("signature") or data.get("signer_name") or "").strip() \
+        or loan.get("borrower_name", "")
+    loan["signed"] = True
+    loan["signed_by"] = signer
+    loan["signature"] = signer
+    loan["signed_date"] = datetime.now().strftime("%Y-%m-%d")
+    loan["signed_method"] = method
+    loan["signed_with_drawing"] = valid_drawing
+    loan["signature_drawing"] = drawing if valid_drawing else ""
+    # signing completes an awaiting-signature loan; it proceeds to underwriting
+    if loan.get("requires_signature") or loan.get("status") == "awaiting_signature":
+        loan["status"] = "pending_approval"
+    db.save_item(SITE, "loans", loan_id, loan)
+    return jsonify({
+        "status": "signed",
+        "loan_id": loan_id,
+        "signed": True,
+        "signed_by": signer,
+        "signed_date": loan["signed_date"],
+        "signed_method": method,
+        "signed_with_drawing": valid_drawing,
+    })
 
 
 # ---------------------------------------------------------------------------

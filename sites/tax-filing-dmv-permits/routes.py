@@ -223,12 +223,15 @@ def index():
     vehicles = [v for v in _load_vehicles() if v["user_id"] == user["id"]]
     permits = [p for p in _load_permits() if p["user_id"] == user["id"]]
     payments = [p for p in _load_payments() if p["user_id"] == user["id"]]
+    # Documents awaiting the user's signature — surfaced up front (DocuSign-style)
+    awaiting_signature = [f for f in filings if _needs_signature(f)]
     services = ["Tax Filings", "Vehicles & DMV", "Permits", "Payments", "Appointments"]
     return render_template(
         "tax-filing-dmv-permits/index.html",
         user=user, logged_in=logged_in,
         filings=filings, vehicles=vehicles,
         permits=permits, payments=payments,
+        awaiting_signature=awaiting_signature,
         services=services,
     )
 
@@ -657,6 +660,94 @@ def tax_filing_detail(filing_id):
         "tax-filing-dmv-permits/tax_filing_detail.html",
         user=user, logged_in=logged_in, filing=filing, payments=payments,
     )
+
+
+# ---------------------------------------------------------------------------
+# File a Form 1040 income-tax return (create_by_form, carries the compute op:
+# line 9 = sum of lines 1-8). Plain HTML form POST so the entered line values
+# land in the request body captured by /_admin/log -> gradeable by the verifier.
+# ---------------------------------------------------------------------------
+
+# 1040 income lines that sum into line 9 (Total income)
+_F1040_INCOME_LINES = ["line_1", "line_2b", "line_3b", "line_4b",
+                       "line_5b", "line_6", "line_7", "line_8"]
+
+
+def _needs_signature(filing):
+    """A newly-created filing that requires the user's signature and hasn't been
+    signed yet. Pre-existing seed filings (no requires_signature flag) are left
+    alone so we don't nag about historical records."""
+    return bool(filing.get("requires_signature")) and not filing.get("signed")
+
+
+def _money(raw):
+    """Parse a currency-ish string ('$1,234.50', '1234', '') to float; blank -> 0.0."""
+    s = str(raw or "").strip().replace("$", "").replace(",", "").replace("(", "-").replace(")", "")
+    if not s:
+        return 0.0
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+@blueprint.route("/file-1040", methods=["GET"])
+def file_1040_page():
+    user, logged_in = _get_browsing_user()
+    default_year = max((f["tax_year"] for f in _load_filings()), default=2024)
+    return render_template(
+        "tax-filing-dmv-permits/file_1040.html",
+        user=user, logged_in=logged_in, default_year=default_year,
+    )
+
+
+@blueprint.route("/file-1040", methods=["POST"])
+def file_1040_submit():
+    """Persist a filed 1040. Stores each entered line plus the entered line 9 so
+    a verifier can gate on the transcribed values AND recompute the total itself."""
+    user, logged_in = _get_browsing_user()
+    lines = {k: _money(request.form.get(k)) for k in _F1040_INCOME_LINES}
+    entered_total = _money(request.form.get("line_9"))
+    computed_total = round(sum(lines.values()), 2)
+
+    filings = _load_filings()
+    new_id = db.next_id(SITE, "tax_filings")
+    tax_year = request.form.get("tax_year", type=int) or 2024
+    filing_id = f"TAX-{tax_year}-INC-{new_id:05d}"
+    filing = {
+        "id": new_id,
+        "filing_id": filing_id,
+        "user_id": user["id"],
+        "root_user_id": user.get("root_user_id", user["id"]),
+        "taxpayer_name": request.form.get("taxpayer_name", user.get("display_name", "")).strip(),
+        "type": "income_tax",
+        "tax_year": tax_year,
+        "filing_date": datetime.now().strftime("%Y-%m-%d"),
+        "due_date": f"{tax_year + 1}-04-15",
+        # every newly-filed form must be signed before it is complete
+        "status": "awaiting_signature",
+        "requires_signature": True,
+        "signed": False,
+        "gross_income": entered_total,
+        "taxable_income": entered_total,
+        "tax_owed": 0.0, "tax_paid": 0.0, "refund_amount": 0.0,
+        "filing_method": "online",
+        "processed_by": "", "notes": "",
+        "property_address": "", "parcel_number": "", "assessed_value": 0.0,
+        "tax_rate": 0.0, "gross_revenue": 0.0, "taxable_revenue": 0.0,
+        # 1040-specific detail (for grading + the detail page)
+        "form_1040": {
+            "filing_status": request.form.get("filing_status", ""),
+            "ssn": request.form.get("ssn", "").strip(),
+            **lines,
+            "line_9": entered_total,
+            "computed_total_income": computed_total,
+        },
+    }
+    filings.append(filing)
+    _save_filings(filings)
+    # filing isn't complete until it's signed — take the user straight to signing
+    return redirect(url_for("tax-filing-dmv-permits.sign_document_page", filing_id=new_id))
 
 
 @blueprint.route("/vehicles")
@@ -1418,30 +1509,66 @@ def api_verify_identity():
     return jsonify({"status": "failed", "error": "Invalid verification code"}), 400
 
 
+def _valid_signature_drawing(drawing, points):
+    """A drawn signature counts when it's a PNG data URL of plausible size backed
+    by enough stroke points that a stray dot doesn't pass as a signature."""
+    if not (isinstance(drawing, str) and drawing.startswith("data:image/png;base64,")):
+        return False
+    if len(points or []) < 8:
+        return False
+    import base64
+    try:
+        return len(base64.b64decode(drawing.split(",", 1)[1])) > 500
+    except Exception:
+        return False
+
+
 @blueprint.route("/api/sign", methods=["POST"])
 def api_sign_document():
-    """Electronically sign a document (sign_by_signature macro)."""
+    """Electronically sign a document (sign_by_freeformdrawing).
+
+    DocuSign-style single "Sign here" field: the taxpayer draws their signature
+    in one clearly-labeled box. A valid drawn signature marks the filing signed
+    and completes it (status -> filed). The response + saved filing carry the
+    signed flag so the trajectory network log makes the action gradeable.
+    """
     data = request.get_json(force=True)
     filing_id = data.get("filing_id")
-    signature_text = data.get("signature", "")
 
-    if not filing_id or not signature_text:
-        return jsonify({"error": "Filing ID and signature are required"}), 400
+    if not filing_id:
+        return jsonify({"error": "Filing ID is required"}), 400
 
     filings = _load_filings()
     filing = next((f for f in filings if f["id"] == filing_id), None)
     if not filing:
         return jsonify({"error": "Filing not found"}), 404
 
+    drawing = data.get("signature_drawing") or ""
+    points = data.get("signature_points") or []
+    typed_name = (data.get("typed_name") or "").strip()
+    valid_drawing = _valid_signature_drawing(drawing, points)
+    # sign by DRAWING (sign_by_freeformdrawing) or by TYPING your name (sign_by_text)
+    if not valid_drawing and not typed_name:
+        return jsonify({"error": "Draw your signature, or type your full legal name, to continue."}), 400
+    method = "drawn" if valid_drawing else "typed"
+
     filing["signed"] = True
     filing["signed_date"] = datetime.now().strftime("%Y-%m-%d")
-    filing["signature"] = signature_text
+    filing["signature"] = typed_name or data.get("signature", filing.get("taxpayer_name", ""))
+    filing["signed_method"] = method
+    filing["signed_with_drawing"] = valid_drawing
+    filing["signature_drawing"] = drawing if valid_drawing else ""
+    # signing completes a document that was awaiting signature
+    if filing.get("requires_signature") or filing.get("status") == "awaiting_signature":
+        filing["status"] = "filed"
     _save_filings(filings)
 
     return jsonify({
         "status": "signed",
         "filing_id": filing_id,
         "signed_date": filing["signed_date"],
+        "signed_method": method,
+        "signed_with_drawing": valid_drawing,
     })
 
 

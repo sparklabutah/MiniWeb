@@ -494,6 +494,106 @@ def form_update_document(doc_id):
     return redirect(url_for("documents.editor", doc_id=doc_id))
 
 
+# ---------------------------------------------------------------------------
+# Inline-editable data grid (edit_by_cell)
+#
+# A document can carry a structured data table (a project / line-item tracker)
+# that is edited directly in grid cells. The grid lives in a purely
+# overlay-backed "doc_tables" collection keyed by document id, mirroring the
+# university-academic gradebook pattern: get_item is overlay-first so saved
+# edits are honoured, and a deterministic default is served when nothing has
+# been saved yet. Mutations go ONLY to the session overlay -- base tables are
+# never touched.
+# ---------------------------------------------------------------------------
+
+_TABLE_HEADER = ["Line Item", "Owner", "Status", "Budget", "Spent"]
+_TABLE_DEFAULT_ROWS = [
+    ["Compute (EC2)", "Priya", "On track", "12000", "9800"],
+    ["Managed DB (RDS)", "Alex", "On track", "6000", "5400"],
+    ["Object storage (S3)", "Sam", "Over budget", "1500", "2100"],
+    ["Observability", "Jordan", "At risk", "3000", "2750"],
+]
+
+
+def _default_doc_table():
+    """Grid with header row 0 followed by the default line-item rows."""
+    return [list(_TABLE_HEADER)] + [list(r) for r in _TABLE_DEFAULT_ROWS]
+
+
+def _load_doc_table(doc_id):
+    """Return the data-table grid for a document.
+
+    Reads the session overlay first (get_item is overlay-first, so saved edits
+    are honoured); falls back to the deterministic default grid.
+    """
+    tbl = db.get_item(SITE, "doc_tables", doc_id)
+    if tbl and tbl.get("data"):
+        return tbl["data"]
+    return _default_doc_table()
+
+
+@blueprint.route("/document/<int:doc_id>/table", methods=["GET"])
+def table_view(doc_id):
+    """Inline-editable data-grid for a document (edit_by_cell)."""
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    can_edit = _user_can_edit(doc, user["id"])
+    grid = _load_doc_table(doc_id)
+    return render_template("documents/table.html", doc=doc, grid=grid,
+                           user=user, can_edit=can_edit)
+
+
+@blueprint.route("/document/<int:doc_id>/table", methods=["POST"])
+def table_submit(doc_id):
+    """Persist inline cell edits from the document data-grid (edit_by_cell).
+
+    Form fields: cell_<row>_<col>=value (e.g. cell_1_3=15000). The grid
+    auto-expands so "+ Add row" rows appended client-side are saved. Persists to
+    the session overlay via db.save_item -- base tables are never written. This
+    is a normal /sites/documents/... route so its POST body is captured by
+    /_admin/log and a verifier can assert the entered values.
+    """
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+
+    grid = _load_doc_table(doc_id)
+    width = len(grid[0]) if grid else len(_TABLE_HEADER)
+
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        while len(grid) <= r:
+            grid.append([""] * width)
+        while len(grid[r]) <= c:
+            grid[r].append("")
+        grid[r][c] = value.strip()
+
+    db.save_item(SITE, "doc_tables", doc_id, {
+        "id": doc_id,
+        "document_id": doc_id,
+        "data": grid,
+    })
+
+    return redirect(url_for("documents.table_view", doc_id=doc_id))
+
+
 @blueprint.route("/upload", methods=["POST"])
 def form_upload_document():
     """Upload a file as a new document."""

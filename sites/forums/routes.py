@@ -256,30 +256,47 @@ def _build_comment_tree(comments, post_id):
     return roots
 
 
-def _next_post_id():
-    table = db.get_table_name(SITE, "posts")
+def _next_prefixed_id(collection, prefix):
+    """Next `<prefix>NNN` id for a collection, aware of BOTH the base table and
+    THIS session's overlay.
+
+    A base-only `MAX(id)` collides on the 2nd create within a session: the 1st
+    new item lives only in session_overlay, so the base MAX is unchanged and the
+    same id is handed out again (crash with save_collection, silent overwrite
+    with save_item). The shared `db.next_id()` helper is integer-PK only, so it
+    can't be used here — forums uses zero-padded string PKs (rd_post_012) — but
+    this mirrors its base+overlay scan for the string format.
+    """
+    max_num = 0
+    table = db.get_table_name(SITE, collection)
     if table:
         row = db.execute(f"SELECT MAX([id]) as max_id FROM [{table}]", fetch="one")
         if row and row["max_id"]:
             try:
-                max_num = int(row["max_id"].replace("rd_post_", ""))
-                return f"rd_post_{max_num + 1:03d}"
+                max_num = int(str(row["max_id"]).replace(prefix, ""))
             except (ValueError, TypeError):
                 pass
-    return "rd_post_001"
+    overlay_rows = db.execute(
+        "SELECT item_id FROM session_overlay "
+        "WHERE session_id = ? AND site = ? AND collection = ?",
+        (db._get_session_id(), SITE, collection),
+    )
+    for r in overlay_rows or []:
+        try:
+            num = int(str(r["item_id"]).replace(prefix, ""))
+            if num > max_num:
+                max_num = num
+        except (ValueError, TypeError):
+            pass
+    return f"{prefix}{max_num + 1:03d}"
+
+
+def _next_post_id():
+    return _next_prefixed_id("posts", "rd_post_")
 
 
 def _next_comment_id():
-    table = db.get_table_name(SITE, "comments")
-    if table:
-        row = db.execute(f"SELECT MAX([id]) as max_id FROM [{table}]", fetch="one")
-        if row and row["max_id"]:
-            try:
-                max_num = int(row["max_id"].replace("rd_comment_", ""))
-                return f"rd_comment_{max_num + 1:03d}"
-            except (ValueError, TypeError):
-                pass
-    return "rd_comment_001"
+    return _next_prefixed_id("comments", "rd_comment_")
 
 
 def _next_message_id():
@@ -489,13 +506,16 @@ def index():
 
 @blueprint.route("/r/<subreddit_name>")
 def subreddit_view(subreddit_name):
-    # Subreddit values are stored without "r/" prefix in the DB.
+    # Subreddit values are stored without "r/" prefix in the DB; tolerate a link
+    # that accidentally kept the prefix (e.g. an "r/boardgames" value → /r/r/...).
+    if subreddit_name.lower().startswith("r/"):
+        subreddit_name = subreddit_name[2:]
     sort = request.args.get("sort", "hot")
 
     sort_col = "score" if sort in ("top", "hot") else "created_utc"
     sub_posts = _load_posts(where={"subreddit": subreddit_name}, sort=f"-{sort_col}", limit=50)
-    if not sub_posts:
-        abort(404)
+    # A community with no posts still gets a page (empty state) rather than a 404
+    # dead-end — every /r/<name> resolves.
     _attach_feed_meta(sub_posts)
 
     # Community "about" widget data

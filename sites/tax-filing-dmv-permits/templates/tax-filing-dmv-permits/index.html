@@ -48,6 +48,13 @@
         <!-- Alerts -->
         {% set overdue = filings | selectattr('status', 'equalto', 'overdue') | list %}
         {% set expired_vehicles = vehicles | selectattr('renewal_status', 'equalto', 'expired') | list %}
+        {% if awaiting_signature %}
+        <div class="alert-bar" style="background:#fef3c7;border-color:#f59e0b">
+            <span class="alert-icon">&#9997;</span>
+            You have {{ awaiting_signature | length }} document{{ 's' if awaiting_signature | length != 1 }} awaiting your signature.
+            <a href="{{ url_for('tax-filing-dmv-permits.sign_document_page', filing_id=awaiting_signature[0].id) }}" style="color:#92400e;font-weight:600;text-decoration:underline">Sign now</a>
+        </div>
+        {% endif %}
         {% if overdue %}
         <div class="alert-bar">
             <span class="alert-icon">&#9888;</span>

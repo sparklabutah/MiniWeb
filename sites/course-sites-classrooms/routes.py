@@ -387,6 +387,113 @@ def form_grade_submission(course_id, assignment_id):
                             course_id=course_id, assignment_id=assignment_id))
 
 
+@blueprint.route("/course/<int:course_id>/gradebook/save", methods=["POST"])
+def form_save_gradebook(course_id):
+    """Persist inline gradebook cell edits (and any appended student rows).
+
+    Existing cells arrive as ``cell_<student_id>_<assignment_id>=<score>``.
+    Appended rows arrive as ``newrow_<n>_name`` plus
+    ``newrow_<n>_cell_<assignment_id>``. The full edit is POSTed here so the
+    mutation body is captured by /_admin/log and a verifier can assert the
+    entered scores. Supports the edit_by_cell (data-grid cell editing) macro.
+    """
+    course = db.get_item(SITE, "courses", course_id)
+    if not course:
+        abort(404)
+
+    assignments = db.query(SITE, "assignments", where={"course_id": course_id})
+    valid_aids = {a["id"] for a in assignments}
+    enrolled = set(course.get("enrolled_students", []))
+
+    submissions = _get_submissions()
+    # Index existing submissions by (assignment_id, student_id) for O(1) lookup.
+    sub_index = {(s["assignment_id"], s["student_id"]): s for s in submissions}
+    changes = 0
+
+    def _apply_score(student_id, assignment_id, raw):
+        nonlocal changes
+        raw = (raw or "").strip()
+        if raw == "":
+            return
+        try:
+            val = float(raw)
+        except ValueError:
+            return
+        if val == int(val):
+            val = int(val)
+        sub = sub_index.get((assignment_id, student_id))
+        if sub:
+            if sub.get("score") != val:
+                sub["score"] = val
+                sub["status"] = "graded"
+                changes += 1
+        else:
+            new_sub = {
+                "id": db.next_id(SITE, "submissions"),
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "course_id": course_id,
+                "submitted_at": datetime.now().isoformat(),
+                "content": "",
+                "score": val,
+                "status": "graded",
+                "feedback": "",
+            }
+            submissions.append(new_sub)
+            sub_index[(assignment_id, student_id)] = new_sub
+            changes += 1
+
+    # 1. Edits to existing student rows.
+    for key, value in request.form.items():
+        if key.startswith("cell_"):
+            parts = key.split("_")
+            if len(parts) == 3:
+                try:
+                    sid, aid = int(parts[1]), int(parts[2])
+                except ValueError:
+                    continue
+                if sid in enrolled and aid in valid_aids:
+                    _apply_score(sid, aid, value)
+
+    # 2. Appended student rows (+ Add row). Create the student, enroll, score.
+    roster_changed = False
+    for key, value in request.form.items():
+        if key.startswith("newrow_") and key.endswith("_name"):
+            name = (value or "").strip()
+            if not name:
+                continue
+            n = key[len("newrow_"):-len("_name")]
+            new_uid = db.next_id(SITE, "users")
+            uname = "".join(ch.lower() if ch.isalnum() else "_" for ch in name).strip("_")
+            db.save_item(SITE, "users", new_uid, {
+                "id": new_uid,
+                "root_user_id": new_uid,
+                "username": f"{uname or 'student'}_{new_uid}",
+                "password": "learn2025!",
+                "name": name,
+                "email": "",
+                "role": "student",
+                "bio": "",
+                "enrolled_since": datetime.now().strftime("%Y-%m-%d"),
+                "department": "",
+                "secondary_role": "",
+                "ta_for_course_id": 0,
+            })
+            enrolled.add(new_uid)
+            roster_changed = True
+            for aid in valid_aids:
+                _apply_score(new_uid, aid, request.form.get(f"newrow_{n}_cell_{aid}"))
+
+    if changes > 0:
+        _save_submissions(submissions)
+    if roster_changed:
+        course["enrolled_students"] = sorted(enrolled)
+        course["enrollment_count"] = len(enrolled)
+        db.save_item(SITE, "courses", course_id, course)
+
+    return redirect(url_for(f"{BP}.gradebook", course_id=course_id))
+
+
 @blueprint.route("/course/<int:course_id>/discussions/new", methods=["POST"])
 def form_new_discussion(course_id):
     user = _current_user()

@@ -577,6 +577,32 @@ def save_item(site: str, collection: str, item_id, data: dict, sid: str = None):
     conn.commit()
 
 
+def next_id(site: str, collection: str) -> int:
+    """Next integer primary key for a collection, aware of BOTH the base table and
+    THIS session's overlay.
+
+    Using only `MAX(id)` from the base table collides on the 2nd create within a
+    session: the 1st new item lives only in session_overlay, so the base MAX is
+    unchanged and the same id is handed out again (→ a UNIQUE-constraint crash with
+    save_collection, or a silent overwrite with save_item). Integer PKs only.
+    """
+    conn = _get_conn()
+    pk = get_pk_column(site, collection)
+    table = get_table_name(site, collection)
+    base = 0
+    if table:
+        try:
+            base = conn.execute(f"SELECT MAX([{pk}]) FROM [{table}]").fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            base = 0
+    over = conn.execute(
+        "SELECT MAX(CAST(item_id AS INTEGER)) FROM session_overlay "
+        "WHERE session_id = ? AND site = ? AND collection = ?",
+        (_get_session_id(), site, collection),
+    ).fetchone()[0] or 0
+    return max(int(base), int(over)) + 1
+
+
 def delete_item(site: str, collection: str, item_id, sid: str = None):
     """Mark an item as deleted in the session overlay."""
     if sid is None:

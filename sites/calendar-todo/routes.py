@@ -93,13 +93,11 @@ def _get_user(user_id):
 
 
 def _next_event_id():
-    max_id = db.execute("SELECT MAX(id) FROM [calendar_todo_events]", (), fetch="val")
-    return (max_id or 0) + 1
+    return db.next_id(SITE, "events")
 
 
 def _next_user_id():
-    max_id = db.execute("SELECT MAX(id) FROM [calendar_todo_users]", (), fetch="val")
-    return (max_id or 0) + 1
+    return db.next_id(SITE, "users")
 
 
 def _safe_next(value):
@@ -506,7 +504,9 @@ def form_create_event():
         "all_day": request.form.get("all_day") == "on",
         "location": request.form.get("location", ""),
         "recurring": request.form.get("recurring") or None,
-        "reminder_minutes": int(request.form.get("reminder_minutes", 15)),
+        # type=int returns the default (not a crash) when the field is missing,
+        # empty, or non-numeric — agents often submit an empty reminder field.
+        "reminder_minutes": request.form.get("reminder_minutes", 15, type=int) or 15,
         "priority": request.form.get("priority", "medium"),
         "status": "confirmed",
         "attendees": attendees,

@@ -133,6 +133,160 @@ SITE_CATEGORIES = {
 }
 
 
+# Human-readable SITE TYPE (the specific kind of site, from its id) — e.g.
+# "Tax Filing, DMV & Permits", "Insurance & Loans", "Course Sites & Classrooms".
+# This is what annotators want to see next to the brand name, NOT the broad
+# 16-bucket category above. Missing ids fall back to a humanized slug.
+SITE_TYPES = {
+    "academic-paper-db": "Academic Paper Database",
+    "agency-portals": "Agency Portals",
+    "ai-chatbots": "AI Chatbots",
+    "auctions-p2p-marketplaces": "Auctions & P2P Marketplaces",
+    "banking": "Banking",
+    "blogs": "Blogs",
+    "books-comics": "Books & Comics",
+    "brokerage": "Brokerage",
+    "business-company": "Business / Company",
+    "calendar-todo": "Calendar & To-Do",
+    "cloud-dev-consoles": "Cloud Dev Consoles",
+    "cloud-storage-file-transfer": "Cloud Storage & File Transfer",
+    "code-editor-execution": "Code Editor & Execution",
+    "comparison-aggregators": "Comparison Aggregators",
+    "conference-review-submission": "Conference Review & Submission",
+    "converters-calculators": "Converters & Calculators",
+    "course-sites-classrooms": "Course Sites & Classrooms",
+    "crm": "CRM",
+    "crowdfunding-donations": "Crowdfunding & Donations",
+    "dating": "Dating",
+    "design-creative": "Design & Creative",
+    "dictionaries-language-tools": "Dictionaries & Language Tools",
+    "documentation-api-docs": "Documentation & API Docs",
+    "documents": "Documents",
+    "e-commerce": "E-commerce",
+    "email": "Email",
+    "flights-hotels": "Flights & Hotels",
+    "forms-surveys": "Forms & Surveys",
+    "forums": "Forums",
+    "handwritten-notes-whiteboards": "Handwritten Notes & Whiteboards",
+    "health-fitness-tracking": "Health & Fitness Tracking",
+    "health-portals": "Health Portals",
+    "instant-messaging": "Instant Messaging",
+    "insurance-loans": "Insurance & Loans",
+    "job-sites": "Job Sites",
+    "live": "Live Streaming",
+    "map-services": "Map Services",
+    "multimedia-posting": "Multimedia Posting",
+    "music": "Music",
+    "news": "News",
+    "password-managers": "Password Managers",
+    "personal-portfolio": "Personal Portfolio",
+    "petitions-voting-info": "Petitions & Voting Info",
+    "podcasts-audiobooks": "Podcasts & Audiobooks",
+    "project-homepages": "Project Homepages",
+    "project-mgmt-issue-tracking": "Project Mgmt & Issue Tracking",
+    "qa-knowledge": "Q&A Knowledge",
+    "rating-review": "Ratings & Reviews",
+    "real-estate-buy-rent": "Real Estate (Buy & Rent)",
+    "remote-calls": "Remote Calls",
+    "software-marketplace": "Software Marketplace",
+    "sports-esports": "Sports & Esports",
+    "spreadsheets-slides": "Spreadsheets & Slides",
+    "tax-filing-dmv-permits": "Tax Filing, DMV & Permits",
+    "team-chat-workspace": "Team Chat & Workspace",
+    "ticketing-events": "Ticketing & Events",
+    "transit-directions": "Transit & Directions",
+    "translation": "Translation",
+    "university-academic": "University / Academic",
+    "url-shorteners-qr": "URL Shorteners & QR",
+    "version-control": "Version Control",
+    "video": "Video",
+    "visual-how-to-guides": "Visual How-To Guides",
+    "weather": "Weather",
+    "wikis": "Wikis",
+}
+
+
+def site_type(site_id):
+    """Readable site type; humanize the slug if not in the curated map."""
+    if site_id in SITE_TYPES:
+        return SITE_TYPES[site_id]
+    return " ".join(w.upper() if w in {"crm", "dmv", "qr", "api", "ai", "qa", "url", "p2p", "lms"}
+                    else w.capitalize()
+                    for w in site_id.split("-"))
+
+
+# Functionality / intent keywords per site, so portal search matches by WHAT a
+# site does or what the user wants to do — not only its brand name. Space/comma
+# separated; matched as lowercased substrings + tokens (see search helpers).
+SITE_KEYWORDS = {
+    "academic-paper-db": "research papers academic papers citations journals scholar publications literature search doi abstracts find papers",
+    "agency-portals": "city government municipal services agency public services city hall local government report an issue civic",
+    "ai-chatbots": "ai assistant chatbot chat with ai language model ask ai conversational ai prompts gpt",
+    "auctions-p2p-marketplaces": "auction bid marketplace buy and sell used items place a bid listings second hand",
+    "banking": "bank banking checking account savings transfer money pay bills balance transactions deposit wire statement",
+    "blogs": "blog blogging write a post personal blog articles followers microblog publish",
+    "books-comics": "books ebooks comics reading library buy books read online manga novels",
+    "brokerage": "stocks investing trade stocks portfolio buy shares brokerage stock market invest trading",
+    "business-company": "company website corporate business about us products services enterprise",
+    "calendar-todo": "calendar todo tasks schedule reminders events to-do list appointments plan my day",
+    "cloud-dev-consoles": "cloud console servers deploy virtual machines devops infrastructure instances cloud computing",
+    "cloud-storage-file-transfer": "cloud storage files upload download share files backup drive file transfer store files",
+    "code-editor-execution": "code editor run code programming compile execute ide python coding write code",
+    "comparison-aggregators": "compare products price comparison compare phones deals specs comparison shopping",
+    "conference-review-submission": "conference paper submission peer review academic conference submit paper reviewer",
+    "converters-calculators": "converter calculator unit conversion convert units currency converter math compute",
+    "course-sites-classrooms": "online course classroom lms learning assignments grades students enroll lectures gradebook",
+    "crm": "crm customer relationship sales leads contacts deals pipeline manage customers",
+    "crowdfunding-donations": "crowdfunding donate fundraiser campaign pledge raise money charity back a project",
+    "dating": "dating match singles meet people profiles swipe relationships find a date",
+    "design-creative": "design graphic design create graphics templates canvas creative edit images posters",
+    "dictionaries-language-tools": "dictionary definitions look up a word thesaurus synonyms spelling vocabulary meaning",
+    "documentation-api-docs": "documentation api docs developer docs reference guides sdk technical docs",
+    "documents": "documents word processor write a document edit document text editor docs",
+    "e-commerce": "shopping online store buy products cart checkout orders add to cart shop ecommerce",
+    "email": "email inbox send email compose mail messages webmail read email",
+    "flights-hotels": "flights hotels book a flight book a hotel travel trips airfare reservations vacation",
+    "forms-surveys": "forms surveys create a form questionnaire poll collect responses survey",
+    "forums": "forum discussion community post subreddit threads comments reddit",
+    "handwritten-notes-whiteboards": "whiteboard handwritten notes draw sketch canvas notes drawing",
+    "health-fitness-tracking": "fitness workout track steps exercise health tracker calories activity weight gym log",
+    "health-portals": "patient portal doctor appointments medical records prescriptions health clinic book appointment",
+    "instant-messaging": "instant messaging chat message a friend dm texting conversations",
+    "insurance-loans": "insurance loans quotes apply for a loan coverage policy mortgage lending",
+    "job-sites": "jobs job search apply for a job resume careers employment hiring listings",
+    "live": "live stream streaming watch live broadcast live video streamers",
+    "map-services": "maps directions navigation find places restaurants nearby route address explore map",
+    "multimedia-posting": "photos share photos images gallery post pictures upload photos social photos",
+    "music": "music songs playlists listen to music albums artists stream music",
+    "news": "news headlines articles current events newspaper read news breaking news",
+    "password-managers": "password manager passwords vault credentials secure passwords store passwords login manager",
+    "personal-portfolio": "portfolio personal website resume projects about me developer portfolio",
+    "petitions-voting-info": "petitions voting elections sign a petition civic ballot voter info",
+    "podcasts-audiobooks": "podcasts audiobooks listen episodes audio subscribe shows",
+    "project-homepages": "open source project project homepage software project docs download releases",
+    "project-mgmt-issue-tracking": "project management issues bug tracker tickets tasks sprints backlog kanban",
+    "qa-knowledge": "q&a questions and answers ask a question knowledge base help answers stack overflow",
+    "rating-review": "reviews ratings rate a business write a review recommendations stars yelp",
+    "real-estate-buy-rent": "real estate homes for sale rent apartments buy a house listings property realtor",
+    "remote-calls": "video call conference call meetings join a call calls meeting",
+    "software-marketplace": "software apps download software app store install marketplace programs",
+    "sports-esports": "sports scores teams esports games standings matches live scores",
+    "spreadsheets-slides": "spreadsheet slides presentation excel sheets cells edit spreadsheet powerpoint tables",
+    "tax-filing-dmv-permits": "taxes file taxes dmv permits vehicle registration tax filing government forms 1040 license",
+    "team-chat-workspace": "team chat workspace channels messaging collaboration teams",
+    "ticketing-events": "tickets events buy tickets concerts book event shows venue",
+    "transit-directions": "transit bus train public transport schedules routes trip planner directions",
+    "translation": "translate translation languages translator convert language spanish french",
+    "university-academic": "university college courses admissions campus academic degree programs faculty",
+    "url-shorteners-qr": "url shortener short link qr code shorten a link links",
+    "version-control": "git version control repositories code commits pull requests repos",
+    "video": "videos watch videos streaming upload video channels movies",
+    "visual-how-to-guides": "how-to tutorials guides step by step instructions diy",
+    "weather": "weather forecast temperature rain weather today conditions",
+    "wikis": "wiki encyclopedia articles look up knowledge reference",
+}
+
+
 SITE_DOMAINS = {
     "academic-paper-db": "scholarbase.edu",
     "agency-portals": "lakeport.gov",
@@ -218,7 +372,9 @@ def discover_sites():
         meta = json.loads(site_json.read_text())
         meta["path"] = f"/sites/{meta['id']}/"
         meta["category"] = SITE_CATEGORIES.get(meta["id"], "Other")
+        meta["type"] = site_type(meta["id"])
         meta["domain"] = SITE_DOMAINS.get(meta["id"], f"{meta['id']}.lakeport.local")
+        meta["keywords"] = SITE_KEYWORDS.get(meta["id"], "")
         sites.append(meta)
     return sites
 
@@ -629,7 +785,7 @@ def create_app():
         if not request.path.startswith("/sites/"):
             return response
         from flask import g
-        sid = session.get("_id", id(session))
+        sid = (session.get("_data_overlay_sid") or session.get("_id") or id(session))
         if sid not in _request_logs:
             _request_logs[sid] = []
         entry = {
@@ -771,7 +927,7 @@ def create_app():
         if request.args.get("all") == "1":
             log = [e for s in _request_logs.values() for e in s]
         else:
-            log = list(_request_logs.get(session.get("_id", id(session)), []))
+            log = list(_request_logs.get((session.get("_data_overlay_sid") or session.get("_id") or id(session)), []))
 
         method_filter = request.args.get("method", "").upper()
         path_filter = request.args.get("path", "")
@@ -790,7 +946,7 @@ def create_app():
     def _admin_log_clear():
         """Clear the request log for the current session."""
         from flask import jsonify
-        sid = session.get("_id", id(session))
+        sid = (session.get("_data_overlay_sid") or session.get("_id") or id(session))
         _request_logs.pop(sid, None)
         _action_beacons.pop(sid, None)
         return jsonify({"status": "cleared"})
@@ -805,7 +961,7 @@ def create_app():
         Every click, type, select, submit, navigation fires a beacon here.
         Works identically for human annotators and browser-use agents.
         """
-        sid = session.get("_id", id(session))
+        sid = (session.get("_data_overlay_sid") or session.get("_id") or id(session))
         if sid not in _action_beacons:
             _action_beacons[sid] = []
 
@@ -850,7 +1006,7 @@ def create_app():
         if request.args.get("all") == "1":
             entries = [e for s in _action_beacons.values() for e in s]
         else:
-            entries = _action_beacons.get(session.get("_id", id(session)), [])
+            entries = _action_beacons.get((session.get("_data_overlay_sid") or session.get("_id") or id(session)), [])
         return jsonify({"count": len(entries), "entries": entries})
 
     # ------------------------------------------------------------------
@@ -911,9 +1067,13 @@ def create_app():
         return jsonify({k: v for k, v in session.items()
                         if not k.startswith("_")})
 
-    @app.route("/_reset_data", methods=["POST"])
+    @app.route("/_reset_data", methods=["GET", "POST"])
     def _reset_data():
-        """Reset session overlay (revert site data to pristine) and clear session."""
+        """Reset session overlay (revert site data to pristine) and clear session.
+
+        GET is allowed so an eval harness can reset a task's session with a plain
+        navigation (browser-agnostic) — it only ever touches the caller's own
+        session, so it's safe even when multiple evals share the DB."""
         # Get current session ID before clearing
         sid = session.get("_data_overlay_sid", "")
         # Clear the overlay for this session
@@ -933,7 +1093,38 @@ def create_app():
         # Also clear request logs and beacons
         _request_logs.pop(sid, None) if sid else None
         _action_beacons.pop(sid, None) if sid else None
+        # ?no_autologin=1 — this session starts logged OUT (authenticate_by_form
+        # tasks on a shared server; per-process MINIWEB_NO_AUTOLOGIN can't help there)
+        if request.args.get("no_autologin") == "1":
+            session["_no_autologin"] = True
         return {"status": "reset", "cleared_sid": sid}
+
+    @app.route("/_blocked")
+    def _blocked():
+        """Landing page for blocked external navigations (offline eval sandboxing).
+
+        The browser layer (see browsergym_miniweb.enforce_offline) 302s any
+        navigation that tries to leave MiniWeb to this page, which explains the
+        sandbox and bounces the agent back to the site directory."""
+        from markupsafe import escape
+        attempted = request.args.get("from", "")
+        shown = f"<p>Blocked URL: <code>{escape(attempted[:300])}</code></p>" if attempted else ""
+        return (
+            "<!doctype html><html><head><title>External page blocked</title>"
+            '<meta http-equiv="refresh" content="3;url=/">'
+            "<style>body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f8fafc;"
+            "color:#1e293b;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
+            ".card{max-width:560px;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;"
+            "padding:2rem;text-align:center}h1{font-size:1.2rem}p{color:#475569;font-size:.9rem}"
+            "code{background:#f1f5f9;padding:.1rem .3rem;border-radius:.25rem;word-break:break-all}"
+            "a{color:#2563eb}</style></head><body><div class='card'>"
+            "<h1>You are not allowed to visit external pages</h1>"
+            f"{shown}"
+            "<p>Every task can be completed entirely inside MiniWeb — no external "
+            "website is needed.</p>"
+            "<p>Redirecting you back to the site directory&hellip; "
+            '<a href="/">go now</a></p>'
+            "</div></body></html>")
 
     @app.route("/_overlay_stats")
     def _overlay_stats():

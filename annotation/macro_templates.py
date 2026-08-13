@@ -74,6 +74,7 @@ def check_schema():
                 "url":         {"kind": "text", "default_open": True},
                 "status":      {"kind": "enum", "options": _http_status_codes(), "default_open": False},
                 "body_fields": {"kind": "dict", "default_open": True},
+                "response_fields": {"kind": "dict", "default_open": True},
             },
         },
         "answer_matches": {
@@ -99,6 +100,7 @@ def check_schema():
             "params": {
                 "expected": {"kind": "text", "default_open": True},
                 "mode": {"kind": "enum", "options": ["fuzzy", "contains"], "default_open": False},
+                "alternatives": {"kind": "list", "default_open": True},
             },
         },
         "reasoning_contains": {
@@ -398,13 +400,18 @@ def _all_leaves(node):
 
 def inject_qa_leaf(macros_spec: dict, task: dict) -> dict:
     """Set `leaf` on every qa_answer check from the task's macro graph, so the
-    conditional (answer vs reasoning) resolves correctly for this task."""
+    conditional (answer vs reasoning) resolves correctly for this task. Also
+    carries the task's `alternatives` (equally valid answers) onto terminal
+    qa_answer checks so they aren't lost between task.json and verifier.json."""
     leaves = leaf_macros(task)
+    alts = task.get("alternatives") or ""
     for macro, tree in (macros_spec or {}).items():
         is_leaf = macro in leaves
         for leaf in _all_leaves(tree):
             if leaf.get("type") == "qa_answer":
                 leaf["leaf"] = is_leaf
+                if is_leaf and alts and not leaf.get("alternatives"):
+                    leaf["alternatives"] = alts
     return macros_spec
 
 

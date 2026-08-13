@@ -560,6 +560,123 @@ def form_results(form_id):
                            stats=stats, user=user)
 
 
+# ---------------------------------------------------------------------------
+# Inline-editable response grid (edit_by_cell)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/form/<int:form_id>/grid")
+def form_grid(form_id):
+    """Spreadsheet-style editable grid of a form's responses.
+
+    Rows = responses, columns = the form's fields. The survey owner can retype
+    any cell in place (edit_by_cell) or append a brand-new response row, then
+    press Save Changes. Only overlay-backed forms (the user's own forms, IDs
+    below the Pew Research block) are editable; the read-only Pew surveys are
+    not shown here.
+    """
+    forms = _load_forms()
+    form = next((f for f in forms if f["id"] == form_id), None)
+    if not form:
+        abort(404)
+    form["_owner_name"] = _user_name(form["owner_id"])
+    # SQL-level filter + sort + limit (CLAUDE.md DB rules). The grid shows <50
+    # rows per the frontend cap; stable ordering by id keeps row indices aligned.
+    responses = db.query(SITE, "responses", where={"form_id": form_id},
+                         sort="id", limit=50)
+    user = _current_user()
+    return render_template("forms-surveys/grid.html", form=form,
+                           responses=responses, user=user)
+
+
+@blueprint.route("/form/<int:form_id>/grid", methods=["POST"])
+def form_grid_submit(form_id):
+    """Persist inline cell edits (and appended rows) from the response grid.
+
+    Reads ``cell_<row>_<col>`` fields; ``row_<row>`` carries the existing
+    response id for pre-populated rows (blank for JS-appended rows, which become
+    new responses). Mutations go to the session overlay only. This is a normal
+    /sites/forms-surveys/ route so its POST body is captured by /_admin/log,
+    which is what makes the edits gradeable.
+    """
+    forms = _load_forms()
+    form = next((f for f in forms if f["id"] == form_id), None)
+    if not form:
+        abort(404)
+    fields = form.get("fields", [])  # column index -> field id
+
+    responses = _load_responses()
+    by_id = {r["id"]: r for r in responses}
+
+    # Group posted cells by row index.
+    row_cells = {}  # row_idx -> {col_idx: value}
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        row_cells.setdefault(r, {})[c] = value
+
+    user = _current_user()
+    # Seed a local id counter from the overlay-aware next_id so multiple appended
+    # rows in ONE submit don't collide (db.next_id can't see rows not yet saved).
+    next_new = db.next_id(SITE, "responses")
+    changes = 0
+
+    for r in sorted(row_cells.keys()):
+        cells = row_cells[r]
+        resp_id_raw = request.form.get(f"row_{r}", "").strip()
+        if resp_id_raw:
+            # Existing response — update answers in place.
+            try:
+                rid = int(resp_id_raw)
+            except ValueError:
+                continue
+            resp = by_id.get(rid)
+            if resp is None:
+                continue
+            answers = resp.setdefault("answers", {})
+            for c, val in cells.items():
+                if 0 <= c < len(fields):
+                    fid = fields[c]["id"]
+                    if answers.get(fid) != val:
+                        answers[fid] = val
+                        changes += 1
+        else:
+            # Appended row — create a new response only if it has content.
+            if not any(str(v).strip() for v in cells.values()):
+                continue
+            answers = {}
+            for c, val in cells.items():
+                if 0 <= c < len(fields):
+                    answers[fields[c]["id"]] = val
+            new_resp = {
+                "id": next_new,
+                "form_id": form_id,
+                "respondent_id": user["id"] if user else None,
+                "submitted_at": datetime.now().isoformat() + "Z",
+                "answers": answers,
+            }
+            next_new += 1
+            responses.append(new_resp)
+            by_id[new_resp["id"]] = new_resp
+            changes += 1
+
+    if changes:
+        _save_responses(responses)
+        form["responses_count"] = len([x for x in responses if x["form_id"] == form_id])
+        _save_forms(forms)
+        emit("grid_edit", user_id=user["id"] if user else None,
+             site_name="forms-surveys", form_id=form_id, form_title=form["title"],
+             cells_changed=changes)
+
+    return redirect(url_for("forms-surveys.form_grid", form_id=form_id))
+
+
 @blueprint.route("/create")
 def create_form_page():
     user = _current_user()

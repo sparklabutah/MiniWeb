@@ -171,6 +171,8 @@ def list_tasks(annotator: str = None) -> list[dict]:
                     task = json.loads(task_file.read_text())
                     # Don't include trajectory in list view
                     task.pop("trajectory", None)
+                    # Directory name is authoritative when task.json lacks it
+                    task.setdefault("annotator", ann)
                     tasks.append(task)
                 except (json.JSONDecodeError, OSError):
                     pass

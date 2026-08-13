@@ -148,11 +148,7 @@ def note_new_page():
 
     now = _now_iso()
     # Get next ID
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
 
     new_note = {
         "id": new_id,
@@ -190,11 +186,7 @@ def note_new_submit():
     drawing_data = request.form.get("drawing_data", "").strip()
 
     now = _now_iso()
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
 
     new_note = {
         "id": new_id,
@@ -269,9 +261,22 @@ def note_save_ajax(note_id):
             note[field] = data[field]
     note["updated_at"] = _now_iso()
 
+    # drawing detector (sign_by_freeformdrawing): a real drawing is a PNG data
+    # URL of plausible size, not a blank canvas or stray dot
+    drawing = note.get("drawing_data") or ""
+    has_drawing = False
+    if isinstance(drawing, str) and drawing.startswith("data:image/png;base64,"):
+        import base64
+        try:
+            has_drawing = len(base64.b64decode(drawing.split(",", 1)[1])) > 500
+        except Exception:
+            has_drawing = False
+    note["has_drawing"] = has_drawing
+
     db.save_item(SITE, "notes", note_id, note)
 
-    return jsonify({"status": "saved", "updated_at": note["updated_at"]})
+    return jsonify({"status": "saved", "updated_at": note["updated_at"],
+                    "has_drawing": has_drawing})
 
 
 @blueprint.route("/note/<int:note_id>/delete", methods=["POST"])
@@ -297,11 +302,7 @@ def form_upload_image():
     f = request.files.get("file")
     title = f.filename if f and f.filename else "Uploaded Image"
     now = _now_iso()
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {title}]",
@@ -443,11 +444,7 @@ def api_notes_create():
         tags_str = str(tags)
 
     now = _now_iso()
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
 
     new_note = {
         "id": new_id,
@@ -774,11 +771,7 @@ def api_notes_create_by_radio():
         return jsonify({"error": "owner_id is required"}), 400
 
     now = _now_iso()
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
     new_note = {
         "id": new_id, "title": title, "content": content,
         "owner_id": owner_id, "created_at": now, "updated_at": now,
@@ -820,11 +813,7 @@ def api_create_by_toggle():
              source_id=new_id)
         return jsonify({"created": "whiteboard", "item": new_wb}), 201
     else:
-        max_row = db.execute(
-            "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-            fetch="one",
-        )
-        new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+        new_id = db.next_id(SITE, "notes")
         new_note = {
             "id": new_id, "title": title,
             "content": data.get("content", ""),
@@ -876,11 +865,7 @@ def api_notes_create_by_image():
         return jsonify({"error": "owner_id is required"}), 400
 
     now = _now_iso()
-    max_row = db.execute(
-        "SELECT MAX(id) as max_id FROM handwritten_notes_whiteboards_notes",
-        fetch="one",
-    )
-    new_id = (max_row["max_id"] or 0) + 1 if max_row else 1
+    new_id = db.next_id(SITE, "notes")
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {img.filename}]",

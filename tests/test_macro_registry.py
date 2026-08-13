@@ -25,7 +25,7 @@ def test_base_macros_complete():
 def test_operations_closed_and_weighted():
     """The reasoning operations are a small closed vocab, each with a check."""
     ops = R.operations()
-    assert set(ops) == {"read", "extremum", "count", "compute", "compare", "verify"}, \
+    assert set(ops) == {"read", "extremum", "count", "compute", "compare", "verify", "spatial"}, \
         f"operation vocabulary drifted: {sorted(ops)}"
     for op, info in ops.items():
         assert info.get("desc") and info.get("check"), f"operation {op} missing desc/check"

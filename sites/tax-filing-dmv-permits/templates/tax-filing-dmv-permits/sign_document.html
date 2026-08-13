@@ -4,48 +4,216 @@
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Document - Lakeport Government Services</title>
     <link rel="stylesheet" href="/static/lakeport.css">
+    <style>
+    .sign-banner { max-width: 720px; margin: 1.25rem auto 0; background: #fef3c7; border: 1px solid #f59e0b;
+                   color: #92400e; border-radius: .4rem; padding: .6rem .9rem; font-size: .9rem; font-weight: 600;
+                   display: flex; align-items: center; gap: .5rem; }
+    .paper-doc { background: #fff; max-width: 720px; margin: .75rem auto 1.5rem; padding: 2.5rem 3.5rem 2rem;
+                 border: 1px solid #d1d5db; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+                 font-family: Georgia, 'Times New Roman', serif; color: #111827; }
+    .paper-doc .doc-head { text-align: center; border-bottom: 2px solid #111827; padding-bottom: .75rem; margin-bottom: 1.25rem; }
+    .paper-doc .doc-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: .08em; }
+    .paper-doc .doc-head .agency { font-size: .75rem; letter-spacing: .18em; color: #374151; }
+    .paper-doc .doc-head .formno { font-size: .7rem; color: #6b7280; margin-top: .2rem; }
+    .doc-fields { width: 100%; border-collapse: collapse; margin-bottom: 1.1rem; font-size: .88rem; }
+    .doc-fields td { border: 1px solid #9ca3af; padding: .35rem .6rem; }
+    .doc-fields td.fl { width: 38%; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #4b5563; }
+    .cert-text { font-size: .82rem; line-height: 1.5; color: #1f2937; margin-bottom: 1.25rem; }
+    /* DocuSign-style single "Sign here" field */
+    .sign-field { position: relative; margin: 0 auto 1rem; max-width: 560px; }
+    .sign-tab { position: absolute; left: -8px; top: 0; transform: translateX(-100%); background: #f6c445;
+                color: #4a3a00; font-family: -apple-system, sans-serif; font-size: .68rem; font-weight: 700;
+                padding: .25rem .5rem; border-radius: .25rem 0 0 .25rem; white-space: nowrap; }
+    .sign-tab::after { content: ""; position: absolute; right: -8px; top: 0; border: 8px solid transparent;
+                       border-left-color: #f6c445; border-top-color: #f6c445; }
+    .sign-box { border: 2px solid #f6c445; background: #fffdf5; height: 130px; position: relative; }
+    #signature-canvas { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none; }
+    .sign-x { position: absolute; left: 14px; bottom: 30px; font-size: 1.3rem; color: #6b7280; font-family: Georgia, serif; }
+    .sign-baseline { position: absolute; left: 40px; right: 16px; bottom: 34px; border-bottom: 1.5px solid #9ca3af; }
+    .sign-caption { position: absolute; left: 40px; bottom: 14px; font-size: .68rem; color: #6b7280;
+                    font-family: -apple-system, sans-serif; }
+    .typed-name { max-width: 560px; margin: 0 auto 1rem; }
+    .typed-name label { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #4b5563; margin-bottom: .25rem; font-family: -apple-system, sans-serif; }
+    .typed-name input { width: 100%; padding: .4rem .6rem; border: 1px solid #9ca3af; font-size: .95rem; font-family: inherit; }
+    .sig-tools { max-width: 560px; margin: 0 auto 1rem; text-align: right; font-family: -apple-system, sans-serif; }
+    .sign-actions { text-align: center; }
+    .signed-note { max-width: 560px; margin: 0 auto; }
+    </style>
 </head>
 <body>
     {% set active_nav = 'filings' %}
     {% include "tax-filing-dmv-permits/_chrome.html" %}
 
+    {% if not filing.signed %}
+    <div class="sign-banner">✍️ Signature required — this document is not filed until you sign it below.</div>
+    {% endif %}
+
     <div class="container">
-        <div class="doc-card">
-            <h2>Sign Tax Filing Document</h2>
-            <div id="success-msg" class="success-msg"></div>
-            <div class="doc-info">
-                <p><strong>Document:</strong> {{ filing.filing_id }}</p>
-                <p><strong>Type:</strong> {{ filing.type|replace("_"," ")|title }}</p>
-                <p><strong>Tax Year:</strong> {{ filing.tax_year }}</p>
-                <p><strong>Taxpayer:</strong> {{ filing.taxpayer_name }}</p>
-                <p><strong>Amount:</strong> ${{ "%.2f"|format(filing.tax_owed) }}</p>
+        <div class="paper-doc">
+            <div class="doc-head">
+                <div class="agency">CITY OF LAKEPORT · DEPARTMENT OF REVENUE</div>
+                <h2>TAX FILING CERTIFICATION</h2>
+                <div class="formno">Form LC-8879 · Document {{ filing.filing_id }} · Rev. {{ filing.tax_year }}</div>
             </div>
-            <p style="font-size:.9rem;color:#64748b;margin-bottom:1rem;">By signing below, you certify that the information in this filing is accurate and complete.</p>
+            <div id="success-msg" class="success-msg"></div>
+            <table class="doc-fields">
+                <tr><td class="fl">Document</td><td>{{ filing.filing_id }}</td></tr>
+                <tr><td class="fl">Filing type</td><td>{{ filing.type|replace("_"," ")|title }}</td></tr>
+                <tr><td class="fl">Tax year</td><td>{{ filing.tax_year }}</td></tr>
+                <tr><td class="fl">Taxpayer</td><td>{{ filing.taxpayer_name }}</td></tr>
+                <tr><td class="fl">Status</td><td>{{ filing.status|replace("_"," ")|title }}</td></tr>
+            </table>
+            <p class="cert-text">Under penalties of perjury, I declare that I have examined this filing and
+            accompanying schedules, and to the best of my knowledge and belief they are true, correct and
+            complete. By signing below, I certify the information in this filing.</p>
+
+            {% if filing.signed %}
+            <div class="signed-note" style="text-align:center;padding:1rem;border:1.5px solid #16a34a;background:#f0fdf4;border-radius:.4rem">
+                <div style="font-weight:700;color:#166534">✓ Signed on {{ filing.signed_date }}{% if filing.signed_method %} ({{ filing.signed_method }}){% endif %}</div>
+                <div style="font-size:.85rem;color:#374151;margin-top:.25rem">This document has been filed.</div>
+                <a href="{{ url_for('tax-filing-dmv-permits.tax_filing_detail', filing_id=filing.id) }}"
+                   class="submit-btn" style="text-decoration:none;display:inline-block;margin-top:.6rem;padding:.4rem 1rem">View filing</a>
+            </div>
+            {% else %}
             <form onsubmit="return signDoc(event)">
-                <div class="signature-area">
-                    <p style="font-size:.8rem;color:#94a3b8;margin-bottom:.5rem;">Type your full legal name as your electronic signature</p>
-                    <input type="text" id="signature" placeholder="Type your name here" required>
+                <div class="signer-tabs" style="max-width:560px;margin:0 auto .5rem;display:flex;gap:.4rem;font-family:-apple-system,sans-serif">
+                    <button type="button" class="signer-tab active" data-mode="draw" onclick="switchTab('draw')" style="flex:1;padding:.4rem;border:1px solid #cbd5e1;background:#eff6ff;border-color:#2563eb;color:#2563eb;font-weight:600;cursor:pointer;border-radius:.3rem">Draw</button>
+                    <button type="button" class="signer-tab" data-mode="type" onclick="switchTab('type')" style="flex:1;padding:.4rem;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-weight:600;cursor:pointer;border-radius:.3rem">Type</button>
                 </div>
-                <button type="submit" class="submit-btn green">Sign and Submit</button>
+                <!-- Draw: freeform canvas (sign_by_freeformdrawing) -->
+                <div id="draw-pane">
+                    <div class="sign-field">
+                        <div class="sign-tab">Sign here</div>
+                        <div class="sign-box">
+                            <canvas id="signature-canvas" width="560" height="130"></canvas>
+                            <span class="sign-x">✗</span>
+                            <div class="sign-baseline"></div>
+                            <div class="sign-caption">Draw your signature</div>
+                        </div>
+                    </div>
+                    <div class="sig-tools">
+                        <button type="button" onclick="clearSignature()" style="padding:.3rem .8rem;font-size:.8rem;cursor:pointer">Clear</button>
+                    </div>
+                </div>
+                <!-- Type: adopt a typed signature (sign_by_text) -->
+                <div id="type-pane" style="display:none">
+                    <div class="typed-name">
+                        <label for="typed-name-input">Type your full legal name</label>
+                        <input type="text" id="typed-name-input" value="{{ filing.taxpayer_name }}" placeholder="e.g. Alex Rivera"
+                               oninput="document.getElementById('typed-preview').textContent = this.value;">
+                        <div id="typed-preview" style="font-family:'Segoe Script','Brush Script MT',cursive;font-size:1.6rem;color:#1d4ed8;min-height:2rem;margin-top:.4rem;border-bottom:1.5px solid #9ca3af">{{ filing.taxpayer_name }}</div>
+                    </div>
+                </div>
+                <div class="sign-actions">
+                    <button type="submit" class="submit-btn green">Adopt and Sign</button>
+                </div>
             </form>
+            {% endif %}
         </div>
     </div>
 
     {% include "tax-filing-dmv-permits/_footer.html" %}
 
+    {% if not filing.signed %}
     <script>
+    var signMode = 'draw';
+    function switchTab(mode) {
+        signMode = mode;
+        document.querySelectorAll('.signer-tab').forEach(function(t) {
+            var on = t.dataset.mode === mode;
+            t.classList.toggle('active', on);
+            t.style.background = on ? '#eff6ff' : '#fff';
+            t.style.borderColor = on ? '#2563eb' : '#cbd5e1';
+            t.style.color = on ? '#2563eb' : '#64748b';
+        });
+        document.getElementById('draw-pane').style.display = mode === 'draw' ? '' : 'none';
+        document.getElementById('type-pane').style.display = mode === 'type' ? '' : 'none';
+    }
+
+    var canvas = document.getElementById('signature-canvas');
+    var ctx = canvas.getContext('2d');
+    var drawing = false;
+    var sigPoints = [];   // sampled stroke points in canvas coordinates
+
+    function getPos(e) {
+        var r = canvas.getBoundingClientRect();
+        var t = (e.touches && e.touches[0]) || e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+    }
+    function startDraw(e) {
+        e.preventDefault(); drawing = true;
+        var p = getPos(e);
+        sigPoints.push([Math.round(p.x), Math.round(p.y)]);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    }
+    function moveDraw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        var p = getPos(e);
+        ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.lineTo(p.x, p.y); ctx.stroke();
+        var last = sigPoints[sigPoints.length - 1];
+        if (!last || Math.abs(p.x - last[0]) + Math.abs(p.y - last[1]) > 4) {
+            sigPoints.push([Math.round(p.x), Math.round(p.y)]);
+        }
+    }
+    function endDraw() { drawing = false; }
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+    canvas.addEventListener('touchstart', startDraw, {passive: false});
+    canvas.addEventListener('touchmove', moveDraw, {passive: false});
+    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchcancel', endDraw);
+
+    function isCanvasBlank() {
+        var px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (var i = 3; i < px.length; i += 4) { if (px[i] !== 0) return false; }
+        return true;
+    }
+    function clearSignature() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        sigPoints = [];
+    }
+
     function signDoc(e) {
         e.preventDefault();
+        var m = document.getElementById('success-msg');
+        var body = { filing_id: {{ filing.id }} };
+        if (signMode === 'draw') {
+            if (isCanvasBlank() || sigPoints.length < 8) {
+                m.style.display = 'block'; m.style.color = '#b91c1c';
+                m.textContent = 'Please draw your signature in the "Sign here" box.';
+                return false;
+            }
+            body.signature_points = sigPoints.slice(0, 400);
+            body.signature_drawing = canvas.toDataURL('image/png');
+        } else {
+            var name = document.getElementById('typed-name-input').value.trim();
+            if (!name) {
+                m.style.display = 'block'; m.style.color = '#b91c1c';
+                m.textContent = 'Please type your full legal name to adopt a typed signature.';
+                return false;
+            }
+            body.typed_name = name;
+        }
         fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/sign', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({filing_id: {{ filing.id }}, signature: document.getElementById('signature').value})
+            body: JSON.stringify(body)
         }).then(function(r) { return r.json(); }).then(function(d) {
-            var msg = document.getElementById('success-msg');
-            msg.style.display = 'block';
-            msg.textContent = 'Document signed successfully on ' + d.signed_date;
+            if (d.status === 'signed') {
+                // reload so the page reflects the signed/filed state
+                window.location.reload();
+            } else {
+                var m = document.getElementById('success-msg');
+                m.style.display = 'block'; m.style.color = '#b91c1c';
+                m.textContent = d.error || 'Could not sign the document.';
+            }
         });
         return false;
     }
     </script>
+    {% endif %}
 </body>
 </html>

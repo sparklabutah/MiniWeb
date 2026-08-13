@@ -253,6 +253,8 @@ def post_detail(post_id):
     comments = _load_comments()
     um = _users_map()
     _enrich_post(post, um, comments)
+    if post.get("type") == "video":
+        post["video_duration"] = _video_duration(post_id)
     # Check if user saved/liked this post
     saved_posts = session.get("saved_posts", [])
     liked_posts = session.get("liked_posts", [])
@@ -522,6 +524,21 @@ def api_post_delete(post_id):
     comments = [c for c in comments if c["post_id"] != post_id]
     _save_comments(comments)
     return jsonify({"status": "deleted", "id": post_id})
+
+
+def _video_duration(post_id):
+    """Deterministic clip length (15-90s) — posts carry no duration column."""
+    import hashlib
+    return 15 + int(hashlib.sha1(str(post_id).encode()).hexdigest(), 16) % 76
+
+
+@blueprint.route("/api/posts/<post_id>/seek", methods=["POST"])
+def api_post_seek(post_id):
+    """Record a scrub on a video post (search_by_playback evidence)."""
+    data = request.get_json(silent=True) or {}
+    return jsonify({"status": "ok", "post_id": post_id,
+                    "position": data.get("position"),
+                    "position_pct": data.get("position_pct")})
 
 
 @blueprint.route("/api/posts/<post_id>/like", methods=["POST"])
@@ -1128,17 +1145,22 @@ def api_settings_update():
 
 @blueprint.route("/api/posts/<post_id>/play", methods=["POST"])
 def api_post_play(post_id):
-    """Play a video post (play_by_dropdown). Select quality via dropdown."""
+    """Play a video post (play_by_playback) — backs the shared MiniPlayer on
+    the post detail page; playing is a POST the verifier can gate on."""
     posts = _load_posts()
     post = next((p for p in posts if p["id"] == post_id), None)
     if not post:
         return jsonify({"error": "Post not found"}), 404
     data = request.get_json(silent=True) or {}
-    quality = data.get("quality", "720p")  # 360p, 480p, 720p, 1080p
+    quality = data.get("quality", "1080p")  # 360p, 480p, 720p, 1080p
+    dur = _video_duration(post_id)
     return jsonify({
         "status": "playing",
+        "playing": True,
         "post_id": post_id,
         "quality": quality,
+        "exact_duration": f"{dur // 60}:{dur % 60:02d}",
+        "stream_quality": quality,
         "stream_url": f"https://pixshare.io/stream/{post_id}?q={quality}",
     })
 

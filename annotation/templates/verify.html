@@ -41,7 +41,13 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 .tv-macro { background:#fff; border:1px solid #e2e8f0; border-radius:.4rem; margin-bottom:.5rem; overflow:hidden; }
 .tv-macro > .mhead { display:flex; align-items:center; gap:.5rem; padding:.4rem .6rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
 .tv-macro > .mhead .mname { font-weight:700; font-family:monospace; font-size:.82rem; }
-.tv-macro > .mbody { padding:.5rem .6rem; }
+.tv-macro > .mbody { padding:.5rem .6rem; display:flex; gap:.7rem; align-items:stretch; }
+.tv-body-tree { flex:1 1 50%; min-width:0; }
+.tv-fb { flex:1 1 50%; min-width:0; border-left:1px dashed #e2e8f0; padding-left:.6rem; display:flex; flex-direction:column; }
+.tv-fb label { margin-top:0; font-size:.6rem; }
+.tv-fb textarea { width:100%; flex:1; min-height:80px; border:1px solid #cbd5e1; border-radius:.25rem; padding:.35rem; font-size:.74rem; font-family:inherit; resize:vertical; }
+.tv-fb .fbrow { display:flex; align-items:center; gap:.4rem; margin-top:.25rem; }
+.tv-fb .fbst { font-size:.62rem; color:#94a3b8; }
 .tv-group { border-left:2px solid #cbd5e1; padding-left:.6rem; margin:.2rem 0 .2rem .15rem; }
 .tv-group.or { border-left-color:#f59e0b; } .tv-group.and { border-left-color:#3b82f6; }
 .tv-glbl { font-size:.6rem; text-transform:uppercase; font-weight:700; letter-spacing:.04em; }
@@ -67,6 +73,12 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 <div class="container">
     <div class="sidebar">
         <div style="margin-bottom:.5rem">
+            <select id="annotator-filter" onchange="setAnnotatorFilter(this.value)" style="width:100%;padding:.3rem .4rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem;margin-bottom:.3rem;background:#fff">
+                <option value="">All annotators ({{ tasks|length }})</option>
+                {% for ann, cnt in annotator_counts %}
+                <option value="{{ ann }}">{{ ann }} ({{ cnt }})</option>
+                {% endfor %}
+            </select>
             <input type="text" id="task-search" placeholder="Search tasks..." style="width:100%;padding:.3rem .5rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem" oninput="filterTasks(this.value)">
             <div id="tag-filter-row" style="display:flex;gap:.25rem;margin-top:.3rem">
                 <button class="tagf active" data-tagf="" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#1e293b;color:#fff">All</button>
@@ -75,16 +87,21 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 <button class="tagf" data-tagf="untagged" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#f8fafc;color:#64748b">Unreviewed</button>
             </div>
         </div>
+        <div id="task-search-empty" style="font-size:.75rem;color:#94a3b8"></div>
         <div id="task-list">
             {% for t in tasks %}
             {% set t_tag = t.review_tag.tag if t.review_tag else '' %}
+            {% set t_sites = t.sites|map(attribute='id')|join(' ') if t.sites else '' %}
             <div class="task-card{% if task and t.task_id == task.task_id %} active{% endif %}"
                  data-tag="{{ t_tag }}"
-                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ (t.sites[0].id if t.sites else '') ~ ' ' ~ t_tag)|lower }}"
+                 data-annotator="{{ t.annotator|default('') }}"
+                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag)|lower }}"
                  onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}'">
                 <div class="tc-id">{{ t.task_id }}
                     {% if t_tag == 'verified' %}<span style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; verified</span>
                     {% elif t_tag == 'stale' %}<span style="font-size:.58rem;background:#ffedd5;color:#ea580c;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">stale</span>{% endif %}
+                    {% if t.has_feedback %}<span style="font-size:.58rem;background:#ede9fe;color:#7c3aed;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#9998; feedback</span>{% endif %}
+                    {% if not t.has_verifier %}<span style="font-size:.58rem;background:#f1f5f9;color:#94a3b8;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">no verifier</span>{% endif %}
                 </div>
                 <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
                 <div class="tc-meta">{{ t.annotator|default('?') }} · {{ t.sites[0].id if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
@@ -147,7 +164,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 </div>
                 <div>
                     <label>Macros</label>
-                    <span>{% for m in task.macros %}{{ (macro_descriptions.get(m, {}).get('description', m))[:30] }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                    <span>{% for m in task.macros %}{{ (macro_descriptions.get(m, {}).get('description', m))[:30] }}{% if task.macro_operations and task.macro_operations.get(m) %} <b style="color:#4338ca">[{{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}]</b>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
                 </div>
                 <div>
                     <label>Expected Answer</label>
@@ -276,7 +293,11 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
             </div>
             {% for m in task.macros %}
             <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
-                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}</div>
+                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}
+                    {% if task.macro_operations and task.macro_operations.get(m) %}
+                    <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase;vertical-align:middle">op: {{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}</span>
+                    {% endif %}
+                </div>
                 <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
                 {% if task.macro_spans and task.macro_spans.get(m) %}
                 <div style="font-size:.68rem;color:#2563eb;margin-top:.1rem">Tagged actions: {{ task.macro_spans[m]|join(' → ') }}</div>
@@ -452,6 +473,7 @@ function playbackAuto() {
 }
 
 var _tagFilter = '';
+var _annFilter = '';
 
 function setTagFilter(btn) {
     _tagFilter = btn.dataset.tagf;
@@ -463,8 +485,13 @@ function setTagFilter(btn) {
     filterTasks(document.getElementById('task-search').value);
 }
 
+function setAnnotatorFilter(v) {
+    _annFilter = v;
+    filterTasks(document.getElementById('task-search').value);
+}
+
 function filterTasks(q) {
-    // match against the full instruction/site/annotator (data-search),
+    // match against the full instruction/sites/macros/annotator (data-search),
     // not just the 80-char excerpt the card displays
     var terms = q.toLowerCase().split(/\s+/).filter(Boolean);
     var visible = 0;
@@ -472,19 +499,66 @@ function filterTasks(q) {
         var hay = (c.dataset.search || c.textContent).toLowerCase();
         var tagOk = !_tagFilter
             || (_tagFilter === 'untagged' ? !c.dataset.tag : c.dataset.tag === _tagFilter);
-        var hit = tagOk && terms.every(t => hay.includes(t));
+        var annOk = !_annFilter || c.dataset.annotator === _annFilter;
+        var hit = tagOk && annOk && terms.every(t => hay.includes(t));
         c.style.display = hit ? '' : 'none';
         if (hit) visible++;
     });
-    var empty = document.getElementById('task-search-empty');
-    if (!empty) {
-        empty = document.createElement('div');
-        empty.id = 'task-search-empty';
-        empty.style.cssText = 'padding:.6rem;font-size:.75rem;color:#94a3b8';
-        document.getElementById('task-list').appendChild(empty);
-    }
-    empty.textContent = visible === 0 ? 'No tasks match "' + q + '"' : '';
+    document.getElementById('task-search-empty').textContent =
+        visible === 0 ? 'No tasks match "' + q + '"' : '';
+    saveSidebarState();
 }
+
+// --- Sidebar state persists across page loads (selection is a full navigation) ---
+var SB_KEY = 'verifySidebarState';
+
+function saveSidebarState() {
+    try {
+        sessionStorage.setItem(SB_KEY, JSON.stringify({
+            q: document.getElementById('task-search').value,
+            tag: _tagFilter,
+            ann: _annFilter,
+            scroll: document.querySelector('.sidebar').scrollTop
+        }));
+    } catch (e) {}
+}
+
+function restoreSidebarState() {
+    var st = {};
+    try { st = JSON.parse(sessionStorage.getItem(SB_KEY) || '{}'); } catch (e) {}
+    if (st.tag) {
+        var btn = document.querySelector('#tag-filter-row .tagf[data-tagf="' + st.tag + '"]');
+        if (btn) {
+            _tagFilter = st.tag;
+            document.querySelectorAll('#tag-filter-row .tagf').forEach(b => {
+                var on = b === btn;
+                b.style.outline = on ? '2px solid #1e293b' : 'none';
+                b.style.fontWeight = on ? '700' : '400';
+            });
+        }
+    }
+    if (st.ann) {
+        var sel = document.getElementById('annotator-filter');
+        sel.value = st.ann;
+        if (sel.value === st.ann) _annFilter = st.ann;
+    }
+    if (st.q) document.getElementById('task-search').value = st.q;
+    filterTasks(document.getElementById('task-search').value);
+
+    var sb = document.querySelector('.sidebar');
+    if (typeof st.scroll === 'number') sb.scrollTop = st.scroll;
+    var active = document.querySelector('.task-card.active');
+    if (active && active.style.display !== 'none') {
+        var r = active.getBoundingClientRect(), s = sb.getBoundingClientRect();
+        if (r.top < s.top || r.bottom > s.bottom) active.scrollIntoView({block: 'nearest'});
+    }
+    var _scrollT = null;
+    sb.addEventListener('scroll', function () {
+        clearTimeout(_scrollT);
+        _scrollT = setTimeout(saveSidebarState, 150);
+    });
+}
+restoreSidebarState();
 
 // --- Delete / Re-record (task header buttons) ---
 var _reviewTaskId = {{ task.task_id | tojson if task else '""' }};
@@ -779,6 +853,36 @@ function vwReview(status) {
 var TV_TASK = {{ task.task_id | tojson if task else '""' }};
 var TV_ANN  = {{ (task.annotator or 'anonymous') | tojson if task else '""' }};
 var TV_MACROS = {};   // macro -> filled tree (editable model)
+var TV_FEEDBACK = {}; // macro -> NL feedback for the later coding-agent fix pass
+var TV_OPS = {{ task.macro_operations | tojson if task and task.macro_operations else '{}' }};  // macro -> reasoning op (stored key)
+var OP_LABELS = {{ op_labels | tojson }};  // op key -> display label (e.g. read -> read/memorize)
+function opLabel(op){ return OP_LABELS[op] || op; }
+var TASK_SPANS = {{ task.macro_spans | tojson if task and task.macro_spans else '{}' }};       // macro -> [start, end] (1-based action indices)
+
+// Tag trajectory rows with their macro span + reasoning op: a labeled chip on the
+// span's first action, a matching left border across the covered rows.
+(function annotateTrajectoryWithSpans() {
+    var palette = ['#4338ca', '#0e7490', '#b45309', '#15803d', '#be185d', '#7c3aed'];
+    Object.keys(TASK_SPANS).forEach(function (m, mi) {
+        var sp = TASK_SPANS[m];
+        if (!sp || sp.length < 2) return;
+        var color = palette[mi % palette.length];
+        for (var i = sp[0]; i <= sp[1]; i++) {
+            var row = document.getElementById('traj-' + (i - 1));  // row ids are 0-based
+            if (!row) continue;
+            row.style.borderLeft = '3px solid ' + color;
+            if (i === sp[0]) {
+                var chip = document.createElement('span');
+                chip.style.cssText = 'float:right;font-size:.58rem;padding:.02rem .35rem;border-radius:.5rem;'
+                    + 'font-weight:700;color:#fff;background:' + color;
+                chip.textContent = m.replace(/_/g, ' ')
+                    + (TV_OPS[m] ? ' · ' + opLabel(TV_OPS[m]) : '')
+                    + (sp[1] > sp[0] ? ' (' + sp[0] + '→' + sp[1] + ')' : '');
+                row.appendChild(chip);
+            }
+        }
+    });
+})();
 
 function suggestTaskVerifier() {
     var btn = document.getElementById('tv-btn');
@@ -843,10 +947,16 @@ function renderTaskVerifier() {
     Object.keys(TV_MACROS).forEach(function(macro){
         var box = document.createElement('div');
         box.className = 'tv-macro';
+        var opBadge = TV_OPS[macro]
+            ? ' <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase">op: '+tvEsc(opLabel(TV_OPS[macro]))+'</span>'
+            : '';
         box.innerHTML =
-            '<div class="mhead"><span class="mname">'+tvEsc(macro)+'</span></div>'
-          + '<div class="mbody">' + tvNode(TV_MACROS[macro])
-          + '<details class="tv-raw"><summary>edit raw JSON</summary></details></div>';
+            '<div class="mhead"><span class="mname">'+tvEsc(macro)+'</span>'+opBadge+'</div>'
+          + '<div class="mbody"><div class="tv-body-tree">' + tvNode(TV_MACROS[macro])
+          + '<details class="tv-raw"><summary>edit raw JSON</summary></details></div>'
+          + '<div class="tv-fb"><label>Feedback</label>'
+          + '<div class="fbrow"><button class="btn btn-primary fbsave" style="padding:.15rem .5rem;font-size:.68rem">Save</button>'
+          + '<span class="fbst"></span></div></div></div>';
         // editable raw-JSON fallback that keeps the readable view in sync
         var ta = document.createElement('textarea');
         ta.value = JSON.stringify(TV_MACROS[macro], null, 2);
@@ -855,6 +965,19 @@ function renderTaskVerifier() {
             catch(e){ ta.style.borderColor='#ef4444'; }
         };
         box.querySelector('.tv-raw').appendChild(ta);
+        // per-macro NL feedback, applied by a coding agent in a later pass
+        var fb = box.querySelector('.tv-fb');
+        var fbst = fb.querySelector('.fbst');
+        var fbta = document.createElement('textarea');
+        fbta.placeholder = "What should change about this macro's checks?";
+        fbta.value = TV_FEEDBACK[macro] || '';
+        if (fbta.value) fbst.textContent = 'saved';
+        fbta.oninput = function(){
+            TV_FEEDBACK[macro] = fbta.value;
+            fbst.textContent = 'unsaved changes';
+        };
+        fb.insertBefore(fbta, fb.querySelector('.fbrow'));
+        fb.querySelector('.fbsave').onclick = function(){ saveFeedback(fbst); };
         el.appendChild(box);
     });
     document.getElementById('tv-sandbox').style.display =
@@ -866,10 +989,26 @@ function saveTaskVerifier() {
     status.textContent = 'saving…';
     fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK), {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({macros: TV_MACROS, model: 'gemini-3.5-flash'})
+        body: JSON.stringify({macros: TV_MACROS})
     }).then(function(r){ return r.json(); }).then(function(d){
         status.textContent = d.error ? ('error: '+d.error) : 'saved ✓';
     });
+}
+
+function saveFeedback(statusEl) {
+    // save the whole feedback dict (all macros), dropping blank entries
+    var pruned = {};
+    Object.keys(TV_FEEDBACK).forEach(function(m){
+        var t = (TV_FEEDBACK[m] || '').trim();
+        if (t) pruned[m] = t;
+    });
+    statusEl.textContent = 'saving…';
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({feedback: pruned, feedback_at: new Date().toISOString()})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        statusEl.textContent = d.error ? ('error: ' + d.error) : 'saved ✓';
+    }).catch(function(e){ statusEl.textContent = 'error: ' + e; });
 }
 
 // --- Sandbox: run the current spec against a trajectory ---
@@ -927,6 +1066,7 @@ function renderNode(node) {
 if (TV_TASK) {
     fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK))
         .then(function(r){ return r.json(); }).then(function(d){
+            if (d.feedback && typeof d.feedback === 'object') TV_FEEDBACK = d.feedback;
             if (d.macros && Object.keys(d.macros).length) {
                 TV_MACROS = d.macros; renderTaskVerifier();
                 document.getElementById('tv-save').style.display = '';

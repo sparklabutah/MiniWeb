@@ -87,6 +87,17 @@
             <span class="badge badge-{{ policy.status }}">{{ policy.status|replace('_', ' ')|title }}</span>
         </div>
 
+        {% if policy.requires_signature and not policy.signed %}
+        <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:.4rem;padding:.9rem 1.1rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <div style="color:#92400e;font-weight:600;font-size:.92rem;">&#9997;&#65039; Signature required &mdash; this policy is not in force until you sign it.</div>
+            <a href="{{ url_for('insurance-loans.policy_sign_page', policy_id=policy.id) }}" style="padding:.5rem 1.2rem;background:#1a3c5e;color:#fff;text-decoration:none;border-radius:.3rem;font-size:.88rem;font-weight:600;">Sign now &rarr;</a>
+        </div>
+        {% elif policy.signed %}
+        <div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:.4rem;padding:.9rem 1.1rem;margin-bottom:1.5rem;color:#166534;font-weight:600;font-size:.92rem;">
+            &#10003; Signed on {{ policy.signed_date }}{% if policy.signed_by %} by {{ policy.signed_by }}{% endif %}.
+        </div>
+        {% endif %}
+
         <div class="grid">
             <div class="card">
                 <h3>Policy Information</h3>

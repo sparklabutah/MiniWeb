@@ -48,10 +48,19 @@ def _get_user(user_id):
 
 
 def _max_id(collection, id_col="id"):
-    """Get the max id from a collection via SQL."""
+    """Get the max id from a collection.
+
+    For the collection's primary-key column this is overlay-aware (accounts for
+    items created earlier in THIS session, which live only in session_overlay) via
+    db.next_id; callers add +1, so we return next_id - 1 to keep max semantics.
+    Non-PK columns (e.g. bids.bid_id) fall back to the base-table SQL MAX, since the
+    session overlay only tracks the PK.
+    """
     table = db.get_table_name(SITE, collection)
     if not table:
         return 0
+    if id_col == db.get_pk_column(SITE, collection):
+        return db.next_id(SITE, collection) - 1
     return db.execute(f"SELECT MAX([{id_col}]) as m FROM [{table}]", fetch="val") or 0
 
 

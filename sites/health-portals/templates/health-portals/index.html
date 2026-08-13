@@ -37,6 +37,26 @@
             </tr>
         </table>
 
+        <!-- Forms awaiting signature (e-signature notifications) -->
+        {% if pending_forms %}
+        <div class="sign-notice">
+            <div class="sign-notice-head">
+                <span class="sign-notice-icon">🖊</span>
+                <span class="sign-notice-title">You have {{ pending_forms|length }} form{{ 's' if pending_forms|length != 1 }} awaiting your signature</span>
+                <span class="sign-notice-badge">{{ pending_forms|length }}</span>
+            </div>
+            <ul class="sign-notice-list">
+                {% for f in pending_forms %}
+                <li>
+                    <span class="sign-notice-doc">{{ f.title }}</span>
+                    <span class="sign-notice-formno">Form {{ f.form_no }}</span>
+                    <a class="sign-notice-btn" href="{{ url_for('health-portals.sign_form_page', form_id=f.id) }}">Review &amp; Sign &raquo;</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         <!-- Announcements -->
         <div class="portlet">
             <div class="portlet-head">Announcements &amp; Health Bulletins</div>

@@ -35,28 +35,39 @@ groups:
 operations:
   read:
     weight: 0
+    label: read/memorize
     desc: 'read/memorize: the info is present on the page — locate and read it (baseline / filler)'
     check: answer appears verbatim on a visited page
   extremum:
     weight: 3
+    label: extremum
     desc: get the max/min among on-page items without using a sort control
     check: chosen item is the argmax/argmin of the candidate set
   count:
     weight: 3
+    label: count
     desc: count the on-page items that match a condition
     check: count matches the true number of matching items
   compute:
     weight: 3
+    label: compute
     desc: compute a new value from values on the page (a value not itself shown)
     check: recompute from source data and compare
   compare:
     weight: 3
+    label: compare
     desc: compare two values on the page against each other
     check: the stated relation holds over the named values
   verify:
     weight: 2
+    label: verify
     desc: compare a value on the page against a value given in the instruction
     check: the on-page value satisfies the instruction's stated value/condition
+  spatial:
+    weight: 3
+    label: spatial
+    desc: 'reason about WHERE something is — locate/position by region, proximity, or coordinates (pan/zoom to reveal off-screen info, pick the item closest to a point, sign/draw in the correct field, scrub to a timestamp)'
+    check: the agent acts at the correct location/region/position, not merely with the right value
 macros:
   create_by_form:
     group: form
@@ -142,6 +153,9 @@ macros:
     example: Enter username and password, then Login
     span_start: open the form
     span_end: submit
+    warning: 'The task must START LOGGED OUT, or logging in isn''t a real step. Turn
+      OFF the auto-login toggle before recording, and give the credentials to use in
+      the instruction.'
   share_by_form:
     group: form
     description: Share an item via a share form/dialog
@@ -212,18 +226,26 @@ macros:
     example: Zoom into downtown to find restaurants
     span_start: first pan/zoom
     span_end: last pan/zoom
+    warning: 'SPATIAL macro — the verifier checks that the agent pans/zooms to REVEAL
+      the target data. Design the task so the info is off-viewport or illegible until
+      panned/zoomed to, and make the instruction depend on that revealed info.'
   search_by_playback:
     group: search
     description: Find info by scrubbing/rewinding media (NEW)
     example: Scrub the video to find when X is said
     span_start: start scrubbing
     span_end: info located
+    warning: 'SPATIAL macro — the verifier checks that the agent uses timestamped
+      playback to find the info. Anchor the question to a specific timestamp (info
+      that is NOT visible without scrubbing/playing to it).'
   navigate_by_route:
     group: navigate
     description: Go to a page by clicking a link/menu/tab
     example: Click Dashboard in the sidebar
     span_start: link/menu click
     span_end: page changed
+    warning: 'The verifier checks the agent REACHED the target page — make the destination
+      unambiguous and reachable via a visible link/menu/tab (not only a typed URL).'
     aliases:
       - navigate_by_semantic
   toggle_relationship:
@@ -233,6 +255,9 @@ macros:
     example: Follow / save / block the located item
     span_start: locate the target
     span_end: toggle clicked
+    warning: 'The toggle must apply to the RIGHT target — design so there is exactly
+      one correct user/item to act on (name it unambiguously). Also check the starting
+      state (already-followed vs not) so the toggle direction is well-defined.'
     aliases:
       - block_by_dropdown
       - block_by_toggle
@@ -252,6 +277,8 @@ macros:
     example: Set the review to 4 of 5 stars
     span_start: first star/drag
     span_end: rating set
+    warning: 'Specify the EXACT rating in the instruction (e.g. 4 of 5) so the set value
+      is assertable — an open-ended "rate it" isn''t deterministically gradeable.'
     aliases:
       - rate_by_slider
   feedback_by_text:
@@ -266,6 +293,9 @@ macros:
     example: Click play to start the episode
     span_start: open media page
     span_end: play clicked
+    warning: 'SPATIAL macro — the verifier checks playback control usage (play/seek
+      to a given position). Specify the exact track and position in the instruction
+      so the seek is assertable.'
     aliases:
       - play_by_date_range
       - play_by_timestamp
@@ -291,12 +321,28 @@ macros:
     span_end: translation received
   sign_by_freeformdrawing:
     group: content
-    description: Sign/draw freeform on a canvas
-    example: Draw your signature in the box
-    span_start: select pen tool
-    span_end: save clicked
+    description: Sign a document by DRAWING your signature freeform on a canvas ("Sign here" field)
+    example: Draw your signature in the "Sign here" box and click Adopt and Sign
+    span_start: start drawing in the signature field
+    span_end: signature adopted/submitted
+    warning: 'There are some docs need signing, and there are detector zones that are
+      only visible to the annotator. Design a task that require the agent to sign one
+      of those zone. You can make it more challenging by avoiding name the zone
+      directly.'
     aliases:
       - sign_by_signature
+  sign_by_text:
+    group: content
+    description: Sign a document by TYPING your name into the signature field (adopt a typed signature)
+    example: Type your full legal name to adopt a typed signature, then Sign
+    span_start: focus the typed-signature field
+    span_end: signature adopted/submitted
+    warning: 'There are some docs need signing, and there are detector zones that are
+      only visible to the annotator. Design a task that require the agent to sign one
+      of those zone. You can make it more challenging by avoiding name the zone
+      directly.'
+    aliases:
+      - sign_by_typed_name
   join_meeting:
     group: content
     description: Join a meeting (by code or link)
@@ -326,6 +372,16 @@ macros:
     example: Crop the profile photo and save
     span_start: select tool
     span_end: save
+  edit_by_cell:
+    group: content
+    description: Enter or change data directly in a grid/table cell (incl. adding a row or column to extend the table)
+    example: Click a cell and type a value, or add a row and fill it
+    span_start: focus a grid cell
+    span_end: cell value committed (save or autosave)
+    aliases:
+      - extend_table
+      - edit_by_grid
+      - add_by_row
   write_executable_program:
     group: content
     description: Write and run code
@@ -376,6 +432,9 @@ macros:
     example: What is the meeting ID of the earliest upcoming meeting? — report_information.read
     span_start: the answer is located/surfaced on the page
     span_end: the answer is reported
+    warning: 'Terminal tag — place it LAST, where the answer is on screen, and set its
+      reasoning op (read/extremum/count/compute/compare/verify/spatial). The reported
+      answer must be a specific, deterministically-gradeable value — not open-ended prose.'
     aliases:
       - reasoning_on_page
       - compare_by_date_range

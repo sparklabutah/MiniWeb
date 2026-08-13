@@ -147,7 +147,7 @@ def entry(name):
     return macros.get(canon(name), {})
 
 
-_DESC_FIELDS = ("description", "example", "group", "span_start", "span_end")
+_DESC_FIELDS = ("description", "example", "group", "span_start", "span_end", "warning")
 
 
 def describe(name):

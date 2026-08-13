@@ -194,17 +194,15 @@ def _enrich_question(q, user_map, answers=None, fetch_answers=False):
 
 
 def _next_question_id():
-    """Next question ID via SQL MAX (not bounded by query limit)."""
-    table = db.get_table_name(SITE, "questions")
-    m = db.execute(f"SELECT MAX([id]) FROM [{table}]", fetch="val")
-    return (m + 1) if m else 90001
+    """Next question ID, aware of base table AND this session's overlay."""
+    nid = db.next_id(SITE, "questions")
+    return nid if nid > 1 else 90001
 
 
 def _next_answer_id():
-    """Next answer ID via SQL MAX (not bounded by query limit)."""
-    table = db.get_table_name(SITE, "answers")
-    m = db.execute(f"SELECT MAX([id]) FROM [{table}]", fetch="val")
-    return (m + 1) if m else 80001
+    """Next answer ID, aware of base table AND this session's overlay."""
+    nid = db.next_id(SITE, "answers")
+    return nid if nid > 1 else 80001
 
 
 def _next_user_id(users):

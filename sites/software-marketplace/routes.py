@@ -460,8 +460,14 @@ def category_page(cat):
     user = None
     installed_ids = set()
     if "user_id" in session:
-        user = _get_user(session["user_id"])
-        installed_ids = _installed_app_ids(session["user_id"])
+        # Personalization must never break the page: a malformed session-overlay
+        # entry (install/user record the agent mutated) should degrade to the
+        # logged-out grid, not a 500.
+        try:
+            user = _get_user(session["user_id"])
+            installed_ids = _installed_app_ids(session["user_id"])
+        except Exception:
+            user, installed_ids = None, set()
 
     return render_template(
         "software-marketplace/category.html",

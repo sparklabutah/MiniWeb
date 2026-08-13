@@ -128,6 +128,28 @@ function hashColor(str) {
     return ICON_COLORS[Math.abs(h) % ICON_COLORS.length];
 }
 
+// Realistic site search: match by brand name AND by functionality/intent
+// keywords, ranked. Mirrors app/portal/routes.py::site_search_score.
+const SEARCH_STOP = new Set(['a','an','the','my','to','find','for','on','in','of',
+    'me','i','want','how','do','can','with','and','or','is','it','get','go','new',
+    'some','that','this','at','by','your','our','we','you']);
+function siteSearchScore(s, query) {
+    const ql = (query || '').toLowerCase().trim();
+    if (!ql) return 0;
+    const name = (s.name || '').toLowerCase();
+    const text = [s.name, s.description, s.category, s.keywords]
+        .filter(Boolean).join(' ').toLowerCase();
+    let score = 0;
+    if (name.includes(ql)) score += 20;
+    else if (text.includes(ql)) score += 10;
+    const toks = ql.split(/[^a-z0-9]+/).filter(t => t.length >= 3 && !SEARCH_STOP.has(t));
+    for (const t of toks) {
+        if (name.includes(t)) score += 4;
+        else if (text.includes(t)) score += 3;
+    }
+    return score;
+}
+
 // ---- Tab management ----
 
 function createTab(siteId, opts) {
@@ -468,60 +490,48 @@ function openBookmark(siteId) {
     createTab(siteId, { insertAfterActive: true });
 }
 
+function _hoverMeta(site) {
+    // The type/category, shown ONLY on hover — never as a visible label.
+    const parts = [];
+    if (site.category) parts.push(site.category);
+    if (site.description && site.description !== site.name) parts.push(site.description);
+    return parts.join(' · ') || site.name;
+}
+
 function buildCategories() {
     const container = document.getElementById('ntp-categories');
     container.innerHTML = '';
 
-    // Group sites by category
-    const groups = {};
-    SITES.forEach(s => {
-        const cat = s.category || 'Other';
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(s);
+    // One flat grid of every site, sorted by NAME. Each tile shows only the site's
+    // actual name; its type/category is revealed on hover (title tooltip), not as a
+    // visible header/label — so what's shown is exactly the site name an agent or
+    // user is looking for.
+    const grid = document.createElement('div');
+    grid.className = 'ntp-category-grid';
+
+    SITES.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(site => {
+        const tile = document.createElement('div');
+        tile.className = 'bookmark-tile';
+        tile.dataset.siteId = site.id;
+        tile.title = _hoverMeta(site);
+        tile.addEventListener('click', () => openBookmark(site.id));
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'bookmark-icon';
+        iconEl.textContent = site.name.charAt(0).toUpperCase();
+        iconEl.style.background = hashColor(site.id);
+
+        const label = document.createElement('div');
+        label.className = 'bookmark-label';
+        label.textContent = site.name;
+        label.title = _hoverMeta(site);
+
+        tile.appendChild(iconEl);
+        tile.appendChild(label);
+        grid.appendChild(tile);
     });
 
-    // Render in defined order
-    CATEGORY_ORDER.forEach(cat => {
-        const sites = groups[cat];
-        if (!sites || sites.length === 0) return;
-
-        const section = document.createElement('div');
-        section.className = 'ntp-category';
-        section.dataset.category = cat;
-
-        const header = document.createElement('div');
-        header.className = 'ntp-category-header';
-        const icon = CATEGORY_ICONS[cat] || '\u{1F4E6}';
-        header.innerHTML = `<span class="cat-icon">${icon}</span> ${cat} <span class="cat-count">${sites.length}</span>`;
-        section.appendChild(header);
-
-        const grid = document.createElement('div');
-        grid.className = 'ntp-category-grid';
-
-        sites.forEach(site => {
-            const tile = document.createElement('div');
-            tile.className = 'bookmark-tile';
-            tile.dataset.siteId = site.id;
-            tile.addEventListener('click', () => openBookmark(site.id));
-
-            const iconEl = document.createElement('div');
-            iconEl.className = 'bookmark-icon';
-            iconEl.textContent = site.name.charAt(0).toUpperCase();
-            iconEl.style.background = hashColor(site.id);
-
-            const label = document.createElement('div');
-            label.className = 'bookmark-label';
-            label.textContent = site.name;
-            label.title = site.description || site.name;
-
-            tile.appendChild(iconEl);
-            tile.appendChild(label);
-            grid.appendChild(tile);
-        });
-
-        section.appendChild(grid);
-        container.appendChild(section);
-    });
+    container.appendChild(grid);
 }
 
 // ---- NTP Search (web search with MiniWeb results on top) ----
@@ -541,11 +551,14 @@ function showSearchResults(query) {
         return;
     }
 
-    // Quick autocomplete from local SITES data
-    const matches = SITES.filter(s =>
-        s.name.toLowerCase().includes(q.toLowerCase()) ||
-        (s.description || '').toLowerCase().includes(q.toLowerCase())
-    );
+    // Quick autocomplete from local SITES data — match by brand name AND by
+    // functionality/intent (keywords), ranked by relevance so "spreadsheet",
+    // "edit a spreadsheet", or "file my taxes" all resolve realistically.
+    const matches = SITES
+        .map(s => ({ s, score: siteSearchScore(s, q) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(x => x.s);
 
     dropdown.innerHTML = '';
     matches.slice(0, 5).forEach(site => {
@@ -558,8 +571,9 @@ function showSearchResults(query) {
         iconEl.style.background = hashColor(site.id);
         const info = document.createElement('div');
         info.className = 'search-result-info';
-        info.innerHTML = `<div class="search-result-name">${site.name}</div>
-            <div class="search-result-desc">${site.category || ''}</div>`;
+        // Only the site name is shown; type/category is on hover (title), not visible.
+        info.innerHTML = `<div class="search-result-name">${site.name}</div>`;
+        item.title = _hoverMeta(site);
         item.appendChild(iconEl);
         item.appendChild(info);
         dropdown.appendChild(item);

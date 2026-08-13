@@ -36,6 +36,15 @@
         .avg-col { font-weight: 600; background: #fafbfd; }
         .export-link { font-size: .85rem; float: right; color: #3b82f6; text-decoration: none; }
         .export-link:hover { text-decoration: underline; }
+        .cell-input { width: 3.4rem; padding: .25rem; text-align: center; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .8rem; color: #1e293b; background: #fff; }
+        .cell-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+        .name-input { width: 100%; padding: .25rem; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .8rem; }
+        .grade-actions { margin-top: 1rem; display: flex; gap: .6rem; }
+        .btn { padding: .45rem 1rem; font-size: .85rem; border: none; border-radius: .3rem; cursor: pointer; }
+        .btn-add { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }
+        .btn-add:hover { background: #e2e8f0; }
+        .btn-save { background: #3b82f6; color: #fff; }
+        .btn-save:hover { background: #2563eb; }
     </style>
 </head>
 <body>
@@ -75,7 +84,8 @@
                 {% endfor %}
             </div>
 
-            <table>
+            <form method="post" action="{{ url_for('course-sites-classrooms.form_save_gradebook', course_id=course.id) }}">
+            <table id="gradebook-table">
                 <thead>
                     <tr>
                         <th>Student</th>
@@ -86,21 +96,17 @@
                         <th class="avg-col">Grade</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="gradebook-body">
                     {% for row in gradebook %}
                     <tr>
                         <td><strong>{{ row.student.name }}</strong></td>
                         {% for a in assignments %}
                         <td class="score-cell">
                             {% set sub = row.scores.get(a.id) %}
-                            {% if sub and sub.score is not none %}
-                                {% set pct = (sub.score / a.points_possible * 100) %}
-                                <span class="{% if pct >= 80 %}score-good{% elif pct >= 60 %}score-mid{% else %}score-low{% endif %}">
-                                    {{ sub.score }}
-                                </span>
-                            {% else %}
-                                <span style="color:#cbd5e1;">--</span>
-                            {% endif %}
+                            <input class="cell-input" type="number" step="any" min="0"
+                                   name="cell_{{ row.student.id }}_{{ a.id }}"
+                                   value="{{ sub.score if sub and sub.score is not none else '' }}"
+                                   placeholder="--" title="out of {{ a.points_possible }}">
                         </td>
                         {% endfor %}
                         <td class="avg-col">{{ row.weighted_avg if row.weighted_avg is not none else '--' }}%</td>
@@ -109,7 +115,51 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <div class="grade-actions">
+                <button type="button" class="btn btn-add" id="add-row-btn">+ Add row</button>
+                <button type="submit" class="btn btn-save">Save Changes</button>
+            </div>
+            </form>
         </div>
+
+        <script>
+            (function () {
+                var assignmentIds = [{% for a in assignments %}{{ a.id }}{% if not loop.last %}, {% endif %}{% endfor %}];
+                var newRowCount = 0;
+                var body = document.getElementById('gradebook-body');
+                var btn = document.getElementById('add-row-btn');
+                if (btn) {
+                    btn.addEventListener('click', function () {
+                        var n = newRowCount++;
+                        var tr = document.createElement('tr');
+                        var nameTd = document.createElement('td');
+                        var nameInput = document.createElement('input');
+                        nameInput.className = 'name-input';
+                        nameInput.name = 'newrow_' + n + '_name';
+                        nameInput.placeholder = 'New student name';
+                        nameTd.appendChild(nameInput);
+                        tr.appendChild(nameTd);
+                        assignmentIds.forEach(function (aid) {
+                            var td = document.createElement('td');
+                            td.className = 'score-cell';
+                            var input = document.createElement('input');
+                            input.className = 'cell-input';
+                            input.type = 'number';
+                            input.step = 'any';
+                            input.min = '0';
+                            input.name = 'newrow_' + n + '_cell_' + aid;
+                            input.placeholder = '--';
+                            td.appendChild(input);
+                            tr.appendChild(td);
+                        });
+                        tr.appendChild(document.createElement('td'));
+                        tr.appendChild(document.createElement('td'));
+                        body.appendChild(tr);
+                        nameInput.focus();
+                    });
+                }
+            })();
+        </script>
     </div>
 </body>
 </html>

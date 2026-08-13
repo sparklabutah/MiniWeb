@@ -7,16 +7,16 @@ A macro tag has **two axes**:
   `filter_by_slider`, `navigate_by_route`, `toggle_relationship`), grouped into
   families (`groups:` in the yaml); and
 - an optional **reasoning operation** — what the agent had to figure out from the
-  page: `read` (baseline / filler), `extremum`, `count`, `compute`, `compare`,
-  `verify`. Every operation has a **deterministic check** so it can grade and
-  reward, not just label.
+  page: `read` (displayed as "read/memorize"; baseline / filler), `extremum`,
+  `count`, `compute`, `compare`, `verify`. Every operation has a **deterministic
+  check** so it can grade and reward, not just label.
 
 Reasoning the agent must **output to the human** (the answer/report) uses the
 op-only base **`report_information`** carrying one operation — e.g. "what is the
 cheapest flight?" = `report_information.extremum`. This replaced the old
 `reasoning_on_page` (now an alias). **Intermediate** reasoning is never its own
 tag: its operation folds onto the base macro it is part of (a macro carries one
-op). Op meanings: `read`=info is on the page; `extremum`=get max/min;
+op). Op meanings: `read` (UI label "read/memorize")=info is on the page; `extremum`=get max/min;
 `count`=count; `compute`=compute a new value from on-page values; `compare`=compare
 two on-page values; `verify`=compare an on-page value against a value in the
 instruction.

@@ -445,6 +445,63 @@ def form_create_contact():
     return redirect(url_for("crm.contact_detail", contact_id=new_id))
 
 
+@blueprint.route("/contacts/save", methods=["POST"])
+def form_save_contacts():
+    """Persist inline data-grid edits from the contacts table (edit_by_cell).
+
+    Existing rows submit `cell_<id>_<field>`; JS-added rows submit
+    `new_<n>_<field>`. Editable fields: name, title, email, phone. The full
+    edit set is POSTed in the request body so the mutation is captured
+    server-side and a verifier can assert what changed. Persists via
+    db.save_collection to the session overlay (never base tables).
+    """
+    if "user_id" not in session:
+        return redirect(url_for("crm.login_page"))
+    editable = ("name", "title", "email", "phone")
+    contacts = db.query(SITE, "contacts")
+    by_id = {c["id"]: c for c in contacts}
+    new_rows = {}
+
+    for key, value in request.form.items():
+        if key.startswith("cell_"):
+            parts = key.split("_", 2)
+            if len(parts) != 3:
+                continue
+            try:
+                cid = int(parts[1])
+            except ValueError:
+                continue
+            field = parts[2]
+            if field in editable and cid in by_id:
+                by_id[cid][field] = value.strip()
+        elif key.startswith("new_"):
+            parts = key.split("_", 2)
+            if len(parts) != 3:
+                continue
+            idx, field = parts[1], parts[2]
+            if field in editable:
+                new_rows.setdefault(idx, {})[field] = value.strip()
+
+    next_new = db.next_id(SITE, "contacts")
+    for idx in sorted(new_rows, key=lambda x: int(x) if x.isdigit() else x):
+        row = new_rows[idx]
+        if not any(row.get(f) for f in editable):
+            continue
+        contacts.append({
+            "id": next_new,
+            "name": row.get("name", ""),
+            "email": row.get("email", ""),
+            "phone": row.get("phone", ""),
+            "company_id": 0,
+            "title": row.get("title", ""),
+            "created_date": datetime.now().strftime("%Y-%m-%d"),
+        })
+        next_new += 1
+
+    db.save_collection(SITE, "contacts", contacts)
+    return redirect(url_for("crm.contacts_page"))
+
+
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------

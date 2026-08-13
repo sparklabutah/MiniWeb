@@ -101,19 +101,20 @@ def _get_browsing_user():
 
 @blueprint.context_processor
 def _inject_unread():
-    """Expose the message unread-count to every template (tab bar badge)."""
+    """Expose message unread-count and pending-form count to every template
+    (tab bar / masthead badges)."""
     from flask import request as _rq
     if "/api/" in _rq.path:
         return {}
     try:
         user, _ = _get_browsing_user()
         if not user:
-            return {"unread_count": 0}
+            return {"unread_count": 0, "pending_forms_count": 0}
         msgs = _load_messages()
         n = sum(1 for m in msgs if m.get("recipient_id") == user["id"] and not m.get("read", True))
-        return {"unread_count": n}
+        return {"unread_count": n, "pending_forms_count": len(_pending_forms(user["id"]))}
     except Exception:
-        return {"unread_count": 0}
+        return {"unread_count": 0, "pending_forms_count": 0}
 
 
 def _get_providers():
@@ -178,6 +179,129 @@ _ANNOUNCEMENT_COLORS = {
     "Seasonal": "#0d9488", "Telehealth": "#2563eb", "Portal": "#7c3aed",
     "Health Tip": "#059669", "Notice": "#b45309",
 }
+
+
+# ---------------------------------------------------------------------------
+# Consent / intake forms (DocuSign-style e-signature)
+# ---------------------------------------------------------------------------
+# Patients have consent/intake forms to sign. The set below is the canonical
+# catalog; the per-patient signed state lives in the session overlay (collection
+# "consent_forms", keyed by patient id) so signing persists within a session
+# without ever touching base tables. A fresh session gets the deterministic
+# default: exactly two forms pending (unsigned), the rest already signed.
+_CONSENT_FORMS = [
+    {
+        "id": "consent-to-treat",
+        "title": "Consent to Treat",
+        "form_no": "LMC-100",
+        "body": (
+            "I voluntarily consent to the health care, treatment, and services "
+            "provided by the physicians, providers, and staff of Lakeport Medical "
+            "Center that are considered necessary or advisable in their professional "
+            "judgment. I understand that the practice of medicine is not an exact "
+            "science and that no guarantees have been made to me about the results of "
+            "any examination or treatment. This consent remains in effect for the "
+            "duration of my care unless withdrawn in writing."
+        ),
+        "default_signed": True,
+        "default_date": "2026-06-14",
+    },
+    {
+        "id": "hipaa-privacy",
+        "title": "HIPAA Privacy Acknowledgment",
+        "form_no": "LMC-201",
+        "body": (
+            "I acknowledge that I have been provided a copy of Lakeport Medical "
+            "Center's Notice of Privacy Practices, which describes how my protected "
+            "health information may be used and disclosed and how I may obtain access "
+            "to that information. I understand that I may request restrictions on "
+            "certain uses and disclosures of my health information as permitted under "
+            "the Health Insurance Portability and Accountability Act (HIPAA)."
+        ),
+        "default_signed": True,
+        "default_date": "2026-06-14",
+    },
+    {
+        "id": "telehealth-consent",
+        "title": "Telehealth Consent Form",
+        "form_no": "LMC-315",
+        "body": (
+            "I consent to receive health care services via telehealth, including the "
+            "use of interactive audio, video, and other electronic media. I understand "
+            "the benefits and risks of telehealth, that my provider may determine an "
+            "in-person visit is required, and that my information will be transmitted "
+            "securely. I understand that I may withdraw my consent to telehealth "
+            "services at any time without affecting my right to future care."
+        ),
+        "default_signed": False,
+        "default_date": None,
+    },
+    {
+        "id": "financial-responsibility",
+        "title": "Financial Responsibility Agreement",
+        "form_no": "LMC-402",
+        "body": (
+            "I understand that I am financially responsible for any balance not paid "
+            "by my insurance carrier for services rendered by Lakeport Medical Center. "
+            "I authorize the release of any information necessary to process my insurance "
+            "claims and assign medical benefits directly to the provider. I agree to pay "
+            "any copayments, deductibles, and non-covered charges at the time of service "
+            "or upon receipt of a statement."
+        ),
+        "default_signed": False,
+        "default_date": None,
+    },
+]
+
+
+def _default_consent_forms():
+    """Deterministic default state: exactly the forms with default_signed=False
+    are pending; the rest are already signed."""
+    forms = []
+    for f in _CONSENT_FORMS:
+        signed = f["default_signed"]
+        forms.append({
+            "id": f["id"],
+            "title": f["title"],
+            "form_no": f["form_no"],
+            "body": f["body"],
+            "signed": signed,
+            "signed_date": f["default_date"] if signed else None,
+            "signed_method": "typed" if signed else None,
+            "signature": None,
+        })
+    return forms
+
+
+def _load_consent_forms(patient_id):
+    """Return this patient's consent forms.
+
+    Reads the session overlay first (get_item is overlay-first, so any signing
+    done this session is honoured); otherwise falls back to the deterministic
+    default in which exactly two forms are pending.
+    """
+    row = db.get_item(SITE, "consent_forms", patient_id)
+    if row and row.get("forms"):
+        return row["forms"]
+    return _default_consent_forms()
+
+
+def _save_consent_forms(patient_id, forms):
+    """Persist the patient's consent-form state to the session overlay only."""
+    db.save_item(SITE, "consent_forms", patient_id, {
+        "id": patient_id,
+        "patient_id": patient_id,
+        "forms": forms,
+    })
+
+
+def _pending_forms(patient_id):
+    """The patient's unsigned consent forms."""
+    return [f for f in _load_consent_forms(patient_id) if not f.get("signed")]
+
+
+def _get_consent_form(patient_id, form_id):
+    return next((f for f in _load_consent_forms(patient_id) if f["id"] == form_id), None)
 
 
 @blueprint.route("/")
@@ -264,9 +388,12 @@ def index():
 
     announcements = [dict(a, color=_ANNOUNCEMENT_COLORS.get(a["category"], "#0d6e6e")) for a in _ANNOUNCEMENTS]
 
+    pending_forms = _pending_forms(patient_id)
+
     return render_template(
         "health-portals/index.html",
         user=user, logged_in=logged_in,
+        pending_forms=pending_forms,
         upcoming=upcoming, recent_appts=recent_appts,
         recent_msgs=recent_msgs, unread_count=unread_count,
         meds=meds, active_prescriptions=len(meds),
@@ -708,6 +835,92 @@ def cancel_appointment_submit(appt_id):
     return render_template("health-portals/cancel.html",
                            user=user, logged_in=logged_in,
                            appointment=appt, error=None, success=True)
+
+
+# ---------------------------------------------------------------------------
+# Consent form e-signature (sign_by_freeformdrawing / sign_by_text)
+# ---------------------------------------------------------------------------
+
+def _valid_signature_drawing(drawing, points):
+    """A drawn signature counts when it's a PNG data URL of plausible size backed
+    by enough stroke points that a stray dot doesn't pass as a signature."""
+    if not (isinstance(drawing, str) and drawing.startswith("data:image/png;base64,")):
+        return False
+    if len(points or []) < 8:
+        return False
+    import base64
+    try:
+        return len(base64.b64decode(drawing.split(",", 1)[1])) > 500
+    except Exception:
+        return False
+
+
+@blueprint.route("/forms/<form_id>/sign", methods=["GET"])
+def sign_form_page(form_id):
+    """Render a consent form's text plus a DocuSign-style signer offering two
+    ways to sign: Draw (freeform canvas) or Type (adopt a typed name)."""
+    user, logged_in = _get_browsing_user()
+    form = _get_consent_form(user["id"], form_id)
+    if not form:
+        abort(404)
+    return render_template(
+        "health-portals/sign_form.html",
+        user=user, logged_in=logged_in, form=form,
+    )
+
+
+@blueprint.route("/forms/<form_id>/sign", methods=["POST"])
+def sign_form_submit(form_id):
+    """Electronically sign a consent form.
+
+    Accepts EITHER a valid drawn signature (PNG data URL + stroke points ->
+    method "drawn", macro sign_by_freeformdrawing) OR a non-empty typed legal
+    name (method "typed", macro sign_by_text). On success the form is marked
+    signed and the change is persisted to the session overlay only, which drops
+    it from the pending list (and the dashboard notification). The POST body is
+    captured by /_admin/log so the action is gradeable.
+    """
+    user, logged_in = _get_browsing_user()
+    forms = _load_consent_forms(user["id"])
+    form = next((f for f in forms if f["id"] == form_id), None)
+    if not form:
+        return jsonify({"error": "Form not found"}), 404
+    if form.get("signed"):
+        return jsonify({"status": "signed", "form_id": form_id,
+                        "already_signed": True,
+                        "signed_date": form.get("signed_date"),
+                        "method": form.get("signed_method")}), 200
+
+    data = request.get_json(silent=True) or request.form
+    drawing = data.get("signature_drawing") or ""
+    points = data.get("signature_points") or []
+    typed_name = (data.get("typed_name") or "").strip()
+
+    if _valid_signature_drawing(drawing, points):
+        method = "drawn"
+        signature = drawing
+    elif typed_name:
+        method = "typed"
+        signature = typed_name
+    else:
+        return jsonify({
+            "error": "Draw your signature in the 'Sign here' box, "
+                     "or type your full legal name to adopt a typed signature."
+        }), 400
+
+    form["signed"] = True
+    form["signed_date"] = datetime.now().strftime("%Y-%m-%d")
+    form["signed_method"] = method
+    form["signature"] = signature
+    _save_consent_forms(user["id"], forms)
+
+    return jsonify({
+        "status": "signed",
+        "form_id": form_id,
+        "method": method,
+        "signed_date": form["signed_date"],
+        "pending_remaining": len([f for f in forms if not f.get("signed")]),
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -156,8 +156,9 @@ def index():
         })
 
     # Sort by last message time (most recent first), then pinned chats to top
+    # recency wins the ordering — a conversation that just received a message
+    # must surface on top; pinned conversations keep their badge, not their rank
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
-    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     return render_template(
         "instant-messaging/index.html",
@@ -242,8 +243,9 @@ def conversation_page(conv_id):
             "last_timestamp": last_msg["timestamp"] if last_msg else c.get("last_message", ""),
             "unread_count": unread_counts.get(c["id"], 0),
         })
+    # recency wins the ordering — a conversation that just received a message
+    # must surface on top; pinned conversations keep their badge, not their rank
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
-    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     return render_template(
         "instant-messaging/conversation.html",
@@ -331,8 +333,9 @@ def contacts_page():
             "last_time": t_display,
             "last_timestamp": last_msg["timestamp"] if last_msg else c.get("last_message", ""),
         })
+    # recency wins the ordering — a conversation that just received a message
+    # must surface on top; pinned conversations keep their badge, not their rank
     conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
-    conv_list.sort(key=lambda c: 0 if c.get("pinned_count", 0) > 0 else 1)
 
     # Exclude current user from contacts
     contacts = [u for u in users if u["id"] != CURRENT_USER_ID]

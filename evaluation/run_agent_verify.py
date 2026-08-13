@@ -158,10 +158,11 @@ def build_trajectory(base):
 
 # ── agent factory (shared build_agent — one factory for every runner) ─────────
 
-def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=False):
+def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=False,
+               harness="browser-use"):
     from agents import build_agent
     from generate_fixtures import ensure_fixtures
-    return build_agent(model, native_llm=native_llm, use_vision=use_vision,
+    return build_agent(model, native_llm=native_llm, harness=harness, use_vision=use_vision,
                        max_steps=max_steps, timeout=timeout, headless=headless,
                        available_file_paths=ensure_fixtures())
 
@@ -169,9 +170,9 @@ def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=Fa
 # ── run + grade (one agent on one task) ───────────────────────────────────────
 
 async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
-                        judge_model="auto", native_llm=False, max_steps=50, timeout=300,
-                        headless=True, start_from="recorded", port=8099, out=None,
-                        verbose=True):
+                        judge_model="auto", native_llm=False, harness="browser-use",
+                        max_steps=50, timeout=300, headless=True, start_from="recorded",
+                        port=8099, out=None, verbose=True):
     """Run one agent on one task and grade it. Returns a result dict."""
     from server import start_server, stop_server, wait_for_server
     from helpers.llm import LLMClient
@@ -195,7 +196,11 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
         print(f"{BOLD}model{RESET}      : {model}   {BOLD}obs{RESET}: "
               f"{'visual (screenshots)' if use_vision else 'text DOM ('+obs+')'}\n")
 
-    proc = start_server(port)
+    # authenticate_by_form tasks must start LOGGED OUT — otherwise auto-login
+    # (session user_id=1 on any /sites/* request) makes the agent already logged
+    # in and the login step is a no-op. All other tasks keep auto-login on.
+    needs_login = "authenticate_by_form" in (verifier.get("macros") or {})
+    proc = start_server(port, env_extra={"MINIWEB_NO_AUTOLOGIN": "1"} if needs_login else None)
     if not wait_for_server(port, site_id=site_id, timeout=90):
         stop_server(proc)
         raise RuntimeError(f"server did not start on port {port}")
@@ -205,7 +210,7 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
 
     tok0 = LLMClient.GLOBAL.as_dict()
     agent = make_agent(model, headless=headless, max_steps=max_steps, timeout=timeout,
-                       use_vision=use_vision, native_llm=native_llm)
+                       use_vision=use_vision, native_llm=native_llm, harness=harness)
     result = None
     t0 = datetime.now()
     try:
@@ -223,7 +228,7 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
     elapsed = (datetime.now() - t0).total_seconds()
 
     agent_answer = (getattr(result, "final_result", "") or "") if result else ""
-    report = verify_task(verifier, traj, agent_answer)
+    report = verify_task(verifier, traj, agent_answer, question=instruction)
 
     judge = None
     if grade in ("judge", "both"):
@@ -277,9 +282,9 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
 async def main_async(args):
     res = await run_and_grade(
         task_id=args.task_id, model=args.model, obs=args.obs, grade=args.grade,
-        judge_model=args.judge_model, native_llm=args.native_llm, max_steps=args.max_steps,
-        timeout=args.timeout, headless=not args.no_headless, start_from=args.start_from,
-        port=args.port, out=args.out, verbose=True)
+        judge_model=args.judge_model, native_llm=args.native_llm, harness=args.harness,
+        max_steps=args.max_steps, timeout=args.timeout, headless=not args.no_headless,
+        start_from=args.start_from, port=args.port, out=args.out, verbose=True)
     return 0 if res["passed"] else 1
 
 
@@ -289,6 +294,7 @@ def _load_config(path):
     """Config (YAML or JSON):
         agents: [{model: gemini-3.1-pro-preview, obs: visual}, {model: mock}]
         tasks:  [Minh/job-sites_3c5414, software-marketplace_dc52a3, "site:banking"]
+        tasks:  all       # or the single token "all" -> every current task w/ a verifier
         grade: verifier   # + max_steps/timeout/headless/start_from/native_llm defaults
     """
     text = Path(path).read_text()
@@ -299,13 +305,27 @@ def _load_config(path):
     return cfg
 
 
+def _all_task_ids():
+    """Every current annotated task that has a verifier (excludes .trash)."""
+    return [f"{p.parent.parent.name}/{p.parent.name}"
+            for p in sorted(ANNOTATIONS_DIR.glob("*/*/task.json"))
+            if (p.parent / "verifier.json").exists() and "/.trash/" not in p.as_posix()]
+
+
 def _expand_tasks(entries):
-    """Task ids, expanding "site:<id>" into every annotated task on that site."""
+    """Task ids, expanding "all" into every current annotated task and "site:<id>"
+    into every annotated task on that site. `entries` may be the bare string "all"."""
+    if isinstance(entries, str):
+        entries = [entries]
     out = []
     for e in entries or []:
-        if isinstance(e, str) and e.startswith("site:"):
+        if e == "all":
+            out.extend(_all_task_ids())
+        elif isinstance(e, str) and e.startswith("site:"):
             sid = e.split(":", 1)[1]
             for p in sorted(ANNOTATIONS_DIR.glob("*/*/task.json")):
+                if "/.trash/" in p.as_posix():
+                    continue
                 t = json.loads(p.read_text())
                 sites = [s["id"] if isinstance(s, dict) else s for s in (t.get("sites") or [])]
                 if sid in sites and (p.parent / "verifier.json").exists():
@@ -338,6 +358,7 @@ async def run_config(args):
                     obs=a.get("obs", d("obs", "axtree")), grade=a.get("grade", d("grade", "verifier")),
                     judge_model=a.get("judge_model", d("judge_model", "auto")),
                     native_llm=a.get("native_llm", d("native_llm", False)),
+                    harness=a.get("harness", d("harness", "browser-use")),
                     max_steps=d("max_steps", 50), timeout=d("timeout", 300),
                     headless=d("headless", True), start_from=d("start_from", "recorded"),
                     port=args.port, out=run_dir / f"{label.replace('/','-')}__{task_id.replace('/','-')}",
@@ -409,6 +430,12 @@ def main():
     ap.add_argument("--judge-model", default="auto",
                     help="model for the LLM judge when --grade includes judge (default: the "
                          "configured default model).")
+    ap.add_argument("--harness", choices=["browser-use", "computer-use", "auto"],
+                    default="browser-use",
+                    help="agent harness: 'browser-use' (DOM/text loop, all providers, default); "
+                         "'computer-use' = the provider's NATIVE computer-use tool (screenshots + "
+                         "click/type) for commercial models (gemini/openai/anthropic); "
+                         "'auto' = computer-use for commercial providers, browser-use otherwise.")
     ap.add_argument("--native-llm", action="store_true",
                     help="drive the agent with browser-use's provider-native LLM (needs that "
                          "provider's API key in env; enables true vision). Default: the unified "

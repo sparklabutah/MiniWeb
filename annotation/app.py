@@ -101,6 +101,12 @@ def _load_sites():
         meta["url"] = f"/sites/{meta['id']}/"
         meta["annotated_count"] = task_counts.get(meta["id"], 0)
         meta["review_count"] = 0
+        # Human-readable site type (specific kind of site, from its id), for
+        # "Name (Type)" labels — e.g. "Tax Filing, DMV & Permits". Plus the broad
+        # category for reference.
+        from app import SITE_CATEGORIES, site_type
+        meta["category"] = SITE_CATEGORIES.get(meta["id"], "Other")
+        meta["type"] = site_type(meta["id"])
         sites.append(meta)
     return sites
 
@@ -626,7 +632,9 @@ def _generate_prompt(sites, coverage, force_single=False):
                 sampled_macro_set.add(pick)
 
     return {
-        "sites": [{"id": s["id"], "name": s.get("name", s["id"])} for s in sampled_sites],
+        "sites": [{"id": s["id"], "name": s.get("name", s["id"]),
+                   "category": s.get("category", "Other"),
+                   "type": s.get("type", "")} for s in sampled_sites],
         "macros": sampled_macros,
         "num_sites": len(sampled_sites),
         "num_macros": len(sampled_macros),
@@ -717,7 +725,9 @@ def _generate_site_prompt(site, rng=None):
     chain_remaining = {k: max(0, targets[k] - chain_counts.get(k, 0)) for k in targets}
 
     return {
-        "sites": [{"id": site_id, "name": site.get("name", site_id)}],
+        "sites": [{"id": site_id, "name": site.get("name", site_id),
+                   "category": site.get("category", "Other"),
+                   "type": site.get("type", "")}],
         "macros": sampled,
         "num_sites": 1,
         "num_macros": len(sampled),
@@ -815,7 +825,9 @@ def annotate():
         task_site_ids = [s["id"] if isinstance(s, dict) else s
                          for s in task.get("sites", [])]
         prompt = {
-            "sites": [{"id": sid, "name": site_map.get(sid, {}).get("name", sid)}
+            "sites": [{"id": sid, "name": site_map.get(sid, {}).get("name", sid),
+                       "category": site_map.get(sid, {}).get("category", "Other"),
+                       "type": site_map.get(sid, {}).get("type", "")}
                       for sid in task_site_ids],
             "macros": task.get("macros", []),
             "num_sites": len(task_site_ids),
@@ -866,10 +878,24 @@ def review():
 @annotation_bp.route("/verify")
 def verify():
     """Verifier builder — load a saved task and build verification checks."""
-    from annotation.storage import list_tasks
+    from collections import Counter
+    from annotation.storage import list_tasks, ANNOTATIONS_DIR
     task_id = request.args.get("task_id")
     annotator = request.args.get("annotator")
-    tasks = list_tasks(annotator)
+    # Always list every annotator's tasks — `annotator` only scopes task loading.
+    tasks = list_tasks()
+    for t in tasks:
+        vf = ANNOTATIONS_DIR / (t.get("annotator") or "anonymous") / t.get("task_id", "") / "verifier.json"
+        t["has_verifier"] = vf.exists()
+        t["has_feedback"] = False
+        if t["has_verifier"]:
+            try:
+                t["has_feedback"] = bool(json.loads(vf.read_text()).get("feedback"))
+            except (json.JSONDecodeError, OSError):
+                pass
+    annotator_counts = sorted(
+        Counter(t.get("annotator") or "?" for t in tasks).items(),
+        key=lambda kv: (-kv[1], kv[0]))
     task = None
     if task_id:
         from annotation.storage import load_task
@@ -885,45 +911,10 @@ def verify():
     return render_template("verify.html",
                            tasks=tasks,
                            task=task,
+                           annotator_counts=annotator_counts,
+                           op_labels={op: info.get("label", op)
+                                      for op, info in _registry.operations().items()},
                            macro_descriptions=_MACRO_DESCRIPTIONS)
-
-
-@annotation_bp.route("/verifiers")
-def verifiers_review():
-    """Read-only review of every per-task macro verifier (verifier.json)."""
-    return render_template("verifier_review.html")
-
-
-@annotation_bp.route("/api/verifier_index")
-def api_verifier_index():
-    """Lightweight index of every task + whether it has a verifier.json, for the
-    verifier-review UI. The verifier tree itself is fetched per-task via
-    /api/task_verifier/<annotator>/<task_id>."""
-    from annotation.storage import ANNOTATIONS_DIR
-    out = []
-    for ann_dir in sorted(ANNOTATIONS_DIR.iterdir()):
-        if not ann_dir.is_dir() or ann_dir.name.startswith("."):
-            continue
-        for td in sorted(ann_dir.iterdir()):
-            tj = td / "task.json"
-            if not tj.exists():
-                continue
-            try:
-                t = json.loads(tj.read_text())
-            except (json.JSONDecodeError, OSError):
-                continue
-            sites = [s["id"] if isinstance(s, dict) else s for s in (t.get("sites") or [])]
-            out.append({
-                "annotator": ann_dir.name,
-                "task_id": td.name,
-                "site": sites[0] if sites else "",
-                "instruction": t.get("instruction", ""),
-                "expected_answer": t.get("expected_answer", ""),
-                "macros": [_canon(m) for m in (t.get("macros") or [])],
-                "has_verifier": (td / "verifier.json").exists(),
-            })
-    out.sort(key=lambda r: (r["site"], r["task_id"]))
-    return jsonify({"count": len(out), "tasks": out})
 
 
 @annotation_bp.route("/graph")
@@ -969,15 +960,17 @@ def api_macro_sheet_csv():
     import io
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["category", "group", "tag", "description", "span_start", "span_end"])
+    w.writerow(["category", "group", "tag", "description", "span_start", "span_end", "warning"])
     group_order = list(_registry.groups().keys())
     for m in sorted(_registry.all_canonical(),
                     key=lambda m: (group_order.index(_registry.group_of(m)), m)):
         e = _registry.entry(m)
         w.writerow(["base macro", e.get("group", ""), m, e.get("description", ""),
-                    e.get("span_start", ""), e.get("span_end", "")])
+                    e.get("span_start", ""), e.get("span_end", ""), e.get("warning", "")])
     for op, info in _registry.operations().items():
-        w.writerow(["reasoning op", "reasoning", op, info.get("desc", ""), "", ""])
+        # reasoning ops carry a `check` (how it's graded) rather than a design warning
+        w.writerow(["reasoning op", "reasoning", info.get("label", op), info.get("desc", ""),
+                    "", "", info.get("check", "")])
     from flask import Response
     return Response(buf.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=refined_macro_set.csv"})
@@ -1331,7 +1324,9 @@ def _load_test_trajectory(annotator, task_id, which):
     tf = tdir / "trajectory.json"
     task = json.loads((tdir / "task.json").read_text()) if (tdir / "task.json").exists() else {}
     traj = json.loads(tf.read_text()) if tf.exists() else []
-    return synthesize_network_events(traj), task.get("answer", ""), "gold (human)"
+    # the human's reported answer IS the expected answer (perfect-trace assumption)
+    answer = task.get("answer") or task.get("expected_answer") or ""
+    return synthesize_network_events(traj), answer, "gold (human)"
 
 
 @annotation_bp.route("/api/run_task_verifier", methods=["POST"])
@@ -1388,9 +1383,18 @@ def api_task_verifier(annotator, task_id):
             return jsonify(json.loads(vf.read_text()))
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
-    spec = {"task_id": task_id,
-            "macros": data.get("macros", {}),
-            "model": data.get("model")}
+    # Merge-save: only overwrite keys present in the payload, so fields written
+    # by other tools (built_by, archetype_v2, ...) survive a partial POST.
+    spec = {}
+    if vf.exists():
+        try:
+            spec = json.loads(vf.read_text())
+        except (json.JSONDecodeError, OSError):
+            spec = {}
+    spec["task_id"] = task_id
+    for key in ("macros", "model", "feedback", "feedback_at"):
+        if key in data:
+            spec[key] = data[key]
     vf.parent.mkdir(parents=True, exist_ok=True)
     vf.write_text(json.dumps(spec, indent=2, default=str))
     return jsonify({"status": "ok"})

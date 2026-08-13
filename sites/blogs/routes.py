@@ -351,7 +351,7 @@ def register_submit():
     if any(u["username"] == username for u in users):
         return render_template("blogs/login.html", error="Username already taken",
                                mode="register", next=nxt)
-    new_id = (db.execute("SELECT MAX([id]) AS mid FROM [blogs_users]", (), fetch="val") or 0) + 1
+    new_id = db.next_id(SITE, "users")
     new_user = {
         "id": new_id,
         "root_user_id": new_id,
@@ -409,8 +409,7 @@ def form_create_post():
     if not author:
         return "Author not found", 404
 
-    max_id = db.execute("SELECT MAX([id]) AS mid FROM [blogs_posts]", (), fetch="val") or 0
-    new_id = max_id + 1
+    new_id = db.next_id(SITE, "posts")
 
     new_post = {
         "id": new_id,
@@ -827,8 +826,7 @@ def api_create_post():
     if not author:
         return jsonify({"error": "author not found"}), 404
 
-    max_id = db.execute("SELECT MAX([id]) AS mid FROM [blogs_posts]", (), fetch="val") or 0
-    new_id = max_id + 1
+    new_id = db.next_id(SITE, "posts")
 
     new_post = {
         "id": new_id,

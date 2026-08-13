@@ -266,6 +266,100 @@ def course_detail(course_id):
     )
 
 
+# ---------------------------------------------------------------------------
+# Gradebook -- inline-editable data grid (edit_by_cell)
+# ---------------------------------------------------------------------------
+
+# Header row + a deterministic default roster used the first time a course's
+# gradebook is opened (before any edits are saved to the session overlay).
+_GB_HEADER = ["Student", "HW1", "HW2", "Midterm", "Final"]
+_GB_DEFAULT_ROWS = [
+    ["Alice Chen", "88", "92", "85", "90"],
+    ["Marcus Rivera", "76", "81", "79", "83"],
+    ["Priya Patel", "95", "89", "93", "97"],
+    ["Jordan Kim", "68", "72", "70", "75"],
+    ["Sofia Nguyen", "82", "85", "88", "84"],
+    ["Liam O'Brien", "90", "87", "91", "88"],
+]
+
+
+def _default_gradebook_grid():
+    """Grid with header row 0 followed by the default student rows."""
+    return [list(_GB_HEADER)] + [list(r) for r in _GB_DEFAULT_ROWS]
+
+
+def _load_gradebook_grid(course_id):
+    """Return the gradebook grid for a course.
+
+    Reads the session overlay first (get_item is overlay-first, so saved edits
+    are honoured); falls back to the deterministic default roster.
+    """
+    gb = db.get_item(SITE, "gradebook", course_id)
+    if gb and gb.get("data"):
+        return gb["data"]
+    return _default_gradebook_grid()
+
+
+@blueprint.route("/course/<course_id>/gradebook", methods=["GET"])
+def gradebook_view(course_id):
+    """Inline-editable gradebook grid for a course (edit_by_cell)."""
+    courses = _courses()
+    course_id_lower = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == course_id_lower), None)
+    if not course:
+        abort(404)
+    grid = _load_gradebook_grid(course["id"])
+    return render_template(
+        "university-academic/gradebook.html",
+        course=course,
+        grid=grid,
+    )
+
+
+@blueprint.route("/course/<course_id>/gradebook", methods=["POST"])
+def gradebook_submit(course_id):
+    """Persist inline cell edits from the gradebook grid (edit_by_cell).
+
+    Form fields: cell_<row>_<col>=value (e.g. cell_1_3=95). The grid auto-expands
+    so "+ Add student" rows appended client-side are saved. Persists to the
+    session overlay via db.save_item -- base tables are never written. The POST
+    body is logged by /_admin/log so a verifier can assert the entered values.
+    """
+    courses = _courses()
+    course_id_lower = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == course_id_lower), None)
+    if not course:
+        abort(404)
+
+    grid = _load_gradebook_grid(course["id"])
+    width = len(grid[0]) if grid else len(_GB_HEADER)
+
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        while len(grid) <= r:
+            grid.append([""] * width)
+        while len(grid[r]) <= c:
+            grid[r].append("")
+        grid[r][c] = value.strip()
+
+    db.save_item(SITE, "gradebook", course["id"], {
+        "id": course["id"],
+        "course_id": course["id"],
+        "course_code": course.get("code", ""),
+        "data": grid,
+    })
+
+    return redirect(url_for("university-academic.gradebook_view", course_id=course["id"]))
+
+
 @blueprint.route("/faculty")
 def faculty_page():
     """Faculty directory with filtering (filter_by_dropdown, search_by_query)."""

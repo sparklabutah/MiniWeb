@@ -604,6 +604,143 @@ def stats_page():
     )
 
 
+# ---------------------------------------------------------------------------
+# Inline-editable daily-log grid (edit_by_cell macro)
+# ---------------------------------------------------------------------------
+
+# Column layout for the log editor grid. Order here defines the cell column
+# index (cell_<row>_<col>) posted by the form and matches the table header.
+STATS_GRID_COLS = [
+    ("date", "Date", "text"),
+    ("steps", "Steps", "int"),
+    ("distance_km", "Distance (km)", "float"),
+    ("calories_burned", "Calories", "int"),
+    ("active_minutes", "Active (min)", "int"),
+    ("sleep_hours", "Sleep (h)", "float"),
+    ("water_ml", "Water (ml)", "int"),
+    ("weight_kg", "Weight (kg)", "float"),
+]
+
+# Full default record for a freshly-added daily-stats row (covers every schema
+# column so overlay reads return a complete item).
+_DAILY_STATS_DEFAULTS = {
+    "date": "",
+    "steps": 0,
+    "distance_km": 0.0,
+    "calories_burned": 0,
+    "active_minutes": 0,
+    "floors_climbed": 0,
+    "sleep_hours": 0.0,
+    "sleep_quality": "",
+    "water_ml": 0,
+    "weight_kg": 0.0,
+}
+
+
+def _coerce_cell(raw, ftype):
+    """Coerce a raw cell string to the column's type, tolerating blanks."""
+    raw = (raw or "").strip()
+    if ftype == "int":
+        try:
+            return int(float(raw)) if raw else 0
+        except ValueError:
+            return 0
+    if ftype == "float":
+        try:
+            return float(raw) if raw else 0.0
+        except ValueError:
+            return 0.0
+    return raw
+
+
+@blueprint.route("/log-editor")
+def stats_editor_page():
+    """Inline-editable grid of recent daily stats (edit_by_cell macro).
+
+    Renders a <form> of cell_<row>_<col> inputs plus a client-side "+ Add row"
+    button. Rows are the user's most recent daily-stats entries, fetched with
+    SQL-level filter/sort/limit (never a full-table load).
+    """
+    user = _get_current_user()
+    uid = user["id"] if user else 1
+
+    rows = _load_daily_stats(where={"user_id": uid}, sort="-date", limit=14)
+
+    return render_template(
+        "health-fitness-tracking/stats_editor.html",
+        user=user,
+        cols=STATS_GRID_COLS,
+        rows=rows,
+        logged_in=user is not None,
+    )
+
+
+@blueprint.route("/log-editor/save", methods=["POST"])
+def stats_editor_save():
+    """Persist inline cell edits from the log-editor grid to the session overlay.
+
+    Reads cell_<row>_<col> values (and a hidden rowid_<row> per existing row).
+    Existing rows are updated in place; appended rows without a rowid become new
+    daily-stats entries with a db.next_id() primary key. All writes go through
+    db.save_item() to the SESSION OVERLAY — base tables are never touched.
+    """
+    user = _get_current_user()
+    uid = user["id"] if user else 1
+
+    ncols = len(STATS_GRID_COLS)
+
+    # Reconstruct grid: row_idx -> {col_idx: value}. Auto-expands to whatever
+    # rows/cols were posted (appended rows included).
+    grid = {}
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        grid.setdefault(r, {})[c] = value
+
+    saved = 0
+    for r in sorted(grid.keys()):
+        cells = grid[r]
+        rowid_raw = request.form.get("rowid_{}".format(r), "").strip()
+
+        # Skip appended rows the user left entirely blank.
+        has_content = any(str(cells.get(c, "")).strip() for c in range(ncols))
+        if not rowid_raw and not has_content:
+            continue
+
+        # Build the edited field values from this row's cells.
+        edits = {}
+        for c, (field, _label, ftype) in enumerate(STATS_GRID_COLS):
+            edits[field] = _coerce_cell(cells.get(c, ""), ftype)
+
+        if rowid_raw:
+            try:
+                row_id = int(rowid_raw)
+            except ValueError:
+                continue
+            record = db.get_item(SITE, "daily_stats", row_id) or dict(_DAILY_STATS_DEFAULTS)
+            record.update(edits)
+            record["row_id"] = row_id
+            record["user_id"] = uid
+        else:
+            row_id = db.next_id(SITE, "daily_stats")
+            record = dict(_DAILY_STATS_DEFAULTS)
+            record.update(edits)
+            record["row_id"] = row_id
+            record["user_id"] = uid
+
+        db.save_item(SITE, "daily_stats", row_id, record)
+        saved += 1
+
+    return redirect(url_for("health-fitness-tracking.stats_editor_page"))
+
+
 @blueprint.route("/log-workout")
 def log_workout_page():
     """Form to log a new workout."""

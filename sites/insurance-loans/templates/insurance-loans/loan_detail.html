@@ -56,6 +56,18 @@
     </nav>
     <div class="container">
         <a href="{{ url_for('insurance-loans.loans_page') }}" class="back">Back to Loans</a>
+
+        {% if loan.requires_signature and not loan.signed %}
+        <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:.4rem;padding:.9rem 1.1rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <div style="color:#92400e;font-weight:600;font-size:.92rem;">&#9997;&#65039; Signature required &mdash; this loan agreement is not complete until you sign it.</div>
+            <a href="{{ url_for('insurance-loans.loan_sign_page', loan_id=loan.id) }}" style="padding:.5rem 1.2rem;background:#1a3c5e;color:#fff;text-decoration:none;border-radius:.3rem;font-size:.88rem;font-weight:600;">Sign now &rarr;</a>
+        </div>
+        {% elif loan.signed %}
+        <div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:.4rem;padding:.9rem 1.1rem;margin-bottom:1.5rem;color:#166534;font-weight:600;font-size:.92rem;">
+            &#10003; Signed on {{ loan.signed_date }}{% if loan.signed_by %} by {{ loan.signed_by }}{% endif %}.
+        </div>
+        {% endif %}
+
         <div class="card">
             <div class="card-header">
                 <h2>{{ loan.loan_number }}</h2>
