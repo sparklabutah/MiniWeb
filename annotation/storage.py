@@ -157,27 +157,38 @@ def list_tasks(annotator: str = None) -> list[dict]:
     else:
         if not ANNOTATIONS_DIR.exists():
             return []
-        annotators = [d.name for d in ANNOTATIONS_DIR.iterdir()
-                      if d.is_dir() and not d.name.startswith(".")]
+        annotators = [
+            d.name for d in ANNOTATIONS_DIR.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
 
     for ann in annotators:
         ann_dir = ANNOTATIONS_DIR / ann
         if not ann_dir.exists():
             continue
+
         for task_dir in sorted(ann_dir.iterdir()):
             task_file = task_dir / "task.json"
             if task_file.exists():
                 try:
                     task = json.loads(task_file.read_text())
+
                     # Don't include trajectory in list view
                     task.pop("trajectory", None)
+
                     # Directory name is authoritative when task.json lacks it
                     task.setdefault("annotator", ann)
+
                     tasks.append(task)
                 except (json.JSONDecodeError, OSError):
                     pass
 
-    return sorted(tasks, key=lambda t: t.get("saved_at", ""), reverse=True)
+    def last_modified(task):
+        saved_at = task.get("saved_at", "")
+        review_at = task.get("review_tag", {}).get("at", "")
+        return max(saved_at, review_at)
+
+    return sorted(tasks, key=last_modified, reverse=True)
 
 
 def delete_task(annotator: str, task_id: str) -> bool:
