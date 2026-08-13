@@ -107,42 +107,39 @@ def _nav_preamble(task):
 from browsergym_miniweb.actions import FINAL_ANSWER_PREFIX
 
 
-def _msg_text(m):
-    if isinstance(m, dict):
-        if m.get("role") in (None, "assistant", "infeasible"):
-            return m.get("message") or ""
-        return ""
-    return m if isinstance(m, str) else ""
+def _agent_texts(chat_messages):
+    """The messages the AGENT produced this episode. BrowserGym seeds a stock
+    assistant greeting ("Hi! I am your UI assistant...") BEFORE the goal, so we take
+    only assistant messages that come AFTER the goal (the first user-role message)."""
+    msgs = list(chat_messages or [])
+    start = 0
+    for i, m in enumerate(msgs):
+        if isinstance(m, dict) and m.get("role") == "user":
+            start = i + 1
+            break
+    out = []
+    for m in msgs[start:]:
+        if isinstance(m, dict):
+            if m.get("role") in (None, "assistant", "infeasible") and m.get("message"):
+                out.append(str(m["message"]))
+        elif isinstance(m, str) and m:
+            out.append(m)
+    return out
 
 
 def _final_answer(chat_messages):
-    """The agent's explicitly-reported final answer, via the report_answer tool
-    (the last message carrying the final-answer marker, marker stripped). '' if the
-    agent never used the tool."""
-    for m in reversed(chat_messages or []):
-        t = _msg_text(m)
-        if t and FINAL_ANSWER_PREFIX in t:
+    """The agent's explicitly-reported final answer via the report_answer tool (last
+    marked message, marker stripped). '' if the agent never used the tool."""
+    for t in reversed(_agent_texts(chat_messages)):
+        if FINAL_ANSWER_PREFIX in t:
             return t.split(FINAL_ANSWER_PREFIX, 1)[1].strip()
     return ""
 
 
-def _reported_final(chat_messages):
-    return any(FINAL_ANSWER_PREFIX in _msg_text(m) for m in (chat_messages or []))
-
-
 def _collect_answer(chat_messages):
-    """Fallback for agents that don't use report_answer: everything they said to the
-    human, joined — so a multi-part answer split across messages ('you have 0 spam'
-    in one, 'name updated' in another) is graded as a whole, not just the last line."""
-    parts = [t for m in (chat_messages or []) if (t := _msg_text(m))]
-    return "\n".join(parts).strip()
-
-
-def _count_user_messages(chat_messages):
-    return sum(1 for m in (chat_messages or [])
-               if isinstance(m, dict)
-               and m.get("role") in (None, "assistant", "infeasible")
-               and m.get("message"))
+    """Fallback for agents that don't use report_answer: everything the agent said to
+    the human, joined (so a multi-part answer split across messages is graded whole)."""
+    return "\n".join(_agent_texts(chat_messages)).strip()
 
 
 class MiniWebTask(AbstractBrowserTask):
@@ -169,53 +166,21 @@ class MiniWebTask(AbstractBrowserTask):
             pass
         page.goto(_start_url(self.base, self.tdir, self.task))
         goal = _nav_preamble(self.task) + self.task["instruction"]
-        # per-episode termination state (see validate)
-        self._pages_seen = 0     # cumulative site actions+network requests observed
-        self._idle_steps = 0     # consecutive steps with no NEW page progress
         return goal, {"task_id": self.task_id}
 
-    # steps of no page progress, after the agent has messaged the user, before we
-    # treat the agent as finished (tolerates a brief wait/pause after answering)
-    _IDLE_PATIENCE = 3
-
     def validate(self, page, chat_messages):
-        # prefer the agent's explicit final answer (report_answer tool); fall back to
-        # its ordinary messages for agents that don't use the tool
-        reported = _final_answer(chat_messages)
-        answer = reported or _collect_answer(chat_messages)
+        # The agent's answer: its explicit report_answer value if used, else its
+        # messages to the human (BrowserGym's seed greeting is excluded).
+        answer = _final_answer(chat_messages) or _collect_answer(chat_messages)
         traj = fetch_session_trajectory(page, self.base)
         report = verify_task(self.verifier, traj, answer,
                              question=self.task.get("instruction", ""))
         passed = report["passed"]
-
-        # Let the AGENT end the episode. BrowserGym only terminates when the task
-        # says done, and send_msg_to_user doesn't end anything — so historically an
-        # agent that finished but wasn't graded-passing (e.g. a verifier miss) would
-        # spin, repeating messages/noops, until the step cap. Instead: once the agent
-        # has reported to the user AND then stops making page progress, consider it
-        # done and grade at that point — pass OR fail — rather than wasting steps.
-        n_pages = sum(1 for e in traj if e.get("type") in ("action", "network"))
-        n_msgs = _count_user_messages(chat_messages)
-        if n_pages > getattr(self, "_pages_seen", 0):
-            self._idle_steps = 0                      # agent did something on the page
-        else:
-            self._idle_steps = getattr(self, "_idle_steps", 0) + 1
-        self._pages_seen = max(getattr(self, "_pages_seen", 0), n_pages)
-        # the agent ends the episode by calling report_answer (explicit, preferred);
-        # for agents that only message, fall back to "engaged with a site, answered,
-        # then went idle". Require prior page progress so an agent that is merely stuck
-        # early (e.g. can't navigate yet) isn't killed before it gets going.
-        idle_done = (self._pages_seen > 0 and n_msgs >= 1
-                     and self._idle_steps >= self._IDLE_PATIENCE)
-        ended_via = "report_answer" if reported else ("idle" if idle_done else "")
-        agent_done = bool(ended_via)
-
-        done = passed or agent_done
+        # Terminate only when the task is solved; otherwise let the agent run to the
+        # step limit (BrowserGym truncates). No clever early-stop heuristics.
         reward = 1.0 if passed else 0.0
-        # MiniWeb's differentiator: the per-skill breakdown rides along in info
-        return reward, done, "", {"task_id": self.task_id,
-                                  "by_macro": report["by_macro"],
-                                  "ended_by": "verifier" if passed else ended_via}
+        return reward, passed, "", {"task_id": self.task_id,
+                                    "by_macro": report["by_macro"]}
 
     def teardown(self):
         pass

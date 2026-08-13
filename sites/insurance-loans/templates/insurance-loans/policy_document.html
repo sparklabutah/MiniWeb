@@ -66,6 +66,15 @@ ol li, ul li { margin: 2px 0; }
     <a href="/">MiniWeb</a>
 </div>
 
+{% if policy.requires_signature and not policy.signed %}
+<div class="no-print" style="max-width:8.5in;margin:14px auto 0;background:#fef3c7;border:2px solid #f59e0b;border-radius:.4rem;padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div style="color:#92400e;font-weight:700;font-size:1rem">&#9997;&#65039; This document requires your signature &mdash; the policy is not in force until you sign it.</div>
+    <a href="{{ url_for('insurance-loans.policy_sign_page', policy_id=policy.id) }}" style="background:#b45309;color:#fff;text-decoration:none;padding:.6rem 1.4rem;border-radius:.3rem;font-weight:700;white-space:nowrap">Sign this document &rarr;</a>
+</div>
+{% elif policy.signed %}
+<div class="no-print" style="max-width:8.5in;margin:14px auto 0;background:#f0fdf4;border:1px solid #16a34a;border-radius:.4rem;padding:.6rem 1.2rem;color:#166534;font-weight:600">&#10003; Signed{% if policy.signed_date %} on {{ policy.signed_date }}{% endif %}</div>
+{% endif %}
+
 <div class="doc-wrapper">
 
 <!-- PAGE 1: DECLARATIONS -->
