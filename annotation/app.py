@@ -2403,6 +2403,92 @@ def _call_llm(system_prompt, user_prompt):
     return call_llm(user_prompt, system=system_prompt, max_tokens=500, temperature=0.4)
 
 
+def _site_data_samples(site_id, max_collections=5, rows=3, maxlen=48):
+    """A compact snapshot of REAL entities on a site, so a drafted task references
+    real items (product names, payees, subreddits …) instead of generic ones."""
+    from app import db
+    try:
+        colls = [r["collection"] for r in db.execute(
+            "SELECT collection FROM site_registry WHERE site=? ORDER BY collection", (site_id,))]
+    except Exception:
+        colls = []
+    skip = {"users", "reddit_users", "cc_users", "sessions"}
+    colls = [c for c in colls if c not in skip and not c.startswith("fts_")][:max_collections]
+    label_fields = ("name", "title", "subject", "subreddit", "reference", "payee_name",
+                    "merchant", "product_name", "id")
+    out = []
+    for c in colls:
+        try:
+            recs = db.query(site_id, c, limit=rows)
+        except Exception:
+            continue
+        items = []
+        for r in recs:
+            lab = next((str(r[f]) for f in label_fields if r.get(f) not in (None, "")), None)
+            if lab is None:
+                lab = str(next((v for v in r.values() if isinstance(v, str) and v), ""))
+            if lab:
+                items.append(lab[:maxlen])
+        if items:
+            out.append(f"  {c}: " + "; ".join(items))
+    return "\n".join(out)
+
+
+@annotation_bp.route("/api/draft_task", methods=["POST"])
+def api_draft_task():
+    """Draft a concrete, realistic task from the sampled macros — feeding the LLM
+    each macro's enriched UI location + REAL site data + the macro/op meaning, so the
+    annotator edits a specific draft instead of writing from scratch."""
+    import json as _json
+    data = request.get_json(silent=True) or {}
+    site_ids = [s["id"] if isinstance(s, dict) else s for s in (data.get("sites") or [])]
+    macros = [m for m in (data.get("macros") or []) if m]
+    if not site_ids or not macros:
+        return jsonify({"error": "sites and macros required"}), 400
+    locs = _canonical_macro_locations()
+    ops = _registry.operations()
+    interactions = []
+    for m in macros:
+        base, _, op = m.partition(".")
+        desc = (_MACRO_DESCRIPTIONS.get(base) or {}).get("description", base)
+        where = ""
+        for sid in site_ids:
+            w = (locs.get(sid) or {}).get(base)
+            if w:
+                where = (w[0] if isinstance(w, list) else str(w)); break
+        entry = {"macro": base, "does": desc, "where": where or "(unspecified)"}
+        if op:
+            entry["reasoning"] = (ops.get(op) or {}).get("desc", op)
+        interactions.append(entry)
+    site_data = "\n".join(f"{sid}:\n{_site_data_samples(sid)}" for sid in site_ids)
+    from app import discover_sites
+    brand = {s["id"]: s.get("name", s["id"]) for s in discover_sites()}
+    site_names = ", ".join(brand.get(sid, sid) for sid in site_ids)
+    system = (
+        "You draft a realistic web task for a benchmark annotator. Given a list of "
+        "interactions (each with WHAT it does and WHERE it lives on the site) and REAL "
+        "data currently on the site, write ONE natural task a person would ask their "
+        "assistant that WEAVES ALL the interactions into a single coherent goal (not a "
+        "list of unrelated actions). It must be concrete and specific, REFERENCING REAL "
+        "ENTITIES/VALUES from the data and the exact options named in each 'where'. If "
+        "an interaction has a reasoning op, the task must genuinely require that "
+        "reasoning. Keep the instruction to 1-2 sentences, conversational. For each "
+        "macro's subtask, write the CONCRETE step to take on the page (the specific "
+        "control + the specific value/entity) — do NOT restate the generic macro "
+        'definition. Reply ONLY JSON: {"instruction": "<the task>", "subtasks": '
+        '{"<macro>": "<concrete step>"}}.')
+    user = _json.dumps({"site": site_names, "interactions": interactions,
+                        "real_site_data": site_data})
+    from app.llm import call_llm
+    raw = call_llm(user, system=system, max_tokens=600, temperature=0.5, json_mode=True)
+    if not raw:
+        return jsonify({"error": "LLM unavailable"}), 503
+    try:
+        return jsonify(_json.loads(raw))
+    except (ValueError, TypeError):
+        return jsonify({"instruction": raw.strip(), "subtasks": {}})
+
+
 @annotation_bp.route("/api/llm_models")
 def api_llm_models():
     """Supported models per provider, with configuration status."""

@@ -23,6 +23,14 @@ h2 { margin-bottom: 1rem; color: #1a1a2e; }
 .match-date { font-size: 0.8rem; color: #aaa; }
 .unread-badge { display: inline-block; background: #f093fb; color: #fff; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 1rem; margin-top: 0.3rem; }
 .empty { text-align: center; color: #888; padding: 3rem; }
+.date-filter { background: #fff; border-radius: 0.8rem; padding: 0.9rem 1.1rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.date-filter form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
+.date-filter .field { display: flex; flex-direction: column; gap: 0.2rem; }
+.date-filter label { font-size: 0.72rem; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.date-filter input[type=date] { border: 1px solid #e5ddf5; border-radius: 0.4rem; padding: 0.4rem 0.6rem; font-size: 0.85rem; color: #333; }
+.date-filter button { background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; border: none; border-radius: 0.4rem; padding: 0.45rem 1rem; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.date-filter .clear { align-self: center; font-size: 0.8rem; color: #999; text-decoration: none; padding: 0.45rem 0.4rem; }
+.date-filter .clear:hover { color: #667eea; }
 </style>
 </head>
 <body>
@@ -39,6 +47,20 @@ h2 { margin-bottom: 1rem; color: #1a1a2e; }
 </nav>
 <div class="main">
 <h2>Your Matches ({{ match_data|length }})</h2>
+<div class="date-filter">
+<form method="get" action="{{ url_for('dating.matches_page') }}">
+<div class="field">
+<label for="date_from">From</label>
+<input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+</div>
+<div class="field">
+<label for="date_to">To</label>
+<input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+</div>
+<button type="submit">Filter by date</button>
+{% if date_from or date_to %}<a class="clear" href="{{ url_for('dating.matches_page') }}">Clear</a>{% endif %}
+</form>
+</div>
 {% if match_data %}
 {% for md in match_data %}
 <div class="match">

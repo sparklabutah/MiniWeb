@@ -1,0 +1,152 @@
+crowdfunding-donations:
+  authenticate_by_form:
+  - "Sign In page (/login, FundSpark) -> 'Sign In' tab form -> Username + Password
+    text fields -> 'Sign In' button. OUTCOME: sets session user_id and redirects to
+    the Dashboard (or the ?next= URL). FIELDS: username (text), password (password).
+    Note auto-login already sets user_id=1 (alex_rivera) on /sites/* so this form is
+    only exercised for an explicit re-login. EXAMPLE: username 'marcus_chen' with his
+    password logs in as Marcus Chen (user id 2)."
+  checkout_by_form:
+  - "Checkout page (/campaign/<id>/checkout, 'Complete your pledge') reached from a
+    tier's 'Select this reward' or the sidebar 'Pledge without a reward' button. OUTCOME:
+    records the pledge (raised_amount/backer_count/tier claimed updated, confirmation
+    email sent) then hands off to 2FA payment verification. CONTROLS: Backer information
+    (Full name, Email text inputs) + 'Don't show my name publicly on the backer list'
+    anonymous checkbox; Pledge amount number input (only when no reward tier, min $1);
+    Shipping address (Street, City, State, ZIP) shown ONLY for physical-fulfillment
+    tiers; Payment method radio cards 'Checking account' (value checking) / 'Credit
+    card' (value credit); 'I understand how and when I will be charged' consent checkbox;
+    'Complete pledge' submit. EXAMPLE: selecting the 'Patron' $50 tier on campaign 1
+    'Young Voices: Lakeport High Creative Writing Program' (physical) requires the shipping
+    block; the 'Early Adopter' $25 tier on campaign 4 'SyncWave' (digital) does not."
+  create_by_form:
+  - "'Start a Project' page (/create, 'Start a project') -> campaign creation form ->
+    'Launch Project' button. OUTCOME: creates a new active campaign (empty reward_tiers/updates,
+    raised 0) owned by the current user and redirects to its detail page. FIELDS: Project
+    Title (text), Description (textarea), Category select (technology, art, games, film,
+    music, community, design, food), Funding Goal $ (number, min 1), Funding Model select
+    ('All or Nothing'=all-or-nothing / 'Flexible'=flexible), End Date (date picker).
+    EXAMPLE: title 'Trail Cleanup Fund', category 'community', goal $8000, model 'All
+    or Nothing', end date 2026-12-31."
+  - "Checkout page (/campaign/<id>/checkout) reached from a tier's 'Select this reward'
+    button -> pledge checkout form -> 'Complete pledge'. OUTCOME: creates a pledge record
+    (backer name, email, anonymous flag, and shipping address for physical tiers) before
+    the 2FA payment step. FIELDS: Full name, Email, optional anonymous checkbox, hidden
+    tier amount, Street/City/State/ZIP (physical tiers only), Checking/Credit payment
+    radios, consent checkbox. EXAMPLE: 'Select this reward' on the 'Collector' $200 physical
+    tier of campaign 6 'Fragments & Light: Sophie Lin Solo Art Exhibition' opens this
+    form with the shipping block required."
+  - "Campaign detail page (/campaign/<id>) -> 'Post an Update' form in the Updates card,
+    shown ONLY to the campaign's own creator -> 'Publish Update' button. OUTCOME: appends
+    a dated update (newest shown first) and reloads the detail page. FIELDS: Update title
+    (text input), content (textarea). EXAMPLE: as creator of campaign 4 'SyncWave', posting
+    title 'Manufacturing update' adds to its existing updates ('Beta is live!', '65%
+    funded - big milestone!', 'Featured in TechCrunch!')."
+  - "Campaign detail page (/campaign/<id>) -> Reward Tiers card -> 'Select this reward'
+    link on each in-stock tier (only when campaign status is 'active' and remaining >
+    0). OUTCOME: navigates to the checkout form pre-scoped to that tier_id and its amount.
+    OPTIONS: each active campaign has 3 tiers, e.g. campaign 4 'SyncWave' offers 'Early
+    Adopter' $25 (500 avail), 'Team Leader' $100 (150 avail), 'Enterprise Pioneer' $500
+    (25 avail); sold-out tiers hide the button."
+  - "Sign In page (/login or /register) -> 'Create Account' tab register form -> 'Create
+    Account' button. OUTCOME: creates a new user account, logs them in (session user_id),
+    and redirects to Dashboard or ?next=. FIELDS: Full Name (required), Email (optional,
+    defaults to <username>@fundspark.com), Username (required), Password (required).
+    EXAMPLE: registering name 'Dana Cole', username 'dana_cole', password set, creates
+    a fresh backer account."
+  feedback_by_react:
+  - "Campaign detail page (/campaign/<id>) -> creator-bar/action-row '\U0001F517 Share'
+    button which opens a client-side dropdown. OUTCOME: no server write; offers 'Copy
+    link' (copies the campaign URL, shows 'Link copied!'), 'Share on Twitter', 'Share
+    on Facebook', 'Share via Email' (mailto). EXAMPLE: on campaign 2 'Lakeport Community
+    Mural: Seasons of the Lake', clicking Share -> Copy link yields that campaign's URL."
+  filter_by_dropdown:
+  - "FundSpark home (/, index) toolbar -> 'All Statuses' status dropdown (id filter-status,
+    onchange applyFilters). OUTCOME: reloads the grid filtered to one status via ?status=.
+    OPTIONS: All Statuses (''), Active, Funded, Expired, Cancelled. EXAMPLE: choosing
+    'Funded' shows only funded campaigns such as 'Lakeport Community Mural: Seasons of
+    the Lake' (of the 42 campaigns, 19 active / 15 funded / 5 expired / 3 cancelled)."
+  - "FundSpark home (/, index) category chips bar (also /category/<name>) -> horizontal
+    chip row. OUTCOME: filters the grid to one category via ?category= (or the category
+    page). OPTIONS chips: All, Technology, Art, Games, Film, Music, Community, Design,
+    Food. EXAMPLE: clicking 'Technology' shows the 4 tech campaigns e.g. 'SyncWave: Real-Time
+    Team Collaboration Reimagined'. (Note: seed data also contains an 'education' category
+    not offered as a chip.)"
+  navigate_by_route:
+  - "FundSpark home (/, index) hero -> 'Search campaigns...' text field with the toolbar
+    status + sort dropdowns below it. OUTCOME: submitting/changing controls reloads the
+    grid at / with ?q=, ?status=, ?sort=. EXAMPLE: searching 'mural' surfaces campaign
+    2 'Lakeport Community Mural: Seasons of the Lake'."
+  - "FundSpark home (/, index) campaign grid -> click any campaign card (whole card is
+    clickable, or the title link). OUTCOME: navigates to /campaign/<id> detail page with
+    story, funding progress, reward tiers and updates. EXAMPLE: clicking the 'SyncWave:
+    Real-Time Team Collaboration Reimagined' card opens /campaign/4."
+  - "Category page (/category/<name>, reached from a category chip) -> click a campaign
+    card to open its detail page. OUTCOME: navigates to /campaign/<id>. EXAMPLE: from
+    the Art category, clicking 'Fragments & Light: Sophie Lin Solo Art Exhibition' opens
+    /campaign/6."
+  pay_by_form:
+  - "Checkout page (/campaign/<id>/checkout) -> 'Complete pledge' submit hands off to
+    the shared 2-step payment verification (/verify-payment). OUTCOME: on confirmation
+    the pledge amount is charged via the linked banking account (category 'Donations')
+    and the user returns to the campaign detail page. EXAMPLE: completing a $25 pledge
+    to campaign 4 'SyncWave' routes through 2FA before the banking bridge posts the payment."
+  report_information:
+  - "FundSpark home (/, index) search -> 'Search campaigns...' returns matching campaign
+    cards. OUTCOME: read the resulting titles/counts (toolbar shows 'N projects found').
+    Search matches title, description, or category (case-insensitive substring). EXAMPLE:
+    query 'SyncWave' returns 2 cards ('SyncWave: Real-Time Team Collaboration Reimagined'
+    and 'SyncWave Open API: Developer Toolkit')."
+  - "FundSpark home (/, index) toolbar status/sort dropdowns -> filtered/ordered campaign
+    grid to read off values. OUTCOME: read per-card raised amount, goal, % funded, backer
+    count. EXAMPLE: sort 'Most Backed' puts 'SyncWave: Real-Time Team Collaboration Reimagined'
+    first with 312 backers."
+  - "Campaign detail page (/campaign/<id>) -> funding card + Updates + reward tiers to
+    read specific figures. OUTCOME: read raised/goal, % funded, backer count, end date,
+    tier remaining counts, and update log. EXAMPLE: campaign 1 'Young Voices: Lakeport
+    High Creative Writing Program' shows $4,350 raised of $5,000 goal, 87% funded, 67
+    backers, 2 updates."
+  - "FundSpark home (/, index) status/sort dropdowns -> campaign cards each render a
+    funding progress bar and '<pct>% funded'. OUTCOME: compare/read funding progress
+    across cards. EXAMPLE: the most-funded card 'SyncWave: Real-Time Team Collaboration
+    Reimagined' shows $32,400 raised of $50,000 (64.8% funded)."
+  search:
+  - "FundSpark home (/, index) hero -> 'Search campaigns...' text field (name=q) sitting
+    above the campaign grid, with a green 'Search' button. OUTCOME: reloads / filtered
+    by keyword; toolbar count updates. Matches title/description/category. EXAMPLE: 'mural'
+    -> campaign 2 'Lakeport Community Mural: Seasons of the Lake'."
+  - "'Fund what matters to you' hero (the FundSpark home page, /) -> search field at
+    the top of the page. OUTCOME: submits ?q= and re-renders the grid with matching campaign
+    cards. EXAMPLE: 'writing' -> campaign 1 'Young Voices: Lakeport High Creative Writing
+    Program'."
+  - "FundSpark home (/, index) 'Search campaigns...' field filters campaigns by keyword
+    (case-insensitive substring over title, description, category). OUTCOME: only matching
+    cards remain, count shown as 'N projects found'. EXAMPLE: 'art' matches art-category
+    campaigns and any with 'art' in text, e.g. 'Fragments & Light: Sophie Lin Solo Art
+    Exhibition'."
+  share_by_form:
+  - "Campaign detail page (/campaign/<id>) -> '\U0001F517 Share' button -> dropdown ->
+    'Copy link' item copies the campaign's URL for sharing (also 'Share via Email' opens
+    a mailto with the link). OUTCOME: client-side only, no server write; 'Link copied!'
+    confirmation appears. EXAMPLE: on campaign 3 'Brooks Fitness Expansion: Community
+    Wellness Wing', Share -> Copy link yields /sites/crowdfunding-donations/campaign/3."
+  sort_by_form:
+  - "FundSpark home (/, index) toolbar -> sort dropdown (id filter-sort, onchange applyFilters).
+    OUTCOME: reorders the grid via ?sort=. OPTIONS: Trending (active first then by backers,
+    default), Newest (start_date desc), Most Funded (raised_amount desc), Most Backed
+    (backer_count desc), Ending Soon (end_date asc). EXAMPLE: 'Most Funded' puts 'SyncWave:
+    Real-Time Team Collaboration Reimagined' ($32,400) at the top."
+  - "FundSpark home (/, index) sort dropdown for ordering the campaign grid. OUTCOME:
+    same 5 options (Trending/Newest/Most Funded/Most Backed/Ending Soon) re-sort the visible
+    cards. EXAMPLE: 'Ending Soon' orders by nearest end_date first."
+  toggle_relationship:
+  - "Campaign detail page (/campaign/<id>) action row -> 'Subscribe to Updates' button
+    (shows '✔ Subscribed' when active), toggling the campaign in the user's subscribed_campaigns.
+    OUTCOME: POST /campaign/<id>/subscribe flips subscribe/unsubscribe. EXAMPLE: on campaign
+    4 'SyncWave', clicking it subscribes user 1 to that campaign's updates. (Same row
+    also has a 'Follow' toggle for the creator.)"
+  - "FundSpark home (/, index) or category grid -> per-card star/bookmark button (top-left
+    of the card image; '☆' unsaved / '★' saved, shown only when logged in).
+    OUTCOME: POST /campaign/<id>/save toggles the campaign in saved_campaigns. EXAMPLE:
+    starring the 'SyncWave' card adds campaign 4 to the user's saved list (also togglable
+    via 'Save' on the detail page)."

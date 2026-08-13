@@ -62,9 +62,50 @@ ol li, ul li { margin: 2px 0; }
     <span style="flex:1"></span>
     <span>Policy Document — {{ policy.policy_number }}</span>
     <span style="flex:1"></span>
-    <button onclick="window.print()">Print / Save as PDF</button>
+    <span id="save-status" style="color:#9ae6b4;font-size:12px;"></span>
+    <button id="save-to-files-btn" type="button"
+            data-save-url="{{ url_for('insurance-loans.policy_save_to_files', policy_id=policy.id) }}">
+        Save to my files
+    </button>
     <a href="/">MiniWeb</a>
 </div>
+
+<script>
+(function () {
+    var btn = document.getElementById("save-to-files-btn");
+    var status = document.getElementById("save-status");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+        btn.disabled = true;
+        var original = btn.textContent;
+        btn.textContent = "Saving…";
+        status.textContent = "";
+        fetch(btn.getAttribute("data-save-url"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+            if (res.ok && res.d.status === "saved") {
+                status.textContent = "✓ " + res.d.message;
+                btn.textContent = "Saved ✓";
+            } else {
+                status.style.color = "#feb2b2";
+                status.textContent = "Could not save. Please try again.";
+                btn.textContent = original;
+                btn.disabled = false;
+            }
+        })
+        .catch(function () {
+            status.style.color = "#feb2b2";
+            status.textContent = "Could not save. Please try again.";
+            btn.textContent = original;
+            btn.disabled = false;
+        });
+    });
+})();
+</script>
 
 {% if policy.requires_signature and not policy.signed %}
 <div class="no-print" style="max-width:8.5in;margin:14px auto 0;background:#fef3c7;border:2px solid #f59e0b;border-radius:.4rem;padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">

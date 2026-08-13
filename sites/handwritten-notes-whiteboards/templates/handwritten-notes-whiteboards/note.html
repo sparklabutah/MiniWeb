@@ -269,6 +269,11 @@
             Save
         </button>
 
+        <a class="tool-btn" href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}" title="Edit this note's image (crop, resize, contrast, vibrance)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2zM8.5 13.5l2.5 3L14.5 12l4.5 6H5l3.5-4.5zM8.5 11A1.5 1.5 0 118.5 8a1.5 1.5 0 010 3z"/></svg>
+            Edit image
+        </a>
+
         <button class="tool-btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" title="Share note">Share</button>
         <form method="POST" action="{{ url_for('handwritten-notes-whiteboards.form_invite_to_note', note_id=note.id) }}" style="display:inline-flex;gap:.2rem;align-items:center;">
             <input type="email" name="email" placeholder="Invite by email" required style="padding:.25rem .5rem;font-size:.8rem;border:1px solid var(--border);border-radius:var(--radius);width:140px;">
@@ -334,6 +339,17 @@
             </div>
             {% endif %}
         </div>
+
+        {% if note.image %}
+        <div class="note-image-bar" style="padding:.4rem 1.5rem 0;">
+            <a href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}" title="Edit image" style="display:inline-block;">
+                <img src="{{ note.image }}" alt="{{ note.title }} image" style="max-height:160px;max-width:100%;border:1px solid var(--border);border-radius:.4rem;display:block;">
+            </a>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:.25rem;">
+                Note image &middot; <a href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}">Edit image</a>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="content-area mode-both" id="content-area">
             <textarea class="text-editor" id="note-content" placeholder="Start typing your note..." {% if not user %}readonly{% endif %}>{{ note.content }}</textarea>

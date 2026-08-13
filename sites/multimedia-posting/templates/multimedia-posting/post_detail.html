@@ -15,8 +15,13 @@
         .top-nav .nav-links a { color: #262626; font-size: 14px; }
         .container { max-width: 935px; margin: 0 auto; padding: 20px; }
         .post-detail { background: #fff; border: 1px solid #dbdbdb; display: flex; height: calc(100vh - 120px); max-height: 720px; min-height: 460px; }
-        .post-media { flex: 1; background: #efefef; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
+        .post-media { flex: 1; background: #efefef; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; overflow: hidden; }
         .post-media .placeholder { font-size: 72px; color: #c7c7c7; }
+        /* Video posts render as a square tile (1:1) consistent with image posts,
+           cropped/fit to the square with no overflow past the tile. */
+        .post-media .video-tile { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 100%; overflow: hidden; }
+        .post-media .video-tile [data-mini-player] { width: 100%; height: 100%; object-fit: cover; }
+        .post-media .video-tile .mp-root { width: 100%; height: 100%; aspect-ratio: 1 / 1; border-radius: 0; }
         .post-media .type-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
         .post-sidebar { width: 340px; display: flex; flex-direction: column; border-left: 1px solid #dbdbdb; }
         .post-header { display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #efefef; }
@@ -78,6 +83,7 @@
         <div class="post-detail">
             <div class="post-media">
                 {% if post.type == 'video' %}
+                <div class="video-tile">
                 <div data-mini-player
                      data-badge="Video"
                      data-accent="#e1306c"
@@ -87,7 +93,8 @@
                      data-qualities="auto,1080p,720p,480p"
                      data-play-url="/sites/multimedia-posting/api/posts/{{ post.id }}/play"
                      data-seek-url="/sites/multimedia-posting/api/posts/{{ post.id }}/seek"
-                     style="width:100%;height:100%"></div>
+                     style="aspect-ratio:1/1;width:100%;height:100%;object-fit:cover"></div>
+                </div>
                 {% else %}
                 {% if post.type == 'carousel' %}
                 <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>

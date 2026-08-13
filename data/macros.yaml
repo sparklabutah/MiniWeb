@@ -90,14 +90,19 @@ macros:
       - submit_form
   edit_by_form:
     group: form
-    description: Edit an existing record through a form
-    example: Edit your profile name and bio, then save
+    description: Edit an existing record or setting through a form (fill the control(s) and save)
+    example: Edit your profile name and bio, or change a setting (e.g. language), then save
     span_start: open the form
     span_end: close/submit the form
     aliases:
       - edit_by_date_range
       - edit_by_dropdown
       - edit_by_query
+      - configure_by_form
+      - configure_by_date_range
+      - configure_by_dropdown
+      - configure_by_slider
+      - configure_by_toggle
   compare_by_form:
     group: form
     description: Compare items by selecting them through form controls (e.g. dropdowns) that render a side-by-side view
@@ -136,17 +141,6 @@ macros:
     example: Select a reason and confirm cancellation
     span_start: open the form
     span_end: submit the form
-  configure_by_form:
-    group: form
-    description: Change one or more settings via a form
-    example: Set the language and save the setting
-    span_start: open the form
-    span_end: submit/save
-    aliases:
-      - configure_by_date_range
-      - configure_by_dropdown
-      - configure_by_slider
-      - configure_by_toggle
   authenticate_by_form:
     group: form
     description: Log in by entering credentials
@@ -220,6 +214,15 @@ macros:
       - navigate_by_query
       - search_by_query
       - search_by_semantic
+  search_by_scroll:
+    group: search
+    description: Find content by scrolling through a long list/feed (no query box) until the target item appears
+    example: Scroll the events feed until you reach the one on Aug 20
+    span_start: first scroll
+    span_end: target item reached/visible
+    warning: 'SPATIAL macro — the verifier checks the agent SCROLLED to reveal the
+      target. Design the task so the item is far enough down that it is not visible
+      without scrolling, and the answer/action depends on reaching it.'
   search_by_pan_zoom:
     group: search
     description: Find content by panning/zooming a map
@@ -414,10 +417,16 @@ macros:
       - export_by_dropdown
   delete_from_table:
     group: content
-    description: Delete an item from a list/table
+    description: Delete a SINGLE item from a list/table (its own delete/trash control)
     example: Click the trash icon to delete the row
     span_start: delete clicked
     span_end: confirmed
+  delete_by_checkbox:
+    group: content
+    description: Select MULTIPLE items with checkboxes and delete them all at once (bulk delete)
+    example: Check three rows, then click Delete selected
+    span_start: first item checkbox
+    span_end: bulk delete confirmed
   compute_by_tool:
     group: content
     description: Use an on-page calculator/tool to compute a result

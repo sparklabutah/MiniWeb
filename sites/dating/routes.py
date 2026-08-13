@@ -314,6 +314,30 @@ def matches_page():
     if not user:
         return redirect(url_for("dating.login_page"))
     user_matches = _get_user_matches(user["id"])
+
+    # filter_by_date_range — narrow the conversation list to matches that have at
+    # least one message within [date_from, date_to]. Bounds are applied in SQL
+    # (WHERE timestamp >= / <=), never by loading messages into Python first.
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    lo = date_from if date_from else None
+    hi = (date_to + "T23:59:59") if date_to else None
+    if (lo or hi) and user_matches:
+        ids = [m["id"] for m in user_matches]
+        placeholders = ",".join("?" * len(ids))
+        sql = f"SELECT DISTINCT match_id FROM dating_messages WHERE match_id IN ({placeholders})"
+        params = list(ids)
+        if lo:
+            sql += " AND timestamp >= ?"
+            params.append(lo)
+        if hi:
+            sql += " AND timestamp <= ?"
+            params.append(hi)
+        sql += " LIMIT ?"
+        params.append(len(ids))
+        keep = {r["match_id"] for r in db.execute(sql, tuple(params), fetch="all")}
+        user_matches = [m for m in user_matches if m["id"] in keep]
+
     users = _load_users()
     user_map = {u["id"]: u for u in users}
 
@@ -336,7 +360,8 @@ def matches_page():
         })
     # Sort by last message timestamp (most recent first)
     match_data.sort(key=lambda x: x["last_message"]["timestamp"] if x["last_message"] else x["match"]["matched_date"], reverse=True)
-    return render_template("dating/matches.html", user=user, match_data=match_data)
+    return render_template("dating/matches.html", user=user, match_data=match_data,
+                           date_from=date_from, date_to=date_to)
 
 
 @blueprint.route("/conversation/<int:match_id>")

@@ -479,6 +479,8 @@ textarea#instruction:focus {
             </div>
             <button id="macro-add-btn" class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="toggleAddMacroPanel()" title="Browse all macros by family, or propose a new one">＋ Add macro ▾</button>
             <div id="macro-add-panel" style="display:none;position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:.4rem;box-shadow:0 8px 28px rgba(0,0,0,.2);max-height:60vh;overflow-y:auto;z-index:9999;width:340px;font-size:.75rem"></div>
+            <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem;background:#f0fdf4;color:#166534;border-color:#bbf7d0" onclick="draftTask()" id="draft-task-btn" title="Draft a full task (subtasks + instruction) from the sampled macros + real site data — then edit it">✨ Draft task (LLM)</button>
+            <span id="draft-status" style="font-size:.6rem;color:#94a3b8"></span>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Suggest instruction (LLM)</button>
             <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem" onclick="macroEdges=[];_drawArrows()">Clear arrows</button>
             <span style="flex:1"></span>
@@ -1597,6 +1599,35 @@ document.addEventListener('click', function(e) {
 });
 
 // --- Generate instruction from macro subtasks ---
+// Draft a full task (subtasks + instruction) from the sampled macros + real site
+// data, so the annotator EDITS a concrete draft instead of writing from scratch.
+function draftTask() {
+    if (!currentPrompt || !currentPrompt.sites || !currentPrompt.macros) return;
+    const macros = getEnabledMacros().map(m => macroOps[m] ? m + '.' + macroOps[m] : m);
+    if (!macros.length) { alert('No macros to draft from.'); return; }
+    const status = document.getElementById('draft-status');
+    const btn = document.getElementById('draft-task-btn');
+    status.textContent = 'Drafting…'; btn.disabled = true;
+    fetch('/annotate/api/draft_task', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sites: currentPrompt.sites.map(s => s.id || s), macros})
+    }).then(r => r.json()).then(d => {
+        btn.disabled = false;
+        if (d.error || (!d.instruction && !d.subtasks)) {
+            status.textContent = '⚠ ' + (d.error || 'draft unavailable (restart server if creds stale)');
+            return;
+        }
+        // prefill each macro's subtask (marker maps base macro -> concrete step)
+        let filled = 0;
+        for (const [mac, text] of Object.entries(d.subtasks || {})) {
+            if (getEnabledMacros().includes(mac) && text) { macroSubtasks[mac] = text; filled++; }
+        }
+        if (d.instruction) document.getElementById('instruction').value = d.instruction;
+        renderMacroList();           // re-render nodes so the prefilled subtasks show
+        status.textContent = '✓ drafted (' + filled + ' steps) — edit it in your own words';
+    }).catch(() => { btn.disabled = false; status.textContent = '⚠ draft request failed'; });
+}
+
 function generateInstruction() {
     const enabledMacros = getEnabledMacros();
     const subtasks = [];

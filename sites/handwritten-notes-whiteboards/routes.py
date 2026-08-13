@@ -15,6 +15,8 @@ from flask import (
 from app import db
 from app.events import emit
 
+from . import images
+
 SITE = "handwritten-notes-whiteboards"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 
@@ -73,6 +75,7 @@ def index():
     q = request.args.get("q", "").strip()
     tag_filter = request.args.get("tag", "").strip()
     sort_by = request.args.get("sort", "recent")
+    upload_error = request.args.get("upload_error", "").strip()
 
     # Build query filters
     where = {}
@@ -119,6 +122,7 @@ def index():
         pinned_notes=pinned, notes=unpinned,
         user=user, tags=tags,
         q=q, tag_filter=tag_filter, sort_by=sort_by,
+        upload_error=upload_error,
     )
 
 
@@ -300,21 +304,145 @@ def form_upload_image():
     if not user:
         return redirect(url_for("handwritten-notes-whiteboards.login_page"))
     f = request.files.get("file")
-    title = f.filename if f and f.filename else "Uploaded Image"
+    # Reject empty uploads: require an actual image file to be selected.
+    if not f or not f.filename:
+        return redirect(url_for(
+            "handwritten-notes-whiteboards.index", upload_error="1",
+        ))
+    if not (f.mimetype or "").startswith("image/"):
+        return redirect(url_for(
+            "handwritten-notes-whiteboards.index", upload_error="2",
+        ))
+    title = f.filename
     now = _now_iso()
     new_id = db.next_id(SITE, "notes")
+    # We never keep the raw uploaded bytes -- store a generated placeholder
+    # image and reference its served path instead.
+    image_url = images.save_upload_placeholder(new_id, f.filename)
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {title}]",
         "owner_id": user["id"], "created_at": now, "updated_at": now,
         "tags": "image", "notebook_id": 0, "is_pinned": False,
-        "color": "#FFFACD", "drawing_data": "",
+        "color": "#FFFACD", "drawing_data": "", "image": image_url,
     }
     db.save_item(SITE, "notes", new_id, new_note)
     emit("file_created", user_id=user["id"], filename=title,
          file_type="note", source_site="handwritten-notes-whiteboards",
          source_id=new_id)
     return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=new_id))
+
+
+# ---------------------------------------------------------------------------
+# Image editor -- edit_by_image macro (crop / resize / contrast / vibrance)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/note/<int:note_id>/image/edit", methods=["GET"])
+def note_image_edit_page(note_id):
+    """Render the basic image editor for a note's image.
+
+    Ensures the note has an image (generating a deterministic placeholder if
+    it does not yet have one) so the editor always has something to edit.
+    """
+    user = _current_user()
+    note = db.get_item(SITE, "notes", note_id)
+    if not note:
+        abort(404)
+
+    image_url = note.get("image")
+    local = images.local_path_for_url(image_url) if image_url else None
+    if not image_url or not (local and local.is_file()):
+        # Generate the base placeholder on demand and persist to the overlay.
+        image_url = images.ensure_note_placeholder(
+            note_id, note.get("title") or f"Note {note_id}")
+        note["image"] = image_url
+        note["updated_at"] = _now_iso()
+        db.save_item(SITE, "notes", note_id, note)
+
+    return render_template(
+        "handwritten-notes-whiteboards/note_image_edit.html",
+        note=note, user=user, image_url=note["image"],
+        edit_ops=list(images.EDIT_OPS),
+    )
+
+
+@blueprint.route("/note/<int:note_id>/image/edit", methods=["POST"])
+def note_image_edit_submit(note_id):
+    """Apply an image edit and persist it to the SESSION OVERLAY.
+
+    Body (JSON or form) must include an ``op`` plus its params, e.g.::
+
+        {"op": "crop", "x": 10, "y": 20, "w": 200, "h": 120}
+        {"op": "resize", "w": 320, "h": 240}
+        {"op": "contrast", "value": 1.4}
+        {"op": "vibrance", "value": 1.6}
+
+    The posted params are what a verifier checks (captured by /_admin/log);
+    the server also applies the transform with PIL and stores the resulting
+    placeholder path on the note overlay record.
+    """
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+
+    note = db.get_item(SITE, "notes", note_id)
+    if not note:
+        abort(404)
+
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    op = (data.get("op") or "").strip().lower()
+    if op not in images.EDIT_OPS:
+        return jsonify({
+            "error": "invalid op",
+            "allowed": list(images.EDIT_OPS),
+        }), 400
+
+    # Collect the recognised params for this op (coerced numerically).
+    def _num(key):
+        v = data.get(key)
+        if v is None or v == "":
+            return None
+        try:
+            return float(v) if ("." in str(v)) else int(v)
+        except (TypeError, ValueError):
+            return None
+
+    params = {}
+    if op == "crop":
+        for k in ("x", "y", "w", "h"):
+            params[k] = _num(k)
+    elif op == "resize":
+        for k in ("w", "h"):
+            params[k] = _num(k)
+    else:  # contrast / vibrance
+        params["value"] = _num("value")
+
+    try:
+        new_url = images.apply_edit_to_note(note, op, params)
+    except Exception as exc:  # pragma: no cover - defensive
+        return jsonify({"error": f"edit failed: {exc}"}), 400
+
+    # Persist to the session overlay only (never the base table).
+    history = note.get("image_edits") or []
+    if isinstance(history, str):
+        try:
+            history = json.loads(history) if history else []
+        except Exception:
+            history = []
+    history.append({"op": op, "params": params, "at": _now_iso()})
+    note["image"] = new_url
+    note["image_edits"] = history
+    note["updated_at"] = _now_iso()
+    db.save_item(SITE, "notes", note_id, note)
+
+    return jsonify({
+        "status": "edited",
+        "note_id": note_id,
+        "op": op,
+        "params": params,
+        "image": new_url,
+        "edit_count": len(history),
+    })
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -866,12 +994,13 @@ def api_notes_create_by_image():
 
     now = _now_iso()
     new_id = db.next_id(SITE, "notes")
+    image_url = images.save_upload_placeholder(new_id, img.filename)
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {img.filename}]",
         "owner_id": owner_id, "created_at": now, "updated_at": now,
         "tags": "image", "notebook_id": 0, "is_pinned": False,
-        "color": "#FFFACD", "drawing_data": "",
+        "color": "#FFFACD", "drawing_data": "", "image": image_url,
     }
     db.save_item(SITE, "notes", new_id, new_note)
     emit("file_created", user_id=owner_id, filename=title,
@@ -930,6 +1059,7 @@ def api_note_replace_image(note_id):
     if not note:
         abort(404)
     note["content"] = f"[image replaced: {img.filename}]"
+    note["image"] = images.save_upload_placeholder(note_id, img.filename)
     note["updated_at"] = _now_iso()
     db.save_item(SITE, "notes", note_id, note)
     return jsonify(note)

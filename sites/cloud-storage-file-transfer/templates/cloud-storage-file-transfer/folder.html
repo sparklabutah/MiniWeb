@@ -133,9 +133,17 @@
         {% endif %}
 
         {% if files %}
+        <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 12px;padding:8px 14px;background:#e8f0fe;border:1px solid #d2e3fc;border-radius:8px;">
+            <span id="bulkCount" style="font-size:0.85rem;color:#1a73e8;font-weight:500;">0 selected</span>
+            <button type="button" id="deleteSelectedBtn" style="padding:6px 16px;background:#c5221f;color:#fff;border:none;border-radius:16px;font-size:0.82rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <span>&#128465;</span> Delete selected
+            </button>
+            <button type="button" id="bulkClearBtn" style="padding:6px 14px;background:none;color:#5f6368;border:none;border-radius:16px;font-size:0.82rem;cursor:pointer;">Clear</button>
+        </div>
         <table class="file-table">
             <thead>
                 <tr>
+                    <th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllFiles" title="Select all"></th>
                     <th style="width:40px;"></th>
                     <th>Name</th>
                     <th>Owner</th>
@@ -146,7 +154,10 @@
             </thead>
             <tbody>
                 {% for file in files %}
-                <tr>
+                <tr data-file-id="{{ file.id }}">
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="file-select" value="{{ file.id }}" title="Select {{ file.name }}">
+                    </td>
                     <td>
                         <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star" onclick="var b=this;fetch('/sites/cloud-storage-file-transfer/api/files/{{ file.id }}/star', {method:'POST'}).then(()=>{var s=b.classList.toggle('starred');b.innerHTML=s?'&#9733;':'&#9734;'})">
                             {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
@@ -180,5 +191,72 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+    /* ── Bulk multi-select + delete (delete_by_checkbox) ──────────
+       Check file rows (or "Select all"), then "Delete selected" trashes them
+       all in a single POST to /files/delete-selected. */
+    (function() {
+        var bulkBar = document.getElementById('bulkBar');
+        if (!bulkBar) return;
+        var selectAll = document.getElementById('selectAllFiles');
+        var countEl = document.getElementById('bulkCount');
+        var deleteBtn = document.getElementById('deleteSelectedBtn');
+        var clearBtn = document.getElementById('bulkClearBtn');
+
+        function boxes() {
+            return Array.prototype.slice.call(document.querySelectorAll('.file-select'));
+        }
+        function checkedBoxes() {
+            return boxes().filter(function(b) { return b.checked; });
+        }
+        function refresh() {
+            var n = checkedBoxes().length;
+            countEl.textContent = n + ' selected';
+            bulkBar.style.display = n > 0 ? 'flex' : 'none';
+            if (selectAll) {
+                var all = boxes();
+                selectAll.checked = all.length > 0 && n === all.length;
+                selectAll.indeterminate = n > 0 && n < all.length;
+            }
+        }
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                boxes().forEach(function(b) { b.checked = selectAll.checked; });
+                refresh();
+            });
+        }
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('file-select')) refresh();
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                boxes().forEach(function(b) { b.checked = false; });
+                refresh();
+            });
+        }
+        deleteBtn.addEventListener('click', function() {
+            var ids = checkedBoxes().map(function(b) { return b.value; });
+            if (!ids.length) return;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = 'Deleting...';
+            var fd = new FormData();
+            ids.forEach(function(id) { fd.append('file_ids', id); });
+            fd.append('next', window.location.pathname + window.location.search);
+            fetch('/sites/cloud-storage-file-transfer/files/delete-selected', {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: fd
+            })
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = '<span>&#128465;</span> Delete selected';
+                });
+        });
+        refresh();
+    })();
+    </script>
 </body>
 </html>

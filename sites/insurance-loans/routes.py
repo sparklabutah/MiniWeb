@@ -252,20 +252,41 @@ def policy_document(policy_id):
             vehicle = _json.loads(vehicle)
         except (ValueError, TypeError):
             vehicle = {}
-    # Emit file_created so the policy doc appears in cloud storage
-    try:
-        from app.events import emit
-        emit("file_created", user_id=policy.get("user_id", 1),
-             filename=f"Policy {policy['policy_number']}", file_type="document",
-             source_site="insurance-loans", source_id=str(policy_id))
-    except Exception:
-        pass
-
+    # Note: saving the document to the user's files is an explicit action via the
+    # "Save to my files" button (POST /policy/<id>/save-to-files), not a side
+    # effect of viewing — so merely opening the document no longer creates a file.
     return render_template(
         "insurance-loans/policy_document.html",
         policy=policy, coverage=coverage, vehicle=vehicle,
         user=user, logged_in=logged_in,
     )
+
+
+@blueprint.route("/policy/<int:policy_id>/save-to-files", methods=["POST"])
+def policy_save_to_files(policy_id):
+    """Save the policy document as a real file into the user's files.
+
+    Persists the policy document through the shared ``file_created`` event, so
+    the cloud-storage handler creates a file entry that surfaces in the file
+    picker / Cloud Storage files list. This is a normal /sites/... route so the
+    action is captured by /_admin/log.
+    """
+    policy = db.get_item(SITE, "policies", policy_id)
+    if not policy:
+        abort(404)
+
+    owner_id = policy.get("user_id", 1)
+    filename = f"Policy {policy['policy_number']}"
+    emit("file_created", user_id=owner_id, filename=filename,
+         file_type="document", source_site="insurance-loans",
+         source_id=str(policy_id))
+
+    return jsonify({
+        "status": "saved",
+        "policy_id": policy_id,
+        "filename": f"{filename}.doc",
+        "message": f"Saved “{filename}” to your files.",
+    })
 
 
 @blueprint.route("/policies/new", methods=["GET"])

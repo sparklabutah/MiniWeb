@@ -802,7 +802,11 @@ def create_app():
                 if body:
                     entry["body"] = body
                 elif request.form:
-                    entry["body"] = dict(request.form)
+                    # preserve REPEATED fields (e.g. bulk file_ids from checkboxes) —
+                    # dict(request.form) would keep only the last value. Collapse
+                    # single-valued fields to a scalar, keep multi-valued as a list.
+                    entry["body"] = {k: (v if len(v) > 1 else v[0])
+                                     for k, v in request.form.to_dict(flat=False).items()}
             except Exception:
                 pass
         # Capture response snippet for API calls

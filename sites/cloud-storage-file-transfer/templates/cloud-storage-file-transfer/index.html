@@ -479,6 +479,7 @@
             <input type="text" name="q" placeholder="Search in Drive" value="{{ q }}" autocomplete="off">
             {% if type_filter %}<input type="hidden" name="type" value="{{ type_filter }}">{% endif %}
             {% if sort != 'modified' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+            {% if view and view != 'drive' %}<input type="hidden" name="view" value="{{ view }}">{% endif %}
         </form>
     </div>
 
@@ -586,7 +587,7 @@
             {% endif %}
         </div>
         <div class="toolbar-actions">
-            <select class="type-select" onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.index') }}?type='+this.value+'&sort={{ sort }}&q={{ q }}'">
+            <select class="type-select" onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.index') }}?type='+this.value+'&sort={{ sort }}&q={{ q }}&view={{ view }}'">
                 <option value="" {% if not type_filter %}selected{% endif %}>Type</option>
                 <option value="document" {% if type_filter == 'document' %}selected{% endif %}>Documents</option>
                 <option value="spreadsheet" {% if type_filter == 'spreadsheet' %}selected{% endif %}>Spreadsheets</option>
@@ -597,7 +598,7 @@
                 <option value="archive" {% if type_filter == 'archive' %}selected{% endif %}>Archives</option>
             </select>
 
-            <select class="sort-select" onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.index') }}?sort='+this.value+'&type={{ type_filter }}&q={{ q }}'">
+            <select class="sort-select" onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.index') }}?sort='+this.value+'&type={{ type_filter }}&q={{ q }}&view={{ view }}'">
                 <option value="modified" {% if sort == 'modified' %}selected{% endif %}>Last modified</option>
                 <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
                 <option value="size" {% if sort == 'size' %}selected{% endif %}>File size</option>
@@ -608,6 +609,7 @@
                 {% if type_filter %}<input type="hidden" name="type" value="{{ type_filter }}">{% endif %}
                 {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
                 {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+                {% if view and view != 'drive' %}<input type="hidden" name="view" value="{{ view }}">{% endif %}
                 <label style="font-size:.82rem;color:#5f6368;white-space:nowrap;">From:</label>
                 <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:4px 8px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;">
                 <label style="font-size:.82rem;color:#5f6368;white-space:nowrap;">To:</label>
@@ -644,6 +646,16 @@
     <!-- Files section -->
     {% if files %}
     <div class="section-label">Files</div>
+
+    <!-- Bulk-select action bar (delete_by_checkbox) — appears when one or more
+         file-row checkboxes in the list view are checked. -->
+    <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 12px;padding:8px 14px;background:#e8f0fe;border:1px solid #d2e3fc;border-radius:8px;">
+        <span id="bulkCount" style="font-size:13px;color:#1a73e8;font-weight:500;">0 selected</span>
+        <button type="button" id="deleteSelectedBtn" style="padding:6px 16px;background:#c5221f;color:#fff;border:none;border-radius:16px;font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            <span>&#128465;</span> Delete selected
+        </button>
+        <button type="button" id="bulkClearBtn" style="padding:6px 14px;background:none;color:#5f6368;border:none;border-radius:16px;font-size:13px;cursor:pointer;">Clear</button>
+    </div>
 
     <!-- ── Grid View ───────────────────────────────────────────── -->
     <div class="file-grid" id="fileGridView">
@@ -705,6 +717,7 @@
     <table class="file-list" id="fileListView" style="display:none;">
         <thead>
             <tr>
+                <th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllFiles" title="Select all"></th>
                 <th style="width:40px;"></th>
                 <th>Name</th>
                 <th>Owner</th>
@@ -716,6 +729,9 @@
         <tbody>
             {% for file in files %}
             <tr data-file-id="{{ file.id }}">
+                <td style="text-align:center;">
+                    <input type="checkbox" class="file-select" value="{{ file.id }}" title="Select {{ file.name }}">
+                </td>
                 <td>
                     <form method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_star_toggle', file_id=file.id) }}" style="display:inline;">
                         <button type="submit" class="fl-star {% if file.starred %}starred{% endif %}" title="{% if file.starred %}Unstar{% else %}Star{% endif %}">
@@ -962,6 +978,71 @@
             .then(function() { window.location.reload(); })
             .catch(function() { btn.innerHTML = '<span class="di-icon">&#128465;</span> Move to trash'; btn.disabled = false; });
     });
+
+    /* ── Bulk multi-select + delete (delete_by_checkbox) ──────────
+       Check one or more file-row checkboxes (or "Select all") in the list
+       view, then "Delete selected" trashes them all in one POST. */
+    (function() {
+        var bulkBar = document.getElementById('bulkBar');
+        if (!bulkBar) return;
+        var selectAll = document.getElementById('selectAllFiles');
+        var countEl = document.getElementById('bulkCount');
+        var deleteBtn = document.getElementById('deleteSelectedBtn');
+        var clearBtn = document.getElementById('bulkClearBtn');
+
+        function boxes() {
+            return Array.prototype.slice.call(document.querySelectorAll('.file-select'));
+        }
+        function checkedBoxes() {
+            return boxes().filter(function(b) { return b.checked; });
+        }
+        function refresh() {
+            var n = checkedBoxes().length;
+            countEl.textContent = n + ' selected';
+            bulkBar.style.display = n > 0 ? 'flex' : 'none';
+            if (selectAll) {
+                var all = boxes();
+                selectAll.checked = all.length > 0 && n === all.length;
+                selectAll.indeterminate = n > 0 && n < all.length;
+            }
+        }
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                boxes().forEach(function(b) { b.checked = selectAll.checked; });
+                refresh();
+            });
+        }
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('file-select')) refresh();
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                boxes().forEach(function(b) { b.checked = false; });
+                refresh();
+            });
+        }
+        deleteBtn.addEventListener('click', function() {
+            var ids = checkedBoxes().map(function(b) { return b.value; });
+            if (!ids.length) return;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = 'Deleting...';
+            var fd = new FormData();
+            ids.forEach(function(id) { fd.append('file_ids', id); });
+            fd.append('next', window.location.pathname + window.location.search);
+            fetch("{{ url_for('cloud-storage-file-transfer.form_files_delete_selected') }}", {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: fd
+            })
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = '<span>&#128465;</span> Delete selected';
+                });
+        });
+        refresh();
+    })();
 </script>
 
 </body>

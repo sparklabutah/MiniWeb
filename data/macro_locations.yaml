@@ -6,476 +6,479 @@
 
 academic-paper-db:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/sites/academic-paper-db/login, ''Sign in to continue to Scholar Search'') -> ''Username'' and ''Password'' text inputs + blue ''Sign in'' button. Outcome: POST /login validates against the users table and sets session user_id, redirecting to the ''My Library'' dashboard; wrong credentials re-render with ''Invalid username or password''. Fields: username, password. Example: sign in as username ''researcher_arivera'' (display name ''Alex Rivera'').'
   filter_by_dropdown:
-  - '''Scholar Search'' page -> ''Sort'' dropdown (Date, Title, Relevance)'
-  - '''Scholar Search'' page -> ''Year'' dropdown for date filtering'
+  - '''Scholar Search'' results view (index.html, only shown after a query/category is active) -> right side of the filter tab bar, ''Sort:'' <select id="filter-sort"> with options Date / Title / Relevance. Outcome: reloads /?sort=<val> and re-orders the current result list (Date = update_date DESC, Title = title A-Z, Relevance = keyword-overlap score, only meaningful with a query). Example: search ''neural network'' then set Sort to Relevance to rank by keyword overlap.'
+  - '''Scholar Search'' results view (index.html filter bar, next to Sort) -> ''Year:'' <select id="filter-from"> with options Any, then ''Since 2018'' down to ''Since 2007'' (range 2018..2007). Outcome: reloads with date_from=<year> and keeps only papers whose publication year >= the chosen year; ''Any'' clears the filter. Example: on a ''cs'' search choose ''Since 2015'' to restrict results to papers from 2015 onward.'
   navigate_by_route:
-  - '''Scholar Search'' page -> click paper title to view paper details'
-  - '''Scholar Search'' page -> click category badge to filter by category'
-  - Paper detail page -> click author name to view author page
+  - '''Scholar Search'' results view (index.html) -> click a result''s blue paper title link (.result-title a) to open its detail page at /paper/<id>. Outcome: navigates to the full paper page. Example: click ''Topological and Statistical Behavior Classifiers for Tracking Applications'' to open /sites/academic-paper-db/paper/1.'
+  - '''Scholar Search'' results view (index.html) -> click a grey category badge (.result-meta a.tag, e.g. ''cs.SY'', ''math.AT'', ''stat.ML'') under a result to filter. Outcome: reloads /?category=<badge> (keeping the current q) showing only papers in that category. Example: click the ''quant-ph'' badge to filter results to quantum-physics papers.'
+  - 'Paper detail page (/paper/<id>) -> click an author name link in the ''.paper-authors'' byline to open that author''s profile at /author/<name>. Outcome: navigates to the Google-Scholar-style author page. Example: on paper 1 click ''Paul Bendich'' to open /sites/academic-paper-db/author/Paul%20Bendich.'
   report_information:
-  - '''Scholar Search'' page -> search results showing paper cards with title, authors, abstract'
-  - '''Scholar Search'' page -> ''Year'' dropdown filters paper results'
-  - Compare page -> side-by-side paper comparison table
-  - Paper detail page -> metadata section with categories and dates
-  - Paper detail page -> full abstract, metadata, author list
-  - Author page -> list of author's papers
-  - Compare page -> two paper selection dropdowns and side-by-side table
-  - Category page -> 'Compute paper count' category dropdown showing the computed paper count on selection
+  - '''Scholar Search'' results view (index.html ''.results-container'') -> read the ranked list of result cards, each showing paper title, ''authors_str - year'' byline, a ~250-char abstract snippet, category tags and ''arXiv:<id>''; header reads ''About N results''. Outcome: agent reports facts read off a card. Example: report the year and arXiv id of ''Topological and Statistical Behavior Classifiers...'' (2014, arXiv:1406.0214).'
+  - '''Scholar Search'' results view -> the filter-bar ''Year:'' dropdown (Any / ''Since 2018''..''Since 2007'') constrains which papers appear; read the resulting filtered list. Outcome: report a value from results narrowed by year. Example: with ''Since 2016'' set on a ''cs'' search, report the top result''s title.'
+  - 'Compare page (/compare?ids=a,b) -> read the side-by-side ''.compare-table'' whose rows are Title, Authors, Year, Categories, DOI, Journal, arXiv ID, Abstract for the two selected papers. Outcome: report/compare a field across the two papers. Example: compare the Year of paper 1 vs paper 2.'
+  - 'Paper detail page (/paper/<id>) -> read the ''.paper-meta'' line plus the info table rows (arXiv ID, Categories, Year, DOI, Journal, Comments, Last Updated). Outcome: report metadata/dates for the paper. Example: report the Categories of paper 1 (''eess.SY, cs.SY, math.AT, stat.ML'') and its Last Updated date.'
+  - 'Paper detail page (/paper/<id>) -> read the full ''Abstract'' section, the info table, and the ''Authors'' row listing every author. Outcome: report the abstract text or the complete author list. Example: report all 11 authors of paper 1 (Paul Bendich, Sang Chin, ... , Adam Watkins).'
+  - 'Author page (/author/<name>) -> read the ''Publications'' list (each item shows title, authors, snippet, arXiv id and a per-paper citation count + year) and the ''Cited by'' box (Citations, h-index, i10-index). Outcome: report an author''s papers or citation stats. Example: on ''Paul Bendich'' report his listed publications and h-index.'
+  - 'Compare page (/compare) -> the two ''Paper A'' / ''Paper B'' <select> dropdowns (id=paper-a / paper-b, each listing up to 50 papers by title) feed the ''Compare'' button which builds the side-by-side comparison table. Outcome: report which two papers were selected and the compared field values. Example: pick two papers from the dropdowns and report their differing Categories.'
+  - 'Category page (/category/<cat>) -> the ''Compute paper count:'' <select id="catCountSelect"> (options ''Select a category…'' plus each top-level category cs, math, quant-ph, astro-ph, ...). On change it fetches api/categories/<cat>/stats and shows ''<count> papers in <cat>''. Outcome: report the computed count. Example: select ''cs'' to display ''500 papers in cs''.'
   search:
-  - '''Scholar Search'' page -> ''Search papers...'' text field at top'
-  - '''Scholar Search'' page -> ''Search papers...'' field with relevance ranking'
-  - '''Scholar Search'' page -> relevance scoring in search results'
+  - '''Scholar Search'' page -> the main search box: on the landing hero (empty placeholder, autofocus) or the compact results-view bar (placeholder ''Search papers...''), <input name="q">. Outcome: GET / with ?q=<text> runs a LIKE match over title/abstract/authors and lists matching papers. Example: type ''neural network'' to retrieve papers like ''Neural Network Approach to Railway Stand Lateral Skew Control''.'
+  - '''Scholar Search'' results view -> the ''Search papers...'' query box combined with Sort=Relevance ranks hits by an occurrence-weighted keyword score (title hits x3, author/category x2, abstract x1). Outcome: most keyword-relevant papers surface first. Example: search ''quantum computation'' with Sort=Relevance to rank the strongest title/abstract matches on top.'
+  - '''Scholar Search'' results view -> relevance scoring drives ordering of the ''.result-item'' cards when a query is present and Sort=Relevance is chosen (backed by /api/papers/search). Outcome: read the top-ranked result for a query. Example: report the #1 relevance result for ''neural network''.'
   sort_by_form:
-  - '''Scholar Search'' page -> ''Sort'' dropdown (Date, Title, Relevance)'
+  - '''Scholar Search'' results view (index.html filter bar) -> ''Sort:'' <select id="filter-sort"> with options Date / Title / Relevance. Outcome: reloads /?sort=<val>; Date orders by update_date DESC (newest first), Title orders A-Z by title, Relevance orders by keyword-overlap score for the active query. Example: on a ''cs'' search set Sort to Title to list results alphabetically.'
   toggle_relationship:
-  - Author page -> 'Follow'/'Unfollow' button
-  - Paper detail page -> 'Follow Author' button
-  - Paper detail page -> 'Save'/'Unsave' button
-  - '''My Library'' page -> ''Unsave'' button on saved papers'
+  - 'Author page (/author/<name>) sidebar -> the ''Follow'' button (becomes highlighted ''Following'' when active) under the author avatar. Outcome: POST /author/<name>/follow toggles the author in the signed-in user''s followed_authors and returns to the profile. Example: on ''Paul Bendich'' click Follow to add him to your followed authors.'
+  - 'Paper detail page (/paper/<id>) actions bar -> the ''Follow <first author>'' button (reads ''Unfollow <first author>'' once followed), e.g. ''Follow Paul Bendich''. Outcome: POST /author/<name>/follow toggles that first author and redirects back to the paper. Example: on paper 1 click ''Follow Paul Bendich''.'
+  - 'Paper detail page (/paper/<id>) actions bar -> the blue Save button, labelled ''☆ Save'' when unsaved and ''★ Saved'' when saved. Outcome: POST /paper/<id>/save toggles the paper in the user''s saved_papers (and emails a ''Paper saved to your library'' notice on save). Example: on paper 1 click ''☆ Save'' to add it to My Library.'
+  - '''My Library'' dashboard (/dashboard) ''My Library'' tab -> the ''Remove'' button beside each saved paper. Outcome: POST /paper/<id>/unsave removes that paper from saved_papers and reloads the library. Example: in Alex Rivera''s library click ''Remove'' on a saved paper to unsave it. (The Authors tab has an equivalent ''Unfollow'' button per followed author.)'
 agency-portals:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/login) -> ''Sign In to Your Account'' form with ''Username'' text input and ''Password'' input, submitted via the ''Sign In'' button. OUTCOME: sets session user_id and redirects to the ''/dashboard'' My Account page. Credentials are matched against the agency_portals_users table (fields: username, password). EXAMPLE: sign in as username ''alex_rivera'' (Alex Rivera).'
   book_by_form:
-  - '''Schedule Appointment'' page -> appointment form with type, date, time'
+  - '''Schedule an Appointment'' page (/book) -> appointment form. Controls: ''Appointment Type *'' dropdown, ''Preferred Date *'' date picker, ''Preferred Time *'' dropdown, plus ''Full Name *'', ''Email *'' and ''Phone'' inputs; submitted with ''Book Appointment''. OUTCOME: creates an appointment on the logged-in user, returns a confirmation number (APT-0001 format) and emails/emits a booking. Appointment Type options (8, from appointment_types): ''Permit Consultation'' (30 min, Mon-Fri), ''Tax Payment Assistance'' (20 min, Mon-Fri), ''Vital Records Request'' (15 min, Mon-Fri), ''Business License Consultation'' (30 min, Mon-Thu), ''Utility Account Setup'' (15 min, Mon-Fri), ''Planning Review Meeting'' (45 min, Tue-Thu), ''Fire Safety Inspection Scheduling'' (15 min, Mon-Fri), ''Vehicle Registration Renewal'' (15 min, Mon-Fri). Preferred Time options are half-hour slots ''9:00 AM'' through ''3:30 PM'' (skipping noon). EXAMPLE: book a ''Permit Consultation'' at 10:00 AM.'
   create_by_form:
-  - '''Services'' page -> search and apply for a service'
-  - Apply page -> application form with service fields
-  - Register page -> name, email, phone, password fields
+  - '''Municipal Services'' page (/services) -> search/filter the service catalog then click a service card''s ''Apply Online'' link to start an application. OUTCOME: opens the ''/apply/<service_id>'' form for the chosen service. Each of the 20 service cards shows name, code, category and fee range with an ''Apply Online'' link. EXAMPLE: from the ''Building Permits'' card (code SVC-BLD, Permits, $50 - $2,500) click Apply Online.'
+  - 'Apply page (/apply/<service_id>, ''Apply: <service name>'') -> application form with ''Full Name *'', ''Email *'', ''Address'', ''Phone'' inputs and an ''Additional Notes'' textarea; submitted via ''Submit Application''. OUTCOME: records a permit on the logged-in user with status ''Submitted'' and a generated permit code (USR-PRM-<uid>-NNN), and emails a confirmation. Permit type is inferred from the service name (Building/Business/Parking/Electrical/Plumbing, else first word). EXAMPLE: apply for service ''Building Permits'' -> new permit of type ''Building'', status ''Submitted''.'
+  - 'Register page (/register, ''Create a Resident Account'') -> form with ''Username *'', ''Password *'', ''Full Name *'', ''Email *'', ''Address'' and ''Phone'' inputs; submitted via ''Create Account''. OUTCOME: creates a new resident in agency_portals_users (verified=False) with a verification code (VRF-XXXXXX) and emails a welcome message. Username/Password/Full Name/Email are required; duplicate usernames are rejected. EXAMPLE: register a new resident, e.g. name ''Jordan Lee'', which yields a code like VRF-200009 to use on the Verify Identity page.'
   filter_by_date_range:
-  - '''Public Records'' page -> date filter fields'
+  - '''Public Records'' page (/records) -> ''From Date'' and ''To Date'' date pickers in the filter bar (applied with the ''Filter'' button). OUTCOME: SQL-filters the records table on date_filed within the range (server-paginated, 50/page). Same date-range controls also exist on the ''/permits'' page (filtering permits'' date_submitted). EXAMPLE: From 2025-03-01 To 2025-03-31 narrows records to those filed in March 2025 (e.g. REC-2025-0001, Property Record, filed 2025-03-10).'
   filter_by_dropdown:
-  - '''Services'' page -> category and department dropdowns'
-  - '''Permits'' page -> status and type dropdowns'
-  - '''Public Records'' page -> record type dropdown'
+  - '''Municipal Services'' page (/services) -> ''Category'' and ''Department'' dropdowns in the filter bar (applied with ''Filter''). OUTCOME: SQL-filters the service cards by category and/or department_id. Category options (9): Elections, Licenses, Permits, Public Safety, Recreation, Registration, Taxes, Utilities, Vital Records. Department options (8): Public Works, Parks & Recreation, Planning & Zoning, Finance & Revenue, Police Department, Fire & Rescue, Community Development, Clerk & Records. EXAMPLE: Category ''Permits'' surfaces the ''Building Permits'' service.'
+  - '''Permits & Applications'' page (/permits) -> ''Status'' and ''Type'' dropdowns in the filter bar (applied with ''Filter''). OUTCOME: SQL-filters the permits table by status and/or type. Status options (3): Approved, Denied, Pending. Type options (13): Building, Building Inquiry, Demolition, Electrical, Fence, Grading, Mechanical, Occupancy, Parking Permit, Plumbing, Renovation, Roofing, Sign. EXAMPLE: Status ''Approved'' + Type ''Building'' shows approved building permits (e.g. PRM-2025-0002, Carlos Mendez).'
+  - '''Public Records'' page (/records) -> ''Record Type'' dropdown in the filter bar (applied with ''Filter''). OUTCOME: SQL-filters the records table by type. Record Type options (5): Business License, Property Record, Property Tax Record, Utility Account, Vehicle Registration. EXAMPLE: ''Vehicle Registration'' shows registration records such as REC-2025-0003 (Alex Rivera).'
   navigate_by_route:
-  - '''City of Lakeport'' page -> ''Search services...'' field above Quick Access'
-  - '''Services'' page -> click service card to view details'
-  - '''Departments'' page -> click department name to view details'
-  - '''Permits'' page -> click permit to view details'
+  - '''Welcome to the City of Lakeport'' home page (/) -> the search box ''Search services (e.g., building permit, utility bill)...'' above the ''Quick Access Services'' cards; submitting routes to ''/services?q=...''. OUTCOME: navigates to the Municipal Services results for the typed keywords. EXAMPLE: searching ''building permit'' lands on services filtered to the ''Building Permits'' card.'
+  - '''Municipal Services'' page (/services) -> click a service card''s name/title link to open its detail page. OUTCOME: navigates to ''/service/<id>'' showing full service info (department, code, category, fee) and an ''Apply for this Service'' button. EXAMPLE: click ''Property Tax Payments'' (SVC-PTX) to view service #2.'
+  - '''City Departments'' page (/departments) -> click a department name link. OUTCOME: navigates to ''/department/<id>'' showing that department''s info plus its services and permits tables. EXAMPLE: click ''Planning & Zoning'' to open department #3.'
+  - '''Permits & Applications'' page (/permits) -> click a permit row''s code link in the results table. OUTCOME: navigates to ''/permit/<id>'' (''Permit: <code>'') detail page. EXAMPLE: click ''PRM-2025-0001'' (Parking Permit, Alex Rivera) to view permit #1.'
   pay_by_form:
-  - '''Pay Online'' page -> payment form with type and amount'
+  - '''Make a Payment'' page (/pay) -> payment form with ''Payment Type *'' dropdown, ''Account / Reference Number *'' text input and ''Amount ($) *'' number input; submitted via ''Submit Payment''. OUTCOME: records a payment on the logged-in user with a confirmation (PAY-0001 format), emails a receipt and emits a ''payment'' event to City of Lakeport. Payment Type options (9, from payment_types, shown as ''Name (Category)''): Property Tax (Taxes), Utility Bill (Utilities), Permit Fee (Permits), Parking Permit (Permits), Business License Fee (Licenses), Vehicle Registration Fee (Registration), Vital Records Fee (Vital Records), Park Reservation Fee (Recreation), Parking Fine (Fines). EXAMPLE: pay ''Utility Bill'' for account 12345, amount 84.50.'
   report_information:
-  - Search results showing matching service cards
-  - '''Public Records'' page -> type dropdown filters the records table'
-  - '''My Account'' dashboard -> recent activity table'
-  - '''Permits'' page -> permits table with status, type, dates'
-  - '''Public Records'' page -> records table'
-  - Department detail -> department info section
-  - Service detail page -> full service information
-  - Permit detail page -> permit details
-  - Department detail page -> department info
-  - Verify identity page -> code verification form
+  - '''Municipal Services'' search results (/services?q=...) -> the card grid of matching services, each card listing name, code, category and fee range. OUTCOME: the agent reads/reports service details from the matching cards. EXAMPLE: searching ''utility'' surfaces ''Utility Billing'' (SVC-UBP, Utilities, fee ''Varies'').'
+  - '''Public Records'' page (/records) -> selecting the ''Record Type'' dropdown filters the records table (columns: Record ID, Type, Owner, Address, Date Filed, Status) so the agent can read the filtered rows. OUTCOME: reports record fields for the chosen type. EXAMPLE: type ''Property Record'' shows rows like REC-2025-0001 (owner Alex Rivera, Active).'
+  - '''My Account Dashboard'' (/dashboard) -> the user''s activity sections: ''Saved Services'', ''My Permits'' (Code/Type/Address/Status), ''Payments'' (Confirmation/Type/Amount) and ''Appointments'' (Confirmation/Type/Date/Time). OUTCOME: reads/reports the logged-in resident''s saved services, permits, payments and booked appointments. EXAMPLE: for Alex Rivera, read the ''My Permits'' table entries.'
+  - '''Permits & Applications'' page (/permits) -> the results table with columns Permit Code, Type, Applicant, Address, Status, Date Submitted, Fee. OUTCOME: reads/reports permit fields (optionally after filtering by status/type/date). EXAMPLE: read the Status and Date Submitted of ''PRM-2025-0001'' (Parking Permit, Alex Rivera, Approved, 2025-04-02).'
+  - '''Public Records'' page (/records) -> the records results table (columns: Record ID, Type, Owner, Address, Date Filed, Status). OUTCOME: reads/reports record fields from the (paginated, 50/page) archive. EXAMPLE: read the owner/date of record ''REC-2025-0002'' (Utility Account, Alex Rivera, filed 2025-03-10).'
+  - 'Department detail page (/department/<id>) -> the department info section (name, description, contact) plus its Services and Permits tables. OUTCOME: reads/reports the department''s details and offerings. EXAMPLE: on ''Public Works'' (department #1) read its listed services.'
+  - 'Service detail page (/service/<id>) -> the full service information block (name, owning department, code, category, fee range, description) with an ''Apply for this Service'' button. OUTCOME: reads/reports the service''s details. EXAMPLE: service ''Building Permits'' (SVC-BLD) under Planning-related department, fee $50 - $2,500.'
+  - 'Permit detail page (/permit/<id>, ''Permit: <code>'') -> the permit''s full detail fields (code, type, applicant, address, status, date submitted, fee). OUTCOME: reads/reports a single permit''s details. EXAMPLE: permit ''PRM-2025-0002'' (Building, Carlos Mendez, Approved).'
+  - 'Department detail page (/department/<id>) -> department info header (name/description) shown above its service and permit tables. OUTCOME: reads/reports the department''s descriptive info. EXAMPLE: ''Finance & Revenue'' (department #4) description.'
+  - '''Verify Your Identity'' page (/verify-identity) -> the ''Verification Code *'' entry form (placeholder ''VRF-XXXXXX'') with a ''Verify'' button; the page reports success/error after submission. OUTCOME: submits a code and reads the verification result (marks the matching user verified). EXAMPLE: entering ''VRF-200001'' verifies Alex Rivera.'
   search:
-  - '''City of Lakeport'' page -> ''Search services (e.g., building permit, utility bill)...'' field'
-  - '''City of Lakeport'' page -> search field with keyword matching'
-  - '''Permits'' page -> status and type filter dropdowns'
+  - '''Welcome to the City of Lakeport'' home page (/) -> the hero search box ''Search services (e.g., building permit, utility bill)...'' with its ''Search'' button. OUTCOME: keyword-matches the service catalog and shows matching results on ''/services''. EXAMPLE: ''utility bill'' returns the ''Utility Billing'' service.'
+  - '''Welcome to the City of Lakeport'' home page (/) -> the same home search field; keyword scoring matches across service name, description, category and code. OUTCOME: ranked service results. EXAMPLE: ''vital records'' returns the ''Vital Records'' service (SVC-VTR).'
+  - '''Permits & Applications'' page (/permits) -> the ''Search by type, applicant, code...'' text box alongside the ''Status'' and ''Type'' filter dropdowns (applied with ''Filter''). OUTCOME: keyword search over permit type/applicant/address/code/status, combinable with the status/type dropdown filters. EXAMPLE: searching ''Carlos Mendez'' returns his permits such as PRM-2025-0002 (Building, Approved).'
   upload_file:
-  - Upload page -> document type dropdown and file input
+  - '''Upload a Document'' page (/upload) -> ''Document Type *'' dropdown, ''Select File *'' file input, and a ''Description'' textarea; submitted via ''Upload''. OUTCOME: accepts the file and echoes back the filename and document type on a success view. Document Type options (5): Permit Application, Identity Verification, Proof of Residence, Business License, Other. EXAMPLE: upload a PDF as ''Proof of Residence''.'
 ai-chatbots:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/login) "Sign In" form -> Username + Password text/password fields, then "Sign In" button. Outcome: authenticates and sets the session, landing on the AI Chatbots Hub home with the user''s conversations. Credentials are matched against the users table. Example: sign in as username "alex_rivera" (Alex Rivera, id 1, pro plan).'
   configure_by_form:
-  - '''Settings'' page -> default bot, theme, font size dropdowns'
+  - 'Settings page (/settings) "Preferences" form -> three dropdowns: Default Bot (Assistant / Creative / Analyst), Theme (Dark / Light), Font Size (Small / Medium / Large), plus "Enable Notifications" and "Save Chat History" toggle switches; "Save Settings" button persists them. Outcome: updates the logged-in user''s preferences. Example: set Default Bot to "Analyst" and Theme to "Light" for Alex Rivera.'
   create_by_form:
-  - '''+ New Chat'' button in sidebar starts a new conversation'
-  - Chat page -> message input field and send
-  - Register page -> email, password, and confirm fields
+  - '"+ New Chat" button at the top of the left sidebar (posts to /form/new-conversation). Outcome: creates a new empty conversation titled "New Chat #N" for the current user and opens it in the chat view. A bot (default "Assistant") is attached.'
+  - 'Chat page (/chat) bottom "Send a message..." textarea + "Send" button (posts to /form/chat). Outcome: appends the user message, generates a deterministic bot reply, and creates the conversation on first send (title = first 50 chars of the message). Example: type "Explain machine learning" to the Assistant bot.'
+  - 'Register page (/register) "Create Account" form -> Username (required), Password (required), Email (optional), and Display Name (optional) fields, then "Create Account" button. Outcome: creates a new user (defaults: free plan, dark theme, medium font, Assistant bot) and logs them in. Note: there is no "confirm password" field.'
   delete_from_table:
-  - Chat page -> 'Delete' button per conversation
-  - Sidebar -> 'x' button on each conversation
+  - 'Chat page (/chat/<id>) top bar "Delete" button (red, next to Edit Title / Share; posts to /form/conversation/<id>/delete). Outcome: permanently deletes the open conversation and redirects to a fresh chat. Example: delete conv_001 "MeridianFlow API rate limits".'
+  - 'Left sidebar conversation list -> hover a conversation row and click its "x" (times) button (posts to /form/conversation/<id>/delete). Also available as a "Delete" button per row in the Home page "Recent Conversations" table. Outcome: removes that conversation and reloads. Example: delete "Hiking trails near Lakeport" (conv_003).'
   edit_by_form:
-  - Chat page -> inline edit conversation title
-  - Chat page -> edit title form with save button
+  - 'Chat page (/chat/<id>) top bar "Edit Title" form -> a text input prefilled with the current title plus an "Edit Title" submit button (posts to /form/conversation/<id>/edit-title). Outcome: renames the open conversation. Example: rename conv_001 from "MeridianFlow API rate limits" to "MeridianFlow rate-limit help".'
+  - 'Same chat top-bar title form: overwrite the "New title" text field value and click the submit button to save. Outcome: updates conv.title and updated_at; a blank title is ignored. Example: retitle conv_005 "Setting up webhooks in MeridianFlow".'
   export:
-  - '''Settings'' page -> export type and format dropdowns'
+  - 'Settings page (/settings) "Export Data" section -> "Export Type" dropdown (My Conversations / Knowledge Base / Prompts Library) + "Format" dropdown (JSON / CSV), then the "Export" button opens /api/export as a download. Outcome: downloads the chosen dataset (conversations are scoped to the current user). Example: export My Conversations as CSV for Alex Rivera.'
   navigate_by_route:
-  - Left sidebar -> click conversation title to open chat
-  - Top nav -> 'Chat', 'FAQ', 'Settings' links
+  - 'Left sidebar conversation list -> click a conversation title to open it at /chat/<id>. Outcome: loads that conversation''s messages in the chat view. Example: click "MeridianFlow API rate limits" (conv_001) to open it.'
+  - 'Left sidebar bottom navigation links -> "Home", "Chat", "FAQ", "Settings", and "Login"/"Logout". Outcome: routes to the corresponding page (there is no top nav bar; Prompts Library and Knowledge Base are reached by URL, not from this nav). Example: click "Settings" to reach the preferences page.'
   report_information:
-  - '''AI Chatbots Hub'' home -> ''Recent Conversations'' list'
-  - Knowledge Base page -> entries table
-  - Chat page -> conversation messages display
+  - 'Home page (AI Chatbots Hub, "/") "Recent Conversations" table -> columns Title, Bot, Messages, Last Updated, Actions for the current user''s non-archived conversations. Outcome: read/report a value from a row. Example: conv_001 "MeridianFlow API rate limits" shows bot "Assistant" and its message count.'
+  - 'Knowledge Base page (/knowledge) entries table -> columns ID, Topic, Category, Keywords. Outcome: read/report an entry''s fields. Example: entry #1 "MeridianFlow Workflow Automation" is in category "meridian_products".'
+  - 'Chat page (/chat/<id>) message thread -> alternating "You" and bot (Assistant/Creative/Analyst) message bubbles rendered in order. Outcome: read/report the conversation content (e.g., the assistant''s answer). Example: read the reply in conv_001.'
   search:
-  - '''FAQ'' page -> search bar at top'
-  - Knowledge Base page -> search bar
-  - Prompts Library page -> search bar
-  - Knowledge Base page -> search with category dropdown
+  - 'FAQ page (/faq) top "Search FAQ..." text box + "Search" button (GET ?q=). Outcome: filters FAQ cards whose question or answer contains the query (no category dropdown here). Example: search "MeridianFlow" to surface "What is MeridianFlow?".'
+  - 'Knowledge Base page (/knowledge) top "Search knowledge base..." text box + "Search" button (GET ?q=). Outcome: filters the entries table by topic/content/keyword match. Example: search "webhook" to find "MeridianFlow API and Integrations".'
+  - 'Prompts Library page (/prompts) top "Search prompts..." text box + "Search" button (GET ?q=), alongside a category dropdown. Outcome: filters prompt cards by title/prompt/category/tag. Example: search "code review" to find "Code Review Checklist".'
+  - 'Knowledge Base page (/knowledge) search bar "All Categories" dropdown combined with the text box -> category options are lakeport_services, local_attractions, local_business, local_restaurants, meridian_products. Outcome: narrows entries to the selected category (and query). Example: pick "meridian_products".'
   share_by_form:
-  - Chat page -> 'Share' button for conversation
+  - 'Chat page (/chat/<id>) top bar "Share" button (posts to /form/conversation/<id>/share with share_with="public"). Outcome: marks the open conversation shared=true and adds it to the user''s shared_conversations list. Example: share conv_001 "MeridianFlow API rate limits".'
   toggle_relationship:
-  - Prompts Library -> 'Save' button on each prompt
-  - '''Settings'' page -> subscription radio buttons (free/pro/enterprise)'
+  - 'Prompts Library page (/prompts) "Save" button on each prompt card (posts prompt_id to /form/save-prompt; shown only when logged in). Outcome: toggles the prompt in the user''s saved_prompts (save if absent, unsave if present). Example: Save prompt #1 "Code Review Checklist" (category coding, popularity 95%).'
+  - 'Settings page (/settings) "Subscription Plan" radio buttons -> Free Plan / Pro Plan / Enterprise Plan (values free/pro/enterprise); saved via "Save Settings". Outcome: sets the user''s subscription. Example: switch Alex Rivera from "pro" to "enterprise".'
   upload_file:
-  - '''Settings'' page -> ''Import File to Knowledge Base'' file input (.txt/.md/.csv/.json) with topic/category fields'
+  - 'Settings page (/settings) "Import File to Knowledge Base" section -> file input accepting .txt/.md/.csv/.json plus optional Topic (defaults to filename) and Category (defaults to "uploaded") fields, then "Upload File" button (async POST to /api/upload). Outcome: reads the file contents and adds a new knowledge_base entry. A parallel "Upload Document to Knowledge Base" form on the same page accepts Topic/Category/Content/Keywords typed directly.'
 auctions-p2p-marketplaces:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Sign In page (/login, linked as ''Sign In'' in the top bar) -> Username and Password text fields, then the ''Sign In'' button. Outcome: matches credentials against the users table and sets the session, redirecting to the Dashboard (or the ?next= target, e.g. Checkout). Fields: both required; login is by username (not email). Example: sign in as username ''alex_r_photo'' (Alex Rivera) to reach that account''s dashboard.'
   checkout_by_form:
-  - Listing detail -> 'Buy It Now' button and bid form
+  - 'Checkout page (/listing/<id>/checkout), reached via the green ''Buy It Now - $X'' button on an active listing detail -> Shipping-address fields (Full name, Street address, City, ZIP code, all required) + Payment radios (Credit Card [default], PayPal, Bank Transfer) + Card number / Expiry / CVC, then the green ''Place order - $X'' button. Outcome: charges the card, marks the listing status ''ended'' with the buyer as winner_id, and shows an ''Order Confirmed!'' receipt with an ORD-<id>-<user> order number. Example: buying listing #28 ''Wood TV Stand for 65 Inch TV'' charges its Buy It Now price of $287.00.'
   configure_by_form:
-  - '''BidMarket'' page -> ''Max Price'' slider, 0 to $999'
+  - 'Index/''BidMarket'' page (/) filter bar -> the ''Max Price'' range slider (input type=range, min 0, max 999), whose handle sets a live ''$<value>'' readout beside it. Outcome: dragging the handle configures the price ceiling used by the ''Apply'' button; leaving it at 999 means no cap. Example: drag to 200 to show ''$200'' before applying, capping results to listings priced <= $200.'
   create_by_form:
-  - '''Sell'' page -> listing form (title, description, price, category)'
-  - Listing detail -> bid amount input and submit button
-  - Listing detail -> 'Add to Watchlist' button
-  - Login page -> register form with email, username, password
+  - 'Sell page (/create-listing, ''Sell''/''Sell an Item'' link) -> ''Create New Listing'' form: Item Name* (text), Description (textarea), Category (dropdown: beauty, electronics, fashion, garden, grocery), Condition (dropdown: New, Like New, Very Good, Good [default], Acceptable), Starting Price ($) (number, default 9.99), Brand (text), Shipping (dropdown: Free Shipping, Standard ($4.99), Expedited ($12.99), Local Pickup); submit ''List Item for Auction''. Outcome: creates an active 7-day auction and redirects to its listing detail. Example: list ''Vintage Film Camera'', category electronics, condition Good, starting price 49.99.'
+  - 'Listing detail page (/listing/<id>) -> bid box on an active auction: number input (placeholder ''Enter bid ($X or more)'', min = current price + 0.01) + ''Place Bid'' button. Outcome: records a bid, raises current_price to the entered amount and increments the bid count. Example: on listing #28 (current bid $194.54) enter 200.00 to become the top bidder.'
+  - 'Listing detail page (/listing/<id>) -> blue ''Watch This Item'' button. Outcome: adds the listing to the signed-in user''s Watchlist (visible in the Dashboard ''Watchlist'' tab); clicking again removes it. Example: watch listing #95 ''QAZPL Hair Weaving Deep Curly'' to track it.'
+  - 'Register page (/register, ''Register'' link) -> ''Create Account'' form: Full Name, Email, Username, Password (all required); submit ''Create Account''. Outcome: creates a buyer account, logs in, and redirects to the Dashboard. Example: register Full Name ''Jamie Fox'', email ''jamie@example.com'', username ''jamie_fox''.'
   delete_from_table:
-  - Dashboard -> 'Delete' button on each listing
-  - Dashboard -> 'Delete' button on each message
+  - 'Dashboard (/dashboard) ''My Listings'' tab -> red ''Delete'' button in the Actions column of each listing row (POSTs to /listing/<id>/delete, removes it and reloads). Outcome: permanently removes that listing from the seller''s table. Example: on Marcus Chen''s dashboard, delete his listing row for item #186 ''Ice Roller For Face''.'
+  - 'Dashboard (/dashboard) ''Messages'' tab -> red ''Delete'' button in the Actions column of each message row (POSTs to /message/<id>/delete). Outcome: removes that message from the user''s inbox/outbox list and reloads.'
   edit_by_form:
-  - Edit listing page -> form with title, description, price, category
+  - 'Edit Listing page (/edit-listing/<id>), reached via the ''Edit'' link in the Dashboard ''My Listings'' tab -> form with Item Name (text), Description (textarea), Category (dropdown of beauty/electronics/fashion/garden/grocery), Condition (dropdown New/Like New/Very Good/Good/Acceptable), Shipping (text); submit ''Save Changes''. Outcome: updates only those fields and returns to the listing detail (price/bids are NOT editable here). Example: edit listing #28 to change its Condition from ''Like New'' to ''Good''.'
   filter_by_dropdown:
-  - '''BidMarket'' page -> ''Category'' and ''Status'' dropdowns'
+  - 'Index/''BidMarket'' page (/) filter bar -> ''Category'' dropdown (All Categories, beauty, electronics, fashion, garden, grocery) and ''Status'' dropdown (All, Active, Ended, Scheduled); selecting either auto-applies via applyFilters(). Outcome: narrows the grid to listings in that category and/or status. Example: pick Category ''electronics'' (464 listings) with Status ''Active'' to see only running electronics auctions.'
   filter_by_options:
-  - '''BidMarket'' page -> condition radio buttons (New, Like New, Good, etc.)'
+  - 'Index/''BidMarket'' page (/) filter bar -> ''Condition'' radio buttons: All, Acceptable, Good, Like New, New, Very Good (one selectable; auto-applies on change). Outcome: restricts the grid to listings of the chosen condition. Example: select ''New'' to show only brand-new items such as #186 ''Ice Roller For Face''.'
   filter_by_slider:
-  - '''BidMarket'' page -> ''Max Price'' slider below the sort dropdown'
+  - 'Index/''BidMarket'' page (/) filter bar -> ''Max Price'' range slider (0 to 999) sitting after the Sort dropdown, paired with an ''Apply'' button. Outcome: after clicking Apply, keeps only listings whose current price is <= the slider value (values below 999 are sent as max_price). Example: set the slider to 50 and click Apply to show only listings $50 or under.'
   message_from_free_text:
-  - Listing detail -> 'Send Message' form with subject and textarea
+  - 'Listing detail page (/listing/<id>) -> ''Contact Seller'' section with a free-text message textarea (placeholder ''Enter your message to the seller...'') and a ''Send Message'' button; the subject is auto-filled as a hidden field (''Question about: <listing name>'') and the recipient is the seller. Outcome: delivers the message to the seller, viewable in the Dashboard ''Messages'' tab. Example: on listing #28 message seller ''daniel_o'' asking whether the TV stand ships assembled.'
   navigate_by_route:
-  - '''BidMarket'' page -> click listing card to view details'
-  - Listing detail -> click seller name to view profile
-  - Category page -> click listing to view details
+  - 'Index/''BidMarket'' page (/) -> click a listing card (its title link or image) to open that item''s detail page (/listing/<id>). Example: click the card for #28 ''Wood TV Stand for 65 Inch TV'' to view its detail.'
+  - 'Listing detail page (/listing/<id>) -> click the seller''s username link in the ''Seller'' box to open their profile (/seller/<seller_id>) listing their items and reviews. Example: on listing #28 click ''daniel_o'' to view Daniel Okonkwo''s seller page.'
+  - 'Category page (/category/<name>) -> click a listing card''s title link to open that item''s detail page. Example: from the ''electronics'' category page, click a card to view its listing.'
   report_information:
-  - '''BidMarket'' page -> filtered results after selecting category/status'
-  - Listing detail page -> full listing info, bids, seller info
-  - '''Compare'' page -> comparison table of selected listings'
+  - 'Index/''BidMarket'' page (/) -> the results grid plus the ''<n> listings found'' count after choosing Category/Status/Condition/price filters; read counts, prices and badges off the returned cards. Example: report how many active ''fashion'' listings appear (fashion has 508 total listings).'
+  - 'Listing detail page (/listing/<id>) -> full item panel: current bid, starting price, Buy It Now price, num bids, condition, brand, category, item ID (ASIN), shipping, location, seller name/rating, the Bid History table and Seller Reviews. Example: read that listing #28 has a $287.00 Buy It Now price and 15 bids from seller daniel_o (rating 4.5).'
+  - 'Compare page (/compare?ids=...) -> side-by-side comparison table with rows for ID, Category, Brand, Condition, Current Price, Start Price, Bids, Status, Seller, Shipping, Return Policy and Ends date for the entered listing IDs. Example: compare ids 1,2,3 to read their Current Price and Bids rows together.'
   search:
-  - '''BidMarket'' page -> ''Search for anything...'' field at top'
-  - '''BidMarket'' page -> search field with category/status/sort filters'
-  - '''BidMarket'' page -> search filters listings by keyword'
+  - 'Index/''BidMarket'' page (/) -> the ''Search for anything...'' text field in the red header bar with its ''Search'' button. Outcome: full-text search over listing name, description, category and brand (?q=), reloading the grid. Example: search ''TV stand'' to surface #28 ''Wood TV Stand for 65 Inch TV''.'
+  - 'Index/''BidMarket'' page (/) -> submit the header ''Search for anything...'' field, then combine the query with the Category / Status / Condition dropdowns/radios and the Sort dropdown to refine. Outcome: keyword-matched listings restricted by the active filters. Example: search ''hair'' then set Category ''beauty'' to narrow to items like #95 ''QAZPL Hair Weaving''.'
+  - 'Index/''BidMarket'' page (/) -> typing a keyword in the ''Search for anything...'' field filters the listing grid to matches on name/description/brand/category. Example: search ''costume'' to find #2 ''Star Wars ... Chewbacca Womens Costume ... Jacket''.'
   sort_by_form:
-  - '''BidMarket'' page -> ''Sort'' dropdown (Ending Soon, Newest, Price, Most Bids)'
+  - 'Index/''BidMarket'' page (/) filter bar (and Category page sort bar) -> ''Sort'' dropdown: Ending Soon (default), Newest, Price: Low to High, Price: High to Low, Most Bids. Outcome: reorders the listing grid accordingly. Example: choose ''Price: High to Low'' to put the most expensive listings first, or ''Most Bids'' to surface the hottest auctions.'
   toggle_relationship:
-  - Listing detail -> 'Follow Seller' button
-  - Listing detail -> 'Save'/'Unsave' listing button
+  - 'Listing detail page (/listing/<id>) -> ''Follow Seller'' button in the ''Seller'' box. Outcome: adds/removes the seller from the signed-in user''s followed_sellers (toggles on repeat click). Example: on listing #28 click ''Follow Seller'' to follow daniel_o.'
+  - 'Listing detail page (/listing/<id>) -> grey ''Save'' button in the actions row (next to ''Watch This Item''). Outcome: toggles the listing in the user''s saved_listings (saves it, or unsaves it if already saved). Example: on listing #95 click ''Save'' to bookmark it, click again to unsave.'
   upload_file:
-  - '''Sell'' page -> file upload for listing images'
+  - 'Sell page (/create-listing) -> ''Upload Photos'' dashed drop area (''Click or drag photos here'', JPG/PNG up to 5MB) wrapping a hidden file input (accept=image/*). Outcome: attaches a listing image file (the API acknowledges the upload). Example: on the Create New Listing form, click the upload area and choose a product photo before listing the item.'
 banking:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/login) -> username + password fields with a ''Sign In'' button; authenticates the customer and opens the SecureBank dashboard. A separate step-up 2FA gate (/verify-identity) then takes a 6-digit MFA code before sensitive actions. Real credentials for Alex Rivera (primary demo customer): username ''alex_rivera'' / password ''secure111'', MFA code 482917. Example: Log in as alex_rivera with password secure111, then enter MFA code 482917 on the Verify Identity page.'
   compute_by_tool:
-  - '''Transfer Funds'' page -> ''Or use slider'' amount slider'
+  - '''Transfer Funds'' page (/transfer) -> ''Or use slider'' amount range input (min $1, max $10,000, step $1) that two-way syncs with the numeric Amount box and a live ''$X.XX'' display; use it to dial in a transfer amount that satisfies a computed target. Accounts available for Alex Rivera: Checking CHK-847291 ($4,237.82) and Savings SAV-310456 ($18,942.15). Example: Use the slider to move exactly half of the Checking balance ($2,118.91) from CHK-847291 to Savings SAV-310456.'
   configure_by_form:
-  - '''Pay Bills'' page -> due date field and auto-pay dropdown'
+  - '''Pay Bills'' page (/pay-bills), ''Configure a bill'' form -> Bill ID (number), Due Date (date picker) and Auto-Pay dropdown (options: ''No change'', ''Enable'', ''Disable''); reschedules a bill or toggles autopay. Alex Rivera''s bills include Mendez Properties rent ($1,650, due 2026-07-01, autopay on) and Puget Sound Energy ($112.47, due 2026-07-08, autopay off). Example: Configure bill #7 (Puget Sound Energy) to change its due date to 2026-07-20 and Enable auto-pay.'
   create_by_form:
-  - '''Payees'' page -> Add Payee form (name, account, routing fields)'
-  - '''Transfer Funds'' page -> transfer form with from/to account dropdowns, amount, and submit'
+  - '''Payees'' page (/payees), ''Add Payee'' form -> Payee name (required), Account number, and Category text fields; adds a new bill-pay recipient to the customer''s payee list. Alex Rivera already has payees like Mendez Properties (Rent), Xfinity Internet (Utility) and Elena Vasquez (Transfer). Example: Add a new payee named ''Seattle City Light'' with account number PAY-55012 and category ''Utility''.'
+  - '''Transfer Funds'' page (/transfer) -> transfer form with ''From account'' and ''To account'' dropdowns (Alex Rivera''s options: Checking CHK-847291 $4,237.82, Savings SAV-310456 $18,942.15), an Amount box, optional Memo, and ''Transfer'' submit; moves money between the customer''s own accounts and writes a debit + credit transaction pair. Example: Transfer $500.00 from Checking CHK-847291 to Savings SAV-310456 with memo ''Rent payment''.'
   delete_from_table:
-  - '''Transaction History'' page -> ''Delete'' button per transaction row'
-  - '''Payees'' page -> ''Delete'' button per payee'
+  - '''Transaction History'' page (/transactions) -> ''Delete'' button on each transaction row; permanently removes that transaction from the ledger. Rows show date, description, category, amount, type and reference (e.g. ''Amazon.com'', $34.97, Shopping, ref TXN000008). Example: On the Transactions page, delete the ''Cascadia Coffee Roasters'' $6.75 Dining charge from 2026-06-25.'
+  - '''Payees'' page (/payees) -> ''Delete'' button on each payee card/row; removes that saved payee. Alex Rivera''s payees include Mendez Properties, Xfinity Internet, Puget Sound Energy, T-Mobile Wireless, Elena Vasquez and James Rivera (''Dad''). Example: Delete the ''James Rivera'' payee (nickname ''Dad'') from the payee list.'
   edit_by_form:
-  - '''Settings'' page -> user settings form (email, phone, notifications)'
-  - Credit Card Settings -> autopay and payment method forms
+  - '''Settings'' page (/settings) -> profile form with Name, Email, Phone and Address text inputs and ''Save Changes''; updates the customer''s contact details. Alex Rivera''s current values: email alex.rivera@gmail.com, phone (555) 201-3344, address 1247 Maple Ln, Lakeport, WA 98401. Example: On Settings, change Alex Rivera''s phone number to (555) 999-0000 and save.'
+  - 'Credit Card Settings page (/credit-card/settings) -> update form with Email field plus Auto-pay toggle (autopay_enabled true/false) and Freeze-card toggle (card_frozen true/false); manages the credit-card account (Alex Rivera''s gold card ending 4821, $12,000 limit, autopay currently on, not frozen). Example: On Credit Card Settings, freeze the card ending 4821 and turn auto-pay off.'
   export:
-  - '''Transactions'' page -> export format dropdown (CSV/JSON) with Export button'
+  - '''Transactions'' page (/transactions) -> export controls: a format dropdown (''CSV'' or ''JSON'') plus an ''Export'' button (backed by /api/export, type=transactions or accounts); downloads the customer''s transaction ledger. Alex Rivera has 4,220 transactions across categories like Dining, Groceries, Gas and Shopping. Example: Export Alex Rivera''s transaction history as a CSV file.'
   filter_by_date_range:
-  - '''Transaction History'' page -> ''From'' and ''To'' date fields above the table'
-  - Credit Card Transactions -> date filters
+  - '''Transaction History'' page (/transactions) -> ''From'' and ''To'' date fields above the table (inclusive date_from/date_to filters, YYYY-MM-DD); narrows the ledger to a period. Alex Rivera''s transactions run through 2026-06-25 (latest month June 2026). Example: Filter transactions to the range 2026-06-01 through 2026-06-30 to see June activity.'
+  - 'Credit Card Transactions page (/credit-card/transactions) -> ''From'' and ''To'' date filters over the card''s purchase history (Alex Rivera''s card charges span Jan-Mar 2026). Example: On Credit Card Transactions, filter to 2026-02-01 through 2026-02-28 to review February charges.'
   filter_by_dropdown:
-  - '''Transaction History'' page -> ''Category'' dropdown (Deposit, Dining, Groceries, etc.)'
-  - '''Transaction History'' page -> ''Type'' dropdown (Debit, Credit)'
-  - '''Transaction History'' page -> ''Sort'' dropdown (Date, Amount, Description)'
-  - Credit Card Transactions -> category and status dropdowns
+  - '''Transaction History'' page (/transactions) -> ''Category'' dropdown (''All'' plus the customer''s real categories: Deposit, Dining, Donations, Entertainment, Gas, Groceries, Health, Insurance, Rent, Shopping, Subscriptions, Transfer, Transport, Travel, Utilities); filters the ledger to one spending category. Example: Filter Alex Rivera''s transactions to the ''Groceries'' category (e.g. the $87.43 Safeway - Lakeport charge).'
+  - '''Transaction History'' page (/transactions) -> ''Type'' dropdown (options ''All'', ''Debit'', ''Credit''); shows only money out (debit) or money in (credit). Example: Filter to ''Credit'' to see deposits like the $4,285.00 ''Meridian Systems - Direct Deposit''.'
+  - '''Transaction History'' page (/transactions) -> ''Sort'' dropdown (options ''Date (newest)'', ''Amount (high to low)'', ''Amount (low to high)'', ''Description (A-Z)''); reorders the visible rows. Example: Sort transactions by ''Amount (high to low)'' to find the largest charge.'
+  - 'Credit Card Transactions page (/credit-card/transactions) -> ''Category'' dropdown (dining, groceries, gas, subscriptions, shopping, travel, entertainment, health, insurance, transport, utilities) and a ''Status'' dropdown (''All'', ''Posted'', ''Pending''); filters the card''s purchase list. Example: On Credit Card Transactions, filter to category ''subscriptions'' to see recurring charges like Netflix ($15.99) and Spotify ($10.99).'
   navigate_by_route:
-  - '''Welcome, Alex Rivera'' dashboard -> click account card for details'
-  - '''Transactions'' page -> click transaction row for details'
+  - '''Welcome, Alex Rivera'' dashboard (/) -> click an account summary card to open its detail page (/account/<id>) showing that account''s info and recent transactions. Cards shown: Checking CHK-847291 ($4,237.82) and Savings SAV-310456 ($18,942.15, 4.2% APY). Example: From the dashboard, click the Savings SAV-310456 card to view its account detail.'
+  - '''Transactions'' page (/transactions) -> click a transaction row to drill into its detail; the row lists date, description, category, amount and reference. Example: Open the detail for the ''Shell Gas - Cedar Blvd'' $52.18 Gas transaction (ref TXN000005).'
   pay_by_form:
-  - '''Pay Bills'' page -> select account, enter amount, and submit'
-  - '''Pay Bills'' page -> pay form with account dropdown and amount'
-  - '''Loans'' page -> pay loan form with amount input'
-  - Credit Card Payments -> make payment form
+  - '''Pay Bills'' page (/pay-bills) -> per-bill ''Pay'' form with a source-account dropdown (Alex Rivera''s checking/savings, e.g. CHK-847291 $4,237.82) and submit; debits the account, marks the bill paid and posts a ''Bill payment'' transaction. Due bills include Xfinity Internet ($79.99, due 2026-07-05). Example: Pay the Xfinity Internet bill of $79.99 from Checking CHK-847291.'
+  - '''Pay Bills'' page (/pay-bills) -> pay form (account dropdown + amount) for a selected bill; use for the largest outstanding bill. Alex Rivera''s biggest due bill is Mendez Properties rent at $1,650.00 (due 2026-07-01). Example: Pay the Mendez Properties rent bill ($1,650.00) from Checking.'
+  - '''Loans'' page (/loans) -> ''Make a payment'' form with a loan selector, Amount input (defaults to the monthly payment if left blank) and source account; debits the account and reduces the loan balance. Alex Rivera''s loans: student loan (balance $12,840.55, monthly $308.72) and auto loan (balance $8,475.33, monthly $413.86). Example: Make the $308.72 monthly payment on the student loan from Checking CHK-847291.'
+  - 'Credit Card Payments page (/credit-card/payments) -> ''Make a payment'' form with Amount, payment Method (bank_transfer) and bank name; reduces the card''s current balance and logs a confirmation (PMT-YYYYMMDD-###). Alex Rivera''s card ending 4821 carries a $2,874.33 balance (minimum $110.00). Example: Make a $500.00 credit-card payment via bank transfer to pay down the card ending 4821.'
   report_information:
-  - '''Transaction History'' page -> search returns filtered transactions'
-  - '''Accounts'' page -> accounts table (name, type, balance, status)'
-  - Account detail -> transactions table
-  - '''Transaction History'' page -> transactions table'
-  - '''Pay Bills'' page -> bills table'
-  - '''Payees'' page -> payees table'
-  - Credit Card pages -> transactions, payments, rewards tables
-  - Account detail page -> account info and transactions
-  - '''Transaction History'' page -> ''Sort'' dropdown with amount column'
-  - '''Transaction History'' page -> ''From'' and ''To'' date fields for date range filtering'
-  - '''Transfer Funds'' page -> amount slider synced with amount input'
-  - '''Transaction History'' page -> flag/select transaction for review'
+  - '''Transaction History'' page (/transactions) -> after searching/filtering, the results table reports matching transactions (date, description, category, amount, type, reference) plus the total match count; read values off it. Example: Report how many ''Dining'' transactions Alex Rivera has and the amount of the most recent one (Cascadia Coffee Roasters, $6.75).'
+  - '''Accounts'' page (/accounts) -> accounts table with columns account number, type, balance and status (optionally filtered by type checking/savings/credit/loan). Alex Rivera: CHK-847291 checking $4,237.82 (active), SAV-310456 savings $18,942.15 (active). Example: Report the total balance across Alex Rivera''s checking and savings accounts.'
+  - 'Account detail page (/account/<id>) -> the account''s recent transactions table (up to 30 rows); read individual charges/deposits for that one account. Example: On the CHK-847291 detail page, report the amount of the most recent direct deposit ($4,285.00 from Meridian Systems).'
+  - '''Transaction History'' page (/transactions) -> the main transactions table (30 per page) with a total count of matching rows; read/scan ledger entries. Example: Report the description and amount of Alex Rivera''s single largest debit transaction.'
+  - '''Pay Bills'' page (/pay-bills) -> bills table with payee name, amount, due date, status (due/paid), category and auto-pay flag; read upcoming or paid bills. Alex Rivera''s due bills: Mendez Properties $1,650, Xfinity Internet $79.99, Puget Sound Energy $112.47, T-Mobile Wireless $85. Example: Report the total dollar amount of Alex Rivera''s bills currently marked ''due''.'
+  - '''Payees'' page (/payees) -> payees table/cards with name, nickname, account number and category. Alex Rivera''s payees: Mendez Properties (''Rent - Carlos''), Xfinity Internet, Puget Sound Energy, T-Mobile Wireless, Elena Vasquez, James Rivera (''Dad''). Example: Report how many of Alex Rivera''s payees are in the ''Utility'' category.'
+  - 'Credit Card pages (/credit-card, /credit-card/transactions, /credit-card/payments, /credit-card/rewards, /credit-card/statements) -> tables of card transactions (merchant, amount, category, status), payments (date, amount, confirmation), rewards points by category, and monthly statements (period, charges, closing balance, minimum due). Alex Rivera: gold tier, APR 18.99%, 34,250 rewards points; 2026-03 statement closing balance $2,239.33 (minimum due $90.00). Example: Report Alex Rivera''s current credit-card rewards points balance (34,250) and the closing balance on the March 2026 statement.'
+  - 'Account detail page (/account/<id>) -> account info header (number, type, balance, opened date, interest rate) plus transactions; read account-level facts. Example: Report the interest rate on Alex Rivera''s savings account SAV-310456 (4.2% / 0.042).'
+  - '''Transaction History'' page (/transactions) -> ''Sort'' dropdown (''Amount high to low'') combined with the amount column to surface the maximum charge; read the top row after sorting. Example: Sort by amount descending and report Alex Rivera''s largest single transaction.'
+  - '''Transaction History'' page (/transactions) -> ''From''/''To'' date fields plus the results table let you total activity over a window; read/aggregate the filtered rows. Example: Filter to June 2026 (2026-06-01 to 2026-06-30) and report the number of transactions shown.'
+  - '''Transfer Funds'' page (/transfer) -> the Amount box synced to the range slider (with live $ display) and the source-account balances lets you verify a transfer amount before submitting. Alex Rivera''s Checking holds $4,237.82. Example: Set the slider so the transfer amount equals $1,000.00 and report the remaining Checking balance after transferring it.'
+  - '''Transaction History'' page (/transactions) -> each row has a flag/select control marking a transaction for review; after flagging, report which transactions are flagged. Example: Flag the ''Amazon.com'' $34.97 charge for review and report its reference number (TXN000008).'
   search:
-  - '''Transaction History'' page -> ''Search transactions by description, category, or reference...'' field'
-  - Credit Card Transactions -> search bar
-  - '''Transaction History'' page -> search with keyword matching'
+  - '''Transaction History'' page (/transactions) -> ''Search transactions by description, category, or reference...'' box (FTS full-text, all keywords must match); returns matching ledger rows. Example: Search Alex Rivera''s transactions for ''Safeway'' to find the $87.43 grocery charge.'
+  - 'Credit Card Transactions page (/credit-card/transactions) -> search box matching merchant/description on the card''s purchases. Example: Search the credit-card transactions for ''Netflix'' to find the $15.99 subscription charge.'
+  - '''Transaction History'' page (/transactions) -> keyword search that can be combined with the Category/Type/date/amount filters to pinpoint a transaction. Example: Search ''transfer'' and filter Type=''Debit'' to list outgoing transfers like the $200.00 ''Transfer to Elena Vasquez''.'
   sort_by_form:
-  - '''Transaction History'' page -> ''Sort'' dropdown (Date, Amount, Description)'
+  - '''Transaction History'' page (/transactions) -> ''Sort'' dropdown with options ''Date (newest)'', ''Amount (high to low)'', ''Amount (low to high)'' and ''Description (A-Z)''; reorders the ledger. Example: Sort Alex Rivera''s transactions by ''Amount (low to high)'' to find the smallest charge.'
 blogs:
   create_by_form:
-  - '''Compose'' page -> create post form (title, body, category)'
-  - Post detail page -> comment textarea below article
+  - '''Compose'' page (/sites/blogs/compose, reached via top-nav ''Compose'' button) -> ''Compose New Post'' form. Fields: Title (text, required), Body (textarea, required), Category (<select> with 10 fixed options: Technology, Travel, Food, Art, Books, Fitness, Music, Lifestyle, Photography, Gaming), Tags (comma-separated text, e.g. ''python, tutorial, webdev''), Image URL (optional text), Author Username (text, prefilled with logged-in username). ''Publish Post'' submit creates a new post (notes_count=0, date=today) and redirects to its detail page. Example: publishing Title=''My First Post'', Category=''Technology'', Author Username=''alex_codes'' creates a post authored by Alex Codes.'
+  - 'Post detail page (/sites/blogs/post/<id>) -> ''Comments'' section, ''Write a comment...'' textarea (visible only when logged in) + ''Post Comment'' button. Submitting adds a dated comment attributed to the current user under the article. Example: on post #6 ''Elden Ring DLC: 40 Hours In...'' by marcus_builds, a comment posts as the auto-logged-in user alex_codes.'
   filter_by_date_range:
-  - '''TumblrVibe'' page -> ''From'' and ''To'' date fields'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Filters'' section -> ''From:'' and ''To:'' <input type=date> fields, applied via ''Apply Filters'' button. Filters the feed to posts whose date falls within the range (SQL date >= from AND date <= to). Post dates run through 2026-06-18 (newest is post #13). Example: From=2026-06-01 To=2026-06-18 returns only June 2026 posts such as #13 ''How We''re Using AI at SyncWave''.'
   filter_by_dropdown:
-  - '''TumblrVibe'' page -> ''Category'' dropdown filter'
-  - '''TumblrVibe'' page -> ''Sort'' dropdown (Newest, Oldest, Popular)'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Categories'' section -> clickable category link list (rendered as tags, NOT an HTML <select>): ''All'' plus the 15 categories present in data: Art, Books, Design, Fitness, Food, Gaming, History, Lifestyle, Marketing, Music, Outdoors, Photography, Startups, Technology, Travel. Clicking one (adds ?category=) filters the feed to that category. Example: clicking ''Gaming'' shows posts like #6 ''Elden Ring DLC: 40 Hours In...'' by marcus_builds.'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Filters'' section -> ''Sort:'' <select> with 3 options: Newest (date DESC, default), Oldest (date ASC), Popular (notes_count DESC). Applied via ''Apply Filters'' button; re-orders the feed. Example: ''Popular'' surfaces post #6 ''Elden Ring DLC...'' (412 notes) at the top.'
   navigate_by_route:
-  - '''TumblrVibe'' page -> click post title to view post'
-  - Top nav -> 'Compose', 'Dashboard' links
+  - '''TumblrVibe'' home page (/sites/blogs/) -> click a post-card title link (e.g. "Elden Ring DLC: 40 Hours In... (Post #6)") to open its detail page at /sites/blogs/post/<id>, showing the full article, tags, comments, and action bar. Example: clicking post #6''s title navigates to /sites/blogs/post/6.'
+  - Top navigation bar (present on every blogs page) -> 'Compose' button (-> /sites/blogs/compose new-post form) and 'Dashboard' link (-> /sites/blogs/dashboard; shows the logged-in user's own posts and saved posts). Dashboard/Compose appear when logged in (auto-login sets user_id=1 = alex_codes).
   report_information:
-  - '''TumblrVibe'' page -> search returns matching post cards'
-  - '''TumblrVibe'' page -> ''Category'' dropdown returns filtered posts'
-  - Post detail page -> full post content, author, comments
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Search'' box submits ?q= and the feed re-renders as matching post cards; the ''result-info'' line reads e.g. ''N posts matching "query"''. Read the returned card count/titles to answer. Example: searching ''Elden Ring'' returns post #6 by marcus_builds and shows the match count.'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Categories'' link list filters the feed by category and the ''result-info'' line reads ''N posts in <Category>''. Read the count or the listed titles/authors. Example: selecting ''Gaming'' shows the Gaming post count and cards such as #6 ''Elden Ring DLC...''.'
+  - 'Post detail page (/sites/blogs/post/<id>) -> full post content: title, body, author (display name + @username), date, category badge, tags, notes count and shares, plus the Comments list. Read these to answer. Example: post #6 shows author marcus_builds, category Gaming, 412 notes, tags #gaming #review #elden-ring.'
   search:
-  - '''TumblrVibe'' page -> ''Search posts...'' field at top'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Search'' section -> ''Search posts...'' text input (name=q) + ''Search'' button. Full-text search over title/body/author (FTS5 with LIKE fallback); reloads the feed with matching post cards. Example: ''AI'' matches post #13 ''How We''re Using AI at SyncWave'' by jake_builds_things.'
   share_by_form:
-  - Post detail page -> 'Share' button
+  - 'Post detail page (/sites/blogs/post/<id>) -> ''Share'' button in the post-meta row (data-miniweb-share, opens the platform''s share widget). Backend POST /api/posts/<id>/share increments the post''s shared_count and returns a share_url like /sites/blogs/post/6. Example: sharing post #6 ''Elden Ring DLC...'' bumps its shares count.'
   sort_by_form:
-  - '''TumblrVibe'' page -> ''Sort'' dropdown (Newest, Oldest)'
+  - '''TumblrVibe'' home page (/sites/blogs/) -> left sidebar ''Filters'' section -> ''Sort:'' <select> (name=sort), applied via ''Apply Filters''. Options: Newest (date DESC, default), Oldest (date ASC), Popular (notes_count DESC). Example: choosing ''Oldest'' orders the feed by ascending date; ''Popular'' puts post #6 (412 notes) first.'
   toggle_relationship:
-  - Post detail page -> 'Follow Author' button
-  - Post detail page -> 'Subscribe to Tag' button
-  - Post detail page -> 'Save'/'Unsave' post button
+  - 'Post detail page (/sites/blogs/post/<id>) -> action bar ''Follow @<username>'' button (blue btn-follow; toggles to ''Unfollow @<username>'' once followed). Adds/removes the post''s author to the current user''s followed_blogs. Visible only when logged in. Example: on post #6, the button reads ''Follow @marcus_builds''.'
+  - 'Post detail page (/sites/blogs/post/<id>) -> action bar ''Subscribe #<tag>'' button(s) (green btn-subscribe, one per post tag; toggles to ''Unsubscribe #<tag>''). Adds/removes the tag from the user''s subscribed_tags. Example: post #6 shows ''Subscribe #gaming'', ''Subscribe #review'', ''Subscribe #elden-ring''.'
+  - 'Post detail page (/sites/blogs/post/<id>) -> action bar ''Save Post'' button (red btn-save; toggles to ''Unsave Post'' once saved). Adds/removes the post id in the user''s saved_posts (also shown on the Dashboard ''saved'' list). Example: saving post #6 ''Elden Ring DLC...'' adds it to alex_codes''s saved posts.'
 books-comics:
   checkout_by_form:
-  - Checkout page -> account type dropdown, email, and submit
+  - 'Checkout page (/checkout, requires login) -> order form with Full Name (text), Email (email), Card Number (text, placeholder ''4242 4242 4242 4242''), CVV (text, placeholder ''123''), and a ''Pay with:'' dropdown (options: ''Checking Account'' [value checking], ''Credit Card'' [value credit]), then the ''Complete Purchase'' button. Outcome: charges the card (any card accepted unless a recognized SecureBank card has a wrong CVV), moves cart books into the reading list, clears the cart, and redirects to the 2FA /verify-payment step. Note: every book on the site is free (price 0.0), so the Order Summary Total is always $0.00. Example: with book #3 ''TheatreAppreciation'' in the cart, fill Full Name ''Alex Rivera'', Email, any card number, pick ''Credit Card'', and Complete Purchase.'
   create_by_form:
-  - Book detail page -> write review textarea
-  - Book detail page -> 'Add to Cart' button
+  - 'Book detail page (/book/<id>, login required) -> Reviews section ''Write your review...'' textarea (name=text, id=review-text) + ''Post Review'' button. Outcome: appends a new review row (empty rating) attached to that book and re-renders the detail page with the review shown under ''Reviews (N)''. Example: on book #255 ''Biology Part II'' type a review and click Post Review.'
+  - 'Book detail page (/book/<id>, login required) -> ''Add to Cart'' button (id=cart-button) in the actions row. Outcome: toggles the book into the logged-in user''s cart (POST /book/<id>/cart) and redirects back to the detail page; the book then appears in the Cart page for checkout. Example: on book #3 ''TheatreAppreciation'' click Add to Cart.'
   feedback_by_star:
-  - Book detail page -> rating slider (1-5 stars)
+  - 'Book detail page (/book/<id>, login required) -> ''Rate This Book'' section: a range slider (id=rate-slider, name=rating, min=1 max=5 step=0.5, default 4) with a live value label, plus ''Submit Rating'' button. Outcome: records a rating review (1-5, clamped) for the book via POST /book/<id>/rate and redirects back to the detail page. Example: on book #3 ''TheatreAppreciation'' drag the slider to 4.5 and Submit Rating.'
   filter_by_dropdown:
-  - '''BookVerse'' page -> ''Category'', ''Min Rating'', and ''Price'' dropdowns'
+  - 'Home/''BookVerse'' index page (/) -> filter bar dropdowns that reload the grid on change: ''Category'' (options: All, plus the 12 real categories Arts & Design, Business & Economics, Education, Engineering, General, Health Sciences, Humanities, Law & Justice, Mathematics, Science, Social Sciences, Technology), ''Min Rating'' (Any, 3+, 3.5+, 4+, 4.5+), and ''Price'' (All, Free, Paid). Outcome: Category and Min Rating rebuild the results via SQL WHERE (category=slug, rating>=value); Price is offered but every book is free so it is effectively cosmetic. Example: pick Category ''Science'' + Min Rating ''4.5+'' to list only science books rated 4.5 and up (e.g. #255 ''Biology Part II'', rating 5.0).'
   filter_by_slider:
-  - Book detail -> progress slider in reader view
+  - 'Reader page (/book/<id>/read) -> ''Reading progress:'' range slider (id=progress-slider, min=0 max=100) in the playback controls above the chapter text. Outcome: dragging it updates the on-page progress percentage label and the progress-fill bar client-side (visual only, not persisted). Example: while reading book #3 ''TheatreAppreciation'' (15 chapters) move the slider to 60%.'
   navigate_by_route:
-  - '''BookVerse'' page -> click book card to view details'
-  - Category page -> click book to view details
-  - Reader page -> chapter navigation links
+  - 'Home/''BookVerse'' index page (/) -> click a book card (grid of covers, each titled with author, rating and ''(#id)''). Outcome: navigates to that book''s detail page /book/<id>. Example: click the ''#3 TheatreAppreciation'' card to open /book/3. (The index also has a ''Go to Book ID'' number box that jumps straight to /book/<id>.)'
+  - 'Category page (/category/<slug>) -> click a book title in the listed items. Outcome: opens that book''s detail page /book/<id>. Example: on /category/science click ''Biology Part II'' to open /book/255.'
+  - 'Reader page (/book/<id>/read) -> chapter navigation: ''Previous Chapter''/''Next Chapter'' links, ''Previous''/''Next'' buttons, and the chapter dropdown; the book detail ''Chapters'' list also links each chapter. Outcome: loads a different chapter via ?chapter=N. Example: in book #3 ''TheatreAppreciation'' (15 chapters) click ''Next Chapter'' to go from chapter 1 to 2.'
   report_information:
-  - Book detail page -> full book info, reviews, chapters
+  - 'Book detail page (/book/<id>) -> reads on-page book facts: title, author(s), year, category, rating with rating_count, price, chapter count and word count, the ''About This Book'' description, the info-table (Category/Subject/Year/Authors/Chapters/Word Count/Price, plus Institution/License when present), the Chapters list, and Reviews. Outcome: agent reports the requested value to the user. Example: read that book #3 ''TheatreAppreciation'' by Kiara Pipino is a 2023 Arts & Design title with 15 chapters and a 3.6 rating.'
   search:
-  - '''BookVerse'' page -> ''Search books by title, author, or genre...'' field'
-  - '''BookVerse'' page -> search field with autosuggest'
+  - 'Home/''BookVerse'' index page (/) -> top search form input placeholder ''Search books by title, author, or genre...'' (name=q) + ''Search'' button. Outcome: runs an FTS5/BM25 full-text search over the 1,892 books and reloads the grid with matches. Example: search ''biology'' to surface titles like #255 ''Biology Part II''.'
+  - 'Home/''BookVerse'' index page (/) -> same ''q'' search field, used to look up by author name (author links on book detail pages also point back here as ?q=<author>). Outcome: FTS-ranked results; there is no client-side autosuggest (autocomplete is off), results appear only after submitting. Example: search ''Kiara Pipino'' to find that author''s book #3 ''TheatreAppreciation''.'
   sort_by_form:
-  - '''BookVerse'' page -> ''Sort'' dropdown (Newest, Title A-Z, Top Rated, Price)'
+  - 'Home/''BookVerse'' index page (/) -> ''Sort'' dropdown that reloads the grid on change. Real options: ''Newest'' (year DESC, default), ''Title A-Z'', ''Top Rated'' (rating DESC), ''Price: Low-High'', ''Price: High-Low'', and ''Relevance'' (used with a text search). Outcome: reorders results via SQL ORDER BY. Example: choose ''Top Rated'' to bring 5.0-rated books like #255 ''Biology Part II'' to the top.'
   toggle_relationship:
-  - Book detail page -> 'Follow Author' button
-  - Book detail page -> 'Subscribe to Category' button
-  - Book detail page -> 'Save'/'Unsave' book button
-  - '''My Library'' page -> ''Unsave'' button on saved books'
+  - 'Book detail page (/book/<id>, login required) -> ''Follow Author'' button (id=follow-button), submits the book''s first author. Outcome: toggles that author in the user''s followed_authors (POST /book/<id>/follow) and redirects back; the author then shows under ''Followed Authors'' in My Library. Example: on book #3 ''TheatreAppreciation'' click Follow Author to follow ''Kiara Pipino''.'
+  - 'Book detail page (/book/<id>, login required) -> ''Subscribe to <Category>'' button (id=subscribe-button), labeled with the book''s category. Outcome: toggles that category in the user''s subscriptions (POST /book/<id>/subscribe) and redirects back; it appears under ''Subscriptions'' in My Library. Example: on book #3 ''TheatreAppreciation'' click ''Subscribe to arts''.'
+  - 'Book detail page (/book/<id>, login required) -> ''Save to Library'' button (id=save-button). Outcome: toggles the book in the user''s saved_books (POST /book/<id>/save) and redirects back; saved books appear under ''Saved Books'' in My Library. Example: on book #255 ''Biology Part II'' click Save to Library.'
+  - 'My Library / dashboard page (/dashboard) -> ''Remove'' button on each Saved Books row (POST /dashboard/unsave with hidden book_id); the Followed Authors tags also have an ''x'' unfollow button. Outcome: removes the book from saved_books (or the author from followed_authors) and reloads the dashboard. Example: click ''Remove'' next to a saved ''#255 Biology Part II'' to unsave it.'
 brokerage:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/sites/brokerage/login, nav ''Log In'') -> ''Email or Username'' + ''Password'' text fields, then the green ''Log In'' button. Outcome: authenticates and starts a session (a 2FA ''Verify Your Identity'' code step appears next unless Skip-2FA is on), landing on the Portfolio page. Real accounts: username ''alex_rivera'' (Alex Rivera), ''priya_sharma'', ''marcus_chen''. Example: log in as ''alex_rivera'' with that user''s password.'
   cancel_by_form:
-  - '''History'' page -> ''Cancel'' button on each open order'
+  - '''History'' page (/sites/brokerage/orders, nav ''History'') -> the ''Cancel'' button shown in the last column of each row whose Status tag is ''Open'' (filled/cancelled rows have no button). Outcome: POSTs to cancel that order and flips its Status to ''Cancelled''. Only limit/stop_loss orders sit Open; market orders fill instantly. Example: alex_rivera has 2 open orders in History with a Cancel button.'
   create_by_form:
-  - '''Trade'' page -> trade form with symbol, shares, order type, and submit'
+  - '''Trade'' page (/sites/brokerage/trade, nav ''Trade'') or the Buy/Sell panel in the right sidebar of a ticker detail page -> order form: Buy/Sell toggle, Symbol dropdown (omitted when a symbol is preselected), ''Order Type'' select (Market Order / Limit Order / Stop Loss), ''Time in Force'' radios (Day / Good till canceled), ''Shares'' number input (min 1), a ''Price'' field that appears for limit/stop orders, then the submit button labelled ''Buy <SYMBOL>''. Outcome: creates an order — a Market Order fills immediately (updates holdings + buying power), limit/stop orders stay Open. Example: Buy 5 shares of AAPL (Apple Inc.) as a Market Order.'
   filter_by_date_range:
-  - '''History'' page -> ''From'' and ''To'' date fields above the orders table'
+  - '''History'' page (/sites/brokerage/orders) -> the ''From:'' and ''To:'' date pickers in the filter bar above the orders table, then the green ''Apply'' button. Outcome: reloads the table showing only orders whose created date falls in the range (inclusive). Example: From 2025-09-01 To 2025-09-30 shows alex_rivera''s Sept orders such as the SPY and VTI buys dated 2025-09-08.'
   filter_by_dropdown:
-  - '''All Securities'' -> ''All Sectors'' dropdown (Technology, Healthcare, etc.)'
-  - '''All Securities'' -> ''All Types'' dropdown (stock, crypto, futures, etc.)'
-  - Options page -> underlying and type dropdowns
-  - '''History'' page -> status dropdown (open, filled, cancelled)'
+  - '''All Securities'' card on the home page -> the ''All Sectors'' dropdown in the table''s filter bar. Outcome: reloads showing only tickers in the chosen sector. 34 real options including Technology, Healthcare, Financial Services, Semiconductor, Cryptocurrency, Energy, Real Estate. Example: pick ''Technology'' to narrow to MSFT, NVDA, AAPL, etc.'
+  - '''All Securities'' card on the home page -> the ''All Types'' dropdown next to the sector dropdown. Outcome: reloads showing only that asset type. Options: stock, crypto, index_fund, futures. Example: pick ''crypto'' to see BTC (Bitcoin), ETH (Ethereum), SOL (Solana).'
+  - 'Options page (/sites/brokerage/options) -> the ''All Underlyings'' dropdown (underlying ticker, e.g. AAPL, AMZN, COR) and the ''All Types'' dropdown (Calls / Puts); both auto-submit on change. Outcome: filters the options-chain table to that underlying and/or call vs put. Example: underlying AAPL + Calls.'
+  - '''History'' page (/sites/brokerage/orders) -> the status dropdown (''All Orders'' default). Outcome: filters the orders table by status. Options: Open, Filled, Cancelled. Example: select ''Filled'' to see only alex_rivera''s 9 filled orders.'
   filter_by_slider:
-  - '''All Securities'' section -> ''Max Price'' slider, below the sort dropdown'
+  - '''All Securities'' card on the home page -> the ''Max Price'' range slider in the filter bar (min 0, max 5000, step 50; 5000 shows as ''Any''), applied with the ''Apply'' button. Outcome: reloads showing only tickers whose current price is at or below the chosen ceiling. Example: drag to $200 to hide pricier names like MSFT (~$442) while keeping AAPL (~$189).'
   navigate_by_route:
-  - '''All Securities'' section -> click ticker row to view details'
-  - '''Portfolio'' page -> click holding to view ticker details'
+  - '''All Securities'' table on the home page -> click any ticker row (the whole row is clickable). Outcome: navigates to that security''s detail page (/sites/brokerage/ticker/<SYMBOL>) with its chart, Key Statistics and trade panel. Example: click the AAPL row to open the Apple Inc. detail page.'
+  - '''Portfolio'' page (/sites/brokerage/portfolio) -> click a row in the ''Stocks'' holdings table. Outcome: navigates to that holding''s ticker detail page. Example: alex_rivera''s holdings include SPY, VTI, QQQ, AAPL, MSFT, NVDA — click NVDA to open its detail page.'
   pay_by_form:
-  - '''Trade'' page -> ''Pay With'' dropdown (Checking Account, Credit Card)'
+  - '''Trade'' page order form (and the ticker-detail Buy/Sell panel) -> the ''Pay With'' dropdown, shown only when logged in. Outcome: sets the funding source recorded on the order (account_type). Options: ''Checking Account'' / ''Credit Card'' (labelled ''Checking'' / ''Credit'' in the ticker-detail panel). The ''Available'' / ''Buying Power'' line below shows the account balance (e.g. $48,720.00 for alex_rivera). Example: buy AAPL paying with Checking Account.'
   report_information:
-  - '''All Securities'' section -> tickers table (symbol, price, change, volume)'
-  - '''Portfolio'' page -> holdings table (symbol, shares, value, P&L)'
-  - '''Lists'' page -> watchlist table'
-  - '''History'' page -> orders table'
-  - Options page -> options chain table
-  - Compare page -> comparison table
-  - Ticker detail page -> price chart, fundamentals, news
-  - '''Portfolio'' page -> positions list with price and P&L columns'
-  - Ticker detail page -> price chart with period buttons (1D, 1W, 1M, 3M, 1Y)
-  - '''All Securities'' section -> sector and type filter dropdowns'
+  - '''All Securities'' table on the home page -> read the tickers grid. Columns: Name (symbol + company name), Type tag, Price (current, live-updating), Today (change in $ and %), Market Cap ($B), Trend sparkline. 506 securities, 50 per page. Example: read NVDA''s price and today''s % change from its row.'
+  - '''Portfolio'' page -> read the ''Stocks'' holdings table. Columns: Name (symbol + name), Shares, Price, Avg Cost, Total Return ($ and % gain/loss), Equity (market value), Allocation (%). Example: read alex_rivera''s AAPL row — 15 shares with its Total Return.'
+  - '''Lists'' page (/sites/brokerage/watchlist, nav ''Lists'') -> read the ''My List'' watchlist rows (symbol, name, sparkline, live price, day change) and, if any are set, the ''Price Alerts'' table (Symbol, Condition, Target Price). Example: alex_rivera''s list holds AMZN, TSLA, JNJ, ETH, GC.'
+  - '''History'' page (/sites/brokerage/orders) -> read the orders table. Columns: Symbol, Side (buy/sell), Type (Market/Limit/Stop Loss), Qty, Price, Filled (fill price), Status tag, Date. Example: read the status and fill price of alex_rivera''s AAPL limit order.'
+  - 'Options page (/sites/brokerage/options) -> read the options-chain table. Columns: Underlying, Spot (underlying price), Type (call/put), Strike, Expiry, Premium, IV (%), Delta, Volume, OI (open interest). Example: read the premium of the AAPL $142 call expiring 2026-07-18.'
+  - 'Compare page (/sites/brokerage/compare) -> read the ''Side-by-Side'' table after entering symbols. Metric rows: Name, Type, Sector, Price, Change, Change %, Market Cap, Exchange; a bar chart above ranks each symbol''s % change. Example: compare AAPL,MSFT and read their Change % rows.'
+  - 'Ticker detail page (/sites/brokerage/ticker/<SYMBOL>) -> read the interactive price chart (hover for date/price tooltip) plus the ''Key Statistics'' card (Market Cap, Day''s Range, Volume, 52W High/Low, Open, Exchange, Sector, Type) and the ''About'' blurb. Example: read AAPL''s 52W High and Day''s Range.'
+  - '''Portfolio'' page -> read the account summary: the hero total value with All-Time gain ($ and %), the ''Daily P&L'' card (Today''s Change, Total Return, Cash Balance), and the sidebar ''Account'' box (Buying Power, Account Type). Example: read alex_rivera''s total portfolio value and Today''s Change.'
+  - 'Ticker detail page -> the price chart''s period buttons (1D, 1W, 1M, 3M, 1Y) below the chart re-draw it over that window (1D uses intraday data). Outcome: read the price trend for the selected period. Example: click 1M on the AAPL chart to read its last-month trend.'
+  - '''All Securities'' filter bar on the home page -> read the available categories from the ''All Sectors'' and ''All Types'' dropdowns (34 sectors such as Technology/Healthcare/Semiconductor; types stock/crypto/index_fund/futures). Outcome: report which sectors or asset types the market offers.'
   search:
-  - '''TradeVista'' page -> ''Search'' field in the top bar'
-  - Search with keyword matching across ticker names
+  - 'Top nav bar (present on every ''TradeVista'' page) -> the ''Search'' text box; submitting reloads the home page filtered to matches. Outcome: substring match across symbol, name, sector and type. Example: search ''apple'' to surface AAPL (Apple Inc.), or ''bank'' to surface financial names.'
+  - 'Same top-bar Search -> keyword matching runs across each ticker''s symbol, name, sector and type text (case-insensitive substring). Outcome: the All Securities table lists only matching securities. Example: search ''semiconductor'' to list Semiconductor-sector tickers.'
   sort_by_form:
-  - '''All Securities'' -> sort dropdown (Market Cap, Price, Top Gainers, Name A-Z)'
+  - '''All Securities'' card on the home page -> the sort dropdown in the filter bar (auto-submits). Options: ''Market Cap'' (default, high-low), ''Price: High-Low'', ''Price: Low-High'', ''Top Gainers'' (change % desc), ''Top Losers'' (change % asc), ''Name A-Z''. Outcome: reorders the securities table. Example: pick ''Top Gainers'' to rank by biggest % gain, or ''Market Cap'' to put MSFT/NVDA/AAPL on top.'
   toggle_relationship:
-  - Ticker detail page -> 'Add to Watchlist'/'Remove' button
-  - '''Lists'' page -> toggle watchlist inclusion'
+  - 'Ticker detail page (/sites/brokerage/ticker/<SYMBOL>) -> the full-width outline button under the Buy/Sell panel labelled ''Add to List'' (or ''Remove from List'' if already watched), shown when logged in. Outcome: toggles the symbol in the user''s watchlist. Example: on the TSLA page it reads ''Remove from List'' for alex_rivera since TSLA is already on their list.'
+  - '''Lists'' page (/sites/brokerage/watchlist) -> the small minus (remove) button at the right of each ''My List'' row. Outcome: removes that symbol from the watchlist. Example: click the minus on the JNJ row to drop it from alex_rivera''s list.'
 business-company:
   create_by_form:
-  - '''Contact'' page -> contact form with subject dropdown, name, email, message'
+  - '''Contact'' page (/contact) -> contact form: Name (text, required), Email (email, required), Subject (select with 5 fixed options: General Inquiry, Product Demo, Partnership, Support, Careers), Message (textarea, required); ''Send Message'' button submits POST /contact -> appends to contacts table, sends confirmation email to inbox, shows success banner. Example: submit Name=''Jane Doe'', Email=''jane@acme.com'', Subject=''Product Demo'', Message=''Interested in MeridianFlow.'''
   navigate_by_route:
-  - Search page -> full-text search across all 'Apex Dynamics' content
-  - '''Featured Products'' section -> click product for details (MeridianFlow, MeridianVault, etc.)'
-  - '''Latest Insights'' section -> click blog post for details'
-  - '''Meet Our Team'' section -> click member for details'
-  - '''Careers'' page -> click job listing for details'
+  - 'Header search box (top of every page) or ''Search'' page (/search) -> full-text keyword search across all Apex Dynamics content (products, blog posts, team, services, jobs); results grouped by type. Example: query ''Meridian'' returns MeridianFlow, MeridianVault, MeridianLens plus matching posts.'
+  - 'Home page (/) ''Featured Products'' section -> click a product card title to open its detail page (/product/<id>). Options are the 3 featured products: MeridianFlow (#1), MeridianVault (#2), MeridianLens (#3). Example: click ''MeridianVault'' -> /product/2 detail page.'
+  - 'Home page (/) ''Latest Insights'' section or ''Blog'' page (/blog) -> click a post title to open its detail page (/blog/<id>). Example: click ''Introducing MeridianLens 2.0: Natural-Language Analytics for Everyone'' -> /blog/1.'
+  - 'Home page (/) ''Meet Our Team'' section or ''Team'' page (/about) -> click a member card title to open their profile (/team/<id>). Example: click ''Alex Rivera'' -> /team/1.'
+  - '''Careers'' page (/careers) -> click a job title to open its detail page (/careers/<id>). Example: click ''Senior Backend Engineer'' -> /careers/1.'
   report_information:
-  - '''Products'' page -> category dropdown filters products'
-  - '''Careers'' page -> department dropdown filters jobs'
-  - '''Meet Our Team'' section -> team members grid; ''Featured Products'' -> products grid'
-  - Product detail page -> product information
-  - Job detail page -> description and requirements
-  - Team member page -> bio, role, contact
+  - '''Products'' page (/products) -> ''All Categories'' category dropdown (filters?category=) with 3 real options: Workflow Automation, Cybersecurity, Data Analytics; plus a ''Search products...'' text box (?q=). Outcome: product grid narrows to the chosen category. Example: select ''Cybersecurity'' -> shows MeridianVault.'
+  - '''Careers'' page (/careers) -> two dropdowns: ''All Departments'' (options: Customer Success, Engineering, Marketing, Sales) and ''All Locations'' (options: ''Lakeport, WA (Hybrid)'', ''Lakeport, WA or Remote'', ''Seattle, WA or Lakeport, WA (Hybrid)''). Selecting reloads with ?department=&location= and filters the job list. Example: department=''Engineering'' -> shows Senior Backend Engineer, Frontend Engineer, Site Reliability Engineer.'
+  - 'Home page (/) ''Meet Our Team'' grid (first 6 of 12 members) and ''Featured Products'' grid (3 featured products); also the full ''Team'' page (/about) with a ''Filter by Department'' dropdown (8 depts incl. Engineering, Sales, Marketing, Product Management, Finance). Example: read that Priya Sharma (#2) is Engineering Manager in Engineering.'
+  - 'Product detail page (/product/<id>) -> reports product name, category badge, description, price (e.g. ''$X/month'' when set), and a ''Features'' checklist. Example: /product/1 (MeridianFlow) shows category ''Workflow Automation'' and its feature list.'
+  - 'Job detail page (/careers/<id>) -> reports title, department/location/type badges, salary range (''$min - $max''), full description, and a ''Requirements'' bullet list. Example: /careers/1 ''Senior Backend Engineer'' — Engineering, Lakeport, WA (Hybrid), Full-time.'
+  - 'Team member page (/team/<id>) -> reports name, title, department, bio, Email, Phone, Joined year, LinkedIn link, and ''Colleagues in <department>'' list. Example: /team/1 Alex Rivera — Software Engineer, Engineering.'
   search:
-  - Header -> 'Search...' field at top of every page
-  - Search page -> 'Search products, blog posts, team members...' field
+  - 'Header ''Search...'' field (name=q) in the navbar at the top of every page -> submits GET /search. Example: type ''MeridianVault'' and press Go.'
+  - '''Search'' page (/search) -> main ''Search products, blog posts, team, services, jobs...'' field (name=q); results are grouped counts per type (Products, Blog Posts, Team Members, Services, Job Openings). Example: query ''analytics'' surfaces MeridianLens and Data Science content.'
   toggle_relationship:
-  - '''Subscribe to Our Newsletter'' section -> email input and ''Subscribe'' button'
+  - 'Home page (/) ''Subscribe to Our Newsletter'' section (email input + ''Subscribe'' button, POST /newsletter/subscribe) OR the full ''Newsletter'' page (/newsletter) with Name, Email, and 5 Topic checkboxes (Product Updates, Blog & Insights, Company News, Events & Webinars, Career Opportunities). Submitting subscribes the email to the selected topics and shows a success banner. Example: subscribe ''jane@acme.com'' with topics Product Updates + Company News.'
 calendar-todo:
   create_by_form:
-  - '''New Event'' form -> ''Add title'', start/end times, Category, Calendar, Priority, Location'
-  - '''New Event'' form -> ''Category'' dropdown, ''Calendar'' dropdown, ''Priority'' dropdown'
-  - '''New Event'' form -> title input at top of the form'
-  - '''New Event'' form -> ''Start'' and ''End'' date/time inputs'
-  - Event detail page -> invite form with email input
+  - 'Sidebar ''Create'' button (round + button, top of left sidebar) opens the ''New Event'' modal; filling it and pressing ''Save'' POSTs to /create and adds a new event to the calendar (owner set by the ''User'' dropdown, status defaults to ''confirmed''). Fields: ''Add title'' (required), ''Start''/''End'' datetime-local (required), ''Category'', ''Calendar'', ''Priority'', ''Location'', ''Invite people'', ''User'', description. Example: create ''Team Retro'' on 2026-06-22T15:00 in the Work calendar for Alex Rivera.'
+  - '''New Event'' modal -> three <select> dropdowns that set the event''s classification: ''Category'' (Work / Personal / Health), ''Calendar'' (options built from existing calendars: Work, Personal, Health), ''Priority'' (High / Medium / Low, defaults to Medium). Outcome: the saved event carries these tags (e.g. category=health, calendar=Health, priority=high, like the existing ''Gym - Strength Training'').'
+  - '''New Event'' modal -> ''Add title'' text input at the top of the form (name=title, required); its value becomes the new event''s title shown across the grid and detail page. Example value: ''Daily Standup''.'
+  - '''New Event'' modal -> ''Start'' and ''End'' datetime-local inputs (both required) that set the event''s date and time window; clicking an empty hour slot or a day-header number pre-fills them (e.g. Start 2026-06-22T09:00, End 2026-06-22T10:00).'
+  - 'Event detail page -> ''Invite by email...'' form at the bottom (email input + ''Invite'' button, POSTs to /api/events/<id>/invite); on submit the address is appended to that event''s Attendees list. Example: invite priya.sharma@meridiansystems.com to event 1 ''Daily Standup''.'
   delete_from_table:
-  - Event detail page -> 'Delete Event' button
+  - 'Event detail page -> red ''Delete'' button in the Actions row; clicking it POSTs to /event/<id>/delete and permanently removes the event, then redirects to the main calendar. Example: on event 2 ''Sprint Planning'', ''Delete'' removes it from Alex Rivera''s calendar.'
   edit_by_form:
-  - Edit event page -> form with title, description, date, time, category, status
-  - Edit event page -> date and time inputs for rescheduling
+  - 'Edit event page (/event/<id>/edit, reached via the ''Edit'' button on the detail page) -> full edit form; ''Save Changes'' POSTs to /event/<id>/edit and updates the event in place. Fields: Title, Description, Category (Work/Personal/Health), Calendar (Work/Personal/Health), Start, End, Location, Priority (High/Medium/Low), Status (Confirmed/Cancelled/Tentative). Example: change event 3 ''1:1 with Priya'' Status to Cancelled.'
+  - 'Edit event page -> ''Start'' and ''End'' datetime-local inputs for rescheduling; editing them and saving moves the event to a new date/time. Example: reschedule event 1 ''Daily Standup'' from 2025-09-15T09:30 to 2025-09-16T09:30.'
   export:
-  - Calendar header -> 'CSV', 'ICS', 'JSON' export links
+  - 'Left sidebar ''Export'' section (below the filters) -> ''CSV'', ''ICS'', and ''JSON'' links hitting /api/export?format=...; each downloads all events in that format (CSV columns: id,user_id,title,category,calendar,start,end,priority,status,location,recurring). The same endpoint accepts category= and user_id= to scope the export, e.g. only Alex Rivera''s Work events.'
   filter_by_date_range:
-  - Left panel -> 'From' and 'To' date fields + 'Apply Date Range' button
+  - 'Left sidebar ''Date Range'' section -> ''From:'' and ''To:'' date inputs plus the ''Apply Date Range'' button; applying reloads the calendar with date_from/date_to query params so only events whose start date falls in the window are shown. Example: From 2025-09-15 To 2025-09-19 shows that week''s standups and reviews.'
   filter_by_dropdown:
-  - Left panel -> 'Category' dropdown (Work, Personal, Health)
-  - Left panel -> priority dropdown (High, Medium, Low)
-  - Left panel -> 'User' dropdown (Alex Rivera, Priya Sharma, etc.)
-  - Left panel -> sort dropdown (Date, Title, Priority)
+  - 'Left sidebar ''Category'' dropdown (options: All, Work, Personal, Health) -> reloads with category= and shows only events in that category. Example: ''Health'' surfaces events like ''Gym - Strength Training''.'
+  - 'Left sidebar ''Priority'' dropdown (options: All, High, Medium, Low) -> reloads with priority= and keeps only events at that priority. Example: ''High'' surfaces ''Sprint Planning'' and ''Deployment Window - MeridianFlow v3.4''.'
+  - 'Left sidebar ''User'' dropdown (options: All + every user by name, e.g. Alex Rivera, Priya Sharma, Marcus Chen, Natalie Kim) -> reloads with user_id= and shows only that owner''s events. Example: ''Priya Sharma'' (id 2) shows only her events.'
+  - 'Left sidebar ''Sort'' dropdown (options: Date, Title, Priority) -> reloads with sort= and re-orders the visible events; not a filter but a same-panel <select>. Example: ''Title'' orders events alphabetically.'
   navigate_by_route:
-  - Calendar grid -> click event to view details
-  - Top bar -> 'Day' and 'Week' view links
-  - Top bar -> user name links to Dashboard
+  - 'Week grid -> clicking an event block (or an all-day event) navigates to /event/<id>, the event detail page. Example: clicking ''Daily Standup'' opens event 1''s details.'
+  - 'Top header bar -> ''Day'' and ''Week'' links; ''Day'' goes to /day/<simulated_today> (2026-06-21) and ''Week'' returns to the main week view (week_offset=0). Outcome: switches the calendar viewing window.'
+  - Top header bar -> the logged-in user's name link (e.g. 'Alex Rivera') navigates to /dashboard, that user's personal event dashboard listing their events and upcoming items.
   report_information:
-  - Search returns matching events in the calendar
-  - Category/priority filters return matching events
-  - Event detail page -> full event info with attendees
-  - Day/Week view -> events filtered by the selected date window
+  - 'Search results -> after submitting the top search bar, the calendar shows only events whose text matches the query (FTS over title/description/location). Example: searching ''Standup'' returns ''Daily Standup''.'
+  - Sidebar Category/Priority/User filters -> the week grid and 'Upcoming Events' list are narrowed to the matching events, letting the agent read/count what remains (e.g. how many High-priority Work events this week).
+  - 'Event detail page -> full event info to read off: Date, Time, Calendar, Location, Description, Owner (name + email), Reminder (minutes before), Status, and the Attendees list. Example: event 1 shows owner ''Alex Rivera (alex.rivera@meridiansystems.com)''.'
+  - 'Day/Week views (/day/<date> and /week/<date>) -> events restricted to the selected date window, sorted by start time, so the agent can read the schedule for a given day or week. Example: /day/2026-06-21 lists that day''s events.'
   search:
-  - Top bar -> 'Search events...' field
+  - 'Top header bar -> magnifier icon toggles a search bar with a ''Search events...'' text input (name=q) and ''Search'' button; submitting runs a full-text search across event title/description/location. Example: ''Gym'' matches ''Gym - Strength Training'' and other gym sessions.'
   share_by_form:
-  - Event detail page -> 'Share' button (copies link)
+  - 'Event detail page -> ''Share'' button in the Actions row; clicking copies the current event URL to the clipboard and briefly shows ''Link Copied!''. Example: share event 5 ''Engineering All-Hands'' to copy its link.'
   sort_by_form:
-  - Left panel -> sort dropdown (Date, Title, Priority)
+  - 'Left sidebar ''Sort'' dropdown (options: Date, Title, Priority) -> reloads the calendar with sort= and reorders the visible events (Date = by start time, Title = alphabetical, Priority = High->Low). Example: ''Priority'' floats ''Sprint Planning'' (high) above medium/low events.'
 cloud-dev-consoles:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - '''Sign In'' page (/login) -> Username + Password text inputs and ''Sign In'' button (login.html). OUTCOME: validates against the console ''users'' collection and, on match, sets session user_id and renders the personalized Dashboard (recent services + saved queries). OPTIONS: 5 real console accounts, each with its own password. EXAMPLE: sign in as username ''dev_alex'' (Alex Rivera, Developer) or ''admin_david'' (David Petrov, Administrator).'
   compute_by_tool:
-  - '''Metrics'' page -> CPU threshold slider for filtering'
+  - '''Performance Metrics'' page (/metrics) -> ''CPU Threshold'' range slider (name=cpu_threshold, min=0 max=100, live ''%''-label) beside the ''Instance'' dropdown, then ''Apply''. OUTCOME: reloads the metrics table and highlights (yellow row) every data point whose cpu_percent >= the chosen threshold; the result-count line shows ''N data points (threshold: X%)''. Values combine stored ''metrics'' rows with deterministic live per-minute samples for running instances. EXAMPLE: set the slider to 80 and Apply to surface high-CPU samples for a running instance such as i-0a1b2c3d4e5f00001 (meridianflow-api-prod-1).'
   create_by_form:
-  - '''Services'' page -> search field with filter dropdowns and ''Apply'' button'
-  - '''Instances'' page -> ''Launch instance'' form (name, type, region, OS, environment)'
-  - '''Functions'' page -> ''Create function'' form (name, runtime, handler, memory, timeout)'
+  - '''Instances'' page (/instances) -> ''Launch instance'' POST form. OUTCOME: appends a new running instance (id i-user...) and redirects to the instances list. FIELDS: Name (text, required, e.g. ''my-new-instance''); Type dropdown (t3.medium, t3.large, c5.xlarge, c5.2xlarge, r6g.xlarge); Region dropdown (us-west-2, us-east-1, eu-central-1, ap-southeast-1); OS dropdown (Amazon Linux 2023, Ubuntu 24.04, Windows Server 2022); Environment dropdown (development, staging, production). EXAMPLE: launch ''analytics-worker-1'' as c5.xlarge in us-east-1 on Ubuntu 24.04, env=staging.'
+  - '''Functions'' page (/functions) -> ''Create function'' POST form. OUTCOME: appends a new active function (id fn-user...) and redirects to the functions list. FIELDS: Name (text, required, e.g. ''my-new-function''); Runtime dropdown (python3.12, nodejs20.x, go1.x, java21); Handler (text, default ''index.handler''); Memory dropdown (128, 256[default], 512, 1024 MB); Timeout dropdown (15, 30[default], 60, 300 sec); Environment (development/staging/production). EXAMPLE: create ''image-thumbnailer'' on python3.12, handler ''index.handler'', 512 MB, 60s timeout.'
+  - 'Alerts creation -> the console''s create-alert action (POST /api/alerts/create; no dedicated template form, driven via the API/recorder). OUTCOME: appends an ''active'' alert (id alert-NNN) and emails the current user a ''Deployment notification''. FIELDS: name (required), severity (warning default / critical / high / medium / low), resource_name, condition, category (default ''Custom'', or a real category like Compute/Database). EXAMPLE: create alert name=''High CPU — MeridianFlow API'', severity=warning, resource_name=''meridianflow-api-prod-1'', category=Compute. NOTE: corrected — the former ''Services search/filter'' entry here was a filter control, not a create form; Services has no create form.'
   delete_from_table:
-  - '''Instances'' page -> ''Delete'' button per instance row'
+  - '''Instances'' page (/instances) -> red ''Delete'' button in the Actions column of each instance row (POST /instance/<id>/delete). OUTCOME: terminates that instance (status set to ''terminated'') and reloads the list; the row is removed from the running/stopped view. EXAMPLE: click Delete on ''meridianflow-api-prod-2'' (i-0a1b2c3d4e5f00002) to terminate it.'
   edit_by_form:
-  - Instance detail page -> 'Edit Configuration' section with name/type/vCPUs/memory/OS fields
-  - '''Metrics'' page -> CPU threshold slider with instance filter dropdown'
+  - 'Instance detail page (/instance/<id>) -> ''Edit Configuration'' section, identity fields: Name (text input), Type dropdown (t3.medium, t3.large, c5.xlarge, c5.2xlarge, r6g.xlarge, m5.2xlarge — plus the instance''s current type if not listed), OS (text input). OUTCOME: ''Save configuration'' POSTs to /instance/<id>/edit, updates the stored instance, and redirects back to the detail page. EXAMPLE: on i-0a1b2c3d4e5f00001 (meridianflow-api-prod-1) change Type from c5.2xlarge to c5.xlarge and OS to ''Ubuntu 24.04''.'
+  - 'Instance detail page (/instance/<id>) -> ''Edit Configuration'' section, capacity fields: vCPUs (number input, min 1 / max 128) and Memory (GB) (number input, min 1 / max 1024), saved with the same ''Save configuration'' button. OUTCOME: updates vcpus/memory_gb on the instance and redirects to the detail page. EXAMPLE: set vCPUs=8 and Memory=32 on i-0a1b2c3d4e5f00003 (meridianvault-engine-prod-1). NOTE: corrected — the former ''Metrics CPU-threshold slider'' entry here is a filter, not an edit; the only edit form on this site is this Instance-detail one.'
   filter_by_date_range:
-  - '''Logs'' page -> date range filters'
+  - '''Logs'' page (/logs) -> ''From'' and ''To'' text inputs (name=date_from / date_to, ISO placeholder like ''2026-06-21T09:00''), applied with ''Apply''. OUTCOME: keeps only log rows whose (relativized, freshest-first) timestamp falls in the range, combined with the level/category/search filters; the count line and 100-per-page pagination update. EXAMPLE: set From=2026-06-21T09:00 and To=2026-06-21T11:00 to narrow the ~30,000-row log stream to that window.'
   filter_by_dropdown:
-  - '''Instances'' page -> ''Status'' dropdown (Running, Stopped), ''Region'' dropdown, ''Sort'' dropdown'
-  - '''Services'' page -> status and sort dropdowns'
-  - '''Databases'' page -> engine, status, sort dropdowns'
-  - '''Functions'' page -> runtime, status, sort dropdowns'
-  - '''IAM'' page -> role, status, sort dropdowns'
-  - '''Alerts'' page -> status, severity, category dropdowns'
-  - '''API Gateway'' -> method, status, sort dropdowns'
-  - '''Billing'' page -> month and category dropdowns'
-  - '''Logs'' page -> level and category dropdowns'
+  - '''Instances'' page (/instances) -> ''Status'' dropdown (All / Running / Stopped), ''Region'' dropdown (us-west-2, us-east-1, eu-central-1, ap-southeast-1) and ''Sort'' dropdown (Name, Cost, Type, vCPUs); ''Apply'' submits. OUTCOME: filters the instances table to matching rows. EXAMPLE: Status=Running + Region=us-west-2 to list running instances like meridianflow-api-prod-1.'
+  - '''Services'' page (/services) -> ''Category'' dropdown (Analytics, Compute, Database, DevTools, Integration, Monitoring, Networking, Security, Storage), ''Status'' dropdown (Active, Warning, Stopped), ''Region'' dropdown, and ''Sort'' dropdown (Name, Cost (High-Low), Category, Newest). OUTCOME: filters the services table. EXAMPLE: Category=Compute + Status=active surfaces meridianflow-api ($1,245.50/mo).'
+  - '''Databases'' page (/databases) -> ''Engine'' dropdown (values drawn from data: PostgreSQL, Redis, MongoDB, mysql, postgres, redis, mongodb), ''Status'' dropdown (Available, Stopped) and ''Sort'' dropdown (Name, Cost, Storage, Connections). OUTCOME: filters the databases table. EXAMPLE: Engine=PostgreSQL lists meridianflow-primary (v16.2, available).'
+  - '''Functions'' page (/functions) -> ''Runtime'' dropdown (go1.22, go1.x, nodejs20.x, python3.12), ''Status'' dropdown (Active, Inactive) and ''Sort'' dropdown (Name, Invocations, Duration, Error Rate). OUTCOME: filters the functions table. EXAMPLE: Runtime=python3.12 + Status=active includes workflow-executor (512 MB).'
+  - '''IAM'' page (/iam) -> ''Role'' dropdown (values from data: Administrator, Developer, Manager, ReadOnly, admin, developer, ops, read-only, security-auditor), ''Status'' dropdown (options hardcoded Active / Inactive) and ''Sort'' dropdown (Name, Role, Last Login). OUTCOME: filters the IAM users table. NOTE: stored statuses are ''active''/''suspended'', so the ''Inactive'' option matches no rows and ''suspended'' users cannot be isolated via this dropdown. EXAMPLE: Role=Developer lists dev_alex (Alex Rivera).'
+  - '''Alerts'' page (/alerts) -> ''Status'' dropdown (options Active / Resolved), ''Severity'' dropdown (options Critical / Warning) and ''Category'' dropdown (data categories: Analytics, Billing, Compute, Database, DevTools, Integration, Monitoring, Networking, Security, Storage). OUTCOME: filters the alerts table (sorted newest-triggered first). NOTE: data also contains severity high/medium/low and status ''firing'' which have no dropdown option. EXAMPLE: Severity=critical + Category=Database surfaces ''MeridianFlow DB Connection Pool''.'
+  - '''API Gateway'' page (/api-gateway) -> ''Method'' dropdown (DELETE, GET, POST, PUT), ''Status'' dropdown (Active, Deprecated) and ''Sort'' dropdown (Name, Requests, Latency, Errors). OUTCOME: filters the endpoints table. EXAMPLE: Method=POST includes ''POST /api/v2/auth'' (Workflow Authentication).'
+  - '''Billing'' page (/billing) -> ''Month'' dropdown (2025-07 through 2026-06) and ''Category'' dropdown (Analytics, Compute, Database, DevTools, Integration, Monitoring, Networking, Security, Storage). OUTCOME: filters the billing rows to the chosen month/category. EXAMPLE: Month=2026-01 + Category=Compute -> cost $2,180.00 against a $2,500.00 budget.'
+  - '''Logs'' page (/logs) -> ''Level'' dropdown (ERROR, INFO, WARN), ''Category'' dropdown (Analytics, Compute, Database, DevTools, Integration, Monitoring, Networking, Security, Storage, application, platform) plus a ''Sort'' dropdown (Newest, Level, Service). OUTCOME: filters the paginated log table. EXAMPLE: Level=ERROR + Category=Compute surfaces the ''Connection timeout to meridianflow-primary'' error from meridianflow-api-prod-1.'
   filter_by_options:
-  - '''Instances'' page -> ''Environment'' checkboxes (Production, Staging, Development)'
+  - '''Instances'' page (/instances) -> ''Environment'' checkbox group (name=env): Production, Staging, Development. OUTCOME: filters instances by their tags.env value (single value submitted). EXAMPLE: check Production to list production-tagged instances such as meridianflow-api-prod-1.'
   navigate_by_route:
-  - '''Instances'' page -> click instance row to view details'
-  - '''Services'' page -> click service to view details'
+  - '''Instances'' page (/instances) -> click an instance row/name to open its detail page (/instance/<id>). OUTCOME: opens per-instance detail with config, live CPU/memory gauges and recent metrics. EXAMPLE: click meridianflow-api-prod-1 -> /instance/i-0a1b2c3d4e5f00001.'
+  - '''Services'' page (/services) -> click a service row/name to open its detail page (/service/<id>). OUTCOME: opens service info (category/status/health/region/cost), its instances and related logs. EXAMPLE: click meridianflow-api -> /service/<id> showing its running instances.'
   report_information:
-  - Search across any service list returns filtered results
-  - '''Billing'' page -> month/category dropdown returns filtered billing data'
-  - '''Instances'' page -> instances table (name, type, status, region, cost)'
-  - '''Services'' page -> services table'
-  - '''Databases'' page -> databases table'
-  - '''Functions'' page -> functions table'
-  - '''IAM'' page -> users table'
-  - '''Alerts'' page -> alerts table'
-  - '''API Gateway'' -> endpoints table'
-  - '''Billing'' page -> billing table'
-  - '''Metrics'' page -> metrics table'
-  - '''Logs'' page -> logs table'
-  - Storage page -> buckets table
-  - Instance detail page -> full instance info table
-  - Service detail page -> service info and endpoints
-  - '''Billing'' page -> billing table with month and category filters'
-  - '''Services'' page -> ''Status'' filter dropdown (All/Active/Warning/Stopped) + ''Apply'' to verify which services are in a given state'
-  - Instance/Service tables -> click row to view details
+  - 'Any list page (/services, /instances, /logs, ...) -> type in the page ''Search'' box and Apply; OUTCOME: the table + result-count line show only matching rows, which the agent reads back. EXAMPLE: search ''meridianflow'' on Services to report the matching service names/costs.'
+  - '''Billing'' page (/billing) -> Month/Category dropdowns return the matching billing rows (Month, Category, Cost, Budget, Variance, Status). OUTCOME: agent reads/derives the filtered billing figures. EXAMPLE: Month=2026-01, Category=Storage -> cost $270.20 vs budget $300.00.'
+  - '''Instances'' page (/instances) -> instances table columns: Name, Instance ID, Type, vCPUs, Memory, Status, Region, Cost/mo, Actions. EXAMPLE: read that meridianflow-api-prod-1 (i-0a1b2c3d4e5f00001) is a running c5.2xlarge in us-west-2 at $245.00/mo.'
+  - '''Services'' page (/services) -> services table columns: Name, Category, Status, Health, Region, Monthly Cost, Tags. EXAMPLE: read meridianflow-api = Compute, active, us-west-2, $1,245.50/mo.'
+  - '''Databases'' page (/databases) -> databases table columns: Name, Engine, Version, Class, Storage, Connections, Status, Multi-AZ, Cost/mo. EXAMPLE: read meridianflow-primary = PostgreSQL 16.2, available.'
+  - '''Functions'' page (/functions) -> functions table columns: Name, Runtime, Memory, Timeout, Invocations (24h), Avg Duration, Error Rate, Status, Cost/mo. EXAMPLE: read workflow-executor = python3.12, 512 MB, active.'
+  - '''IAM'' page (/iam) -> users table columns: Username, Name, Role, Department, MFA, Status, API Keys, Last Login, Policies. EXAMPLE: read dev_alex = Alex Rivera, Developer, status active.'
+  - '''Alerts'' page (/alerts) -> alerts table columns: Name, Severity, Status, Resource, Condition, Category, Triggered, Ack. EXAMPLE: read ''MeridianFlow DB Connection Pool'' = critical, active, Database.'
+  - '''API Gateway'' page (/api-gateway) -> endpoints table columns: Name, Method, Path, Status, Rate Limit, Avg Latency, Requests (24h), Error Rate, Auth. EXAMPLE: read Workflow Authentication = POST /api/v2/auth, active.'
+  - '''Billing'' page (/billing) -> billing table columns: Month, Category, Cost, Budget, Variance, Status. EXAMPLE: read the 2026-01 Compute row = $2,180.00 cost vs $2,500.00 budget.'
+  - '''Performance Metrics'' page (/metrics) -> metrics table columns: Timestamp, Instance, CPU %, Memory %, Net In (Mbps), Net Out (Mbps), Disk Read IOPS, Disk Write IOPS, Requests. EXAMPLE: read the latest CPU % sample for i-0a1b2c3d4e5f00001.'
+  - '''Logs'' page (/logs) -> logs table columns: Timestamp, Level, Service, Category, Message, Trace ID (100/page). EXAMPLE: read the newest ERROR from meridianflow-api-prod-1 (''Connection timeout to meridianflow-primary...'').'
+  - '''Storage'' page (/storage) -> buckets table columns: Name, Region, Class, Size, Objects, Versioning, Encryption, Public, Cost/mo. EXAMPLE: read meridianlens-data-lake = us-west-2, Intelligent-Tiering, 12,400 GB.'
+  - 'Instance detail page (/instance/<id>) -> full instance info (name, id, type, vCPUs, memory, status, region, AZ, private/public IP, OS, launched) plus live CPU/memory gauges and recent metrics. EXAMPLE: read the config of meridianflow-api-prod-1.'
+  - 'Service detail page (/service/<id>) -> service info (category, status, health, region, monthly cost), its instances list and related recent logs. EXAMPLE: open meridianflow-api to report its running instances and latest logs.'
+  - '''Billing'' page (/billing) -> billing table with Month and Category filters applied (Cost, Budget, Variance, Status). OUTCOME: agent reads the filtered spend/budget figures. EXAMPLE: filter Month=2026-06 to total the current-month spend.'
+  - '''Services'' page (/services) -> ''Status'' filter dropdown (All / Active / Warning / Stopped) + ''Apply'' to verify which services are in a given state (stored statuses: active, warning, stopped). EXAMPLE: filter Status=warning to report which services are currently in a warning state.'
+  - 'Instance/Service tables -> click a row to open its detail page and read the fuller record. EXAMPLE: click meridianflow-primary''s parent service, or an instance row, to read details not shown in the list.'
   search:
-  - '''Instances'' page -> ''Search instances...'' field'
-  - '''Services'' page -> search input'
-  - '''Logs'' page -> search input'
-  - '''Console Home'' page -> global search field -> grouped results page across services, instances, databases, functions, buckets, IAM, endpoints, alerts, logs'
-  - All list pages -> search text input filters items by name
+  - '''Instances'' page (/instances) -> ''Search instances...'' text input (name=q); searches name, id, type, os and tags. EXAMPLE: ''prod'' or ''c5.2xlarge'' to narrow the instances list.'
+  - '''Services'' page (/services) -> ''Search services...'' text input (name=q); searches name, description, category, tags. EXAMPLE: ''meridianvault'' -> meridianvault-engine.'
+  - '''Logs'' page (/logs) -> ''Search log messages...'' text input (name=q); searches message, service, source, trace_id. EXAMPLE: ''timeout'' to find connection-timeout errors.'
+  - '''Console Home'' page (/) -> global search field (''Search services, instances, logs...'') in the top bar; Enter submits to /search?q=. OUTCOME: a grouped results page across Services, Instances, Databases, Functions, Storage Buckets, IAM Users, API Endpoints, Alerts and Logs, each group linking to its list page. EXAMPLE: search ''meridianflow'' -> grouped hits across services, instances, databases, endpoints and logs.'
+  - 'All list pages -> the ''Search'' text input filters items by name (and related fields) via the _search_resources keyword match. EXAMPLE: type a resource name on any list page to filter to it.'
   sort_by_form:
-  - All list pages -> sort dropdown (Name, Cost, Type, etc.)
+  - 'All list pages -> ''Sort'' dropdown reorders the table server-side; the exact options vary by page: Services (Name / Cost (High-Low) / Category / Newest), Instances (Name / Cost / Type / vCPUs), Databases (Name / Cost / Storage / Connections), Functions (Name / Invocations / Duration / Error Rate), Storage (Name / Size / Objects / Cost), API Gateway (Name / Requests / Latency / Errors), IAM (Name / Role / Last Login), Logs (Newest / Level / Service). EXAMPLE: on Instances choose Sort=Cost to rank by monthly cost, top being c5.2xlarge boxes at $245.00/mo.'
 cloud-storage-file-transfer:
   authenticate_by_form:
-  - Login page -> username and password fields
+  - 'Login page (/login) -> ''Username'' and ''Password'' text fields + ''Sign in'' button; a match sets the session and redirects to My Drive, otherwise shows ''Invalid username or password.'' Example: username ''alex.chen'' / password ''meridian111'' signs in as Alex Chen (50 GB quota).'
   configure_by_form:
-  - File detail page -> 'Share' button and star toggle (filled/empty star)
+  - 'File detail page (/file/<id>) -> star button (outline star toggles to a filled favorite) plus the pencil ''Rename'' button that reveals an inline name field + ''Save''. Outcome: renaming updates file.name and bumps it to the top of My Drive''s Last-modified order. Example: on ''RFC: MeridianFlow API Redesign.docx'' (file 1) click Rename, edit the name, Save.'
   create_by_form:
-  - '''New folder'' button -> folder name input (''Untitled folder'' placeholder)'
-  - File detail page -> 'Enter email to invite' input and 'Invite' button
-  - File detail page -> 'Share' button for sharing with other users
+  - '''New'' button (top-left) -> ''New folder'' -> modal with a folder-name text input (''Untitled folder'' placeholder) + ''Create''; POSTs to /api/folders and adds a new root folder. Example: creates a sibling of the existing ''Projects'', ''Personal'', ''Shared'', and ''Archives'' root folders.'
+  - 'File detail page (/file/<id>) Sharing panel -> ''Enter email to invite'' email field + ''Invite'' button; creates a share record whose email does NOT match a user, recorded as an external invited_email. Example: on ''Employee Directory.pptx'' (file 10) invite ''partner@acmecorp.com'' -> a new ''(invited)'' entry appears in the Sharing list.'
+  - 'File detail page (/file/<id>) -> same ''Enter email to invite'' + ''Invite'' form using an existing MeridianCloud account email; creates a share linked to that user (their name/avatar show in the Sharing list). Note: the separate ''🔗 Share'' button only copies the file link to the clipboard, it does not create a share. Example: invite ''marcus.johnson@meridiansystems.com'' -> shares with Marcus Johnson.'
+  delete_by_checkbox:
+  - 'My Drive (/?view=drive) switched to List view -> header ''Select all'' checkbox + per-row checkboxes; checking rows reveals a red ''Delete selected'' button (with ''Clear'') that POSTs every checked file_ids to /files/delete-selected in one request, moving live files to Trash. Example: tick ''Quarterly metrics.csv'' and ''Budget summary updated.csv'' -> Delete selected trashes both at once.'
+  - 'Folder page (/folder/<id>) list -> same ''Select all'' + row checkboxes -> ''Delete selected'' bulk-trashes the checked files in that folder in a single POST. Example: inside ''Projects'' (folder 1), check two files and click Delete selected.'
   delete_from_table:
-  - File rows -> delete action (moves to trash)
-  - Trash page -> permanent delete buttons
+  - 'File detail page (/file/<id>) -> ''🗑 Delete'' button POSTs to /file/<id>/delete, moving a live file to Trash (a file already in Trash is purged permanently); each My Drive list row''s ''⋮'' menu also has a Delete action. Example: open ''Security audit v3.pptx'' (file 423) and click Delete to move it to Trash.'
+  - 'Trash page (/?view=trash) -> per-row ''🗑 Delete permanently'' button (data-url -> /file/<id>/delete) removes an already-trashed file for good. Example: ''Conference slides v3.md'' (file 499), already in Trash, is purged.'
   edit_by_form:
-  - Upload modal -> file type dropdown; main view -> type filter dropdown
-  - File detail page -> sharing form ('Enter email to invite')
+  - 'Upload-file modal ''Type'' dropdown sets a new file''s type (Document, Spreadsheet, Presentation, Image, Code, Note, Archive); the My Drive toolbar ''Type'' dropdown re-filters the current listing to a single type. Example: choose ''Spreadsheet'' to list only .csv files such as ''Quarterly metrics.csv''.'
+  - 'File detail page (/file/<id>) Sharing panel -> ''Enter email to invite'' field + ''Invite'' edits the file''s share list (permission defaults to ''view''; existing shares render ''view''/''edit'' badges, there is no permission selector in the UI form). Example: file 1''s Sharing list shows Priya Sharma (edit) and Marcus Johnson (view).'
   export:
-  - File detail page -> 'Download' button at top of detail view
+  - 'File detail page (/file/<id>) -> ''↓ Download'' button (also on each My Drive row''s ''⋮'' menu) streams the file as an attachment whose content is deterministically generated from its metadata. Example: downloading ''Quarterly metrics.csv'' (file 391) yields a real CSV attachment.'
   filter_by_date_range:
-  - '''MeridianCloud'' page -> ''From'' and ''To'' date fields above file list'
+  - 'My Drive toolbar -> ''From:'' and ''To:'' date inputs + blue ''Filter'' button; keeps only files whose modified_at falls within [date_from, date_to] (the To date covers the whole day). Example: From 2026-03-01 To 2026-03-31 shows only files modified in March 2026.'
   filter_by_dropdown:
-  - '''MeridianCloud'' page -> ''Type'' dropdown (Documents, Spreadsheets, Images, Code, etc.)'
-  - '''MeridianCloud'' page -> sort dropdown (Last modified, Name, File size, Date created)'
+  - 'My Drive toolbar ''Type'' dropdown -> Documents, Spreadsheets, Presentations, Images, Code, Notes, Archives (blank ''Type'' = all); reloads the listing filtered to that type. Example: ''Images'' shows files like ''Offsite agenda FINAL.png''.'
+  - 'My Drive toolbar sort dropdown -> Last modified (default), Name, File size, Date created; reorders the listing. Example: ''File size'' surfaces the largest files, e.g. ''Architecture sketch OLD.png'' (76.1 MB), near the top.'
   navigate_by_route:
-  - '''MeridianCloud'' page -> click file name in file list to view details'
-  - Folder page -> click file in folder listing
-  - Left sidebar -> 'Projects', 'Personal', 'Shared', 'Archives' folder links
-  - '''MeridianCloud'' page -> click folder to open it'
+  - 'My Drive (/) -> click a file''s name in the grid or list to open its detail page (/file/<id>). Example: clicking ''RFC: MeridianFlow API Redesign.docx'' opens /file/1.'
+  - 'Folder page (/folder/<id>) -> click a file in the folder listing to open its detail page. Example: inside ''Projects'' (folder 1) open a file to reach its /file/<id> view.'
+  - 'Left sidebar -> view links ''My Drive'', ''Shared with me'', ''Recent'', ''Starred'', ''Trash'' (each sets ?view=...), switching the listing scope. Note: ''Projects''/''Personal''/''Shared''/''Archives'' are folder chips in the main area, NOT sidebar links.'
+  - My Drive (/) -> click a root folder chip (e.g. 'Projects', 'Personal', 'Shared', 'Archives', 'Engineering') to open /folder/<id> and browse its contents.
   report_information:
-  - '''MeridianCloud'' page -> search returns matching files with type and sort options'
-  - '''MeridianCloud'' page -> ''Type'' dropdown returns filtered files'
-  - File detail page -> file metadata, sharing info, transfer records
+  - 'My Drive ''Search in Drive'' box combined with the Type/sort controls surfaces a filtered, ordered file set to read off (name, type, size, modified date). Example: report that ''Architecture sketch OLD.png'' is the largest image at 76.1 MB.'
+  - 'My Drive toolbar ''Type'' dropdown returns the filtered file set for counting or reading. Example: filter ''Presentations'' (.pptx) then count how many exist.'
+  - 'File detail page (/file/<id>) surfaces file metadata (size, type, owner, modified date), the Sharing list (who + permission) and File Transfers (recipient email, status, download count). Example: file 1 is shared with Priya Sharma (edit) and Marcus Johnson (view).'
   search:
-  - '''MeridianCloud'' page -> ''Search in Drive'' field at top'
-  - '''MeridianCloud'' page -> ''Search in Drive'' field with file results'
+  - 'Top header ''Search in Drive'' field (name=q) -> GET on My Drive; case-insensitive substring match on file name/path lists all matches. Example: searching ''architecture'' returns ''Architecture sketch (final).docx'' and ''Architecture sketch OLD.png''.'
+  - 'Same ''Search in Drive'' field returning the result listing, combinable with the Type/sort controls. Example: ''audit'' -> ''Security audit v3.pptx''.'
   share_by_form:
-  - File detail page -> 'Share' button with permission controls
+  - 'File detail page (/file/<id>) Sharing panel -> ''Enter email to invite'' field + ''Invite'' button creates a share for the file (matches an existing user by email, otherwise records an external invited_email; permission defaults to ''view''). The separate ''🔗 Share'' button only copies the file''s link to the clipboard. Example: invite ''marcus.johnson@meridiansystems.com'' on ''Employee Directory.pptx'' (file 10) to share with Marcus Johnson.'
   sort_by_form:
-  - '''MeridianCloud'' page -> sort dropdown (Last modified, Name, File size, Date created)'
+  - 'My Drive / Folder toolbar sort dropdown -> Last modified (default), Name, File size, Date created; reorders the file listing at the SQL level (ORDER BY). Folder chips / subfolders stay grouped ahead of files, so sorting is folder-preserving. Example: ''Name'' orders files A->Z.'
   toggle_relationship:
-  - File rows -> star/unstar toggle button (filled/empty star icon)
-  - Starred page -> unstar button
+  - 'Star button (☆/★) on My Drive grid cards and list rows (POST /file/<id>/star) toggles a file''s favorite state; starred files appear under Starred (?view=starred). Example: star ''Quarterly metrics.csv'' -> it joins Starred alongside ''Dashboard Wireframes v2.fig''.'
+  - 'Starred page (/?view=starred) -> click a filled star to unstar and drop the file from Starred. Example: unstar ''RFC: MeridianFlow API Redesign.docx'' (file 1).'
   upload_file:
-  - '''File upload'' button -> file name, type dropdown, size, and upload'
+  - '''New'' button -> ''File upload'' -> modal with a ''File name'' text field, a ''Type'' dropdown (Document, Spreadsheet, Presentation, Image, Code, Note, Archive), and a ''Size in bytes'' number field + ''Upload'' button (POST /api/upload creates a file entry). Example: name ''Q3 report'', type Spreadsheet, size 1048576 -> a new file appears at the top of My Drive.'
 code-editor-execution:
   configure_by_form:
-  - '''Editor'' page -> font size slider in editor settings'
+  - 'Settings page (/settings, nav ''Settings'') -> ''Editor Settings'' form that persists the logged-in user''s editor preferences on Save Settings. Fields: ''Font Size (px)'' number input (min 8, max 32; default 14), ''Tab Size (spaces)'' select with options 2 / 4 / 8 (default 4), and ''Theme'' select with options Dark / Light (default dark). Submitting shows ''Settings saved successfully.'' and updates the ''Current settings:'' line. (The Editor toolbar also has a transient Font Size range slider 8-28 and Tab Size select 2/4/8, but that only restyles the current page and does not persist.) Example: as Alex Rivera, set Font Size to 18, Tab Size to 2, Theme to Light, and Save.'
   create_by_form:
-  - '''Editor'' page -> code editor textarea with syntax highlighting'
+  - 'Upload Snippet page (/upload, nav ''Upload Snippet'') -> ''Upload New Snippet'' form that creates a brand-new persisted snippet. Fields: ''Title'' text (required), ''Python Code'' textarea (required, monospace), ''Description'' text, ''Category'' text (prefilled ''custom''), and ''Difficulty'' select Easy / Medium / Hard (default Medium). On submit a new snippet is appended (language is always ''python'') and a success banner ''Snippet <title> created with ID <n>.'' links to the new snippet. Example: create title ''Square Numbers'', code print([n*n for n in range(1,6)]), category ''math'', difficulty Easy -> becomes snippet #387.'
   edit_by_form:
-  - '''Editor'' page -> code content textarea with run/save buttons'
+  - 'Editor page (/editor?snippet_id=<id>, reached via a snippet''s ''Run in Editor'' / ''Open in Editor'' link) -> large ''Python 3'' code textarea pre-filled with the selected snippet''s code and syntax-highlighted. You modify the code in-place and press the green ''Run Code'' button to execute it (POST /api/execute, 5s timeout, dangerous imports like os/sys/open() blocked); output and ''Exit code: N'' appear in the right Output panel. Note: editing here re-executes the code but the frontend has no button to overwrite the stored snippet. Example: open snippet #4 ''Bubble Sort'' (sorting/medium) in the editor, change the input list, and Run Code.'
   navigate_by_route:
-  - '''CodeRunner'' gallery -> click snippet card (Hello World, Fibonacci, etc.)'
-  - Dashboard -> click saved snippet to view
-  - Top nav -> 'Gallery', 'Editor' links; user name -> Dashboard
-  - '''CodeRunner'' gallery -> ''Run in Editor'' or ''View'' links per snippet'
+  - 'Gallery / landing page (/, ''>_ CodeRunner'') -> click a snippet card title to open its detail page. Cards render real snippets such as #1 ''Hello World'' (basics/easy), #2 ''Fibonacci Sequence'' (algorithms/easy), #4 ''Bubble Sort'' (sorting/medium). Example: click ''Fibonacci Sequence'' -> /snippet/2.'
+  - 'Dashboard page (/dashboard, requires login) -> ''Saved Snippets'' section lists the current user''s saved items as links; click one to view its detail page. Example: Alex Rivera''s dashboard lists Hello World (#1), FizzBuzz (#7), and List Comprehension Examples (#12); click any to open it, or its ''Run'' link to open it in the editor.'
+  - 'Top nav bar (present on every page) -> ''Gallery'', ''Editor'', ''Upload Snippet'', ''Export'' links; when logged in, ''Dashboard (<name>)'', ''Settings'', and ''Logout''; when logged out, ''Login / Sign In''. Example: as Alex Rivera, click ''Dashboard (Alex Rivera)'' to reach /dashboard, or ''Editor'' to open a blank /editor.'
+  - 'Gallery snippet card action row -> per-card ''Run in Editor'' link (opens /editor?snippet_id=<id> with the code loaded) and ''View'' link (opens /snippet/<id>). Example: on the ''Prime Number Sieve'' card (#9, algorithms/medium) click ''Run in Editor'' to load it into the editor.'
   report_information:
-  - Dashboard -> saved snippets table (title, language, difficulty)
+  - 'Dashboard page (/dashboard) -> read and report the user''s stats and saved list: the two stat tiles ''Saved Snippets'' and ''Executions'' (counts), the ''Editor Settings'' summary table (Font Size / Tab Size / Theme, showing ''default (14)'' etc. when unset), the ''Saved Snippets'' list (each row shows title plus ''category / difficulty'', e.g. ''Hello World -- basics / easy''), and ''Recent Execution History'' rows. Example: report that Alex Rivera has 3 saved snippets, all defaults for settings, and that his saved list is Hello World, FizzBuzz, List Comprehension Examples.'
   search:
-  - '''CodeRunner'' gallery -> ''Search snippets by title, description, or category...'' field'
+  - 'Gallery page (/) search bar -> text input ''Search snippets by title, description, or category...'' with a ''Search'' button (GET ?q=). Matches case-insensitively against a snippet''s title, description, or category; combinable with the Category (13 real values: algorithms, basics, conversions, data-structures, datetime, itertools, math, oop, parsing, projects, regex, sorting, strings), Difficulty (easy/medium/hard), and Sort (Default/Title A-Z/Difficulty/Category) selects below it. The result count ''N snippets found'' updates. Example: search ''sort'' to surface ''Bubble Sort'' (#4) among the matches.'
   share_by_form:
-  - '''Editor'' page -> ''Share Snippet'' button; Snippet page -> ''Share'' button'
+  - 'Snippet detail page (/snippet/<id>) -> yellow ''Share'' button, and Editor page (/editor?snippet_id=<id>) -> purple ''Share Snippet'' button (only shown when a snippet is loaded). Both call GET /api/share/<id>, which returns a share_token and a share_url (/sites/code-editor-execution/editor?snippet_id=<id>); the link is copied to the clipboard and displayed. Example: on snippet #2 ''Fibonacci Sequence'', click ''Share'' to generate its shareable editor link.'
 comparison-aggregators:
   filter_by_dropdown:
   - '''PhoneCompare'' page -> brand and OS dropdowns in the filter bar'
@@ -668,10 +671,6 @@ dating:
   - Login page -> username and password fields
   configure_by_form:
   - '''Edit Profile'' page -> ''Looking for'' dropdown, ''Gender Preference'' dropdown'
-  create_by_form:
-  - '''Edit Profile'' page -> ''Bio'' textarea'
-  - '''Edit Profile'' page -> form submit to update profile'
-  - 'Register page (/register, linked from login) -> signup form: username, password, name, age, gender, location, bio, interests, looking_for, gender preference'
   edit_by_form:
   - '''Edit Profile'' page -> ''Location'', ''Interests'', ''Bio'' fields, ''Looking for'' and ''Gender Preference'' dropdowns'
   feedback_by_react:
@@ -679,7 +678,7 @@ dating:
   - '''Likes You'' page -> ''Like back'' / ''Pass'' buttons on pending likes'
   - '''Spark'' page -> heart (like) and X (pass) buttons on profile cards'
   filter_by_date_range:
-  - '''Spark'' page -> ''Joined From'' and ''To'' date fields in filter bar'
+  - '''Matches'' page -> ''From'' and ''To'' date fields above the conversation list (narrows matches to those with messages in the range)'
   filter_by_dropdown:
   - '''Spark'' page -> ''Looking for'' dropdown in the Discovery Filters bar'
   - Profiles page -> filter form with gender and looking_for dropdowns
@@ -810,39 +809,39 @@ documents:
   - '''DocEdit'' page -> ''Upload File'' button in sidebar'
 e-commerce:
   cancel_by_form:
-  - '''Orders'' page -> ''Cancel Order'' button on each non-shipped order'
+  - "'Orders' page (/sites/e-commerce/orders) -> red 'Cancel Order' button shown on each order whose status is NOT shipped/delivered/cancelled (i.e. 'processing' orders); clicking pops a 'Cancel order ORD-...?' confirm and flips the order status to 'cancelled'. Orders are created at checkout with IDs like ORD-20260813-001. Example: place an order for the 'Adjustable Cell Phone Stand, Lamicall Desk Phone Holder', then go to Orders and cancel that order, and report its new status."
   checkout_by_form:
-  - '''Checkout'' page -> checkout form with shipping address, shipping method, and payment fields'
-  - '''Cart'' page -> promo code entry input with ''Apply'' button in the order summary showing applied discount'
+  - "'Checkout' page (/sites/e-commerce/checkout, reachable from the Cart) -> single checkout form with three sections: (1) Shipping Address (Full Name, Street, City, State, ZIP - full name/street/city/ZIP required), (2) Shipping Method radios (Standard - FREE, 5-7 business days / Express - $9.99, 2 business days / Overnight - $24.99, next business day), (3) Payment 'Pay with' dropdown (Checking Account / Credit Card); the 'Place Your Order' button submits and routes to 2FA verification. The order summary adds the shipping cost to the cart subtotal. Example: add the 'Anker 10W Max Wireless Charger, 2 Pack' ($25.99) to cart, check out with Express Shipping, and report the final total including shipping ($35.98)."
+  - "'Cart' page (/sites/e-commerce/cart) -> 'Promo Code' text input with an 'Apply' button in the order summary. Valid codes are SAVE10 (10% off), WELCOME5 (5% off), SHOP20 (20% off); anything else shows 'Invalid promo code.' and a valid code shows 'Code X applied: -$Y' with the discount. Example: add the 'BOLSIUS Tea Lights Candles - Pack of 100' ($24.98) to cart, apply promo code SHOP20, and report the discount amount."
   configure_by_form:
-  - '''ShopHub'' page -> ''Min $'' input and ''Max Price'' slider for price range'
+  - "'ShopHub' storefront (/sites/e-commerce, left sidebar 'Price Range') -> 'Min $' number input (step 0.01, min 0) combined with the 'Max Price' range slider (0-2000, step 10) to set a price window on the product grid. Prices across the 500 products span $1.00 to $967.76. Example: set Min $ to 500 and leave Max at Any to surface only premium items like the 'ZEFS--ESD Mini Projector for Movies D29' ($967.76) and 'Mayton 12-Inch King Size Mattress' ($884.03), and report how many products fall in that range."
   create_by_form:
-  - Product detail and listing pages -> 'Add to Cart' button
+  - "Product detail page (/sites/e-commerce/product/<id>) and product cards -> 'Add to Cart' button; on the detail page a 'Qty:' dropdown (1-10) sets the quantity first. Adds the item to the logged-in user's cart (creating a cart line item). Example: open 'Adjustable Cell Phone Stand, Lamicall Desk Phone Holder' ($12.99), choose Qty 3, click Add to Cart, and report the cart subtotal ($38.97)."
   filter_by_dropdown:
-  - '''ShopHub'' page -> ''All Categories'', ''All Brands'', ''Any Rating'' dropdowns in sidebar'
+  - "'ShopHub' storefront (/sites/e-commerce, left sidebar) -> three dropdowns: Category ('All Categories' plus the 15 real categories: Automotive, Baby Products, Beauty & Personal Care, Cell Phones & Accessories, Clothing Shoes & Jewelry, Electronics, Grocery & Gourmet Food, Health & Household, Home & Kitchen, Office Products, Other, Patio Lawn & Garden, Sports & Outdoors, Tools & Home Improvement, Video Games), Brand ('All Brands' plus ~464 brands e.g. Anker, Sony, Canon, Dell, Nike, Lamicall, BOLSIUS), and Rating ('Any Rating' / 4+ Stars / 3+ Stars / 2+ Stars / 1+ Stars). Each narrows the product grid. Example: filter Category to 'Beauty & Personal Care' (113 products) and report how many products remain."
   filter_by_options:
-  - '''ShopHub'' page -> category checkboxes in left sidebar filter panel'
+  - "'ShopHub' storefront (/sites/e-commerce, left sidebar 'Categories' panel) -> multi-select category checkboxes (one per real category: Electronics (82), Beauty & Personal Care (113), Home & Kitchen (89), Clothing Shoes & Jewelry (104), Grocery & Gourmet Food (50), etc.); ticking several combines them so the grid shows products matching ANY checked category. Example: check both 'Electronics' and 'Cell Phones & Accessories' and report the combined product count shown."
   filter_by_slider:
-  - '''ShopHub'' page -> ''Max Price'' slider in left sidebar filter panel'
+  - "'ShopHub' storefront (/sites/e-commerce, left sidebar 'Price Range') -> 'Max Price' range slider (min 0, max 2000, step 10; the max end reads 'Any'). Dragging it caps the product grid to items at or below that price. Products range $1.00-$967.76. Example: drag Max Price to $20 and report how many products remain (surfacing cheap items like the 'Adjustable Cell Phone Stand' at $12.99)."
   navigate_by_route:
-  - '''ShopHub'' page -> click product card to view details'
+  - "'ShopHub' storefront (/sites/e-commerce) -> click any product card (or a category link in the top nav) to open its detail page at /sites/e-commerce/product/<id>. Example: navigate to the 'iPad Case Fit 2018/2017 iPad 9.7 6th/5th Generation' product page and report its brand (CenYouful) and price ($12.99)."
   pay_by_form:
-  - '''Checkout'' page -> shipping address fields (full name, street, city, state, ZIP), shipping method radios (Standard/Express/Overnight), ''Pay with'' dropdown, and ''Place Your Order'' button'
+  - "'Checkout' page (/sites/e-commerce/checkout) -> shipping address fields (Full Name, Street, City, State, ZIP), Shipping Method radios (Standard FREE / Express $9.99 / Overnight $24.99), 'Pay with' dropdown (Checking Account / Credit Card), and the yellow 'Place Your Order' button which submits the payment and hands off to the 2FA verification flow before the order is finalized. Example: check out a cart containing the 'KontrolFreek FPS Freek Inferno for Xbox One' ($12.99) using Standard Shipping paid from the Checking Account, and report the order total ($12.99, free shipping)."
   report_information:
-  - '''ShopHub'' page -> category/brand dropdown returns filtered products'
-  - Product detail page -> full product info, reviews, pricing
-  - '''ShopHub'' page -> sort dropdown for ranking products by rating or price'
-  - '''ShopHub'' page -> sort dropdown allows price sorting to find extremes'
-  - Product detail page -> specs display with 'Add to Cart' and 'Wishlist' buttons
-  - Product detail page -> product info with category, rating, and specs
+  - "'ShopHub' storefront (/sites/e-commerce) -> after applying a Category/Brand/Rating filter, the grid header shows the filtered product set to read off. Example: filter Brand to 'Anker' and report the product names and prices returned."
+  - "Product detail page (/sites/e-commerce/product/<id>) -> full product info: name, brand, price, star rating with review count, description, and the reviews list below. Example: open the 'BOLSIUS Tea Lights Candles - Pack of 100 White' page and report its rating (4.8) and total review count (12,515)."
+  - "'ShopHub' storefront (/sites/e-commerce, 'Sort by' dropdown) -> rank products by 'Avg. Rating' or 'Most Reviews' to read a leaderboard. Example: sort by Most Reviews and report the top product ('Adjustable Cell Phone Stand, Lamicall Desk Phone Holder', 30,214 reviews)."
+  - "'ShopHub' storefront (/sites/e-commerce, 'Sort by' dropdown) -> 'Price: Low to High' / 'Price: High to Low' surface the price extremes to report. Example: sort by Price: High to Low and report the single most expensive product ('ZEFS--ESD Mini Projector for Movies D29', $967.76)."
+  - "Product detail page (/sites/e-commerce/product/<id>) -> specs/description block alongside the 'Add to Cart' (with Qty dropdown) and 'Add to Wishlist' buttons; read the specs while deciding to act. Example: on the 'Anker 10W Max Wireless Charger, 2 Pack' page report the price ($25.99) and whether it is in the Cell Phones & Accessories category."
+  - "Product detail page (/sites/e-commerce/product/<id>) -> product info showing category breadcrumb, star rating, and reviews. Example: report the category, rating, and number of on-page reviews for the 'iPad Case Fit 2018/2017 iPad 9.7' listing."
   search:
-  - '''ShopHub'' page -> ''Search products...'' field at top'
-  - '''ShopHub'' page -> ''Search products...'' field with results'
+  - "'ShopHub' storefront (/sites/e-commerce) -> 'Search products...' field in the top header; a keyword query matches product name, brand, description, and category (ranked by number of matching terms). Example: search 'wireless charger' and report the top result ('Anker 10W Max Wireless Charger, 2 Pack', $25.99)."
+  - "'ShopHub' storefront (/sites/e-commerce) -> 'Search products...' field returns a filtered results grid that can then be sorted/filtered further. Example: search 'projector' and report how many results appear (includes the 'ZEFS--ESD Mini Projector' at $967.76 and '01 Video Projector, LED Projector Outdoor 1080P HD' at $138.49)."
   sort_by_form:
-  - '''ShopHub'' page -> ''Sort by'' dropdown (Relevance, Price Low-High, Price High-Low, Avg. Rating, Most Reviews)'
+  - "'ShopHub' storefront (/sites/e-commerce, bottom of sidebar) -> 'Sort by' dropdown with options: Relevance (default), Price: Low to High, Price: High to Low, Avg. Rating, Name: A-Z, Most Reviews; selecting one reorders the product grid immediately. Example: sort by 'Avg. Rating' and report the name of the top-ranked product."
   toggle_relationship:
-  - Product detail -> 'Add to Wishlist' button
-  - '''Wishlist'' page -> ''Remove from Wishlist'' button'
+  - "Product detail page (/sites/e-commerce/product/<id>) -> orange 'Add to Wishlist' button that toggles to 'Remove from Wishlist' once saved, adding the product to the logged-in user's wishlist. Example: add the 'Home Dynamix Lyndhurst Rotana Modern Area Rug' to your wishlist and confirm it appears on the Wishlist page."
+  - "'Wishlist' page (/sites/e-commerce/wishlist) -> each saved item has a 'Remove from Wishlist' control that toggles the product off the list. Example: remove the 'Anker 10W Max Wireless Charger, 2 Pack' from the wishlist and report how many items remain."
 email:
   authenticate_by_form:
   - Login page -> username and password fields
@@ -955,47 +954,60 @@ forms-surveys:
   - Form detail page -> 'Attachments' file input with 'Upload File' button
 forums:
   authenticate_by_form:
-  - Login page -> username and password fields
+    - "Login page (/sites/forums/login) -> 'Username' and 'Password' fields, then Log In button; signs the visitor in as an existing ForumHub member. Registered accounts are cascadia_coder, marcus_climbs, sophie_designs, lakeport_hoops, mia_rescues, syncwave_jake (all use the password 'password'). Example: log in as marcus_climbs with password 'password'."
+
   create_by_form:
-  - '''Create a post'' page -> ''Community'' dropdown, ''Title'' input, ''Body'' textarea'
-  - '''Create a post'' page -> post creation form and submit'
-  - '''Create a post'' page -> form submit to create new post'
-  - Register page -> username and password fields
+    - "'Create a post' page (/sites/forums/submit) -> 'Community' dropdown (choose from real subreddits like AskReddit, memes, wallstreetbets, worldnews, gaming), 'Title' input (max 300 chars, required), 'Body' textarea (optional), 'Flair' input (optional, e.g. Discussion, Question, OC); submitting creates a new post and opens its detail page. Example: post to r/gaming titled 'Best co-op games for a rainy weekend?' with flair 'Discussion'."
+    - "'Create a post' page (/sites/forums/submit) -> fill the community/title/body form and click the submit button to publish a new post under your username. Example: create a post in r/personalfinance titled 'How I paid off my student loans in 3 years'."
+    - "'Create a post' page (/sites/forums/submit) -> form submit that adds a new thread to the chosen community's feed. Example: submit a post to r/technology titled 'Thoughts on the new open-source LLM release?'."
+    - "Register page (/sites/forums/register) -> 'Username' and 'Password' fields, then Sign Up button; creates a brand-new ForumHub account and logs you in (username must be unique - existing ones like cascadia_coder are rejected). Example: register a new account with username 'trailmix_dev' and password 'hunter2'."
+
   delete_from_table:
-  - Post detail page -> Delete action on post
+    - "Post detail page (/sites/forums/post/<id>) -> 'Delete' action in the post action row (only on your own posts); removes the post and all of its comments. Example: open your post in r/AskReddit and delete it."
+
   edit_by_form:
-  - Post detail page -> inline edit textarea for post body
+    - "Post detail page (/sites/forums/post/<id>) -> inline edit form (Save / Cancel buttons) that rewrites the post's title, body, or flair (only on your own posts). Example: edit one of your posts to append '[EDIT: solved, thanks all]' to the body."
+
   feedback_by_react:
-  - Post detail -> upvote/downvote arrow buttons
-  - Comments -> upvote/downvote arrow buttons
+    - "Post feed and post detail page -> upvote (↑) / downvote (↓) arrow buttons beside each post that adjust its score by one; clicking the same arrow again clears your vote. Example: upvote the r/memes post 'Which of the following fruits will be the 2nd most popular?' (currently ~56.7k score)."
+    - "Post detail page -> upvote (↑) / downvote (↓) arrows on each comment in the thread, adjusting that comment's score. Example: upvote Halfevil_2002's top comment 'Reverse psychology. Just vote for what you think will win.'"
+
   filter_by_date_range:
-  - '''ForumHub'' page -> ''From'' and ''To'' date fields below sort controls'
+    - "'ForumHub' home feed (/sites/forums/?date_from=&date_to=) -> 'From' and 'To' date bounds applied to the post feed (compared against each post's created_utc); returns only posts created within that window, newest first. Example: show posts created between 2022-11-01 and 2022-11-30."
+
   filter_by_dropdown:
-  - '''ForumHub'' page -> ''Subreddit'' dropdown'
+    - "'ForumHub' home feed (/sites/forums/?subreddit=<name>) and the left-rail community links -> restrict the feed to a single subreddit chosen from the real communities (AskReddit ~10k posts, relationship_advice ~5.7k, worldnews, news, movies, memes, wallstreetbets, gaming, technology, pics). Example: filter the feed to only r/wallstreetbets posts."
+
   message_from_free_text:
-  - '''Messages'' page -> compose message form (recipient, subject, body)'
+    - "'Messages' page (/sites/forums/messages) -> 'New Message' compose form with 'Enter username' (recipient), 'Subject', and message body fields; sends a direct message to another member (blocked recipients are rejected). Example: message sophie_designs with subject 'Design collab?' and a short body asking to team up."
+
   navigate_by_route:
-  - '''ForumHub'' page -> ''Search ForumHub'' field in header'
-  - '''ForumHub'' page -> click post title to view post and comments'
-  - '''ForumHub'' page -> click subreddit link (r/memes, r/aww, etc.) to view community'
-  - Top nav -> 'Messages' link; post form -> 'Submit' link
+    - "'ForumHub' topbar -> 'Search ForumHub' field that navigates to the search results page for the typed query. Example: search 'interest rates' to jump to matching posts."
+    - "Post feed -> click a post's title to open its detail page with the full body and threaded comments. Example: click 'Lovely eyes full of love' in r/aww to view the post."
+    - "Post feed / left rail -> click a subreddit link (r/AskReddit, r/memes, r/aww, r/EarthPorn, etc.) to open that community's page. Example: open r/EarthPorn to browse its top posts."
+    - "Topbar -> 'Messages' link opens the inbox; a post's author link (u/<name>) opens their profile. Example: navigate to u/ThetaGang_wsb's profile from one of their wallstreetbets posts."
+
   report_information:
-  - '''Search'' page -> search results list'
-  - '''ForumHub'' page -> ''Subreddit'' dropdown returns filtered posts'
-  - Post detail page -> full post content and comments thread
-  - User profile page -> user posts, karma, activity
+    - "'Search' results page (/sites/forums/search?q=) -> read back the ranked list of matching posts (title, community, score, comment count). Example: report the top result and its score when searching 'Federal Reserve'."
+    - "'ForumHub' feed filtered by community (?subreddit=<name>) -> report facts from the filtered post list. Example: report the highest-scoring post currently in r/relationship_advice."
+    - "Post detail page (/sites/forums/post/<id>) -> read the full post body and its comment thread. Example: report how many comments the r/memes post 'Which of the following fruits will be the 2nd most popular?' has, or quote its top comment."
+    - "User profile page (/sites/forums/user/<username>) -> read the member's posts, karma (post + comment), and cake day. Example: report cascadia_coder's total karma (28,450) or list their recent posts."
+
   search:
-  - '''ForumHub'' page -> ''Search ForumHub'' field at top'
-  - Search page -> search form
-  - '''Search'' page -> ''Search ForumHub'' field'
+    - "'ForumHub' topbar 'Search ForumHub' field -> full-text search across post titles and bodies (FTS5/BM25), opening the results page. Example: search 'student loans' to find personalfinance discussions."
+    - "Search page (/sites/forums/search) -> search form with a query box and Top/New/Hot sort links over the results. Example: search 'Federal Reserve interest rates' and sort results by Top."
+    - "'Search' results page 'Search ForumHub' field -> refine or re-run a keyword search across all communities. Example: search 'pumpkin carving' to surface the r/Art posts."
+
   share_by_form:
-  - Post detail page -> 'Share' button with 'Copy Link' and 'Crosspost' options
+    - "Post detail page (/sites/forums/post/<id>) -> '↗ Share' button opening a menu with 'Copy Link', 'Crosspost', and 'Send as Message' options; Crosspost re-posts to a chosen subreddit and Send as Message DMs the link to a user. Example: open the r/aww post 'Lovely eyes full of love' and crosspost it to r/pics."
+
   sort_by_form:
-  - '''ForumHub'' page -> ''Hot'', ''New'', ''Top'' sort tabs above posts'
+    - "'ForumHub' feed (and community pages) -> '🔥 Hot', '✦ New', '↑ Top' sort tabs above the posts; Top orders by score, New by recency, Hot approximates trending. Example: switch the r/AskReddit feed to 'Top' to see the highest-scoring threads first."
+
   toggle_relationship:
-  - User profile page -> 'Follow' button
-  - '''ForumHub'' page -> ''Save'' button on each post'
-  - User profile page -> 'Block' button
+    - "User profile page (/sites/forums/user/<username>) -> 'Follow' button (toggles to 'Following') to follow/unfollow that member. Example: follow u/Practiccount from their profile."
+    - "Post feed and post detail -> 'Save' button on a post that adds/removes it from your saved list. Example: save the r/wallstreetbets post 'How much will the Federal Reserve raise interest rates in November?'."
+    - "User profile page -> 'Block' button (toggles to 'Blocked') to block/unblock a member, which also prevents messaging. Example: block u/SashaGreatest from their profile."
 handwritten-notes-whiteboards:
   configure_by_form:
   - Note editor -> brush size slider in the drawing toolbar (1-10)
@@ -1010,7 +1022,8 @@ handwritten-notes-whiteboards:
   edit_by_form:
   - Edit note page -> form with title, content, tags, color, notebook
   edit_by_image:
-  - Note page -> drawing canvas area for visual content
+  - Note image -> 'Edit image' button -> image editor with crop/resize/contrast/vibrance
+    tools -> Apply (posts {op, params} to /note/<id>/image/edit)
   edit_by_ranking:
   - '''All Notes'' list -> sort and tag filter controls'
   navigate_by_route:
@@ -1119,8 +1132,6 @@ instant-messaging:
   - Chat panel -> 'x' delete button per message
   edit_by_form:
   - Conversation page -> pencil button on sent messages opens inline edit form (text input + Save/Cancel)
-  filter_by_date_range:
-  - '''QuickChat'' page -> ''From'' and ''To'' date fields below search'
   filter_by_dropdown:
   - Chat sidebar -> search field for finding specific chats
   join_meeting:
@@ -1930,6 +1941,10 @@ ticketing-events:
   - '''LakeportEvents'' page -> ''Search events, venues, organizers...'' field at top'
   - '''LakeportEvents'' page -> search with category-based filtering'
   - '''LakeportEvents'' page -> search filters events by keyword'
+  search_by_scroll:
+  - '''LakeportEvents'' page -> scroll the events feed (275 events, open-for-registration
+    first) until the target event is reached; the feed appends more events as you
+    scroll'
   sort_by_form:
   - '''LakeportEvents'' page -> ''Sort by'' dropdown (Date Soonest, Date Latest, Price, Name A-Z)'
   toggle_relationship:

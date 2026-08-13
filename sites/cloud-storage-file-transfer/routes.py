@@ -333,23 +333,24 @@ def folder_view(folder_id):
         abort(404)
 
     user = _current_user()
-    files = _load_files()
     users = _load_users()
     user_map = {u["id"]: u for u in users}
 
-    # Files in this folder
-    folder_files = [f for f in files if f.get("folder_id") == folder_id
-                    and not f.get("is_trashed", False)]
-
+    # Files in THIS folder only, filtered + sorted at the SQL level (per CLAUDE.md):
+    # WHERE keeps us in the current folder, ORDER BY reorders its contents.
     sort = request.args.get("sort", "modified").strip()
-    if sort == "name":
-        folder_files.sort(key=lambda f: f["name"].lower())
-    elif sort == "size":
-        folder_files.sort(key=lambda f: f.get("size_bytes", 0), reverse=True)
-    elif sort == "created":
-        folder_files.sort(key=lambda f: f.get("created_at", ""), reverse=True)
-    else:
-        folder_files.sort(key=lambda f: f.get("modified_at", ""), reverse=True)
+    sort_map = {
+        "name": "name",
+        "size": "-size_bytes",
+        "created": "-created_at",
+        "modified": "-modified_at",
+    }
+    order = sort_map.get(sort, "-modified_at")
+    folder_files = db.query(
+        SITE, "files",
+        where={"folder_id": folder_id, "is_trashed": 0},
+        sort=order,
+    )
 
     # Subfolders
     subfolders = _get_subfolders(folder_id, folders)
@@ -966,6 +967,53 @@ def form_file_delete(file_id):
         file["modified_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         _save_files(files)
         return redirect(url_for("cloud-storage-file-transfer.index"))
+
+
+@blueprint.route("/files/delete-selected", methods=["POST"])
+def form_files_delete_selected():
+    """Bulk delete (delete_by_checkbox): trash/permanently-delete every checked
+    file id in ONE request.
+
+    Mirrors the single-delete semantics per file (see form_file_delete): a live
+    file is moved to trash; an already-trashed file is permanently removed. Ids
+    come from the ``file_ids`` form field (repeated, one per checked row).
+
+    Persists per item straight to the session overlay via db.get_item /
+    db.save_item / db.delete_item — no full-table load (per CLAUDE.md)."""
+    raw_ids = request.form.getlist("file_ids") or request.form.getlist("file_ids[]")
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    trashed, purged = [], []
+    seen = set()
+    for raw in raw_ids:
+        try:
+            fid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if fid in seen:
+            continue
+        seen.add(fid)
+        file = db.get_item(SITE, "files", fid)
+        if file is None:
+            continue
+        if file.get("is_trashed", False):
+            db.delete_item(SITE, "files", fid)
+            purged.append(fid)
+        else:
+            file["is_trashed"] = True
+            file["modified_at"] = now
+            db.save_item(SITE, "files", fid, file)
+            trashed.append(fid)
+
+    # AJAX callers (fetch) get JSON; plain form posts get a redirect back to the
+    # listing they came from.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" \
+            or "application/json" in (request.headers.get("Accept") or ""):
+        return jsonify({"trashed": trashed, "purged": purged,
+                        "count": len(trashed) + len(purged)})
+    nxt = request.form.get("next", "").strip()
+    if nxt.startswith("/sites/cloud-storage-file-transfer/"):
+        return redirect(nxt)
+    return redirect(url_for("cloud-storage-file-transfer.index"))
 
 
 @blueprint.route("/file/<int:file_id>/rename", methods=["POST"])

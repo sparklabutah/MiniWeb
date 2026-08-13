@@ -182,6 +182,46 @@
         @media (max-width: 480px) {
             .notes-grid { grid-template-columns: 1fr; }
         }
+
+        /* ---- Upload image widget ---- */
+        .upload-widget { margin-top: .5rem; }
+        .upload-dropzone {
+            display: flex; flex-direction: column; align-items: center; gap: .3rem;
+            padding: .7rem .5rem;
+            border: 1.5px dashed var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-page);
+            cursor: pointer; text-align: center;
+            transition: border-color .15s, background .15s;
+        }
+        .upload-dropzone:hover, .upload-dropzone.dragover { border-color: var(--amber); background: var(--amber-50); }
+        .upload-dropzone svg { width: 20px; height: 20px; color: var(--text-muted); }
+        .upload-dropzone .up-label { font-size: .75rem; font-weight: 600; color: var(--text-secondary); }
+        .upload-dropzone .up-hint { font-size: .65rem; color: var(--text-muted); }
+        .upload-widget input[type=file] { display: none; }
+        .upload-filename {
+            font-size: .72rem; color: var(--text-primary); font-weight: 500;
+            margin-top: .35rem; word-break: break-all; display: none;
+        }
+        .upload-preview { display: none; margin-top: .4rem; }
+        .upload-preview img {
+            max-width: 100%; max-height: 120px; border-radius: var(--radius);
+            border: 1px solid var(--border); display: block;
+        }
+        .upload-msg {
+            font-size: .7rem; margin-top: .35rem; display: none;
+            padding: .35rem .5rem; border-radius: var(--radius);
+        }
+        .upload-msg.error { display: block; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
+        .btn-upload {
+            width: 100%; margin-top: .4rem; padding: .4rem;
+            font-size: .8rem; font-weight: 600;
+            background: var(--amber); color: #fff;
+            border: none; border-radius: var(--radius);
+            cursor: pointer; transition: background .15s;
+        }
+        .btn-upload:hover:not(:disabled) { background: var(--amber-dark); }
+        .btn-upload:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -220,10 +260,101 @@
             {% if user %}
             <div class="sidebar-section" style="padding: 0 .75rem .5rem;">
                 <a href="{{ url_for('handwritten-notes-whiteboards.note_new_page') }}" class="btn-new" style="display:block;text-align:center;padding:.5rem;font-size:.85rem;">+ New Note</a>
-                <form method="POST" enctype="multipart/form-data" action="{{ url_for('handwritten-notes-whiteboards.form_upload_image') }}" style="margin-top:.4rem;">
-                    <input type="file" name="file" accept="image/*" style="font-size:.75rem;width:100%;margin-bottom:.3rem;">
-                    <button type="submit" style="width:100%;padding:.35rem;font-size:.8rem;background:var(--bg-page);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;">Upload Image</button>
+                <form method="POST" enctype="multipart/form-data" action="{{ url_for('handwritten-notes-whiteboards.form_upload_image') }}" class="upload-widget" id="upload-form">
+                    <label class="upload-dropzone" id="upload-dropzone" for="upload-file-input">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+                        <span class="up-label">Choose an image</span>
+                        <span class="up-hint">or drag &amp; drop &middot; PNG, JPG</span>
+                    </label>
+                    <input type="file" name="file" id="upload-file-input" accept="image/*">
+                    <div class="upload-filename" id="upload-filename"></div>
+                    <div class="upload-preview" id="upload-preview"><img id="upload-preview-img" alt="Preview"></div>
+                    <div class="upload-msg {{ 'error' if upload_error }}" id="upload-msg">
+                        {% if upload_error == '2' %}That file is not an image. Please choose a PNG or JPG.
+                        {% elif upload_error %}Please choose an image file before uploading.
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn-upload" id="upload-btn" disabled>Upload Image</button>
                 </form>
+                <script>
+                (function () {
+                    var form = document.getElementById('upload-form');
+                    if (!form) return;
+                    var input = document.getElementById('upload-file-input');
+                    var dropzone = document.getElementById('upload-dropzone');
+                    var btn = document.getElementById('upload-btn');
+                    var nameEl = document.getElementById('upload-filename');
+                    var previewEl = document.getElementById('upload-preview');
+                    var previewImg = document.getElementById('upload-preview-img');
+                    var msgEl = document.getElementById('upload-msg');
+
+                    function showError(text) {
+                        msgEl.textContent = text;
+                        msgEl.classList.add('error');
+                    }
+                    function clearError() {
+                        msgEl.textContent = '';
+                        msgEl.classList.remove('error');
+                    }
+
+                    function update() {
+                        var file = input.files && input.files[0];
+                        if (file) {
+                            clearError();
+                            nameEl.textContent = file.name;
+                            nameEl.style.display = 'block';
+                            btn.disabled = false;
+                            if (file.type && file.type.indexOf('image/') === 0) {
+                                var reader = new FileReader();
+                                reader.onload = function (e) {
+                                    previewImg.src = e.target.result;
+                                    previewEl.style.display = 'block';
+                                };
+                                reader.readAsDataURL(file);
+                            } else {
+                                previewEl.style.display = 'none';
+                            }
+                        } else {
+                            nameEl.style.display = 'none';
+                            previewEl.style.display = 'none';
+                            btn.disabled = true;
+                        }
+                    }
+
+                    input.addEventListener('change', update);
+
+                    // Drag & drop support
+                    ['dragover', 'dragenter'].forEach(function (evt) {
+                        dropzone.addEventListener(evt, function (e) {
+                            e.preventDefault();
+                            dropzone.classList.add('dragover');
+                        });
+                    });
+                    ['dragleave', 'drop'].forEach(function (evt) {
+                        dropzone.addEventListener(evt, function (e) {
+                            e.preventDefault();
+                            dropzone.classList.remove('dragover');
+                        });
+                    });
+                    dropzone.addEventListener('drop', function (e) {
+                        if (e.dataTransfer && e.dataTransfer.files.length) {
+                            input.files = e.dataTransfer.files;
+                            update();
+                        }
+                    });
+
+                    // Block submit if no file is selected.
+                    form.addEventListener('submit', function (e) {
+                        if (!input.files || !input.files.length) {
+                            e.preventDefault();
+                            btn.disabled = true;
+                            showError('Please choose an image file before uploading.');
+                        }
+                    });
+
+                    update();
+                })();
+                </script>
             </div>
             {% endif %}
 
@@ -292,6 +423,9 @@
                     </div>
                     <div class="card-title"><a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}">{{ note.title }}</a></div>
                     <div class="card-preview">{{ note.content[:180] }}</div>
+                    {% if note.image %}
+                    <div class="card-drawing-thumb"><img src="{{ note.image }}" alt="{{ note.title }} image" loading="lazy"></div>
+                    {% endif %}
                     {% if note.drawing_data %}
                     <div class="card-drawing-thumb"><img src="{{ note.drawing_data }}" alt="Saved drawing" loading="lazy"></div>
                     {% endif %}
@@ -323,6 +457,9 @@
                     <div class="card-color-bar" style="background: {{ note.color }};"></div>
                     <div class="card-title"><a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}">{{ note.title }}</a></div>
                     <div class="card-preview">{{ note.content[:180] }}</div>
+                    {% if note.image %}
+                    <div class="card-drawing-thumb"><img src="{{ note.image }}" alt="{{ note.title }} image" loading="lazy"></div>
+                    {% endif %}
                     {% if note.drawing_data %}
                     <div class="card-drawing-thumb"><img src="{{ note.drawing_data }}" alt="Saved drawing" loading="lazy"></div>
                     {% endif %}

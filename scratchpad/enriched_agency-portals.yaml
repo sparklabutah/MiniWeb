@@ -1,0 +1,159 @@
+agency-portals:
+  authenticate_by_form:
+  - "Login page (/login) -> 'Sign In to Your Account' form with 'Username' text\
+    \ input and 'Password' input, submitted via the 'Sign In' button. OUTCOME: sets\
+    \ session user_id and redirects to the '/dashboard' My Account page. Credentials\
+    \ are matched against the agency_portals_users table (fields: username, password).\
+    \ EXAMPLE: sign in as username 'alex_rivera' (Alex Rivera)."
+  book_by_form:
+  - "'Schedule an Appointment' page (/book) -> appointment form. Controls: 'Appointment\
+    \ Type *' dropdown, 'Preferred Date *' date picker, 'Preferred Time *' dropdown,\
+    \ plus 'Full Name *', 'Email *' and 'Phone' inputs; submitted with 'Book Appointment'.\
+    \ OUTCOME: creates an appointment on the logged-in user, returns a confirmation\
+    \ number (APT-0001 format) and emails/emits a booking. Appointment Type options\
+    \ (8, from appointment_types): 'Permit Consultation' (30 min, Mon-Fri), 'Tax Payment\
+    \ Assistance' (20 min, Mon-Fri), 'Vital Records Request' (15 min, Mon-Fri), 'Business\
+    \ License Consultation' (30 min, Mon-Thu), 'Utility Account Setup' (15 min, Mon-Fri),\
+    \ 'Planning Review Meeting' (45 min, Tue-Thu), 'Fire Safety Inspection Scheduling'\
+    \ (15 min, Mon-Fri), 'Vehicle Registration Renewal' (15 min, Mon-Fri). Preferred\
+    \ Time options are half-hour slots '9:00 AM' through '3:30 PM' (skipping noon).\
+    \ EXAMPLE: book a 'Permit Consultation' at 10:00 AM."
+  create_by_form:
+  - "'Municipal Services' page (/services) -> search/filter the service catalog then\
+    \ click a service card's 'Apply Online' link to start an application. OUTCOME:\
+    \ opens the '/apply/<service_id>' form for the chosen service. Each of the 20 service\
+    \ cards shows name, code, category and fee range with an 'Apply Online' link. EXAMPLE:\
+    \ from the 'Building Permits' card (code SVC-BLD, Permits, $50 - $2,500) click Apply\
+    \ Online."
+  - "Apply page (/apply/<service_id>, 'Apply: <service name>') -> application form\
+    \ with 'Full Name *', 'Email *', 'Address', 'Phone' inputs and an 'Additional Notes'\
+    \ textarea; submitted via 'Submit Application'. OUTCOME: records a permit on the\
+    \ logged-in user with status 'Submitted' and a generated permit code (USR-PRM-<uid>-NNN),\
+    \ and emails a confirmation. Permit type is inferred from the service name (Building/Business/Parking/Electrical/Plumbing,\
+    \ else first word). EXAMPLE: apply for service 'Building Permits' -> new permit\
+    \ of type 'Building', status 'Submitted'."
+  - "Register page (/register, 'Create a Resident Account') -> form with 'Username\
+    \ *', 'Password *', 'Full Name *', 'Email *', 'Address' and 'Phone' inputs; submitted\
+    \ via 'Create Account'. OUTCOME: creates a new resident in agency_portals_users\
+    \ (verified=False) with a verification code (VRF-XXXXXX) and emails a welcome message.\
+    \ Username/Password/Full Name/Email are required; duplicate usernames are rejected.\
+    \ EXAMPLE: register a new resident, e.g. name 'Jordan Lee', which yields a code\
+    \ like VRF-200009 to use on the Verify Identity page."
+  filter_by_date_range:
+  - "'Public Records' page (/records) -> 'From Date' and 'To Date' date pickers in\
+    \ the filter bar (applied with the 'Filter' button). OUTCOME: SQL-filters the records\
+    \ table on date_filed within the range (server-paginated, 50/page). Same date-range\
+    \ controls also exist on the '/permits' page (filtering permits' date_submitted).\
+    \ EXAMPLE: From 2025-03-01 To 2025-03-31 narrows records to those filed in March\
+    \ 2025 (e.g. REC-2025-0001, Property Record, filed 2025-03-10)."
+  filter_by_dropdown:
+  - "'Municipal Services' page (/services) -> 'Category' and 'Department' dropdowns\
+    \ in the filter bar (applied with 'Filter'). OUTCOME: SQL-filters the service cards\
+    \ by category and/or department_id. Category options (9): Elections, Licenses,\
+    \ Permits, Public Safety, Recreation, Registration, Taxes, Utilities, Vital Records.\
+    \ Department options (8): Public Works, Parks & Recreation, Planning & Zoning, Finance\
+    \ & Revenue, Police Department, Fire & Rescue, Community Development, Clerk & Records.\
+    \ EXAMPLE: Category 'Permits' surfaces the 'Building Permits' service."
+  - "'Permits & Applications' page (/permits) -> 'Status' and 'Type' dropdowns in the\
+    \ filter bar (applied with 'Filter'). OUTCOME: SQL-filters the permits table by\
+    \ status and/or type. Status options (3): Approved, Denied, Pending. Type options\
+    \ (13): Building, Building Inquiry, Demolition, Electrical, Fence, Grading, Mechanical,\
+    \ Occupancy, Parking Permit, Plumbing, Renovation, Roofing, Sign. EXAMPLE: Status\
+    \ 'Approved' + Type 'Building' shows approved building permits (e.g. PRM-2025-0002,\
+    \ Carlos Mendez)."
+  - "'Public Records' page (/records) -> 'Record Type' dropdown in the filter bar (applied\
+    \ with 'Filter'). OUTCOME: SQL-filters the records table by type. Record Type options\
+    \ (5): Business License, Property Record, Property Tax Record, Utility Account,\
+    \ Vehicle Registration. EXAMPLE: 'Vehicle Registration' shows registration records\
+    \ such as REC-2025-0003 (Alex Rivera)."
+  navigate_by_route:
+  - "'Welcome to the City of Lakeport' home page (/) -> the search box 'Search services\
+    \ (e.g., building permit, utility bill)...' above the 'Quick Access Services' cards;\
+    \ submitting routes to '/services?q=...'. OUTCOME: navigates to the Municipal Services\
+    \ results for the typed keywords. EXAMPLE: searching 'building permit' lands on\
+    \ services filtered to the 'Building Permits' card."
+  - "'Municipal Services' page (/services) -> click a service card's name/title link\
+    \ to open its detail page. OUTCOME: navigates to '/service/<id>' showing full service\
+    \ info (department, code, category, fee) and an 'Apply for this Service' button.\
+    \ EXAMPLE: click 'Property Tax Payments' (SVC-PTX) to view service #2."
+  - "'City Departments' page (/departments) -> click a department name link. OUTCOME:\
+    \ navigates to '/department/<id>' showing that department's info plus its services\
+    \ and permits tables. EXAMPLE: click 'Planning & Zoning' to open department #3."
+  - "'Permits & Applications' page (/permits) -> click a permit row's code link in\
+    \ the results table. OUTCOME: navigates to '/permit/<id>' ('Permit: <code>') detail\
+    \ page. EXAMPLE: click 'PRM-2025-0001' (Parking Permit, Alex Rivera) to view permit\
+    \ #1."
+  pay_by_form:
+  - "'Make a Payment' page (/pay) -> payment form with 'Payment Type *' dropdown, 'Account\
+    \ / Reference Number *' text input and 'Amount ($) *' number input; submitted via\
+    \ 'Submit Payment'. OUTCOME: records a payment on the logged-in user with a confirmation\
+    \ (PAY-0001 format), emails a receipt and emits a 'payment' event to City of Lakeport.\
+    \ Payment Type options (9, from payment_types, shown as 'Name (Category)'): Property\
+    \ Tax (Taxes), Utility Bill (Utilities), Permit Fee (Permits), Parking Permit (Permits),\
+    \ Business License Fee (Licenses), Vehicle Registration Fee (Registration), Vital\
+    \ Records Fee (Vital Records), Park Reservation Fee (Recreation), Parking Fine (Fines).\
+    \ EXAMPLE: pay 'Utility Bill' for account 12345, amount 84.50."
+  report_information:
+  - "'Municipal Services' search results (/services?q=...) -> the card grid of matching\
+    \ services, each card listing name, code, category and fee range. OUTCOME: the\
+    \ agent reads/reports service details from the matching cards. EXAMPLE: searching\
+    \ 'utility' surfaces 'Utility Billing' (SVC-UBP, Utilities, fee 'Varies')."
+  - "'Public Records' page (/records) -> selecting the 'Record Type' dropdown filters\
+    \ the records table (columns: Record ID, Type, Owner, Address, Date Filed, Status)\
+    \ so the agent can read the filtered rows. OUTCOME: reports record fields for the\
+    \ chosen type. EXAMPLE: type 'Property Record' shows rows like REC-2025-0001 (owner\
+    \ Alex Rivera, Active)."
+  - "'My Account Dashboard' (/dashboard) -> the user's activity sections: 'Saved Services',\
+    \ 'My Permits' (Code/Type/Address/Status), 'Payments' (Confirmation/Type/Amount)\
+    \ and 'Appointments' (Confirmation/Type/Date/Time). OUTCOME: reads/reports the\
+    \ logged-in resident's saved services, permits, payments and booked appointments.\
+    \ EXAMPLE: for Alex Rivera, read the 'My Permits' table entries."
+  - "'Permits & Applications' page (/permits) -> the results table with columns Permit\
+    \ Code, Type, Applicant, Address, Status, Date Submitted, Fee. OUTCOME: reads/reports\
+    \ permit fields (optionally after filtering by status/type/date). EXAMPLE: read\
+    \ the Status and Date Submitted of 'PRM-2025-0001' (Parking Permit, Alex Rivera,\
+    \ Approved, 2025-04-02)."
+  - "'Public Records' page (/records) -> the records results table (columns: Record\
+    \ ID, Type, Owner, Address, Date Filed, Status). OUTCOME: reads/reports record\
+    \ fields from the (paginated, 50/page) archive. EXAMPLE: read the owner/date of\
+    \ record 'REC-2025-0002' (Utility Account, Alex Rivera, filed 2025-03-10)."
+  - "Department detail page (/department/<id>) -> the department info section (name,\
+    \ description, contact) plus its Services and Permits tables. OUTCOME: reads/reports\
+    \ the department's details and offerings. EXAMPLE: on 'Public Works' (department\
+    \ #1) read its listed services."
+  - "Service detail page (/service/<id>) -> the full service information block (name,\
+    \ owning department, code, category, fee range, description) with an 'Apply for\
+    \ this Service' button. OUTCOME: reads/reports the service's details. EXAMPLE:\
+    \ service 'Building Permits' (SVC-BLD) under Planning-related department, fee $50\
+    \ - $2,500."
+  - "Permit detail page (/permit/<id>, 'Permit: <code>') -> the permit's full detail\
+    \ fields (code, type, applicant, address, status, date submitted, fee). OUTCOME:\
+    \ reads/reports a single permit's details. EXAMPLE: permit 'PRM-2025-0002' (Building,\
+    \ Carlos Mendez, Approved)."
+  - "Department detail page (/department/<id>) -> department info header (name/description)\
+    \ shown above its service and permit tables. OUTCOME: reads/reports the department's\
+    \ descriptive info. EXAMPLE: 'Finance & Revenue' (department #4) description."
+  - "'Verify Your Identity' page (/verify-identity) -> the 'Verification Code *' entry\
+    \ form (placeholder 'VRF-XXXXXX') with a 'Verify' button; the page reports success/error\
+    \ after submission. OUTCOME: submits a code and reads the verification result (marks\
+    \ the matching user verified). EXAMPLE: entering 'VRF-200001' verifies Alex Rivera."
+  search:
+  - "'Welcome to the City of Lakeport' home page (/) -> the hero search box 'Search\
+    \ services (e.g., building permit, utility bill)...' with its 'Search' button.\
+    \ OUTCOME: keyword-matches the service catalog and shows matching results on '/services'.\
+    \ EXAMPLE: 'utility bill' returns the 'Utility Billing' service."
+  - "'Welcome to the City of Lakeport' home page (/) -> the same home search field;\
+    \ keyword scoring matches across service name, description, category and code.\
+    \ OUTCOME: ranked service results. EXAMPLE: 'vital records' returns the 'Vital\
+    \ Records' service (SVC-VTR)."
+  - "'Permits & Applications' page (/permits) -> the 'Search by type, applicant, code...'\
+    \ text box alongside the 'Status' and 'Type' filter dropdowns (applied with 'Filter').\
+    \ OUTCOME: keyword search over permit type/applicant/address/code/status, combinable\
+    \ with the status/type dropdown filters. EXAMPLE: searching 'Carlos Mendez' returns\
+    \ his permits such as PRM-2025-0002 (Building, Approved)."
+  upload_file:
+  - "'Upload a Document' page (/upload) -> 'Document Type *' dropdown, 'Select File\
+    \ *' file input, and a 'Description' textarea; submitted via 'Upload'. OUTCOME:\
+    \ accepts the file and echoes back the filename and document type on a success\
+    \ view. Document Type options (5): Permit Application, Identity Verification, Proof\
+    \ of Residence, Business License, Other. EXAMPLE: upload a PDF as 'Proof of Residence'."

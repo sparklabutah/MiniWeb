@@ -29,6 +29,22 @@ from helpers.auth import current_user, browsing_user
 
 SITE = "ticketing-events"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
+_EVENTS_TABLE = "ticketing_events_events"
+
+# Size of one page in the scrollable events feed (search_by_scroll). The feed
+# renders one page server-side and appends the rest as the user scrolls, so
+# far-down events are off-screen until scrolled to.
+FEED_PAGE_SIZE = 20
+
+# Open-for-registration first (soonest date first), then past/completed events
+# (most recent first). Done entirely in SQL so LIMIT/OFFSET paging is stable.
+# [id] is the final tiebreaker so page boundaries never split or duplicate rows.
+_LISTING_ORDER = (
+    "CASE WHEN [status]='on_sale' THEN 0 ELSE 1 END, "
+    "CASE WHEN [status]='on_sale' THEN [date] ELSE '' END ASC, "
+    "CASE WHEN [status]='on_sale' THEN '' ELSE [date] END DESC, "
+    "[id] ASC"
+)
 
 blueprint = Blueprint(
     "ticketing-events",
@@ -48,6 +64,71 @@ def _load_events():
 
 def _save_events(events):
     db.save_collection(SITE, "events", events)
+
+
+def _events_for_listing():
+    """Events ordered for the listing: open-for-registration first, past last.
+
+    An event's state is the ``status`` field: ``on_sale`` == open for
+    registration, anything else (``completed``) == past/closed. Site dates are
+    intentionally static, so state comes from ``status`` -- no date anchoring or
+    mutation needed. Ordering is done in SQL (open group first, then soonest
+    date within the open group and most-recent date within the past group),
+    matching the auctions site's "still running before ended" pattern.
+    """
+    order = (
+        "CASE WHEN [status]='on_sale' THEN 0 ELSE 1 END, "
+        "CASE WHEN [status]='on_sale' THEN [date] ELSE '' END ASC, "
+        "CASE WHEN [status]='on_sale' THEN '' ELSE [date] END DESC"
+    )
+    rows = db.execute(f"SELECT * FROM [{_EVENTS_TABLE}] ORDER BY {order}")
+    # Raw SQL reads the base table only; merge this session's overlay edits
+    # (e.g. sold-count updates after a purchase) so isolation is preserved.
+    events = db.merge_overlay(SITE, "events", rows)
+    # Overlay merge can reorder; re-apply the open-first grouping as the
+    # authoritative order over the already-materialized listing set.
+    open_events = sorted(
+        (e for e in events if e.get("status") == "on_sale"),
+        key=lambda e: e.get("date", ""),
+    )
+    past_events = sorted(
+        (e for e in events if e.get("status") != "on_sale"),
+        key=lambda e: e.get("date", ""),
+        reverse=True,
+    )
+    return open_events + past_events
+
+
+def _events_page(limit, offset):
+    """One page of the open-first listing, sliced at the SQL level.
+
+    Powers the scrollable events feed (``search_by_scroll``): only the visible
+    slice is fetched via SQL ``ORDER BY ... LIMIT ? OFFSET ?`` -- never the whole
+    275-row table -- so scrolling is what reveals events further down the feed.
+    """
+    rows = db.execute(
+        f"SELECT * FROM [{_EVENTS_TABLE}] ORDER BY {_LISTING_ORDER} LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    # Merge this session's overlay edits (e.g. sold-count changes) onto the page.
+    # Restricting the match to this page's ids keeps overlay rows from leaking in
+    # from other pages, so LIMIT/OFFSET paging stays duplicate-free.
+    page_ids = {r.get("id") for r in rows}
+    events = db.merge_overlay(
+        SITE, "events", rows, match=lambda e: e.get("id") in page_ids
+    )
+    # The overlay merge can reorder the page; re-apply the open-first grouping so
+    # the slice keeps the same authoritative order the SQL produced.
+    open_events = sorted(
+        (e for e in events if e.get("status") == "on_sale"),
+        key=lambda e: (e.get("date", ""), e.get("id", 0)),
+    )
+    past_events = sorted(
+        (e for e in events if e.get("status") != "on_sale"),
+        key=lambda e: (e.get("date", ""), e.get("id", 0)),
+        reverse=True,
+    )
+    return open_events + past_events
 
 
 def _load_tickets():
@@ -119,18 +200,32 @@ def _event_location(event):
 
 @blueprint.route("/")
 def index():
-    events = _load_events()
-    categories = sorted(set(e["category"] for e in events))
+    # search_by_scroll: render only the first page of the feed; the rest is
+    # appended as the user scrolls (see /api/events/feed). Categories and date
+    # bounds are computed with SQL aggregates so we never load all 275 rows.
+    events = _events_page(FEED_PAGE_SIZE, 0)
+    total = db.count(SITE, "events")
+    cat_rows = db.execute(
+        f"SELECT DISTINCT [category] FROM [{_EVENTS_TABLE}] "
+        "WHERE [category] IS NOT NULL AND [category] != '' ORDER BY [category]"
+    )
+    categories = [r["category"] for r in cat_rows]
     user, logged_in = _get_browsing_user()
     # Bound the date-range pickers to the actual event dates so the calendar
     # opens within the data and cannot drift to an empty month once the real
     # "today" moves past the last event in this static dataset.
-    dates = sorted(e["date"] for e in events if e.get("date"))
-    date_min = dates[0] if dates else ""
-    date_max = dates[-1] if dates else ""
+    drow = db.execute(
+        f"SELECT MIN([date]) AS mn, MAX([date]) AS mx FROM [{_EVENTS_TABLE}] "
+        "WHERE [date] IS NOT NULL AND [date] != ''",
+        fetch="one",
+    )
+    date_min = (drow or {}).get("mn") or ""
+    date_max = (drow or {}).get("mx") or ""
     return render_template(
         "ticketing-events/index.html",
         events=events,
+        total=total,
+        page_size=FEED_PAGE_SIZE,
         categories=categories,
         user=user,
         logged_in=logged_in,
@@ -312,8 +407,17 @@ def api_events():
     elif sort_by == "name_desc":
         events.sort(key=lambda e: e["name"].lower(), reverse=True)
     else:
-        # Default: upcoming first (by date ascending)
-        events.sort(key=lambda e: e["date"])
+        # Default: open-for-registration events first (soonest date first),
+        # then past/completed events (most recent first) at the bottom.
+        open_part = sorted(
+            (e for e in events if e.get("status") == "on_sale"),
+            key=lambda e: e["date"],
+        )
+        past_part = sorted(
+            (e for e in events if e.get("status") != "on_sale"),
+            key=lambda e: e["date"], reverse=True,
+        )
+        events = open_part + past_part
 
     # -- Pagination --
     limit = request.args.get("limit", type=int)
@@ -325,6 +429,32 @@ def api_events():
         events = events[:limit]
 
     return jsonify({"total": total, "events": events})
+
+
+@blueprint.route("/api/events/feed")
+def api_events_feed():
+    """search_by_scroll: next page of the open-first events feed.
+
+    The listing has 275 events (open-for-registration first, past events after).
+    The frontend renders one page, then appends subsequent pages as the user
+    scrolls toward the bottom -- so reaching a far-down event genuinely requires
+    scrolling. Paging is done purely in SQL via ``LIMIT``/``OFFSET`` (see
+    ``_events_page``); only the requested slice is ever loaded.
+    """
+    limit = request.args.get("limit", FEED_PAGE_SIZE, type=int)
+    offset = request.args.get("offset", 0, type=int)
+    limit = max(1, min(limit, 50))
+    offset = max(0, offset)
+
+    total = db.count(SITE, "events")
+    events = _events_page(limit, offset)
+    return jsonify({
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "events": events,
+        "has_more": offset + len(events) < total,
+    })
 
 
 @blueprint.route("/api/events/<int:event_id>")
