@@ -173,6 +173,9 @@ def list_tasks(annotator: str = None) -> list[dict]:
                 try:
                     task = json.loads(task_file.read_text())
 
+                    if not task:
+                        continue
+                    
                     # Don't include trajectory in list view
                     task.pop("trajectory", None)
 
