@@ -51,6 +51,15 @@
         .inquiry-form { background: #e3f2fd; border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
         .inquiry-form h4 { font-size: .9rem; margin-bottom: .5rem; color: #0d47a1; }
         .inquiry-form textarea { width: 100%; padding: .6rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .85rem; margin: .3rem 0; font-family: inherit; }
+        .tour-form { background: #fff7ed; border: 1px solid #fed7aa; border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+        .tour-form h4 { font-size: .95rem; margin-bottom: .2rem; color: #9a3412; }
+        .tour-form p.sub { font-size: .8rem; color: #9a6b4a; margin-bottom: .7rem; }
+        .tour-fields { display: flex; gap: .6rem; flex-wrap: wrap; align-items: flex-end; }
+        .tour-fields label { display: block; font-size: .75rem; color: #7c4a2a; margin-bottom: .2rem; text-transform: uppercase; letter-spacing: .02em; }
+        .tour-fields input[type=date], .tour-fields select { padding: .5rem; border: 1px solid #e0b48f; border-radius: .3rem; font-size: .85rem; font-family: inherit; background: #fff; }
+        .tour-form textarea { width: 100%; padding: .6rem; border: 1px solid #e0b48f; border-radius: .3rem; font-size: .85rem; margin: .6rem 0 0; font-family: inherit; }
+        .btn-tour { background: #ea580c; color: #fff; border-color: #ea580c; }
+        .btn-tour:hover { background: #f97316; }
         .related { margin-top: 2rem; }
         .related h3 { font-size: 1.1rem; color: #333; margin-bottom: .8rem; }
         .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; }
@@ -72,6 +81,7 @@
         <div class="header-nav">
             {% if user %}
             <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.tours_page') }}">Tours</a>
             <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}">Inquiries</a>
             <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout</a>
             {% else %}
@@ -98,6 +108,15 @@
         </div>
         {% elif request.args.get('sent') == 'empty' %}
         <div class="flash-error">Please enter a message before sending your inquiry.</div>
+        {% endif %}
+
+        {% if request.args.get('tour') == '1' %}
+        <div class="flash-success">
+            <span>Your tour request has been submitted. The agent will confirm your showing shortly.</span>
+            <a href="{{ url_for('real-estate-buy-rent.tours_page') }}">View My Tours &rarr;</a>
+        </div>
+        {% elif request.args.get('tour') == 'empty' %}
+        <div class="flash-error">Please choose a date and a time slot to schedule a tour.</div>
         {% endif %}
 
         <div class="detail-card">
@@ -197,6 +216,38 @@
                 <a class="btn btn-primary" href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign in to save</a>
                 {% endif %}
             </div>
+
+            {% if user and listing.status in ('for_sale', 'for_rent') %}
+            <div class="tour-form">
+                <h4>Schedule a Tour</h4>
+                <p class="sub">Pick a date and time slot to tour this property{% if agent %} with {{ agent.name }}{% endif %}.</p>
+                <form method="post" action="{{ url_for('real-estate-buy-rent.schedule_tour', listing_id=listing.id) }}">
+                    <input type="hidden" name="listing_id" value="{{ listing.id }}">
+                    <div class="tour-fields">
+                        <div>
+                            <label for="tour_date">Preferred date</label>
+                            <input type="date" id="tour_date" name="tour_date" required>
+                        </div>
+                        <div>
+                            <label for="tour_time">Time slot</label>
+                            <select id="tour_time" name="tour_time" required>
+                                <option value="">Select a time...</option>
+                                {% for slot in tour_slots %}
+                                <option value="{{ slot }}">{{ slot }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-tour">Request Tour</button>
+                    </div>
+                    <textarea name="message" rows="2" placeholder="Anything the agent should know? (optional)"></textarea>
+                </form>
+            </div>
+            {% elif not user and listing.status in ('for_sale', 'for_rent') %}
+            <div class="tour-form">
+                <h4>Schedule a Tour</h4>
+                <p class="sub"><a href="{{ url_for('real-estate-buy-rent.login_page') }}" style="color:#ea580c">Sign in</a> to book a showing for this property.</p>
+            </div>
+            {% endif %}
 
             {% if user and listing.status in ('for_sale', 'for_rent') %}
             <div class="inquiry-form">

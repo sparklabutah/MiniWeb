@@ -82,6 +82,22 @@
         .comment-item .comment-author { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; }
         .comment-item .comment-date { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .7rem; color: #aaa; margin-left: .5rem; }
         .comment-item .comment-body { font-size: .9rem; color: #444; margin-top: .3rem; }
+        /* Threaded replies: nested + indented under the parent */
+        .comment-replies { margin-top: .6rem; margin-left: 1.4rem; padding-left: 1rem; border-left: 2px solid #eee; }
+        .comment-replies .comment-item { padding: .6rem 0; border-bottom: 1px dashed #f2f2f2; }
+        /* Comment actions row: upvote + reply */
+        .comment-actions { display: flex; align-items: center; gap: .8rem; margin-top: .4rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .btn-upvote { display: inline-flex; align-items: center; gap: .3rem; font-size: .75rem; font-weight: 600; padding: .2rem .55rem; border: 1px solid #ccc; border-radius: 1rem; background: #fff; color: #666; cursor: pointer; }
+        .btn-upvote:hover { border-color: #e74c3c; color: #e74c3c; }
+        .btn-upvote.upvoted { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+        .btn-upvote .upvote-count { font-variant-numeric: tabular-nums; }
+        .btn-reply { font-size: .75rem; font-weight: 600; color: #1a5276; background: none; border: none; cursor: pointer; padding: 0; }
+        .btn-reply:hover { text-decoration: underline; }
+        .reply-form { display: none; margin-top: .5rem; }
+        .reply-form.open { display: block; }
+        .reply-form textarea { width: 100%; padding: .5rem .7rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .85rem; font-family: 'Helvetica Neue', Arial, sans-serif; height: 56px; resize: vertical; }
+        .reply-form textarea:focus { outline: none; border-color: #e74c3c; }
+        .reply-form button { margin-top: .4rem; padding: .35rem 1rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: .8rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
 
         /* Sidebar */
         .sidebar-box { background: #fff; border-radius: .4rem; padding: 1.2rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
@@ -230,9 +246,45 @@
                     </div>
                 </article>
 
-                <!-- Comments: post_from_free_text -->
+                <!-- Comments: threaded replies + per-user upvotes -->
+                {% macro render_comment(c) %}
+                <div class="comment-item" data-comment-id="{{ c.id }}">
+                    <span class="comment-author">{{ c.display_name }}</span>
+                    <span class="comment-date">{{ c.posted_at }}</span>
+                    <div class="comment-body">{{ c.body }}</div>
+                    <div class="comment-actions">
+                        {% if user %}
+                        <button type="button"
+                                class="btn-upvote {{ 'upvoted' if c.user_has_upvoted else '' }}"
+                                data-comment-id="{{ c.id }}"
+                                onclick="upvoteComment(this)">
+                            &#9650; <span class="upvote-count">{{ c.upvote_count }}</span>
+                        </button>
+                        <button type="button" class="btn-reply" onclick="toggleReply({{ c.id }})">Reply</button>
+                        {% else %}
+                        <span class="btn-upvote" style="cursor:default;">&#9650; <span class="upvote-count">{{ c.upvote_count }}</span></span>
+                        {% endif %}
+                    </div>
+                    {% if user %}
+                    <form class="reply-form" id="reply-form-{{ c.id }}" method="post"
+                          action="{{ url_for('news.form_post_comment', article_id=article.id) }}">
+                        <input type="hidden" name="parent_id" value="{{ c.id }}">
+                        <textarea name="body" placeholder="Write a reply..." required></textarea>
+                        <button type="submit">Post Reply</button>
+                    </form>
+                    {% endif %}
+                    {% if c.replies %}
+                    <div class="comment-replies">
+                        {% for r in c.replies %}
+                            {{ render_comment(r) }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endmacro %}
+
                 <div class="comments-section">
-                    <h2>Comments</h2>
+                    <h2>Comments ({{ article.comments_count }})</h2>
                     {% if user %}
                     <div class="comment-form">
                         <form method="post" action="{{ url_for('news.form_post_comment', article_id=article.id) }}">
@@ -248,11 +300,7 @@
 
                     {% if comments %}
                         {% for c in comments %}
-                        <div class="comment-item">
-                            <span class="comment-author">{{ c.display_name }}</span>
-                            <span class="comment-date">{{ c.posted_at }}</span>
-                            <div class="comment-body">{{ c.body }}</div>
-                        </div>
+                            {{ render_comment(c) }}
                         {% endfor %}
                     {% else %}
                     <p style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:.85rem; color:#aaa;">No comments yet. Be the first to comment.</p>
@@ -349,6 +397,27 @@
             }
             _renderAudio();
         }, 1000);
+    }
+    function toggleReply(commentId) {
+        var f = document.getElementById('reply-form-' + commentId);
+        if (f) {
+            f.classList.toggle('open');
+            if (f.classList.contains('open')) { f.querySelector('textarea').focus(); }
+        }
+    }
+    function upvoteComment(btn) {
+        var commentId = btn.getAttribute('data-comment-id');
+        fetch('/sites/news/api/comments/' + commentId + '/upvote', {method: 'POST'})
+            .then(function(r) {
+                if (r.status === 401) { window.location = '{{ url_for("news.login_page") }}'; return null; }
+                return r.json();
+            })
+            .then(function(data) {
+                if (!data) { return; }
+                btn.querySelector('.upvote-count').textContent = data.upvotes;
+                if (data.user_has_upvoted) { btn.classList.add('upvoted'); }
+                else { btn.classList.remove('upvoted'); }
+            });
     }
     function followTarget(type, target) {
         fetch('/sites/news/api/follow', {

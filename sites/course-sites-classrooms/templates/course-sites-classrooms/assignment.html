@@ -129,6 +129,7 @@
                         {% endif %}
                         <th>Submitted</th>
                         <th>Content</th>
+                        <th>File</th>
                         <th>Score</th>
                         <th>Status</th>
                         <th>Feedback</th>
@@ -142,6 +143,16 @@
                         {% endif %}
                         <td>{{ sub.submitted_at[:16] }}</td>
                         <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ sub.content|default('') }}">{{ sub.content|default('--')|truncate(80) }}</td>
+                        <td>
+                            {% if sub.attachment %}
+                                <a class="submission-file-link" href="{{ url_for('course-sites-classrooms.download_submission_file', course_id=course.id, assignment_id=assignment.id, submission_id=sub.id) }}"
+                                   style="color:#3b82f6;text-decoration:none;" title="Download {{ sub.attachment.filename }}">
+                                    &#128206; {{ sub.attachment.filename|truncate(28) }}
+                                </a>
+                            {% else %}
+                                --
+                            {% endif %}
+                        </td>
                         <td>
                             {% if sub.score is not none %}
                                 {% set pct = (sub.score / assignment.points_possible * 100)|round(1) %}

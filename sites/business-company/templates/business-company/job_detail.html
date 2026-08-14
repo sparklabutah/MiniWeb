@@ -30,6 +30,17 @@
         .requirements li { padding: .2rem 0; font-size: .9rem; }
         .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 3rem; }
         .footer a { color: #cbd5e1; margin: 0 .5rem; }
+        .apply-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin-top: 1.5rem; }
+        .apply-card h2 { font-size: 1.2rem; color: var(--primary); margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .3rem; color: var(--primary); }
+        .form-group input, .form-group textarea { width: 100%; padding: .7rem; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; font-family: inherit; }
+        .form-group textarea { height: 110px; resize: vertical; }
+        .form-hint { font-size: .8rem; color: var(--text-light); margin-top: .3rem; }
+        .submit-btn { background: var(--accent); color: #fff; padding: .8rem 2rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        .submit-btn:hover { background: #1d4ed8; }
+        .success-msg { background: #dcfce7; color: #166534; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .error-msg { background: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -69,6 +80,50 @@
                 </ul>
             </div>
         </div>
+
+        {% if apply_success %}
+        <div class="apply-card" id="apply">
+            <div class="success-msg" data-testid="apply-success">
+                Application submitted! Thank you{% if application %}, {{ application.name }}{% endif %} —
+                we have received your application for <strong>{{ job.title }}</strong>.
+                A confirmation email has been sent to {{ application.email }}.
+            </div>
+            <p>Reference #: <strong>{{ application.id }}</strong></p>
+            <p style="margin-top:1rem"><a href="{{ url_for('business-company.my_applications') }}">View my applications</a> &middot;
+               <a href="{{ url_for('business-company.careers_page') }}">Browse more openings</a></p>
+        </div>
+        {% else %}
+        <div class="apply-card" id="apply">
+            <h2>Apply for this position</h2>
+            {% if error %}
+            <div class="error-msg" data-testid="apply-error">{{ error }}</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('business-company.job_apply', job_id=job.id) }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="resume">Resume (paste text)</label>
+                    <textarea id="resume" name="resume" placeholder="Paste your resume here..."></textarea>
+                    <p class="form-hint">Provide your resume as pasted text or upload a file below.</p>
+                </div>
+                <div class="form-group">
+                    <label for="resume_file">Resume (upload file)</label>
+                    <input type="file" id="resume_file" name="resume_file">
+                </div>
+                <div class="form-group">
+                    <label for="cover_letter">Cover Letter</label>
+                    <textarea id="cover_letter" name="cover_letter" placeholder="Tell us why you're a great fit (optional)..."></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Submit Application</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 
     <div class="footer">

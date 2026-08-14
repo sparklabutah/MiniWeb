@@ -49,6 +49,14 @@
         .action-bar button.btn-save:hover { background: #c03050; }
         .action-bar button.btn-subscribe { background: #2ecc71; color: #fff; border-color: #2ecc71; }
         .action-bar button.btn-subscribe:hover { background: #27ae60; }
+        .action-bar button.btn-like { background: #e94560; color: #fff; border-color: #e94560; }
+        .action-bar button.btn-like:hover { background: #c03050; }
+        .action-bar button.btn-like.liked { background: #ff6b81; border-color: #ff6b81; }
+        .action-bar button.btn-reblog { background: #2ecc71; color: #fff; border-color: #2ecc71; }
+        .action-bar button.btn-reblog:hover { background: #27ae60; }
+
+        .reblog-banner { background: #0f3460; color: #b0b0c0; font-size: .8rem; padding: .5rem .8rem; border-radius: .4rem; margin-bottom: 1rem; }
+        .reblog-banner a { font-weight: 600; }
         .action-bar .btn-report { background: transparent; color: #888; border: 1px solid #333; }
         .action-bar .btn-report:hover { color: #e94560; border-color: #e94560; }
 
@@ -103,6 +111,13 @@
             <img src="{{ post.image_url }}" alt="" class="hero">
             {% endif %}
             <div class="post-body-wrap">
+                {% if post.reblog_of %}
+                <div class="reblog-banner">
+                    {{ post.author_display_name }} reblogged
+                    <a href="{{ url_for('blogs.post_detail', post_id=post.reblog_of) }}">"{{ post.reblog_of_title }}"</a>
+                    from @{{ post.reblog_of_author }}
+                </div>
+                {% endif %}
                 <div class="post-header">
                     <img src="{{ post.author_avatar }}" alt="" class="avatar">
                     <div class="author-info">
@@ -128,6 +143,14 @@
                 <!-- Action buttons -->
                 <div class="action-bar">
                     {% if user %}
+                    <form method="post" action="{{ url_for('blogs.form_like_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-like{% if post.id in user.get('liked_posts', []) %} liked{% endif %}" id="like-btn">
+                            {% if post.id in user.get('liked_posts', []) %}&#9829; Liked{% else %}&#9825; Like{% endif %}
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('blogs.form_reblog_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-reblog" id="reblog-btn">&#8635; Reblog</button>
+                    </form>
                     <form method="post" action="{{ url_for('blogs.form_follow_blog', post_id=post.id) }}" style="display:inline">
                         <input type="hidden" name="blog" value="{{ post.author_username }}">
                         <button type="submit" class="btn-follow" id="follow-btn">

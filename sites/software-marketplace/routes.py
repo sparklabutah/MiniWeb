@@ -111,6 +111,80 @@ def _get_app(app_id):
     return app
 
 
+_PURCHASES_TABLE = "software_marketplace_purchases"
+
+
+def _ensure_purchases_table():
+    """Create + register the purchases base table once (idempotent).
+
+    Checkout writes purchase/receipt rows, but the table was never provisioned
+    at build time, so `get_table_name` returned None and every write was skipped
+    behind its guard. Creating + registering it here (idempotent) lets checkout
+    persist receipts and lets the Purchases page + refund flow read them back.
+    Actual rows still land in the per-session overlay via save_collection /
+    save_item, so parallel sessions stay isolated.
+    """
+    if db.get_table_name(SITE, "purchases"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_PURCHASES_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL DEFAULT 0,
+            app_id INTEGER NOT NULL DEFAULT 0,
+            app_name TEXT NOT NULL DEFAULT '',
+            price REAL NOT NULL DEFAULT 0.0,
+            discount REAL NOT NULL DEFAULT 0.0,
+            promo_code TEXT,
+            date TEXT NOT NULL DEFAULT '',
+            receipt_id TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'completed',
+            refund_date TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_sm_purchases_user "
+        f"ON [{_PURCHASES_TABLE}] (user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "purchases", _PURCHASES_TABLE, "id")
+
+
+def _receipt_id(purchase_id, date_str):
+    """Deterministic human-facing receipt / order id for a purchase row."""
+    return f"AV-{date_str.replace('-', '')}-{int(purchase_id):05d}"
+
+
+_CART_TABLE = "software_marketplace_cart"
+
+
+def _ensure_cart_table():
+    """Create + register the cart base table once (idempotent).
+
+    Like purchases, the shopping cart was never provisioned at build time, so
+    every `get_table_name(SITE, "cart")` guard short-circuited to an empty list
+    and nothing could be added or checked out. Provisioning it here restores the
+    add-to-cart -> checkout -> receipt flow. Rows live in the per-session overlay.
+    """
+    if db.get_table_name(SITE, "cart"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_CART_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL DEFAULT 0,
+            app_id INTEGER NOT NULL DEFAULT 0,
+            added_date TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_sm_cart_user "
+        f"ON [{_CART_TABLE}] (user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "cart", _CART_TABLE, "id")
+
+
 def _get_community_reviews(app_name):
     """Get community reviews for an app from the app_reviews table."""
     return db.query(SITE, "app_reviews", where={"app": app_name}, limit=100)
@@ -587,6 +661,7 @@ def cart_page():
     if not user:
         return redirect(url_for("software-marketplace.login_page"))
 
+    _ensure_cart_table()
     cart = db.query(SITE, "cart", where={"user_id": session["user_id"]}, limit=50)
     cart_items = []
     total = 0.0
@@ -611,6 +686,7 @@ def checkout_page():
     if not user:
         return redirect(url_for("software-marketplace.login_page"))
 
+    _ensure_cart_table()
     cart = db.query(SITE, "cart", where={"user_id": session["user_id"]}, limit=50)
     cart_items = []
     subtotal = 0.0
@@ -682,9 +758,11 @@ def checkout_page():
                     promo_error=pay["error"], promo_applied=None, user=user,
                 )
 
-            purchases = db.query(SITE, "purchases") if db.get_table_name(SITE, "purchases") else []
+            _ensure_purchases_table()
+            purchases = db.query(SITE, "purchases")
             installed = db.query(SITE, "installed")
             new_purchase_id = max((p["id"] for p in purchases), default=0) + 1
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
 
             purchased_app_ids = []
             for item in cart_items:
@@ -696,7 +774,10 @@ def checkout_page():
                     "price": item["app"]["price"],
                     "discount": actual_discount,
                     "promo_code": promo_code or None,
-                    "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                    "date": today,
+                    "receipt_id": _receipt_id(new_purchase_id, today),
+                    "status": "completed",
+                    "refund_date": "",
                 })
                 new_purchase_id += 1
                 purchased_app_ids.append(item["app"]["id"])
@@ -714,8 +795,7 @@ def checkout_page():
                         "installed_date": datetime.datetime.now().strftime("%Y-%m-%d"),
                     })
 
-            if db.get_table_name(SITE, "purchases"):
-                db.save_collection(SITE, "purchases", purchases)
+            db.save_collection(SITE, "purchases", purchases)
             db.save_collection(SITE, "installed", installed)
 
             # Clear cart
@@ -790,6 +870,94 @@ def my_apps():
         "software-marketplace/my_apps.html",
         installed_apps=installed_apps, user=user,
     )
+
+
+@blueprint.route("/purchases")
+def purchases_page():
+    """User's purchase history / receipts, backed by the purchases table."""
+    if "user_id" not in session:
+        return redirect(url_for("software-marketplace.login_page"))
+    user = _get_user(session["user_id"])
+    if not user:
+        return redirect(url_for("software-marketplace.login_page"))
+
+    _ensure_purchases_table()
+    purchases = db.query(
+        SITE, "purchases", where={"user_id": session["user_id"]},
+        sort="-id", limit=50,
+    )
+
+    total_spent = round(
+        sum(
+            max(0.0, (p.get("price") or 0) - (p.get("discount") or 0))
+            for p in purchases if p.get("status") != "refunded"
+        ),
+        2,
+    )
+    refunded_total = round(
+        sum(
+            max(0.0, (p.get("price") or 0) - (p.get("discount") or 0))
+            for p in purchases if p.get("status") == "refunded"
+        ),
+        2,
+    )
+
+    return render_template(
+        "software-marketplace/purchases.html",
+        purchases=purchases, user=user,
+        total_spent=total_spent, refunded_total=refunded_total,
+    )
+
+
+@blueprint.route("/purchase/<int:purchase_id>")
+def purchase_detail(purchase_id):
+    """Receipt / detail view for a single purchase."""
+    if "user_id" not in session:
+        return redirect(url_for("software-marketplace.login_page"))
+    user = _get_user(session["user_id"])
+    if not user:
+        return redirect(url_for("software-marketplace.login_page"))
+
+    _ensure_purchases_table()
+    purchase = db.get_item(SITE, "purchases", purchase_id)
+    if not purchase or purchase.get("user_id") != session["user_id"]:
+        abort(404)
+
+    app = _get_app(purchase["app_id"])
+    net_paid = round(max(0.0, (purchase.get("price") or 0) - (purchase.get("discount") or 0)), 2)
+
+    return render_template(
+        "software-marketplace/receipt.html",
+        purchase=purchase, app=app, net_paid=net_paid, user=user,
+    )
+
+
+@blueprint.route("/purchase/<int:purchase_id>/refund", methods=["POST"])
+def form_refund_purchase(purchase_id):
+    """Request a refund on a purchase (persists a refunded status)."""
+    if "user_id" not in session:
+        return redirect(url_for("software-marketplace.login_page"))
+
+    _ensure_purchases_table()
+    purchase = db.get_item(SITE, "purchases", purchase_id)
+    if not purchase or purchase.get("user_id") != session["user_id"]:
+        abort(404)
+
+    if purchase.get("status") != "refunded":
+        purchase["status"] = "refunded"
+        purchase["refund_date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+        db.save_item(SITE, "purchases", purchase_id, purchase)
+        _add_email(
+            session["user_id"], "noreply@software-marketplace.lakeport.local",
+            "Refund processed",
+            f'Your refund for "{purchase.get("app_name", "your purchase")}" '
+            f'(receipt {purchase.get("receipt_id", "")}) has been processed.',
+        )
+
+    redirect_to = request.form.get("redirect_to", "")
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for("software-marketplace.purchase_detail", purchase_id=purchase_id))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -918,7 +1086,8 @@ def form_add_to_cart(app_id):
     if not app:
         abort(404)
 
-    cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart")
     already = any(
         c["user_id"] == session["user_id"] and c["app_id"] == app_id
         for c in cart
@@ -945,7 +1114,8 @@ def form_remove_from_cart(app_id):
     if "user_id" not in session:
         return redirect(url_for("software-marketplace.login_page"))
 
-    cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart")
     cart = [
         c for c in cart
         if not (c["user_id"] == session["user_id"] and c["app_id"] == app_id)
@@ -1364,7 +1534,8 @@ def api_cart():
     if not user_id:
         return jsonify({"error": "Not logged in"}), 401
 
-    cart = db.query(SITE, "cart", where={"user_id": user_id}, limit=50) if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart", where={"user_id": user_id}, limit=50)
     result = []
     total = 0.0
     for item in cart:
@@ -1397,7 +1568,8 @@ def api_cart_add():
     if not app:
         return jsonify({"error": "App not found"}), 404
 
-    cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart")
     already = any(
         c["user_id"] == user_id and c["app_id"] == app_id for c in cart
     )
@@ -1426,7 +1598,8 @@ def api_cart_remove():
     if not user_id:
         return jsonify({"error": "Not logged in"}), 401
 
-    cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart")
     before = len(cart)
     cart = [
         c for c in cart
@@ -1455,7 +1628,8 @@ def api_checkout():
     if not card_name or not card_number or not card_expiry:
         return jsonify({"error": "Payment details required"}), 400
 
-    cart = db.query(SITE, "cart", where={"user_id": user_id}, limit=50) if db.get_table_name(SITE, "cart") else []
+    _ensure_cart_table()
+    cart = db.query(SITE, "cart", where={"user_id": user_id}, limit=50)
     if not cart:
         return jsonify({"error": "Cart is empty"}), 400
 
@@ -1476,9 +1650,11 @@ def api_checkout():
 
     final_total = round(max(0, subtotal - discount), 2)
 
-    purchases = db.query(SITE, "purchases") if db.get_table_name(SITE, "purchases") else []
+    _ensure_purchases_table()
+    purchases = db.query(SITE, "purchases")
     installed = db.query(SITE, "installed")
     new_purchase_id = max((p["id"] for p in purchases), default=0) + 1
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
 
     purchased = []
     for item in cart:
@@ -1492,7 +1668,10 @@ def api_checkout():
                 "price": app["price"],
                 "discount": discount,
                 "promo_code": promo_code or None,
-                "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                "date": today,
+                "receipt_id": _receipt_id(new_purchase_id, today),
+                "status": "completed",
+                "refund_date": "",
             })
             purchased.append(app["id"])
             new_purchase_id += 1
@@ -1510,11 +1689,10 @@ def api_checkout():
                     "installed_date": datetime.datetime.now().strftime("%Y-%m-%d"),
                 })
 
-    if db.get_table_name(SITE, "purchases"):
-        db.save_collection(SITE, "purchases", purchases)
+    db.save_collection(SITE, "purchases", purchases)
     db.save_collection(SITE, "installed", installed)
 
-    all_cart = db.query(SITE, "cart") if db.get_table_name(SITE, "cart") else []
+    all_cart = db.query(SITE, "cart")
     all_cart = [c for c in all_cart if c["user_id"] != user_id]
     db.save_collection(SITE, "cart", all_cart)
 
@@ -1659,5 +1837,30 @@ def api_purchases():
     if not user_id:
         return jsonify({"error": "Not logged in"}), 401
 
-    purchases = db.query(SITE, "purchases", where={"user_id": user_id}, limit=50) if db.get_table_name(SITE, "purchases") else []
+    _ensure_purchases_table()
+    purchases = db.query(
+        SITE, "purchases", where={"user_id": user_id}, sort="-id", limit=50,
+    )
     return jsonify(purchases)
+
+
+@blueprint.route("/api/purchases/<int:purchase_id>/refund", methods=["POST"])
+def api_refund(purchase_id):
+    """Refund a purchase — persist a refunded status (reflected everywhere)."""
+    user_id = session.get("user_id")
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id") or user_id
+    if not user_id:
+        return jsonify({"error": "Not logged in"}), 401
+
+    _ensure_purchases_table()
+    purchase = db.get_item(SITE, "purchases", purchase_id)
+    if not purchase or purchase.get("user_id") != user_id:
+        return jsonify({"error": "Purchase not found"}), 404
+    if purchase.get("status") == "refunded":
+        return jsonify({"action": "already_refunded", "purchase": purchase})
+
+    purchase["status"] = "refunded"
+    purchase["refund_date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+    db.save_item(SITE, "purchases", purchase_id, purchase)
+    return jsonify({"action": "refunded", "purchase": purchase})

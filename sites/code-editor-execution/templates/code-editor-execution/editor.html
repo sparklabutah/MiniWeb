@@ -144,6 +144,11 @@ print("Hello, World!"){% endif %}</textarea>
         </div>
     </div>
 
+    <div class="stdin-panel" style="margin-top:12px;background:#181825;border:1px solid #313244;border-radius:6px;padding:10px;">
+        <label for="stdin-input" style="display:block;color:#a6adc8;font-size:13px;margin-bottom:6px;">Standard Input (stdin)</label>
+        <textarea id="stdin-input" spellcheck="false" placeholder="Type input for the program here. Each line is fed to input()..." style="width:100%;min-height:60px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:4px;padding:8px;font-family:'Fira Code',monospace;font-size:13px;resize:vertical;box-sizing:border-box;">{% if stdin is defined and stdin %}{{ stdin }}{% endif %}</textarea>
+    </div>
+
     <div class="toolbar">
         <button class="btn-run" onclick="runCode()">Run Code</button>
         <button class="btn-clear" onclick="clearOutput()">Clear Output</button>
@@ -313,13 +318,15 @@ print("Hello, World!"){% endif %}</textarea>
 
     function runCode() {
         const code = codeInput.value;
+        const stdinEl = document.getElementById('stdin-input');
+        const stdin = stdinEl ? stdinEl.value : '';
         execStatus.textContent = 'Running...';
         outputArea.innerHTML = '<span style="color:#f9e2af">Executing...</span>';
 
         fetch('{{ url_for("code-editor-execution.api_execute") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({code: code, timeout: 5})
+            body: JSON.stringify({code: code, timeout: 5, stdin: stdin})
         })
         .then(r => r.json())
         .then(data => {

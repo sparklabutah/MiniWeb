@@ -21,7 +21,12 @@
                 <div><div class="field-label">Filing Date</div><div class="field-value">{{ filing.filing_date or 'Not filed' }}</div></div>
                 <div><div class="field-label">Due Date</div><div class="field-value">{{ filing.due_date }}</div></div>
                 <div><div class="field-label">Tax Owed</div><div class="field-value">${{ "%.2f"|format(filing.tax_owed) }}</div></div>
-                <div><div class="field-label">Tax Paid</div><div class="field-value">${{ "%.2f"|format(filing.tax_paid) }}</div></div>
+                <div><div class="field-label">Tax Paid / Withheld</div><div class="field-value">${{ "%.2f"|format(filing.tax_paid) }}</div></div>
+                {% if filing.refund_amount and filing.refund_amount > 0 %}
+                <div><div class="field-label">Refund</div><div class="field-value" style="color:#166534;font-weight:700">${{ "%.2f"|format(filing.refund_amount) }}</div></div>
+                {% elif filing.amount_due and filing.amount_due > 0 %}
+                <div><div class="field-label">Amount Due</div><div class="field-value" style="color:#b91c1c;font-weight:700">${{ "%.2f"|format(filing.amount_due) }}</div></div>
+                {% endif %}
                 {% if filing.gross_income %}<div><div class="field-label">Gross Income</div><div class="field-value">${{ "%.2f"|format(filing.gross_income) }}</div></div>{% endif %}
                 {% if filing.taxable_income %}<div><div class="field-label">Taxable Income</div><div class="field-value">${{ "%.2f"|format(filing.taxable_income) }}</div></div>{% endif %}
                 {% if filing.assessed_value %}<div><div class="field-label">Assessed Value</div><div class="field-value">${{ "%.2f"|format(filing.assessed_value) }}</div></div>{% endif %}
@@ -45,7 +50,24 @@
                         <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get(ln, 0.0)) }}</td></tr>
                 {% endfor %}
                     <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111">9  Total income</td>
-                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111">${{ "%.2f"|format(f.get('line_9', 0.0)) }}</td></tr>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111">${{ "%.2f"|format(f.get('line_9', 0.0) or filing.gross_income) }}</td></tr>
+                    {% if f.get('standard_deduction') %}
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">12  Standard deduction</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">&minus;${{ "%.2f"|format(f.get('standard_deduction', 0.0)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">15  Taxable income</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('taxable_income', filing.taxable_income)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">22  Tax owed</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('tax_owed', filing.tax_owed)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">25  Federal income tax withheld</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('line_25', filing.tax_paid)) }}</td></tr>
+                    {% if f.get('refund_amount', filing.refund_amount) > 0 %}
+                    <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111;color:#166534">34  Refund</td>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111;color:#166534">${{ "%.2f"|format(f.get('refund_amount', filing.refund_amount)) }}</td></tr>
+                    {% else %}
+                    <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111;color:#b91c1c">37  Amount you owe</td>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111;color:#b91c1c">${{ "%.2f"|format(f.get('amount_due', filing.get('amount_due', 0.0))) }}</td></tr>
+                    {% endif %}
+                    {% endif %}
                 </tbody>
             </table>
             {% if f.get('filing_status') %}<p style="color:#374151;font-size:.85rem">Filing status: {{ f.filing_status|replace("_"," ")|title }}</p>{% endif %}

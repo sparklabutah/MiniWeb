@@ -38,16 +38,55 @@
     <h3 class="section-title">My Permits</h3>
     <table class="data-table">
         <thead>
-            <tr><th>Code</th><th>Type</th><th>Address</th><th>Status</th></tr>
+            <tr><th>Code</th><th>Type</th><th>Address</th><th>Review Status</th><th>Documents</th><th>Action</th></tr>
         </thead>
         <tbody>
             {% for p in user.permits %}
+            {% if p is mapping %}
+            {% set status = p.status or "Submitted" %}
             <tr>
                 <td>{{ p.code }}</td>
                 <td>{{ p.type }}</td>
                 <td>{{ p.address }}</td>
-                <td>{{ p.status }}</td>
+                <td>
+                    <span class="badge badge-{{ status|lower|replace(' ', '-') }}">{{ status }}</span>
+                    {% if p.date_reviewed %}<div style="font-size:.75rem;color:#71767a;">Reviewed {{ p.date_reviewed }}{% if p.reviewed_by %} &middot; {{ p.reviewed_by }}{% endif %}</div>{% endif %}
+                </td>
+                <td>
+                    {% if p.documents %}
+                    <ul style="margin:0;padding-left:1rem;">
+                        {% for d in p.documents %}
+                        <li><a href="{{ d.data_uri }}" download="{{ d.filename }}">{{ d.filename }}</a>{% if d.doc_type %} <span style="color:#71767a;">({{ d.doc_type }})</span>{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span style="color:#71767a;">None</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if status in ("Approved", "Denied") %}
+                    <span style="color:#71767a;">Closed</span>
+                    {% else %}
+                    <form method="post" action="{{ url_for('agency-portals.permit_advance') }}" style="display:inline;">
+                        <input type="hidden" name="permit_code" value="{{ p.code }}">
+                        <button type="submit" class="btn btn-secondary" style="padding:.25rem .6rem;font-size:.8rem;">Advance Review</button>
+                    </form>
+                    {% if status == "Under Review" %}
+                    <form method="post" action="{{ url_for('agency-portals.permit_advance') }}" style="display:inline;">
+                        <input type="hidden" name="permit_code" value="{{ p.code }}">
+                        <input type="hidden" name="decision" value="deny">
+                        <button type="submit" class="btn btn-secondary" style="padding:.25rem .6rem;font-size:.8rem;">Deny</button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+                </td>
             </tr>
+            {% else %}
+            <tr>
+                <td>{{ p }}</td>
+                <td colspan="5" style="color:#71767a;">Archived application</td>
+            </tr>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>

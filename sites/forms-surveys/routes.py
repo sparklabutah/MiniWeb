@@ -744,6 +744,44 @@ def create_form_submit():
     return redirect(url_for("forms-surveys.view_form", form_id=new_id))
 
 
+@blueprint.route("/form/<int:form_id>/edit")
+def edit_form_page(form_id):
+    """Form-EDIT builder: reuses the create builder, prefilled with an existing
+    form's title/description/status/fields, and PUTs the edited definition back
+    to ``api_form_update``. Only overlay-backed forms are editable (Pew surveys
+    404 via ``db.get_item``)."""
+    user = _current_user()
+    form = db.get_item(SITE, "forms", form_id)
+    if not form:
+        abort(404)
+    return render_template("forms-surveys/edit.html", user=user, form=form)
+
+
+@blueprint.route("/form/<int:form_id>/status", methods=["POST"])
+def form_set_status(form_id):
+    """Publish/close toggle: persist a form's status (draft/active/closed).
+
+    Gates responses — only 'active' forms are respondable, so flipping to
+    'closed' (or back to 'draft') makes the respond routes reject new responses.
+    A normal /sites/forms-surveys/ POST so /_admin/log captures it for grading.
+    Only overlay forms are toggleable (Pew surveys 404 via ``db.get_item``).
+    """
+    form = db.get_item(SITE, "forms", form_id)
+    if not form:
+        abort(404)
+    new_status = request.form.get("status", "").strip()
+    if new_status not in ("draft", "active", "closed"):
+        abort(400)
+    form["status"] = new_status
+    db.save_item(SITE, "forms", form_id, form)
+
+    user = _current_user()
+    emit("form_status_change", user_id=user["id"] if user else None,
+         site_name="forms-surveys", form_id=form_id, form_title=form["title"],
+         status=new_status)
+    return redirect(url_for("forms-surveys.view_form", form_id=form_id))
+
+
 @blueprint.route("/templates")
 def templates_page():
     templates = _get_templates()
@@ -840,17 +878,47 @@ def api_form_get(form_id):
 
 @blueprint.route("/api/forms/<int:form_id>", methods=["PUT"])
 def api_form_update(form_id):
+    """Update an existing overlay form's title/description/status/fields.
+
+    Backs the form-EDIT builder UI (/form/<id>/edit): the builder collects the
+    edited definition and PUTs it here. Only overlay-backed forms are editable —
+    the read-only Pew surveys (ids 100+) are not in the overlay/base ``forms``
+    table, so ``db.get_item`` returns None for them and this 404s. Mutations go
+    to the session overlay via ``db.save_item`` (CLAUDE.md DB rules).
+    """
     data = request.get_json(silent=True) or {}
-    forms = _load_forms()
-    form = next((f for f in forms if f["id"] == form_id), None)
+    form = db.get_item(SITE, "forms", form_id)
     if not form:
         abort(404)
 
-    for key in ["title", "description", "status", "fields"]:
-        if key in data:
-            form[key] = data[key]
+    if "title" in data:
+        form["title"] = (data.get("title") or "").strip()
+    if "description" in data:
+        form["description"] = (data.get("description") or "").strip()
+    if "status" in data:
+        new_status = (data.get("status") or "").strip()
+        if new_status not in ("draft", "active", "closed"):
+            return jsonify({"error": "Invalid status"}), 400
+        form["status"] = new_status
+    if "fields" in data:
+        fields = data.get("fields") or []
+        for i, field in enumerate(fields):
+            # Preserve existing field ids; mint a collision-proof id for new ones.
+            if not field.get("id"):
+                field["id"] = f"f{form_id}_{uuid.uuid4().hex[:6]}"
+            field.setdefault("type", "text")
+            field.setdefault("label", "")
+            field["label"] = (field.get("label") or "").strip()
+            field.setdefault("required", False)
+            field.setdefault("options", [])
+        form["fields"] = fields
 
-    _save_forms(forms)
+    db.save_item(SITE, "forms", form_id, form)
+
+    user = _current_user()
+    emit("form_update", user_id=user["id"] if user else None,
+         site_name="forms-surveys", form_id=form_id, form_title=form["title"],
+         status=form["status"], field_count=len(form.get("fields", [])))
     return jsonify(form)
 
 

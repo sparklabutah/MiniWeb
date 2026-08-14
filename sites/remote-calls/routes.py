@@ -398,6 +398,150 @@ def recording_detail(recording_id):
     )
 
 
+def _fmt_ts(seconds):
+    """Format a segment offset (seconds) as M:SS or H:MM:SS."""
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def _build_transcript_segments(recording, meeting, user_map):
+    """Return a list of speaker-tagged, timestamped transcript segments for a
+    recording. If the recording carries stored ``transcript_segments`` they are
+    used verbatim; otherwise a deterministic transcript is generated from the
+    recording id so it is stable across requests and gradeable.
+
+    Each segment: {"ts": "M:SS", "seconds": int, "speaker": str, "text": str}.
+    """
+    stored = recording.get("transcript_segments")
+    if isinstance(stored, list) and stored:
+        return stored
+
+    rnd = random.Random("transcript:" + str(recording["id"]))
+
+    # Speakers come from the meeting participants; fall back to the recorder.
+    speaker_ids = []
+    if meeting:
+        speaker_ids = list(meeting.get("participants", []))
+    if not speaker_ids:
+        speaker_ids = [recording.get("recorded_by")]
+    speakers = [user_map.get(sid, "Unknown") for sid in speaker_ids if sid]
+    speakers = [s for s in speakers if s] or ["Host", "Participant"]
+    host_name = user_map.get(meeting["host_id"], speakers[0]) if meeting else speakers[0]
+
+    title = recording.get("title", "the session")
+    total_seconds = max(60, int(recording.get("duration_minutes") or 30) * 60)
+
+    # Roughly one segment per ~40s of runtime, bounded so the page stays small.
+    n = max(6, min(45, total_seconds // 40))
+
+    # Topical lines; some reference the recording title so title-keyword search
+    # over the transcript returns hits.
+    body_lines = [
+        f"Let's walk through the main agenda for {title}.",
+        "Can everyone see my screen okay?",
+        "I'll share the numbers from last week before we dig in.",
+        "That's a good point — let's turn it into an action item.",
+        "We need to confirm the timeline before the next release.",
+        "I'll follow up with the design team after this call.",
+        "The main blocker right now is the staging environment.",
+        "Let's park that and come back to it at the end.",
+        "Who wants to own the customer-facing rollout?",
+        "I think we're aligned on the roadmap for this quarter.",
+        "Can we get a decision on the budget by Friday?",
+        "The deploy went out clean, no rollbacks needed.",
+        "Let's make sure QA signs off before we ship.",
+        f"To recap {title}, we agreed on the top three priorities.",
+        "I'll send the notes and action items right after this.",
+        "Any concerns before we wrap up?",
+        "Let's schedule a follow-up for next week.",
+        "Great, that covers everything on my list.",
+    ]
+
+    segments = []
+    last = 0
+    step = total_seconds // n
+    for i in range(n):
+        # Monotonic timestamps with small deterministic jitter.
+        base = i * step
+        jitter = rnd.randint(0, max(1, step // 3))
+        t = min(total_seconds - 1, base + jitter)
+        if t <= last and i > 0:
+            t = min(total_seconds - 1, last + 1)
+        last = t
+
+        if i == 0:
+            speaker = host_name
+            text = f"Alright everyone, thanks for joining {title}. Let's get started."
+        elif i == n - 1:
+            speaker = host_name
+            text = f"That's a wrap on {title}. Thanks all, I'll send the recording and notes."
+        else:
+            speaker = rnd.choice(speakers)
+            text = body_lines[(i + rnd.randint(0, 2)) % len(body_lines)]
+
+        segments.append({
+            "ts": _fmt_ts(t),
+            "seconds": t,
+            "speaker": speaker,
+            "text": text,
+        })
+    return segments
+
+
+@blueprint.route("/recording/<recording_id>/transcript")
+def recording_transcript(recording_id):
+    """Full transcript view for a recording.
+
+    Renders timestamped, speaker-tagged transcript segments for recordings
+    whose ``transcript_available`` flag is set. Recordings without a transcript
+    render an explicit empty state. Supports an in-transcript keyword search
+    (``q``) so the transcript is a gradeable read surface.
+    """
+    user, redir = _require_login()
+    if redir:
+        return redir
+
+    recordings = _load_recordings()
+    recording = next((r for r in recordings if r["id"] == recording_id), None)
+    if not recording:
+        abort(404)
+
+    user_map = _build_user_map()
+    meetings = _load_meetings()
+    meeting = next((m for m in meetings if m["id"] == recording["meeting_id"]), None)
+
+    has_transcript = bool(recording.get("transcript_available"))
+    query = request.args.get("q", "").strip()
+
+    segments = []
+    total_segments = 0
+    if has_transcript:
+        segments = _build_transcript_segments(recording, meeting, user_map)
+        total_segments = len(segments)
+        if query:
+            ql = query.lower()
+            segments = [
+                s for s in segments
+                if ql in s["text"].lower() or ql in s["speaker"].lower()
+            ]
+
+    return render_template(
+        "remote-calls/recording_transcript.html",
+        user=user,
+        recording=recording,
+        meeting=meeting,
+        has_transcript=has_transcript,
+        segments=segments,
+        total_segments=total_segments,
+        query=query,
+        parse_dt=_parse_dt,
+    )
+
+
 @blueprint.route("/call-log")
 def call_log_page():
     user, redir = _require_login()

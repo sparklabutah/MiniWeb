@@ -197,7 +197,34 @@
                 <div class="ticket-panel">
                     <h3>Tickets</h3>
 
-                    {% if event.status == 'on_sale' %}
+                    {% if event.status == 'on_sale' and reserved %}
+                    <p style="font-size:.85rem;color:#666;margin-bottom:1rem;">
+                        Reserved seating &mdash; pick your exact seats at checkout.
+                    </p>
+                    {% for tt in event.ticket_types %}
+                    {% set remaining = tt.available - tt.sold if tt.available > 0 else 0 %}
+                    <div class="ticket-type">
+                        <div class="ticket-type-info">
+                            <h4>{{ tt.type }}</h4>
+                            {% if tt.price == 0 %}
+                            <div class="price free">Free</div>
+                            {% else %}
+                            <div class="price">${{ "%.2f" | format(tt.price) }}</div>
+                            {% endif %}
+                            {% if tt.available == 0 %}
+                            <div class="avail">Unlimited</div>
+                            {% elif remaining <= 0 %}
+                            <div class="avail sold-out">Sold Out</div>
+                            {% elif remaining <= 10 %}
+                            <div class="avail low">Only {{ remaining }} left!</div>
+                            {% else %}
+                            <div class="avail">{{ remaining }} available</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <a href="{{ url_for('ticketing-events.checkout_page', event_id=event.id) }}" class="btn-buy" style="display:block;text-align:center;text-decoration:none;margin-top:.8rem">Select Your Seats</a>
+                    {% elif event.status == 'on_sale' %}
                     <form id="purchaseForm" onsubmit="return false;">
                         {% for tt in event.ticket_types %}
                         {% set remaining = tt.available - tt.sold if tt.available > 0 else 0 %}
@@ -260,7 +287,7 @@
         </div>
     </div>
 
-    {% if event.status == 'on_sale' %}
+    {% if event.status == 'on_sale' and not reserved %}
     <script>
         var userId = {{ user.id }};
         var eventId = {{ event.id }};

@@ -43,6 +43,31 @@ TABLES = {
             "user_id",
         ],
     },
+    "orders": {
+        # Purchase / order history — created + registered at runtime on first use
+        # (see routes._ensure_orders_table, the forums_messages seed convention).
+        # Records each checkout as a receipt (book/date/price/order id), distinct
+        # from the reading library. Session orders live in the overlay.
+        "table_name": "books_comics_orders",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("order_number", "TEXT NOT NULL DEFAULT ''"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("created_at", "TEXT NOT NULL DEFAULT ''"),
+            ("items", "TEXT NOT NULL DEFAULT '[]'"),
+            ("item_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("subtotal", "REAL NOT NULL DEFAULT 0.0"),
+            ("total", "REAL NOT NULL DEFAULT 0.0"),
+            ("payment_method", "TEXT NOT NULL DEFAULT ''"),
+            ("card_last4", "TEXT NOT NULL DEFAULT ''"),
+            ("name", "TEXT NOT NULL DEFAULT ''"),
+            ("email", "TEXT NOT NULL DEFAULT ''"),
+            ("status", "TEXT NOT NULL DEFAULT 'completed'"),
+        ],
+        "indexes": [
+            "user_id",
+        ],
+    },
     "categories": {
         "table_name": "books_comics_categories",
         "columns": [
@@ -82,6 +107,7 @@ TABLES = {
             ("followed_authors", "TEXT NOT NULL DEFAULT ''"),
             ("subscriptions", "TEXT NOT NULL DEFAULT ''"),
             ("reading_list", "TEXT NOT NULL DEFAULT ''"),
+            ("dismissed_issues", "TEXT NOT NULL DEFAULT ''"),
             ("cart", "TEXT NOT NULL DEFAULT ''"),
             ("avatar", "TEXT NOT NULL DEFAULT ''"),
         ],

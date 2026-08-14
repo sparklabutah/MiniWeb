@@ -11,7 +11,10 @@
 
     <div class="container">
         <div class="form-card">
-            <h2>Book a DMV Appointment</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0">Book a DMV Appointment</h2>
+                <a href="{{ url_for('tax-filing-dmv-permits.my_appointments_page') }}" style="font-weight:600;color:#1b3a4b">My Appointments &rarr;</a>
+            </div>
             <div id="success-msg" class="success-msg"></div>
             <form id="appt-form" onsubmit="return bookAppt(event)">
                 <div class="form-group"><label for="service">Service</label>
@@ -45,7 +48,8 @@
         }).then(function(r) { return r.json(); }).then(function(d) {
             var msg = document.getElementById('success-msg');
             msg.style.display = 'block';
-            msg.textContent = 'Appointment booked! ID: ' + d.appointment_id + ' on ' + d.date + ' at ' + d.time_slot;
+            msg.innerHTML = 'Appointment booked! ID: ' + d.appointment_id + ' on ' + d.date + ' at ' + d.time_slot +
+                ' &mdash; <a href="{{ url_for("tax-filing-dmv-permits.my_appointments_page") }}">View My Appointments</a>';
         });
         return false;
     }

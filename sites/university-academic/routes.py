@@ -13,6 +13,7 @@ Macro support (18):
   submit_by_query, apply_by_form, export_by_dropdown, subscribe_by_toggle
 """
 import csv
+import hashlib
 import io
 import json
 import pathlib
@@ -166,6 +167,13 @@ def courses_page():
     levels = sorted(set(c["level"] for c in courses))
     areas = sorted(set(c["research_area"] for c in courses if c.get("research_area")))
 
+    # Registration status for the current user (for the catalog Enroll column).
+    enrolled_ids = {e.get("course_id") for e in _my_enrollments()
+                    if e.get("status") == "enrolled"}
+    waitlisted_ids = {e.get("course_id") for e in _my_enrollments()
+                      if e.get("status") == "waitlisted"}
+    seats = {c["id"]: _seats_available(c) for c in filtered}
+
     return render_template(
         "university-academic/courses.html",
         courses=filtered,
@@ -176,6 +184,9 @@ def courses_page():
         level_filter=level_filter,
         search_query=search_query,
         checked_levels=checked_levels,
+        enrolled_ids=enrolled_ids,
+        waitlisted_ids=waitlisted_ids,
+        seats=seats,
     )
 
 
@@ -259,10 +270,14 @@ def course_detail(course_id):
     instructor = next(
         (f for f in faculty if f["name"] == course.get("instructor")), None
     )
+    enrollment = _enrollment_for_course(course["id"])
     return render_template(
         "university-academic/course_detail.html",
         course=course,
         instructor=instructor,
+        enrollment=enrollment,
+        seats_available=_seats_available(course),
+        is_full=(_seats_free(course) <= 0),
     )
 
 
@@ -358,6 +373,240 @@ def gradebook_submit(course_id):
     })
 
     return redirect(url_for("university-academic.gradebook_view", course_id=course["id"]))
+
+
+# ---------------------------------------------------------------------------
+# Course registration / enrollment (toggle_relationship)
+#
+# The site DB seeds a course catalog but no student-registration model at all
+# (there was nowhere for an enrollment to land -- db.query returns [] for an
+# unregistered collection). We create + register a base `enrollments` table on
+# first use (the forums_reports / auctions-orders runtime-seed pattern) so
+# db.query()/db.get_item() have a real home, then write every actual enrollment
+# to the per-session overlay via db.save_item -- base tables are never written,
+# so parallel agents stay isolated.
+#
+# Seats: courses carry max_enrollment but no live "seats taken" count, so we
+# derive a deterministic baseline of already-taken seats per course from a hash
+# of its id (stable across runs, no seeding needed). A course whose baseline
+# leaves zero free seats is full -> new registrations are WAITLISTED instead of
+# enrolled. Enrolling consumes one of the current user's free seats, so the
+# seats-available figure shown in the catalog/detail decrements.
+# ---------------------------------------------------------------------------
+
+_ENROLL_TABLE = "university_academic_enrollments"
+_enroll_table_ready = False
+
+
+def _ensure_enroll_table():
+    """Create + register the enrollments base table on first use. Idempotent."""
+    global _enroll_table_ready
+    if _enroll_table_ready and db.get_table_name(SITE, "enrollments"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_ENROLL_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            root_user_id INTEGER NOT NULL DEFAULT 0,
+            course_id TEXT NOT NULL DEFAULT '',
+            course_code TEXT NOT NULL DEFAULT '',
+            course_title TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'enrolled',
+            created_at TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_ua_enrollments_user "
+        f"ON [{_ENROLL_TABLE}] (root_user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "enrollments", _ENROLL_TABLE, "id")
+    _enroll_table_ready = True
+
+
+def _current_uid():
+    """Root user id for the current request (auto-login sets user_id=1)."""
+    return session.get("user_id", 1)
+
+
+def _seats_free(course):
+    """Deterministic count of currently-free seats in a course (before the
+    current user enrols). 0 free seats == the course is full -> waitlist.
+    Derived from a stable hash of the course id so it never drifts."""
+    try:
+        max_e = int(course.get("max_enrollment") or 0)
+    except (TypeError, ValueError):
+        max_e = 0
+    if max_e <= 0:
+        return 0
+    h = int(hashlib.sha256(str(course["id"]).encode("utf-8")).hexdigest(), 16)
+    # 0..7 baseline free seats; ~1 in 8 courses land on 0 (full).
+    return h % 8
+
+
+def _my_enrollments(uid=None):
+    """This user's active (non-dropped) enrollment rows, newest first."""
+    _ensure_enroll_table()
+    if uid is None:
+        uid = _current_uid()
+    return db.query(SITE, "enrollments", where={"root_user_id": uid},
+                    sort="-id")
+
+
+def _enrollment_for_course(course_id, uid=None):
+    """The user's active enrollment for a course, or None."""
+    for e in _my_enrollments(uid):
+        if e.get("course_id") == course_id:
+            return e
+    return None
+
+
+def _seats_available(course, uid=None):
+    """Free seats visible to the current user: baseline free minus a seat if
+    they are already enrolled (not waitlisted) in this course."""
+    free = _seats_free(course)
+    e = _enrollment_for_course(course["id"], uid)
+    if e and e.get("status") == "enrolled":
+        free -= 1
+    return max(free, 0)
+
+
+@blueprint.route("/schedule")
+def schedule_page():
+    """My Schedule -- the current user's registered courses (navigate_by_route,
+    report_information). Lists enrolled + waitlisted courses persisted in the
+    session overlay."""
+    uid = _current_uid()
+    enrollments = _my_enrollments(uid)
+    courses = _courses()
+    by_id = {c["id"]: c for c in courses}
+    rows = []
+    total_credits = 0
+    for e in enrollments:
+        course = by_id.get(e.get("course_id"))
+        credits = int(course.get("credits") or 0) if course else 0
+        if e.get("status") == "enrolled":
+            total_credits += credits
+        rows.append({
+            "enrollment_id": e["id"],
+            "course_id": e.get("course_id"),
+            "code": e.get("course_code") or (course.get("code") if course else ""),
+            "title": e.get("course_title") or (course.get("title") if course else ""),
+            "credits": credits,
+            "status": e.get("status", "enrolled"),
+            "instructor": course.get("instructor", "") if course else "",
+        })
+    enrolled_count = sum(1 for r in rows if r["status"] == "enrolled")
+    waitlisted_count = sum(1 for r in rows if r["status"] == "waitlisted")
+    return render_template(
+        "university-academic/schedule.html",
+        rows=rows,
+        total_credits=total_credits,
+        enrolled_count=enrolled_count,
+        waitlisted_count=waitlisted_count,
+    )
+
+
+def _do_enroll(course):
+    """Shared enrol logic. Returns (enrollment_dict, already_bool)."""
+    uid = _current_uid()
+    existing = _enrollment_for_course(course["id"], uid)
+    if existing:
+        return existing, True
+    status = "enrolled" if _seats_free(course) > 0 else "waitlisted"
+    eid = db.next_id(SITE, "enrollments")
+    record = {
+        "id": eid,
+        "root_user_id": uid,
+        "course_id": course["id"],
+        "course_code": course.get("code", ""),
+        "course_title": course.get("title", ""),
+        "status": status,
+        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    db.save_item(SITE, "enrollments", eid, record)
+    return record, False
+
+
+@blueprint.route("/course/<course_id>/enroll", methods=["POST"])
+def enroll_course(course_id):
+    """Register the current user for a course (toggle_relationship).
+
+    If the course is full (no free seats) the user is WAITLISTED instead of
+    enrolled. Idempotent per user+course. Persists to the session overlay."""
+    _ensure_enroll_table()
+    courses = _courses()
+    cid = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == cid), None)
+    if not course:
+        abort(404)
+    _do_enroll(course)
+    if request.headers.get("Accept") == "application/json":
+        e = _enrollment_for_course(course["id"])
+        return jsonify(e)
+    return redirect(url_for("university-academic.schedule_page"))
+
+
+@blueprint.route("/enrollment/<int:enrollment_id>/drop", methods=["POST"])
+def drop_enrollment(enrollment_id):
+    """Drop a registered course by enrollment id (toggle_relationship).
+
+    Removes the enrollment from the session overlay; the seat is released."""
+    _ensure_enroll_table()
+    uid = _current_uid()
+    e = db.get_item(SITE, "enrollments", enrollment_id)
+    # Only drop the current user's own enrollment.
+    if not e or int(e.get("root_user_id", 0)) != int(uid):
+        if request.headers.get("Accept") == "application/json":
+            return jsonify({"error": "Enrollment not found"}), 404
+        return redirect(url_for("university-academic.schedule_page"))
+    db.delete_item(SITE, "enrollments", enrollment_id)
+    if request.headers.get("Accept") == "application/json":
+        return jsonify({"status": "dropped", "enrollment_id": enrollment_id})
+    return redirect(url_for("university-academic.schedule_page"))
+
+
+@blueprint.route("/course/<course_id>/drop", methods=["POST"])
+def drop_course(course_id):
+    """Drop a course by course id (convenience for the course-detail button)."""
+    _ensure_enroll_table()
+    courses = _courses()
+    cid = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == cid), None)
+    if not course:
+        abort(404)
+    e = _enrollment_for_course(course["id"])
+    if e:
+        db.delete_item(SITE, "enrollments", e["id"])
+    if request.headers.get("Accept") == "application/json":
+        return jsonify({"status": "dropped", "course_id": course["id"]})
+    return redirect(url_for("university-academic.schedule_page"))
+
+
+# --- enrollment API ---
+@blueprint.route("/api/schedule", methods=["GET"])
+def api_schedule():
+    """GET the current user's registered courses (enrolled + waitlisted)."""
+    return jsonify(_my_enrollments())
+
+
+@blueprint.route("/api/course/<course_id>/enroll", methods=["POST"])
+def api_enroll_course(course_id):
+    """Register for a course via API; waitlists if full (toggle_relationship)."""
+    _ensure_enroll_table()
+    courses = _courses()
+    cid = course_id.lower()
+    course = next((c for c in courses if c["id"].lower() == cid), None)
+    if not course:
+        abort(404)
+    record, already = _do_enroll(course)
+    return jsonify({
+        "status": record["status"],
+        "already_registered": already,
+        "course_id": course["id"],
+        "enrollment_id": record["id"],
+        "seats_available": _seats_available(course),
+    })
 
 
 @blueprint.route("/faculty")

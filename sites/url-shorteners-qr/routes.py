@@ -30,6 +30,25 @@ from helpers.auth import current_user, browsing_user
 SITE = "url-shorteners-qr"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 
+# The site package name contains hyphens, so the sibling ``qr_encoder`` module
+# can't be reached with a normal ``from ... import``. Load it by file path.
+import importlib.util as _ilu
+_qr_spec = _ilu.spec_from_file_location(
+    "url_shorteners_qr_encoder", str(SITE_DIR / "qr_encoder.py"))
+qr_encoder = _ilu.module_from_spec(_qr_spec)
+_qr_spec.loader.exec_module(qr_encoder)
+
+
+def _short_url(link):
+    """Canonical short URL that a link's QR code encodes."""
+    return f"https://snplnk.io/{link['short_code']}"
+
+
+def _qr_svg(link, scale=6, border=4):
+    """Render a real, scannable QR code (SVG) encoding the link's short URL."""
+    return qr_encoder.make_qr_svg(_short_url(link), scale=scale, border=border,
+                                  dark="#1e293b", light="#ffffff")
+
 blueprint = Blueprint(
     "url-shorteners-qr",
     __name__,
@@ -231,7 +250,8 @@ def qr_page(link_id):
     if not link:
         abort(404)
     return render_template("url-shorteners-qr/qr.html", user=user,
-                           link=link, logged_in=logged_in)
+                           link=link, logged_in=logged_in,
+                           qr_svg=_qr_svg(link), short_url=_short_url(link))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -671,24 +691,17 @@ def api_link_qr(link_id):
     link = next((l for l in links if l["id"] == link_id), None)
     if not link:
         abort(404)
-    short_url = f"https://snplnk.io/{link['short_code']}"
-    qr_placeholder = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">'
-        f'<rect width="200" height="200" fill="white" stroke="#ccc"/>'
-        f'<rect x="20" y="20" width="40" height="40" fill="black"/>'
-        f'<rect x="140" y="20" width="40" height="40" fill="black"/>'
-        f'<rect x="20" y="140" width="40" height="40" fill="black"/>'
-        f'<rect x="70" y="70" width="60" height="60" fill="black"/>'
-        f'<text x="100" y="195" text-anchor="middle" font-size="8" fill="#666">{link["short_code"]}</text>'
-        f'</svg>'
-    )
+    short_url = _short_url(link)
+    matrix = qr_encoder.make_qr_matrix(short_url)
     return jsonify({
         "link_id": link_id,
         "short_code": link["short_code"],
         "short_url": short_url,
         "original_url": link["original_url"],
         "qr_enabled": link.get("qr_enabled", True),
-        "qr_svg": qr_placeholder,
+        "qr_svg": _qr_svg(link),
+        "qr_matrix": matrix,
+        "qr_modules": len(matrix),
     })
 
 

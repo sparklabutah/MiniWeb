@@ -465,6 +465,9 @@ def form_add_comment(post_id):
     }
     comments.append(new_comment)
     _save_comments(comments)
+    # Comments count toward a post's notes (likes + reblogs + comments).
+    post["notes_count"] = post.get("notes_count", 0) + 1
+    db.save_item(SITE, "posts", post_id, post)
     return redirect(url_for("blogs.post_detail", post_id=post_id))
 
 
@@ -511,6 +514,98 @@ def form_save_post(post_id):
         saved.append(post_id)
     _save_users(users)
     return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
+@blueprint.route("/post/<int:post_id>/like", methods=["POST"])
+def form_like_post(post_id):
+    """Like/unlike a post via HTML form POST.
+
+    Persists the like on the current user (liked_posts) and bumps the post's
+    notes_count so "notes" reflect real engagement. Toggling off decrements.
+    """
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page"))
+    user_id = session["user_id"]
+
+    post = db.get_item(SITE, "posts", post_id)
+    if not post:
+        abort(404)
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    liked = user.setdefault("liked_posts", [])
+    if post_id in liked:
+        liked.remove(post_id)
+        post["notes_count"] = max(0, post.get("notes_count", 0) - 1)
+    else:
+        liked.append(post_id)
+        post["notes_count"] = post.get("notes_count", 0) + 1
+    _save_users(users)
+    db.save_item(SITE, "posts", post_id, post)
+    return redirect(url_for("blogs.post_detail", post_id=post_id))
+
+
+def _build_reblog(original, user):
+    """Assemble a new post that reblogs `original` onto `user`'s blog."""
+    new_id = db.next_id(SITE, "posts")
+    return {
+        "id": new_id,
+        "title": original.get("title", ""),
+        "body": original.get("body", ""),
+        "author_id": user["id"],
+        "author_username": user["username"],
+        "author_display_name": user["display_name"],
+        "author_avatar": user["avatar"],
+        "category": original.get("category", ""),
+        "tags": original.get("tags", []) or [],
+        "image_url": original.get("image_url"),
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "notes_count": 0,
+        "is_pinned": False,
+        "shared_count": 0,
+        # Reblog provenance — references the original post.
+        "reblog_of": original["id"],
+        "reblog_of_title": original.get("title", ""),
+        "reblog_of_author": original.get("author_username", ""),
+    }
+
+
+@blueprint.route("/post/<int:post_id>/reblog", methods=["POST"])
+def form_reblog_post(post_id):
+    """Reblog a post via HTML form POST.
+
+    Creates a NEW post on the current user's blog that references the original,
+    records it on the user (reblogged_posts), and bumps the original's
+    notes_count. Redirects to the newly created reblog post.
+    """
+    if "user_id" not in session:
+        return redirect(url_for("blogs.login_page"))
+    user_id = session["user_id"]
+
+    original = db.get_item(SITE, "posts", post_id)
+    if not original:
+        abort(404)
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    new_post = _build_reblog(original, user)
+    db.save_item(SITE, "posts", new_post["id"], new_post)
+
+    original["notes_count"] = original.get("notes_count", 0) + 1
+    db.save_item(SITE, "posts", post_id, original)
+
+    reblogged = user.setdefault("reblogged_posts", [])
+    if post_id not in reblogged:
+        reblogged.append(post_id)
+        _save_users(users)
+
+    return redirect(url_for("blogs.post_detail", post_id=new_post["id"]))
 
 
 @blueprint.route("/post/<int:post_id>/subscribe", methods=["POST"])
@@ -806,6 +901,67 @@ def api_share_post(post_id):
     })
 
 
+@blueprint.route("/api/posts/<int:post_id>/like", methods=["POST"])
+def api_like_post(post_id):
+    """Like/unlike a post (JSON). Persists on the user and updates notes_count."""
+    if "user_id" not in session:
+        return jsonify({"error": "login required"}), 401
+    user_id = session["user_id"]
+    post = db.get_item(SITE, "posts", post_id)
+    if not post:
+        abort(404)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+    liked = user.setdefault("liked_posts", [])
+    if post_id in liked:
+        liked.remove(post_id)
+        post["notes_count"] = max(0, post.get("notes_count", 0) - 1)
+        action = "unliked"
+    else:
+        liked.append(post_id)
+        post["notes_count"] = post.get("notes_count", 0) + 1
+        action = "liked"
+    _save_users(users)
+    db.save_item(SITE, "posts", post_id, post)
+    return jsonify({
+        "action": action,
+        "post_id": post_id,
+        "notes_count": post["notes_count"],
+        "total_liked": len(liked),
+    })
+
+
+@blueprint.route("/api/posts/<int:post_id>/reblog", methods=["POST"])
+def api_reblog_post(post_id):
+    """Reblog a post (JSON). Creates a new referencing post and bumps notes."""
+    if "user_id" not in session:
+        return jsonify({"error": "login required"}), 401
+    user_id = session["user_id"]
+    original = db.get_item(SITE, "posts", post_id)
+    if not original:
+        abort(404)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+    new_post = _build_reblog(original, user)
+    db.save_item(SITE, "posts", new_post["id"], new_post)
+    original["notes_count"] = original.get("notes_count", 0) + 1
+    db.save_item(SITE, "posts", post_id, original)
+    reblogged = user.setdefault("reblogged_posts", [])
+    if post_id not in reblogged:
+        reblogged.append(post_id)
+        _save_users(users)
+    return jsonify({
+        "action": "reblogged",
+        "post_id": new_post["id"],
+        "reblog_of": post_id,
+        "original_notes_count": original["notes_count"],
+    }), 201
+
+
 @blueprint.route("/api/posts/create", methods=["POST"])
 def api_create_post():
     data = request.get_json(silent=True) or {}
@@ -879,6 +1035,9 @@ def api_add_comment(post_id):
     }
     comments.append(new_comment)
     _save_comments(comments)
+    # Comments count toward a post's notes (likes + reblogs + comments).
+    post["notes_count"] = post.get("notes_count", 0) + 1
+    db.save_item(SITE, "posts", post_id, post)
     return jsonify(new_comment), 201
 
 

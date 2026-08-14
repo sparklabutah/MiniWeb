@@ -2,10 +2,256 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0;url={{ url_for('handwritten-notes-whiteboards.index') }}">
-    <title>Redirecting...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ wb.title }} - NoteCanvas Whiteboard</title>
+    <style>
+        :root {
+            --amber: #f59e0b;
+            --amber-dark: #d97706;
+            --amber-light: #fef3c7;
+            --amber-50: #fffbeb;
+            --text-primary: #1c1917;
+            --text-secondary: #57534e;
+            --text-muted: #a8a29e;
+            --bg-page: #fafaf9;
+            --bg-card: #ffffff;
+            --border: #e7e5e4;
+            --border-light: #f5f5f4;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,.07);
+            --radius: .5rem;
+            --danger: #ef4444;
+            --danger-light: #fef2f2;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-page); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; line-height: 1.5; }
+        a { color: var(--amber-dark); text-decoration: none; }
+        a:hover { color: var(--amber); }
+
+        .top-bar {
+            background: var(--bg-card); padding: .5rem 1rem;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 200;
+        }
+        .top-bar .left { display: flex; align-items: center; gap: .75rem; }
+        .back-btn { display: inline-flex; align-items: center; gap: .3rem; font-size: .85rem; font-weight: 500; color: var(--text-secondary); padding: .3rem .6rem; border-radius: var(--radius); transition: background .12s; }
+        .back-btn:hover { background: var(--border-light); color: var(--text-primary); }
+        .back-btn svg { width: 16px; height: 16px; }
+        .wb-title { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
+        .top-bar .right { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-muted); }
+
+        /* Toolbar for adding elements */
+        .toolbar {
+            background: var(--bg-card); border-bottom: 1px solid var(--border);
+            padding: .45rem 1rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+            position: sticky; top: 43px; z-index: 190;
+        }
+        .toolbar label { font-size: .75rem; color: var(--text-muted); }
+        .toolbar select, .toolbar input[type=text] {
+            font-family: inherit; font-size: .8rem; padding: .3rem .5rem;
+            border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text-primary);
+        }
+        .toolbar input[type=text] { width: 190px; }
+        .swatches { display: inline-flex; gap: .2rem; }
+        .swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+        .swatch.active { border-color: var(--text-primary); }
+        .btn {
+            display: inline-flex; align-items: center; gap: .3rem;
+            padding: .35rem .7rem; border: 1px solid transparent; border-radius: var(--radius);
+            font-size: .8rem; font-weight: 600; cursor: pointer; font-family: inherit;
+        }
+        .btn-primary { background: var(--amber); color: #fff; }
+        .btn-primary:hover { background: var(--amber-dark); }
+        .save-indicator { font-size: .75rem; color: var(--text-muted); margin-left: .4rem; min-width: 90px; }
+
+        /* Canvas */
+        .canvas-wrap { padding: 1.25rem; overflow: auto; height: calc(100vh - 92px); }
+        .board-canvas {
+            position: relative; width: 1200px; min-height: 700px;
+            background-color: var(--bg-card);
+            background-image:
+                linear-gradient(var(--border-light) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-light) 1px, transparent 1px);
+            background-size: 24px 24px;
+            border: 1px solid var(--border); border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+        }
+        .wb-element {
+            position: absolute; cursor: grab; user-select: none;
+            border-radius: .4rem; padding: .5rem .6rem;
+            font-size: .82rem; color: var(--text-primary);
+            box-shadow: var(--shadow-sm); overflow: hidden;
+            display: flex; align-items: flex-start; word-break: break-word;
+        }
+        .wb-element.dragging { cursor: grabbing; box-shadow: var(--shadow-md); z-index: 50; opacity: .95; }
+        .wb-element.type-sticky { box-shadow: 2px 3px 8px rgba(0,0,0,.08); }
+        .wb-element.type-text { background: transparent !important; box-shadow: none; font-weight: 600; }
+        .wb-element.type-shape { align-items: center; justify-content: center; opacity: .85; }
+        .empty-hint { position: absolute; top: 40%; left: 0; right: 0; text-align: center; color: var(--text-muted); font-size: .9rem; pointer-events: none; }
+    </style>
 </head>
 <body>
-    <p>Whiteboards have been merged into <a href="{{ url_for('handwritten-notes-whiteboards.index') }}">All Notes</a>.</p>
+    <div class="top-bar">
+        <div class="left">
+            <a href="{{ url_for('handwritten-notes-whiteboards.whiteboards_page') }}" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                Whiteboards
+            </a>
+            <span class="wb-title">{{ wb.title }}</span>
+        </div>
+        <div class="right">
+            {% if user %}<span>{{ user.display_name }}</span>{% else %}<a href="{{ url_for('handwritten-notes-whiteboards.login_page') }}">Sign in</a>{% endif %}
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <label for="el-type">Add</label>
+        <select id="el-type">
+            <option value="sticky">Sticky note</option>
+            <option value="text">Text label</option>
+            <option value="shape">Shape (rectangle)</option>
+        </select>
+        <input type="text" id="el-content" placeholder="Content..." value="New idea">
+        <span class="swatches" id="swatches">
+            {% for c in ['#FFF3E0', '#E8F5E9', '#E3F2FD', '#F3E5F5', '#FFE0E0', '#7EC699', '#E87461'] %}
+            <button type="button" class="swatch {{ 'active' if loop.first }}" style="background:{{ c }};" data-color="{{ c }}"></button>
+            {% endfor %}
+        </span>
+        <button class="btn btn-primary" id="add-btn" {% if not user %}disabled{% endif %}>+ Add element</button>
+        <span class="save-indicator" id="save-indicator"></span>
+    </div>
+
+    <div class="canvas-wrap">
+        <div class="board-canvas" id="board-canvas">
+            {% if not wb.elements %}
+            <div class="empty-hint" id="empty-hint">This whiteboard is empty. Add an element from the toolbar above.</div>
+            {% endif %}
+            {% for el in wb.elements %}
+            <div class="wb-element type-{{ el.type }}"
+                 data-index="{{ loop.index0 }}"
+                 style="left:{{ el.x }}px; top:{{ el.y }}px; width:{{ el.width }}px; height:{{ el.height }}px; background:{{ el.color }};">
+                {% if el.type == 'shape' %}{% else %}{{ el.content }}{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var wbId = {{ wb.id }};
+        var isLoggedIn = {{ 'true' if user else 'false' }};
+        var board = document.getElementById('board-canvas');
+        var indicator = document.getElementById('save-indicator');
+        var elementCount = {{ wb.elements | length }};
+
+        // ---- Chosen color ----
+        var chosenColor = '#FFF3E0';
+        document.getElementById('swatches').addEventListener('click', function (e) {
+            var btn = e.target.closest('.swatch');
+            if (!btn) return;
+            document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('active'); });
+            btn.classList.add('active');
+            chosenColor = btn.getAttribute('data-color');
+        });
+
+        function setIndicator(text, color) {
+            indicator.textContent = text;
+            indicator.style.color = color || 'var(--text-muted)';
+        }
+
+        // ---- Add element ----
+        var addBtn = document.getElementById('add-btn');
+        if (addBtn) addBtn.addEventListener('click', function () {
+            if (!isLoggedIn) return;
+            var type = document.getElementById('el-type').value;
+            var content = document.getElementById('el-content').value;
+            if (type === 'shape') content = 'rectangle';
+            // Stagger new elements so they don't stack exactly.
+            var x = 40 + (elementCount % 6) * 40;
+            var y = 300 + (elementCount % 4) * 30;
+            var payload = { type: type, content: content, x: x, y: y,
+                            width: type === 'text' ? 160 : 160,
+                            height: type === 'text' ? 35 : 80, color: chosenColor };
+            setIndicator('Saving...');
+            fetch('{{ url_for("handwritten-notes-whiteboards.api_whiteboard_add_element", wb_id=wb.id) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var idx = data.element_index;
+                var el = data.element;
+                renderElement(el, idx);
+                elementCount++;
+                var hint = document.getElementById('empty-hint');
+                if (hint) hint.remove();
+                setIndicator('Saved', '#16a34a');
+            })
+            .catch(function () { setIndicator('Save failed', 'var(--danger)'); });
+        });
+
+        function renderElement(el, idx) {
+            var div = document.createElement('div');
+            div.className = 'wb-element type-' + el.type;
+            div.setAttribute('data-index', idx);
+            div.style.left = el.x + 'px';
+            div.style.top = el.y + 'px';
+            div.style.width = el.width + 'px';
+            div.style.height = el.height + 'px';
+            div.style.background = el.color;
+            div.textContent = (el.type === 'shape') ? '' : (el.content || '');
+            board.appendChild(div);
+            attachDrag(div);
+            return div;
+        }
+
+        // ---- Dragging + persist position ----
+        function attachDrag(el) {
+            el.addEventListener('mousedown', function (e) {
+                if (!isLoggedIn) return;
+                e.preventDefault();
+                var boardRect = board.getBoundingClientRect();
+                var startX = e.clientX, startY = e.clientY;
+                var origLeft = parseFloat(el.style.left) || 0;
+                var origTop = parseFloat(el.style.top) || 0;
+                el.classList.add('dragging');
+
+                function onMove(ev) {
+                    var nx = origLeft + (ev.clientX - startX);
+                    var ny = origTop + (ev.clientY - startY);
+                    nx = Math.max(0, nx);
+                    ny = Math.max(0, ny);
+                    el.style.left = nx + 'px';
+                    el.style.top = ny + 'px';
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    el.classList.remove('dragging');
+                    var idx = parseInt(el.getAttribute('data-index'), 10);
+                    var finalX = Math.round(parseFloat(el.style.left) || 0);
+                    var finalY = Math.round(parseFloat(el.style.top) || 0);
+                    setIndicator('Saving...');
+                    fetch('{{ url_for("handwritten-notes-whiteboards.index") }}'.replace(/\/$/, '') +
+                          '/api/whiteboards/' + wbId + '/elements/' + idx + '/move', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ x: finalX, y: finalY })
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function () { setIndicator('Saved', '#16a34a'); })
+                    .catch(function () { setIndicator('Save failed', 'var(--danger)'); });
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        // Wire up server-rendered elements.
+        document.querySelectorAll('.wb-element').forEach(attachDrag);
+    })();
+    </script>
 </body>
 </html>

@@ -30,6 +30,20 @@
 
         .btn-launch { width: 100%; padding: .85rem; background: #2bde73; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: .5rem; transition: background .15s; }
         .btn-launch:hover { background: #25c766; }
+
+        /* ---------- Reward tiers ---------- */
+        .section-head { font-size: 1.05rem; font-weight: 800; margin: 2rem 0 .3rem; }
+        .section-sub { font-size: .78rem; color: #999; margin-bottom: 1rem; }
+        .tier-row { border: 1.5px solid #e0e0e0; border-radius: 10px; padding: 1.1rem 1.1rem .4rem; margin-bottom: 1rem; position: relative; background: #fcfcfc; }
+        .tier-row .tier-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .8rem; }
+        .tier-row .tier-idx { font-size: .78rem; font-weight: 700; color: #2bde73; text-transform: uppercase; letter-spacing: .04em; }
+        .tier-remove { background: none; border: none; color: #c0392b; font-size: .78rem; font-weight: 600; cursor: pointer; padding: .2rem .4rem; }
+        .tier-remove:hover { text-decoration: underline; }
+        .tier-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+        .tier-grid .full { grid-column: 1 / -1; }
+        .btn-add-tier { width: 100%; padding: .7rem; background: #fff; color: #2bde73; border: 1.5px dashed #2bde73; border-radius: 8px; font-size: .9rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+        .btn-add-tier:hover { background: #f0fdf5; }
+        .no-tiers-hint { font-size: .75rem; color: #bbb; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -54,8 +68,13 @@
                 <input type="text" id="title" name="title" placeholder="Give your project a catchy title" required>
             </div>
             <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" name="description" placeholder="Tell people about your project, why it matters, and what you plan to do..." required></textarea>
+                <label for="description">Short Description</label>
+                <textarea id="description" name="description" placeholder="A one or two sentence summary of your project..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="story">Full Story <span style="color:#bbb;font-weight:400">(optional)</span></label>
+                <textarea id="story" name="story" placeholder="Tell backers the full story: why it matters, what you'll do with the funds, and your timeline..."></textarea>
+                <div class="form-hint">Added to the "About this project" section on your campaign page.</div>
             </div>
             <div class="form-group">
                 <label for="category">Category</label>
@@ -83,10 +102,85 @@
                 <label for="end_date">End Date</label>
                 <input type="date" id="end_date" name="end_date" required>
             </div>
+
+            <!-- ---------- Reward tiers ---------- -->
+            <div class="section-head">Reward Tiers</div>
+            <div class="section-sub">Offer backers something in return for their pledge. Add one tier per reward level.</div>
+
+            <div id="tiers"></div>
+            <p class="no-tiers-hint" id="no-tiers-hint">No reward tiers yet. Backers will still be able to pledge a custom amount.</p>
+
+            <button type="button" class="btn-add-tier" id="add-tier" style="margin-bottom:1rem">+ Add reward tier</button>
+
             <button type="submit" class="btn-launch">Launch Project</button>
         </form>
     </div>
 </div>
+
+<!-- Reward-tier row template -->
+<template id="tier-template">
+    <div class="tier-row">
+        <div class="tier-head">
+            <span class="tier-idx">Reward Tier</span>
+            <button type="button" class="tier-remove">Remove</button>
+        </div>
+        <div class="tier-grid">
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Reward Title</label>
+                <input type="text" name="tier_name" placeholder="e.g. Early Bird Special">
+            </div>
+            <div class="form-group" style="margin-bottom:.8rem">
+                <label>Pledge Amount ($)</label>
+                <input type="number" name="tier_amount" placeholder="25" min="1" step="1">
+            </div>
+            <div class="form-group" style="margin-bottom:.8rem">
+                <label>Limit <span style="color:#bbb;font-weight:400">(optional)</span></label>
+                <input type="number" name="tier_limit" placeholder="Unlimited" min="1" step="1">
+            </div>
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Description</label>
+                <textarea name="tier_description" placeholder="What does a backer get at this level?" style="min-height:70px"></textarea>
+            </div>
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Fulfillment</label>
+                <select name="tier_fulfillment">
+                    <option value="physical">Physical (requires shipping)</option>
+                    <option value="digital">Digital (no shipping)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+(function () {
+    var tiers = document.getElementById('tiers');
+    var tpl = document.getElementById('tier-template');
+    var addBtn = document.getElementById('add-tier');
+    var hint = document.getElementById('no-tiers-hint');
+
+    function renumber() {
+        var rows = tiers.querySelectorAll('.tier-row');
+        rows.forEach(function (row, i) {
+            row.querySelector('.tier-idx').textContent = 'Reward Tier ' + (i + 1);
+        });
+        hint.style.display = rows.length ? 'none' : 'block';
+    }
+
+    function addTier() {
+        var frag = tpl.content.cloneNode(true);
+        frag.querySelector('.tier-remove').addEventListener('click', function (e) {
+            e.target.closest('.tier-row').remove();
+            renumber();
+        });
+        tiers.appendChild(frag);
+        renumber();
+    }
+
+    addBtn.addEventListener('click', addTier);
+    renumber();
+})();
+</script>
 
 </body>
 </html>

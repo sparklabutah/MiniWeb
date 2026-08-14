@@ -6,6 +6,7 @@ reviews in per-site typed tables.  Queried through app.db.
 import json
 import pathlib
 import re
+import hashlib
 import datetime
 from collections import Counter
 
@@ -260,6 +261,105 @@ def _save_reviews(reviews):
 
 
 # ---------------------------------------------------------------------------
+# Post-purchase order lifecycle: status progression, tracking, and returns
+# ---------------------------------------------------------------------------
+#
+# An order moves processing -> shipped -> delivered deterministically, one
+# stage per time the Orders list or an Order-detail page is viewed. Shipping a
+# package assigns a deterministic carrier + tracking number (derived from the
+# order id, so it is stable across refreshes). From a delivered order the buyer
+# can open a return (RMA), which persists on the order and itself progresses
+# requested -> approved -> refunded on subsequent views.
+
+_CARRIERS = ["UPS", "FedEx", "USPS", "DHL"]
+
+# Order status flow (cancelled is terminal and never advances)
+ORDER_STATUS_FLOW = {"processing": "shipped", "shipped": "delivered"}
+RETURN_STATUS_FLOW = {"requested": "approved", "approved": "refunded"}
+
+RETURN_REASONS = [
+    "Defective or doesn't work",
+    "Wrong item received",
+    "Item damaged in shipping",
+    "No longer needed",
+    "Better price available elsewhere",
+    "Arrived too late",
+]
+
+
+def _order_seq(order):
+    """Stable integer fingerprint of an order id (deterministic carrier/tracking)."""
+    return int(hashlib.sha1(str(order.get("id", "")).encode()).hexdigest()[:8], 16)
+
+
+def _assign_tracking(order):
+    """Attach a deterministic carrier + tracking number to a shipped order."""
+    seq = _order_seq(order)
+    order["carrier"] = _CARRIERS[seq % len(_CARRIERS)]
+    order["tracking_number"] = f"1Z{seq % 10**10:010d}"
+
+
+def _order_date(order):
+    try:
+        return datetime.datetime.strptime(order.get("date", ""), "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return datetime.datetime.now()
+
+
+def _advance_order_lifecycle(order):
+    """Advance one order one lifecycle stage. Returns True if it changed."""
+    nxt = ORDER_STATUS_FLOW.get(order.get("status"))
+    if not nxt:
+        return False
+    order["status"] = nxt
+    if nxt == "shipped":
+        if not order.get("tracking_number"):
+            _assign_tracking(order)
+        order.setdefault("shipped_date",
+                          (_order_date(order) + datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
+    elif nxt == "delivered":
+        order.setdefault("delivered_date",
+                          (_order_date(order) + datetime.timedelta(days=3)).strftime("%Y-%m-%d"))
+    return True
+
+
+def _advance_return(order):
+    """Advance an existing return record one stage. Returns True if it changed."""
+    ret = order.get("return")
+    if not ret:
+        return False
+    nxt = RETURN_STATUS_FLOW.get(ret.get("status"))
+    if not nxt:
+        return False
+    ret["status"] = nxt
+    if nxt == "approved":
+        ret.setdefault("approved_date", datetime.datetime.now().strftime("%Y-%m-%d"))
+    elif nxt == "refunded":
+        ret.setdefault("refunded_date", datetime.datetime.now().strftime("%Y-%m-%d"))
+        ret.setdefault("refund_amount", order.get("total", 0.0))
+    return True
+
+
+def _progress_and_persist(user, users):
+    """Advance every order (and its return) for `user` by one stage on view;
+    persist the whole users collection to the session overlay if anything moved."""
+    changed = False
+    for order in user.get("orders", []):
+        if _advance_order_lifecycle(order):
+            changed = True
+        if _advance_return(order):
+            changed = True
+    if changed:
+        _save_users(users)
+    return changed
+
+
+def _order_can_return(order):
+    """A delivered order with no open/closed return is eligible for a return."""
+    return order.get("status") == "delivered" and not order.get("return")
+
+
+# ---------------------------------------------------------------------------
 # Search / filter helpers
 # ---------------------------------------------------------------------------
 
@@ -469,11 +569,32 @@ def cart_page():
 def orders_page():
     if "user_id" not in session:
         return redirect(url_for("e-commerce.login_page"))
-    user = _get_user(session["user_id"])
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
     if not user:
         return redirect(url_for("e-commerce.login_page"))
-    orders = user.get("orders", [])
-    return render_template("e-commerce/orders.html", orders=orders, user=user)
+    # Deterministically advance each order's status one stage on view.
+    _progress_and_persist(user, users)
+    orders = list(reversed(user.get("orders", [])))
+    return render_template("e-commerce/orders.html", orders=orders, user=user,
+                           return_reasons=RETURN_REASONS)
+
+
+@blueprint.route("/order/<order_id>")
+def order_detail_page(order_id):
+    if "user_id" not in session:
+        return redirect(url_for("e-commerce.login_page"))
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("e-commerce.login_page"))
+    # Advance the whole account one stage on view (keeps list + detail in sync).
+    _progress_and_persist(user, users)
+    order = next((o for o in user.get("orders", []) if o.get("id") == order_id), None)
+    if order is None:
+        abort(404)
+    return render_template("e-commerce/order_detail.html", order=order, user=user,
+                           return_reasons=RETURN_REASONS)
 
 
 @blueprint.route("/wishlist")
@@ -621,6 +742,32 @@ def form_cancel_order():
             order["status"] = "cancelled"
     _save_users(users)
     return redirect(url_for("e-commerce.orders_page"))
+
+
+@blueprint.route("/orders/return", methods=["POST"])
+def form_request_return():
+    """Open a return (RMA) against a delivered order. Persists a return record
+    that then progresses requested -> approved -> refunded on later views."""
+    if "user_id" not in session:
+        return redirect(url_for("e-commerce.login_page"))
+    order_id = request.form.get("order_id", "")
+    reason = request.form.get("reason", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["id"] == session["user_id"]), None)
+    if not user:
+        return redirect(url_for("e-commerce.login_page"))
+    for order in user.get("orders", []):
+        if order.get("id") == order_id and _order_can_return(order):
+            suffix = order_id.split("ORD-", 1)[-1] if "ORD-" in order_id else order_id
+            order["return"] = {
+                "rma_id": f"RMA-{suffix}",
+                "reason": reason or RETURN_REASONS[0],
+                "status": "requested",
+                "requested_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            }
+            break
+    _save_users(users)
+    return redirect(url_for("e-commerce.order_detail_page", order_id=order_id))
 
 
 @blueprint.route("/wishlist/toggle", methods=["POST"])
@@ -958,10 +1105,45 @@ def api_toggle_wishlist(user_id):
 
 @blueprint.route("/api/orders/<int:user_id>")
 def api_get_orders(user_id):
-    user = _get_user(user_id)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
     if not user:
         abort(404)
+    # Reading orders advances their lifecycle one stage (parity with the UI).
+    _progress_and_persist(user, users)
     return jsonify(user.get("orders", []))
+
+
+@blueprint.route("/api/orders/return", methods=["POST"])
+def api_request_return():
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    order_id = data.get("order_id", "")
+    reason = (data.get("reason") or "").strip()
+    if user_id is None or not order_id:
+        return jsonify({"error": "user_id and order_id required"}), 400
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    order = next((o for o in user.get("orders", []) if o.get("id") == order_id), None)
+    if order is None:
+        return jsonify({"error": "order not found"}), 404
+    if not _order_can_return(order):
+        return jsonify({"error": "order is not eligible for a return"}), 400
+
+    suffix = order_id.split("ORD-", 1)[-1] if "ORD-" in order_id else order_id
+    order["return"] = {
+        "rma_id": f"RMA-{suffix}",
+        "reason": reason or RETURN_REASONS[0],
+        "status": "requested",
+        "requested_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+    }
+    _save_users(users)
+    return jsonify({"action": "return_requested", "return": order["return"],
+                     "order_id": order_id})
 
 
 @blueprint.route("/api/orders", methods=["POST"])

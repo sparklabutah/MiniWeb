@@ -14,6 +14,11 @@
             <input type="hidden" name="share_with" value="public">
             <button type="submit" class="btn-small" title="Share conversation">Share</button>
         </form>
+        {% if current_conv.messages %}
+        <form method="post" action="{{ url_for('ai-chatbots.form_regenerate', conv_id=current_conv.id) }}" style="display:inline;">
+            <button type="submit" class="btn-small" id="regenerate-btn" title="Regenerate the last assistant reply">Regenerate</button>
+        </form>
+        {% endif %}
         <button class="btn-small btn-danger" title="Delete conversation" id="delete-conv-btn" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=current_conv.id) }}">Delete</button>
         <script>
         document.getElementById('delete-conv-btn').addEventListener('click', function() {
@@ -39,6 +44,17 @@
 {% endblock %}
 
 {% block content %}
+{% if current_conv %}
+<details class="custom-instructions" id="custom-instructions" {% if current_conv.system_prompt %}open{% endif %} style="margin:0 0 12px;border:1px solid #4a4a5a;border-radius:8px;padding:8px 12px;background:#2a2a3a;">
+    <summary style="cursor:pointer;font-size:13px;color:#c5c5d2;">Custom Instructions{% if current_conv.system_prompt %} (active){% endif %}</summary>
+    <form method="post" action="{{ url_for('ai-chatbots.form_system_prompt', conv_id=current_conv.id) }}" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+        <textarea name="system_prompt" id="system-prompt-input" rows="2" placeholder="e.g. Respond concisely and in a formal tone." style="width:100%;padding:6px 8px;font-size:13px;resize:vertical;">{{ current_conv.system_prompt or '' }}</textarea>
+        <div>
+            <button type="submit" class="btn-small" title="Save custom instructions for this conversation">Save Instructions</button>
+        </div>
+    </form>
+</details>
+{% endif %}
 <div id="messages-container">
     {% if current_conv and current_conv.messages %}
         {% for msg in current_conv.messages %}

@@ -153,6 +153,16 @@ def _semantic_search_audiobooks(audiobooks, query):
     return [a for a, _ in scored]
 
 
+def _get_resume(lib, item_type, item_id):
+    """Return the saved (position_seconds, progress_percent) for an item, or (0, 0)."""
+    if not lib:
+        return 0, 0
+    for h in lib.get("listen_history", []):
+        if h.get("item_type") == item_type and h.get("item_id") == item_id:
+            return h.get("position", 0) or 0, h.get("progress_percent", 0) or 0
+    return 0, 0
+
+
 def _ensure_lib(libraries, user_id):
     """Get or create a library entry for user_id."""
     lib = next((l for l in libraries if l["user_id"] == user_id), None)
@@ -277,6 +287,8 @@ def episode_detail(episode_id):
     liked = False
     saved = False
     user = None
+    resume_position = 0
+    resume_percent = 0
     if "user_id" in session:
         user = _get_user(session["user_id"])
         if user and user["id"] in episode.get("liked_by", []):
@@ -284,6 +296,8 @@ def episode_detail(episode_id):
         lib = _get_user_library(session["user_id"])
         if lib and episode_id in lib.get("saved_episodes", []):
             saved = True
+        # Resume where the listener left off (persisted playback position).
+        resume_position, resume_percent = _get_resume(lib, "episode", episode_id)
 
     return render_template(
         "podcasts-audiobooks/episode_detail.html",
@@ -292,6 +306,8 @@ def episode_detail(episode_id):
         liked=liked,
         saved=saved,
         user=user,
+        resume_position=resume_position,
+        resume_percent=resume_percent,
     )
 
 
@@ -1026,11 +1042,99 @@ def api_playback_speed():
     libraries = _load_library()
     lib = _ensure_lib(libraries, session["user_id"])
     lib["playback_speed"] = speed
-    db.save_collection(SITE, "library", libraries)
+    db.save_item(SITE, "library", lib["id"], lib)
 
     return jsonify({
         "action": "speed_set",
         "speed": speed,
+    })
+
+
+def _item_duration_seconds(item_type, item):
+    """Total playable length of an episode/audiobook in seconds."""
+    if item_type == "episode":
+        return int(item.get("duration_minutes", 0)) * 60
+    return int(round(float(item.get("duration_hours", 0)) * 3600))
+
+
+@blueprint.route("/api/playback/progress", methods=["POST"])
+def api_playback_progress():
+    """Persist real playback position/progress for an episode or audiobook.
+
+    This is what makes "Continue Listening" / resume real: the player POSTs the
+    listener's current position as they listen, seek, or pause, and we upsert the
+    matching listen_history entry (keyed by user + item) with the new position,
+    progress_percent, and last_played date.
+
+    Body JSON:
+      item_type: "episode" | "audiobook"   (required)
+      item_id:   int                        (required)
+      position:  number (seconds, >= 0)     (required)
+      duration:  number (seconds, optional) -- overrides catalog length
+      progress_percent: number (optional)   -- else derived from position/duration
+    """
+    if "user_id" not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    data = request.get_json(silent=True) or {}
+    item_type = str(data.get("item_type", "")).strip()
+    item_id = data.get("item_id")
+    position = data.get("position")
+
+    if item_type not in ("episode", "audiobook"):
+        return jsonify({"error": "item_type must be 'episode' or 'audiobook'"}), 400
+    if not isinstance(item_id, int):
+        return jsonify({"error": "item_id required (int)"}), 400
+    if not isinstance(position, (int, float)) or isinstance(position, bool) or position < 0:
+        return jsonify({"error": "position required (number >= 0 seconds)"}), 400
+
+    if item_type == "episode":
+        item = next((e for e in _load_episodes() if e["id"] == item_id), None)
+    else:
+        item = next((a for a in _load_audiobooks() if a["id"] == item_id), None)
+    if not item:
+        return jsonify({"error": f"{item_type} not found"}), 404
+
+    total_sec = _item_duration_seconds(item_type, item)
+    duration_override = data.get("duration")
+    if isinstance(duration_override, (int, float)) and not isinstance(duration_override, bool) and duration_override > 0:
+        total_sec = duration_override
+
+    # Clamp position to the item's length so a resume can never overshoot.
+    if total_sec:
+        position = min(position, total_sec)
+
+    progress_percent = data.get("progress_percent")
+    if not isinstance(progress_percent, (int, float)) or isinstance(progress_percent, bool):
+        progress_percent = (position / total_sec * 100) if total_sec else 0
+    progress_percent = int(max(0, min(100, round(progress_percent))))
+    position = round(float(position), 2)
+
+    libraries = _load_library()
+    lib = _ensure_lib(libraries, session["user_id"])
+    history = lib.setdefault("listen_history", [])
+
+    entry = next(
+        (h for h in history
+         if h.get("item_type") == item_type and h.get("item_id") == item_id),
+        None,
+    )
+    if entry is None:
+        entry = {"item_type": item_type, "item_id": item_id}
+        history.append(entry)
+    entry["position"] = position
+    entry["progress_percent"] = progress_percent
+    entry["last_played"] = datetime.now().strftime("%Y-%m-%d")
+
+    db.save_item(SITE, "library", lib["id"], lib)
+
+    return jsonify({
+        "action": "progress_saved",
+        "item_type": item_type,
+        "item_id": item_id,
+        "position": position,
+        "progress_percent": progress_percent,
+        "last_played": entry["last_played"],
     })
 
 

@@ -50,6 +50,23 @@ def _load_articles(**kwargs):
     return articles
 
 
+def _ensure_comments_table():
+    """Idempotently create + register the news_comments table.
+
+    Comments live in a real per-site table so replies (parent_id) and per-user
+    upvotes (upvoted_by JSON) persist and are queryable via SQL. Creation is a
+    no-op once the table exists; safe to call on every comment-related request.
+    """
+    if db.get_table_name(SITE, "comments") is not None:
+        return
+    from sites.news.schema import TABLES
+    spec = TABLES["comments"]
+    conn = db.get_conn()
+    db.create_site_table(conn, spec["table_name"], spec["columns"], spec.get("indexes"))
+    db.register_table(SITE, "comments", spec["table_name"], "id", conn=conn)
+    conn.commit()
+
+
 def _load_categories():
     return db.query(SITE, "categories")
 
@@ -201,15 +218,18 @@ def article_detail(article_id):
             is_bookmarked = True
             bookmark_note = bm.get("note")
 
-    # Load comments for this article (SQL-filtered, ordered, limited)
-    article_comments = db.query(SITE, "comments", where={"article_id": article_id},
-                                sort="-posted_at", limit=100)
+    # Load comments for this article (SQL-filtered, ordered, limited), then
+    # build the reply tree + per-user upvote state for rendering.
+    _ensure_comments_table()
+    flat_comments = db.query(SITE, "comments", where={"article_id": article_id},
+                             sort="-posted_at", limit=200)
+    comments = _thread_comments(flat_comments, user_id=user["id"] if user else None)
 
     return render_template("news/article.html",
                            article=article, categories=categories,
                            related=related, user=user,
                            is_bookmarked=is_bookmarked, bookmark_note=bookmark_note,
-                           comments=article_comments)
+                           comments=comments)
 
 
 WORLD_TOPICS = {
@@ -729,23 +749,79 @@ def api_stats():
 # post_from_free_text (comment)
 # ---------------------------------------------------------------------------
 
-def _add_comment(article, user, body):
-    """Persist a single comment to the session overlay (no whole-table load).
+def _normalize_upvoters(comment):
+    """Return the upvoted_by list as a real list of ints (tolerates JSON text)."""
+    ub = comment.get("upvoted_by")
+    if isinstance(ub, str):
+        try:
+            ub = json.loads(ub) if ub else []
+        except (json.JSONDecodeError, TypeError):
+            ub = []
+    elif ub is None:
+        ub = []
+    return [int(x) for x in ub]
 
-    Returns the created comment dict. Also bumps the article's comments_count
-    and emits a cross-site content event.
+
+def _thread_comments(flat, user_id=None):
+    """Turn a flat comment list into a nested tree (top-level -> replies).
+
+    A comment with parent_id pointing at another comment on the same article is
+    nested under it. Roots are newest-first; replies are oldest-first (natural
+    reading order within a thread). Also annotates per-comment upvote state so
+    the template can render counts and the current user's toggle.
     """
-    # Highest existing comment id (base + overlay), fetched with LIMIT 1.
-    top = db.query(SITE, "comments", sort="-id", limit=1)
-    new_id = (top[0]["id"] if top else 0) + 1
+    by_id = {}
+    for raw in flat:
+        c = dict(raw)
+        upvoters = _normalize_upvoters(c)
+        c["upvoted_by"] = upvoters
+        c["upvote_count"] = c.get("upvotes") if c.get("upvotes") is not None else len(upvoters)
+        c["user_has_upvoted"] = bool(user_id) and int(user_id) in upvoters
+        c["replies"] = []
+        by_id[c["id"]] = c
+
+    roots = []
+    for c in by_id.values():
+        pid = c.get("parent_id") or 0
+        if pid and pid in by_id:
+            by_id[pid]["replies"].append(c)
+        else:
+            roots.append(c)
+
+    roots.sort(key=lambda x: x.get("posted_at", ""), reverse=True)
+    for c in by_id.values():
+        c["replies"].sort(key=lambda x: x.get("posted_at", ""))
+    return roots
+
+
+def _add_comment(article, user, body, parent_id=0):
+    """Persist a single comment (or reply) to the session overlay.
+
+    Returns the created comment dict. ``parent_id`` (>0) nests this comment as a
+    reply under an existing comment on the same article. Also bumps the article's
+    comments_count and emits a cross-site content event.
+    """
+    _ensure_comments_table()
+    new_id = db.next_id(SITE, "comments")
+
+    # Validate the parent: must be an existing comment on THIS article.
+    parent_id = int(parent_id or 0)
+    if parent_id:
+        parent = db.get_item(SITE, "comments", parent_id)
+        if not parent or parent.get("article_id") != article["id"]:
+            parent_id = 0
+
     comment = {
         "id": new_id,
         "article_id": article["id"],
+        "parent_id": parent_id,
         "user_id": user["id"],
         "username": user["username"],
         "display_name": user["display_name"],
         "body": body,
         "posted_at": datetime.utcnow().isoformat() + "Z",
+        "upvotes": 0,
+        "upvoted_by": [],
     }
     db.save_item(SITE, "comments", new_id, comment)
 
@@ -753,8 +829,9 @@ def _add_comment(article, user, body):
     article["comments_count"] = (article.get("comments_count") or 0) + 1
     db.save_item(SITE, "articles", article["id"], article)
 
+    verb = "replied to a comment on" if parent_id else "commented on"
     emit("message", from_user_id=user["id"], to_user_id=user["id"],
-         text=f'You commented on "{article["title"]}"',
+         text=f'You {verb} "{article["title"]}"',
          source_site="news", source_id=str(article["id"]))
     return comment
 
@@ -774,8 +851,9 @@ def api_post_comment(article_id):
     if not body:
         return jsonify({"error": "Comment body is required"}), 400
 
-    comment = _add_comment(article, user, body)
-    return jsonify({"action": "posted", "comment": comment}), 201
+    comment = _add_comment(article, user, body, parent_id=data.get("parent_id", 0))
+    action = "replied" if comment["parent_id"] else "posted"
+    return jsonify({"action": action, "comment": comment}), 201
 
 
 @blueprint.route("/article/<int:article_id>/comment", methods=["POST"])
@@ -790,15 +868,61 @@ def form_post_comment(article_id):
 
     body = request.form.get("body", "").strip()
     if body:
-        _add_comment(article, user, body)
+        try:
+            parent_id = int(request.form.get("parent_id", "0") or 0)
+        except (ValueError, TypeError):
+            parent_id = 0
+        _add_comment(article, user, body, parent_id=parent_id)
 
     return redirect(url_for("news.article_detail", article_id=article_id))
 
 
+@blueprint.route("/api/comments/<int:comment_id>/upvote", methods=["POST"])
+def api_upvote_comment(comment_id):
+    """Toggle the current user's upvote on a comment (persisted, per-user).
+
+    Upvoters are tracked in the comment's ``upvoted_by`` list; ``upvotes`` is the
+    denormalized count. Clicking again removes the user's upvote (idempotent per
+    user). Persisted to the session overlay.
+    """
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Login required"}), 401
+
+    _ensure_comments_table()
+    comment = db.get_item(SITE, "comments", comment_id)
+    if comment is None:
+        return jsonify({"error": "Comment not found"}), 404
+
+    upvoters = _normalize_upvoters(comment)
+    uid = int(user["id"])
+    if uid in upvoters:
+        upvoters.remove(uid)
+        action = "removed"
+    else:
+        upvoters.append(uid)
+        action = "upvoted"
+
+    comment["upvoted_by"] = upvoters
+    comment["upvotes"] = len(upvoters)
+    db.save_item(SITE, "comments", comment_id, comment)
+
+    return jsonify({
+        "action": action,
+        "comment_id": comment_id,
+        "upvotes": len(upvoters),
+        "user_has_upvoted": uid in upvoters,
+    })
+
+
 @blueprint.route("/api/articles/<int:article_id>/comments")
 def api_article_comments(article_id):
-    article_comments = db.query(SITE, "comments", where={"article_id": article_id}, sort="-posted_at")
-    return jsonify(article_comments)
+    _ensure_comments_table()
+    user = _current_user()
+    flat = db.query(SITE, "comments", where={"article_id": article_id},
+                    sort="-posted_at", limit=200)
+    threaded = _thread_comments(flat, user_id=user["id"] if user else None)
+    return jsonify(threaded)
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,8 @@
     {% if success %}
     <div class="alert alert-success">
         Document <strong>{{ uploaded_filename }}</strong> ({{ doc_type }}) has been uploaded successfully.
+        {% if attached_to %}It is now attached to permit <strong>{{ attached_to }}</strong> &mdash;
+        view it on your <a href="{{ url_for('agency-portals.dashboard') }}">dashboard</a>.{% endif %}
     </div>
     {% endif %}
 
@@ -27,6 +29,18 @@
                     <option value="Other">Other</option>
                 </select>
             </div>
+            {% if user and user.permits %}
+            <div class="form-group">
+                <label for="permit_code">Attach to Permit</label>
+                <select id="permit_code" name="permit_code">
+                    <option value="">Most recent application</option>
+                    {% for p in user.permits %}
+                    {% set pcode = p.code if p is mapping else p %}
+                    <option value="{{ pcode }}">{{ pcode }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="form-group">
                 <label for="document">Select File *</label>
                 <input type="file" id="document" name="document" required>

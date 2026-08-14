@@ -82,6 +82,28 @@ def _user_by_id(uid):
     return db.get_item(SITE, "users", uid)
 
 
+# --- Owner responses -------------------------------------------------------
+# A business owner may post ONE public reply per review (Yelp-style "Response
+# from the owner"). Responses live in a single overlay-backed blob keyed by
+# str(review_id). No base table exists for this collection, so it is read via
+# db.get_item (overlay-first) and written via db.save_item — the same pattern
+# used for user_state. db.query is NOT used here (it returns [] for collections
+# with no registered base table).
+
+def _owner_responses_map():
+    """Return {str(review_id): response_dict}. Empty dict when none saved."""
+    data = db.get_item(SITE, "owner_responses", "map")
+    return data if isinstance(data, dict) else {}
+
+
+def _save_owner_responses_map(responses):
+    db.save_item(SITE, "owner_responses", "map", responses)
+
+
+def _owner_response_for_review(review_id):
+    return _owner_responses_map().get(str(review_id))
+
+
 def _compute_rating_distribution(reviews_list):
     """Return dict {1: count, 2: count, ...5: count} for a list of reviews."""
     dist = {i: 0 for i in range(1, 6)}
@@ -280,9 +302,11 @@ def business_detail(business_id):
     reviews = _reviews_for_business(business_id)
     photos = _photos_for_business(business_id)
     user_map = {u["id"]: u for u in _users()}
+    owner_responses = _owner_responses_map()
     for r in reviews:
         r["_user"] = user_map.get(r["user_id"])
         r["_photos"] = [p for p in photos if p.get("review_id") == r["id"]]
+        r["_owner_response"] = owner_responses.get(str(r["id"]))
 
     # Sort reviews: most recent first
     sort_by = request.args.get("sort", "date")
@@ -651,6 +675,98 @@ def api_review_helpful(review_id):
             db.save_collection(SITE, "reviews", reviews)
             return jsonify({"success": True, "review_id": review_id, key: r[key]})
     return jsonify({"error": "Review not found"}), 404
+
+
+@blueprint.route("/api/reviews/<int:review_id>/owner-response", methods=["GET"])
+def api_owner_response_get(review_id):
+    """GET the business owner's public reply to a review (if any)."""
+    resp = _owner_response_for_review(review_id)
+    if not resp:
+        return jsonify({"error": "No owner response"}), 404
+    return jsonify(resp)
+
+
+@blueprint.route("/api/reviews/<int:review_id>/owner-response", methods=["POST"])
+def api_owner_response_create(review_id):
+    """POST a business owner's public reply to a review.
+
+    One reply per review. The logged-in user acts as the business owner
+    (there is no per-business owner mapping, so any authenticated user is
+    given the owner affordance on the business page). Persisted to the
+    session overlay and rendered beneath the review.
+    """
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Login required"}), 401
+
+    review = next((r for r in _reviews() if r["id"] == review_id), None)
+    if not review:
+        return jsonify({"error": "Review not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Response text is required"}), 400
+
+    responses = _owner_responses_map()
+    if str(review_id) in responses:
+        return jsonify({
+            "error": "This review already has an owner response. Edit it instead."
+        }), 409
+
+    biz = _business_by_id(review["business_id"])
+    today = datetime.now().strftime("%Y-%m-%d")
+    resp = {
+        "review_id": review_id,
+        "business_id": review["business_id"],
+        "business_name": biz["name"] if biz else "",
+        "responder_user_id": user["id"],
+        "text": text,
+        "created_at": today,
+        "updated_at": today,
+    }
+    responses[str(review_id)] = resp
+    _save_owner_responses_map(responses)
+    return jsonify(resp), 201
+
+
+@blueprint.route("/api/reviews/<int:review_id>/owner-response", methods=["PUT"])
+def api_owner_response_update(review_id):
+    """PUT edit the existing owner response for a review."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Login required"}), 401
+
+    responses = _owner_responses_map()
+    resp = responses.get(str(review_id))
+    if not resp:
+        return jsonify({"error": "No owner response to edit"}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Response text is required"}), 400
+
+    resp["text"] = text
+    resp["updated_at"] = datetime.now().strftime("%Y-%m-%d")
+    responses[str(review_id)] = resp
+    _save_owner_responses_map(responses)
+    return jsonify(resp)
+
+
+@blueprint.route("/api/reviews/<int:review_id>/owner-response", methods=["DELETE"])
+def api_owner_response_delete(review_id):
+    """DELETE the owner response for a review."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Login required"}), 401
+
+    responses = _owner_responses_map()
+    if str(review_id) not in responses:
+        return jsonify({"error": "No owner response to delete"}), 404
+    del responses[str(review_id)]
+    _save_owner_responses_map(responses)
+    return jsonify({"success": True, "review_id": review_id})
 
 
 @blueprint.route("/api/photos", methods=["GET"])

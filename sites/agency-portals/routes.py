@@ -3,13 +3,62 @@
 Synthesized data: departments, services, permits, public records, users,
 announcements, appointments, payments.
 """
+import base64
 import pathlib
 import random
+from datetime import date
 
 from flask import (Blueprint, Response, abort, jsonify, render_template,
                    request, session, redirect, url_for)
 from app import db
 from app.events import emit
+
+# Review workflow for resident-submitted permits. A freshly applied permit
+# starts at "Submitted"; the applicant advances it one stage at a time through
+# review to a final decision. "Approved" / "Denied" are terminal.
+_REVIEW_STAGES = ["Submitted", "Under Review", "Approved"]
+
+
+def _next_status(current, decision=None):
+    """Deterministic next review status for a resident permit.
+
+    Submitted -> Under Review -> Approved (default) / Denied (decision='deny').
+    Terminal states return themselves unchanged.
+    """
+    if current == "Submitted":
+        return "Under Review"
+    if current == "Under Review":
+        return "Denied" if (decision or "").lower() == "deny" else "Approved"
+    return current
+
+
+def _find_user_permit(user, permit_code):
+    """Return (permits_list, permit_dict) for a resident permit by code.
+
+    A user's ``permits`` list may hold legacy plain-string codes alongside
+    dict entries. When a match is a bare string it is upgraded in place to a
+    dict so documents / status can be attached; returns (None, None) if the
+    code is not found.
+    """
+    permits = user.setdefault("permits", [])
+    for i, p in enumerate(permits):
+        if isinstance(p, dict) and p.get("code") == permit_code:
+            return permits, p
+        if isinstance(p, str) and p == permit_code:
+            upgraded = {"code": p, "type": "", "address": "",
+                        "description": "", "status": "Submitted"}
+            permits[i] = upgraded
+            return permits, upgraded
+    return None, None
+
+
+def _file_to_data_uri(uploaded_file):
+    """Read a Werkzeug FileStorage into a (filename, data-URI) pair."""
+    raw = uploaded_file.read()
+    mime = uploaded_file.mimetype or "application/octet-stream"
+    data_uri = "data:%s;base64,%s" % (
+        mime, base64.b64encode(raw).decode("ascii"))
+    return uploaded_file.filename, data_uri
 
 
 def _send_confirmation_email(user_id, subject, body):
@@ -676,12 +725,62 @@ def upload_submit():
     uploaded_file = request.files.get("document")
     doc_type = request.form.get("document_type", "").strip()
     description = request.form.get("description", "").strip()
+    permit_code = request.form.get("permit_code", "").strip()
 
     filename = uploaded_file.filename if uploaded_file else "unknown"
+    attached_to = None
+    if user and uploaded_file and uploaded_file.filename:
+        filename, data_uri = _file_to_data_uri(uploaded_file)
+        doc = {
+            "filename": filename,
+            "doc_type": doc_type,
+            "description": description,
+            "data_uri": data_uri,
+            "uploaded_at": date.today().isoformat(),
+        }
+        users = _load_users()
+        u = next((x for x in users if x["id"] == user["id"]), None)
+        if u:
+            _, target = _find_user_permit(u, permit_code)
+            if target is None:
+                # Fall back to the most recent dict permit if none chosen.
+                dict_permits = [p for p in u.get("permits", [])
+                                if isinstance(p, dict)]
+                target = dict_permits[-1] if dict_permits else None
+            if target is not None:
+                target.setdefault("documents", []).append(doc)
+                attached_to = target.get("code")
+            else:
+                # No permit to attach to -> keep at the account level.
+                u.setdefault("documents", []).append(doc)
+            _save_users(users)
+            user = _get_user(user["id"])
     return render_template("agency-portals/upload.html",
                            user=user, success=True,
                            uploaded_filename=filename,
-                           doc_type=doc_type)
+                           doc_type=doc_type,
+                           attached_to=attached_to)
+
+
+@blueprint.route("/permit/advance", methods=["POST"])
+def permit_advance():
+    """Advance a resident permit one review stage (UI action)."""
+    if "user_id" not in session:
+        return redirect(url_for("agency-portals.login_page"))
+    permit_code = request.form.get("permit_code", "").strip()
+    decision = request.form.get("decision", "").strip()
+    users = _load_users()
+    u = next((x for x in users if x["id"] == session["user_id"]), None)
+    if u:
+        _, target = _find_user_permit(u, permit_code)
+        if target is not None:
+            new_status = _next_status(target.get("status", "Submitted"), decision)
+            target["status"] = new_status
+            if new_status in ("Approved", "Denied"):
+                target["date_reviewed"] = date.today().isoformat()
+                target["reviewed_by"] = "Lakeport Review Board"
+            _save_users(users)
+    return redirect(url_for("agency-portals.dashboard"))
 
 
 # ---------------------------------------------------------------------------
@@ -996,6 +1095,33 @@ def api_apply_permit(user_id):
                     "permit": new_permit})
 
 
+@blueprint.route("/api/users/<int:user_id>/advance-permit", methods=["POST"])
+def api_advance_permit(user_id):
+    data = request.get_json(silent=True) or {}
+    permit_code = data.get("permit_code", "").strip()
+    decision = data.get("decision", "").strip()
+    if not permit_code:
+        return jsonify({"error": "permit_code required"}), 400
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+
+    _, target = _find_user_permit(user, permit_code)
+    if target is None:
+        return jsonify({"error": "permit not found"}), 404
+
+    new_status = _next_status(target.get("status", "Submitted"), decision)
+    target["status"] = new_status
+    if new_status in ("Approved", "Denied"):
+        target["date_reviewed"] = date.today().isoformat()
+        target["reviewed_by"] = "Lakeport Review Board"
+    _save_users(users)
+    return jsonify({"action": "advanced", "permit_code": permit_code,
+                    "status": new_status, "permit": target})
+
+
 @blueprint.route("/api/users/<int:user_id>/pay", methods=["POST"])
 def api_pay(user_id):
     data = request.get_json(silent=True) or {}
@@ -1085,14 +1211,42 @@ def api_upload():
     description = request.form.get("description", "").strip()
     user_id = request.form.get("user_id", type=int)
 
+    permit_code = request.form.get("permit_code", "").strip()
+
     if not uploaded_file:
         return jsonify({"error": "No file uploaded"}), 400
 
-    filename = uploaded_file.filename
+    filename, data_uri = _file_to_data_uri(uploaded_file)
+    doc = {
+        "filename": filename,
+        "doc_type": doc_type,
+        "description": description,
+        "data_uri": data_uri,
+        "uploaded_at": date.today().isoformat(),
+    }
+
+    attached_to = None
+    if user_id:
+        users = _load_users()
+        u = next((x for x in users if x["id"] == user_id), None)
+        if u:
+            _, target = _find_user_permit(u, permit_code)
+            if target is None:
+                dict_permits = [p for p in u.get("permits", [])
+                                if isinstance(p, dict)]
+                target = dict_permits[-1] if dict_permits else None
+            if target is not None:
+                target.setdefault("documents", []).append(doc)
+                attached_to = target.get("code")
+            else:
+                u.setdefault("documents", []).append(doc)
+            _save_users(users)
+
     return jsonify({
         "action": "uploaded",
         "filename": filename,
         "document_type": doc_type,
         "description": description,
         "user_id": user_id,
+        "attached_to": attached_to,
     })

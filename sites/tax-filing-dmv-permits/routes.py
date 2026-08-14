@@ -691,6 +691,129 @@ def _money(raw):
         return 0.0
 
 
+# ---------------------------------------------------------------------------
+# 1040 liability calculator — turns the entered income lines into a real
+# tax_owed and a refund / amount-due, using 2024 federal standard deductions
+# and progressive brackets. Keeps the "Where's My Refund?" tool honest instead
+# of hardcoding 0.0.
+# ---------------------------------------------------------------------------
+
+# 2024 standard deduction by filing status
+_STD_DEDUCTION = {
+    "single": 14600.0,
+    "married_jointly": 29200.0,
+    "married_separately": 14600.0,
+    "head_of_household": 21900.0,
+    "qualifying_surviving_spouse": 29200.0,
+}
+
+# 2024 ordinary-income brackets: ordered (upper_bound, rate); final bound None = ∞
+_TAX_BRACKETS = {
+    "single": [(11600, .10), (47150, .12), (100525, .22), (191950, .24),
+               (243725, .32), (609350, .35), (None, .37)],
+    "married_jointly": [(23200, .10), (94300, .12), (201050, .22), (383900, .24),
+                        (487450, .32), (731200, .35), (None, .37)],
+    "married_separately": [(11600, .10), (47150, .12), (100525, .22), (191950, .24),
+                           (243725, .32), (365600, .35), (None, .37)],
+    "head_of_household": [(16550, .10), (63100, .12), (100500, .22), (191950, .24),
+                          (243700, .32), (609350, .35), (None, .37)],
+    "qualifying_surviving_spouse": [(23200, .10), (94300, .12), (201050, .22),
+                                    (383900, .24), (487450, .32), (731200, .35),
+                                    (None, .37)],
+}
+
+
+def _standard_deduction(filing_status):
+    return _STD_DEDUCTION.get(filing_status, _STD_DEDUCTION["single"])
+
+
+def _bracket_tax(taxable_income, filing_status):
+    """Progressive tax on taxable income for the given filing status."""
+    if taxable_income <= 0:
+        return 0.0
+    brackets = _TAX_BRACKETS.get(filing_status, _TAX_BRACKETS["single"])
+    tax = 0.0
+    lower = 0.0
+    for upper, rate in brackets:
+        cap = taxable_income if upper is None else min(taxable_income, float(upper))
+        if cap > lower:
+            tax += (cap - lower) * rate
+            lower = cap
+        if upper is not None and taxable_income <= upper:
+            break
+    return round(tax, 2)
+
+
+def _compute_1040(total_income, filing_status, withholding):
+    """Turn total income + withholding into the return's bottom line.
+
+    Returns dict with taxable_income, tax_owed, tax_paid, refund_amount,
+    amount_due and the standard_deduction used.
+    """
+    std = _standard_deduction(filing_status)
+    taxable = round(max(0.0, total_income - std), 2)
+    tax_owed = _bracket_tax(taxable, filing_status)
+    tax_paid = round(withholding, 2)
+    refund = round(max(0.0, tax_paid - tax_owed), 2)
+    due = round(max(0.0, tax_owed - tax_paid), 2)
+    return {
+        "standard_deduction": std,
+        "taxable_income": taxable,
+        "tax_owed": tax_owed,
+        "tax_paid": tax_paid,
+        "refund_amount": refund,
+        "amount_due": due,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Appointments — booked DMV/city-hall slots persist to their own per-site table
+# (created + registered lazily, like other runtime collections). Writes land in
+# the session overlay via db.save_item, so parallel agents stay isolated.
+# ---------------------------------------------------------------------------
+
+_APPTS_TABLE = "tax_filing_dmv_permits_appointments"
+_appts_table_ready = False
+
+
+def _ensure_appts_table():
+    global _appts_table_ready
+    if _appts_table_ready:
+        return
+    conn = db.get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_APPTS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            appointment_id TEXT NOT NULL DEFAULT '',
+            user_id INTEGER NOT NULL DEFAULT 0,
+            root_user_id INTEGER NOT NULL DEFAULT 0,
+            service TEXT NOT NULL DEFAULT '',
+            date TEXT NOT NULL DEFAULT '',
+            time_slot TEXT NOT NULL DEFAULT '',
+            location TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'booked',
+            booked_date TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_{_APPTS_TABLE}_user ON [{_APPTS_TABLE}] (user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "appointments", _APPTS_TABLE, "id")
+    _appts_table_ready = True
+
+
+def _user_appointments(user_id):
+    """Appointments for a user, upcoming/newest first (base + session overlay)."""
+    _ensure_appts_table()
+    appts = db.query(SITE, "appointments", where={"user_id": user_id},
+                     sort="-id", limit=100)
+    # show soonest scheduled date first, keep newest-booked as the tiebreaker
+    appts.sort(key=lambda a: (a.get("date") or "", a.get("id", 0)))
+    return appts
+
+
 @blueprint.route("/file-1040", methods=["GET"])
 def file_1040_page():
     user, logged_in = _get_browsing_user()
@@ -709,6 +832,14 @@ def file_1040_submit():
     lines = {k: _money(request.form.get(k)) for k in _F1040_INCOME_LINES}
     entered_total = _money(request.form.get("line_9"))
     computed_total = round(sum(lines.values()), 2)
+    # income the tax is computed on: the transcribed line-9 total when present,
+    # otherwise the sum of the entered income lines
+    total_income = entered_total or computed_total
+    withholding = _money(request.form.get("line_25"))
+    filing_status = request.form.get("filing_status", "single") or "single"
+
+    # Compute the actual liability + refund/amount-due from the entered values
+    calc = _compute_1040(total_income, filing_status, withholding)
 
     filings = _load_filings()
     new_id = db.next_id(SITE, "tax_filings")
@@ -728,20 +859,30 @@ def file_1040_submit():
         "status": "awaiting_signature",
         "requires_signature": True,
         "signed": False,
-        "gross_income": entered_total,
-        "taxable_income": entered_total,
-        "tax_owed": 0.0, "tax_paid": 0.0, "refund_amount": 0.0,
+        "gross_income": total_income,
+        "taxable_income": calc["taxable_income"],
+        "tax_owed": calc["tax_owed"],
+        "tax_paid": calc["tax_paid"],
+        "refund_amount": calc["refund_amount"],
+        "amount_due": calc["amount_due"],
         "filing_method": "online",
         "processed_by": "", "notes": "",
         "property_address": "", "parcel_number": "", "assessed_value": 0.0,
         "tax_rate": 0.0, "gross_revenue": 0.0, "taxable_revenue": 0.0,
         # 1040-specific detail (for grading + the detail page)
         "form_1040": {
-            "filing_status": request.form.get("filing_status", ""),
+            "filing_status": filing_status,
             "ssn": request.form.get("ssn", "").strip(),
             **lines,
             "line_9": entered_total,
             "computed_total_income": computed_total,
+            "line_25": withholding,
+            "standard_deduction": calc["standard_deduction"],
+            "taxable_income": calc["taxable_income"],
+            "tax_owed": calc["tax_owed"],
+            "tax_paid": calc["tax_paid"],
+            "refund_amount": calc["refund_amount"],
+            "amount_due": calc["amount_due"],
         },
     }
     filings.append(filing)
@@ -946,6 +1087,32 @@ def appointments_page():
     return render_template(
         "tax-filing-dmv-permits/appointments.html",
         user=user, logged_in=logged_in,
+    )
+
+
+@blueprint.route("/my-appointments")
+def my_appointments_page():
+    """List the current user's booked appointments."""
+    user, logged_in = _get_browsing_user()
+    appointments = _user_appointments(user["id"])
+    return render_template(
+        "tax-filing-dmv-permits/my_appointments.html",
+        user=user, logged_in=logged_in, appointments=appointments,
+    )
+
+
+@blueprint.route("/wheres-my-refund")
+def wheres_my_refund_page():
+    """Where's My Refund? — the user's income-tax returns with the computed
+    refund / amount-due and filing status."""
+    user, logged_in = _get_browsing_user()
+    # user's rows only (capped), then keep income-tax returns and sort by year
+    rows = db.query(SITE, "tax_filings", where={"user_id": user["id"]}, limit=100)
+    filings = [f for f in rows if f.get("type") == "income_tax"]
+    filings.sort(key=lambda f: (f.get("tax_year", 0), f.get("id", 0)), reverse=True)
+    return render_template(
+        "tax-filing-dmv-permits/wheres_my_refund.html",
+        user=user, logged_in=logged_in, filings=filings,
     )
 
 
@@ -1466,9 +1633,20 @@ def api_upload():
     })
 
 
+@blueprint.route("/api/appointments", methods=["GET"])
+def api_appointments_get():
+    """List appointments (defaults to the current user)."""
+    _ensure_appts_table()
+    user, _ = _get_browsing_user()
+    user_id = request.args.get("user_id", type=int) or user["id"]
+    return jsonify(_user_appointments(user_id))
+
+
 @blueprint.route("/api/appointments", methods=["POST"])
 def api_book_appointment():
-    """Book a DMV appointment (book_by_date_range macro)."""
+    """Book a DMV appointment (book_by_date_range macro). Persists the booking
+    so it shows up on the My Appointments list."""
+    _ensure_appts_table()
     data = request.get_json(force=True)
     date = data.get("date")
     time_slot = data.get("time_slot", "10:00 AM")
@@ -1478,17 +1656,25 @@ def api_book_appointment():
     if not date:
         return jsonify({"error": "Date is required"}), 400
 
-    appt_id = f"APT-{date.replace('-', '')}-{hash(date + time_slot) % 9999:04d}"
     user, _ = _get_browsing_user()
-    emit("booking", user_id=user["id"], title=f"DMV Appt: {service}", start=date, location=location)
-    return jsonify({
-        "status": "booked",
+    new_id = db.next_id(SITE, "appointments")
+    appt_id = f"APT-{date.replace('-', '')}-{new_id:04d}"
+    appointment = {
+        "id": new_id,
         "appointment_id": appt_id,
+        "user_id": user["id"],
+        "root_user_id": user.get("root_user_id", user["id"]),
+        "service": service,
         "date": date,
         "time_slot": time_slot,
-        "service": service,
         "location": location,
-    })
+        "status": "booked",
+        "booked_date": datetime.now().strftime("%Y-%m-%d"),
+        "notes": data.get("notes", ""),
+    }
+    db.save_item(SITE, "appointments", new_id, appointment)
+    emit("booking", user_id=user["id"], title=f"DMV Appt: {service}", start=date, location=location)
+    return jsonify({"status": "booked", **appointment})
 
 
 @blueprint.route("/api/verify-identity", methods=["POST"])

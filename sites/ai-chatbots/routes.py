@@ -209,7 +209,7 @@ def _seeded_index(text, n):
     return zlib.crc32(text.encode("utf-8")) % n
 
 
-def _generate_response(user_message, bot_name="Assistant", conversation_history=None):
+def _base_response(user_message, bot_name="Assistant", conversation_history=None):
     """Generate a deterministic reply locally — no LLM, no network call.
 
     The same (message, bot) input always produces the same output: intent
@@ -268,6 +268,69 @@ def _generate_response(user_message, bot_name="Assistant", conversation_history=
     # Generic fallback — hash-seeded so it varies by input yet is reproducible
     bank = persona["generic"]
     return bank[_seeded_index(msg_lower, len(bank))]
+
+
+# A conversation-level system prompt (a.k.a. custom instructions) shapes every
+# reply the way real ChatGPT custom instructions do. It is threaded through the
+# LOCAL rule engine (no LLM) via deterministic, keyword-triggered style
+# transforms so its effect is plainly visible in the output.
+def _apply_system_prompt(response, system_prompt):
+    """Apply a per-conversation system prompt to a generated reply.
+
+    Deterministic: keyword-triggered style transforms mirror how custom
+    instructions steer a real assistant. Any non-empty system prompt changes
+    the reply, so its effect is observable (and testable).
+    """
+    if not system_prompt or not system_prompt.strip():
+        return response
+    sp = system_prompt.lower()
+
+    if "pirate" in sp:
+        return "Arr, matey! " + response
+    if any(w in sp for w in ("concise", "brief", "shorter", "short", "one sentence", "terse")):
+        first = re.split(r'(?<=[.!?])\s', response.strip())[0]
+        return first
+    if "formal" in sp or "professional" in sp:
+        return "Certainly. " + response
+    if any(w in sp for w in ("friendly", "casual", "warm", "cheerful")):
+        return "Hey there! " + response
+    if "emoji" in sp:
+        return response + " \U0001F600"
+    if any(w in sp for w in ("bullet", "list", "step")):
+        return "Here you go:\n- " + response
+    # Generic: the instruction is honored explicitly so its presence shows.
+    return f"[Following your custom instructions] {response}"
+
+
+# Regeneration rewords the reply the way a real "Regenerate" button yields a
+# fresh phrasing. variant==0 is the first generation (verbatim); each regenerate
+# advances the variant and rotates through these deterministic rewordings so the
+# replacement is always visibly different from the message it replaces.
+_REGEN_VARIANTS = [
+    "{r}",
+    "Here's another take: {r}",
+    "Let me put that differently. {r}",
+    "To rephrase: {r}",
+    "Looking at it again: {r}",
+]
+
+
+def _apply_variant(response, variant):
+    """Wrap a reply in a rotating regeneration reword (variant 0 = verbatim)."""
+    if not variant:
+        return response
+    template = _REGEN_VARIANTS[variant % len(_REGEN_VARIANTS)]
+    return template.format(r=response)
+
+
+def _generate_response(user_message, bot_name="Assistant", conversation_history=None,
+                       system_prompt=None, variant=0):
+    """Public reply engine: base rule engine + per-conversation system prompt
+    + regeneration variant. Fully local and deterministic."""
+    base = _base_response(user_message, bot_name=bot_name,
+                          conversation_history=conversation_history)
+    styled = _apply_system_prompt(base, system_prompt)
+    return _apply_variant(styled, variant)
 
 
 # ---------------------------------------------------------------------------
@@ -565,7 +628,8 @@ def form_chat():
 
     conv["messages"].append({"role": "user", "content": message})
     response = _generate_response(message, bot_name=bot,
-                                  conversation_history=conv["messages"])
+                                  conversation_history=conv["messages"],
+                                  system_prompt=conv.get("system_prompt", ""))
     conv["messages"].append({"role": "assistant", "content": response})
     conv["updated_at"] = datetime.now(timezone.utc).isoformat()
     _save_conversations(convs)
@@ -623,6 +687,70 @@ def form_share_conversation(conv_id):
                 shared_list.append(conv_id)
             _save_users(users)
 
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+
+def _last_user_message(messages):
+    """Return the content of the most recent user turn, or None."""
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            return msg["content"]
+    return None
+
+
+def _regenerate_conversation(conv):
+    """Re-run the reply engine on the last user turn and replace the last
+    assistant message in place. Mutates and returns conv (not persisted here).
+
+    Mirrors ChatGPT's Regenerate: the trailing assistant reply is dropped, the
+    engine reruns on the same last user message (with a fresh variant so the
+    new reply reads differently), and the result is appended. Persisted so it
+    survives a reload.
+    """
+    messages = conv.get("messages", [])
+    last_user = _last_user_message(messages)
+    if last_user is None:
+        return conv  # nothing to regenerate
+
+    # Drop the trailing assistant message (the one being replaced), if present.
+    if messages and messages[-1].get("role") == "assistant":
+        messages.pop()
+
+    # Advance the regeneration variant so the replacement is visibly different.
+    variant = int(conv.get("regen_count", 0)) + 1
+    conv["regen_count"] = variant
+
+    response = _generate_response(last_user, bot_name=conv.get("bot", "Assistant"),
+                                  conversation_history=messages,
+                                  system_prompt=conv.get("system_prompt", ""),
+                                  variant=variant)
+    messages.append({"role": "assistant", "content": response})
+    conv["messages"] = messages
+    conv["updated_at"] = datetime.now(timezone.utc).isoformat()
+    return conv
+
+
+@blueprint.route("/form/conversation/<conv_id>/regenerate", methods=["POST"])
+def form_regenerate(conv_id):
+    """Regenerate the last assistant reply for a conversation (form POST)."""
+    conv = db.get_item(SITE, "conversations", conv_id)
+    if not conv:
+        return redirect(url_for("ai-chatbots.chat_page"))
+    _regenerate_conversation(conv)
+    db.save_item(SITE, "conversations", conv_id, conv)
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+
+
+@blueprint.route("/form/conversation/<conv_id>/system-prompt", methods=["POST"])
+def form_system_prompt(conv_id):
+    """Set the per-conversation system prompt / custom instructions (form POST)."""
+    system_prompt = request.form.get("system_prompt", "").strip()
+    conv = db.get_item(SITE, "conversations", conv_id)
+    if not conv:
+        return redirect(url_for("ai-chatbots.chat_page"))
+    conv["system_prompt"] = system_prompt
+    conv["updated_at"] = datetime.now(timezone.utc).isoformat()
+    db.save_item(SITE, "conversations", conv_id, conv)
     return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
 
 
@@ -763,7 +891,8 @@ def api_chat():
 
     # Generate response
     response = _generate_response(message, bot_name=bot,
-                                  conversation_history=conv["messages"])
+                                  conversation_history=conv["messages"],
+                                  system_prompt=conv.get("system_prompt", ""))
 
     # Add assistant response
     conv["messages"].append({"role": "assistant", "content": response})

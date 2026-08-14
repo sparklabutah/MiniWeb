@@ -5,6 +5,7 @@ testimonials, job openings, contact info) from config/config.json seeds.
 All JSON data is written to data/ on first load and pristine copies kept in
 data/.pristine/.
 """
+import datetime
 import json
 import pathlib
 from collections import Counter
@@ -16,6 +17,50 @@ from app import db
 
 SITE = "business-company"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
+
+# ---------------------------------------------------------------------------
+# Job applications — real base table registered at runtime (the
+# forums_messages / books-comics-orders runtime-seed convention). Gives
+# db.query()/db.get_item() a real home so submitted applications can be read
+# back; session applications live in the overlay.
+# ---------------------------------------------------------------------------
+
+_APPLICATIONS_TABLE = "business_company_applications"
+_applications_ready = False
+
+
+def _ensure_applications_table():
+    global _applications_ready
+    if _applications_ready and db.get_table_name(SITE, "applications"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_APPLICATIONS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER NOT NULL DEFAULT 0,
+            job_title TEXT NOT NULL DEFAULT '',
+            department TEXT NOT NULL DEFAULT '',
+            user_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            resume TEXT NOT NULL DEFAULT '',
+            resume_filename TEXT NOT NULL DEFAULT '',
+            cover_letter TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'submitted',
+            submitted_at TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_business_company_applications_job "
+        f"ON [{_APPLICATIONS_TABLE}] (job_id)"
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_business_company_applications_user "
+        f"ON [{_APPLICATIONS_TABLE}] (user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "applications", _APPLICATIONS_TABLE, "id")
+    _applications_ready = True
 
 blueprint = Blueprint(
     "business-company",
@@ -263,7 +308,82 @@ def job_detail(job_id):
     job = next((j for j in jobs if j["id"] == job_id), None)
     if job is None:
         abort(404)
-    return render_template("business-company/job_detail.html", job=job)
+    return render_template("business-company/job_detail.html", job=job,
+                           apply_success=False, error=None, application=None)
+
+
+@blueprint.route("/careers/<int:job_id>/apply", methods=["POST"])
+def job_apply(job_id):
+    """Submit a job application tied to a specific opening.
+
+    Persists an application record to the (overlay-aware) applications table,
+    sends a confirmation email to the user's inbox via the existing bridge, and
+    re-renders the job detail page in a success state.
+    """
+    jobs = _get("jobs")
+    job = next((j for j in jobs if j["id"] == job_id), None)
+    if job is None:
+        abort(404)
+
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip()
+    resume = request.form.get("resume", "").strip()
+    cover_letter = request.form.get("cover_letter", "").strip()
+    # A resume may be provided as pasted text OR an uploaded file.
+    resume_file = request.files.get("resume_file")
+    resume_filename = resume_file.filename.strip() if resume_file and resume_file.filename else ""
+
+    if not name or not email or (not resume and not resume_filename):
+        return render_template(
+            "business-company/job_detail.html", job=job, apply_success=False,
+            application=None,
+            error="Please provide your name, email, and a resume (text or file).",
+        )
+
+    _ensure_applications_table()
+    app_id = db.next_id(SITE, "applications")
+    application = {
+        "id": app_id,
+        "job_id": job["id"],
+        "job_title": job["title"],
+        "department": job.get("department", ""),
+        "user_id": session.get("user_id", 1),
+        "name": name,
+        "email": email,
+        "resume": resume,
+        "resume_filename": resume_filename,
+        "cover_letter": cover_letter,
+        "status": "submitted",
+        "submitted_at": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    db.save_item(SITE, "applications", app_id, application)
+
+    # Bridge: send an application-received confirmation email to the inbox.
+    try:
+        from app.bridges import on_inquiry
+        on_inquiry(
+            user_id=session.get("user_id", 1),
+            company_name="Apex Dynamics",
+            subject=f"Application received — {job['title']}",
+            message=(f"Thank you {name}, we have received your application for "
+                     f"{job['title']} ({job.get('department', '')})."),
+        )
+    except Exception:
+        pass
+
+    return render_template("business-company/job_detail.html", job=job,
+                           apply_success=True, error=None, application=application)
+
+
+@blueprint.route("/applications")
+def my_applications():
+    """Acknowledgement page listing the current user's submitted applications."""
+    _ensure_applications_table()
+    uid = session.get("user_id", 1)
+    applications = db.query(SITE, "applications", where={"user_id": uid},
+                            sort="-id", limit=50)
+    return render_template("business-company/applications.html",
+                           applications=applications)
 
 
 @blueprint.route("/contact", methods=["GET"])

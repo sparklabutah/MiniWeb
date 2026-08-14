@@ -2,6 +2,7 @@
 
 Data: 1,892 books from pressbooks dataset stored in SQLite.
 """
+import datetime
 import pathlib
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
@@ -12,6 +13,7 @@ from app.events import emit
 SITE = "books-comics"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 _BOOKS_TABLE = "books_comics_books"
+_ORDERS_TABLE = "books_comics_orders"
 
 blueprint = Blueprint(
     "books-comics",
@@ -140,6 +142,185 @@ def _count_books(cat="", min_rating=None):
         params.append(min_rating)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     return db.execute(f"SELECT COUNT(*) FROM [{_BOOKS_TABLE}]{where}", tuple(params), fetch="val") or 0
+
+
+# ---------------------------------------------------------------------------
+# Orders / purchase history (runtime-registered base table)
+#
+# The site DB was seeded WITHOUT an orders table, so a purchase left no record —
+# checkout silently folded the cart into the reading list and nothing captured
+# the transaction (book/date/price/order id). db.query() returns [] for an
+# unregistered collection, so there was nowhere for an order to land. We create +
+# register books_comics_orders on first use (the forums_reports / auctions-orders
+# runtime-seed pattern) and seed a couple of deterministic past orders for the
+# auto-login user so the history has content. Real, session-placed orders go to
+# the per-session overlay via db.save_item, keeping agent sessions isolated.
+# ---------------------------------------------------------------------------
+
+# Deterministic historical orders for user 1 (alex_reads, the auto-login user).
+# These correspond to books already in their reading list, so the purchase
+# history coherently explains how those titles entered the library. Seeded once
+# into the base table (shared config), like the forums moderator seed.
+_ORDER_SEED = [
+    {
+        "id": 1, "order_number": "BV-100001", "user_id": 1,
+        "created_at": "2025-06-14", "book_ids": [10, 19],
+        "payment_method": "checking", "card_last4": "4242",
+        "name": "Alex Rivera", "email": "alex.rivera@gmail.com",
+    },
+    {
+        "id": 2, "order_number": "BV-100002", "user_id": 1,
+        "created_at": "2025-07-22", "book_ids": [9],
+        "payment_method": "credit", "card_last4": "4242",
+        "name": "Alex Rivera", "email": "alex.rivera@gmail.com",
+    },
+]
+
+_orders_ready = False
+
+
+def _order_line(book):
+    """One receipt line item from a book row (price as charged at purchase)."""
+    return {
+        "book_id": book["id"],
+        "title": book.get("title", ""),
+        "author": book.get("author", ""),
+        "price": book.get("price", 0.0),
+    }
+
+
+def _ensure_orders_table():
+    """Create + register books_comics_orders on first use (idempotent).
+
+    Gives db.query()/db.get_item() a real home for order records so the purchase
+    history can be read back, distinct from the reading library. Base table is
+    seeded once with the auto-login user's past orders; session orders live in
+    the overlay."""
+    global _orders_ready
+    if _orders_ready and db.get_table_name(SITE, "orders"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_ORDERS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            order_number TEXT NOT NULL DEFAULT '',
+            user_id INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT '',
+            items TEXT NOT NULL DEFAULT '[]',
+            item_count INTEGER NOT NULL DEFAULT 0,
+            subtotal REAL NOT NULL DEFAULT 0.0,
+            total REAL NOT NULL DEFAULT 0.0,
+            payment_method TEXT NOT NULL DEFAULT '',
+            card_last4 TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'completed'
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_books_comics_orders_user "
+        f"ON [{_ORDERS_TABLE}] (user_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "orders", _ORDERS_TABLE, "id")
+    # Seed historical orders once (global, shared across sessions).
+    import json
+    have = conn.execute(f"SELECT COUNT(*) FROM [{_ORDERS_TABLE}]").fetchone()[0]
+    if not have:
+        for o in _ORDER_SEED:
+            books = [db.get_item(SITE, "books", bid) for bid in o["book_ids"]]
+            items = [_order_line(b) for b in books if b]
+            total = round(sum(i["price"] for i in items), 2)
+            conn.execute(
+                f"INSERT INTO [{_ORDERS_TABLE}] (id, order_number, user_id, "
+                f"created_at, items, item_count, subtotal, total, "
+                f"payment_method, card_last4, name, email, status) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')",
+                (o["id"], o["order_number"], o["user_id"], o["created_at"],
+                 json.dumps(items, ensure_ascii=False), len(items), total, total,
+                 o["payment_method"], o["card_last4"], o["name"], o["email"]),
+            )
+        conn.commit()
+    _orders_ready = True
+
+
+def _create_order(user, cart_items, payment_method="checking", card="", name="", email=""):
+    """Record a purchase as an order in the session overlay and return it.
+
+    Called at checkout after a successful charge. Captures book, date, price and
+    an order id so the purchase is viewable as a receipt on the orders page —
+    separate from (and in addition to) the reading library."""
+    _ensure_orders_table()
+    oid = db.next_id(SITE, "orders")
+    items = [_order_line(b) for b in cart_items]
+    total = round(sum(i["price"] for i in items), 2)
+    card_last4 = "".join(ch for ch in card if ch.isdigit())[-4:]
+    order = {
+        "id": oid,
+        "order_number": f"BV-{100000 + oid}",
+        "user_id": user["id"],
+        "created_at": datetime.date.today().isoformat(),
+        "items": items,
+        "item_count": len(items),
+        "subtotal": total,
+        "total": total,
+        "payment_method": payment_method,
+        "card_last4": card_last4,
+        "name": name or user.get("name", ""),
+        "email": email or user.get("email", ""),
+        "status": "completed",
+    }
+    db.save_item(SITE, "orders", oid, order)
+    return order
+
+
+def _get_orders(user_id, limit=50):
+    """Purchase history for a user, newest first (base + overlay via db.query)."""
+    _ensure_orders_table()
+    return db.query(SITE, "orders", where={"user_id": user_id},
+                    sort="-created_at", limit=limit)
+
+
+# ---------------------------------------------------------------------------
+# Subscriptions — "New from your subscriptions" feed
+#
+# Subscribing to an author (Follow Author) or a category was a bare toggle that
+# did nothing but flip a flag. Now a subscription actually surfaces new/unread
+# issues: books by a followed author OR in a subscribed category that the user
+# hasn't added to their reading list yet (and hasn't dismissed). Deterministic —
+# SQL WHERE (author IN ...) OR (category IN ...) ORDER BY rating DESC, id ASC,
+# bounded by LIMIT — so the same subscriptions always surface the same issues.
+# ---------------------------------------------------------------------------
+
+def _new_from_subscriptions(user, limit=24):
+    """Unread issues surfaced by the user's author follows + category subs."""
+    authors = user.get("followed_authors", []) or []
+    cats = user.get("subscriptions", []) or []
+    if not authors and not cats:
+        return []
+    clauses, params = [], []
+    if authors:
+        clauses.append(f"author IN ({','.join('?' * len(authors))})")
+        params.extend(authors)
+    if cats:
+        clauses.append(f"category IN ({','.join('?' * len(cats))})")
+        params.extend(cats)
+    where = " OR ".join(clauses)
+    exclude = set(user.get("reading_list", []) or []) | set(user.get("dismissed_issues", []) or [])
+    sql = (f"SELECT id, title, author, category, year, rating, price, cover_url "
+           f"FROM [{_BOOKS_TABLE}] WHERE {where} "
+           f"ORDER BY rating DESC, id ASC LIMIT ?")
+    rows = db.execute(sql, tuple(params) + (limit + len(exclude),))
+    aset = set(authors)
+    issues = []
+    for r in rows:
+        if r["id"] in exclude:
+            continue
+        r["reason"] = ("author", r["author"]) if r["author"] in aset else ("category", r["category"])
+        issues.append(r)
+        if len(issues) >= limit:
+            break
+    return issues
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +466,10 @@ def checkout_page():
                                    cart_items=cart_items, total=total,
                                    error=pay["error"])
         account_type = request.form.get("account_type", "checking")
+        # Record the purchase as an order (receipt) BEFORE clearing the cart, so
+        # there is a persistent transaction record distinct from the library.
+        order = _create_order(user, cart_items, payment_method=account_type,
+                              card=card, name=name, email=email)
         # Clear cart after checkout
         users = _load_users()
         u = next((u for u in users if u["id"] == user["id"]), None)
@@ -296,6 +481,7 @@ def checkout_page():
                 if pid not in reading:
                     reading.append(pid)
             _save_users(users)
+        session["last_order_id"] = order["id"]
         from app.events import request_2fa
         verify_url = request_2fa("purchase",
                                  return_url=url_for("books-comics.dashboard"),
@@ -324,10 +510,74 @@ def dashboard():
     reading_ids = user.get("reading_list", []) or []
     reading = [db.get_item(SITE, "books", bid) for bid in reading_ids if bid]
     reading = [b for b in reading if b]
+    new_issues = _new_from_subscriptions(user)
+    orders = _get_orders(user["id"], limit=5)
     return render_template("books-comics/dashboard.html", user=user,
                            saved_books=saved, reading_list=reading,
                            followed_authors=user.get("followed_authors", []),
-                           subscriptions=user.get("subscriptions", []))
+                           subscriptions=user.get("subscriptions", []),
+                           new_issues=new_issues, orders=orders,
+                           new_issue_count=len(new_issues))
+
+
+@blueprint.route("/orders")
+def orders_page():
+    if "user_id" not in session:
+        return render_template("books-comics/login.html", error=None)
+    user = _get_user(session["user_id"])
+    if not user:
+        return render_template("books-comics/login.html", error=None)
+    orders = _get_orders(user["id"], limit=50)
+    return render_template("books-comics/orders.html", user=user, orders=orders)
+
+
+@blueprint.route("/orders/<int:order_id>")
+def order_receipt(order_id):
+    if "user_id" not in session:
+        return render_template("books-comics/login.html", error=None)
+    user = _get_user(session["user_id"])
+    if not user:
+        return render_template("books-comics/login.html", error=None)
+    _ensure_orders_table()
+    order = db.get_item(SITE, "orders", order_id)
+    if order is None or order.get("user_id") != user["id"]:
+        abort(404)
+    return render_template("books-comics/receipt.html", user=user, order=order)
+
+
+@blueprint.route("/subscriptions/read", methods=["POST"])
+def form_subscription_mark_read():
+    """Mark a surfaced subscription issue as read — moves it into the reading
+    list so it leaves the 'New from your subscriptions' feed."""
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    book_id = request.form.get("book_id", type=int)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user and book_id is not None:
+        reading = user.setdefault("reading_list", [])
+        if book_id not in reading:
+            reading.append(book_id)
+        _save_users(users)
+    return redirect(url_for("books-comics.dashboard"))
+
+
+@blueprint.route("/subscriptions/dismiss", methods=["POST"])
+def form_subscription_dismiss():
+    """Dismiss a surfaced subscription issue so it stops appearing as unread."""
+    if "user_id" not in session:
+        return redirect(url_for("books-comics.login_page"))
+    user_id = session["user_id"]
+    book_id = request.form.get("book_id", type=int)
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user and book_id is not None:
+        dismissed = user.setdefault("dismissed_issues", [])
+        if book_id not in dismissed:
+            dismissed.append(book_id)
+        _save_users(users)
+    return redirect(url_for("books-comics.dashboard"))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -345,16 +595,7 @@ def login_submit():
         return render_template("books-comics/login.html",
                                error="Invalid username or password")
     session["user_id"] = user["id"]
-    saved_ids = user.get("saved_books", []) or []
-    saved = [db.get_item(SITE, "books", bid) for bid in saved_ids if bid]
-    saved = [b for b in saved if b]
-    reading_ids = user.get("reading_list", []) or []
-    reading = [db.get_item(SITE, "books", bid) for bid in reading_ids if bid]
-    reading = [b for b in reading if b]
-    return render_template("books-comics/dashboard.html", user=user,
-                           saved_books=saved, reading_list=reading,
-                           followed_authors=user.get("followed_authors", []),
-                           subscriptions=user.get("subscriptions", []))
+    return redirect(url_for("books-comics.dashboard"))
 
 
 @blueprint.route("/logout")
@@ -821,17 +1062,22 @@ def api_checkout(user_id):
     books = _query_books(limit=2000)
     cart_items = [b for b in books if b["id"] in cart]
     total = sum(b["price"] for b in cart_items)
+    account_type = data.get("account_type", "checking")
+    # Record the purchase as an order (receipt) before mutating cart/library.
+    order = _create_order(user, cart_items, payment_method=account_type,
+                          card=card, name=name, email=email)
     # Move cart items to reading list
     reading = user.setdefault("reading_list", [])
     for bid in cart:
         if bid not in reading:
             reading.append(bid)
-    account_type = data.get("account_type", "checking")
     user["cart"] = []
     _save_users(users)
     emit("purchase", user_id=user["id"], amount=total, merchant="BookVerse", item=f"{len(cart_items)} books", account_type=account_type)
     return jsonify({
         "status": "completed",
+        "order_id": order["id"],
+        "order_number": order["order_number"],
         "items_purchased": len(cart_items),
         "total": round(total, 2),
         "reading_list_count": len(reading)
@@ -937,3 +1183,31 @@ def api_get_reading_progress(user_id):
     if not user:
         abort(404)
     return jsonify(user.get("reading_progress", {}))
+
+
+@blueprint.route("/api/users/<int:user_id>/orders", methods=["GET"])
+def api_user_orders(user_id):
+    """Purchase history for a user (distinct from the reading library)."""
+    user = _get_user(user_id)
+    if not user:
+        abort(404)
+    return jsonify(_get_orders(user_id, limit=50))
+
+
+@blueprint.route("/api/orders/<int:order_id>", methods=["GET"])
+def api_order(order_id):
+    _ensure_orders_table()
+    order = db.get_item(SITE, "orders", order_id)
+    if order is None:
+        abort(404)
+    return jsonify(order)
+
+
+@blueprint.route("/api/users/<int:user_id>/subscriptions/new", methods=["GET"])
+def api_subscription_new(user_id):
+    """Unread issues surfaced by the user's author follows + category subs."""
+    user = _get_user(user_id)
+    if not user:
+        abort(404)
+    issues = _new_from_subscriptions(user)
+    return jsonify({"count": len(issues), "issues": issues})

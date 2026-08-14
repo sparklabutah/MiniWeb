@@ -23,9 +23,32 @@
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
         .card-header h2 { color: #1a3c5e; font-size: 1.2rem; }
         .badge { display: inline-block; padding: .2rem .7rem; border-radius: .25rem; font-size: .8rem; font-weight: 600; }
-        .badge-open { background: #fef3c7; color: #92400e; }
-        .badge-in_review { background: #dbeafe; color: #1e40af; }
+        .badge-open, .badge-submitted { background: #fef3c7; color: #92400e; }
+        .badge-in_review, .badge-under_review, .badge-adjuster_assigned, .badge-estimate { background: #dbeafe; color: #1e40af; }
+        .badge-settlement_offer { background: #ede9fe; color: #5b21b6; }
+        .badge-accepted, .badge-approved { background: #d1fae5; color: #065f46; }
+        .badge-appealed, .badge-denied { background: #fee2e2; color: #991b1b; }
         .badge-closed { background: #f1f5f9; color: #475569; }
+        .section-h { font-size:.95rem; color:#1a3c5e; margin: 1.5rem 0 .6rem; }
+        .timeline { list-style: none; border-left: 2px solid #cbd5e1; margin-left: .4rem; padding-left: 1.1rem; }
+        .timeline li { position: relative; padding-bottom: 1rem; }
+        .timeline li:before { content:''; position:absolute; left:-1.55rem; top:.2rem; width:.7rem; height:.7rem; border-radius:50%; background:#2b5f8a; border:2px solid #fff; }
+        .timeline li.done:before { background:#059669; }
+        .tl-label { font-weight:600; color:#1e293b; font-size:.9rem; }
+        .tl-meta { font-size:.78rem; color:#94a3b8; }
+        .tl-detail { font-size:.85rem; color:#475569; margin-top:.15rem; }
+        .docs { list-style:none; }
+        .docs li { display:flex; justify-content:space-between; align-items:center; padding:.6rem .8rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:.4rem; margin-bottom:.5rem; font-size:.88rem; }
+        .docs a { color:#2563eb; text-decoration:none; font-weight:600; }
+        .docs a:hover { text-decoration:underline; }
+        .offer { background:#f5f3ff; border:1px solid #ddd6fe; padding:1.2rem; border-radius:.5rem; margin-top:1.5rem; }
+        .offer .amt { font-size:1.6rem; font-weight:700; color:#5b21b6; margin:.2rem 0 .8rem; }
+        .actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:1rem; }
+        .btn { border:none; padding:.6rem 1.4rem; border-radius:.35rem; font-size:.9rem; font-weight:600; cursor:pointer; }
+        .btn-accept { background:#059669; color:#fff; }
+        .btn-appeal { background:#fff; color:#991b1b; border:1px solid #fecaca; }
+        .btn-advance { background:#2b5f8a; color:#fff; }
+        .btn-form { display:inline; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
         .item label { font-size: .75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
         .item .val { font-size: .95rem; color: #1e293b; margin-top: .15rem; }
@@ -71,11 +94,60 @@
                 <div class="item"><label>Payout Amount</label><div class="val">{% if claim.payout_amount is not none %}${{ "%.2f"|format(claim.payout_amount) }}{% else %}--{% endif %}</div></div>
                 <div class="item"><label>Adjuster</label><div class="val">{{ claim.adjuster or '--' }} {{ claim.adjuster_phone or '' }}</div></div>
             </div>
-            <h3 style="font-size:.95rem;color:#1a3c5e;margin-bottom:.5rem;">Description</h3>
+            <h3 class="section-h" style="margin-top:0;">Description</h3>
             <div class="desc">{{ claim.description }}</div>
             {% if claim.notes %}
-            <h3 style="font-size:.95rem;color:#1a3c5e;margin-bottom:.5rem;">Notes</h3>
+            <h3 class="section-h">Notes</h3>
             <div class="notes">{{ claim.notes }}</div>
+            {% endif %}
+
+            <h3 class="section-h">Claim Timeline</h3>
+            <ul class="timeline">
+                {% for t in claim.timeline %}
+                <li class="{% if not loop.last %}done{% endif %}">
+                    <div class="tl-label">{{ t.label }}</div>
+                    <div class="tl-meta">{{ t.date }}</div>
+                    {% if t.detail %}<div class="tl-detail">{{ t.detail }}</div>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+
+            <h3 class="section-h">Supporting Documents</h3>
+            {% if claim.documents %}
+            <ul class="docs">
+                {% for d in claim.documents %}
+                <li>
+                    <span>
+                        {% if d.data_uri %}<a href="{{ d.data_uri }}" download="{{ d.filename }}">{{ d.filename }}</a>{% else %}{{ d.filename }}{% endif %}
+                        <span class="tl-meta">&nbsp;&mdash; {{ d.description }} ({{ d.uploaded_date }})</span>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="tl-meta">No documents on file.</div>
+            {% endif %}
+
+            {% if can_settle %}
+            <div class="offer">
+                <div class="tl-meta" style="text-transform:uppercase;letter-spacing:.03em;">Settlement Offer</div>
+                <div class="amt">${{ "%.2f"|format(claim.settlement_offer_amount or 0) }}</div>
+                <div class="tl-detail">Based on a ${{ "%.2f"|format(claim.damage_estimate or 0) }} estimate less a ${{ "%.2f"|format(claim.deductible_applied or 0) }} deductible.</div>
+                <div class="actions">
+                    <form class="btn-form" method="post" action="{{ url_for('insurance-loans.claim_accept', claim_id=claim.id) }}">
+                        <button type="submit" class="btn btn-accept">Accept Settlement</button>
+                    </form>
+                    <form class="btn-form" method="post" action="{{ url_for('insurance-loans.claim_appeal', claim_id=claim.id) }}">
+                        <button type="submit" class="btn btn-appeal">Appeal Offer</button>
+                    </form>
+                </div>
+            </div>
+            {% elif can_advance %}
+            <div class="actions">
+                <form class="btn-form" method="post" action="{{ url_for('insurance-loans.claim_advance', claim_id=claim.id) }}">
+                    <button type="submit" class="btn btn-advance">Advance Claim Status</button>
+                </form>
+            </div>
             {% endif %}
         </div>
     </div>

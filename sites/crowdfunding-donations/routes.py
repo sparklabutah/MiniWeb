@@ -73,6 +73,65 @@ def _funding_pct(campaign):
     return round(campaign["raised_amount"] / campaign["goal_amount"] * 100, 1)
 
 
+def _build_reward_tiers(raw_tiers):
+    """Normalise a list of loosely-typed tier dicts into stored reward tiers.
+
+    Each raw tier may supply: name/title, amount, description, limit (or
+    quantity_available), fulfillment. Tiers missing a name or a positive
+    amount are dropped. IDs are assigned 1..N in author order.
+    """
+    tiers = []
+    next_id = 1
+    for raw in raw_tiers or []:
+        name = str(raw.get("name") or raw.get("title") or "").strip()
+        try:
+            amount = float(raw.get("amount") or 0)
+        except (TypeError, ValueError):
+            amount = 0
+        if not name or amount <= 0:
+            continue
+        limit = raw.get("quantity_available", raw.get("limit"))
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 0
+        if limit <= 0:
+            limit = 100  # default cap when the author leaves the limit blank
+        fulfillment = str(raw.get("fulfillment") or "physical").strip().lower()
+        if fulfillment not in ("physical", "digital"):
+            fulfillment = "physical"
+        tiers.append({
+            "id": next_id,
+            "name": name,
+            "amount": amount,
+            "description": str(raw.get("description") or "").strip(),
+            "quantity_available": limit,
+            "quantity_claimed": 0,
+            "fulfillment": fulfillment,
+        })
+        next_id += 1
+    return tiers
+
+
+def _reward_tiers_from_form(form):
+    """Read the parallel-array reward-tier fields from a submitted form."""
+    names = form.getlist("tier_name")
+    amounts = form.getlist("tier_amount")
+    descriptions = form.getlist("tier_description")
+    limits = form.getlist("tier_limit")
+    fulfillments = form.getlist("tier_fulfillment")
+    raw = []
+    for i in range(len(names)):
+        raw.append({
+            "name": names[i],
+            "amount": amounts[i] if i < len(amounts) else "",
+            "description": descriptions[i] if i < len(descriptions) else "",
+            "limit": limits[i] if i < len(limits) else "",
+            "fulfillment": fulfillments[i] if i < len(fulfillments) else "physical",
+        })
+    return _build_reward_tiers(raw)
+
+
 def _search_campaigns(campaigns, query):
     if not query:
         return campaigns
@@ -490,6 +549,8 @@ def form_create_campaign():
             goal_amount = float(goal_amount)
         funding_model = data.get("funding_model", "all-or-nothing").strip()
         end_date = data.get("end_date", "").strip()
+        story = data.get("story", "").strip()
+        reward_tiers = _build_reward_tiers(data.get("reward_tiers"))
     else:
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
@@ -497,11 +558,18 @@ def form_create_campaign():
         goal_amount = request.form.get("goal_amount", type=float)
         funding_model = request.form.get("funding_model", "all-or-nothing").strip()
         end_date = request.form.get("end_date", "").strip()
+        story = request.form.get("story", "").strip()
+        reward_tiers = _reward_tiers_from_form(request.form)
 
     if not title or not description or not category or not goal_amount or not end_date:
         if is_json:
             return jsonify({"error": "Missing required fields"}), 400
         abort(400)
+
+    # An optional richer story is folded into the description, which the
+    # campaign page renders (with pre-line whitespace) as "About this project".
+    if story:
+        description = f"{description}\n\n{story}"
 
     campaigns = _get_campaigns()
     new_id = max((c["id"] for c in campaigns), default=0) + 1
@@ -518,7 +586,7 @@ def form_create_campaign():
         "status": "active",
         "start_date": datetime.now().strftime("%Y-%m-%d"),
         "end_date": end_date,
-        "reward_tiers": [],
+        "reward_tiers": reward_tiers,
         "updates": []
     }
     campaigns.append(new_campaign)
@@ -737,11 +805,16 @@ def api_create_campaign():
     goal_amount = data.get("goal_amount")
     funding_model = data.get("funding_model", "all-or-nothing").strip()
     end_date = data.get("end_date", "").strip()
+    story = data.get("story", "").strip()
+    reward_tiers = _build_reward_tiers(data.get("reward_tiers"))
 
     if not user_id:
         return jsonify({"error": "Authentication required"}), 401
     if not title or not description or not category or not goal_amount or not end_date:
         return jsonify({"error": "Missing required fields"}), 400
+
+    if story:
+        description = f"{description}\n\n{story}"
 
     campaigns = _get_campaigns()
     new_id = max((c["id"] for c in campaigns), default=0) + 1
@@ -758,7 +831,7 @@ def api_create_campaign():
         "status": "active",
         "start_date": datetime.now().strftime("%Y-%m-%d"),
         "end_date": end_date,
-        "reward_tiers": [],
+        "reward_tiers": reward_tiers,
         "updates": []
     }
     campaigns.append(new_campaign)

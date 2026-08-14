@@ -16,6 +16,7 @@ Macro coverage (27):
   cancel_by_form, authenticate_by_form, register_by_form
 """
 
+import hashlib
 import pathlib
 from datetime import datetime, date
 
@@ -195,6 +196,139 @@ def _event_location(event):
 
 
 # ---------------------------------------------------------------------------
+# Reserved-seating support
+# ---------------------------------------------------------------------------
+# Indoor fixed-seat venues get an interactive seat map (section -> row -> seat).
+# Everything else -- outdoor amphitheater lawn, festival grounds, marina,
+# brewery, library classroom, community center, convention hall -- is general
+# admission (open / standing) and stays quantity-only, no seat picker.
+_RESERVED_VENUE_KEYWORDS = ("theater", "theatre", "ballroom", "playhouse",
+                            "opera house", "auditorium")
+# "amphitheater"/"amphitheatre" contain the substring "theater" but are open
+# lawn seating, so they are explicitly general admission, never reserved.
+_GA_VENUE_KEYWORDS = ("amphitheater", "amphitheatre")
+
+# Skip I and O in row letters (they read like 1 / 0 on a seat chart).
+_ROW_LETTERS = "ABCDEFGHJKLMNPQRSTUVWX"
+_SEATS_PER_ROW = 16
+_MAX_ROWS = 14
+
+
+def _is_reserved_seating(event):
+    """True when the event's venue has assigned seats (rows + seat numbers).
+
+    Deterministic from the venue name -- no schema/date changes needed. Used to
+    decide whether checkout shows a seat map (reserved) or stays quantity-only
+    (general admission).
+    """
+    venue = (event.get("venue") or "").lower()
+    if any(k in venue for k in _GA_VENUE_KEYWORDS):
+        return False
+    return any(k in venue for k in _RESERVED_VENUE_KEYWORDS)
+
+
+def _section_layout(tt):
+    """(rows, seats_per_row) for one ticket-type 'section', sized to availability."""
+    available = tt.get("available") or 0
+    if available <= 0:
+        available = _SEATS_PER_ROW
+    rows = max(1, min(_MAX_ROWS, -(-available // _SEATS_PER_ROW)))  # ceil division
+    return rows, _SEATS_PER_ROW
+
+
+def _seat_label(section, row_letter, num):
+    return f"{section} {row_letter}{num}"
+
+
+def _seat_sold_deterministic(event_id, label, sold, capacity):
+    """Deterministic 'already sold' flag for a seat.
+
+    Same result on every load (hash of event id + seat label), with the taken
+    density scaled by the section's sold-through ratio so busier sections render
+    fuller. This is what makes some seats blocked without touching the DB.
+    """
+    if capacity <= 0:
+        return False
+    h = int(hashlib.md5(f"{event_id}|{label}".encode()).hexdigest(), 16)
+    ratio = min(0.9, sold / capacity)
+    return (h % 1000) / 1000.0 < ratio
+
+
+def _seat_map(event, booked=None):
+    """Section/row/seat structure for a reserved-seating event's seat picker.
+
+    ``booked`` is a set of seat labels already persisted on tickets for this
+    event (base + this session's overlay); they render as taken on top of the
+    deterministic sold seats.
+    """
+    booked = booked or set()
+    sections = []
+    for tt in event.get("ticket_types", []):
+        rows_n, per_row = _section_layout(tt)
+        capacity = rows_n * per_row
+        sold = tt.get("sold") or 0
+        section = tt["type"]
+        rows = []
+        for ri in range(rows_n):
+            letter = _ROW_LETTERS[ri]
+            seats = []
+            for num in range(1, per_row + 1):
+                label = _seat_label(section, letter, num)
+                taken = (label in booked
+                         or _seat_sold_deterministic(event["id"], label, sold, capacity))
+                seats.append({"label": label, "num": num, "taken": taken})
+            rows.append({"letter": letter, "seats": seats})
+        sections.append({"type": section, "price": tt.get("price", 0.0), "rows": rows})
+    return sections
+
+
+def _valid_seats(event):
+    """Map of valid seat label -> section (ticket_type) for the event."""
+    idx = {}
+    for tt in event.get("ticket_types", []):
+        rows_n, per_row = _section_layout(tt)
+        for ri in range(rows_n):
+            letter = _ROW_LETTERS[ri]
+            for num in range(1, per_row + 1):
+                idx[_seat_label(tt["type"], letter, num)] = tt["type"]
+    return idx
+
+
+def _booked_seats(event_id):
+    """Seat labels already taken by existing tickets (overlay-aware, SQL-filtered)."""
+    rows = db.query(SITE, "tickets", where={"event_id": event_id})
+    return {t.get("seat") for t in rows if t.get("seat")}
+
+
+def _validate_seat_selection(event, ticket_type, seats, booked):
+    """Return an error string if the seat selection is invalid, else None.
+
+    Rejects unknown seats, seats outside the chosen section, duplicates, and
+    seats that are already taken (already booked OR deterministically sold).
+    """
+    valid = _valid_seats(event)
+    tt_by_type = {t["type"]: t for t in event.get("ticket_types", [])}
+    seen = set()
+    for label in seats:
+        section = valid.get(label)
+        if section is None:
+            return f"Seat '{label}' does not exist for this event"
+        if section != ticket_type:
+            return f"Seat '{label}' is not in the '{ticket_type}' section"
+        if label in seen:
+            return f"Seat '{label}' was selected more than once"
+        seen.add(label)
+        if label in booked:
+            return f"Seat '{label}' is already taken"
+        tt = tt_by_type[section]
+        rows_n, per_row = _section_layout(tt)
+        if _seat_sold_deterministic(event["id"], label, tt.get("sold") or 0,
+                                    rows_n * per_row):
+            return f"Seat '{label}' is already taken"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
@@ -277,6 +411,7 @@ def event_detail(event_id):
         event=event,
         user=user,
         logged_in=logged_in,
+        reserved=_is_reserved_seating(event),
     )
 
 
@@ -546,6 +681,21 @@ def api_orders_create():
     if not tt:
         return jsonify({"error": f"Ticket type '{ticket_type}' not found for this event"}), 400
 
+    # Reserved seating: specific seats must be chosen; they define the quantity.
+    reserved = _is_reserved_seating(event)
+    selected_seats = []
+    if reserved:
+        selected_seats = [s.strip() for s in (data.get("seats") or []) if s and s.strip()]
+        if not selected_seats:
+            return jsonify({
+                "error": "This event has reserved seating -- select seat(s) via 'seats'"
+            }), 400
+        err = _validate_seat_selection(event, ticket_type, selected_seats,
+                                       _booked_seats(event_id))
+        if err:
+            return jsonify({"error": err}), 400
+        quantity = len(selected_seats)
+
     remaining = tt["available"] - tt["sold"]
     if tt["available"] > 0 and remaining < quantity:
         return jsonify({
@@ -594,7 +744,7 @@ def api_orders_create():
             "price": unit_price,
             "status": "active",
             "barcode": f"LP{event_id:04d}{next_ticket_num + i:05d}",
-            "seat": None,
+            "seat": selected_seats[i] if reserved else None,
             "purchased_at": now,
             "checked_in_at": None,
         })
@@ -973,11 +1123,16 @@ def checkout_page(event_id):
     if not event:
         abort(404)
     user, logged_in = _get_browsing_user()
+    reserved = _is_reserved_seating(event)
+    seat_map = _seat_map(event, _booked_seats(event_id)) if reserved else None
     return render_template(
         "ticketing-events/checkout.html",
         event=event,
         user=user,
         logged_in=logged_in,
+        reserved=reserved,
+        seat_map=seat_map,
+        error=None,
     )
 
 
@@ -998,12 +1153,37 @@ def checkout_submit(event_id):
     if not event or event["status"] != "on_sale":
         abort(400)
 
+    reserved = _is_reserved_seating(event)
+    selected_seats = []
+
+    def _reshow(error):
+        """Re-render the checkout form with an error (reserved-seat failures)."""
+        seat_map = _seat_map(event, _booked_seats(event_id)) if reserved else None
+        return render_template(
+            "ticketing-events/checkout.html", event=event, user=user,
+            logged_in=True, reserved=reserved, seat_map=seat_map, error=error,
+        ), 400
+
+    if reserved:
+        # Reserved seating: the chosen seats define the ticket type and quantity.
+        raw = request.form.get("seats", "")
+        selected_seats = [s.strip() for s in raw.split(",") if s.strip()]
+        if not selected_seats:
+            return _reshow("Please select at least one seat.")
+        booked = _booked_seats(event_id)
+        err = _validate_seat_selection(event, ticket_type, selected_seats, booked)
+        if err:
+            return _reshow(err)
+        quantity = len(selected_seats)
+
     tt = next((t for t in event["ticket_types"] if t["type"] == ticket_type), None)
     if not tt:
         abort(400)
 
     remaining = tt["available"] - tt["sold"]
     if tt["available"] > 0 and remaining < quantity:
+        if reserved:
+            return _reshow(f"Only {remaining} tickets remaining for '{ticket_type}'.")
         abort(400)
 
     unit_price = tt["price"]
@@ -1049,7 +1229,8 @@ def checkout_submit(event_id):
             "user_id": user["id"], "ticket_type": ticket_type,
             "price": unit_price, "status": "active",
             "barcode": f"LP{event_id:04d}{next_ticket_num + i:05d}",
-            "seat": None, "purchased_at": now, "checked_in_at": None,
+            "seat": selected_seats[i] if reserved else None,
+            "purchased_at": now, "checked_in_at": None,
         })
 
     pm_list = user.get("payment_methods", [])

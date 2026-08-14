@@ -143,6 +143,79 @@ def _save_inquiries(data):
     db.save_collection(SITE, "inquiries", data)
 
 
+# ---------------------------------------------------------------------------
+# Tour scheduling — the defining real-estate conversion action.
+#
+# The site was seeded WITHOUT a tours table (a buyer could only fire off a
+# free-text "Contact Agent" inquiry that never progressed past status
+# "pending"). Scheduling a showing — pick a date + time slot for a specific
+# listing and drive it through a real lifecycle — is the core action a
+# Zillow/Redfin-style site exists for. We create + register an (empty) base
+# table on first use (the forums_reports / auctions-orders runtime-seed
+# pattern) so db.query()/db.get_item() have a real home to read tours back
+# from; every actual tour request lives in the per-session overlay via
+# db.save_item, keeping parallel agent sessions isolated.
+# ---------------------------------------------------------------------------
+
+_TOURS_TABLE = "real_estate_buy_rent_tours"
+
+# Bookable showing slots offered on every listing (deterministic, so a task can
+# name an exact slot and it is always selectable).
+_TOUR_SLOTS = [
+    "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+    "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM",
+]
+
+# Tour lifecycle: requested -> confirmed (agent accepts) or cancelled.
+_TOUR_STATUSES = ("requested", "confirmed", "cancelled")
+
+_tours_table_ready = False
+
+
+def _ensure_tours_table():
+    """Create + register the tours base table on first use. Idempotent.
+
+    The table is created empty in the base DB; real per-session tour requests
+    land in session_overlay via db.save_item, so registering the table only
+    gives db.query()/db.get_item() a place to look — it never persists a
+    session's tours into the shared base table."""
+    global _tours_table_ready
+    if _tours_table_ready and db.get_table_name(SITE, "tours"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_TOURS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL DEFAULT 0,
+            listing_id INTEGER NOT NULL DEFAULT 0,
+            agent_id INTEGER NOT NULL DEFAULT 0,
+            tour_date TEXT NOT NULL DEFAULT '',
+            tour_time TEXT NOT NULL DEFAULT '',
+            message TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'requested',
+            created_date TEXT NOT NULL DEFAULT '',
+            confirmed_date TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_{_TOURS_TABLE}_user "
+        f"ON [{_TOURS_TABLE}] (user_id)"
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_{_TOURS_TABLE}_listing "
+        f"ON [{_TOURS_TABLE}] (listing_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "tours", _TOURS_TABLE, "id")
+    _tours_table_ready = True
+
+
+def _user_tours(user_id):
+    """Tours for a user, newest first (base + this session's overlay)."""
+    _ensure_tours_table()
+    return db.query(SITE, "tours", where={"user_id": user_id},
+                    sort="-id", limit=100)
+
 
 # ---------------------------------------------------------------------------
 # HTML routes
@@ -239,7 +312,8 @@ def listing_detail(listing_id):
 
     return render_template("real-estate-buy-rent/listing_detail.html",
                            listing=listing, agent=agent, related=related,
-                           user=user, is_saved=is_saved)
+                           user=user, is_saved=is_saved,
+                           tour_slots=_TOUR_SLOTS)
 
 
 @blueprint.route("/agents")
@@ -459,6 +533,100 @@ def submit_inquiry(listing_id):
                             listing_id=listing_id, sent="1"))
 
 
+@blueprint.route("/tours")
+def tours_page():
+    """The signed-in user's scheduled property tours (My Tours)."""
+    if "user_id" not in session:
+        return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    user = _get_user(session["user_id"])
+    tours = _user_tours(session["user_id"])
+    enriched = []
+    for tour in tours:
+        listing = db.get_item(SITE, "listings", tour["listing_id"])
+        agent = _get_agent(tour.get("agent_id")) if tour.get("agent_id") else None
+        enriched.append({"tour": tour, "listing": listing, "agent": agent})
+    return render_template("real-estate-buy-rent/tours.html",
+                           tours=enriched, user=user)
+
+
+@blueprint.route("/listing/<int:listing_id>/tour", methods=["POST"])
+def schedule_tour(listing_id):
+    """Schedule a showing for a listing: pick a date + time slot.
+
+    Persists a tour request with status 'requested' tied to the listing and its
+    agent, in the session overlay."""
+    if "user_id" not in session:
+        return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    listing = db.get_item(SITE, "listings", listing_id)
+    if listing is None:
+        abort(404)
+    tour_date = request.form.get("tour_date", "").strip()
+    tour_time = request.form.get("tour_time", "").strip()
+    message = request.form.get("message", "").strip()
+    # Both a date and a valid slot are required to book a showing.
+    if not tour_date or tour_time not in _TOUR_SLOTS:
+        return redirect(url_for("real-estate-buy-rent.listing_detail",
+                                listing_id=listing_id, tour="empty"))
+
+    _ensure_tours_table()
+    tour_id = db.next_id(SITE, "tours")
+    agent_id = listing.get("agent_id", 0)
+    db.save_item(SITE, "tours", tour_id, {
+        "id": tour_id,
+        "user_id": session["user_id"],
+        "listing_id": listing_id,
+        "agent_id": agent_id,
+        "tour_date": tour_date,
+        "tour_time": tour_time,
+        "message": message,
+        "status": "requested",
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
+        "confirmed_date": "",
+    })
+    agent = _get_agent(agent_id) if agent_id else None
+    agent_name = agent.get("name", "the agent") if agent else "the agent"
+    title = listing.get("title", "Listing")
+    emit("message",
+         from_user_id=session["user_id"],
+         to_user_id=session["user_id"],
+         text=(f"Tour requested with {agent_name} for \"{title}\" "
+               f"on {tour_date} at {tour_time}."),
+         source_site="real-estate-buy-rent")
+    return redirect(url_for("real-estate-buy-rent.listing_detail",
+                            listing_id=listing_id, tour="1"))
+
+
+@blueprint.route("/tour/<int:tour_id>/confirm", methods=["POST"])
+def confirm_tour(tour_id):
+    """Advance a tour from 'requested' to 'confirmed' (agent accepts)."""
+    if "user_id" not in session:
+        return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    _ensure_tours_table()
+    tour = db.get_item(SITE, "tours", tour_id)
+    if tour is None or tour.get("user_id") != session["user_id"]:
+        abort(404)
+    if tour.get("status") == "requested":
+        tour["status"] = "confirmed"
+        tour["confirmed_date"] = datetime.now().strftime("%Y-%m-%d")
+        db.save_item(SITE, "tours", tour_id, tour)
+    return redirect(url_for("real-estate-buy-rent.tours_page"))
+
+
+@blueprint.route("/tour/<int:tour_id>/cancel", methods=["POST"])
+def cancel_tour(tour_id):
+    """Cancel a tour that has not yet been cancelled."""
+    if "user_id" not in session:
+        return render_template("real-estate-buy-rent/login.html", error=None, mode="login")
+    _ensure_tours_table()
+    tour = db.get_item(SITE, "tours", tour_id)
+    if tour is None or tour.get("user_id") != session["user_id"]:
+        abort(404)
+    if tour.get("status") != "cancelled":
+        tour["status"] = "cancelled"
+        db.save_item(SITE, "tours", tour_id, tour)
+    return redirect(url_for("real-estate-buy-rent.tours_page"))
+
+
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
@@ -596,6 +764,45 @@ def api_inquiries_post():
     inquiries.append(new_inquiry)
     _save_inquiries(inquiries)
     return jsonify(new_inquiry), 201
+
+
+@blueprint.route("/api/tours", methods=["GET"])
+def api_tours_get():
+    if "user_id" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    return jsonify(_user_tours(session["user_id"]))
+
+
+@blueprint.route("/api/tours", methods=["POST"])
+def api_tours_post():
+    if "user_id" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    data = request.get_json(silent=True) or {}
+    listing_id = data.get("listing_id")
+    tour_date = str(data.get("tour_date", "")).strip()
+    tour_time = str(data.get("tour_time", "")).strip()
+    if not listing_id or not tour_date or tour_time not in _TOUR_SLOTS:
+        return jsonify({"error": "listing_id, tour_date and a valid tour_time required",
+                        "valid_times": _TOUR_SLOTS}), 400
+    listing = db.get_item(SITE, "listings", listing_id)
+    if listing is None:
+        return jsonify({"error": "Listing not found"}), 404
+    _ensure_tours_table()
+    tour_id = db.next_id(SITE, "tours")
+    new_tour = {
+        "id": tour_id,
+        "user_id": session["user_id"],
+        "listing_id": listing_id,
+        "agent_id": listing.get("agent_id", 0),
+        "tour_date": tour_date,
+        "tour_time": tour_time,
+        "message": str(data.get("message", "")).strip(),
+        "status": "requested",
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
+        "confirmed_date": "",
+    }
+    db.save_item(SITE, "tours", tour_id, new_tour)
+    return jsonify(new_tour), 201
 
 
 @blueprint.route("/api/stats")

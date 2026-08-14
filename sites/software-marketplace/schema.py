@@ -44,6 +44,18 @@ TABLES = {
             "type",
         ],
     },
+    "cart": {
+        "table_name": "software_marketplace_cart",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("app_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("added_date", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "user_id",
+        ],
+    },
     "installed": {
         "table_name": "software_marketplace_installed",
         "columns": [
@@ -51,6 +63,25 @@ TABLES = {
             ("user_id", "INTEGER NOT NULL DEFAULT 0"),
             ("app_id", "INTEGER NOT NULL DEFAULT 0"),
             ("installed_date", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "user_id",
+        ],
+    },
+    "purchases": {
+        "table_name": "software_marketplace_purchases",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("app_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("app_name", "TEXT NOT NULL DEFAULT ''"),
+            ("price", "REAL NOT NULL DEFAULT 0.0"),
+            ("discount", "REAL NOT NULL DEFAULT 0.0"),
+            ("promo_code", "TEXT"),
+            ("date", "TEXT NOT NULL DEFAULT ''"),
+            ("receipt_id", "TEXT NOT NULL DEFAULT ''"),
+            ("status", "TEXT NOT NULL DEFAULT 'completed'"),
+            ("refund_date", "TEXT NOT NULL DEFAULT ''"),
         ],
         "indexes": [
             "user_id",

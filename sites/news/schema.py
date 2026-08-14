@@ -42,6 +42,25 @@ TABLES = {
             "user_id",
         ],
     },
+    "comments": {
+        "table_name": "news_comments",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("article_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("parent_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("user_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("username", "TEXT NOT NULL DEFAULT ''"),
+            ("display_name", "TEXT NOT NULL DEFAULT ''"),
+            ("body", "TEXT NOT NULL DEFAULT ''"),
+            ("posted_at", "TEXT NOT NULL DEFAULT ''"),
+            ("upvotes", "INTEGER NOT NULL DEFAULT 0"),
+            ("upvoted_by", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "article_id",
+            "parent_id",
+        ],
+    },
     "categories": {
         "table_name": "news_categories",
         "columns": [

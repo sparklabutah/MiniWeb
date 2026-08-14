@@ -69,8 +69,15 @@ def _check_dangerous(code):
 # Code execution via subprocess
 # ---------------------------------------------------------------------------
 
-def _execute_code(code, timeout=5):
-    """Execute Python code in a subprocess. Returns (stdout, stderr, returncode)."""
+def _execute_code(code, timeout=5, stdin=""):
+    """Execute Python code in a subprocess. Returns (stdout, stderr, returncode).
+
+    ``stdin`` is fed to the program's standard input so code that calls
+    ``input()`` works like it would in a real IDE. It always defaults to an
+    empty string (rather than inheriting the server's stdin), so a program
+    that reads input without any supplied value gets a clean EOF instead of
+    hanging.
+    """
     dangerous = _check_dangerous(code)
     if dangerous:
         return ("", f"Blocked: use of {', '.join(dangerous)} is not allowed", 1)
@@ -81,6 +88,7 @@ def _execute_code(code, timeout=5):
             text=True,
             timeout=timeout,
             cwd="/tmp",
+            input=stdin if stdin is not None else "",
         )
         return (result.stdout, result.stderr, result.returncode)
     except subprocess.TimeoutExpired:
@@ -177,6 +185,11 @@ def index():
 def editor():
     """Blank code editor page, optionally pre-filled with snippet code."""
     snippet_id = request.args.get("snippet_id", type=int)
+    share_token = request.args.get("share", "").strip()
+    if not snippet_id and share_token:
+        share = db.get_item(SITE, "shares", share_token)
+        if share:
+            snippet_id = share.get("snippet_id")
     snippet = None
     if snippet_id:
         snippet = _get_snippet(snippet_id)
@@ -367,7 +380,8 @@ def form_execute():
     code = request.form.get("code", "")
     timeout = int(request.form.get("timeout", "5"))
     timeout = min(max(timeout, 1), 10)
-    stdout, stderr, rc = _execute_code(code, timeout=timeout)
+    stdin = request.form.get("stdin", "")
+    stdout, stderr, rc = _execute_code(code, timeout=timeout, stdin=stdin)
     snippet_id = request.form.get("snippet_id", type=int)
     snippet = _get_snippet(snippet_id) if snippet_id else None
     font_size = request.form.get("font_size", "14")
@@ -377,7 +391,7 @@ def form_execute():
         user = _get_user(session["user_id"])
     return render_template("code-editor-execution/editor.html",
                            snippet=snippet, code=code, stdout=stdout,
-                           stderr=stderr, returncode=rc,
+                           stderr=stderr, returncode=rc, stdin=stdin,
                            font_size=font_size, tab_size=tab_size, user=user)
 
 
@@ -392,9 +406,10 @@ def api_execute():
     code = data.get("code", "")
     timeout = data.get("timeout", 5)
     timeout = min(max(int(timeout), 1), 10)
+    stdin = data.get("stdin", "")
     if not code.strip():
         return jsonify({"error": "No code provided"}), 400
-    stdout, stderr, rc = _execute_code(code, timeout=timeout)
+    stdout, stderr, rc = _execute_code(code, timeout=timeout, stdin=stdin)
 
     # Record in execution history if logged in
     if "user_id" in session:
@@ -550,12 +565,29 @@ def api_share(snippet_id):
     if snippet is None:
         abort(404)
     share_token = uuid.uuid5(uuid.NAMESPACE_URL, f"snippet-{snippet_id}").hex[:12]
+    # Persist the token -> snippet mapping in the (overlay-aware) shares collection
+    # so it can be resolved later via /s/<token> or ?share=<token>.
+    db.save_item(SITE, "shares", share_token, {
+        "id": share_token,
+        "snippet_id": snippet_id,
+    })
+    share_url = url_for("code-editor-execution.resolve_share", token=share_token)
     return jsonify({
         "snippet_id": snippet_id,
         "title": snippet["title"],
         "share_token": share_token,
-        "share_url": f"/sites/code-editor-execution/editor?snippet_id={snippet_id}",
+        "share_url": share_url,
     })
+
+
+@blueprint.route("/s/<token>")
+def resolve_share(token):
+    """Resolve a share token to its snippet and open it in the editor."""
+    share = db.get_item(SITE, "shares", token)
+    if not share:
+        abort(404)
+    return redirect(url_for("code-editor-execution.editor",
+                            snippet_id=share["snippet_id"]))
 
 
 # ---------------------------------------------------------------------------

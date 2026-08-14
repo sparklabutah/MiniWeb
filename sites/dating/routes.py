@@ -147,6 +147,9 @@ def _get_discover_profiles(user_id):
     for u in users:
         if u["id"] in already_acted:
             continue
+        if u.get("blocked"):
+            # Blocked profiles are hidden from Discover entirely.
+            continue
         if _matches_preferences(user, u):
             candidates.append(u)
 
@@ -546,8 +549,16 @@ def form_like(profile_id):
     user = _get_current_user()
     if not user:
         return redirect(url_for("dating.login_page"))
-    _do_like(user["id"], profile_id)
-    return redirect(request.form.get("next") or url_for("dating.index"))
+    action, match_id = _do_like(user["id"], profile_id)
+    next_url = request.form.get("next") or url_for("dating.index")
+    if action == "matched":
+        # A mutual like just created a match — show the celebratory
+        # "It's a Match!" interstitial with a jump-to-chat link.
+        matched_profile = _get_user(profile_id)
+        return render_template("dating/match.html", user=user,
+                               profile=matched_profile, match_id=match_id,
+                               next_url=next_url)
+    return redirect(next_url)
 
 
 @blueprint.route("/pass/<int:profile_id>", methods=["POST"])
@@ -621,6 +632,11 @@ def form_send_message(match_id):
         return redirect(url_for("dating.conversation", match_id=match_id))
 
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
+
+    # Block enforcement: no messaging to/from a blocked user.
+    other = _get_user(other_id)
+    if (other and other.get("blocked")) or user.get("blocked"):
+        abort(403)
 
     new_id = _next_id("messages")
     msg = {
@@ -869,6 +885,11 @@ def api_send_message():
         return jsonify({"error": "Forbidden"}), 403
 
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
+
+    # Block enforcement: no messaging to/from a blocked user.
+    other = _get_user(other_id)
+    if (other and other.get("blocked")) or user.get("blocked"):
+        return jsonify({"error": "Blocked"}), 403
 
     new_id = _next_id("messages")
     new_msg = {

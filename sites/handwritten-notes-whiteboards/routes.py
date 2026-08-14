@@ -297,6 +297,33 @@ def form_invite_to_note(note_id):
     return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=note_id))
 
 
+# Cap for inlining raw uploads as a data-URI on the note (keeps the session
+# overlay from ballooning). Larger files fall back to a deterministic
+# placeholder so the note still renders something.
+MAX_UPLOAD_DATAURI_BYTES = 3 * 1024 * 1024
+
+
+def _persist_uploaded_image(f, note_id):
+    """Persist an uploaded image's REAL bytes on the note as a data-URI so it
+    renders back exactly as uploaded. Empty/oversized files fall back to a
+    deterministic placeholder. Returns the string for note['image']."""
+    import base64
+    try:
+        raw = f.read()
+    except Exception:
+        raw = b""
+    # Rewind so any later reader still sees the stream.
+    try:
+        f.stream.seek(0)
+    except Exception:
+        pass
+    if raw and len(raw) <= MAX_UPLOAD_DATAURI_BYTES:
+        mimetype = f.mimetype or "image/png"
+        b64 = base64.b64encode(raw).decode("ascii")
+        return f"data:{mimetype};base64,{b64}"
+    return images.save_upload_placeholder(note_id, f.filename)
+
+
 @blueprint.route("/upload-image", methods=["POST"])
 def form_upload_image():
     """Upload an image and create a new note from it."""
@@ -316,9 +343,9 @@ def form_upload_image():
     title = f.filename
     now = _now_iso()
     new_id = db.next_id(SITE, "notes")
-    # We never keep the raw uploaded bytes -- store a generated placeholder
-    # image and reference its served path instead.
-    image_url = images.save_upload_placeholder(new_id, f.filename)
+    # Persist the real uploaded bytes (data-URI) so the note shows the actual
+    # image; oversized/unreadable uploads fall back to a placeholder.
+    image_url = _persist_uploaded_image(f, new_id)
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {title}]",
@@ -490,12 +517,48 @@ def notebook_detail(notebook_id):
 
 @blueprint.route("/whiteboards")
 def whiteboards_page():
-    return redirect(url_for("handwritten-notes-whiteboards.index"))
+    """List the current user's whiteboards (each links to its canvas)."""
+    user = _current_user()
+    where = {"owner_id": user["id"]} if user else None
+    boards = db.query(SITE, "whiteboards", where=where,
+                      sort="-updated_at", limit=50)
+    for b in boards:
+        els = b.get("elements", [])
+        if isinstance(els, str):
+            try:
+                els = json.loads(els) if els else []
+            except Exception:
+                els = []
+        b["element_count"] = len(els)
+    return render_template(
+        "handwritten-notes-whiteboards/whiteboards.html",
+        whiteboards=boards, user=user,
+    )
 
 
 @blueprint.route("/whiteboard/<int:wb_id>")
 def whiteboard_detail(wb_id):
-    return redirect(url_for("handwritten-notes-whiteboards.index"))
+    """Interactive whiteboard canvas.
+
+    Renders every element at its stored (x, y) position and lets the user add
+    a new element and drag existing ones -- both persisted via the whiteboard
+    element APIs (POST .../elements, PUT .../elements/<i>/move).
+    """
+    user = _current_user()
+    wb = db.get_item(SITE, "whiteboards", wb_id)
+    if not wb:
+        abort(404)
+    elements = wb.get("elements", [])
+    if isinstance(elements, str):
+        try:
+            elements = json.loads(elements) if elements else []
+        except Exception:
+            elements = []
+    wb["elements"] = elements
+    return render_template(
+        "handwritten-notes-whiteboards/whiteboard.html",
+        wb=wb, user=user,
+    )
 
 
 @blueprint.route("/search")
@@ -994,7 +1057,7 @@ def api_notes_create_by_image():
 
     now = _now_iso()
     new_id = db.next_id(SITE, "notes")
-    image_url = images.save_upload_placeholder(new_id, img.filename)
+    image_url = _persist_uploaded_image(img, new_id)
     new_note = {
         "id": new_id, "title": title,
         "content": f"[image uploaded: {img.filename}]",
@@ -1059,7 +1122,7 @@ def api_note_replace_image(note_id):
     if not note:
         abort(404)
     note["content"] = f"[image replaced: {img.filename}]"
-    note["image"] = images.save_upload_placeholder(note_id, img.filename)
+    note["image"] = _persist_uploaded_image(img, note_id)
     note["updated_at"] = _now_iso()
     db.save_item(SITE, "notes", note_id, note)
     return jsonify(note)

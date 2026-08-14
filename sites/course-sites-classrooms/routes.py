@@ -4,6 +4,7 @@ Serves courses, assignments, submissions, gradebook, and discussion
 boards with role-based access (admin / instructor / student).
 Data is loaded from JSON files in data/.
 """
+import base64
 import pathlib
 from datetime import datetime
 
@@ -16,6 +17,39 @@ from app.events import emit
 from app.handlers.email_handler import _add_email
 
 SITE = "course-sites-classrooms"
+
+# Cap a single submission attachment so the base64 payload stashed inline on the
+# submission (and into the session overlay) stays modest. Real LMSes cap too.
+MAX_SUBMISSION_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _clean_filename(name):
+    """Strip characters that would break a Content-Disposition header."""
+    return (name or "attachment").replace("\n", " ").replace("\r", " ").replace('"', "").strip() or "attachment"
+
+
+def _build_submission_file(storage):
+    """Read an uploaded werkzeug FileStorage into an inline attachment dict.
+
+    Returns ``{"filename", "content_type", "size", "data_uri"}`` or ``None`` when
+    no real file was provided. The raw bytes are base64-encoded into a data URI
+    so the file survives inline on the submission (JSON) with no extra table.
+    """
+    if not storage or not storage.filename:
+        return None
+    raw = storage.read()
+    if not raw:
+        return None
+    if len(raw) > MAX_SUBMISSION_FILE_BYTES:
+        raw = raw[:MAX_SUBMISSION_FILE_BYTES]
+    ct = storage.mimetype or "application/octet-stream"
+    b64 = base64.b64encode(raw).decode("ascii")
+    return {
+        "filename": _clean_filename(storage.filename),
+        "content_type": ct,
+        "size": len(raw),
+        "data_uri": f"data:{ct};base64,{b64}",
+    }
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 blueprint = Blueprint(
     "course-sites-classrooms",
@@ -341,6 +375,7 @@ def form_submit_assignment(course_id, assignment_id):
     if not course or user["id"] not in course.get("enrolled_students", []):
         abort(403)
     content = request.form.get("content", "").strip()
+    attachment = _build_submission_file(request.files.get("file"))
     submissions = _get_submissions()
     new_id = max((s["id"] for s in submissions), default=0) + 1
     submissions.append({
@@ -352,7 +387,8 @@ def form_submit_assignment(course_id, assignment_id):
         "content": content,
         "score": None,
         "status": "submitted",
-        "feedback": ""
+        "feedback": "",
+        "attachment": attachment,
     })
     _save_submissions(submissions)
     _add_email(user["id"], "noreply@course-sites.lakeport.local",
@@ -363,6 +399,37 @@ def form_submit_assignment(course_id, assignment_id):
         emit("booking", user_id=user["id"], title=f"Due: {assignment.get('title', 'Assignment')}", start=assignment.get("due_date", ""), location="")
     return redirect(url_for(f"{BP}.assignment_detail",
                             course_id=course_id, assignment_id=assignment_id))
+
+
+@blueprint.route("/course/<int:course_id>/assignment/<int:assignment_id>/submission/<int:submission_id>/file")
+def download_submission_file(course_id, assignment_id, submission_id):
+    """Serve the file attached to a submission for download/preview.
+
+    Students may fetch their own submitted file; instructors/admins of any
+    submission on the assignment. The bytes are decoded from the inline
+    base64 data URI persisted at submit time.
+    """
+    user = _current_user()
+    if not user:
+        return redirect(url_for(f"{BP}.login_page"))
+    sub = db.get_item(SITE, "submissions", submission_id)
+    if not sub or sub.get("assignment_id") != assignment_id:
+        abort(404)
+    # Access control: owner student, or instructor/admin.
+    if user["role"] == "student" and sub.get("student_id") != user["id"]:
+        abort(403)
+    att = sub.get("attachment")
+    if not att or not att.get("data_uri"):
+        abort(404)
+    try:
+        _, b64 = att["data_uri"].split(",", 1)
+        raw = base64.b64decode(b64)
+    except (ValueError, TypeError):
+        abort(404)
+    ct = att.get("content_type") or "application/octet-stream"
+    fname = _clean_filename(att.get("filename"))
+    return Response(raw, mimetype=ct,
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @blueprint.route("/course/<int:course_id>/assignment/<int:assignment_id>/grade", methods=["POST"])

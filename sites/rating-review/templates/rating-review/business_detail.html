@@ -74,6 +74,16 @@
         .review-actions button { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 4px 12px; font-size: 12px; color: #666; cursor: pointer; }
         .review-actions button:hover { background: #f5f5f5; }
 
+        .owner-response { margin-top: 14px; margin-left: 20px; padding: 14px 16px; background: #fbf7f2; border-left: 3px solid #d32323; border-radius: 4px; }
+        .owner-response-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .owner-badge { display: inline-block; background: #d32323; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 10px; text-transform: uppercase; letter-spacing: .3px; }
+        .owner-response-biz { font-weight: 600; font-size: 13px; color: #333; }
+        .owner-response-date { font-size: 12px; color: #999; margin-left: auto; }
+        .owner-response-text { font-size: 14px; color: #444; line-height: 1.6; white-space: pre-wrap; }
+        .owner-response-edit-btn, .owner-respond-btn { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 4px 12px; font-size: 12px; color: #666; cursor: pointer; margin-top: 8px; }
+        .owner-response-edit-btn:hover, .owner-respond-btn:hover { background: #f5f5f5; }
+        .owner-response-affordance { margin-top: 10px; margin-left: 20px; }
+
         .photos-section { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
         .photo-thumb { width: 140px; height: 105px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; border: 1px solid #e0e0e0; }
 
@@ -183,6 +193,24 @@
                         <button class="follow-user-btn" onclick="toggleFollowUser({{ r.user_id }}, this)">+ Follow {{ r._user.display_name if r._user else 'Reviewer' }}</button>
                         {% endif %}
                     </div>
+
+                    {% if r._owner_response %}
+                    <div class="owner-response" id="owner-response-{{ r.id }}">
+                        <div class="owner-response-header">
+                            <span class="owner-badge">Response from the owner</span>
+                            {% if r._owner_response.business_name %}<span class="owner-response-biz">{{ r._owner_response.business_name }}</span>{% endif %}
+                            <span class="owner-response-date">{{ r._owner_response.updated_at }}</span>
+                        </div>
+                        <div class="owner-response-text">{{ r._owner_response.text }}</div>
+                        {% if user %}
+                        <button class="owner-response-edit-btn" onclick="editOwnerResponse({{ r.id }})">Edit response</button>
+                        {% endif %}
+                    </div>
+                    {% elif user %}
+                    <div class="owner-response-affordance">
+                        <button class="owner-respond-btn" onclick="addOwnerResponse({{ r.id }})">Respond as owner</button>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
 
@@ -280,6 +308,59 @@
             }
         });
     }
+    var OWNER_RESP_BASE = "{{ url_for('rating-review.index') }}api/reviews/";
+    var LOGIN_URL = "{{ url_for('rating-review.login') }}";
+
+    function addOwnerResponse(reviewId) {
+        var text = prompt("Respond to this review as the business owner:");
+        if (text === null) return;
+        text = text.trim();
+        if (!text) return;
+        fetch(OWNER_RESP_BASE + reviewId + "/owner-response", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({text: text})
+        })
+        .then(r => {
+            if (r.status === 401) {
+                window.location.href = LOGIN_URL + "?next=" + encodeURIComponent(window.location.href);
+                return null;
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (!data) return;
+            if (data.error) { alert(data.error); return; }
+            window.location.reload();
+        });
+    }
+
+    function editOwnerResponse(reviewId) {
+        var el = document.querySelector("#owner-response-" + reviewId + " .owner-response-text");
+        var current = el ? el.textContent : "";
+        var text = prompt("Edit your owner response:", current);
+        if (text === null) return;
+        text = text.trim();
+        if (!text) return;
+        fetch(OWNER_RESP_BASE + reviewId + "/owner-response", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({text: text})
+        })
+        .then(r => {
+            if (r.status === 401) {
+                window.location.href = LOGIN_URL + "?next=" + encodeURIComponent(window.location.href);
+                return null;
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (!data) return;
+            if (data.error) { alert(data.error); return; }
+            window.location.reload();
+        });
+    }
+
     function toggleFollowUser(targetUserId, btn) {
         fetch("{{ url_for('rating-review.index') }}api/users/" + targetUserId + "/follow", {
             method: "POST",

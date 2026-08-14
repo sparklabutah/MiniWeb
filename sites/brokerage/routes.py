@@ -421,6 +421,73 @@ def _semantic_search(tickers, query):
     return [t for t, _ in scored]
 
 # ---------------------------------------------------------------------------
+# Order execution helpers
+# ---------------------------------------------------------------------------
+
+def _order_crosses(side, limit_price, current_price):
+    """Whether a priced (limit/stop) order can fill against the static price.
+
+    Prices here are static (no live clock), so an order either already
+    satisfies its price at placement time or it never will. Fill rule:
+    a buy fills when its limit price is at or above the market
+    (limit_price >= current_price); a sell fills when its limit price is
+    at or below the market (limit_price <= current_price).
+    """
+    if limit_price is None or current_price is None:
+        return False
+    if side == "buy":
+        return limit_price >= current_price
+    if side == "sell":
+        return limit_price <= current_price
+    return False
+
+
+def _apply_fill(user_id, symbol, side, quantity, fill_price):
+    """Apply a filled order to holdings + buying power/cash balance.
+
+    Shared by market orders and by limit/stop orders that cross at
+    placement. Updates go to the session overlay via save_collection on the
+    (per-user, small) portfolios and users collections.
+    """
+    portfolios = _load_portfolios()
+    portfolio = next((p for p in portfolios if p["user_id"] == user_id), None)
+    if not portfolio:
+        portfolio = {"user_id": user_id, "holdings": []}
+        portfolios.append(portfolio)
+
+    holding = next((h for h in portfolio["holdings"] if h["symbol"] == symbol), None)
+    if side == "buy":
+        if holding:
+            total_cost = holding["shares"] * holding["avg_cost"] + quantity * fill_price
+            holding["shares"] += quantity
+            holding["avg_cost"] = round(total_cost / holding["shares"], 2)
+        else:
+            portfolio["holdings"].append({
+                "symbol": symbol,
+                "shares": quantity,
+                "avg_cost": fill_price,
+            })
+    elif side == "sell":
+        if holding:
+            holding["shares"] = round(holding["shares"] - quantity, 6)
+            if holding["shares"] <= 0:
+                portfolio["holdings"].remove(holding)
+    _save_portfolios(portfolios)
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if user:
+        cost = quantity * fill_price
+        if side == "buy":
+            user["buying_power"] = round(user["buying_power"] - cost, 2)
+            user["cash_balance"] = round(user["cash_balance"] - cost, 2)
+        else:
+            user["buying_power"] = round(user["buying_power"] + cost, 2)
+            user["cash_balance"] = round(user["cash_balance"] + cost, 2)
+        _save_users(users)
+
+
+# ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
@@ -773,8 +840,7 @@ def trade_submit():
     if not _is_market_open(ticker["type"]):
         return redirect(url_for("brokerage.trade_page", symbol=symbol))
 
-    orders = _load_orders()
-    new_id = max((o["id"] for o in orders), default=0) + 1
+    new_id = db.next_id(SITE, "orders")
     current_price = _get_current_price(symbol) or ticker["base_price"]
 
     limit_price = None
@@ -783,6 +849,11 @@ def trade_submit():
             limit_price = float(price)
         except (TypeError, ValueError):
             limit_price = None
+
+    # Market orders fill immediately. Limit/stop orders fill immediately too
+    # IF the (static) price already satisfies them; otherwise they sit open.
+    fills = order_type == "market" or _order_crosses(side, limit_price, current_price)
+    fill_price = current_price if fills else None
 
     sim_time = _get_sim_clock()
     new_order = {
@@ -794,55 +865,17 @@ def trade_submit():
         "time_in_force": time_in_force,
         "quantity": quantity,
         "price": limit_price,
-        "filled_price": current_price if order_type == "market" else None,
-        "status": "filled" if order_type == "market" else "open",
+        "filled_price": fill_price,
+        "status": "filled" if fills else "open",
         "created_at": sim_time.isoformat(),
-        "filled_at": sim_time.isoformat() if order_type == "market" else None,
+        "filled_at": sim_time.isoformat() if fills else None,
     }
-    orders.append(new_order)
-    _save_orders(orders)
+    db.save_item(SITE, "orders", new_id, new_order)
 
-    if order_type == "market":
-        portfolios = _load_portfolios()
-        portfolio = next((p for p in portfolios if p["user_id"] == user_id), None)
-        if not portfolio:
-            portfolio = {"user_id": user_id, "holdings": []}
-            portfolios.append(portfolio)
-
-        holding = next((h for h in portfolio["holdings"] if h["symbol"] == symbol), None)
-        if side == "buy":
-            if holding:
-                total_cost = holding["shares"] * holding["avg_cost"] + quantity * current_price
-                holding["shares"] += quantity
-                holding["avg_cost"] = round(total_cost / holding["shares"], 2)
-            else:
-                portfolio["holdings"].append({
-                    "symbol": symbol,
-                    "shares": quantity,
-                    "avg_cost": current_price,
-                })
-        elif side == "sell":
-            if holding:
-                holding["shares"] = round(holding["shares"] - quantity, 6)
-                if holding["shares"] <= 0:
-                    portfolio["holdings"].remove(holding)
-
-        users = _load_users()
-        user = next((u for u in users if u["id"] == user_id), None)
-        if user:
-            cost = quantity * current_price
-            if side == "buy":
-                user["buying_power"] = round(user["buying_power"] - cost, 2)
-                user["cash_balance"] = round(user["cash_balance"] - cost, 2)
-            else:
-                user["buying_power"] = round(user["buying_power"] + cost, 2)
-                user["cash_balance"] = round(user["cash_balance"] + cost, 2)
-            _save_users(users)
-
-        _save_portfolios(portfolios)
-
-        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=current_price, account_type=account_type)
-        emit("message", from_user_id=user_id, to_user_id=user_id, text=f"Trade executed: {side.upper()} {quantity} {symbol} @ ${current_price}", source_site="brokerage")
+    if fills:
+        _apply_fill(user_id, symbol, side, quantity, fill_price)
+        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=fill_price, account_type=account_type)
+        emit("message", from_user_id=user_id, to_user_id=user_id, text=f"Trade executed: {side.upper()} {quantity} {symbol} @ ${fill_price}", source_site="brokerage")
 
     return redirect(url_for("brokerage.orders_page"))
 
@@ -869,6 +902,44 @@ def form_watchlist_toggle():
         wl["symbols"].append(symbol)
     _save_watchlists(watchlists)
     return redirect(url_for("brokerage.watchlist_page"))
+
+
+@blueprint.route("/funds", methods=["POST"])
+def form_funds():
+    """Form-based cash deposit / withdrawal.
+
+    Adjusts the user's buying power and cash balance and persists them.
+    A withdrawal is clamped to the available cash balance so cash never
+    goes negative. `action` is 'deposit' (default) or 'withdraw'.
+    """
+    if "user_id" not in session:
+        return redirect(url_for("brokerage.login_page"))
+    user_id = session["user_id"]
+    action = request.form.get("action", "deposit").strip()
+    try:
+        amount = float(request.form.get("amount", "0"))
+    except (TypeError, ValueError):
+        amount = 0
+    if amount <= 0:
+        return redirect(url_for("brokerage.portfolio_page"))
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return redirect(url_for("brokerage.login_page"))
+
+    if action == "withdraw":
+        amount = min(amount, max(user["cash_balance"], 0))
+        user["buying_power"] = round(user["buying_power"] - amount, 2)
+        user["cash_balance"] = round(user["cash_balance"] - amount, 2)
+    else:
+        user["buying_power"] = round(user["buying_power"] + amount, 2)
+        user["cash_balance"] = round(user["cash_balance"] + amount, 2)
+    _save_users(users)
+
+    emit("message", from_user_id=user_id, to_user_id=user_id,
+         text=f"Cash {action}: ${amount:.2f}", source_site="brokerage")
+    return redirect(url_for("brokerage.portfolio_page"))
 
 
 @blueprint.route("/orders/<int:order_id>/cancel", methods=["POST"])
@@ -1146,6 +1217,42 @@ def api_portfolio(user_id):
     })
 
 
+@blueprint.route("/api/funds", methods=["POST"])
+def api_funds():
+    """JSON cash deposit / withdrawal. Body: {user_id, action, amount}."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    action = (data.get("action") or "deposit").strip()
+    try:
+        amount = float(data.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0
+    if not user_id or amount <= 0:
+        return jsonify({"error": "user_id and positive amount required"}), 400
+
+    users = _load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if action == "withdraw":
+        amount = min(amount, max(user["cash_balance"], 0))
+        user["buying_power"] = round(user["buying_power"] - amount, 2)
+        user["cash_balance"] = round(user["cash_balance"] - amount, 2)
+    else:
+        action = "deposit"
+        user["buying_power"] = round(user["buying_power"] + amount, 2)
+        user["cash_balance"] = round(user["cash_balance"] + amount, 2)
+    _save_users(users)
+
+    return jsonify({
+        "action": action,
+        "amount": round(amount, 2),
+        "buying_power": user["buying_power"],
+        "cash_balance": user["cash_balance"],
+    })
+
+
 # ---------------------------------------------------------------------------
 # Orders API
 # ---------------------------------------------------------------------------
@@ -1190,9 +1297,20 @@ def api_place_order():
     if not _is_market_open(ticker["type"]):
         return jsonify({"error": f"Market closed for {symbol}"}), 400
 
-    orders = _load_orders()
-    new_id = max((o["id"] for o in orders), default=0) + 1
+    new_id = db.next_id(SITE, "orders")
     current_price = _get_current_price(symbol) or ticker["base_price"]
+
+    limit_price = None
+    if price is not None:
+        try:
+            limit_price = float(price)
+        except (TypeError, ValueError):
+            limit_price = None
+
+    # Market orders fill immediately. Limit/stop orders fill immediately too
+    # IF the (static) price already satisfies them; otherwise they sit open.
+    fills = order_type == "market" or _order_crosses(side, limit_price, current_price)
+    fill_price = current_price if fills else None
 
     sim_time = _get_sim_clock()
     new_order = {
@@ -1202,57 +1320,18 @@ def api_place_order():
         "side": side,
         "order_type": order_type,
         "quantity": quantity,
-        "price": price,
-        "filled_price": current_price if order_type == "market" else None,
-        "status": "filled" if order_type == "market" else "open",
+        "price": limit_price,
+        "filled_price": fill_price,
+        "status": "filled" if fills else "open",
         "created_at": sim_time.isoformat(),
-        "filled_at": sim_time.isoformat() if order_type == "market" else None,
+        "filled_at": sim_time.isoformat() if fills else None,
     }
-    orders.append(new_order)
-    _save_orders(orders)
+    db.save_item(SITE, "orders", new_id, new_order)
 
-    # If market order filled, update portfolio
-    if order_type == "market":
-        portfolios = _load_portfolios()
-        portfolio = next((p for p in portfolios if p["user_id"] == user_id), None)
-        if not portfolio:
-            portfolio = {"user_id": user_id, "holdings": []}
-            portfolios.append(portfolio)
-
-        holding = next((h for h in portfolio["holdings"] if h["symbol"] == symbol), None)
-        if side == "buy":
-            if holding:
-                total_cost = holding["shares"] * holding["avg_cost"] + quantity * current_price
-                holding["shares"] += quantity
-                holding["avg_cost"] = round(total_cost / holding["shares"], 2)
-            else:
-                portfolio["holdings"].append({
-                    "symbol": symbol,
-                    "shares": quantity,
-                    "avg_cost": current_price,
-                })
-        elif side == "sell":
-            if holding:
-                holding["shares"] = round(holding["shares"] - quantity, 6)
-                if holding["shares"] <= 0:
-                    portfolio["holdings"].remove(holding)
-
-        # Update buying power
-        users = _load_users()
-        user = next((u for u in users if u["id"] == user_id), None)
-        if user:
-            cost = quantity * current_price
-            if side == "buy":
-                user["buying_power"] = round(user["buying_power"] - cost, 2)
-                user["cash_balance"] = round(user["cash_balance"] - cost, 2)
-            else:
-                user["buying_power"] = round(user["buying_power"] + cost, 2)
-                user["cash_balance"] = round(user["cash_balance"] + cost, 2)
-            _save_users(users)
-
-        _save_portfolios(portfolios)
-
-        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=current_price, account_type=account_type)
+    # If the order filled, update portfolio + buying power
+    if fills:
+        _apply_fill(user_id, symbol, side, quantity, fill_price)
+        emit("trade", user_id=user_id, symbol=symbol, side=side, quantity=quantity, price=fill_price, account_type=account_type)
 
     return jsonify(new_order)
 

@@ -23,6 +23,16 @@
         .tag { display: inline-block; background: #f5efe6; padding: .3rem .7rem; border-radius: .25rem; font-size: .85rem; color: #6b5b4f; margin: .2rem; }
         .msg { display: none; font-size: .85rem; color: #2e7d32; margin: .5rem 0; }
         .empty { color: #a09080; font-size: .9rem; }
+        .badge { display: inline-block; background: #c44536; color: #fff; font-size: .72rem; font-weight: 600; border-radius: 1rem; padding: .05rem .5rem; margin-left: .4rem; vertical-align: middle; }
+        .issue { border: 1px solid #e8dfd3; border-radius: .4rem; background: #fffdfa; padding: .6rem .8rem; margin-bottom: .5rem; display: flex; justify-content: space-between; align-items: center; gap: .8rem; }
+        .issue-main a { color: #8b4513; text-decoration: none; font-size: .95rem; font-weight: 600; }
+        .issue-main a:hover { text-decoration: underline; }
+        .issue-reason { font-size: .78rem; color: #a09080; margin-top: .15rem; }
+        .issue-reason b { color: #6b5b4f; font-weight: 600; }
+        .issue-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+        .order-row { border-bottom: 1px solid #f5efe6; padding: .6rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .order-row .onum { color: #8b4513; text-decoration: none; font-size: .95rem; font-weight: 600; }
+        .order-row .onum:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -30,6 +40,7 @@
         <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
         <div class="header-nav">
             <a href="{{ url_for('books-comics.index') }}">Browse</a>
+            <a href="{{ url_for('books-comics.orders_page') }}">Orders</a>
             <a href="{{ url_for('books-comics.cart_page') }}">Cart</a>
             <a href="{{ url_for('books-comics.logout') }}">Logout</a>
             <a href="/">MiniWeb</a>
@@ -38,6 +49,35 @@
 
     <div class="main">
         <div class="welcome">Welcome, {{ user.name }}</div>
+
+        <h2 class="section-title">New from your subscriptions{% if new_issue_count %}<span class="badge" id="new-issue-badge">{{ new_issue_count }} new</span>{% endif %}</h2>
+        {% if new_issues %}
+        <div id="new-issues">
+            {% for it in new_issues %}
+            <div class="issue" id="issue-{{ it.id }}">
+                <div class="issue-main">
+                    <a href="{{ url_for('books-comics.book_detail', book_id=it.id) }}">{{ it.title }}</a>
+                    <div class="issue-reason">
+                        {% if it.reason[0] == 'author' %}New from followed author <b>{{ it.reason[1] }}</b>{% else %}New in subscribed category <b>{{ it.reason[1] }}</b>{% endif %}
+                        &middot; {{ it.rating }}&#9733;
+                    </div>
+                </div>
+                <div class="issue-actions">
+                    <form method="post" action="{{ url_for('books-comics.form_subscription_mark_read') }}" style="display:inline">
+                        <input type="hidden" name="book_id" value="{{ it.id }}">
+                        <button type="submit" class="btn-sm">Mark read</button>
+                    </form>
+                    <form method="post" action="{{ url_for('books-comics.form_subscription_dismiss') }}" style="display:inline">
+                        <input type="hidden" name="book_id" value="{{ it.id }}">
+                        <button type="submit" class="btn-sm">Dismiss</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No new issues. Follow an author or subscribe to a category and new titles will surface here.</p>
+        {% endif %}
 
         <h2 class="section-title">Saved Books ({{ saved_books|length }})</h2>
         <div id="save-msg" class="msg"></div>
@@ -98,7 +138,23 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="empty">No category subscriptions yet.</p>
+        <p class="empty">No category subscriptions yet. New titles from your subscriptions appear under "New from your subscriptions" above.</p>
+        {% endif %}
+
+        <h2 class="section-title">Recent Orders</h2>
+        {% if orders %}
+        {% for o in orders %}
+        <div class="order-row">
+            <div>
+                <a class="onum" href="{{ url_for('books-comics.order_receipt', order_id=o.id) }}">{{ o.order_number }}</a>
+                <div class="saved-meta">{{ o.created_at }} &middot; {{ o.item_count }} item(s) &middot; ${{ "%.2f"|format(o.total) }}</div>
+            </div>
+            <a href="{{ url_for('books-comics.order_receipt', order_id=o.id) }}" class="btn-sm">Receipt</a>
+        </div>
+        {% endfor %}
+        <div style="margin-top:.8rem"><a href="{{ url_for('books-comics.orders_page') }}" class="btn-sm">View all orders &rarr;</a></div>
+        {% else %}
+        <p class="empty">No orders yet. Purchases you make at checkout are recorded here, separate from your reading list.</p>
         {% endif %}
     </div>
 

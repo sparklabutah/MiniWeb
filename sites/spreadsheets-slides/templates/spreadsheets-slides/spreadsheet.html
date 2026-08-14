@@ -34,6 +34,9 @@
         td:has(input.cell-input):hover { background: #f1f8f4; cursor: text; }
         input.cell-input { border: none; background: none; width: 100%; font-size: 0.85rem; padding: 0; outline: none; cursor: text; }
         input.cell-input:focus { background: #fff; }
+        input.cell-input.is-formula { color: #0b8043; font-family: 'SFMono-Regular', Consolas, monospace; }
+        td.cell-cell { position: relative; }
+        .formula-val { position: absolute; right: 2px; top: 1px; font-size: 0.62rem; color: #80868b; background: #e6f4ea; padding: 0 0.25rem; border-radius: 3px; pointer-events: none; }
 
         .mode-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 1rem; font-size: 0.82rem; }
         .mode-banner .mode-icon { font-weight: 700; }
@@ -133,9 +136,15 @@
                 <tr>
                     <td class="row-header">{{ loop.index }}</td>
                     {% for cell in row %}
-                    <td>
+                    {% set fkey = row_idx ~ '_' ~ loop.index0 %}
+                    {% set raw_formula = current_sheet.formulas.get(fkey) if current_sheet.formulas else None %}
+                    <td class="cell-cell">
                         {% if can_edit %}
-                        <input type="text" class="cell-input" name="cell_{{ row_idx }}_{{ loop.index0 }}" value="{{ cell }}">
+                        <input type="text"
+                               class="cell-input{{ ' is-formula' if raw_formula }}"
+                               name="cell_{{ row_idx }}_{{ loop.index0 }}"
+                               value="{{ raw_formula if raw_formula is not none else cell }}">
+                        {% if raw_formula %}<span class="formula-val" title="Computed value (recomputed on save)">{{ cell }}</span>{% endif %}
                         {% else %}
                         {{ cell }}
                         {% endif %}
@@ -150,7 +159,7 @@
             <button type="button" class="btn" onclick="ssAddRow()"
                     style="border:1px solid #dadce0;background:#fff;color:#3c4043;">+ Add row</button>
             <button type="submit" class="btn btn-green">Save Changes</button>
-            <span style="font-size:0.72rem;color:#80868b;">Type into cells (or a new row), then Save Changes.</span>
+            <span style="font-size:0.72rem;color:#80868b;">Type into cells (or a new row), then Save Changes. Start a cell with <code>=</code> for a formula &mdash; e.g. <code>=SUM(A1:A5)</code>, <code>=AVERAGE(B1:B9)</code>, <code>=A1*2</code>, <code>=(A1+B2)/2</code>. Formulas recompute on save; the small green badge shows the computed value.</span>
         </div>
         {% endif %}
         </form>

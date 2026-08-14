@@ -1941,6 +1941,157 @@ def form_update_slide(pid, slide_idx):
     return redirect(url_for("spreadsheets-slides.presentation_view", pid=pid, slide=slide_idx))
 
 
+# ---------------------------------------------------------------------------
+# Slide management UI (form-driven add / reorder / delete)
+#
+# The presentation editor exposes these as buttons. Each mutation reads the
+# single presentation via db.get_item and writes it back with db.save_item so
+# the change lands in the session overlay (parallel-agent safe) -- no full
+# collection load/replace.
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/presentation/<int:pid>/slide/add", methods=["POST"])
+def form_add_slide(pid):
+    """Add a slide via the presentation editor UI.
+
+    Form fields: title, content, notes, position (optional 0-based insert index).
+    Supports the create_by_form macro for presentations.
+    """
+    pres = db.get_item(SITE, "presentations", pid)
+    if not pres:
+        abort(404)
+
+    slides = pres.get("slides", [])
+    new_slide = {
+        "title": (request.form.get("title") or "New Slide").strip(),
+        "content": (request.form.get("content") or "").strip(),
+        "notes": (request.form.get("notes") or "").strip(),
+    }
+
+    position = request.form.get("position", type=int)
+    if position is None:
+        pos1 = request.form.get("position_1based", type=int)
+        position = pos1 - 1 if pos1 is not None else None
+    if position is not None and 0 <= position <= len(slides):
+        slides.insert(position, new_slide)
+        new_index = position
+    else:
+        slides.append(new_slide)
+        new_index = len(slides) - 1
+
+    pres["slides"] = slides
+    pres["slides_count"] = len(slides)
+    pres["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    db.save_item(SITE, "presentations", pid, pres)
+
+    return redirect(url_for("spreadsheets-slides.presentation_view", pid=pid, slide=new_index))
+
+
+@blueprint.route("/presentation/<int:pid>/slide/<int:slide_idx>/reorder", methods=["POST"])
+def form_reorder_slide(pid, slide_idx):
+    """Move a slide within the deck via the presentation editor UI.
+
+    Form fields (one of):
+        direction = "up" | "down"   -- move one position
+        to        = <0-based index> -- move to an explicit position
+    Supports the reorder (move_by_form) macro for presentations.
+    """
+    pres = db.get_item(SITE, "presentations", pid)
+    if not pres:
+        abort(404)
+
+    slides = pres.get("slides", [])
+    if slide_idx < 0 or slide_idx >= len(slides):
+        abort(400)
+
+    to = request.form.get("to", type=int)
+    direction = (request.form.get("direction") or "").strip().lower()
+    if to is None:
+        if direction == "up":
+            to = slide_idx - 1
+        elif direction == "down":
+            to = slide_idx + 1
+        else:
+            abort(400)
+    to = max(0, min(to, len(slides) - 1))
+
+    if to != slide_idx:
+        slide = slides.pop(slide_idx)
+        slides.insert(to, slide)
+        pres["slides"] = slides
+        pres["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        db.save_item(SITE, "presentations", pid, pres)
+
+    return redirect(url_for("spreadsheets-slides.presentation_view", pid=pid, slide=to))
+
+
+@blueprint.route("/presentation/<int:pid>/slide/<int:slide_idx>/delete", methods=["POST"])
+def form_delete_slide(pid, slide_idx):
+    """Delete a slide via the presentation editor UI.
+
+    Supports the delete_from_table macro for presentations.
+    """
+    pres = db.get_item(SITE, "presentations", pid)
+    if not pres:
+        abort(404)
+
+    slides = pres.get("slides", [])
+    if slide_idx < 0 or slide_idx >= len(slides):
+        abort(400)
+
+    slides.pop(slide_idx)
+    pres["slides"] = slides
+    pres["slides_count"] = len(slides)
+    pres["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    db.save_item(SITE, "presentations", pid, pres)
+
+    focus = min(slide_idx, len(slides) - 1) if slides else 0
+    return redirect(url_for("spreadsheets-slides.presentation_view", pid=pid, slide=focus))
+
+
+@blueprint.route("/api/presentations/<int:pid>/slides/reorder", methods=["POST"])
+def api_reorder_slide(pid):
+    """Reorder slides via API (parity with the UI reorder button).
+
+    JSON body (one of):
+        {"from": <idx>, "to": <idx>}      -- move a single slide
+        {"order": [<idx>, <idx>, ...]}    -- explicit full permutation
+    """
+    data = request.get_json(silent=True) or {}
+    pres = db.get_item(SITE, "presentations", pid)
+    if pres is None:
+        return jsonify({"error": "Presentation not found"}), 404
+
+    slides = pres.get("slides", [])
+    n = len(slides)
+
+    order = data.get("order")
+    if order is not None:
+        if sorted(order) != list(range(n)):
+            return jsonify({"error": "order must be a permutation of slide indices"}), 400
+        slides = [slides[i] for i in order]
+    else:
+        frm = data.get("from")
+        to = data.get("to")
+        if not isinstance(frm, int) or not isinstance(to, int):
+            return jsonify({"error": "provide 'order' or integer 'from'/'to'"}), 400
+        if not (0 <= frm < n) or not (0 <= to < n):
+            return jsonify({"error": "index out of range"}), 400
+        slide = slides.pop(frm)
+        slides.insert(to, slide)
+
+    pres["slides"] = slides
+    pres["slides_count"] = len(slides)
+    pres["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    db.save_item(SITE, "presentations", pid, pres)
+
+    return jsonify({
+        "presentation_id": pid,
+        "slides_count": pres["slides_count"],
+        "slide_titles": [sl.get("title", "") for sl in slides],
+    })
+
+
 @blueprint.route("/api/presentations/<int:pid>/slides/<int:slide_idx>", methods=["PUT"])
 def api_update_slide(pid, slide_idx):
     """Update a single slide by index.

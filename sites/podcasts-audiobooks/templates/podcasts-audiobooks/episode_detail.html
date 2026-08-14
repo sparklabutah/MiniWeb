@@ -117,17 +117,34 @@
     <script>
     // Fully simulated audio player: the progress bar advances in real time,
     // honours playback speed, pauses/resumes, and is seekable by clicking.
-    let playing = false, pos = 0, speed = 1.0, timer = null;
+    // Playback position is persisted per user+episode so "Continue Listening"
+    // and resume-on-reload reflect real progress.
+    const EPISODE_ID = {{ episode.id }};
     const totalSec = {{ episode.duration_minutes }} * 60;
+    let playing = false, speed = 1.0, timer = null;
+    // Resume from the last persisted position for this listener.
+    let pos = Math.min(totalSec, Math.max(0, {{ resume_position|default(0)|round|int }}));
     function fmtTime(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
     function renderPlayer() {
         document.getElementById('progress-fill').style.width = (totalSec ? Math.min(100, pos / totalSec * 100) : 0) + '%';
         document.getElementById('time-display').textContent = fmtTime(pos) + ' / ' + fmtTime(totalSec);
         document.getElementById('play-btn').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
     }
+    function saveProgress() {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/progress`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                item_type: 'episode',
+                item_id: EPISODE_ID,
+                position: pos,
+                duration: totalSec
+            })
+        }).catch(() => {});
+    }
     function tickPlayer() { pos += speed; if (pos >= totalSec) { pos = totalSec; stopPlayer(); } renderPlayer(); }
     function startPlayer() { playing = true; if (timer) clearInterval(timer); timer = setInterval(tickPlayer, 1000); renderPlayer(); }
-    function stopPlayer() { playing = false; if (timer) clearInterval(timer); timer = null; renderPlayer(); }
+    function stopPlayer() { playing = false; if (timer) clearInterval(timer); timer = null; renderPlayer(); saveProgress(); }
     function togglePlay() {
         if (playing) stopPlayer(); else startPlayer();
         fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({speed: speed})});
@@ -139,8 +156,11 @@
             var r = bar.getBoundingClientRect();
             pos = Math.round((e.clientX - r.left) / r.width * totalSec);
             renderPlayer();
+            saveProgress();
         });
     });
+    // Persist progress if the listener navigates away mid-play.
+    window.addEventListener('beforeunload', function () { if (pos > 0) saveProgress(); });
 
     function setSpeed(speedVal) {
         speed = parseFloat(speedVal);

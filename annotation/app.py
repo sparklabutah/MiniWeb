@@ -2449,38 +2449,61 @@ def api_draft_task():
         return jsonify({"error": "sites and macros required"}), 400
     locs = _canonical_macro_locations()
     ops = _registry.operations()
+    from app import discover_sites
+    brand = {s["id"]: s.get("name", s["id"]) for s in discover_sites()}
     interactions = []
+    used_sites = []          # order-preserving list of sites actually hosting a macro
+    site_load = {sid: 0 for sid in site_ids}
     for m in macros:
         base, _, op = m.partition(".")
         desc = (_MACRO_DESCRIPTIONS.get(base) or {}).get("description", base)
-        where = ""
-        for sid in site_ids:
-            w = (locs.get(sid) or {}).get(base)
-            if w:
-                where = (w[0] if isinstance(w, list) else str(w)); break
-        entry = {"macro": base, "does": desc, "where": where or "(unspecified)"}
+        # Assign the macro to a requested site that actually hosts it, spreading
+        # macros across sites (least-loaded first) so a cross-site draft gets a real
+        # A-on-site-X / B-on-site-Y structure instead of collapsing onto one site.
+        candidates = [sid for sid in site_ids if (locs.get(sid) or {}).get(base)]
+        if candidates:
+            host = min(candidates, key=lambda s: (site_load[s], site_ids.index(s)))
+            w = (locs.get(host) or {}).get(base)
+            where = w[0] if isinstance(w, list) else str(w)
+        else:
+            host, where = site_ids[0], ""
+        site_load[host] += 1
+        entry = {"site": brand.get(host, host), "macro": base,
+                 "does": desc, "where": where or "(unspecified)"}
         if op:
             entry["reasoning"] = (ops.get(op) or {}).get("desc", op)
         interactions.append(entry)
-    site_data = "\n".join(f"{sid}:\n{_site_data_samples(sid)}" for sid in site_ids)
-    from app import discover_sites
-    brand = {s["id"]: s.get("name", s["id"]) for s in discover_sites()}
+        if host not in used_sites:
+            used_sites.append(host)
+    cross_site = len(site_ids) > 1 or len(used_sites) > 1
+    site_data = "\n".join(f"{brand.get(sid, sid)} ({sid}):\n{_site_data_samples(sid)}"
+                          for sid in site_ids)
     site_names = ", ".join(brand.get(sid, sid) for sid in site_ids)
     system = (
         "You draft a realistic web task for a benchmark annotator. Given a list of "
-        "interactions (each with WHAT it does and WHERE it lives on the site) and REAL "
-        "data currently on the site, write ONE natural task a person would ask their "
-        "assistant that WEAVES ALL the interactions into a single coherent goal (not a "
-        "list of unrelated actions). It must be concrete and specific, REFERENCING REAL "
-        "ENTITIES/VALUES from the data and the exact options named in each 'where'. If "
-        "an interaction has a reasoning op, the task must genuinely require that "
-        "reasoning. Keep the instruction to 1-2 sentences, conversational. For each "
-        "macro's subtask, write the CONCRETE step to take on the page (the specific "
-        "control + the specific value/entity) — do NOT restate the generic macro "
-        'definition. Reply ONLY JSON: {"instruction": "<the task>", "subtasks": '
+        "interactions (each with WHAT it does, WHERE it lives, and the SITE it's on) "
+        "and REAL data currently on those sites, write ONE natural task a person would "
+        "ask their assistant that WEAVES ALL the interactions into a single coherent "
+        "goal (not a list of unrelated actions). It must be concrete and specific, "
+        "REFERENCING REAL ENTITIES/VALUES from the data and the exact options named in "
+        "each 'where'. If an interaction has a reasoning op, the task must genuinely "
+        "require that reasoning. Keep the instruction to 1-2 sentences, conversational. "
+        "For each macro's subtask, write the CONCRETE step to take on the page (the "
+        "specific control + the specific value/entity) — do NOT restate the generic "
+        'macro definition. Reply ONLY JSON: {"instruction": "<the task>", "subtasks": '
         '{"<macro>": "<concrete step>"}}.')
-    user = _json.dumps({"site": site_names, "interactions": interactions,
-                        "real_site_data": site_data})
+    if cross_site:
+        system += (
+            " IMPORTANT — this is a CROSS-SITE task spanning multiple sites (each "
+            "interaction names the SITE it happens on). Write ONE goal that genuinely "
+            "REQUIRES MOVING BETWEEN these sites: carry a real value/result from one "
+            "site to the next (e.g. read/compute something on one site and use that "
+            "exact value to act on another). Name that carried value explicitly in the "
+            "instruction. The agent moves between sites via the portal (search bar / "
+            "opening the other site) — do not assume they are the same site. Every "
+            "listed site must be essential to completing the task.")
+    user = _json.dumps({"sites": site_names, "cross_site": cross_site,
+                        "interactions": interactions, "real_site_data": site_data})
     from app.llm import call_llm
     raw = call_llm(user, system=system, max_tokens=600, temperature=0.5, json_mode=True)
     if not raw:

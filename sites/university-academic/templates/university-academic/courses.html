@@ -50,6 +50,7 @@
         <a href="{{ url_for('university-academic.departments_page') }}">Research</a>
         <a href="{{ url_for('university-academic.events_page') }}">Events</a>
         <a href="{{ url_for('university-academic.alumni_page') }}">Alumni</a>
+        <a href="{{ url_for('university-academic.schedule_page') }}">My Schedule</a>
         <a href="{{ url_for('university-academic.login_page') }}">Sign In</a>
     </nav>
 
@@ -93,7 +94,8 @@
                     <th>Instructor</th>
                     <th>Credits</th>
                     <th>Level</th>
-                    <th>Quarters</th>
+                    <th>Seats</th>
+                    <th>Register</th>
                 </tr>
             </thead>
             <tbody>
@@ -104,7 +106,18 @@
                     <td>{{ course.instructor }}</td>
                     <td>{{ course.credits }}</td>
                     <td><span class="badge badge-{{ course.level }}">{{ course.level | title }}</span></td>
-                    <td>{{ course.quarters_offered | join(', ') | title }}</td>
+                    <td>{{ seats[course.id] }} / {{ course.max_enrollment }}{% if seats[course.id] == 0 %} <span style="color:#92400e;font-weight:600;">(Full)</span>{% endif %}</td>
+                    <td>
+                        {% if course.id in enrolled_ids %}
+                            <span class="badge badge-introductory">Registered</span>
+                        {% elif course.id in waitlisted_ids %}
+                            <span class="badge" style="background:#fef3c7;color:#92400e;">Waitlisted</span>
+                        {% else %}
+                            <form method="post" action="{{ url_for('university-academic.enroll_course', course_id=course.id) }}" style="margin:0;">
+                                <button type="submit" style="background:#4b2e83;color:#fff;border:none;padding:.35rem .8rem;border-radius:.3rem;font-size:.8rem;font-weight:600;cursor:pointer;">{% if seats[course.id] == 0 %}Waitlist{% else %}Enroll{% endif %}</button>
+                            </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
