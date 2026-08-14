@@ -14,6 +14,47 @@ from app.handlers.email_handler import _add_email
 SITE = "crm"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
 STAGES_ORDERED = ["prospecting", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
+TASK_STATUSES = ["open", "completed"]
+_TASKS_TABLE = "crm_tasks"
+
+
+def _ensure_tasks_table():
+    """Create + register the tasks base table on first use (idempotent).
+
+    The CRM DB was seeded without a tasks table (only write-once activity
+    history existed), so open/assignable follow-up tasks had nowhere to
+    persist. We create the empty base table + registry row once (the
+    forums_messages / auctions-orders runtime-seed pattern); real task rows
+    still go to the session overlay via db.save_item, keeping sessions
+    isolated. Without a registered base table db.query() cannot read overlay
+    writes back (get_table_name -> None -> []).
+    """
+    if db.get_table_name(SITE, "tasks"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_TASKS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL DEFAULT '',
+            contact_id INTEGER NOT NULL DEFAULT 0,
+            deal_id INTEGER NOT NULL DEFAULT 0,
+            owner_id INTEGER NOT NULL DEFAULT 0,
+            due_date TEXT NOT NULL DEFAULT '',
+            priority TEXT NOT NULL DEFAULT 'normal',
+            status TEXT NOT NULL DEFAULT 'open',
+            notes TEXT NOT NULL DEFAULT '',
+            created_date TEXT NOT NULL DEFAULT '',
+            completed_date TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_crm_tasks_status ON [{_TASKS_TABLE}] (status)"
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_crm_tasks_due ON [{_TASKS_TABLE}] (due_date)"
+    )
+    conn.commit()
+    db.register_table(SITE, "tasks", _TASKS_TABLE, "id")
 STAGE_PROBABILITIES = {
     "prospecting": 10,
     "qualification": 25,
@@ -70,6 +111,19 @@ def _current_user():
     if "user_id" in session:
         return db.get_item(SITE, "users", session["user_id"])
     return None
+
+
+def _deal_name(deal_id):
+    d = db.get_item(SITE, "deals", deal_id) if deal_id else None
+    return d["name"] if d else ""
+
+
+def _enrich_task(t):
+    """Attach display names for a task's linked contact/deal/owner."""
+    t["_contact_name"] = _contact_name(t["contact_id"]) if t.get("contact_id") else ""
+    t["_deal_name"] = _deal_name(t.get("deal_id"))
+    t["_owner_name"] = _user_name(t["owner_id"]) if t.get("owner_id") else "Unassigned"
+    return t
 
 # ---------------------------------------------------------------------------
 # Stats helpers
@@ -258,8 +312,15 @@ def deal_detail(deal_id):
     for a in activities:
         a["_contact_name"] = _contact_name(a["contact_id"])
         a["_user_name"] = _user_name(a["user_id"])
+    _ensure_tasks_table()
+    open_tasks = db.query(SITE, "tasks", where={"deal_id": deal_id, "status": "open"},
+                          sort="due_date")
+    for t in open_tasks:
+        _enrich_task(t)
+    users = _get_users()
     user = _current_user()
     return render_template("crm/deal.html", deal=deal, activities=activities,
+                           open_tasks=open_tasks, users=users,
                            stages=STAGES_ORDERED, user=user)
 
 
@@ -313,6 +374,49 @@ def activities_page():
                            type_filter=type_filter, date_from=date_from,
                            date_to=date_to, user=user, page=page,
                            total_pages=total_pages, total_count=total_count)
+
+
+@blueprint.route("/tasks")
+def tasks_page():
+    """Open-tasks worklist: the CRM's next-step / follow-up queue.
+
+    Defaults to open tasks (the daily driver); ?status=completed or all
+    switches the view. SQL-level filtering + sorting via db.query.
+    """
+    _ensure_tasks_table()
+    status_filter = request.args.get("status", "open").strip().lower()
+    owner_filter = request.args.get("owner_id", "").strip()
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    per_page = 50
+
+    where = {}
+    if status_filter in TASK_STATUSES:
+        where["status"] = status_filter
+    if owner_filter:
+        try:
+            where["owner_id"] = int(owner_filter)
+        except ValueError:
+            pass
+
+    total_count = db.count(SITE, "tasks", where=where or None)
+    # Open tasks sort soonest-due-first; done tasks show most-recent first.
+    sort = "due_date" if status_filter == "open" else "-completed_date"
+    tasks = db.query(SITE, "tasks", where=where or None, sort=sort,
+                     limit=per_page, offset=(page - 1) * per_page)
+    for t in tasks:
+        _enrich_task(t)
+    total_pages = max(1, -(-total_count // per_page))
+
+    open_count = db.count(SITE, "tasks", where={"status": "open"})
+    contacts = _get_contacts()
+    deals = _get_deals()
+    users = _get_users()
+    user = _current_user()
+    return render_template("crm/tasks.html", tasks=tasks, status_filter=status_filter,
+                           owner_filter=owner_filter, users=users, contacts=contacts,
+                           deals=deals, user=user, page=page, total_pages=total_pages,
+                           total_count=total_count, open_count=open_count,
+                           today=datetime.now().strftime("%Y-%m-%d"))
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -414,6 +518,111 @@ def form_create_activity():
     if redirect_to:
         return redirect(redirect_to)
     return redirect(url_for("crm.activities_page"))
+
+
+@blueprint.route("/task/create", methods=["POST"])
+def form_create_task():
+    """Create an open follow-up task, optionally linked to a contact/deal.
+
+    Persists to the session overlay via db.save_item (never base tables).
+    """
+    if "user_id" not in session:
+        return redirect(url_for("crm.login_page"))
+    _ensure_tasks_table()
+
+    def _as_int(name):
+        try:
+            return int(request.form.get(name, 0) or 0)
+        except ValueError:
+            return 0
+
+    owner_id = _as_int("owner_id") or session["user_id"]
+    new_id = db.next_id(SITE, "tasks")
+    task = {
+        "id": new_id,
+        "title": request.form.get("title", "").strip(),
+        "contact_id": _as_int("contact_id"),
+        "deal_id": _as_int("deal_id"),
+        "owner_id": owner_id,
+        "due_date": request.form.get("due_date", "").strip(),
+        "priority": request.form.get("priority", "normal").strip() or "normal",
+        "status": "open",
+        "notes": request.form.get("notes", "").strip(),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
+        "completed_date": "",
+    }
+    db.save_item(SITE, "tasks", new_id, task)
+    redirect_to = request.form.get("redirect_to", "")
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for("crm.tasks_page"))
+
+
+@blueprint.route("/task/<int:task_id>/complete", methods=["POST"])
+def form_complete_task(task_id):
+    """Mark a task done (persisted). Idempotent."""
+    if "user_id" not in session:
+        return redirect(url_for("crm.login_page"))
+    _ensure_tasks_table()
+    task = db.get_item(SITE, "tasks", task_id)
+    if not task:
+        abort(404)
+    task["status"] = "completed"
+    task["completed_date"] = datetime.now().strftime("%Y-%m-%d")
+    db.save_item(SITE, "tasks", task_id, task)
+    redirect_to = request.form.get("redirect_to", "")
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for("crm.tasks_page"))
+
+
+@blueprint.route("/task/<int:task_id>/reopen", methods=["POST"])
+def form_reopen_task(task_id):
+    """Re-open a completed task (persisted)."""
+    if "user_id" not in session:
+        return redirect(url_for("crm.login_page"))
+    _ensure_tasks_table()
+    task = db.get_item(SITE, "tasks", task_id)
+    if not task:
+        abort(404)
+    task["status"] = "open"
+    task["completed_date"] = ""
+    db.save_item(SITE, "tasks", task_id, task)
+    redirect_to = request.form.get("redirect_to", "")
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for("crm.tasks_page"))
+
+
+@blueprint.route("/company/create", methods=["POST"])
+def form_create_company():
+    """Create a company from the Companies-page form (overlay mutation)."""
+    if "user_id" not in session:
+        return redirect(url_for("crm.login_page"))
+
+    def _as_int(name):
+        try:
+            return int(request.form.get(name, 0) or 0)
+        except ValueError:
+            return 0
+
+    new_id = db.next_id(SITE, "companies")
+    company = {
+        "id": new_id,
+        "name": request.form.get("name", "").strip(),
+        "industry": request.form.get("industry", "").strip(),
+        "size": request.form.get("size", "").strip(),
+        "website": request.form.get("website", "").strip(),
+        "address": request.form.get("address", "").strip(),
+        "annual_revenue": _as_int("annual_revenue"),
+        "status": request.form.get("status", "active").strip() or "active",
+        "primary_contact_id": 0,
+        "owner_id": session["user_id"],
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
+        "notes": request.form.get("notes", "").strip(),
+    }
+    db.save_item(SITE, "companies", new_id, company)
+    return redirect(url_for("crm.company_detail", company_id=new_id))
 
 
 @blueprint.route("/contact/<int:contact_id>/delete", methods=["POST"])

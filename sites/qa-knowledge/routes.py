@@ -64,11 +64,12 @@ def _load_questions(**kwargs):
                 q["tags"] = json.loads(q["tags"])
             except (json.JSONDecodeError, TypeError):
                 q["tags"] = []
-        if isinstance(q.get("reports"), str):
-            try:
-                q["reports"] = json.loads(q["reports"])
-            except (json.JSONDecodeError, TypeError):
-                q["reports"] = []
+        for field in ("reports", "comments"):
+            if isinstance(q.get(field), str):
+                try:
+                    q[field] = json.loads(q[field])
+                except (json.JSONDecodeError, TypeError):
+                    q[field] = []
     return questions
 
 
@@ -81,11 +82,12 @@ def _get_question(qid):
                 q["tags"] = json.loads(q["tags"])
             except (json.JSONDecodeError, TypeError):
                 q["tags"] = []
-        if isinstance(q.get("reports"), str):
-            try:
-                q["reports"] = json.loads(q["reports"])
-            except (json.JSONDecodeError, TypeError):
-                q["reports"] = []
+        for field in ("reports", "comments"):
+            if isinstance(q.get(field), str):
+                try:
+                    q[field] = json.loads(q[field])
+                except (json.JSONDecodeError, TypeError):
+                    q[field] = []
     return q
 
 
@@ -96,11 +98,12 @@ def _load_answers(**kwargs):
     """
     answers = db.query(SITE, "answers", limit=kwargs.pop("limit", 50), **kwargs)
     for a in answers:
-        if isinstance(a.get("reports"), str):
-            try:
-                a["reports"] = json.loads(a["reports"])
-            except (json.JSONDecodeError, TypeError):
-                a["reports"] = []
+        for field in ("reports", "comments"):
+            if isinstance(a.get(field), str):
+                try:
+                    a[field] = json.loads(a[field])
+                except (json.JSONDecodeError, TypeError):
+                    a[field] = []
     return answers
 
 
@@ -108,11 +111,12 @@ def _get_answer(aid):
     """Fetch a single answer by ID."""
     a = db.get_item(SITE, "answers", aid)
     if a:
-        if isinstance(a.get("reports"), str):
-            try:
-                a["reports"] = json.loads(a["reports"])
-            except (json.JSONDecodeError, TypeError):
-                a["reports"] = []
+        for field in ("reports", "comments"):
+            if isinstance(a.get(field), str):
+                try:
+                    a[field] = json.loads(a[field])
+                except (json.JSONDecodeError, TypeError):
+                    a[field] = []
     return a
 
 
@@ -440,11 +444,13 @@ def question_detail(qid):
         # keyed by answer id (string) so the template can highlight the arrow
         answer_votes = {str(a["id"]): a_votes.get(str(a["id"]), 0)
                         for a in question.get("answers", [])}
+    is_owner = _is_question_owner(current_user, question)
     return render_template(
         "qa-knowledge/question_detail.html",
         question=question, current_user=current_user,
         saved_ids=saved_ids, followed_tags=followed_tags,
         question_vote=question_vote, answer_votes=answer_votes,
+        is_owner=is_owner,
     )
 
 
@@ -919,6 +925,42 @@ def report_answer_submit(aid):
     return redirect(url_for("qa-knowledge.question_detail", qid=a["question_id"]))
 
 
+# macro: create_from_free_text -- add a comment to a question or answer
+def _make_comment(body):
+    """Build a persisted comment entry authored by the logged-in user."""
+    author = _get_logged_in_user()
+    return {
+        "body": body,
+        "author_root_user_id": author.get("root_user_id") if author else None,
+        "author_name": author.get("se_display_name") if author else "Anonymous",
+        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+@blueprint.route("/question/<int:qid>/comment", methods=["POST"])
+def form_question_comment(qid):
+    body = request.form.get("body", "").strip()
+    q = _get_question(qid)
+    if q is None:
+        abort(404)
+    if body:
+        q.setdefault("comments", []).append(_make_comment(body))
+        _save_question(q)
+    return redirect(url_for("qa-knowledge.question_detail", qid=qid))
+
+
+@blueprint.route("/answer/<int:aid>/comment", methods=["POST"])
+def form_answer_comment(aid):
+    body = request.form.get("body", "").strip()
+    a = _get_answer(aid)
+    if a is None:
+        abort(404)
+    if body:
+        a.setdefault("comments", []).append(_make_comment(body))
+        _save_answer(a)
+    return redirect(url_for("qa-knowledge.question_detail", qid=a["question_id"]))
+
+
 # macro: dashboard -- shows saved questions and followed tags
 @blueprint.route("/dashboard")
 def dashboard():
@@ -1158,19 +1200,54 @@ def api_answer_delete(aid):
     return jsonify({"deleted": True, "id": aid})
 
 
+def _accept_answer(target):
+    """Mark `target` as the accepted answer, unaccepting any sibling.
+
+    Only writes the answers whose accepted-state actually changes, and keeps
+    the parent question's accepted_answer_id column in sync. Shared by the
+    HTML form route and the JSON API.
+    """
+    qid = target["question_id"]
+    siblings = _load_answers(where={"question_id": qid}, limit=100000)
+    for a in siblings:
+        desired = (a["id"] == target["id"])
+        if bool(a.get("is_accepted", False)) != desired:
+            a["is_accepted"] = desired
+            _save_answer(a)
+    q = _get_question(qid)
+    if q is not None and str(q.get("accepted_answer_id") or "") != str(target["id"]):
+        q["accepted_answer_id"] = str(target["id"])
+        _save_question(q)
+
+
+def _is_question_owner(current_user, question):
+    """True when the logged-in user authored the question (may accept answers)."""
+    return bool(current_user) and (
+        current_user.get("root_user_id") == question.get("author_root_user_id"))
+
+
+# macro: react_by_toggle -- question owner accepts an answer (HTML form)
+@blueprint.route("/answer/<int:aid>/accept", methods=["POST"])
+def form_answer_accept(aid):
+    a = _get_answer(aid)
+    if a is None:
+        abort(404)
+    q = _get_question(a["question_id"])
+    if q is None:
+        abort(404)
+    current_user = _get_logged_in_user()
+    # Only the question's author may accept an answer.
+    if _is_question_owner(current_user, q):
+        _accept_answer(a)
+    return redirect(url_for("qa-knowledge.question_detail", qid=a["question_id"]))
+
+
 @blueprint.route("/api/answers/<int:aid>/accept", methods=["POST"])
 def api_answer_accept(aid):
     target = _get_answer(aid)
     if target is None:
         abort(404)
-    # Unaccept any other accepted answer for the same question.
-    # Only write the answers whose accepted-state actually changes.
-    siblings = _load_answers(where={"question_id": target["question_id"]}, limit=100000)
-    for a in siblings:
-        desired = (a["id"] == aid)
-        if bool(a.get("is_accepted", False)) != desired:
-            a["is_accepted"] = desired
-            _save_answer(a)
+    _accept_answer(target)
     return jsonify({"id": aid, "is_accepted": True})
 
 

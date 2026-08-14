@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review &amp; Pay - {{ flight.flight_number }} - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 760px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { font-size: .9rem; color: #4299e1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { text-decoration: underline; }
+        .step-head { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+        .step-head h2 { font-size: 1.3rem; color: #1a365d; }
+        .step-tag { font-size: .72rem; font-weight: 600; color: #718096; background: #edf2f7; padding: .15rem .5rem; border-radius: .3rem; }
+
+        /* ---- Boarding pass ---- */
+        .boarding-pass { display: flex; flex-wrap: wrap; background: #fff; border-radius: .8rem; overflow: hidden; box-shadow: 0 6px 22px rgba(26,54,93,.18); margin-bottom: 1.5rem; }
+        .bp-main { flex: 1 1 420px; min-width: 300px; display: flex; flex-direction: column; }
+        .bp-band { background: linear-gradient(135deg, #1a365d, #2b6cb0); color: #fff; padding: .9rem 1.4rem; display: flex; justify-content: space-between; align-items: center; }
+        .bp-band .airline { font-size: 1.05rem; font-weight: 700; letter-spacing: .02rem; }
+        .bp-band .airline span { color: #90cdf4; }
+        .bp-band .bp-label { font-size: .66rem; text-transform: uppercase; letter-spacing: .12rem; opacity: .85; }
+        .bp-band .flightno { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 1rem; font-weight: 700; }
+        .bp-route { display: flex; align-items: center; justify-content: space-between; padding: 1.3rem 1.4rem .6rem; }
+        .bp-city { text-align: center; }
+        .bp-city .code { font-size: 2.4rem; font-weight: 800; color: #1a365d; line-height: 1; font-family: 'SFMono-Regular', Menlo, Consolas, monospace; }
+        .bp-city .name { font-size: .78rem; color: #718096; margin-top: .25rem; max-width: 8rem; }
+        .bp-plane { flex: 1; display: flex; flex-direction: column; align-items: center; color: #a0aec0; padding: 0 .6rem; }
+        .bp-plane .line { width: 100%; height: 1px; background: repeating-linear-gradient(90deg,#cbd5e0 0 6px,transparent 6px 12px); position: relative; }
+        .bp-plane .glyph { font-size: 1.3rem; color: #2b6cb0; margin-bottom: .1rem; }
+        .bp-plane .dur { font-size: .68rem; color: #a0aec0; margin-top: .25rem; }
+        .bp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem 1rem; padding: .8rem 1.4rem 1.3rem; border-top: 1px dashed #e2e8f0; }
+        .bp-field { min-width: 0; }
+        .bp-field .k { font-size: .6rem; text-transform: uppercase; letter-spacing: .08rem; color: #a0aec0; font-weight: 700; }
+        .bp-field .v { font-size: .92rem; color: #2d3748; font-weight: 600; margin-top: .15rem; font-family: 'SFMono-Regular', Menlo, Consolas, monospace; word-break: break-word; }
+        .bp-field.wide { grid-column: span 2; }
+
+        /* perforated stub */
+        .bp-stub { flex: 0 0 190px; position: relative; border-left: 2px dashed #cbd5e0; background: #f7fafc; padding: 1rem 1.2rem; display: flex; flex-direction: column; }
+        .bp-stub::before, .bp-stub::after { content: ""; position: absolute; left: -11px; width: 20px; height: 20px; border-radius: 50%; background: #f0f4f8; }
+        .bp-stub::before { top: -10px; }
+        .bp-stub::after { bottom: -10px; }
+        .bp-stub .airline { font-size: .8rem; font-weight: 700; color: #1a365d; margin-bottom: .6rem; }
+        .bp-stub .airline span { color: #2b6cb0; }
+        .bp-stub .bp-field { margin-bottom: .55rem; }
+        .barcode { margin-top: auto; height: 46px; width: 100%; background-image: repeating-linear-gradient(90deg, #1a202c 0 2px, #fff 2px 3px, #1a202c 3px 6px, #fff 6px 8px, #1a202c 8px 9px, #fff 9px 12px); border-radius: 2px; }
+        .barcode-no { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: .62rem; letter-spacing: .18rem; color: #4a5568; text-align: center; margin-top: .3rem; }
+
+        .card { background: #fff; border-radius: .5rem; padding: 1.6rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .card h3 { font-size: 1rem; color: #1a365d; margin: 0 0 .6rem; }
+        table.pax { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 1.2rem; }
+        table.pax th, table.pax td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid #edf2f7; }
+        table.pax th { font-size: .72rem; text-transform: uppercase; color: #a0aec0; letter-spacing: .03rem; }
+        .fare { width: 100%; border-collapse: collapse; font-size: .92rem; }
+        .fare td { padding: .4rem .2rem; border-bottom: 1px solid #edf2f7; color: #4a5568; }
+        .fare td.amt { text-align: right; color: #2d3748; font-weight: 600; }
+        .fare tr.total td { border-top: 2px solid #cbd5e0; border-bottom: none; font-size: 1.15rem; font-weight: 700; color: #2b6cb0; padding-top: .7rem; }
+        .pay-row { display: flex; gap: 1rem; align-items: flex-end; margin-top: 1.3rem; flex-wrap: wrap; }
+        label { display: block; font-size: .82rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        select { padding: .5rem .7rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .9rem; }
+        .book-btn { background: #38a169; color: #fff; border: none; padding: .7rem 1.8rem; border-radius: .3rem; cursor: pointer; font-size: 1rem; font-weight: 700; }
+        .book-btn:hover { background: #2f855a; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+        @media (max-width: 560px) { .bp-stub { flex-basis: 100%; border-left: none; border-top: 2px dashed #cbd5e0; } .bp-city .code { font-size: 1.9rem; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}" class="active">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <a href="{{ url_for('flights-hotels.book_flight_seats') }}" class="back">&larr; Back to seat selection</a>
+        <div class="step-head">
+            <h2>Review &amp; Pay</h2>
+            <span class="step-tag">Step 3 of 3 &middot; Confirm</span>
+        </div>
+
+        {% set dur = flight.duration_minutes|int %}
+        <div class="boarding-pass">
+            <div class="bp-main">
+                <div class="bp-band">
+                    <div class="airline">Sky<span>Lodge</span> Air</div>
+                    <div style="text-align:right">
+                        <div class="bp-label">Boarding Pass</div>
+                        <div class="flightno">{{ flight.airline }} &middot; {{ flight.flight_number }}</div>
+                    </div>
+                </div>
+                <div class="bp-route">
+                    <div class="bp-city">
+                        <div class="code">{{ flight.origin }}</div>
+                        <div class="name">{{ flight.origin_city }}</div>
+                    </div>
+                    <div class="bp-plane">
+                        <div class="glyph">&#9992;</div>
+                        <div class="line"></div>
+                        {% if dur %}<div class="dur">{{ dur // 60 }}h {{ dur % 60 }}m{% if flight.stops %} &middot; {{ flight.stops }} stop{% else %} &middot; Nonstop{% endif %}</div>{% endif %}
+                    </div>
+                    <div class="bp-city">
+                        <div class="code">{{ flight.destination }}</div>
+                        <div class="name">{{ flight.dest_city }}</div>
+                    </div>
+                </div>
+                <div class="bp-grid">
+                    <div class="bp-field wide"><div class="k">Passenger</div><div class="v">{{ pending.passengers|join(' / ') if pending.passengers else '—' }}</div></div>
+                    <div class="bp-field"><div class="k">Date</div><div class="v">{{ pending.depart_date }}</div></div>
+                    <div class="bp-field"><div class="k">Class</div><div class="v">{{ fare.cabin_label }}</div></div>
+                    <div class="bp-field"><div class="k">Depart</div><div class="v">{{ flight.departure_time }}</div></div>
+                    <div class="bp-field"><div class="k">Arrive</div><div class="v">{{ flight.arrival_time }}</div></div>
+                    <div class="bp-field"><div class="k">Boarding</div><div class="v">{{ bp.boarding_time or '—' }}</div></div>
+                    <div class="bp-field"><div class="k">Aircraft</div><div class="v">{{ flight.aircraft }}</div></div>
+                    <div class="bp-field"><div class="k">Terminal</div><div class="v">{{ bp.terminal }}</div></div>
+                    <div class="bp-field"><div class="k">Gate</div><div class="v">{{ bp.gate }}</div></div>
+                    <div class="bp-field"><div class="k">Zone</div><div class="v">{{ bp.zone }}</div></div>
+                    <div class="bp-field"><div class="k">Seat{{ 's' if pending.seats and pending.seats|length > 1 else '' }}</div><div class="v">{{ pending.seats|join(', ') if pending.seats else '—' }}</div></div>
+                    {% if pending.trip_type == 'round_trip' and pending.return_date %}
+                    <div class="bp-field"><div class="k">Return</div><div class="v">{{ pending.return_date }}</div></div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="bp-stub">
+                <div class="airline">Sky<span>Lodge</span></div>
+                <div class="bp-field"><div class="k">Flight</div><div class="v">{{ flight.flight_number }}</div></div>
+                <div class="bp-field"><div class="k">{{ flight.origin }} &rarr; {{ flight.destination }}</div><div class="v">{{ pending.depart_date }}</div></div>
+                <div class="bp-field"><div class="k">Seat</div><div class="v">{{ pending.seats|join(', ') if pending.seats else '—' }}</div></div>
+                <div class="bp-field"><div class="k">Gate / Zone</div><div class="v">{{ bp.gate }} / {{ bp.zone }}</div></div>
+                <div class="barcode"></div>
+                <div class="barcode-no">{{ flight.flight_number }} {{ flight.origin }}{{ flight.destination }}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Passengers &amp; Seats</h3>
+            <table class="pax">
+                <tr><th>Passenger</th><th>Seat</th><th>Zone</th><th>Seat fee</th></tr>
+                {% for a in seat_assignments %}
+                <tr>
+                    <td>{{ a.passenger }}</td>
+                    <td>{{ a.seat }}</td>
+                    <td>{{ a.zone }}</td>
+                    <td>{% if a.fee %}+${{ "%.2f"|format(a.fee) }}{% else %}Free{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <h3>Fare Breakdown</h3>
+            <form method="post" action="{{ url_for('flights-hotels.book_flight_confirm') }}">
+                <table class="fare">
+                    <tr>
+                        <td>Base fare ${{ "%.2f"|format(fare.base) }} &times; {{ fare.cabin_label }} ({{ fare.cabin_mult }}&times;) &times; {{ fare.travelers }} traveler{{ 's' if fare.travelers != 1 else '' }}{% if fare.legs == 2 %} &times; 2 legs{% endif %}</td>
+                        <td class="amt">${{ "%.2f"|format(fare.fare_subtotal) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Seat fees</td>
+                        <td class="amt">${{ "%.2f"|format(fare.seat_total) }}</td>
+                    </tr>
+                    <tr class="total">
+                        <td>Total</td>
+                        <td class="amt">${{ "%.2f"|format(fare.total) }}</td>
+                    </tr>
+                </table>
+
+                <div class="pay-row">
+                    <div>
+                        <label for="account_type">Pay with:</label>
+                        <select name="account_type" id="account_type">
+                            <option value="checking">Checking Account</option>
+                            <option value="credit">Credit Card</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="book-btn">Confirm &amp; Pay ${{ "%.2f"|format(fare.total) }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

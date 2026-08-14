@@ -48,6 +48,15 @@
         .answer { border-bottom: 1px solid #e3e6e8; padding: 16px 0; }
         .answer.accepted { border-left: 3px solid #2f6f44; padding-left: 12px; }
         .accepted-badge { color: #2f6f44; font-weight: 600; font-size: 13px; }
+        .accept-btn { background: none; border: 1px solid #babfc4; border-radius: 50%; cursor: pointer; width: 34px; height: 34px; font-size: 18px; line-height: 1; color: #babfc4; margin-top: 4px; }
+        .accept-btn:hover { background: #e6f4ea; color: #2f6f44; border-color: #2f6f44; }
+        .accept-btn.accepted { background: #2f6f44; border-color: #2f6f44; color: #fff; }
+        .comments { margin-top: 10px; border-top: 1px solid #e3e6e8; }
+        .comment { font-size: 12px; color: #3b4045; padding: 6px 0; border-bottom: 1px solid #eff0f1; line-height: 1.5; }
+        .comment .c-author { color: #0074cc; font-weight: 600; }
+        .comment .c-date { color: #9199a1; }
+        .comment-form { display: flex; gap: 6px; margin-top: 8px; }
+        .comment-form input[type=text] { flex: 1; padding: 5px 8px; border: 1px solid #babfc4; border-radius: 3px; font-size: 12px; }
         .answer-form { margin-top: 24px; }
         .answer-form textarea { width: 100%; min-height: 120px; padding: 8px; border: 1px solid #babfc4; border-radius: 3px; font-family: inherit; font-size: 14px; }
         select { padding: 4px 8px; font-size: 13px; border: 1px solid #babfc4; border-radius: 3px; }
@@ -131,6 +140,21 @@
                         {% endif %}
                         <a href="{{ url_for('qa-knowledge.report_question_page', qid=question.id) }}" class="btn btn-sm btn-outline" style="color:#d1383d; border-color:#d1383d;">Report</a>
                     </div>
+                    <div class="comments">
+                        {% for c in question.comments %}
+                        <div class="comment">
+                            {{ c.body }} &ndash;
+                            <span class="c-author">{{ c.author_name }}</span>
+                            <span class="c-date">{{ c.created_at }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if current_user %}
+                        <form class="comment-form" method="post" action="{{ url_for('qa-knowledge.form_question_comment', qid=question.id) }}">
+                            <input type="text" name="body" placeholder="Add a comment..." required>
+                            <button type="submit" class="btn btn-sm btn-outline">Add comment</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -150,7 +174,16 @@
                             <input type="hidden" name="direction" value="down">
                             <button class="vote-btn {% if answer_votes.get(a.id|string) == -1 %}active{% endif %}" title="Downvote">&#9660;</button>
                         </form>
+                        {% if is_owner %}
+                        <form method="post" action="{{ url_for('qa-knowledge.form_answer_accept', aid=a.id) }}">
+                            <button type="submit" class="accept-btn {% if a.is_accepted %}accepted{% endif %}"
+                                    title="{% if a.is_accepted %}Accepted answer (click to unaccept via another){% else %}Accept this answer{% endif %}"
+                                    aria-pressed="{{ 'true' if a.is_accepted else 'false' }}">&#10004;</button>
+                        </form>
                         {% if a.is_accepted %}
+                        <div class="accepted-badge">Accepted</div>
+                        {% endif %}
+                        {% elif a.is_accepted %}
                         <div class="accepted-badge">&#10004; Accepted</div>
                         {% endif %}
                     </div>
@@ -171,6 +204,21 @@
                                 <input type="hidden" name="reason" value="not-an-answer">
                                 <button type="submit" class="btn btn-sm btn-outline" style="color:#d1383d; border-color:#d1383d; font-size:11px;">Report</button>
                             </form>
+                        </div>
+                        <div class="comments">
+                            {% for c in a.comments %}
+                            <div class="comment">
+                                {{ c.body }} &ndash;
+                                <span class="c-author">{{ c.author_name }}</span>
+                                <span class="c-date">{{ c.created_at }}</span>
+                            </div>
+                            {% endfor %}
+                            {% if current_user %}
+                            <form class="comment-form" method="post" action="{{ url_for('qa-knowledge.form_answer_comment', aid=a.id) }}">
+                                <input type="text" name="body" placeholder="Add a comment..." required>
+                                <button type="submit" class="btn btn-sm btn-outline">Add comment</button>
+                            </form>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

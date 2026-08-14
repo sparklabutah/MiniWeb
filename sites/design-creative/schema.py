@@ -38,6 +38,24 @@ TABLES = {
             "category",
         ],
     },
+    "assets": {
+        "table_name": "design_creative_assets",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("name", "TEXT NOT NULL DEFAULT ''"),
+            ("type", "TEXT NOT NULL DEFAULT ''"),
+            ("category", "TEXT NOT NULL DEFAULT ''"),
+            ("tags", "TEXT NOT NULL DEFAULT ''"),
+            ("svg", "TEXT NOT NULL DEFAULT ''"),
+            ("src", "TEXT NOT NULL DEFAULT ''"),
+            ("width", "INTEGER NOT NULL DEFAULT 200"),
+            ("height", "INTEGER NOT NULL DEFAULT 200"),
+        ],
+        "indexes": [
+            "type",
+            "category",
+        ],
+    },
     "users": {
         "table_name": "design_creative_users",
         "columns": [

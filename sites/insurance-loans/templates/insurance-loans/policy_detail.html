@@ -117,6 +117,9 @@
                 <div class="detail-row"><span class="label">Effective Date</span><span class="value">{{ policy.effective_date }}</span></div>
                 <div class="detail-row"><span class="label">Renewal Date</span><span class="value">{{ policy.renewal_date or 'N/A' }}</span></div>
                 <div class="detail-row"><span class="label">Expiration Date</span><span class="value">{{ policy.expiration_date }}</span></div>
+                {% if policy.paid_through_date %}
+                <div class="detail-row"><span class="label">Paid Through</span><span class="value">{{ policy.paid_through_date }}</span></div>
+                {% endif %}
             </div>
         </div>
 
@@ -248,8 +251,11 @@
         </div>
         {% endif %}
 
+        {% if policy.status == 'active' %}
+        <a href="{{ url_for('insurance-loans.make_payment_page', policy_id=policy.id) }}" class="action-btn" style="background:#2d6a4f;">Make a Payment</a>
+        {% endif %}
         <a href="{{ url_for('insurance-loans.file_claim_page') }}" class="action-btn">File a Claim on This Policy</a>
-        <a href="{{ url_for('insurance-loans.policy_document', policy_id=policy.id) }}" class="action-btn" style="background:#2d6a4f;">View Policy Document</a>
+        <a href="{{ url_for('insurance-loans.policy_document', policy_id=policy.id) }}" class="action-btn">View Policy Document</a>
     </div>
 
     <div class="footer">Cascadia Insurance &amp; Lending</div>

@@ -20,13 +20,39 @@
             <label>Engine</label>
             <select name="engine" id="engine-filter">
                 <option value="">All Engines</option>
-                {% for e in engines %}<option value="{{ e }}" {% if engine == e %}selected{% endif %}>{{ e }}</option>{% endfor %}
+                {% for e_val, e_label in engines %}<option value="{{ e_val }}" {% if engine == e_val %}selected{% endif %}>{{ e_label }}</option>{% endfor %}
             </select>
             <label>Status</label>
             <select name="status"><option value="">All</option><option value="available" {% if status == 'available' %}selected{% endif %}>Available</option><option value="stopped" {% if status == 'stopped' %}selected{% endif %}>Stopped</option></select>
             <label>Sort</label>
             <select name="sort"><option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option><option value="cost" {% if sort == 'cost' %}selected{% endif %}>Cost</option><option value="storage" {% if sort == 'storage' %}selected{% endif %}>Storage Used</option><option value="connections" {% if sort == 'connections' %}selected{% endif %}>Connections</option></select>
             <button type="submit">Apply</button>
+        </form>
+        <!-- Provision database (create_by_form) -->
+        <form class="filters" method="POST" action="{{ url_for('cloud-dev-consoles.form_create_database') }}" id="create-database-form">
+            <strong style="font-size:.85rem;">Create database</strong>
+            <label>Name</label><input type="text" name="name" placeholder="my-new-database" required>
+            <label>Engine</label>
+            <select name="engine">
+                <option value="PostgreSQL">PostgreSQL</option>
+                <option value="MySQL">MySQL</option>
+                <option value="MongoDB">MongoDB</option>
+                <option value="Redis">Redis</option>
+            </select>
+            <label>Version</label><input type="text" name="version" placeholder="16.2" style="width:90px;">
+            <label>Class</label>
+            <select name="instance_class">
+                <option value="db.t3.medium">db.t3.medium</option>
+                <option value="db.r6g.large">db.r6g.large</option>
+                <option value="db.r6g.2xlarge">db.r6g.2xlarge</option>
+                <option value="db.m5.large">db.m5.large</option>
+            </select>
+            <label>Storage (GB)</label><input type="number" name="storage_gb" value="100" min="1" max="65536" style="width:90px;">
+            <label>Region</label>
+            <select name="region">{% for r in regions %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select>
+            <label><input type="checkbox" name="multi_az"> Multi-AZ</label>
+            <label><input type="checkbox" name="encrypted" checked> Encrypted</label>
+            <button type="submit" style="background:#ff9900;color:#232f3e;font-weight:600;">Create database</button>
         </form>
         <div class="result-count">{{ databases|length }} databases</div>
         <table id="databases-table">

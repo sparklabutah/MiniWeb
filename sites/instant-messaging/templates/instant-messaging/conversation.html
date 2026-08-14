@@ -71,8 +71,16 @@
         .msg-time { font-size: .65rem; color: #8696a0; }
         .msg-read { font-size: .7rem; }
         .msg-media { margin: .3rem 0; padding: .4rem; background: #1a2930; border-radius: .4rem; }
+        .msg-media-img { display: block; max-width: 260px; max-height: 300px; width: 100%; border-radius: .35rem; object-fit: cover; }
+        .msg-media-video { display: block; max-width: 260px; max-height: 300px; width: 100%; border-radius: .35rem; background: #000; }
         .msg-media-caption { font-size: .75rem; color: #8696a0; margin-top: .2rem; }
-        .msg-media-file { font-size: .8rem; color: #53bdeb; }
+        .msg-media-file { font-size: .75rem; color: #53bdeb; margin-top: .25rem; }
+
+        /* Pagination controls for the message thread */
+        .msg-pager { text-align: center; margin: .6rem 0 1rem; }
+        .msg-pager a { display: inline-block; background: #202c33; color: #00a884; text-decoration: none; padding: .4rem .9rem; border-radius: .5rem; font-size: .78rem; font-weight: 600; }
+        .msg-pager a:hover { background: #2a3942; }
+        .msg-pager .msg-pager-note { color: #8696a0; font-size: .72rem; margin-top: .3rem; }
 
         /* Input area */
         .input-area { background: #202c33; padding: .6rem 1rem; display: flex; align-items: center; gap: .6rem; border-top: 1px solid #2a3942; }
@@ -175,6 +183,12 @@
             </div>
 
             <div class="messages-area" id="messagesArea">
+                {% if has_older %}
+                <div class="msg-pager" id="olderPager">
+                    <a href="{{ url_for('instant-messaging.conversation_page', conv_id=conversation.id, page=page + 1) }}">&#8593; Load older messages</a>
+                    <div class="msg-pager-note">Showing {{ messages|length }} of {{ total_messages }} messages (page {{ page }})</div>
+                </div>
+                {% endif %}
                 {% set prev_date = namespace(val='') %}
                 {% for msg in messages %}
                     {% set msg_date = msg.time_display.split(',')[0] if ',' in msg.time_display else msg.time_display %}
@@ -189,6 +203,13 @@
                             {% endif %}
                             {% if msg.media %}
                                 <div class="msg-media">
+                                    {% if msg.media.render_kind == 'video' and msg.media.render_is_real %}
+                                        <video class="msg-media-video" src="{{ msg.media.render_src }}" controls preload="metadata"></video>
+                                    {% elif msg.media.render_kind in ('image', 'video') %}
+                                        <img class="msg-media-img" src="{{ msg.media.render_src }}" alt="{{ msg.media.file_name }}" loading="lazy">
+                                    {% else %}
+                                        <img class="msg-media-img msg-media-file-thumb" src="{{ msg.media.render_src }}" alt="{{ msg.media.file_name }}" loading="lazy">
+                                    {% endif %}
                                     <div class="msg-media-file">&#128206; {{ msg.media.file_name }}</div>
                                     {% if msg.media.caption %}
                                         <div class="msg-media-caption">{{ msg.media.caption }}</div>
@@ -221,6 +242,11 @@
                         </div>
                     </div>
                 {% endfor %}
+                {% if has_newer %}
+                <div class="msg-pager" id="newerPager">
+                    <a href="{{ url_for('instant-messaging.conversation_page', conv_id=conversation.id, page=page - 1) }}">&#8595; Newer messages</a>
+                </div>
+                {% endif %}
             </div>
 
             <div class="input-area">

@@ -237,6 +237,17 @@ def _parse_max_salary(salary_range):
 # Unified search/filter/sort — works for both DB and file mode
 # ---------------------------------------------------------------------------
 
+# UI job-type values don't always match the stored work_type verbatim
+# (e.g. the "Internship" radio submits "internship" but data stores "Intern").
+_JOB_TYPE_ALIASES = {"internship": "intern"}
+
+
+def _normalize_job_type(job_type):
+    """Map a UI job_type value to the stored work_type value (lowercased)."""
+    jt = job_type.lower()
+    return _JOB_TYPE_ALIASES.get(jt, jt)
+
+
 def _search_and_filter_jobs(q="", location="", job_type="", company="",
                             salary_min=None, salary_max=None,
                             date_from="", date_to="", sort="date",
@@ -248,7 +259,8 @@ def _search_and_filter_jobs(q="", location="", job_type="", company="",
     if q:
         jobs = [j for j in jobs if _keyword_score(q, _job_search_text(j)) > 0]
     if job_type:
-        jobs = [j for j in jobs if j.get("work_type", j.get("job_type", "")).lower() == job_type.lower()]
+        jt = _normalize_job_type(job_type)
+        jobs = [j for j in jobs if j.get("work_type", j.get("job_type", "")).lower() == jt]
     if location:
         jobs = [j for j in jobs if location.lower() in j["location"].lower()]
     if company:
@@ -705,7 +717,8 @@ def api_jobs_semantic():
 
     # Additional filters on semantic results
     if job_type:
-        results = [j for j in results if j.get("work_type", j.get("job_type", "")).lower() == job_type.lower()]
+        jt = _normalize_job_type(job_type)
+        results = [j for j in results if j.get("work_type", j.get("job_type", "")).lower() == jt]
     if location:
         results = [j for j in results if location.lower() in j["location"].lower()]
 

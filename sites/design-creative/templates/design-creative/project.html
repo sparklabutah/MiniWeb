@@ -182,13 +182,30 @@
                         </form>
                         {% endif %}
                         <button class="btn btn-outline" onclick="var b=this;navigator.clipboard.writeText(window.location.href).then(function(){b.textContent='Copied!';setTimeout(function(){b.textContent='Share Link'},2000)});">Share Link</button>
-                        <button class="btn btn-outline" onclick="window.print()">Export / Print</button>
+                        <a class="btn btn-dup" href="{{ url_for('design-creative.export_project', project_id=project.id) }}" download>Download SVG</a>
+                        <button class="btn btn-outline" onclick="window.print()">Print</button>
                     </div>
                 </div>
 
                 <!-- Invite collaborator -->
                 <div class="info-card">
-                    <h3>Invite Collaborator</h3>
+                    <h3>Collaborators</h3>
+                    {% set collaborators = project.get('collaborators', []) %}
+                    {% if collaborators %}
+                    <ul class="element-list" style="margin-bottom:.8rem;">
+                        {% for c in collaborators %}
+                        <li class="element-item">
+                            <div class="el-icon el-icon-text">{{ (c.name or c.email)[:1]|upper }}</div>
+                            <div class="el-details">
+                                <div class="el-type">{{ c.name or c.email }}</div>
+                                <div class="el-pos">{{ c.email }} -- {{ c.role or 'editor' }} ({{ c.status or 'invited' }})</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="no-elements" style="padding:.4rem 0 .8rem;">No collaborators yet</div>
+                    {% endif %}
                     <form method="POST" action="{{ url_for('design-creative.form_invite', project_id=project.id) }}" style="display:flex;gap:.4rem;">
                         <input type="email" name="email" placeholder="Enter email to invite" required style="flex:1;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
                         <button type="submit" class="btn btn-edit">Invite</button>

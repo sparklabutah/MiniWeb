@@ -38,6 +38,30 @@ TABLES = {
             "timestamp",
         ],
     },
+    "orders": {
+        "table_name": "auctions_p2p_marketplaces_orders",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("order_number", "TEXT NOT NULL DEFAULT ''"),
+            ("listing_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("buyer_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("seller_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("item_name", "TEXT NOT NULL DEFAULT ''"),
+            ("total", "REAL NOT NULL DEFAULT 0.0"),
+            ("payment_method", "TEXT NOT NULL DEFAULT ''"),
+            ("card_last4", "TEXT NOT NULL DEFAULT ''"),
+            ("full_name", "TEXT NOT NULL DEFAULT ''"),
+            ("address", "TEXT NOT NULL DEFAULT ''"),
+            ("city", "TEXT NOT NULL DEFAULT ''"),
+            ("zip", "TEXT NOT NULL DEFAULT ''"),
+            ("source", "TEXT NOT NULL DEFAULT ''"),
+            ("status", "TEXT NOT NULL DEFAULT ''"),
+            ("timestamp", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "buyer_id",
+        ],
+    },
     "products": {
         "table_name": "auctions_p2p_marketplaces_products",
         "columns": [

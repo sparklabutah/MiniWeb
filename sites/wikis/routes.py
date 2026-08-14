@@ -230,13 +230,19 @@ def _save_revisions(revisions):
 
 
 def _new_revision(revisions, *, page_id, editor_id, timestamp, summary,
-                  lines_added=0, lines_removed=0):
+                  lines_added=0, lines_removed=0, content=None):
     """Build a revision dict for a change made in THIS session.
 
     Tagged with `_session_new` so Recent Changes can float the current
     session's own edits to the very top — the seed revisions carry
     hand-authored (and sometimes future-dated) timestamps, so ordering by
     timestamp alone would bury a fresh edit below them.
+
+    `content` is the FULL article body as it stands *after* this edit — the
+    revision's content snapshot.  Storing it lets us view a historical
+    version, diff two revisions, and revert.  It is persisted as an extra
+    JSON field on the revision row (the overlay stores whole-dict blobs, so
+    no schema column is needed).
     """
     return {
         "id": max((r["id"] for r in revisions), default=0) + 1,
@@ -246,8 +252,72 @@ def _new_revision(revisions, *, page_id, editor_id, timestamp, summary,
         "summary": summary,
         "diff_lines_added": lines_added,
         "diff_lines_removed": lines_removed,
+        "content": content if content is not None else "",
         "_session_new": True,
     }
+
+
+def _page_revisions_chrono(page_id):
+    """All revisions for one page, oldest-first (chronological).
+
+    Ordered by (timestamp, id) so the immediately-preceding revision of any
+    edit is well defined — used for per-edit diffs and for locating the
+    version restored by a revert.
+    """
+    revs = [r for r in _load_revisions() if r["page_id"] == page_id]
+    revs.sort(key=lambda r: (r.get("timestamp", ""), r["id"]))
+    return revs
+
+
+def _revision_content(rev, page):
+    """Best-effort content snapshot for a revision.
+
+    Newer revisions carry their own `content`.  Legacy seed revisions predate
+    the snapshot feature; for the single most-recent revision we can safely
+    fall back to the page's current body (they are identical), otherwise the
+    snapshot is simply unavailable.
+    """
+    if rev.get("content"):
+        return rev["content"], True
+    chrono = _page_revisions_chrono(rev["page_id"])
+    if chrono and chrono[-1]["id"] == rev["id"] and page is not None:
+        return page["content"], True
+    return "", False
+
+
+def _diff_lines(old_text, new_text):
+    """Line-level diff between two article bodies.
+
+    Returns a list of {"tag": "add"|"rem"|"ctx", "text": str} rows and a
+    (added, removed) count tuple.  Uses difflib so it mirrors a real
+    revision diff view.
+    """
+    import difflib
+    old_lines = (old_text or "").splitlines()
+    new_lines = (new_text or "").splitlines()
+    sm = difflib.SequenceMatcher(a=old_lines, b=new_lines)
+    rows = []
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for line in old_lines[i1:i2]:
+                rows.append({"tag": "ctx", "text": line})
+        elif tag == "delete":
+            for line in old_lines[i1:i2]:
+                rows.append({"tag": "rem", "text": line})
+                removed += 1
+        elif tag == "insert":
+            for line in new_lines[j1:j2]:
+                rows.append({"tag": "add", "text": line})
+                added += 1
+        elif tag == "replace":
+            for line in old_lines[i1:i2]:
+                rows.append({"tag": "rem", "text": line})
+                removed += 1
+            for line in new_lines[j1:j2]:
+                rows.append({"tag": "add", "text": line})
+                added += 1
+    return rows, (added, removed)
 
 
 def _sort_recent_changes(revisions):
@@ -457,6 +527,7 @@ def edit_page_submit(slug):
         summary=summary,
         lines_added=max(0, new_lines - old_lines + 2),
         lines_removed=max(0, old_lines - new_lines + 1),
+        content=new_content,
     ))
     _save_revisions(revisions)
 
@@ -470,6 +541,141 @@ def edit_page_submit(slug):
     _recount_categories()
     emit("edit", user_id=editor_id, site_name=SITE, page_id=page["id"],
          title=page["title"], slug=slug, summary=summary, source_site=SITE)
+    return redirect(url_for("wikis.wiki_page", slug=slug))
+
+
+# ---------------------------------------------------------------------------
+# Revision history — view a version, diff against the previous one, revert
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/wiki/<slug>/revision/<int:rev_id>")
+def view_revision(slug, rev_id):
+    """Show the article body captured in a single historical revision."""
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    chrono = _page_revisions_chrono(page["id"])
+    rev = next((r for r in chrono if r["id"] == rev_id), None)
+    if not rev:
+        abort(404)
+    content, has_snapshot = _revision_content(rev, page)
+    # Locate the immediately-preceding revision (for a "diff" convenience link)
+    idx = next(i for i, r in enumerate(chrono) if r["id"] == rev_id)
+    prev_rev = chrono[idx - 1] if idx > 0 else None
+    is_current = (idx == len(chrono) - 1)
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == rev["editor_id"]), None)
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template(
+        "wikis/revision.html",
+        page=page, rev=rev, content=content, has_snapshot=has_snapshot,
+        editor=editor, prev_rev=prev_rev, is_current=is_current,
+        user=user, categories=categories)
+
+
+@blueprint.route("/wiki/<slug>/diff/<int:rev_id>")
+def diff_revision(slug, rev_id):
+    """Show what a single edit changed: this revision vs the previous one.
+
+    An explicit ?from=<rev_id> compares against any earlier revision instead
+    of the immediately-preceding one.
+    """
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    chrono = _page_revisions_chrono(page["id"])
+    rev = next((r for r in chrono if r["id"] == rev_id), None)
+    if not rev:
+        abort(404)
+    idx = next(i for i, r in enumerate(chrono) if r["id"] == rev_id)
+
+    from_id = request.args.get("from", type=int)
+    if from_id is not None:
+        prev_rev = next((r for r in chrono if r["id"] == from_id), None)
+    else:
+        prev_rev = chrono[idx - 1] if idx > 0 else None
+
+    new_content, new_ok = _revision_content(rev, page)
+    if prev_rev is not None:
+        old_content, old_ok = _revision_content(prev_rev, page)
+    else:
+        # First revision of the page: diff against an empty document.
+        old_content, old_ok = "", True
+
+    rows, (added, removed) = _diff_lines(old_content, new_content)
+    snapshots_ok = new_ok and old_ok
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == rev["editor_id"]), None)
+    user = _get_user(session.get("user_id")) if "user_id" in session else None
+    categories = _load_categories()
+    return render_template(
+        "wikis/diff.html",
+        page=page, rev=rev, prev_rev=prev_rev, rows=rows,
+        added=added, removed=removed, snapshots_ok=snapshots_ok,
+        editor=editor, user=user, categories=categories)
+
+
+@blueprint.route("/wiki/<slug>/revert/<int:rev_id>", methods=["POST"])
+def revert_revision(slug, rev_id):
+    """Restore an old revision's content as a brand-new edit.
+
+    The article body is overwritten with the chosen revision's snapshot and a
+    fresh revision (carrying its own snapshot) is recorded, so the history is
+    append-only — nothing is destroyed.
+    """
+    overlay_pages = _load_overlay_pages()
+    page = next((p for p in overlay_pages if p["slug"] == slug), None)
+    if not page:
+        # Promote a raw Wikipedia page into the overlay before mutating.
+        all_pages = _load_pages()
+        raw_page = next((p for p in all_pages if p["slug"] == slug), None)
+        if not raw_page:
+            abort(404)
+        promoted = {k: v for k, v in raw_page.items() if not k.startswith("_")}
+        overlay_pages.append(promoted)
+        page = promoted
+
+    target = next((r for r in _load_revisions() if r["id"] == rev_id
+                   and r["page_id"] == page["id"]), None)
+    if not target:
+        abort(404)
+
+    restored_content, has_snapshot = _revision_content(target, page)
+    if not has_snapshot:
+        return "That revision has no stored content snapshot to restore", 400
+
+    old_lines = page["content"].count("\n")
+    new_lines = restored_content.count("\n")
+
+    page["content"] = restored_content
+    page["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    _save_pages(overlay_pages)
+
+    revisions = _load_revisions()
+    editor_id = session.get("user_id", 1)
+    revisions.append(_new_revision(
+        revisions,
+        page_id=page["id"],
+        editor_id=editor_id,
+        timestamp=page["updated_at"],
+        summary=f"Reverted to revision {rev_id}",
+        lines_added=max(0, new_lines - old_lines),
+        lines_removed=max(0, old_lines - new_lines),
+        content=restored_content,
+    ))
+    _save_revisions(revisions)
+
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+
+    _recount_categories()
+    emit("edit", user_id=editor_id, site_name=SITE, page_id=page["id"],
+         title=page["title"], slug=slug,
+         summary=f"Reverted to revision {rev_id}", source_site=SITE)
     return redirect(url_for("wikis.wiki_page", slug=slug))
 
 
@@ -531,6 +737,7 @@ def create_page_submit():
         summary=f"Created article: {title}",
         lines_added=content.count("\n") + 1,
         lines_removed=0,
+        content=content,
     ))
     _save_revisions(revisions)
 
@@ -742,6 +949,7 @@ def api_page_update(slug):
         summary=summary,
         lines_added=max(0, new_lines - old_lines + 2),
         lines_removed=max(0, old_lines - new_lines + 1),
+        content=page["content"],
     ))
     _save_revisions(revisions)
 
@@ -806,6 +1014,7 @@ def api_page_create():
         summary=f"Created article: {title}",
         lines_added=content.count("\n") + 1,
         lines_removed=0,
+        content=content,
     ))
     _save_revisions(revisions)
 
@@ -829,6 +1038,104 @@ def api_page_revisions(slug):
     page_revisions = [r for r in revisions if r["page_id"] == page["id"]]
     page_revisions.sort(key=lambda r: r["timestamp"], reverse=True)
     return jsonify(page_revisions)
+
+
+@blueprint.route("/api/pages/<slug>/revisions/<int:rev_id>")
+def api_revision_get(slug, rev_id):
+    """Return one revision including its stored content snapshot."""
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    rev = next((r for r in _load_revisions()
+                if r["id"] == rev_id and r["page_id"] == page["id"]), None)
+    if not rev:
+        abort(404)
+    content, has_snapshot = _revision_content(rev, page)
+    return jsonify({**rev, "content": content, "has_snapshot": has_snapshot})
+
+
+@blueprint.route("/api/pages/<slug>/revisions/<int:rev_id>/diff")
+def api_revision_diff(slug, rev_id):
+    """Return the line diff of a revision against the previous one (or ?from=)."""
+    page = _get_page_by_slug(slug)
+    if not page:
+        abort(404)
+    chrono = _page_revisions_chrono(page["id"])
+    rev = next((r for r in chrono if r["id"] == rev_id), None)
+    if not rev:
+        abort(404)
+    idx = next(i for i, r in enumerate(chrono) if r["id"] == rev_id)
+    from_id = request.args.get("from", type=int)
+    if from_id is not None:
+        prev_rev = next((r for r in chrono if r["id"] == from_id), None)
+    else:
+        prev_rev = chrono[idx - 1] if idx > 0 else None
+    new_content, new_ok = _revision_content(rev, page)
+    if prev_rev is not None:
+        old_content, old_ok = _revision_content(prev_rev, page)
+    else:
+        old_content, old_ok = "", True
+    rows, (added, removed) = _diff_lines(old_content, new_content)
+    return jsonify({
+        "page_slug": page["slug"],
+        "from_revision": prev_rev["id"] if prev_rev else None,
+        "to_revision": rev["id"],
+        "lines_added": added,
+        "lines_removed": removed,
+        "snapshots_available": new_ok and old_ok,
+        "diff": rows,
+    })
+
+
+@blueprint.route("/api/pages/<slug>/revert/<int:rev_id>", methods=["POST"])
+def api_revert_revision(slug, rev_id):
+    """Restore a revision's content as a new edit; returns the updated page."""
+    overlay_pages = _load_overlay_pages()
+    page = next((p for p in overlay_pages if p["slug"] == slug), None)
+    if not page:
+        all_pages = _load_pages()
+        raw_page = next((p for p in all_pages if p["slug"] == slug), None)
+        if not raw_page:
+            abort(404)
+        promoted = {k: v for k, v in raw_page.items() if not k.startswith("_")}
+        overlay_pages.append(promoted)
+        page = promoted
+
+    target = next((r for r in _load_revisions()
+                   if r["id"] == rev_id and r["page_id"] == page["id"]), None)
+    if not target:
+        abort(404)
+    restored_content, has_snapshot = _revision_content(target, page)
+    if not has_snapshot:
+        return jsonify({"error": "revision has no stored content snapshot"}), 400
+
+    old_lines = page["content"].count("\n")
+    new_lines = restored_content.count("\n")
+    page["content"] = restored_content
+    page["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    _save_pages(overlay_pages)
+
+    revisions = _load_revisions()
+    editor_id = session.get("user_id", 1)
+    revisions.append(_new_revision(
+        revisions,
+        page_id=page["id"],
+        editor_id=editor_id,
+        timestamp=page["updated_at"],
+        summary=f"Reverted to revision {rev_id}",
+        lines_added=max(0, new_lines - old_lines),
+        lines_removed=max(0, old_lines - new_lines),
+        content=restored_content,
+    ))
+    _save_revisions(revisions)
+
+    users = _load_users()
+    editor = next((u for u in users if u["id"] == editor_id), None)
+    if editor:
+        editor["edit_count"] = editor.get("edit_count", 0) + 1
+        _save_users(users)
+    _recount_categories()
+    return jsonify(page)
 
 
 @blueprint.route("/api/categories")

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Messages - Meridian Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; flex-direction: column; }
+        a { color: #1d9bd1; text-decoration: none; } a:hover { text-decoration: underline; }
+        .topbar { background: #19171d; height: 38px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #383838; }
+        .topbar .workspace-name { color: #fff; font-weight: 700; font-size: 15px; }
+        .topbar .user-info { margin-left: auto; font-size: 13px; color: #ababad; }
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 260px; background: #19171d; border-right: 1px solid #383838; overflow-y: auto; flex-shrink: 0; }
+        .sidebar-section { padding: 12px 16px 4px; }
+        .sidebar-section-title { font-size: 13px; font-weight: 700; color: #ababad; text-transform: uppercase; }
+        .sidebar-nav { list-style: none; } .sidebar-nav li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .sidebar-nav li a:hover { background: #27242c; text-decoration: none; color: #fff; } .sidebar-nav li a.active { background: #1264a3; color: #fff; }
+        .sidebar-nav li .nav-icon { margin-right: 8px; font-size: 16px; }
+        .channel-list { list-style: none; } .channel-list li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .channel-list li a:hover { background: #27242c; text-decoration: none; color: #fff; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; }
+        h2 { color: #fff; margin-bottom: 12px; font-size: 18px; }
+        h3 { color: #ababad; margin: 20px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+        .convo-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+        .convo-card { background: #222529; border-radius: 8px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; }
+        .convo-card:hover { background: #2a2d31; }
+        .avatar { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .avatar-0 { background: #e04e4e; } .avatar-1 { background: #e07b2e; } .avatar-2 { background: #d4a72c; }
+        .avatar-3 { background: #2ea854; } .avatar-4 { background: #1d9bd1; } .avatar-5 { background: #7b68ee; } .avatar-6 { background: #e05eb3; }
+        .convo-body { flex: 1; min-width: 0; }
+        .convo-name { color: #fff; font-weight: 700; font-size: 14px; }
+        .convo-preview { color: #8b8b8d; font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .convo-time { color: #8b8b8d; font-size: 11px; flex-shrink: 0; }
+        .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+        .member-card { background: #222529; border-radius: 8px; padding: 12px; display: flex; gap: 10px; align-items: center; }
+        .member-info { flex: 1; min-width: 0; }
+        .member-info .name { color: #fff; font-weight: 700; font-size: 13px; }
+        .member-info .title { color: #8b8b8d; font-size: 12px; }
+        .msg-link { background: #007a5a; color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; text-decoration: none; flex-shrink: 0; }
+        .empty { color: #8b8b8d; font-size: 13px; padding: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <span class="workspace-name">Meridian Systems</span>
+        {% if current_user %}<span class="user-info">{{ current_user.display_name }}</span>{% endif %}
+    </div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <ul class="sidebar-nav">
+                    <li><a href="{{ url_for('team-chat-workspace.index') }}"><span class="nav-icon">&#x1F4AC;</span> All Channels</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.threads_view') }}"><span class="nav-icon">&#x1F9F5;</span> Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}" class="active"><span class="nav-icon">&#x1F4E8;</span> Direct Messages</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.members_view') }}"><span class="nav-icon">&#x1F465;</span> Members</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.search_view') }}"><span class="nav-icon">&#x1F50D;</span> Search</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Channels</div>
+                <ul class="channel-list">
+                    {% for ch in channels %}
+                    <li><a href="{{ url_for('team-chat-workspace.channel_view', channel_id=ch.id) }}">#{{ ch.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="content">
+            <h2>Direct Messages</h2>
+
+            <h3>Conversations</h3>
+            <div class="convo-list">
+                {% if conversations %}
+                    {% for c in conversations %}
+                    <a class="convo-card" href="{{ url_for('team-chat-workspace.dm_view', user_id=c.user.id) }}" style="text-decoration:none;">
+                        <div class="avatar avatar-{{ (c.user.root_user_id|default(loop.index0)) % 7 }}">{{ c.user.display_name[:1] if c.user else '?' }}</div>
+                        <div class="convo-body">
+                            <div class="convo-name">{{ c.user.display_name if c.user else 'Unknown' }}</div>
+                            <div class="convo-preview">{{ c.last_text }}</div>
+                        </div>
+                        <div class="convo-time">{{ c.last_time[:16].replace('T', ' ') }}</div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty">No conversations yet. Start one below.</div>
+                {% endif %}
+            </div>
+
+            <h3>Start a new message</h3>
+            <div class="member-grid">
+                {% for u in directory %}
+                <div class="member-card">
+                    <div class="avatar avatar-{{ loop.index0 % 7 }}">{{ u.display_name[:1] }}</div>
+                    <div class="member-info">
+                        <div class="name">{{ u.display_name }}</div>
+                        <div class="title">{{ u.title }}</div>
+                    </div>
+                    <a class="msg-link" href="{{ url_for('team-chat-workspace.dm_view', user_id=u.id) }}">Message</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

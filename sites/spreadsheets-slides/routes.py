@@ -346,6 +346,13 @@ def form_share_spreadsheet(sid):
     if not ss:
         abort(404)
     user_id = request.form.get("user_id", type=int)
+    if not user_id:
+        email = request.form.get("email", "").strip().lower()
+        if email:
+            match = next((u for u in _load_users()
+                          if u.get("email", "").lower() == email), None)
+            if match:
+                user_id = match["id"]
     if user_id and user_id not in ss.get("shared_with", []):
         ss.setdefault("shared_with", []).append(user_id)
         ss["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1362,6 +1369,336 @@ def api_spreadsheet_compute_at_threshold(sid):
 
 
 # ---------------------------------------------------------------------------
+# In-cell formula evaluation (safe recursive-descent parser -- NO eval())
+#
+# A cell whose text starts with "=" is treated as a formula. Formulas are
+# computed from the numeric values of OTHER cells and support:
+#     =SUM(A1:A5)   =AVERAGE(B1:B9)   =MIN(...)   =MAX(...)   =COUNT(...)
+#     arithmetic:   =A1*2   =A1+B2   =(A1+A2)/2   =B3-10   =A1*B2/2
+# The raw formula is preserved in sheet["formulas"] (so it stays editable),
+# while the computed result is written into the grid as the displayed value.
+# Formulas are recomputed every time the sheet is saved. Nothing is eval()'d:
+# input is tokenized and parsed, so cell text cannot execute arbitrary code.
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_FORMULA_FUNCS = {"SUM", "AVERAGE", "AVG", "MEAN", "MIN", "MAX", "COUNT"}
+_TOKEN_RE = _re.compile(r"\s*(?:([0-9]*\.?[0-9]+)|([A-Za-z]+[0-9]*)|([+\-*/(),:]))")
+
+
+class _FormulaError(Exception):
+    """Raised for any malformed / unsafe formula (shown as #ERROR!)."""
+
+
+def _cell_to_number(text):
+    """Parse a literal cell value into a float, or None if non-numeric."""
+    if text is None:
+        return None
+    s = str(text).strip()
+    if not s:
+        return None
+    s = s.replace(",", "").replace("$", "").replace("%", "").strip()
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _fmt_number(x):
+    """Format a numeric formula result for display (integers without .0)."""
+    if x is None:
+        return ""
+    fx = float(x)
+    if fx.is_integer():
+        return str(int(fx))
+    return "%g" % round(fx, 10)
+
+
+def _ref_to_rc(ref):
+    """Parse a cell reference like 'A1' / 'B12' into 0-indexed (row, col)."""
+    m = _re.match(r"^([A-Z]+)([0-9]+)$", ref.strip().upper())
+    if not m:
+        return None
+    col = 0
+    for ch in m.group(1):
+        col = col * 26 + (ord(ch) - 64)
+    return int(m.group(2)) - 1, col - 1
+
+
+class _FormulaEvaluator:
+    """Evaluates cell formulas over a raw grid, with cycle protection."""
+
+    def __init__(self, raw_grid):
+        self.raw = raw_grid
+        self._cache = {}
+        self._visiting = set()
+
+    def _raw_at(self, r, c):
+        if 0 <= r < len(self.raw) and 0 <= c < len(self.raw[r]):
+            return self.raw[r][c]
+        return ""
+
+    def numeric_at(self, r, c):
+        """Numeric value of a cell for use inside another formula."""
+        key = (r, c)
+        if key in self._cache:
+            return self._cache[key]
+        if key in self._visiting:
+            return 0.0  # circular reference -> treat as 0
+        raw = self._raw_at(r, c)
+        if isinstance(raw, str) and raw.strip().startswith("="):
+            self._visiting.add(key)
+            try:
+                val = self._eval_body(raw.strip()[1:])
+            except _FormulaError:
+                val = 0.0
+            finally:
+                self._visiting.discard(key)
+            self._cache[key] = val
+            return val
+        num = _cell_to_number(raw)
+        return num if num is not None else 0.0
+
+    def evaluate_display(self, r, c):
+        """Compute the display string for the formula at (r, c).
+
+        Returns a formatted number, or "#ERROR!" for an invalid formula.
+        """
+        key = (r, c)
+        if key in self._cache:
+            return _fmt_number(self._cache[key])
+        raw = self._raw_at(r, c)
+        self._visiting.add(key)
+        try:
+            val = self._eval_body(raw.strip()[1:])
+        except _FormulaError:
+            self._visiting.discard(key)
+            return "#ERROR!"
+        self._visiting.discard(key)
+        self._cache[key] = val
+        return _fmt_number(val)
+
+    # -- tokenizer ----------------------------------------------------------
+    @staticmethod
+    def _tokenize(s):
+        tokens = []
+        i = 0
+        n = len(s)
+        while i < n:
+            if s[i].isspace():
+                i += 1
+                continue
+            m = _TOKEN_RE.match(s, i)
+            if not m or m.end() == i:
+                raise _FormulaError("bad character %r" % s[i])
+            num, name, op = m.group(1), m.group(2), m.group(3)
+            if num is not None:
+                tokens.append(("num", float(num)))
+            elif name is not None:
+                tokens.append(("name", name.upper()))
+            else:
+                tokens.append(("op", op))
+            i = m.end()
+        return tokens
+
+    # -- recursive-descent parser -------------------------------------------
+    def _eval_body(self, body):
+        self._toks = self._tokenize(body)
+        self._pos = 0
+        val = self._parse_expr()
+        if self._pos != len(self._toks):
+            raise _FormulaError("trailing tokens")
+        return val
+
+    def _peek(self):
+        return self._toks[self._pos] if self._pos < len(self._toks) else (None, None)
+
+    def _lookahead(self):
+        return self._toks[self._pos + 1] if self._pos + 1 < len(self._toks) else (None, None)
+
+    def _advance(self):
+        tok = self._peek()
+        self._pos += 1
+        return tok
+
+    def _parse_expr(self):
+        val = self._parse_term()
+        while True:
+            t, v = self._peek()
+            if t == "op" and v in ("+", "-"):
+                self._advance()
+                rhs = self._parse_term()
+                val = val + rhs if v == "+" else val - rhs
+            else:
+                return val
+
+    def _parse_term(self):
+        val = self._parse_factor()
+        while True:
+            t, v = self._peek()
+            if t == "op" and v in ("*", "/"):
+                self._advance()
+                rhs = self._parse_factor()
+                if v == "*":
+                    val = val * rhs
+                else:
+                    if rhs == 0:
+                        raise _FormulaError("division by zero")
+                    val = val / rhs
+            else:
+                return val
+
+    def _parse_factor(self):
+        t, v = self._peek()
+        if t == "op" and v == "-":
+            self._advance()
+            return -self._parse_factor()
+        if t == "op" and v == "+":
+            self._advance()
+            return self._parse_factor()
+        if t == "op" and v == "(":
+            self._advance()
+            val = self._parse_expr()
+            t2, v2 = self._advance()
+            if v2 != ")":
+                raise _FormulaError("expected )")
+            return val
+        if t == "num":
+            self._advance()
+            return v
+        if t == "name":
+            if v in _FORMULA_FUNCS and self._lookahead() == ("op", "("):
+                return self._parse_function(v)
+            rc = _ref_to_rc(v)
+            if rc is None:
+                raise _FormulaError("bad reference %r" % v)
+            self._advance()
+            return self.numeric_at(rc[0], rc[1])
+        raise _FormulaError("unexpected token")
+
+    def _parse_function(self, fname):
+        self._advance()  # function name
+        self._advance()  # (
+        values = []
+        if self._peek() == ("op", ")"):
+            self._advance()
+        else:
+            while True:
+                values.extend(self._parse_arg())
+                t, v = self._peek()
+                if t == "op" and v == ",":
+                    self._advance()
+                    continue
+                if t == "op" and v == ")":
+                    self._advance()
+                    break
+                raise _FormulaError("expected , or )")
+        return self._apply_func(fname, values)
+
+    def _parse_arg(self):
+        """An argument is a RANGE (A1:B3 -> list) or a scalar expression."""
+        t, v = self._peek()
+        if t == "name" and self._lookahead() == ("op", ":"):
+            start = _ref_to_rc(v)
+            self._advance()  # start ref
+            self._advance()  # :
+            t2, v2 = self._advance()
+            end = _ref_to_rc(v2) if t2 == "name" else None
+            if start is None or end is None:
+                raise _FormulaError("bad range")
+            return self._range_values(start, end)
+        return [self._parse_expr()]
+
+    def _range_values(self, start, end):
+        r1, r2 = sorted((start[0], end[0]))
+        c1, c2 = sorted((start[1], end[1]))
+        vals = []
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                raw = self._raw_at(r, c)
+                if isinstance(raw, str) and raw.strip().startswith("="):
+                    vals.append(self.numeric_at(r, c))
+                else:
+                    num = _cell_to_number(raw)
+                    if num is not None:
+                        vals.append(num)
+        return vals
+
+    @staticmethod
+    def _apply_func(fname, values):
+        if fname == "SUM":
+            return float(sum(values))
+        if fname in ("AVERAGE", "AVG", "MEAN"):
+            return float(sum(values) / len(values)) if values else 0.0
+        if fname == "MIN":
+            return float(min(values)) if values else 0.0
+        if fname == "MAX":
+            return float(max(values)) if values else 0.0
+        if fname == "COUNT":
+            return float(len(values))
+        raise _FormulaError("unknown function %s" % fname)
+
+
+def _sheet_raw_grid(sheet):
+    """Reconstruct the raw grid (formulas + literals) for a sheet.
+
+    grid cells hold DISPLAY values; sheet["formulas"] maps "row_col" -> raw
+    formula text. A freshly entered formula may still live in the grid (leading
+    "=") before the map is rebuilt, so both sources are honored.
+    """
+    grid = sheet.get("data", []) or []
+    formulas = sheet.get("formulas", {}) or {}
+    raw = []
+    for r, row in enumerate(grid):
+        raw_row = []
+        for c, cell in enumerate(row):
+            key = "%d_%d" % (r, c)
+            if key in formulas:
+                raw_row.append(formulas[key])
+            else:
+                raw_row.append(cell)
+        raw.append(raw_row)
+    return raw
+
+
+def _recompute_sheet(sheet):
+    """Evaluate every formula in the sheet, writing computed values into
+    sheet['data'] and preserving the raw formulas in sheet['formulas']."""
+    raw = _sheet_raw_grid(sheet)
+    evaluator = _FormulaEvaluator(raw)
+    grid = sheet.get("data", []) or []
+    formulas = {}
+    for r, row in enumerate(raw):
+        for c, cell in enumerate(row):
+            if isinstance(cell, str) and cell.strip().startswith("="):
+                formulas["%d_%d" % (r, c)] = cell.strip()
+                grid[r][c] = evaluator.evaluate_display(r, c)
+            else:
+                grid[r][c] = cell
+    sheet["data"] = grid
+    if formulas:
+        sheet["formulas"] = formulas
+    else:
+        sheet.pop("formulas", None)
+    return sheet
+
+
+def _set_cell_raw(sheet, r, c, value, default_cols=10):
+    """Write a raw value (formula or literal) into a sheet cell, clearing any
+    stale formula for that cell (recompute re-registers live formulas)."""
+    grid = sheet.setdefault("data", [])
+    while len(grid) <= r:
+        grid.append([""] * default_cols)
+    while len(grid[r]) <= c:
+        grid[r].append("")
+    formulas = sheet.get("formulas")
+    if formulas:
+        formulas.pop("%d_%d" % (r, c), None)
+    grid[r][c] = value
+
+
+# ---------------------------------------------------------------------------
 # Macro-support routes: submit_from_table (batch cell update via form)
 # ---------------------------------------------------------------------------
 
@@ -1369,11 +1706,11 @@ def api_spreadsheet_compute_at_threshold(sid):
 def form_submit_spreadsheet(sid):
     """Submit bulk cell edits from a table form.
 
-    Form fields: cell_<row>_<col>=value (e.g., cell_1_3=42)
+    Form fields: cell_<row>_<col>=value (e.g., cell_1_3=42). A value beginning
+    with "=" is stored as a formula and evaluated (e.g. cell_5_1=\"=SUM(B1:B5)\").
     Supports submit_from_table macro.
     """
-    spreadsheets = _load_spreadsheets()
-    ss = next((s for s in spreadsheets if s["id"] == sid), None)
+    ss = db.get_item(SITE, "spreadsheets", sid)
     if not ss:
         abort(404)
 
@@ -1382,28 +1719,31 @@ def form_submit_spreadsheet(sid):
     if sheet_idx < 0 or sheet_idx >= len(sheets):
         abort(400)
 
-    grid = sheets[sheet_idx]["data"]
+    sheet = sheets[sheet_idx]
+    default_cols = ss.get("cols", 10)
+    old_raw = _sheet_raw_grid(sheet)
     changes = 0
 
     for key, value in request.form.items():
-        if key.startswith("cell_"):
-            parts = key.split("_")
-            if len(parts) == 3:
-                try:
-                    r, c = int(parts[1]), int(parts[2])
-                    while len(grid) <= r:
-                        grid.append([""] * ss.get("cols", 10))
-                    while len(grid[r]) <= c:
-                        grid[r].append("")
-                    if grid[r][c] != str(value):
-                        grid[r][c] = str(value)
-                        changes += 1
-                except (ValueError, IndexError):
-                    continue
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        new_val = str(value)
+        prev = old_raw[r][c] if r < len(old_raw) and c < len(old_raw[r]) else ""
+        if str(prev) != new_val:
+            changes += 1
+        _set_cell_raw(sheet, r, c, new_val, default_cols)
 
     if changes > 0:
+        _recompute_sheet(sheet)
         ss["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        _save_spreadsheets(spreadsheets)
+        db.save_item(SITE, "spreadsheets", sid, ss)
 
     return redirect(url_for("spreadsheets-slides.spreadsheet_view", sid=sid, sheet=sheet_idx))
 

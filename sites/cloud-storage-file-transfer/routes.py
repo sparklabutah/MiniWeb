@@ -8,6 +8,7 @@ reset from .pristine/ between evaluation runs.
 import json
 import pathlib
 import re
+import secrets
 from datetime import datetime, timedelta
 
 from flask import (
@@ -386,17 +387,29 @@ def file_detail(file_id):
 
     # Shares for this file
     file_shares = [s for s in shares if s["file_id"] == file_id]
-    # Transfers for this file
-    file_transfers = [t for t in transfers if t["file_id"] == file_id]
+    # Transfers for this file — match the legacy single file_id OR the newer
+    # multi-file file_ids list.
+    file_transfers = [t for t in transfers
+                      if t.get("file_id") == file_id
+                      or file_id in (t.get("file_ids") or [])]
 
     # Breadcrumb
     breadcrumb = []
     if file.get("folder_id"):
         breadcrumb = _get_folder_path(file["folder_id"], folders)
 
+    # Folder options for the "Move to folder" control (label = full path).
+    folder_options = sorted(
+        ({"id": f["id"],
+          "label": " / ".join(p["name"] for p in _get_folder_path(f["id"], folders))}
+         for f in folders),
+        key=lambda o: o["label"].lower(),
+    )
+
     return render_template(
         "cloud-storage-file-transfer/file_detail.html",
         file=file, user=user, user_map=user_map, folders=folders,
+        folder_options=folder_options,
         shares=file_shares, transfers=file_transfers,
         breadcrumb=breadcrumb, format_size=_format_size, file_icon=_file_icon,
         open_in_urls=OPEN_IN_URLS,
@@ -777,6 +790,222 @@ def api_transfers_create():
     transfers.append(new_transfer)
     _save_transfers(transfers)
     return jsonify(new_transfer), 201
+
+
+# ---------------------------------------------------------------------------
+# HTML routes -- File Transfer (send files / transfers list / recipient page)
+#
+# The "file transfer" half of MeridianCloud (a WeTransfer-style flow): pick one
+# or more of your files, generate an unguessable share link addressed to a
+# recipient email, then let that recipient open a download page. All persistence
+# goes through the session overlay (db.next_id / db.save_item / db.get_item) —
+# no full-table loads of the 3k+ transfers table (per CLAUDE.md).
+# ---------------------------------------------------------------------------
+
+def _transfer_files(transfer):
+    """Resolve a transfer's file list. New transfers carry a ``file_ids`` list;
+    legacy seed rows carry a single ``file_id``. Returns live file dicts."""
+    fids = transfer.get("file_ids")
+    if not fids:
+        fids = [transfer["file_id"]] if transfer.get("file_id") is not None else []
+    out = []
+    for fid in fids:
+        f = db.get_item(SITE, "files", fid)
+        if f is not None:
+            out.append(f)
+    return out
+
+
+def _transfer_share_path(transfer):
+    """Relative recipient-download URL for a transfer (needs a token)."""
+    token = transfer.get("token")
+    if not token:
+        return None
+    return url_for("cloud-storage-file-transfer.transfer_download",
+                   transfer_id=transfer["id"], token=token)
+
+
+@blueprint.route("/transfers")
+def transfers_list_page():
+    """List the file transfers the current user has sent (newest first)."""
+    user = _current_user()
+    me_id = session.get("user_id", 1)
+    transfers = db.query(SITE, "transfers", where={"sender_id": me_id},
+                         sort="-created_at", limit=50)
+    rows = []
+    for t in transfers:
+        primary = db.get_item(SITE, "files", t.get("file_id"))
+        fids = t.get("file_ids") or ([t["file_id"]] if t.get("file_id") is not None else [])
+        rows.append({
+            "transfer": t,
+            "primary_name": (primary or {}).get("name", "(file removed)"),
+            "file_count": len(fids),
+            "share_path": _transfer_share_path(t),
+        })
+    return render_template(
+        "cloud-storage-file-transfer/transfers_list.html",
+        user=user, rows=rows, format_size=_format_size,
+    )
+
+
+@blueprint.route("/transfers/new")
+def transfers_new():
+    """'Send files' page — choose files + recipient to create a transfer."""
+    user = _current_user()
+    me_id = session.get("user_id", 1)
+    my_files = db.query(SITE, "files",
+                        where={"owner_id": me_id, "is_trashed": 0},
+                        sort="-modified_at", limit=200)
+    preselect = request.args.get("file", type=int)
+    return render_template(
+        "cloud-storage-file-transfer/send_files.html",
+        user=user, files=my_files, preselect=preselect,
+        error=request.args.get("error"),
+        format_size=_format_size, file_icon=_file_icon,
+    )
+
+
+@blueprint.route("/transfers/create", methods=["POST"])
+def transfers_create_form():
+    """Create a transfer from the Send files form and issue a share link."""
+    me_id = session.get("user_id", 1)
+    recipient = request.form.get("recipient_email", "").strip()
+    message = request.form.get("message", "").strip()
+    try:
+        expires_days = int(request.form.get("expires_days", "7"))
+    except (TypeError, ValueError):
+        expires_days = 7
+    expires_days = max(1, min(expires_days, 90))
+
+    file_ids = []
+    for raw in request.form.getlist("file_ids"):
+        try:
+            file_ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+
+    if not recipient or not file_ids:
+        return redirect(url_for("cloud-storage-file-transfer.transfers_new",
+                                error="Pick at least one file and enter a recipient email."))
+
+    now = datetime.utcnow()
+    expires = now + timedelta(days=expires_days)
+    tid = db.next_id(SITE, "transfers")
+    transfer = {
+        "id": tid,
+        "file_id": file_ids[0],
+        "file_ids": file_ids,
+        "sender_id": me_id,
+        "recipient_email": recipient,
+        "message": message,
+        "status": "active",
+        "created_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "expires_at": expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "download_count": 0,
+        "token": secrets.token_urlsafe(9),
+    }
+    db.save_item(SITE, "transfers", tid, transfer)
+    return redirect(url_for("cloud-storage-file-transfer.transfer_sent",
+                            transfer_id=tid))
+
+
+@blueprint.route("/transfers/<int:transfer_id>/sent")
+def transfer_sent(transfer_id):
+    """Confirmation page shown to the sender, with the copyable share link."""
+    transfer = db.get_item(SITE, "transfers", transfer_id)
+    if transfer is None:
+        abort(404)
+    user = _current_user()
+    files = _transfer_files(transfer)
+    share_path = _transfer_share_path(transfer)
+    share_link = None
+    if share_path:
+        share_link = request.url_root.rstrip("/") + share_path
+    return render_template(
+        "cloud-storage-file-transfer/transfer_sent.html",
+        user=user, transfer=transfer, files=files,
+        share_link=share_link, share_path=share_path,
+        total_bytes=sum(f.get("size_bytes", 0) for f in files),
+        format_size=_format_size,
+    )
+
+
+@blueprint.route("/t/<int:transfer_id>/<token>")
+def transfer_download(transfer_id, token):
+    """Recipient-facing download page reached via the share link."""
+    transfer = db.get_item(SITE, "transfers", transfer_id)
+    if transfer is None or transfer.get("token") != token:
+        abort(404)
+    files = _transfer_files(transfer)
+    sender = db.get_item(SITE, "users", transfer.get("sender_id"))
+    return render_template(
+        "cloud-storage-file-transfer/transfer_download.html",
+        transfer=transfer, files=files, token=token,
+        sender=sender, total_bytes=sum(f.get("size_bytes", 0) for f in files),
+        format_size=_format_size, file_icon=_file_icon,
+    )
+
+
+@blueprint.route("/t/<int:transfer_id>/<token>/download/<int:file_id>")
+def transfer_file_download(transfer_id, token, file_id):
+    """Download one file from a transfer; bumps the transfer's download_count."""
+    transfer = db.get_item(SITE, "transfers", transfer_id)
+    if transfer is None or transfer.get("token") != token:
+        abort(404)
+    fids = transfer.get("file_ids") or ([transfer["file_id"]]
+                                        if transfer.get("file_id") is not None else [])
+    if file_id not in fids:
+        abort(404)
+    file = db.get_item(SITE, "files", file_id)
+    if file is None:
+        abort(404)
+    transfer["download_count"] = transfer.get("download_count", 0) + 1
+    db.save_item(SITE, "transfers", transfer_id, transfer)
+    content, mime = _download_payload(file)
+    fname = file.get("name") or f"file-{file_id}"
+    return Response(
+        content, mimetype=mime,
+        headers={"Content-Disposition": 'attachment; filename="%s"' % fname},
+    )
+
+
+# ---------------------------------------------------------------------------
+# HTML routes -- Move file to another folder (edit_by_form)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/file/<int:file_id>/move", methods=["POST"])
+def form_file_move(file_id):
+    """Move a file to another folder from the 'Move to folder' control on the
+    file detail page. Persists via the session overlay (db.save_item)."""
+    file = db.get_item(SITE, "files", file_id)
+    if file is None:
+        abort(404)
+
+    raw = request.form.get("folder_id", "").strip()
+    if raw in ("", "root", "0"):
+        target_folder_id = None
+    else:
+        try:
+            target_folder_id = int(raw)
+        except ValueError:
+            target_folder_id = None
+
+    folders = _load_folders()
+    if target_folder_id is not None:
+        target = next((f for f in folders if f["id"] == target_folder_id), None)
+        if target is None:
+            return redirect(url_for("cloud-storage-file-transfer.file_detail",
+                                    file_id=file_id))
+        path_parts = _get_folder_path(target_folder_id, folders)
+        file["path"] = "/" + "/".join(f["name"] for f in path_parts) + "/" + file["name"]
+    else:
+        file["path"] = "/" + file["name"]
+
+    file["folder_id"] = target_folder_id
+    file["modified_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    db.save_item(SITE, "files", file_id, file)
+    return redirect(url_for("cloud-storage-file-transfer.file_detail",
+                            file_id=file_id))
 
 
 # ---------------------------------------------------------------------------

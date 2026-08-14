@@ -582,6 +582,310 @@ def payments_page():
 
 
 # ---------------------------------------------------------------------------
+# Make a Payment — real on-page payment flow (pay_by_form)
+#
+# A visible form where the user picks a loan or policy, enters an amount and a
+# payment method, and submits. On submit we persist a payment record (overlay-
+# isolated via db.next_id + db.save_item), reduce the loan balance / advance the
+# policy paid-through, route the financial mutation through the shared 2FA /
+# banking bridge (like every other financial site), then show a confirmation.
+# ---------------------------------------------------------------------------
+
+# What each account_type maps to for the banking bridge
+_PAY_METHODS = ["online", "bank_transfer", "debit_card", "credit_card", "check"]
+
+
+def _payment_targets(user_id):
+    """Payable items for a user: loans that still carry a balance plus active
+    policies. Per-user sets are small (well under 100 rows) so reading them
+    directly is within the DB rules; the SQL WHERE already scopes to this user."""
+    targets = []
+    for l in db.query(SITE, "loans", where={"user_id": user_id}):
+        if l.get("status") == "paid_off":
+            continue
+        if l.get("status") not in ("active", "deferred", "pending_approval"):
+            continue
+        targets.append({
+            "key": "loan:%s" % l["id"],
+            "kind": "loan",
+            "label": "%s — %s Loan" % (l["loan_number"], (l.get("type", "") or "").replace("_", " ").title()),
+            "sub": "Balance ${:,.2f}".format(l.get("current_balance", 0) or 0),
+            "default_amount": round(l.get("monthly_payment", 0) or 0, 2),
+        })
+    for p in db.query(SITE, "policies", where={"user_id": user_id}):
+        if p.get("status") != "active":
+            continue
+        targets.append({
+            "key": "policy:%s" % p["id"],
+            "kind": "policy",
+            "label": "%s — %s Insurance" % (p["policy_number"], (p.get("type", "") or "").replace("_", " ").title()),
+            "sub": "Premium ${:,.2f}/mo".format(p.get("premium_monthly", 0) or 0),
+            "default_amount": round(p.get("premium_monthly", 0) or 0, 2),
+        })
+    return targets
+
+
+@blueprint.route("/pay", methods=["GET"])
+def make_payment_page():
+    """On-page payment form. Optionally preselect a loan/policy via query args
+    (?loan_id= / ?policy_id=) when arriving from a detail page."""
+    user, logged_in = _get_browsing_user()
+    targets = _payment_targets(user["id"])
+    preselect = ""
+    if request.args.get("loan_id"):
+        preselect = "loan:%s" % request.args.get("loan_id")
+    elif request.args.get("policy_id"):
+        preselect = "policy:%s" % request.args.get("policy_id")
+    return render_template(
+        "insurance-loans/make_payment.html",
+        user=user, logged_in=logged_in,
+        targets=targets, preselect=preselect,
+        methods=_PAY_METHODS, error=None,
+    )
+
+
+@blueprint.route("/pay", methods=["POST"])
+def make_payment_submit():
+    """Process a submitted payment: persist the payment, update the loan/policy,
+    then route through 2FA (which fires the banking bridge on verification)."""
+    user, logged_in = _get_browsing_user()
+    target = (request.form.get("target", "") or "").strip()
+    method = (request.form.get("method", "") or "online").strip()
+    account_type = (request.form.get("account_type", "") or "checking").strip()
+    account_last_four = (request.form.get("account_last_four", "") or "").strip()
+    amount = _to_float(request.form.get("amount"), 0.0)
+
+    def _reject(message):
+        return render_template(
+            "insurance-loans/make_payment.html",
+            user=user, logged_in=logged_in,
+            targets=_payment_targets(user["id"]), preselect=target,
+            methods=_PAY_METHODS, error=message,
+        )
+
+    kind, _sep, raw_id = target.partition(":")
+    try:
+        target_id = int(raw_id)
+    except (TypeError, ValueError):
+        target_id = 0
+    if kind not in ("loan", "policy") or not target_id:
+        return _reject("Please choose a loan or policy to pay.")
+
+    collection = "loans" if kind == "loan" else "policies"
+    item = db.get_item(SITE, collection, target_id)
+    if not item:
+        abort(404)
+
+    if amount <= 0:
+        amount = (item.get("monthly_payment") if kind == "loan" else item.get("premium_monthly")) or 0
+    amount = round(float(amount), 2)
+    if amount <= 0:
+        return _reject("Enter a payment amount greater than $0.00.")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_id = db.next_id(SITE, "payments")
+    confirmation = "ILP-%s-%05d" % (today.replace("-", ""), new_id)
+
+    if kind == "loan":
+        if item.get("status") == "paid_off":
+            return _reject("That loan is already paid off.")
+        new_balance = round(max(0.0, (item.get("current_balance", 0) or 0) - amount), 2)
+        item["current_balance"] = new_balance
+        if new_balance == 0:
+            item["status"] = "paid_off"
+            item["payments_remaining"] = 0
+            item["payoff_date"] = today
+        else:
+            item["payments_made"] = (item.get("payments_made", 0) or 0) + 1
+            item["payments_remaining"] = max(0, (item.get("payments_remaining", 0) or 0) - 1)
+        db.save_item(SITE, "loans", target_id, item)
+        payer_name = item.get("borrower_name", user["display_name"])
+        pay_type = "loan_payment"
+        related = {"related_loan": item["loan_number"], "related_policy": ""}
+        recipient = "Cascadia Federal - Loan %s" % item["loan_number"]
+        due_date = item.get("next_payment_due") or today
+    else:
+        # advance the policy's paid-through date by ~1 month (30 days)
+        from datetime import timedelta
+        base = item.get("paid_through_date") or today
+        try:
+            base_dt = datetime.strptime(base, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            base_dt = datetime.now()
+        item["paid_through_date"] = (base_dt + timedelta(days=30)).strftime("%Y-%m-%d")
+        item["last_payment_date"] = today
+        db.save_item(SITE, "policies", target_id, item)
+        payer_name = item.get("policyholder_name", user["display_name"])
+        pay_type = "insurance_premium"
+        related = {"related_policy": item["policy_number"], "related_loan": ""}
+        recipient = "Cascadia Insurance - Policy %s" % item["policy_number"]
+        due_date = today
+
+    payment = {
+        "id": new_id,
+        "payment_id": "ILPAY-%s-%04d" % (datetime.now().year, new_id),
+        "user_id": item.get("user_id", user["id"]),
+        "root_user_id": item.get("root_user_id", user.get("root_user_id", user["id"])),
+        "payer_name": payer_name,
+        "type": pay_type,
+        "amount": amount,
+        "method": method,
+        "account_last_four": account_last_four,
+        "payment_date": today,
+        "due_date": due_date,
+        "status": "completed",
+        "confirmation_number": confirmation,
+        "notes": "Payment submitted online via %s." % method.replace("_", " "),
+        "check_number": "",
+        "related_loan": related.get("related_loan", ""),
+        "related_policy": related.get("related_policy", ""),
+    }
+    db.save_item(SITE, "payments", new_id, payment)
+
+    # Financial mutation → shared 2FA / banking bridge, same as other money sites.
+    from app.events import request_2fa
+    verify_url = request_2fa(
+        "payment",
+        return_url=url_for("insurance-loans.pay_confirmation", payment_id=new_id),
+        user_id=item.get("user_id", user["id"]),
+        recipient=recipient,
+        amount=amount,
+        category="Insurance",
+        reference=confirmation,
+        account_type=account_type,
+    )
+    return redirect(verify_url)
+
+
+@blueprint.route("/pay/confirmation/<int:payment_id>")
+def pay_confirmation(payment_id):
+    """Confirmation screen shown after a payment is recorded (and 2FA cleared).
+    Re-reads the loan/policy so the freshly reduced balance / paid-through shows."""
+    user, logged_in = _get_browsing_user()
+    payment = db.get_item(SITE, "payments", payment_id)
+    if not payment:
+        abort(404)
+    loan = None
+    policy = None
+    if payment.get("related_loan"):
+        matches = db.query(SITE, "loans", where={"loan_number": payment["related_loan"]}, limit=1)
+        loan = matches[0] if matches else None
+    elif payment.get("related_policy"):
+        matches = db.query(SITE, "policies", where={"policy_number": payment["related_policy"]}, limit=1)
+        policy = matches[0] if matches else None
+    return render_template(
+        "insurance-loans/pay_confirmation.html",
+        user=user, logged_in=logged_in,
+        payment=payment, loan=loan, policy=policy,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Apply for a Loan — real on-page application + signing (create_by_form)
+#
+# A visible application form (amount, term, type, purpose, rate). On submit we
+# create a NEW loan owned by the logged-in user in 'awaiting_signature' status
+# (overlay-isolated) then route the user into the EXISTING signing flow. Signing
+# advances it to pending_approval and it surfaces in the user's loans list and
+# the dashboard "awaiting your signature" banner.
+# ---------------------------------------------------------------------------
+
+_LOAN_TYPES = [
+    ("personal_loan", "Personal Loan"),
+    ("auto_loan", "Auto Loan"),
+    ("home_equity", "Home Equity"),
+    ("student_loan", "Student Loan"),
+    ("medical", "Medical"),
+]
+
+
+def _amortized_monthly(amount, rate, term_months):
+    """Standard amortized monthly payment; falls back to straight-line at 0%."""
+    if term_months <= 0:
+        return round(amount, 2)
+    monthly_rate = rate / 100 / 12
+    if monthly_rate == 0:
+        return round(amount / term_months, 2)
+    return round(
+        amount * (monthly_rate * (1 + monthly_rate) ** term_months) /
+        ((1 + monthly_rate) ** term_months - 1), 2,
+    )
+
+
+@blueprint.route("/loans/apply", methods=["GET"])
+def apply_loan_page():
+    user, logged_in = _get_browsing_user()
+    return render_template(
+        "insurance-loans/apply_loan.html",
+        user=user, logged_in=logged_in,
+        loan_types=_LOAN_TYPES, error=None, form={},
+    )
+
+
+@blueprint.route("/loans/apply", methods=["POST"])
+def apply_loan_submit():
+    """Create a new awaiting_signature loan for the logged-in user, then send
+    them into the existing signing surface."""
+    user, logged_in = _get_browsing_user()
+    loan_type = (request.form.get("type", "") or "personal_loan").strip()
+    purpose = (request.form.get("purpose", "") or "").strip()
+    amount = _to_float(request.form.get("amount"), 0.0)
+    term_months = int(_to_float(request.form.get("term_months"), 60))
+    rate = _to_float(request.form.get("interest_rate"), 5.99)
+
+    if amount <= 0 or term_months <= 0:
+        return render_template(
+            "insurance-loans/apply_loan.html",
+            user=user, logged_in=logged_in,
+            loan_types=_LOAN_TYPES, form=request.form,
+            error="Enter a loan amount and a term greater than zero.",
+        )
+
+    monthly_payment = _amortized_monthly(amount, rate, term_months)
+    new_id = db.next_id(SITE, "loans")
+    today = datetime.now().strftime("%Y-%m-%d")
+    loan_number = "LN-APP-%s-%05d" % (datetime.now().year, new_id)
+
+    new_loan = {
+        "id": new_id,
+        "loan_number": loan_number,
+        "user_id": user["id"],
+        "root_user_id": user.get("root_user_id", user["id"]),
+        "borrower_name": user["display_name"],
+        "type": loan_type,
+        "subtype": "standard",
+        # a new loan agreement isn't complete until the borrower signs it
+        "status": "awaiting_signature",
+        "requires_signature": True,
+        "signed": False,
+        "lender": "Cascadia Federal Credit Union",
+        "servicer": "Cascadia Federal Credit Union",
+        "original_amount": round(amount, 2),
+        "current_balance": round(amount, 2),
+        "interest_rate": rate,
+        "rate_type": "fixed",
+        "term_months": term_months,
+        "monthly_payment": monthly_payment,
+        "origination_date": today,
+        "first_payment_date": "",
+        "maturity_date": "",
+        "payments_made": 0,
+        "payments_remaining": term_months,
+        "next_payment_due": "",
+        "autopay_enabled": False,
+        "autopay_account_last_four": "",
+        "collateral": "",
+        "purpose": purpose,
+        "notes": ("Application submitted online%s. Awaiting signature."
+                  % (" — purpose: %s" % purpose if purpose else "")),
+        "payoff_date": "",
+    }
+    db.save_item(SITE, "loans", new_id, new_loan)
+    # route straight into the existing DocuSign-style signing flow
+    return redirect(url_for("insurance-loans.loan_sign_page", loan_id=new_id))
+
+
+# ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
 

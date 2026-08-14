@@ -61,6 +61,7 @@
             <a href="{{ url_for('crm.companies_page') }}">Companies</a>
             <a href="{{ url_for('crm.deals_page') }}">Deals</a>
             <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            <a href="{{ url_for('crm.tasks_page') }}">Tasks</a>
             {% if user %}
             <span class="user-info">{{ user.name }}</span>
             <a href="{{ url_for('crm.logout') }}">Logout</a>
@@ -103,6 +104,49 @@
                 {% endfor %}
             </select>
             <button type="submit">Update</button>
+        </form>
+        {% endif %}
+
+        <h3>Open Tasks ({{ open_tasks|length }})</h3>
+        {% for t in open_tasks %}
+        <div class="activity-item" style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+            <div>
+                <div class="desc" style="font-weight:600;">{{ t.title }}</div>
+                <div class="meta">Due {{ t.due_date or '—' }} &middot; {{ t.priority|title }} &middot; {{ t._owner_name }}</div>
+            </div>
+            {% if user %}
+            <form method="POST" action="{{ url_for('crm.form_complete_task', task_id=t.id) }}">
+                <input type="hidden" name="redirect_to" value="{{ url_for('crm.deal_detail', deal_id=deal.id) }}">
+                <button type="submit" style="padding:.35rem .8rem; background:#38a169; color:#fff; border:none; border-radius:6px; font-size:.82rem; cursor:pointer;">Complete</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if not open_tasks %}
+        <p style="color:#a0aec0;">No open tasks for this deal.</p>
+        {% endif %}
+
+        {% if user %}
+        <form class="log-form" method="POST" action="{{ url_for('crm.form_create_task') }}" style="margin-bottom:1.5rem;">
+            <h4>Add Task</h4>
+            <input type="hidden" name="deal_id" value="{{ deal.id }}">
+            <input type="hidden" name="contact_id" value="{{ deal.contact_id }}">
+            <input type="hidden" name="redirect_to" value="{{ url_for('crm.deal_detail', deal_id=deal.id) }}">
+            <div class="form-row">
+                <input type="text" name="title" placeholder="Follow-up task..." required style="flex:2; min-width:200px;">
+                <input type="date" name="due_date">
+                <select name="priority">
+                    <option value="high">High</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="low">Low</option>
+                </select>
+                <select name="owner_id">
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {% if user and u.id == user.id %}selected{% endif %}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-top:.4rem;"><button type="submit">Add Task</button></div>
         </form>
         {% endif %}
 

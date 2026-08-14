@@ -100,6 +100,28 @@
             </div>
             {% endif %}
 
+            <!-- Reused Passwords -->
+            {% if report.reused_passwords and report.reused_passwords.count %}
+            <div class="card card-pad" id="reused" style="scroll-margin-top:80px;">
+                <div class="card-title">Reused Passwords</div>
+                <p class="muted" style="margin-bottom:.9rem;">
+                    {{ report.reused_passwords.count }} entr{{ 'ies' if report.reused_passwords.count != 1 else 'y' }}
+                    across {{ report.reused_passwords.group_count }} group{{ 's' if report.reused_passwords.group_count != 1 }}
+                    share a password with another entry. Reused passwords let one breach unlock several accounts.
+                </p>
+                {% for grp in report.reused_passwords.groups %}
+                <div class="mini-row">
+                    <span class="pill warn">{{ grp.count }}&times; reused</span>
+                    <span>
+                        {% for it in grp.entries %}
+                        <a href="{{ url_for('password-managers.entry_detail', entry_id=it.entry_id) }}">{{ it.title }}</a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <!-- Password Strength -->
             {% if report.password_strength %}
             <div class="card card-pad" id="weak" style="scroll-margin-top:80px;">

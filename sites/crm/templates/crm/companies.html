@@ -40,6 +40,7 @@
             <a href="{{ url_for('crm.companies_page') }}">Companies</a>
             <a href="{{ url_for('crm.deals_page') }}">Deals</a>
             <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            <a href="{{ url_for('crm.tasks_page') }}">Tasks</a>
             {% if user %}
             <span class="user-info">{{ user.name }}</span>
             <a href="{{ url_for('crm.logout') }}">Logout</a>
@@ -77,6 +78,46 @@
             {% endfor %}
             </tbody>
         </table>
+
+        {% if user %}
+        <div style="background:#fff; padding:1.2rem; border-radius:8px; box-shadow:0 1px 8px rgba(0,0,0,0.06); margin-top:1.5rem;">
+            <h3 style="font-size:1rem; margin-bottom:.8rem; color:#1a365d;">Add Company</h3>
+            <form method="POST" action="{{ url_for('crm.form_create_company') }}">
+                <div style="display:flex; gap:.8rem; margin-bottom:.8rem; flex-wrap:wrap;">
+                    <div style="flex:2; min-width:180px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Name</label>
+                        <input type="text" name="name" required style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                    </div>
+                    <div style="flex:1; min-width:140px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Industry</label>
+                        <input type="text" name="industry" list="industry_list" style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                        <datalist id="industry_list">
+                            {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
+                        </datalist>
+                    </div>
+                    <div style="flex:1; min-width:110px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Size</label>
+                        <input type="text" name="size" placeholder="e.g. 200-500" style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                    </div>
+                </div>
+                <div style="display:flex; gap:.8rem; margin-bottom:.8rem; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:160px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Website</label>
+                        <input type="text" name="website" placeholder="https://..." style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                    </div>
+                    <div style="flex:2; min-width:180px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Address</label>
+                        <input type="text" name="address" style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                    </div>
+                    <div style="flex:1; min-width:140px;">
+                        <label style="display:block; font-size:.82rem; color:#4a5568; margin-bottom:.3rem;">Annual Revenue</label>
+                        <input type="number" name="annual_revenue" min="0" placeholder="0" style="width:100%; padding:.45rem .7rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:.9rem;">
+                    </div>
+                </div>
+                <button type="submit" style="padding:.5rem 1.5rem; background:#2b6cb0; color:#fff; border:none; border-radius:6px; font-size:.9rem; cursor:pointer;">Create Company</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

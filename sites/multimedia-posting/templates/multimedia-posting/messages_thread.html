@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - {{ other.username }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .top-nav .nav-links a:hover { color: #0095f6; }
+        .container { max-width: 640px; margin: 24px auto; padding: 0 20px; }
+        .thread-card { background: #fff; border: 1px solid #dbdbdb; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; height: 70vh; }
+        .thread-header { padding: 14px 20px; border-bottom: 1px solid #dbdbdb; display: flex; align-items: center; gap: 12px; }
+        .thread-header .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+        .thread-header .name { font-weight: 600; }
+        .thread-header .handle { font-size: 12px; color: #8e8e8e; }
+        .thread-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .bubble { max-width: 72%; padding: 9px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .bubble.me { align-self: flex-end; background: #0095f6; color: #fff; border-bottom-right-radius: 4px; }
+        .bubble.them { align-self: flex-start; background: #efefef; color: #262626; border-bottom-left-radius: 4px; }
+        .no-msgs { text-align: center; color: #8e8e8e; margin: auto; }
+        .compose { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #dbdbdb; }
+        .compose input { flex: 1; padding: 10px 14px; border: 1px solid #dbdbdb; border-radius: 20px; font-size: 14px; }
+        .compose button { padding: 9px 20px; background: #0095f6; color: #fff; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .compose button:disabled { opacity: 0.5; cursor: default; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}" style="color:#0095f6;font-weight:600;">Messages</a>
+            <a href="{{ url_for('multimedia-posting.settings_page') }}">Settings</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="thread-card">
+            <div class="thread-header">
+                <a href="{{ url_for('multimedia-posting.messages_inbox') }}" style="font-size:20px;color:#262626;">&#8592;</a>
+                <div class="avatar" style="background: hsl({{ (other.id | replace('mp-u-', '') | int * 40) if 'mp-u-' in other.id else 200 }}, 50%, 50%);">
+                    {{ other.display_name[0] if other.display_name else '?' }}
+                </div>
+                <div>
+                    <a href="{{ url_for('multimedia-posting.profile', user_id=other.id) }}" class="name" style="color:#262626;">{{ other.username }}</a>
+                    <div class="handle">{{ other.display_name }}</div>
+                </div>
+            </div>
+            <div class="thread-body" id="thread-body">
+                {% if messages %}
+                    {% for m in messages %}
+                    <div class="bubble {{ 'me' if m.sender_id == user.id else 'them' }}">{{ m.text }}</div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-msgs">No messages yet. Say hello!</div>
+                {% endif %}
+            </div>
+            <form class="compose" id="compose" onsubmit="sendMessage(event)">
+                <input type="text" id="msg-text" placeholder="Message…" autocomplete="off">
+                <button type="submit" id="send-btn">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    const baseUrl = "{{ url_for('multimedia-posting.index') }}";
+    const recipientId = "{{ other.id }}";
+    const myId = "{{ user.id }}";
+    const body = document.getElementById('thread-body');
+    body.scrollTop = body.scrollHeight;
+
+    function appendBubble(text, mine) {
+        const noMsgs = body.querySelector('.no-msgs');
+        if (noMsgs) noMsgs.remove();
+        const div = document.createElement('div');
+        div.className = 'bubble ' + (mine ? 'me' : 'them');
+        div.textContent = text;
+        body.appendChild(div);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function sendMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('msg-text');
+        const text = input.value.trim();
+        if (!text) return;
+        const btn = document.getElementById('send-btn');
+        btn.disabled = true;
+        fetch(`${baseUrl}api/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient_id: recipientId, text })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            if (data.error) { alert(data.error); return; }
+            appendBubble(data.text, data.sender_id === myId);
+            input.value = '';
+            input.focus();
+        })
+        .catch(() => { btn.disabled = false; });
+    }
+    </script>
+</body>
+</html>

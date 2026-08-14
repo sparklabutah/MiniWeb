@@ -15,6 +15,26 @@ TABLES = {
             ("booking_date", "TEXT NOT NULL DEFAULT ''"),
             ("total_price", "REAL NOT NULL DEFAULT 0.0"),
             ("travelers", "INTEGER NOT NULL DEFAULT 0"),
+            # Real trip parameters captured ON the booking (not pulled from
+            # the referenced inventory row). Flight: depart_date / return_date /
+            # trip_type. Hotel: check_in_date / check_out_date / nights.
+            ("passenger_name", "TEXT NOT NULL DEFAULT ''"),
+            ("passengers", "TEXT NOT NULL DEFAULT ''"),
+            ("depart_date", "TEXT NOT NULL DEFAULT ''"),
+            ("return_date", "TEXT NOT NULL DEFAULT ''"),
+            ("trip_type", "TEXT NOT NULL DEFAULT ''"),
+            ("check_in_date", "TEXT NOT NULL DEFAULT ''"),
+            ("check_out_date", "TEXT NOT NULL DEFAULT ''"),
+            ("nights", "INTEGER NOT NULL DEFAULT 0"),
+            # Flight seat selection: chosen lead seat + JSON list of all seats,
+            # plus the cabin class that scaled the fare. Hotel room selection:
+            # chosen room type + its derived per-night rate.
+            ("seat", "TEXT NOT NULL DEFAULT ''"),
+            ("seats", "TEXT NOT NULL DEFAULT ''"),
+            ("cabin_class", "TEXT NOT NULL DEFAULT ''"),
+            ("room_type", "TEXT NOT NULL DEFAULT ''"),
+            ("room_rate", "REAL NOT NULL DEFAULT 0.0"),
+            ("refund_amount", "REAL NOT NULL DEFAULT 0.0"),
         ],
         "indexes": [
             "status",

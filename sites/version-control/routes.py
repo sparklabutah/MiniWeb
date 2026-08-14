@@ -105,6 +105,45 @@ def _repo_by_id(repo_id):
     return repo
 
 
+def _now():
+    """Current UTC timestamp in the ISO-ish format used throughout the site."""
+    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _session_author():
+    """Author identity for content the current session creates.
+
+    Maps to a ``users_raw`` id (for the ``author_id`` columns the raw tables and
+    templates use) plus a display username.
+    """
+    return {
+        "id": session.get("vc_user_id") or session.get("user_id") or 1,
+        "username": session.get("vc_username") or "you",
+    }
+
+
+def _resolve_any_repo(repo_id):
+    """Resolve a repo from EITHER ``projects_raw`` (the 175 real GitLab projects)
+    or the synthetic ``repositories`` table.
+
+    Returns ``(repo_dict, is_raw)`` or ``(None, False)``.  Mirrors the dual lookup
+    ``repo_detail`` / ``api_repo_star`` already do so that creates (issues, MRs,
+    comments, uploads) work on raw repos too — previously they only resolved
+    synthetic repos and silently 404'd (or vanished) on the real ones.
+    ``name`` and ``default_branch`` are normalised so callers can rely on them.
+    """
+    raw = db.get_item(SITE, "projects_raw", repo_id)
+    if raw:
+        raw.setdefault("default_branch", "main")
+        return raw, True
+    repo = _repo_by_id(repo_id)
+    if repo:
+        if not repo.get("default_branch"):
+            repo["default_branch"] = "main"
+        return repo, False
+    return None, False
+
+
 def _enrich_repo(repo, users=None):
     """Add owner info and normalised field aliases to repo dict.
 
@@ -793,8 +832,17 @@ def index():
     users = db.query(SITE, "users")  # small table: 6 rows
     enriched_activities = [_enrich_activity(a, users) for a in activities]
 
-    # Top repos from projects_raw (real GitLab data) for sidebar
-    top_repos = db.query(SITE, "projects_raw", sort="-last_activity_at", limit=5)
+    # Top repos from projects_raw (real GitLab data) for sidebar.
+    # Respect the dashboard sort dropdown (?sort=updated|stars|name), matching
+    # how the Repositories / Explore pages sort at the SQL level.
+    sort_by = request.args.get("sort", "updated")
+    if sort_by == "stars":
+        sort_col = "-star_count"
+    elif sort_by == "name":
+        sort_col = "name"
+    else:  # updated
+        sort_col = "-last_activity_at"
+    top_repos = db.query(SITE, "projects_raw", sort=sort_col, limit=5)
     for r in top_repos:
         creator = db.get_item(SITE, "users_raw", r.get("creator_id", 0))
         r["owner_username"] = creator["username"] if creator else "unknown"
@@ -912,21 +960,32 @@ def repo_detail(repo_id):
         repo["forks"] = 0
         repo["default_branch"] = "main"
         repo["tech_stack"] = []
-        # Get real issues for this project
+        # Get real issues for this project. db.query is overlay-aware, so issues
+        # created this session (stored in the issues_raw overlay with this
+        # project_name) are merged in automatically and read back on this repo.
         issues = db.query(SITE, "issues_raw",
                           where={"project_name": repo["name"]},
                           sort="-updated_at", limit=20)
-        # Convert raw issues to the format the template expects
+        # Convert raw issues to the format the template expects. Overlay-created
+        # issues already carry these keys — keep them instead of blanking them.
         for issue in issues:
             issue["state"] = "open" if issue.get("state_id") == 1 else "closed"
-            issue["labels"] = []
-            issue["comments"] = 0
-            author = db.get_item(SITE, "users_raw", issue.get("author_id", 0))
-            issue["author"] = author["username"] if author else "unknown"
+            issue.setdefault("labels", [])
+            issue.setdefault("comments", 0)
+            if not issue.get("author"):
+                author = db.get_item(SITE, "users_raw", issue.get("author_id", 0))
+                issue["author"] = author["username"] if author else "unknown"
     else:
         users = _load_users()
         repo = _enrich_repo(repo, users)
-        issues = _ISSUES.get(repo_id, [])
+        # Seed issues plus any created this session. Synthetic repo names don't
+        # exist in issues_raw base data, so this returns only the session's
+        # overlay-created issues for THIS repo (matched by project_name).
+        created = [i for i in db.query(SITE, "issues_raw",
+                                       where={"project_name": repo["name"]},
+                                       sort="-created_at", limit=50)
+                   if i.get("_user_created")]
+        issues = created + list(_ISSUES.get(repo_id, []))
 
     files = _FILE_TREES.get(repo["name"])
     commits = _COMMIT_HISTORIES.get(repo["name"])
@@ -1328,13 +1387,12 @@ def issue_detail(issue_id):
     if not issue:
         abort(404)
 
-    # Get comments (notes) for this issue
-    notes = db.execute(
-        "SELECT * FROM version_control_notes_raw "
-        "WHERE noteable_type = 'Issue' AND noteable_id = ? "
-        "ORDER BY created_at ASC LIMIT 50",
-        (issue_id,),
-    )
+    # Comments (notes). db.query is overlay-aware, so comments posted this
+    # session (stored in the notes_raw overlay) read back on reload — the raw
+    # SQL read used before could never see them.
+    notes = db.query(SITE, "notes_raw",
+                     where={"noteable_type": "Issue", "noteable_id": issue_id},
+                     sort="created_at", limit=50)
 
     # Look up author
     author = db.get_item(SITE, "users_raw", issue["author_id"])
@@ -1354,13 +1412,10 @@ def mr_detail(mr_id):
     if not mr:
         abort(404)
 
-    # Get comments (notes) for this MR
-    notes = db.execute(
-        "SELECT * FROM version_control_notes_raw "
-        "WHERE noteable_type = 'MergeRequest' AND noteable_id = ? "
-        "ORDER BY created_at ASC LIMIT 50",
-        (mr_id,),
-    )
+    # Comments (notes) — overlay-aware so session comments read back on reload.
+    notes = db.query(SITE, "notes_raw",
+                     where={"noteable_type": "MergeRequest", "noteable_id": mr_id},
+                     sort="created_at", limit=50)
 
     author = db.get_item(SITE, "users_raw", mr["author_id"])
 
@@ -1370,6 +1425,57 @@ def mr_detail(mr_id):
         notes=notes,
         author=author,
     )
+
+
+def _transition_mr(mr_id, new_state_id, verb):
+    """Transition an MR's state (open -> merged / open -> closed), persist it to
+    the merge_requests_raw overlay, and record an activity entry.
+    """
+    mr = db.get_item(SITE, "merge_requests_raw", mr_id)
+    if not mr:
+        abort(404)
+    now = _now()
+    mr["state_id"] = new_state_id
+    mr["state"] = verb
+    mr["updated_at"] = now
+    if verb == "merged":
+        mr["merged_at"] = now
+    db.save_item(SITE, "merge_requests_raw", mr_id, mr)
+
+    author = _session_author()
+    act_id = f"mract-{verb}-{mr_id}-{int(datetime.utcnow().timestamp())}"
+    db.save_item(SITE, "activities", act_id, {
+        "id": act_id,
+        "type": "merge" if verb == "merged" else "merge_request_close",
+        "author_root_user_id": author["id"],
+        "gitlab_username": author["username"],
+        "repo": mr.get("project_name", ""),
+        "branch": mr.get("target_branch", ""),
+        "source_branch": mr.get("source_branch", ""),
+        "target_branch": mr.get("target_branch", ""),
+        "merge_request_id": mr_id,
+        "merge_request_title": mr.get("title", ""),
+        "review_state": verb,
+        "created_at": now,
+    })
+
+    wants_json = request.is_json or "application/json" in request.headers.get("Accept", "")
+    if wants_json:
+        return jsonify({"id": mr_id, "state_id": new_state_id, "state": verb,
+                        "activity_id": act_id})
+    return redirect(url_for("version-control.mr_detail", mr_id=mr_id))
+
+
+@blueprint.route("/mr/<int:mr_id>/merge", methods=["POST"])
+def mr_merge(mr_id):
+    """Merge an open merge request (open -> merged). Macro: toggle_relationship."""
+    return _transition_mr(mr_id, new_state_id=3, verb="merged")
+
+
+@blueprint.route("/mr/<int:mr_id>/close", methods=["POST"])
+def mr_close(mr_id):
+    """Close an open merge request without merging (open -> closed)."""
+    return _transition_mr(mr_id, new_state_id=2, verb="closed")
 
 
 @blueprint.route("/members")
@@ -1649,7 +1755,7 @@ def api_repo_detail(repo_id):
     enriched["files"] = _FILE_TREES.get(repo["name"], [])
     enriched["commits"] = _COMMIT_HISTORIES.get(repo["name"], [])
     enriched["readme"] = _READMES.get(repo["name"], "")
-    enriched["issues"] = _ISSUES.get(repo_id, [])
+    enriched["issues"] = _created_issues_for(repo) + list(_ISSUES.get(repo_id, []))
     return jsonify(enriched)
 
 
@@ -1688,23 +1794,28 @@ def api_repo_delete(repo_id):
 
 @blueprint.route("/api/repos/<int:repo_id>/star", methods=["POST"])
 def api_repo_star(repo_id):
-    """Toggle star on a repo."""
-    repo = _repo_by_id(repo_id)
+    """Toggle star on a repo.
+
+    Resolves from either table (raw GitLab ``projects_raw`` or synthetic
+    ``repositories``), mirroring ``repo_detail`` — previously this only looked
+    in ``repositories`` so starring any of the 175 raw projects 404'd.
+    """
+    collection = "projects_raw"
+    repo = db.get_item(SITE, collection, repo_id)
+    if not repo:
+        collection = "repositories"
+        repo = db.get_item(SITE, collection, repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
     new_state = _toggle_star(repo_id)
 
-    # Update star count in data
-    repos = _load_repos()
-    for r in repos:
-        if r["id"] == repo_id:
-            if new_state:
-                r["stars"] = r.get("stars", 0) + 1
-            else:
-                r["stars"] = max(0, r.get("stars", 0) - 1)
-            break
-    _save_repos(repos)
-    return jsonify({"starred": new_state, "stars": r["stars"]})
+    # Persist the star count on that specific row (overlay-aware single upsert).
+    # DB column is ``star_count``; the old loop wrote a stray ``stars`` key.
+    count = repo.get("star_count", repo.get("stars", 0)) or 0
+    count = count + 1 if new_state else max(0, count - 1)
+    repo["star_count"] = count
+    db.save_item(SITE, collection, repo_id, repo)
+    return jsonify({"starred": new_state, "stars": count})
 
 
 @blueprint.route("/api/repos/<int:repo_id>/fork", methods=["POST"])
@@ -1736,39 +1847,65 @@ def api_repo_fork(repo_id):
     return jsonify(forked), 201
 
 
+def _created_issues_for(repo):
+    """Session-created issues for a repo (raw or synthetic), template-shaped."""
+    return [i for i in db.query(SITE, "issues_raw",
+                                where={"project_name": repo["name"]},
+                                sort="-created_at", limit=50)
+            if i.get("_user_created")]
+
+
 @blueprint.route("/api/repos/<int:repo_id>/issues", methods=["GET"])
 def api_repo_issues_list(repo_id):
-    """List issues for a repo."""
-    repo = _repo_by_id(repo_id)
+    """List issues for a repo (seed + session-created)."""
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
-    issues = _ISSUES.get(repo_id, [])
+    seed = [] if is_raw else list(_ISSUES.get(repo_id, []))
+    issues = _created_issues_for(repo) + seed
     state = request.args.get("state", "")
     if state:
-        issues = [i for i in issues if i["state"] == state]
+        issues = [i for i in issues if i.get("state") == state]
     return jsonify({"issues": issues, "total": len(issues)})
 
 
 @blueprint.route("/api/repos/<int:repo_id>/issues", methods=["POST"])
 def api_repo_issues_create(repo_id):
-    """Create a new issue on a repo."""
-    repo = _repo_by_id(repo_id)
+    """Create a new issue on a repo (raw OR synthetic).
+
+    Persists to the ``issues_raw`` session overlay so the issue survives restarts,
+    is isolated per session, and reads back on the SAME repo it was created on —
+    the raw ``repo_detail`` read path already queries ``issues_raw`` by
+    ``project_name`` (overlay-aware), and the synthetic path merges in the same
+    created rows.  Previously this appended to a module-level dict, so issues
+    created on the 175 real repos silently vanished.
+    """
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
     data = request.get_json(force=True)
-    issues = _ISSUES.get(repo_id, [])
-    max_issue_id = max((i["id"] for i in issues), default=0)
+    author = _session_author()
+    new_id = db.next_id(SITE, "issues_raw")
+    now = _now()
+    labels = data.get("labels", []) or []
     new_issue = {
-        "id": max_issue_id + 1,
-        "title": data.get("title", "Untitled issue"),
+        "id": new_id,
+        "title": data.get("title") or "Untitled issue",
+        "description": data.get("description", ""),
+        "state_id": 1,
+        "author_id": author["id"],
+        "project_name": repo["name"],
+        "created_at": now,
+        "updated_at": now,
+        # template-convenience keys (used by the synthetic repo_detail read path)
         "state": "open",
-        "author": data.get("author", "unknown"),
-        "labels": data.get("labels", []),
-        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "author": data.get("author") or author["username"],
+        "labels": labels,
         "comments": 0,
+        "repo_id": repo_id,
+        "_user_created": True,
     }
-    issues.append(new_issue)
-    _ISSUES[repo_id] = issues
+    db.save_item(SITE, "issues_raw", new_id, new_issue)
     return jsonify(new_issue), 201
 
 
@@ -1964,8 +2101,11 @@ _MERGE_REQUESTS = {
     ],
 }
 
-# Uploaded files (in-memory storage for upload_by_upload)
-_UPLOADED_FILES = {}
+# NOTE: `_ISSUES`, `_ISSUE_COMMENTS`, and `_MERGE_REQUESTS` above are read-only
+# SEED data for the synthetic MeridianGit repos. All CREATE/EDIT writes now go to
+# the session overlay (issues_raw / merge_requests_raw / notes_raw / uploads)
+# so they are session-scoped and durable — see the api_* handlers below.
+# Uploaded-file records live purely in the "uploads" overlay collection.
 
 
 # ---------------------------------------------------------------------------
@@ -2085,10 +2225,10 @@ def api_repos_compare():
             continue
         enriched = _enrich_repo(repo, users)
         commits = _COMMIT_HISTORIES.get(repo["name"], [])
-        issues = _ISSUES.get(rid, [])
+        issues = _created_issues_for(repo) + list(_ISSUES.get(rid, []))
         enriched["commit_count"] = len(commits)
-        enriched["open_issues"] = sum(1 for i in issues if i["state"] == "open")
-        enriched["closed_issues"] = sum(1 for i in issues if i["state"] == "closed")
+        enriched["open_issues"] = sum(1 for i in issues if i.get("state") == "open")
+        enriched["closed_issues"] = sum(1 for i in issues if i.get("state") == "closed")
         enriched["latest_commit"] = commits[0]["message"] if commits else ""
         enriched["latest_commit_date"] = commits[0]["date"] if commits else ""
         enriched["total_additions"] = sum(c.get("additions", 0) for c in commits)
@@ -2130,13 +2270,32 @@ def api_commits_compare(repo_id):
     })
 
 
+def _synthetic_issue_comments(repo_id, issue_id):
+    """Seed + session-created comments for a synthetic repo's issue.
+
+    Session comments live in the ``notes_raw`` overlay under a distinct
+    ``noteable_type`` ('SyntheticIssue') so they never clash with the real
+    GitLab issue/MR notes read by the raw ``/issue`` and ``/mr`` detail pages.
+    """
+    seed = list(_ISSUE_COMMENTS.get((repo_id, issue_id), []))
+    overlay = [n for n in db.query(SITE, "notes_raw",
+                                   where={"noteable_type": "SyntheticIssue",
+                                          "noteable_id": issue_id},
+                                   sort="created_at", limit=100)
+               if n.get("repo_id") == repo_id]
+    created = [{"id": n["id"], "author": n.get("author", "anonymous"),
+               "body": n.get("note", ""), "created_at": n.get("created_at", "")}
+              for n in overlay]
+    return seed + created
+
+
 @blueprint.route("/api/repos/<int:repo_id>/issues/<int:issue_id>/comments", methods=["GET"])
 def api_issue_comments_list(repo_id, issue_id):
     """List comments on an issue.
 
     Supporting route for post_from_free_text.
     """
-    comments = _ISSUE_COMMENTS.get((repo_id, issue_id), [])
+    comments = _synthetic_issue_comments(repo_id, issue_id)
     return jsonify({"comments": comments, "total": len(comments)})
 
 
@@ -2145,75 +2304,152 @@ def api_issue_comments_create(repo_id, issue_id):
     """Post a free-text comment on an issue.
 
     Macro: post_from_free_text
+
+    Persists to the ``notes_raw`` session overlay (was a module-level dict, so
+    comments leaked across parallel sessions and were lost on restart).
     """
-    repo = _repo_by_id(repo_id)
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
-
-    issues = _ISSUES.get(repo_id, [])
-    issue = next((i for i in issues if i["id"] == issue_id), None)
-    if not issue:
-        return jsonify({"error": "Issue not found"}), 404
 
     data = request.get_json(force=True)
     body = data.get("body", "").strip()
     if not body:
         return jsonify({"error": "Comment body is required"}), 400
 
-    comments = _ISSUE_COMMENTS.setdefault((repo_id, issue_id), [])
-    max_id = max((c["id"] for c in comments), default=0)
-    new_comment = {
-        "id": max_id + 1,
-        "author": data.get("author", session.get("vc_username", "anonymous")),
-        "body": body,
-        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    author = _session_author()
+    now = _now()
+    note_id = db.next_id(SITE, "notes_raw")
+    note = {
+        "id": note_id,
+        "note": body,
+        "noteable_type": "SyntheticIssue",
+        "noteable_id": issue_id,
+        "author_id": author["id"],
+        "author": data.get("author") or author["username"],
+        "repo_id": repo_id,
+        "created_at": now,
+        "updated_at": now,
     }
-    comments.append(new_comment)
-    issue["comments"] = len(comments)
-    return jsonify(new_comment), 201
+    db.save_item(SITE, "notes_raw", note_id, note)
+    return jsonify({"id": note_id, "author": note["author"], "body": body,
+                    "created_at": now}), 201
+
+
+@blueprint.route("/api/mr/<int:mr_id>/comments", methods=["POST"])
+def api_mr_comment_create(mr_id):
+    """Post a discussion comment on a merge request (raw or created).
+
+    Macro: post_from_free_text. Persists to the ``notes_raw`` overlay so the
+    read-only ``mr_detail`` discussion thread now accepts new comments that
+    read back on reload.
+    """
+    mr = db.get_item(SITE, "merge_requests_raw", mr_id)
+    if not mr:
+        return jsonify({"error": "Merge request not found"}), 404
+    body = (request.get_json(force=True).get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "Comment body is required"}), 400
+    author = _session_author()
+    now = _now()
+    note_id = db.next_id(SITE, "notes_raw")
+    note = {
+        "id": note_id, "note": body, "noteable_type": "MergeRequest",
+        "noteable_id": mr_id, "author_id": author["id"],
+        "created_at": now, "updated_at": now,
+    }
+    db.save_item(SITE, "notes_raw", note_id, note)
+    return jsonify(note), 201
+
+
+@blueprint.route("/api/issue/<int:issue_id>/comments", methods=["POST"])
+def api_raw_issue_comment_create(issue_id):
+    """Post a comment on a raw GitLab issue (the ``/issue/<id>`` detail page).
+
+    Macro: post_from_free_text. Persists to the ``notes_raw`` overlay.
+    """
+    issue = db.get_item(SITE, "issues_raw", issue_id)
+    if not issue:
+        return jsonify({"error": "Issue not found"}), 404
+    body = (request.get_json(force=True).get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "Comment body is required"}), 400
+    author = _session_author()
+    now = _now()
+    note_id = db.next_id(SITE, "notes_raw")
+    note = {
+        "id": note_id, "note": body, "noteable_type": "Issue",
+        "noteable_id": issue_id, "author_id": author["id"],
+        "created_at": now, "updated_at": now,
+    }
+    db.save_item(SITE, "notes_raw", note_id, note)
+    return jsonify(note), 201
+
+
+def _created_mrs_for(repo):
+    """Session-created merge requests for a repo (raw or synthetic)."""
+    return [m for m in db.query(SITE, "merge_requests_raw",
+                                where={"project_name": repo["name"]},
+                                sort="-created_at", limit=50)
+            if m.get("_user_created")]
 
 
 @blueprint.route("/api/repos/<int:repo_id>/merge_requests", methods=["GET"])
 def api_merge_requests_list(repo_id):
-    """List merge requests for a repo.
+    """List merge requests for a repo (seed + session-created).
 
     Supporting route for submit_by_form.
     """
-    repo = _repo_by_id(repo_id)
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
-    mrs = _MERGE_REQUESTS.get(repo_id, [])
+    seed = [] if is_raw else list(_MERGE_REQUESTS.get(repo_id, []))
+    mrs = _created_mrs_for(repo) + seed
     state = request.args.get("state", "")
     if state:
-        mrs = [m for m in mrs if m["state"] == state]
+        mrs = [m for m in mrs if m.get("state") == state]
     return jsonify({"merge_requests": mrs, "total": len(mrs)})
 
 
 @blueprint.route("/api/repos/<int:repo_id>/merge_requests", methods=["POST"])
 def api_merge_requests_create(repo_id):
-    """Create a new merge request (PR).
+    """Create a new merge request (PR) on a repo (raw OR synthetic).
 
     Macro: submit_by_form
+
+    Persists to the ``merge_requests_raw`` session overlay so the MR survives
+    restarts, is session-scoped, and reads back on the global Merge Requests
+    listing, the project page, and its own ``/mr/<id>`` detail page — all of
+    which query ``merge_requests_raw`` (overlay-aware).  Previously it went to a
+    module-level dict that no reader consulted.
     """
-    repo = _repo_by_id(repo_id)
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
 
     data = request.get_json(force=True)
-    mrs = _MERGE_REQUESTS.setdefault(repo_id, [])
-    max_id = max((m["id"] for m in mrs), default=0)
+    author = _session_author()
+    now = _now()
+    new_id = db.next_id(SITE, "merge_requests_raw")
     new_mr = {
-        "id": max_id + 1,
-        "title": data.get("title", "Untitled merge request"),
-        "state": "open",
-        "author": data.get("author", session.get("vc_username", "unknown")),
-        "source_branch": data.get("source_branch", "feature/new-feature"),
-        "target_branch": data.get("target_branch", repo["default_branch"]),
-        "labels": data.get("labels", []),
-        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "id": new_id,
+        "title": data.get("title") or "Untitled merge request",
         "description": data.get("description", ""),
+        "state_id": 1,
+        "author_id": author["id"],
+        "project_name": repo["name"],
+        "source_branch": data.get("source_branch") or "feature/new-feature",
+        "target_branch": data.get("target_branch") or repo["default_branch"],
+        "created_at": now,
+        "updated_at": now,
+        # template-convenience keys
+        "state": "open",
+        "author": data.get("author") or author["username"],
+        "labels": data.get("labels", []),
+        "repo_id": repo_id,
+        "_user_created": True,
     }
-    mrs.append(new_mr)
+    db.save_item(SITE, "merge_requests_raw", new_id, new_mr)
     _add_email(session.get("user_id", 1), "noreply@version-control.lakeport.local",
                "Pull request created",
                f'Merge request "{new_mr["title"]}" has been created targeting {new_mr["target_branch"]}.')
@@ -2227,7 +2463,7 @@ def api_upload_file(repo_id):
 
     Macro: upload_by_upload
     """
-    repo = _repo_by_id(repo_id)
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
 
@@ -2240,19 +2476,22 @@ def api_upload_file(repo_id):
     branch = request.form.get("branch", repo["default_branch"])
     content = file.read().decode("utf-8", errors="replace")
 
-    uploads = _UPLOADED_FILES.setdefault(repo_id, [])
+    # Persist the upload record to the session overlay (collection has no base
+    # table, so it lives purely in session_overlay — session-scoped + durable).
+    new_id = db.next_id(SITE, "uploads")
     upload_entry = {
-        "id": len(uploads) + 1,
+        "id": new_id,
+        "repo_id": repo_id,
         "path": file_path,
         "size": len(content),
         "branch": branch,
         "commit_message": commit_msg,
-        "author": session.get("vc_username", "anonymous"),
-        "uploaded_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "author": _session_author()["username"],
+        "uploaded_at": _now(),
     }
-    uploads.append(upload_entry)
+    db.save_item(SITE, "uploads", new_id, upload_entry)
 
-    # Also add to file contents for code search
+    # Also index the content for code search (search index, not per-session state)
     _FILE_CONTENTS.setdefault(repo["name"], {})[file_path] = content
 
     return jsonify(upload_entry), 201
@@ -2260,11 +2499,15 @@ def api_upload_file(repo_id):
 
 @blueprint.route("/api/repos/<int:repo_id>/uploads", methods=["GET"])
 def api_list_uploads(repo_id):
-    """List uploaded files for a repo."""
-    repo = _repo_by_id(repo_id)
+    """List uploaded files for a repo (from the session overlay)."""
+    repo, is_raw = _resolve_any_repo(repo_id)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
-    uploads = _UPLOADED_FILES.get(repo_id, [])
+    uploads = db.merge_overlay(
+        SITE, "uploads", [],
+        match=lambda u: u.get("repo_id") == repo_id,
+        sort="-uploaded_at",
+    )
     return jsonify({"uploads": uploads, "total": len(uploads)})
 
 
@@ -2301,12 +2544,28 @@ def api_issue_update(repo_id, issue_id):
 
     Macro: edit_by_form
     """
+    data = request.get_json(force=True)
+
+    # Session-created issue: persist the edit to the issues_raw overlay so it
+    # survives reloads and stays session-scoped.
+    created = db.get_item(SITE, "issues_raw", issue_id)
+    if created and created.get("_user_created") and created.get("repo_id") == repo_id:
+        if "title" in data:
+            created["title"] = data["title"]
+        if "labels" in data:
+            created["labels"] = data["labels"]
+        if "state" in data:
+            created["state"] = data["state"]
+            created["state_id"] = 1 if data["state"] == "open" else 2
+        created["updated_at"] = _now()
+        db.save_item(SITE, "issues_raw", issue_id, created)
+        return jsonify(created)
+
+    # Seed synthetic issue.
     issues = _ISSUES.get(repo_id, [])
     issue = next((i for i in issues if i["id"] == issue_id), None)
     if not issue:
         return jsonify({"error": "Issue not found"}), 404
-
-    data = request.get_json(force=True)
     for field in ("title", "state", "labels"):
         if field in data:
             issue[field] = data[field]
@@ -2451,7 +2710,7 @@ def api_repo_by_name(name):
     enriched["files"] = _FILE_TREES.get(repo["name"], [])
     enriched["commits"] = _COMMIT_HISTORIES.get(repo["name"], [])
     enriched["readme"] = _READMES.get(repo["name"], "")
-    enriched["issues"] = _ISSUES.get(repo["id"], [])
+    enriched["issues"] = _created_issues_for(repo) + list(_ISSUES.get(repo["id"], []))
     return jsonify(enriched)
 
 
@@ -2488,10 +2747,10 @@ def api_repo_issues_by_name(name):
     repo = _repo_by_name(name)
     if not repo:
         return jsonify({"error": "Repository not found"}), 404
-    issues = _ISSUES.get(repo["id"], [])
+    issues = _created_issues_for(repo) + list(_ISSUES.get(repo["id"], []))
     state = request.args.get("state", "")
     if state:
-        issues = [i for i in issues if i["state"] == state]
+        issues = [i for i in issues if i.get("state") == state]
     return jsonify({"repo": repo["name"], "issues": issues, "total": len(issues)})
 
 

@@ -37,6 +37,7 @@
             <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
             <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
             <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}">Messages</a>
             <a href="{{ url_for('multimedia-posting.settings_page') }}">Settings</a>
             <a href="{{ url_for('multimedia-posting.create_page') }}" style="color:#0095f6;font-weight:600;">+ Create</a>
             {% if logged_in %}
@@ -57,6 +58,7 @@
                 <input type="file" id="file-input" accept="image/*,video/*" onchange="uploadFile(this)">
             </div>
             <div id="upload-result" class="upload-result" style="display:none;"></div>
+            <img id="upload-preview" alt="upload preview" style="display:none; max-width:100%; border-radius:8px; margin-bottom:16px;">
 
             <form id="create-form" onsubmit="createPost(event)">
                 <div class="form-group">
@@ -89,6 +91,7 @@
 
     <script>
     const baseUrl = "{{ url_for('multimedia-posting.index') }}";
+    let uploadedMediaUrl = null;  // data URI of the last successful upload
 
     function uploadFile(input) {
         if (!input.files.length) return;
@@ -102,9 +105,18 @@
                     document.getElementById('error-msg').textContent = data.error;
                     return;
                 }
+                uploadedMediaUrl = data.media_url || null;
+                if (data.type === 'video') {
+                    document.getElementById('post-type').value = 'video';
+                }
                 const el = document.getElementById('upload-result');
                 el.style.display = 'block';
                 el.textContent = `Uploaded: ${data.filename} (${data.size} bytes)`;
+                if (uploadedMediaUrl && uploadedMediaUrl.startsWith('data:')) {
+                    const prev = document.getElementById('upload-preview');
+                    prev.src = uploadedMediaUrl;
+                    prev.style.display = 'block';
+                }
             });
     }
 
@@ -115,11 +127,13 @@
         const type = document.getElementById('post-type').value;
         const tagsRaw = document.getElementById('tags').value;
         const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+        const payload = { caption, location, type, tags };
+        if (uploadedMediaUrl) payload.image_url = uploadedMediaUrl;
 
         fetch(`${baseUrl}api/posts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caption, location, type, tags })
+            body: JSON.stringify(payload)
         })
         .then(r => r.json())
         .then(data => {

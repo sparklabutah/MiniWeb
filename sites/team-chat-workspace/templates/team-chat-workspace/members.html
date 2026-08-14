@@ -41,6 +41,7 @@
                 <ul class="sidebar-nav">
                     <li><a href="{{ url_for('team-chat-workspace.index') }}">All Channels</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.threads_view') }}">Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}">Direct Messages</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.members_view') }}" class="active">Members</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.search_view') }}">Search</a></li>
                 </ul>
@@ -78,11 +79,17 @@
                     </div>
                     {% if current_user and u.id != current_user.id %}
                     {% set is_blocked = u.id in (current_user.get('blocked_users') or []) %}
-                    <button class="block-toggle-btn" data-url="{{ url_for('team-chat-workspace.api_member_block', member_id=u.id) }}"
-                            onclick="toggleBlock(this)"
-                            style="background:{{ '#e04e4e' if is_blocked else '#3f3f42' }};color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;align-self:flex-start;">
-                        {{ 'Blocked' if is_blocked else 'Block' }}
-                    </button>
+                    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;">
+                        <a class="dm-btn" href="{{ url_for('team-chat-workspace.dm_view', user_id=u.id) }}"
+                           style="background:#007a5a;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;">
+                            Message
+                        </a>
+                        <button class="block-toggle-btn" data-url="{{ url_for('team-chat-workspace.api_member_block', member_id=u.id) }}"
+                                onclick="toggleBlock(this)"
+                                style="background:{{ '#e04e4e' if is_blocked else '#3f3f42' }};color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;">
+                            {{ 'Blocked' if is_blocked else 'Block' }}
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}

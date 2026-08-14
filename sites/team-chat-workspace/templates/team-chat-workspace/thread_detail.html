@@ -50,8 +50,15 @@
         .parent-message .msg-text { font-size: 14px; line-height: 1.6; color: #d1d2d3; margin-top: 4px; white-space: pre-wrap; }
 
         .reactions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-        .reaction-badge { display: inline-flex; align-items: center; gap: 4px; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; }
+        .reaction-badge { display: inline-flex; align-items: center; gap: 4px; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+        .reaction-badge:hover { background: #3a3d41; }
         .reaction-badge .rxn-count { color: #1d9bd1; font-weight: 600; }
+        .react-add { display: inline-flex; align-items: center; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; color: #ababad; }
+        .react-add:hover { background: #3a3d41; color: #fff; }
+        .emoji-picker { display: none; gap: 4px; align-items: center; background: #232629; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 6px; }
+        .emoji-picker.open { display: inline-flex; }
+        .emoji-opt { cursor: pointer; font-size: 15px; padding: 1px 3px; border-radius: 6px; }
+        .emoji-opt:hover { background: #3a3d41; }
 
         .replies-divider { display: flex; align-items: center; padding: 12px 20px; }
         .replies-divider::before, .replies-divider::after { content: ''; flex: 1; border-bottom: 1px solid #383838; }
@@ -98,6 +105,7 @@
                 <ul class="sidebar-nav">
                     <li><a href="{{ url_for('team-chat-workspace.index') }}"><span class="nav-icon">&#x1F4AC;</span> All Channels</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.threads_view') }}" class="active"><span class="nav-icon">&#x1F9F5;</span> Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}"><span class="nav-icon">&#x1F4E8;</span> Direct Messages</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.members_view') }}"><span class="nav-icon">&#x1F465;</span> Members</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.search_view') }}"><span class="nav-icon">&#x1F50D;</span> Search</a></li>
                 </ul>
@@ -142,15 +150,20 @@
                                 <span class="msg-time">{{ thread.parent_message.timestamp[:16].replace('T', ' ') if thread.parent_message else '' }}</span>
                             </div>
                             <div class="msg-text">{{ thread.parent_message.text if thread.parent_message else '' }}</div>
-                            {% if thread.parent_reactions %}
                             <div class="reactions">
                                 {% for rxn in thread.parent_reactions %}
-                                <span class="reaction-badge" title="{{ rxn.users|join(', ') }}">
+                                <span class="reaction-badge" title="{{ rxn.users|join(', ') }}"
+                                      onclick="addReaction('{{ thread.parent_message.id }}', '{{ rxn.emoji }}')">
                                     {{ rxn.emoji }} <span class="rxn-count">{{ rxn.count }}</span>
                                 </span>
                                 {% endfor %}
+                                <span class="react-add" onclick="toggleEmojiPicker(this)" title="Add reaction">&#128578;+</span>
+                                <span class="emoji-picker">
+                                    {% for glyph, code in [('\U0001F44D', ':thumbsup:'), ('❤️', ':heart:'), ('\U0001F389', ':tada:'), ('\U0001F440', ':eyes:'), ('\U0001F680', ':rocket:'), ('✅', ':white_check_mark:'), ('\U0001F604', ':smile:'), ('\U0001F64C', ':raised_hands:')] %}
+                                    <span class="emoji-opt" onclick="addReaction('{{ thread.parent_message.id }}', '{{ code }}')">{{ glyph }}</span>
+                                    {% endfor %}
+                                </span>
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -185,6 +198,20 @@
     </div>
 
     <script>
+    var API_BASE = '{{ url_for("team-chat-workspace.index") }}';
+    function toggleEmojiPicker(btn) {
+        var picker = btn.parentNode.querySelector('.emoji-picker');
+        if (picker) picker.classList.toggle('open');
+    }
+    function addReaction(msgId, emoji) {
+        fetch(API_BASE + 'api/messages/' + encodeURIComponent(msgId) + '/react', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({emoji: emoji})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+    }
     function sendReply(e) {
         e.preventDefault();
         var text = document.getElementById('reply-input').value.trim();

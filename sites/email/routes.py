@@ -3,6 +3,7 @@
 Data is stored in SQLite: enron emails in the email_emails table, users and
 sent messages in per-site typed tables.  Queried through app.db.
 """
+import base64
 import pathlib
 import re
 from datetime import datetime
@@ -25,6 +26,52 @@ blueprint = Blueprint(
 )
 
 EMAILS_PER_PAGE = 25
+
+# Cap a single attachment so the base64 payload we stash in the session overlay
+# stays small.  Real webmail clients cap too (Gmail ~25 MB); we keep it modest.
+MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+# ---------------------------------------------------------------------------
+# Attachments -- stored inline on the message as base64 data URIs
+# ---------------------------------------------------------------------------
+# Attachments are persisted right on the composed message dict (which is JSON
+# serialized into the sent_messages session overlay), so no extra table is
+# needed and they survive across requests within a session.  Each attachment is
+# {"filename", "content_type", "size", "data_uri"}.
+
+def _clean_filename(name):
+    """Strip characters that would break a Content-Disposition header."""
+    return (name or "attachment").replace("\n", " ").replace("\r", " ").replace('"', "").strip() or "attachment"
+
+
+def _build_attachment(filename, content_type, raw_bytes):
+    ct = content_type or "application/octet-stream"
+    b64 = base64.b64encode(raw_bytes).decode("ascii")
+    return {
+        "filename": _clean_filename(filename),
+        "content_type": ct,
+        "size": len(raw_bytes),
+        "data_uri": f"data:{ct};base64,{b64}",
+    }
+
+
+def _extract_uploaded_attachments(files):
+    """Read uploaded files from request.files (a werkzeug MultiDict)."""
+    attachments = []
+    if not files:
+        return attachments
+    for storage in files.getlist("file"):
+        if not storage or not storage.filename:
+            continue
+        raw = storage.read()
+        if not raw:
+            continue
+        if len(raw) > MAX_ATTACHMENT_BYTES:
+            raw = raw[:MAX_ATTACHMENT_BYTES]
+        attachments.append(_build_attachment(storage.filename, storage.mimetype, raw))
+    return attachments
+
 
 # ---------------------------------------------------------------------------
 # Data interpreter -- reads raw JSONL, maps to users
@@ -304,6 +351,13 @@ def _load_overlay_emails():
     emails = []
 
     for idx, raw in enumerate(raw_msgs):
+        # Runtime-composed messages / drafts (id >= 10000) are surfaced directly
+        # by _user_emails from their full stored dict (attachments included).
+        # Skip them here so they are not ALSO re-interpreted into a second,
+        # attachment-less overlay copy (which duplicated them in the list).
+        raw_id = raw.get("id")
+        if isinstance(raw_id, int) and raw_id >= 10000:
+            continue
         from_addr = (raw.get("from") or raw.get("from_") or "").strip()
         to_addrs = raw.get("to") or []
         if isinstance(to_addrs, str):
@@ -586,6 +640,30 @@ def message_detail(email_id):
     return render_template("email/message.html", user=user, email=email, counts=counts)
 
 
+@blueprint.route("/message/<int:email_id>/attachment/<int:idx>")
+def download_attachment(email_id, idx):
+    user = _current_user()
+    if not user:
+        return redirect(url_for("email.login_page"))
+    email, _ = _find_email(email_id, user["id"])
+    if email is None:
+        abort(404)
+    attachments = email.get("attachments") or []
+    if idx < 0 or idx >= len(attachments):
+        abort(404)
+    att = attachments[idx]
+    data_uri = att.get("data_uri", "")
+    try:
+        _, b64 = data_uri.split(",", 1)
+        raw = base64.b64decode(b64)
+    except (ValueError, TypeError):
+        abort(404)
+    ct = att.get("content_type") or "application/octet-stream"
+    fname = _clean_filename(att.get("filename"))
+    return Response(raw, mimetype=ct,
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
 @blueprint.route("/compose")
 def compose_page():
     user = _current_user()
@@ -677,8 +755,13 @@ def compose_submit():
     subject = request.form.get("subject", "").strip() or "(no subject)"
     body = request.form.get("body", "")
 
+    # "Save as draft" vs "Send" is chosen by which submit button posted.
+    is_draft = request.form.get("action", "send").strip().lower() == "draft"
+    folder = "drafts" if is_draft else "sent"
+
     to_addrs = _parse_addr_list(to_raw)
     cc_addrs = _parse_addr_list(cc_raw)
+    attachments = _extract_uploaded_attachments(request.files)
 
     now = datetime.utcnow()
     sent_msgs = _load_sent()
@@ -697,27 +780,30 @@ def compose_submit():
         "body": body,
         "body_preview": (body[:120].replace('\n', ' ').strip() + '...') if len(body) > 120 else body.replace('\n', ' ').strip(),
         "message_id": f"<compose-{new_id}@webmail>",
-        "folder": "sent",
+        "folder": folder,
         "is_read": True,
         "is_starred": False,
         "labels": [],
+        "attachments": attachments,
+        "has_attachment": 1 if attachments else 0,
         "user_id": user["id"],
     }
     sent_msgs.append(new_email)
 
-    # Also deliver to recipient if they are a known user
-    for addr in to_addrs:
-        uid = _USER_EMAIL_MAP.get(addr)
-        if uid is not None and uid != user["id"]:
-            inbox_copy = dict(new_email)
-            inbox_copy["id"] = 10000 + len(sent_msgs) + 1
-            inbox_copy["folder"] = "inbox"
-            inbox_copy["is_read"] = False
-            inbox_copy["user_id"] = uid
-            sent_msgs.append(inbox_copy)
+    # Drafts are never delivered; only Send drops inbox copies for known users.
+    if not is_draft:
+        for addr in to_addrs:
+            uid = _USER_EMAIL_MAP.get(addr)
+            if uid is not None and uid != user["id"]:
+                inbox_copy = dict(new_email)
+                inbox_copy["id"] = 10000 + len(sent_msgs) + 1
+                inbox_copy["folder"] = "inbox"
+                inbox_copy["is_read"] = False
+                inbox_copy["user_id"] = uid
+                sent_msgs.append(inbox_copy)
 
     _save_sent(sent_msgs)
-    return redirect(url_for("email.index", folder="sent"))
+    return redirect(url_for("email.index", folder=folder))
 
 
 @blueprint.route("/message/<int:email_id>/star", methods=["POST"])
@@ -953,6 +1039,23 @@ def api_compose():
     subject = data.get("subject", "").strip() or "(no subject)"
     body = data.get("body", "")
 
+    is_draft = bool(data.get("draft")) or data.get("folder") == "drafts"
+    folder = "drafts" if is_draft else "sent"
+
+    # Attachments in the JSON body: [{"filename","content_type","data": <base64>}]
+    attachments = []
+    for a in (data.get("attachments") or []):
+        raw_b64 = a.get("data") or a.get("data_b64") or ""
+        try:
+            raw = base64.b64decode(raw_b64)
+        except (ValueError, TypeError):
+            continue
+        if not raw:
+            continue
+        if len(raw) > MAX_ATTACHMENT_BYTES:
+            raw = raw[:MAX_ATTACHMENT_BYTES]
+        attachments.append(_build_attachment(a.get("filename"), a.get("content_type"), raw))
+
     now = datetime.utcnow()
     sent_msgs = _load_sent()
     new_id = 10000 + len(sent_msgs) + 1
@@ -969,28 +1072,32 @@ def api_compose():
         "body": body,
         "body_preview": (body[:120].replace('\n', ' ').strip() + '...') if len(body) > 120 else body.replace('\n', ' ').strip(),
         "message_id": f"<compose-{new_id}@webmail>",
-        "folder": "sent",
+        "folder": folder,
         "is_read": True,
         "is_starred": False,
         "labels": [],
+        "attachments": attachments,
+        "has_attachment": 1 if attachments else 0,
         "user_id": user_id,
     }
     sent_msgs.append(new_email)
 
-    for addr in to_addrs:
-        uid = _USER_EMAIL_MAP.get(addr)
-        if uid is not None and uid != user_id:
-            inbox_copy = dict(new_email)
-            inbox_copy["id"] = 10000 + len(sent_msgs) + 1
-            inbox_copy["folder"] = "inbox"
-            inbox_copy["is_read"] = False
-            inbox_copy["user_id"] = uid
-            sent_msgs.append(inbox_copy)
+    if not is_draft:
+        for addr in to_addrs:
+            uid = _USER_EMAIL_MAP.get(addr)
+            if uid is not None and uid != user_id:
+                inbox_copy = dict(new_email)
+                inbox_copy["id"] = 10000 + len(sent_msgs) + 1
+                inbox_copy["folder"] = "inbox"
+                inbox_copy["is_read"] = False
+                inbox_copy["user_id"] = uid
+                sent_msgs.append(inbox_copy)
 
     _save_sent(sent_msgs)
     counts = _folder_counts(user_id)
     sent_count = counts.get("sent", {}).get("total", 0)
-    return jsonify({"status": "sent", "id": new_id, "message": new_email,
+    return jsonify({"status": "draft" if is_draft else "sent", "id": new_id,
+                    "folder": folder, "message": new_email,
                     "sent_count": sent_count})
 
 

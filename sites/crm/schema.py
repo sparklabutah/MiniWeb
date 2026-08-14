@@ -23,6 +23,28 @@ TABLES = {
             "user_id",
         ],
     },
+    "tasks": {
+        "table_name": "crm_tasks",
+        "columns": [
+            ("id", "INTEGER PRIMARY KEY"),
+            ("title", "TEXT NOT NULL DEFAULT ''"),
+            ("contact_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("deal_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("owner_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("due_date", "TEXT NOT NULL DEFAULT ''"),
+            ("priority", "TEXT NOT NULL DEFAULT 'normal'"),
+            ("status", "TEXT NOT NULL DEFAULT 'open'"),
+            ("notes", "TEXT NOT NULL DEFAULT ''"),
+            ("created_date", "TEXT NOT NULL DEFAULT ''"),
+            ("completed_date", "TEXT NOT NULL DEFAULT ''"),
+        ],
+        "indexes": [
+            "status",
+            "due_date",
+            "owner_id",
+            "deal_id",
+        ],
+    },
     "companies": {
         "table_name": "crm_companies",
         "columns": [

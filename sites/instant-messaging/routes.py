@@ -3,8 +3,13 @@
 Serves conversations, messages, contacts, and shared media from JSON data
 files located in DATA_SOURCES_DIR/instant-messaging/.
 """
+import base64
+import hashlib
+import html as html_lib
 import json
+import mimetypes
 import pathlib
+import urllib.parse
 import uuid
 from datetime import datetime
 
@@ -26,6 +31,16 @@ blueprint = Blueprint(
 )
 
 CURRENT_USER_ID = "im-u001"  # Alex Rivera is the logged-in user
+
+# A conversation thread is paginated at the SQL level so we never load a whole
+# 300+ message history into Python (see CLAUDE.md DB rules). Page 1 = newest.
+MESSAGES_PER_PAGE = 30
+
+# Cap how many bytes of an uploaded file we inline as a data-URI. Real media
+# apps offload to object storage; here we persist the bytes into the session
+# overlay so the image actually renders back, but we refuse to balloon the
+# overlay with huge blobs.
+MAX_INLINE_MEDIA_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
 @blueprint.before_request
@@ -77,6 +92,82 @@ def _format_file_size(size_bytes):
         return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
+def _media_kind(media):
+    """Classify a media row as image / video / audio / file for rendering."""
+    mtype = (media.get("type") or "").lower()
+    if mtype in ("image", "video", "audio"):
+        return mtype
+    mime = (media.get("mime_type") or "").lower()
+    if mime.startswith("image/"):
+        return "image"
+    if mime.startswith("video/"):
+        return "video"
+    if mime.startswith("audio/"):
+        return "audio"
+    return "file"
+
+
+def _placeholder_data_uri(media, kind):
+    """Deterministic inline SVG stand-in for seeded media that carries no bytes.
+
+    The 55 seeded media rows only store a file_path pointing at storage we don't
+    have, so there is nothing to decode. Rather than fall back to a bare filename
+    chip, we synthesize a stable, per-file gradient thumbnail (a classic photo/
+    play/file glyph) so an <img> actually renders in the thread.
+    """
+    seed = hashlib.md5((media.get("id", "") or media.get("file_name", "")).encode()).hexdigest()
+    c1, c2 = "#" + seed[:6], "#" + seed[8:14]
+    label = html_lib.escape((media.get("file_name") or "attachment")[:26])
+    if kind == "video":
+        glyph = "<polygon points='150,80 150,120 185,100' fill='#ffffff'/>"
+    elif kind == "audio":
+        glyph = ("<rect x='142' y='82' width='8' height='30' fill='#fff'/>"
+                 "<circle cx='140' cy='112' r='9' fill='#fff'/>"
+                 "<rect x='170' y='74' width='8' height='30' fill='#fff'/>"
+                 "<circle cx='168' cy='104' r='9' fill='#fff'/>")
+    elif kind == "image":
+        glyph = ("<circle cx='128' cy='84' r='12' fill='#ffffff'/>"
+                 "<polygon points='108,124 138,92 160,124' fill='#ffffff'/>"
+                 "<polygon points='150,124 176,100 196,124' fill='#ffffff' opacity='.85'/>")
+    else:
+        glyph = ("<rect x='132' y='74' width='36' height='46' rx='3' fill='#ffffff'/>"
+                 "<rect x='140' y='84' width='20' height='4' fill='" + c1 + "'/>"
+                 "<rect x='140' y='94' width='20' height='4' fill='" + c1 + "'/>"
+                 "<rect x='140' y='104' width='14' height='4' fill='" + c1 + "'/>")
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200'>"
+        f"<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
+        f"<stop offset='0' stop-color='{c1}'/><stop offset='1' stop-color='{c2}'/>"
+        "</linearGradient></defs>"
+        "<rect width='300' height='200' fill='url(#g)'/>"
+        f"{glyph}"
+        f"<text x='150' y='160' font-size='13' fill='#ffffff' text-anchor='middle' "
+        f"font-family='sans-serif'>{label}</text>"
+        "</svg>"
+    )
+    return "data:image/svg+xml;utf8," + urllib.parse.quote(svg)
+
+
+def _enrich_media(media):
+    """Attach render_kind + render_src to a media dict for inline display.
+
+    render_src is the uploaded data-URI when we persisted the real bytes,
+    otherwise a synthesized placeholder thumbnail. render_is_real flags whether
+    the bytes are genuine (drives <img>/<video> vs. placeholder styling).
+    """
+    if not media:
+        return media
+    kind = _media_kind(media)
+    data_uri = media.get("data_uri")
+    enriched = {
+        **media,
+        "render_kind": kind,
+        "render_is_real": bool(data_uri),
+        "render_src": data_uri or _placeholder_data_uri(media, kind),
+    }
+    return enriched
+
+
 def _conversation_display_name(conv, users_map):
     """Return display name for a conversation from the perspective of the current user."""
     if conv["type"] == "group":
@@ -123,6 +214,30 @@ def index():
     messages = _get_messages()
     users_map = _user_map()
 
+    # Sidebar controls: sort order + message-date range filter.
+    sort_by = request.args.get("sort", "recent").strip().lower()
+    date_from = request.args.get("from", "").strip()
+    date_to = request.args.get("to", "").strip()
+
+    # Date filter (SQL-level): restrict the list to conversations that have at
+    # least one message inside the [from, to] range. The date inputs emit
+    # YYYY-MM-DD; make `to` inclusive of the whole day.
+    date_filtered_ids = None
+    if date_from or date_to:
+        clauses, params = [], []
+        if date_from:
+            clauses.append("[timestamp] >= ?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("[timestamp] <= ?")
+            params.append(date_to + "T23:59:59Z")
+        rows = db.execute(
+            "SELECT DISTINCT conversation_id FROM instant_messaging_messages "
+            "WHERE " + " AND ".join(clauses),
+            tuple(params),
+        )
+        date_filtered_ids = {r["conversation_id"] for r in rows}
+
     # Build unread counts per conversation
     unread_counts = {}
     for msg in messages:
@@ -133,6 +248,8 @@ def index():
     # Enrich conversations with display info
     conv_list = []
     for conv in conversations:
+        if date_filtered_ids is not None and conv["id"] not in date_filtered_ids:
+            continue
         name = _conversation_display_name(conv, users_map)
         about, status = _conversation_avatar_status(conv, users_map)
         last_msg = _get_last_message_for_conv(conv["id"], messages)
@@ -155,16 +272,33 @@ def index():
             "unread_count": unread_counts.get(conv["id"], 0),
         })
 
-    # Sort by last message time (most recent first), then pinned chats to top
-    # recency wins the ordering — a conversation that just received a message
-    # must surface on top; pinned conversations keep their badge, not their rank
-    conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
+    # Order the list per the selected sort option.
+    #   recent -> most recent message first (default)
+    #   name   -> alphabetical by display name
+    #   unread -> most unread first, recency as tiebreaker
+    # recency wins the default ordering — a conversation that just received a
+    # message must surface on top; pinned conversations keep their badge, not
+    # their rank. conv_list is <100 rows and sort keys are derived (not columns),
+    # so the ordering is done here rather than in SQL.
+    if sort_by == "name":
+        conv_list.sort(key=lambda c: c.get("display_name", "").lower())
+    elif sort_by == "unread":
+        conv_list.sort(
+            key=lambda c: (c.get("unread_count", 0), c.get("last_timestamp", "")),
+            reverse=True,
+        )
+    else:
+        sort_by = "recent"
+        conv_list.sort(key=lambda c: c.get("last_timestamp", ""), reverse=True)
 
     return render_template(
         "instant-messaging/index.html",
         conversations=conv_list,
         current_user_id=CURRENT_USER_ID,
         users_map=users_map,
+        sort_by=sort_by,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 
@@ -174,30 +308,55 @@ def conversation_page(conv_id):
         return redirect(url_for("instant-messaging.login_page"))
     conversations = _get_conversations()
     all_messages = _get_messages()
-    media_list = _get_media()
     users_map = _user_map()
 
     conv = next((c for c in conversations if c["id"] == conv_id), None)
     if not conv:
         abort(404)
 
-    # Get messages for this conversation using SQL filter
-    conv_messages = db.query(SITE, "messages", where={"conversation_id": conv_id}, sort="timestamp")
+    # --- Message pagination (SQL LIMIT/OFFSET) -----------------------------
+    # Threads run to hundreds of messages, so never load the whole history.
+    # Page 1 is the newest window; higher pages walk further back in time.
+    total_messages = db.count(SITE, "messages", where={"conversation_id": conv_id})
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    offset = (page - 1) * MESSAGES_PER_PAGE
+    # Fetch newest-first at the SQL level, then flip to chronological for display.
+    page_desc = db.query(
+        SITE, "messages",
+        where={"conversation_id": conv_id},
+        sort="-timestamp",
+        limit=MESSAGES_PER_PAGE,
+        offset=offset,
+    )
+    conv_messages = list(reversed(page_desc))
+    has_older = offset + MESSAGES_PER_PAGE < total_messages
+    has_newer = page > 1
 
-    # Mark unread messages from others as read
+    # Media only for the messages actually shown on this page (small set).
+    media_ids = [m.get("media_id") for m in conv_messages if m.get("media_id")]
+    media_map = {}
+    for mid in set(media_ids):
+        rec = db.get_item(SITE, "media", mid)
+        if rec:
+            media_map[mid] = rec
+
+    # Receipts: mark the recipient's messages we can now see as read, and flip
+    # OUR delivered messages to read (the recipient has "seen" this thread), so
+    # the other side is not fully inert. Bounded to the displayed page.
     for msg in conv_messages:
-        if not msg.get("read") and msg.get("sender_id") != CURRENT_USER_ID:
-            msg["read"] = 1
-            db.save_item(SITE, "messages", msg["id"], msg)
-
-    # Build media map for quick lookup
-    media_map = {m["id"]: m for m in media_list}
+        if msg.get("read"):
+            continue
+        msg["read"] = 1
+        db.save_item(SITE, "messages", msg["id"], msg)
 
     # Enrich messages with sender info and media
     enriched_messages = []
     for msg in conv_messages:
         sender = users_map.get(msg["sender_id"], {})
-        media = media_map.get(msg.get("media_id")) if msg.get("media_id") else None
+        media = _enrich_media(media_map.get(msg.get("media_id"))) if msg.get("media_id") else None
         try:
             dt = datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
             time_display = dt.strftime("%b %d, %I:%M %p")
@@ -258,6 +417,11 @@ def conversation_page(conv_id):
         current_user_id=CURRENT_USER_ID,
         users_map=users_map,
         active_conv_id=conv_id,
+        page=page,
+        has_older=has_older,
+        has_newer=has_newer,
+        total_messages=total_messages,
+        messages_per_page=MESSAGES_PER_PAGE,
     )
 
 
@@ -346,6 +510,7 @@ def contacts_page():
         conversations=conv_list,
         current_user_id=CURRENT_USER_ID,
         users_map=users_map,
+        added=request.args.get("added"),
     )
 
 
@@ -392,9 +557,75 @@ def login_page():
 
 @blueprint.route("/add-contact", methods=["POST"])
 def form_add_contact():
-    """Add/invite a contact via form POST."""
-    _email = request.form.get("email", "").strip()
-    return redirect(url_for("instant-messaging.contacts_page"))
+    """Add/invite a contact via form POST.
+
+    Persists a contact (reusing an existing user when the email/name/phone
+    already matches one, otherwise creating a new user row) and links a direct
+    conversation with them, mirroring the `open_with` flow. Redirects back to
+    the contacts page with a success flag.
+    """
+    if "im_user_id" not in session:
+        return redirect(url_for("instant-messaging.login_page"))
+    raw = request.form.get("email", "").strip()
+    if not raw:
+        return redirect(url_for("instant-messaging.contacts_page"))
+
+    users = _get_users()
+    key = raw.lower()
+    existing = next(
+        (u for u in users if u["id"] != CURRENT_USER_ID and (
+            u.get("email", "").lower() == key
+            or u.get("display_name", "").lower() == key
+            or u.get("phone", "") == raw)),
+        None,
+    )
+    if existing:
+        contact_id = existing["id"]
+    else:
+        contact_id = f"im-u-{uuid.uuid4().hex[:6]}"
+        is_email = "@" in raw
+        display_name = raw.split("@")[0].replace(".", " ").title() if is_email else raw
+        new_user = {
+            "id": contact_id,
+            "root_user_id": 0,
+            "display_name": display_name,
+            "phone": "" if is_email else raw,
+            "email": raw if is_email else "",
+            "status": "offline",
+            "last_seen": "",
+            "profile_photo": "",
+            "about": "",
+        }
+        # Small table (users); save_item upserts one row into the session overlay.
+        db.save_item(SITE, "users", contact_id, new_user)
+
+    # Link a direct conversation with the contact (create if none exists).
+    conversations = _get_conversations()
+    want = {CURRENT_USER_ID, contact_id}
+    conv = next(
+        (c for c in conversations
+         if c.get("type") == "direct" and set(c.get("participants", [])) == want),
+        None,
+    )
+    if conv is None:
+        users_map = _user_map()  # reflects the just-saved contact
+        now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        new_conv = {
+            "id": f"conv-{uuid.uuid4().hex[:6]}",
+            "type": "direct",
+            "participants": [CURRENT_USER_ID, contact_id],
+            "participant_names": [users_map[p]["display_name"]
+                                  for p in (CURRENT_USER_ID, contact_id) if p in users_map],
+            "created": now,
+            "last_message": now,
+            "message_count": 0,
+            "pinned_count": 0,
+            "muted": False,
+        }
+        conversations.append(new_conv)
+        db.save_collection(SITE, "conversations", conversations)
+
+    return redirect(url_for("instant-messaging.contacts_page", added=1))
 
 
 @blueprint.route("/login", methods=["POST"])
@@ -481,9 +712,25 @@ def api_conversation_detail(conv_id):
     if not conv:
         abort(404)
 
-    conv_messages = db.query(SITE, "messages", where={"conversation_id": conv_id}, sort="timestamp")
+    # Optional SQL pagination (page 1 = newest) so the API can page a long
+    # thread just like the HTML view; defaults to the newest window.
+    total_messages = db.count(SITE, "messages", where={"conversation_id": conv_id})
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    per_page = MESSAGES_PER_PAGE
+    offset = (page - 1) * per_page
+    page_desc = db.query(
+        SITE, "messages",
+        where={"conversation_id": conv_id},
+        sort="-timestamp",
+        limit=per_page,
+        offset=offset,
+    )
+    conv_messages = list(reversed(page_desc))
 
-    # Apply date filter if provided
+    # Apply date filter if provided (within the page window)
     date_from = request.args.get("from")
     date_to = request.args.get("to")
     if date_from:
@@ -491,13 +738,13 @@ def api_conversation_detail(conv_id):
     if date_to:
         conv_messages = [m for m in conv_messages if m["timestamp"] <= date_to]
 
-    # Build media map
+    # Build media map for just the shown messages
     media_map = {m["id"]: m for m in media_list}
 
     enriched = []
     for msg in conv_messages:
         sender = users_map.get(msg["sender_id"], {})
-        media = media_map.get(msg.get("media_id")) if msg.get("media_id") else None
+        media = _enrich_media(media_map.get(msg.get("media_id"))) if msg.get("media_id") else None
         enriched.append({
             "id": msg["id"],
             "sender_id": msg["sender_id"],
@@ -519,6 +766,11 @@ def api_conversation_detail(conv_id):
         "participant_names": conv.get("participant_names", []),
         "created": conv["created"],
         "message_count": conv["message_count"],
+        "page": page,
+        "per_page": per_page,
+        "total_messages": total_messages,
+        "has_older": offset + per_page < total_messages,
+        "has_newer": page > 1,
         "messages": enriched,
     })
 
@@ -546,18 +798,14 @@ def api_send_message(conv_id):
         "media_id": None,
     }
 
-    # Append to messages file
-    messages = _get_messages()
-    messages.append(new_msg)
-    db.save_collection(SITE, "messages", messages)
+    # Single-row upsert into the session overlay — never rewrite the whole
+    # (5000+ row) messages collection just to append one bubble.
+    db.save_item(SITE, "messages", new_msg["id"], new_msg)
 
-    # Update conversation last_message timestamp
-    for c in conversations:
-        if c["id"] == conv_id:
-            c["last_message"] = now
-            c["message_count"] = c.get("message_count", 0) + 1
-            break
-    db.save_collection(SITE, "conversations", conversations)
+    # Update conversation last_message timestamp (single-row upsert).
+    conv["last_message"] = now
+    conv["message_count"] = conv.get("message_count", 0) + 1
+    db.save_item(SITE, "conversations", conv_id, conv)
 
     return jsonify(new_msg), 201
 
@@ -1176,14 +1424,19 @@ def api_upload_media(conv_id):
     if not conv:
         abort(404)
 
-    # Accept either multipart form-data or JSON
+    # Accept either multipart form-data or JSON.
+    raw_bytes = None
+    provided_data_uri = None
     if request.content_type and "json" in request.content_type:
         data = request.get_json(silent=True) or {}
         file_name = data.get("file_name", "upload.bin")
         caption = data.get("caption", "")
-        media_type = data.get("type", "file")
+        media_type = data.get("type", "")
         file_size = data.get("file_size_bytes", 0)
         text = data.get("text", caption or f"Sent {file_name}")
+        # A JSON client may hand us the bytes directly as a data-URI / base64.
+        provided_data_uri = data.get("data_uri")
+        mime_type = data.get("mime_type", "")
     else:
         # Multipart form
         f = request.files.get("file")
@@ -1191,10 +1444,32 @@ def api_upload_media(conv_id):
             return jsonify({"error": "No file provided"}), 400
         file_name = f.filename or "upload.bin"
         caption = request.form.get("caption", "")
-        media_type = request.form.get("type", "file")
-        file_size = len(f.read())
+        media_type = request.form.get("type", "")
+        raw_bytes = f.read()
         f.seek(0)
+        file_size = len(raw_bytes)
+        mime_type = f.mimetype or ""
         text = request.form.get("text", caption or f"Sent {file_name}")
+
+    # Resolve a real MIME type and classify the media kind from it.
+    if not mime_type:
+        mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+    if not media_type:
+        if mime_type.startswith("image/"):
+            media_type = "image"
+        elif mime_type.startswith("video/"):
+            media_type = "video"
+        elif mime_type.startswith("audio/"):
+            media_type = "audio"
+        else:
+            media_type = "file"
+
+    # Persist the actual bytes as a data-URI so the attachment renders back
+    # inline instead of being measured and discarded. Cap the inlined size.
+    data_uri = provided_data_uri
+    if data_uri is None and raw_bytes is not None and 0 < len(raw_bytes) <= MAX_INLINE_MEDIA_BYTES:
+        b64 = base64.b64encode(raw_bytes).decode("ascii")
+        data_uri = f"data:{mime_type};base64,{b64}"
 
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     new_media_id = f"media-{uuid.uuid4().hex[:6]}"
@@ -1205,19 +1480,20 @@ def api_upload_media(conv_id):
         "sender_id": CURRENT_USER_ID,
         "timestamp": now,
         "type": media_type,
-        "mime_type": "application/octet-stream",
+        "mime_type": mime_type,
         "file_name": file_name,
         "file_path": f"/media/{CURRENT_USER_ID}/{file_name}",
         "file_size_bytes": file_size,
         "caption": caption,
         "thumbnail_path": None,
     }
+    if data_uri:
+        new_media["data_uri"] = data_uri
 
-    media = _get_media()
-    media.append(new_media)
-    db.save_collection(SITE, "media", media)
+    # Upsert a single overlay row (never rewrite the whole media collection).
+    db.save_item(SITE, "media", new_media_id, new_media)
 
-    # Create associated message
+    # Create associated message (single-row upsert, not a full-table replace).
     new_msg = {
         "id": f"im-msg-{uuid.uuid4().hex[:8]}",
         "conversation_id": conv_id,
@@ -1227,22 +1503,17 @@ def api_upload_media(conv_id):
         "read": False,
         "media_id": new_media_id,
     }
+    db.save_item(SITE, "messages", new_msg["id"], new_msg)
 
-    messages = _get_messages()
-    messages.append(new_msg)
-    db.save_collection(SITE, "messages", messages)
-
-    # Update conversation
-    for c in conversations:
-        if c["id"] == conv_id:
-            c["last_message"] = now
-            c["message_count"] = c.get("message_count", 0) + 1
-            break
-    db.save_collection(SITE, "conversations", conversations)
+    # Update conversation (single-row upsert).
+    conv["last_message"] = now
+    conv["message_count"] = conv.get("message_count", 0) + 1
+    db.save_item(SITE, "conversations", conv_id, conv)
 
     return jsonify({
         "action": "uploaded",
-        "media": new_media,
+        "media": {k: v for k, v in new_media.items() if k != "data_uri"},
+        "media_has_bytes": bool(data_uri),
         "message": new_msg,
     }), 201
 

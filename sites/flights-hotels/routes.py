@@ -6,8 +6,10 @@ mutations are isolated per user.
 """
 import json
 import pathlib
+import re
+import html as _html
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, date as _date
 
 from flask import (
     Blueprint, abort, jsonify, redirect, render_template, request,
@@ -50,11 +52,59 @@ def _query_flights(*, where=None, sort=None, limit=None, offset=0):
     return flights
 
 
+_CARRIERS = {
+    "AA": "American Airlines", "WN": "Southwest Airlines", "DL": "Delta Air Lines",
+    "UA": "United Airlines", "B6": "JetBlue", "AS": "Alaska Airlines",
+    "NK": "Spirit Airlines", "F9": "Frontier Airlines", "G4": "Allegiant Air",
+    "HA": "Hawaiian Airlines", "SY": "Sun Country Airlines", "US": "US Airways",
+    "CO": "Continental Airlines", "NW": "Northwest Airlines", "VX": "Virgin America",
+}
+
+
+def _normalize_flight(f):
+    """Fill in route/airline/flight number/price for the 50k raw imported flights
+    (empty origin/destination/airline/flight_number, price=0 with the real price
+    in `fare`), so the detail/seat/review/booking pages show a real itinerary and
+    fare instead of ()->() and $0."""
+    if not f:
+        return f
+    if not (f.get("origin") or "").strip():
+        f["origin"] = (f.get("airport_1") or "").strip()
+    if not (f.get("destination") or "").strip():
+        f["destination"] = (f.get("airport_2") or "").strip()
+    if not (f.get("origin_city") or "").strip():
+        f["origin_city"] = (f.get("city1") or "").strip()
+    if not (f.get("dest_city") or "").strip():
+        f["dest_city"] = (f.get("city2") or "").strip()
+    if not (f.get("airline") or "").strip():
+        code = (f.get("carrier_lg") or f.get("carrier_low") or "").strip()
+        f["airline"] = _CARRIERS.get(code, (code + " Airlines").strip() or "SkyLodge Air")
+    if not (f.get("flight_number") or "").strip():
+        code = (f.get("carrier_lg") or "SL").strip() or "SL"
+        f["flight_number"] = f"{code}{str(f.get('id', '')).zfill(4)[-4:]}"
+    try:
+        price = float(f.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    if price <= 0:
+        try:
+            price = float(f.get("fare") or f.get("fare_low") or 0)
+        except (TypeError, ValueError):
+            price = 0
+    f["price"] = round(price, 2) if price > 0 else 99.0
+    if not (f.get("aircraft") or "").strip():
+        f["aircraft"] = "Boeing 737-800"
+    if not (f.get("class") or "").strip():
+        f["class"] = "Economy"
+    return f
+
+
 def _get_flight(flight_id):
-    """Get a single flight by ID."""
+    """Get a single flight by ID (normalized so raw imports have route/airline/price)."""
     f = db.get_item(SITE, "flights", flight_id)
     if f:
         _fix_amenities(f)
+        _normalize_flight(f)
     return f
 
 
@@ -66,11 +116,68 @@ def _query_hotels(*, where=None, sort=None, limit=None, offset=0):
     return hotels
 
 
+def _hotel_stars(h):
+    """Star rating for a hotel, from the synthetic `stars` col or the raw
+    `hotelrating` text ('...Four Star...'). Defaults to 3."""
+    try:
+        if float(h.get("stars") or 0) > 0:
+            return int(float(h["stars"]))
+    except (TypeError, ValueError):
+        pass
+    rating = h.get("hotelrating") or ""
+    for word, n in (("Five", 5), ("Four", 4), ("Three", 3), ("Two", 2), ("One", 1)):
+        if word in rating:
+            return n
+    return 3
+
+
+def _clean_description(text):
+    """Raw hotel descriptions are HTML with encoding artefacts. Strip tags,
+    unescape entities, drop mojibake replacement chars, and tidy whitespace so
+    the detail page shows clean prose instead of literal <p> markup."""
+    if not text:
+        return ""
+    t = re.sub(r"(?i)<\s*br\s*/?>", "\n", str(text))
+    t = re.sub(r"(?i)</p\s*>", "\n", t)
+    t = re.sub(r"<[^>]+>", "", t)
+    t = _html.unescape(t).replace("�", "")
+    t = re.sub(r"[ \t]+", " ", t)
+    return re.sub(r"\n\s*\n+", "\n", t).strip()
+
+
+def _normalize_hotel(h):
+    """Fill in name/city/stars/price/rating/description for the 50k raw imported
+    hotels (which have empty name and price_per_night=0), matching how the
+    listing page derives them so the DETAIL/booking pages aren't blank/$0."""
+    if not h:
+        return h
+    if not (h.get("name") or "").strip():
+        h["name"] = (h.get("hotelname") or "").strip() or "Hotel"
+    if not (h.get("city") or "").strip():
+        parts = [(h.get("cityname") or "").strip(), (h.get("countyname") or "").strip()]
+        h["city"] = ", ".join(p for p in parts if p) or h.get("city", "")
+    stars = _hotel_stars(h)
+    h["stars"] = stars
+    try:
+        price = float(h.get("price_per_night") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    h["price_per_night"] = price if price > 0 else stars * 60 + 40   # same rule as the listing
+    try:
+        if not float(h.get("rating") or 0) > 0:
+            h["rating"] = round(3.5 + (stars - 3) * 0.3, 1)
+    except (TypeError, ValueError):
+        h["rating"] = round(3.5 + (stars - 3) * 0.3, 1)
+    h["description"] = _clean_description(h.get("description"))
+    return h
+
+
 def _get_hotel(hotel_id):
-    """Get a single hotel by ID."""
+    """Get a single hotel by ID (normalized so raw imports have name/price/desc)."""
     h = db.get_item(SITE, "hotels", hotel_id)
     if h:
         _fix_amenities(h)
+        _normalize_hotel(h)
     return h
 
 
@@ -80,6 +187,193 @@ def _load_bookings(*, where=None, sort=None, limit=None):
 
 def _save_bookings(bookings):
     db.save_collection(SITE, "bookings", bookings)
+
+
+def _collect_passenger_names(form, count, lead_field="passenger_name",
+                             prefix="passenger_name_"):
+    """Collect per-traveler names from the booking form.
+
+    Reads indexed inputs (passenger_name_1, passenger_name_2, ...) plus an
+    optional single lead field, returns a de-duplicated ordered list of the
+    non-empty names (capped at `count`). Always returns at least the lead
+    name if one was supplied.
+    """
+    names = []
+    lead = (form.get(lead_field) or "").strip()
+    if lead:
+        names.append(lead)
+    for i in range(1, max(count, 1) + 1):
+        v = (form.get(f"{prefix}{i}") or "").strip()
+        if v and v not in names:
+            names.append(v)
+    return names[:max(count, 1)]
+
+
+def _nights_between(check_in, check_out):
+    """Number of nights between two YYYY-MM-DD dates, or None if not parseable."""
+    try:
+        ci = datetime.strptime(check_in, "%Y-%m-%d").date()
+        co = datetime.strptime(check_out, "%Y-%m-%d").date()
+        n = (co - ci).days
+        return n if n > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Seat selection (flights) + cabin class + room types (hotels)
+# ---------------------------------------------------------------------------
+
+# Boeing 737-800 cabin: single aisle, 3-3 layout. Columns A/B/C | aisle | D/E/F
+# across 30 rows -> seats 1A .. 30F. Seats are chosen on their OWN screen after
+# the flight-detail form is submitted (staged wizard).
+_SEAT_ROWS = list(range(1, 31))
+_SEAT_COLS = ["A", "B", "C", "D", "E", "F"]
+
+# Paid-seat zones — a fee is added on top of the fare, once per assigned seat:
+#   rows 1-4   -> "Premium"       +$40
+#   rows 16-17 -> "Extra legroom" +$25  (exit rows)
+#   all others -> "Standard"      free
+_SEAT_PREMIUM_ROWS = set(range(1, 5))
+_SEAT_LEGROOM_ROWS = {16, 17}
+_SEAT_PREMIUM_FEE = 40.0
+_SEAT_LEGROOM_FEE = 25.0
+
+# Cabin classes with a price multiplier applied to the flight's base fare.
+_CABIN_CLASSES = {
+    "economy":  {"label": "Economy",  "mult": 1.0},
+    "premium":  {"label": "Premium",  "mult": 1.35},
+    "business": {"label": "Business", "mult": 1.9},
+}
+
+# Hotel room types with a per-night multiplier applied to the base rate.
+_ROOM_TYPES = {
+    "standard": {"label": "Standard", "mult": 1.0},
+    "deluxe":   {"label": "Deluxe",   "mult": 1.5},
+    "suite":    {"label": "Suite",    "mult": 2.0},
+}
+
+
+def _no_store(html):
+    """Wrap rendered HTML in a response that browsers must not cache.
+
+    The seat page is a stateful wizard step; without this the browser bfcache
+    can restore a stale, frozen copy on "Back" (checkboxes stuck at the max
+    count) instead of the live re-entrant map, stranding the user.
+    """
+    from flask import make_response
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+def _all_seats():
+    """Every seat label on the 737-800 map, e.g. '1A' .. '30F'."""
+    return [f"{r}{c}" for r in _SEAT_ROWS for c in _SEAT_COLS]
+
+
+def _seat_row_num(seat):
+    """Numeric row of a seat label ('2A' -> 2), or 0 if unparseable."""
+    m = re.match(r"(\d+)", seat or "")
+    return int(m.group(1)) if m else 0
+
+
+def _seat_zone(seat):
+    """(key, label, fee) for a seat: premium / legroom / standard."""
+    r = _seat_row_num(seat)
+    if r in _SEAT_PREMIUM_ROWS:
+        return ("premium", "Premium", _SEAT_PREMIUM_FEE)
+    if r in _SEAT_LEGROOM_ROWS:
+        return ("legroom", "Extra legroom", _SEAT_LEGROOM_FEE)
+    return ("standard", "Standard", 0.0)
+
+
+def _seat_fee(seat):
+    """Paid-seat surcharge for a single seat ($0 for standard)."""
+    return _seat_zone(seat)[2]
+
+
+def _boarding_extras(flight, seats=None):
+    """Deterministic boarding-pass filler for the ticket visual.
+
+    Gate / terminal / zone / boarding time are derived from the flight id and
+    departure time so they stay stable across page loads. These are cosmetic
+    ticket fields (not real operational data), used to make the review /
+    confirmation pages read like a real boarding pass.
+    """
+    fid = int(flight.get("id") or 0)
+    terminal = chr(ord("A") + fid % 4)               # A-D
+    gate = "%s%d" % (terminal, 1 + fid % 30)          # e.g. B12
+    boarding = ""
+    dep = (flight.get("departure_time") or "").strip()
+    m = re.match(r"^(\d{1,2}):(\d{2})", dep)
+    if m:
+        total = (int(m.group(1)) * 60 + int(m.group(2)) - 35) % (24 * 60)
+        boarding = "%02d:%02d" % (total // 60, total % 60)
+    row = _seat_row_num((seats or [""])[0]) if seats else 0
+    zone = 1 if 1 <= row <= 6 else (2 if 7 <= row <= 15 else (3 if row else 4))
+    return {"terminal": terminal, "gate": gate,
+            "boarding_time": boarding, "zone": zone}
+
+
+def _seat_map(flight_id, selected=None):
+    """Structured seat map for rendering: rows -> list of cell dicts.
+
+    Each cell carries the seat label, its zone key/label/fee, and whether it is
+    taken (deterministically unavailable for this flight) or currently selected.
+    """
+    selected = set(s.upper() for s in (selected or []))
+    # The user's own pending seats must never render as taken/blocked on
+    # re-entry — they belong to THIS booking and must stay re-selectable.
+    taken = _taken_seats(flight_id) - selected
+    rows = []
+    for r in _SEAT_ROWS:
+        cells = []
+        for c in _SEAT_COLS:
+            label = f"{r}{c}"
+            zk, zl, fee = _seat_zone(label)
+            cells.append({
+                "label": label, "col": c, "zone": zk, "zone_label": zl,
+                "fee": fee, "taken": label in taken,
+                "selected": label in selected,
+            })
+        rows.append({"row": r, "cells": cells})
+    return rows
+
+
+def _taken_seats(flight_id):
+    """Deterministically mark a subset of seats as already booked for a flight.
+
+    Same flight id always yields the same taken set, so a seat that is
+    unavailable stays unavailable across page loads and can be reasoned about.
+    """
+    taken = set()
+    for idx, seat in enumerate(_all_seats()):
+        if (int(flight_id) * 7 + idx * 3) % 5 == 0:
+            taken.add(seat)
+    return taken
+
+
+def _clean_seat_selection(seat_values, flight_id):
+    """Validate a list of chosen seat labels against the taken map.
+
+    Returns (seats, bad) where `seats` is the ordered, de-duplicated list of
+    valid free seats and `bad` lists any requested seats that are unknown or
+    already taken. Case-insensitive; whitespace tolerant.
+    """
+    valid = set(_all_seats())
+    taken = _taken_seats(flight_id)
+    raw = [s.strip().upper() for s in seat_values if s and s.strip()]
+    seats, seen, bad = [], set(), []
+    for s in raw:
+        if s not in valid or s in taken:
+            bad.append(s)
+        elif s not in seen:
+            seen.add(s)
+            seats.append(s)
+    return seats, bad
 
 
 def _load_users():
@@ -282,8 +576,12 @@ def flight_detail(flight_id):
     flight = _get_flight(flight_id)
     if not flight:
         abort(404)
+    # STEP 1 of the flight wizard: collect cabin class, travelers, passenger
+    # names and dates only. Seats are chosen on the next screen; nothing is
+    # persisted here.
     return render_template("flights-hotels/flight_detail.html",
-                           user=user, logged_in=logged_in, flight=flight)
+                           user=user, logged_in=logged_in, flight=flight,
+                           cabin_classes=_CABIN_CLASSES, form_error=None)
 
 
 @blueprint.route("/hotels")
@@ -405,8 +703,15 @@ def hotel_detail(hotel_id):
     hotel = _get_hotel(hotel_id)
     if not hotel:
         abort(404)
+    # Derive per-night rates for each room type from the hotel's base price.
+    room_options = [
+        {"key": k, "label": v["label"],
+         "rate": round((hotel.get("price_per_night") or 0) * v["mult"], 2)}
+        for k, v in _ROOM_TYPES.items()
+    ]
     return render_template("flights-hotels/hotel_detail.html",
-                           user=user, logged_in=logged_in, hotel=hotel)
+                           user=user, logged_in=logged_in, hotel=hotel,
+                           room_options=room_options, form_error=None)
 
 
 @blueprint.route("/bookings")
@@ -433,14 +738,51 @@ def booking_detail(booking_id):
     booking = db.get_item(SITE, "bookings", booking_id)
     if not booking:
         abort(404)
+    # Deserialize the per-traveler names captured on the booking.
+    pax = booking.get("passengers")
+    if isinstance(pax, str) and pax:
+        try:
+            booking["passengers"] = json.loads(pax)
+        except (json.JSONDecodeError, TypeError):
+            booking["passengers"] = [pax]
+    elif not pax:
+        booking["passengers"] = []
+    # Deserialize the per-traveler seat list captured on flight bookings.
+    seats = booking.get("seats")
+    if isinstance(seats, str) and seats:
+        try:
+            booking["seats"] = json.loads(seats)
+        except (json.JSONDecodeError, TypeError):
+            booking["seats"] = [seats]
+    elif not seats:
+        booking["seats"] = []
+    # Deserialize the per-seat fee list captured on flight bookings.
+    seat_fees = booking.get("seat_fees")
+    if isinstance(seat_fees, str) and seat_fees:
+        try:
+            booking["seat_fees"] = json.loads(seat_fees)
+        except (json.JSONDecodeError, TypeError):
+            booking["seat_fees"] = []
+    elif not seat_fees:
+        booking["seat_fees"] = []
+    # Pair passengers with their assigned seats + fees for display.
+    booking["seat_assignments"] = [
+        {"passenger": p, "seat": s,
+         "fee": (booking["seat_fees"][i] if i < len(booking["seat_fees"]) else 0)}
+        for i, (p, s) in enumerate(zip(booking.get("passengers", []),
+                                       booking.get("seats", [])))
+    ]
     ref_detail = None
+    bp = None
     if booking["type"] == "flight":
         ref_detail = _get_flight(booking["reference_id"])
+        if ref_detail:
+            bp = _boarding_extras(ref_detail, booking.get("seats"))
     elif booking["type"] == "hotel":
         ref_detail = _get_hotel(booking["reference_id"])
     return render_template("flights-hotels/booking_detail.html",
                            user=user, logged_in=logged_in,
-                           booking=booking, ref_detail=ref_detail)
+                           booking=booking, ref_detail=ref_detail, bp=bp)
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -753,9 +1095,15 @@ def api_booking_delete(booking_id):
     booking = db.get_item(SITE, "bookings", booking_id)
     if not booking:
         abort(404)
+    if booking.get("status") == "cancelled":
+        refund = booking.get("refund_amount", 0.0)
+    else:
+        refund = round(booking.get("total_price", 0.0), 2)
     booking["status"] = "cancelled"
+    booking["refund_amount"] = refund
     db.save_item(SITE, "bookings", booking_id, booking)
-    return jsonify({"cancelled": booking_id, "status": "cancelled"})
+    return jsonify({"cancelled": booking_id, "status": "cancelled",
+                    "refund_amount": refund})
 
 
 @blueprint.route("/api/stats")
@@ -834,8 +1182,48 @@ def api_login():
 # Form-based booking actions (HTML routes for POST)
 # ---------------------------------------------------------------------------
 
+def _room_options(hotel):
+    """Per-night rate for each room type, derived from the hotel's base price."""
+    base = float(hotel.get("price_per_night") or 0)
+    return [
+        {"key": k, "label": v["label"], "mult": v["mult"],
+         "rate": round(base * v["mult"], 2)}
+        for k, v in _ROOM_TYPES.items()
+    ]
+
+
+def _flight_fare(flight, pending):
+    """Full fare breakdown for a pending flight booking.
+
+    total = base * cabin_mult * travelers * legs + seat fees.
+    """
+    base = round(float(flight.get("price") or 0), 2)
+    cabin = _CABIN_CLASSES.get(pending.get("cabin_class"), _CABIN_CLASSES["economy"])
+    mult = cabin["mult"]
+    travelers = int(pending.get("travelers") or 1)
+    legs = 2 if (pending.get("trip_type") == "round_trip"
+                 and pending.get("return_date")) else 1
+    fare_subtotal = round(base * mult * travelers * legs, 2)
+    seat_total = round(sum(pending.get("seat_fees", [])), 2)
+    total = round(fare_subtotal + seat_total, 2)
+    return {
+        "base": base, "cabin_key": pending.get("cabin_class", "economy"),
+        "cabin_label": cabin["label"], "cabin_mult": mult,
+        "travelers": travelers, "legs": legs, "fare_subtotal": fare_subtotal,
+        "seat_total": seat_total, "total": total,
+    }
+
+
+# ------------------------- FLIGHT WIZARD (3 steps) -------------------------
+# STEP 1: /flight/<id> form -> POST here -> store pending -> seat selection.
+# STEP 2: /book/flight/seats (GET map, POST assign) -> review.
+# STEP 3: /book/flight/review (GET) -> /book/flight/confirm (POST, 2FA) ->
+#         /book/flight/complete (GET) writes the booking. Nothing touches the
+#         bookings table until the final complete step.
+
 @blueprint.route("/book/flight/<int:flight_id>", methods=["POST"])
 def book_flight(flight_id):
+    """STEP 1 submit: validate details, stash in session, go pick seats."""
     user = _get_current_user()
     if not user:
         return render_template("flights-hotels/login.html",
@@ -843,54 +1231,244 @@ def book_flight(flight_id):
     flight = _get_flight(flight_id)
     if not flight:
         abort(404)
-    travelers = request.form.get("travelers", 1, type=int)
-    account_type = request.form.get("account_type", "checking")
-    total_price = round(flight["price"] * travelers, 2)
+    travelers = request.form.get("travelers", 1, type=int) or 1
+    travelers = max(1, min(travelers, 4))
 
-    bookings = _load_bookings()
-    new_id = max((b["id"] for b in bookings), default=0) + 1
-    booking = {
-        "id": new_id,
-        "user_id": user["id"],
-        "type": "flight",
-        "reference_id": flight_id,
-        "status": "confirmed",
-        "booking_date": datetime.now().strftime("%Y-%m-%d"),
-        "total_price": total_price,
+    cabin_class = (request.form.get("cabin_class") or "economy").strip().lower()
+    if cabin_class not in _CABIN_CLASSES:
+        cabin_class = "economy"
+
+    passengers = _collect_passenger_names(request.form, travelers)
+    if len(passengers) < travelers:
+        return render_template(
+            "flights-hotels/flight_detail.html",
+            user=user, logged_in=True, flight=flight,
+            cabin_classes=_CABIN_CLASSES,
+            form_error="Please enter a name for each traveler."), 400
+
+    depart_date = (request.form.get("depart_date") or "").strip() or flight.get("date", "")
+    trip_type = (request.form.get("trip_type") or "one_way").strip()
+    return_date = (request.form.get("return_date") or "").strip()
+    if trip_type != "round_trip":
+        return_date = ""
+
+    session["pending_flight_booking"] = {
+        "flight_id": flight_id,
         "travelers": travelers,
+        "cabin_class": cabin_class,
+        "passengers": passengers,
+        "depart_date": depart_date,
+        "return_date": return_date,
+        "trip_type": trip_type,
+        "seats": [],
+        "seat_fees": [],
+        "seat_fee_total": 0.0,
+        "account_type": "checking",
     }
-    bookings.append(booking)
-    _save_bookings(bookings)
+    session.modified = True
+    return redirect(url_for("flights-hotels.book_flight_seats"))
 
-    # Bridge: calendar booking (non-financial, no 2FA needed)
-    try:
-        from app.bridges import on_booking
-        on_booking(user_id=user["id"],
-                   title=f"Flight {flight['flight_number']} {flight['origin']}-{flight['destination']}",
-                   start=f"{flight['date']}T{flight['departure_time']}",
-                   end=f"{flight['date']}T{flight['arrival_time']}",
-                   location=f"{flight['origin']} to {flight['destination']}",
-                   service_name="SkyLodge Travel",
-                   confirmation_id=str(new_id))
-    except Exception:
-        pass  # bridge failure should never block the main flow
 
-    emit("message", from_user_id=user["id"], to_user_id=user["id"], text=f"Flight booked: {flight['flight_number']} {flight['origin']}-{flight['destination']} on {flight['date']}", source_site="flights-hotels")
+@blueprint.route("/book/flight/seats", methods=["GET"])
+def book_flight_seats():
+    """STEP 2 (GET): render the 737-800 seat map for the pending booking."""
+    user = _get_current_user()
+    pending = session.get("pending_flight_booking")
+    if not user or not pending:
+        return redirect(url_for("flights-hotels.flights_page"))
+    flight = _get_flight(pending["flight_id"])
+    if not flight:
+        session.pop("pending_flight_booking", None)
+        return redirect(url_for("flights-hotels.flights_page"))
+    html = render_template(
+        "flights-hotels/flight_seats.html",
+        user=user, logged_in=True, flight=flight, pending=pending,
+        seat_rows=_seat_map(pending["flight_id"], pending.get("seats")),
+        seat_cols=_SEAT_COLS,
+        premium_fee=_SEAT_PREMIUM_FEE, legroom_fee=_SEAT_LEGROOM_FEE,
+        seat_error=None)
+    # Defeat the browser bfcache: hitting "Back" onto the seat page must always
+    # re-fetch a live, re-entrant map (with current pending seats pre-selected)
+    # rather than restoring a frozen DOM whose checkbox state locks selection.
+    return _no_store(html)
 
-    # 2FA: send verification code before completing the payment
+
+@blueprint.route("/book/flight/seats", methods=["POST"])
+def book_flight_seats_submit():
+    """STEP 2 (POST): assign one seat per traveler, then go to review.
+
+    A taken/unknown seat, or the wrong number of seats, re-renders the map with
+    an error and does NOT advance — still nothing persisted."""
+    user = _get_current_user()
+    pending = session.get("pending_flight_booking")
+    if not user or not pending:
+        return redirect(url_for("flights-hotels.flights_page"))
+    flight = _get_flight(pending["flight_id"])
+    if not flight:
+        session.pop("pending_flight_booking", None)
+        return redirect(url_for("flights-hotels.flights_page"))
+
+    travelers = int(pending.get("travelers") or 1)
+    seats, bad = _clean_seat_selection(request.form.getlist("seat"), pending["flight_id"])
+    err = None
+    if bad:
+        err = "Seat %s is unavailable — please choose a free seat." % ", ".join(bad)
+    elif len(seats) != travelers:
+        err = ("Please select exactly %d seat%s (one per traveler)."
+               % (travelers, "s" if travelers != 1 else ""))
+    if err:
+        return render_template(
+            "flights-hotels/flight_seats.html",
+            user=user, logged_in=True, flight=flight, pending=pending,
+            seat_rows=_seat_map(pending["flight_id"], seats),
+            seat_cols=_SEAT_COLS,
+            premium_fee=_SEAT_PREMIUM_FEE, legroom_fee=_SEAT_LEGROOM_FEE,
+            seat_error=err), 400
+
+    pending["seats"] = seats
+    pending["seat_fees"] = [_seat_fee(s) for s in seats]
+    pending["seat_fee_total"] = round(sum(pending["seat_fees"]), 2)
+    session["pending_flight_booking"] = pending
+    session.modified = True
+    return redirect(url_for("flights-hotels.book_flight_review"))
+
+
+@blueprint.route("/book/flight/review", methods=["GET"])
+def book_flight_review():
+    """STEP 3 (GET): itinerary + fare breakdown + payment method + Confirm."""
+    user = _get_current_user()
+    pending = session.get("pending_flight_booking")
+    if not user or not pending or not pending.get("seats"):
+        return redirect(url_for("flights-hotels.flights_page"))
+    flight = _get_flight(pending["flight_id"])
+    if not flight:
+        session.pop("pending_flight_booking", None)
+        return redirect(url_for("flights-hotels.flights_page"))
+    fare = _flight_fare(flight, pending)
+    # Pair each passenger with the seat assigned to them (same order).
+    seat_assignments = [
+        {"passenger": p, "seat": s, "zone": _seat_zone(s)[1], "fee": _seat_fee(s)}
+        for p, s in zip(pending.get("passengers", []), pending.get("seats", []))
+    ]
+    return render_template(
+        "flights-hotels/flight_review.html",
+        user=user, logged_in=True, flight=flight, pending=pending,
+        fare=fare, seat_assignments=seat_assignments,
+        bp=_boarding_extras(flight, pending.get("seats")))
+
+
+@blueprint.route("/book/flight/confirm", methods=["POST"])
+def book_flight_confirm():
+    """STEP 3 (POST): route through 2FA; finalize happens on return."""
+    user = _get_current_user()
+    pending = session.get("pending_flight_booking")
+    if not user or not pending or not pending.get("seats"):
+        return redirect(url_for("flights-hotels.flights_page"))
+    flight = _get_flight(pending["flight_id"])
+    if not flight:
+        session.pop("pending_flight_booking", None)
+        return redirect(url_for("flights-hotels.flights_page"))
+
+    account_type = (request.form.get("account_type") or "checking").strip()
+    fare = _flight_fare(flight, pending)
+    pending["account_type"] = account_type
+    pending["fare"] = fare
+    pending["ready"] = True
+    session["pending_flight_booking"] = pending
+    session.modified = True
+
     from app.events import request_2fa
     verify_url = request_2fa("payment",
-                             return_url=url_for("flights-hotels.bookings_page"),
+                             return_url=url_for("flights-hotels.book_flight_complete"),
                              user_id=user["id"],
                              recipient="SkyLodge Travel",
-                             amount=total_price,
+                             amount=fare["total"],
                              category="Travel",
                              account_type=account_type)
     return redirect(verify_url)
 
 
+@blueprint.route("/book/flight/complete", methods=["GET"])
+def book_flight_complete():
+    """FINALIZE: reached only after 2FA. Writes the booking exactly once, then
+    clears the pending session. An abandoned wizard never reaches here, so it
+    leaves NO booking."""
+    user = _get_current_user()
+    pending = session.get("pending_flight_booking")
+    if not user or not pending or not pending.get("ready"):
+        return redirect(url_for("flights-hotels.flights_page"))
+    flight = _get_flight(pending["flight_id"])
+    if not flight:
+        session.pop("pending_flight_booking", None)
+        return redirect(url_for("flights-hotels.flights_page"))
+
+    fare = pending.get("fare") or _flight_fare(flight, pending)
+    passengers = pending.get("passengers", [])
+    seats = pending.get("seats", [])
+
+    new_id = db.next_id(SITE, "bookings")
+    booking = {
+        "id": new_id,
+        "user_id": user["id"],
+        "type": "flight",
+        "reference_id": pending["flight_id"],
+        "status": "confirmed",
+        "booking_date": datetime.now().strftime("%Y-%m-%d"),
+        "total_price": fare["total"],
+        "travelers": pending["travelers"],
+        "passenger_name": passengers[0] if passengers else "",
+        "passengers": json.dumps(passengers),
+        "depart_date": pending.get("depart_date", ""),
+        "return_date": pending.get("return_date", ""),
+        "trip_type": pending.get("trip_type", "one_way"),
+        "seat": seats[0] if seats else "",
+        "seats": json.dumps(seats),
+        "seat_fees": json.dumps(pending.get("seat_fees", [])),
+        "seat_fee_total": pending.get("seat_fee_total", 0.0),
+        "cabin_class": pending.get("cabin_class", "economy"),
+        "base_fare": fare["base"],
+        "cabin_mult": fare["cabin_mult"],
+        "legs": fare["legs"],
+        "fare_subtotal": fare["fare_subtotal"],
+        "refund_amount": 0.0,
+    }
+    db.save_item(SITE, "bookings", new_id, booking)
+
+    # Bridge: calendar booking (non-financial). Payment was bridged by 2FA.
+    try:
+        from app.bridges import on_booking
+        depart = pending.get("depart_date") or booking["booking_date"]
+        on_booking(user_id=user["id"],
+                   title=f"Flight {flight['flight_number']} {flight['origin']}-{flight['destination']}",
+                   start=f"{depart}T{flight['departure_time']}",
+                   end=f"{depart}T{flight['arrival_time']}",
+                   location=f"{flight['origin']} to {flight['destination']}",
+                   service_name="SkyLodge Travel",
+                   confirmation_id=str(new_id))
+    except Exception:
+        pass
+
+    emit("message", from_user_id=user["id"], to_user_id=user["id"],
+         text=f"Flight booked: {flight['flight_number']} {flight['origin']}-{flight['destination']} on {pending.get('depart_date')}",
+         source_site="flights-hotels")
+
+    session.pop("pending_flight_booking", None)
+    session.modified = True
+    return render_template("flights-hotels/booking_confirmation.html",
+                           user=user, logged_in=True, booking=booking,
+                           booking_id=new_id, ref=flight, seats=seats,
+                           passengers=passengers,
+                           bp=_boarding_extras(flight, seats))
+
+
+# ------------------------- HOTEL WIZARD (2 steps) --------------------------
+# STEP 1: /hotel/<id> form -> POST here -> store pending -> review.
+# STEP 2: /book/hotel/review (GET) -> /book/hotel/confirm (POST, 2FA) ->
+#         /book/hotel/complete (GET) writes the booking.
+
 @blueprint.route("/book/hotel/<int:hotel_id>", methods=["POST"])
 def book_hotel(hotel_id):
+    """STEP 1 submit: validate the stay, stash in session, go to review."""
     user = _get_current_user()
     if not user:
         return render_template("flights-hotels/login.html",
@@ -898,30 +1476,131 @@ def book_hotel(hotel_id):
     hotel = _get_hotel(hotel_id)
     if not hotel:
         abort(404)
-    nights = request.form.get("nights", 1, type=int)
-    travelers = request.form.get("travelers", 1, type=int)
-    account_type = request.form.get("account_type", "checking")
-    total_price = round(hotel["price_per_night"] * nights, 2)
+    travelers = request.form.get("travelers", 1, type=int) or 1
+    travelers = max(1, min(travelers, 4))
 
-    bookings = _load_bookings()
-    new_id = max((b["id"] for b in bookings), default=0) + 1
+    guests = _collect_passenger_names(request.form, travelers,
+                                      lead_field="guest_name",
+                                      prefix="guest_name_")
+    if len(guests) < travelers:
+        return render_template(
+            "flights-hotels/hotel_detail.html",
+            user=user, logged_in=True, hotel=hotel,
+            room_options=_room_options(hotel),
+            form_error="Please enter a name for each guest."), 400
+
+    check_in_date = (request.form.get("check_in_date") or "").strip()
+    check_out_date = (request.form.get("check_out_date") or "").strip()
+    nights = _nights_between(check_in_date, check_out_date)
+    if nights is None:
+        nights = request.form.get("nights", 1, type=int) or 1
+
+    room_type = (request.form.get("room_type") or "standard").strip().lower()
+    if room_type not in _ROOM_TYPES:
+        room_type = "standard"
+    room_rate = round(float(hotel["price_per_night"]) * _ROOM_TYPES[room_type]["mult"], 2)
+    total_price = round(room_rate * nights, 2)
+
+    session["pending_hotel_booking"] = {
+        "hotel_id": hotel_id,
+        "travelers": travelers,
+        "guests": guests,
+        "check_in_date": check_in_date,
+        "check_out_date": check_out_date,
+        "nights": nights,
+        "room_type": room_type,
+        "room_rate": room_rate,
+        "total_price": total_price,
+        "account_type": "checking",
+    }
+    session.modified = True
+    return redirect(url_for("flights-hotels.book_hotel_review"))
+
+
+@blueprint.route("/book/hotel/review", methods=["GET"])
+def book_hotel_review():
+    """STEP 2 (GET): room + nightly rate + nights + total + payment + Confirm."""
+    user = _get_current_user()
+    pending = session.get("pending_hotel_booking")
+    if not user or not pending:
+        return redirect(url_for("flights-hotels.hotels_page"))
+    hotel = _get_hotel(pending["hotel_id"])
+    if not hotel:
+        session.pop("pending_hotel_booking", None)
+        return redirect(url_for("flights-hotels.hotels_page"))
+    return render_template(
+        "flights-hotels/hotel_review.html",
+        user=user, logged_in=True, hotel=hotel, pending=pending,
+        room_label=_ROOM_TYPES.get(pending["room_type"], _ROOM_TYPES["standard"])["label"])
+
+
+@blueprint.route("/book/hotel/confirm", methods=["POST"])
+def book_hotel_confirm():
+    """STEP 2 (POST): route through 2FA; finalize happens on return."""
+    user = _get_current_user()
+    pending = session.get("pending_hotel_booking")
+    if not user or not pending:
+        return redirect(url_for("flights-hotels.hotels_page"))
+    hotel = _get_hotel(pending["hotel_id"])
+    if not hotel:
+        session.pop("pending_hotel_booking", None)
+        return redirect(url_for("flights-hotels.hotels_page"))
+
+    account_type = (request.form.get("account_type") or "checking").strip()
+    pending["account_type"] = account_type
+    pending["ready"] = True
+    session["pending_hotel_booking"] = pending
+    session.modified = True
+
+    from app.events import request_2fa
+    verify_url = request_2fa("payment",
+                             return_url=url_for("flights-hotels.book_hotel_complete"),
+                             user_id=user["id"],
+                             recipient="SkyLodge Travel",
+                             amount=pending["total_price"],
+                             category="Travel",
+                             account_type=account_type)
+    return redirect(verify_url)
+
+
+@blueprint.route("/book/hotel/complete", methods=["GET"])
+def book_hotel_complete():
+    """FINALIZE: reached only after 2FA. Writes the booking exactly once."""
+    user = _get_current_user()
+    pending = session.get("pending_hotel_booking")
+    if not user or not pending or not pending.get("ready"):
+        return redirect(url_for("flights-hotels.hotels_page"))
+    hotel = _get_hotel(pending["hotel_id"])
+    if not hotel:
+        session.pop("pending_hotel_booking", None)
+        return redirect(url_for("flights-hotels.hotels_page"))
+
+    guests = pending.get("guests", [])
+    new_id = db.next_id(SITE, "bookings")
     booking = {
         "id": new_id,
         "user_id": user["id"],
         "type": "hotel",
-        "reference_id": hotel_id,
+        "reference_id": pending["hotel_id"],
         "status": "confirmed",
         "booking_date": datetime.now().strftime("%Y-%m-%d"),
-        "total_price": total_price,
-        "travelers": travelers,
+        "total_price": pending["total_price"],
+        "travelers": pending["travelers"],
+        "passenger_name": guests[0] if guests else "",
+        "passengers": json.dumps(guests),
+        "check_in_date": pending.get("check_in_date", ""),
+        "check_out_date": pending.get("check_out_date", ""),
+        "nights": pending.get("nights", 1),
+        "room_type": pending.get("room_type", "standard"),
+        "room_rate": pending.get("room_rate", 0.0),
+        "refund_amount": 0.0,
     }
-    bookings.append(booking)
-    _save_bookings(bookings)
+    db.save_item(SITE, "bookings", new_id, booking)
 
-    # Bridge: calendar booking (non-financial, no 2FA needed)
+    # Bridge: calendar booking (non-financial). Payment was bridged by 2FA.
     try:
         from app.bridges import on_booking
-        check_in = request.form.get("check_in", booking["booking_date"])
+        check_in = pending.get("check_in_date") or booking["booking_date"]
         on_booking(user_id=user["id"],
                    title=f"Hotel: {hotel['name']}",
                    start=f"{check_in}T{hotel['check_in']}",
@@ -929,20 +1608,17 @@ def book_hotel(hotel_id):
                    service_name="SkyLodge Travel",
                    confirmation_id=str(new_id))
     except Exception:
-        pass  # bridge failure should never block the main flow
+        pass
 
-    emit("message", from_user_id=user["id"], to_user_id=user["id"], text=f"Hotel booked: {hotel['name']} in {hotel['city']}", source_site="flights-hotels")
+    emit("message", from_user_id=user["id"], to_user_id=user["id"],
+         text=f"Hotel booked: {hotel['name']} in {hotel['city']}",
+         source_site="flights-hotels")
 
-    # 2FA: send verification code before completing the payment
-    from app.events import request_2fa
-    verify_url = request_2fa("payment",
-                             return_url=url_for("flights-hotels.bookings_page"),
-                             user_id=user["id"],
-                             recipient="SkyLodge Travel",
-                             amount=total_price,
-                             category="Travel",
-                             account_type=account_type)
-    return redirect(verify_url)
+    session.pop("pending_hotel_booking", None)
+    session.modified = True
+    return render_template("flights-hotels/booking_confirmation.html",
+                           user=user, logged_in=True, booking=booking,
+                           booking_id=new_id, ref=hotel)
 
 
 @blueprint.route("/booking/<int:booking_id>/cancel", methods=["POST"])
@@ -951,12 +1627,18 @@ def cancel_booking(booking_id):
     if not user:
         return render_template("flights-hotels/login.html",
                                error="Please log in first")
-    bookings = _load_bookings()
-    booking = next((b for b in bookings if b["id"] == booking_id), None)
+    booking = db.get_item(SITE, "bookings", booking_id)
     if not booking:
         abort(404)
+    # Compute and record a refund (mirrors ticketing-events: a confirmed
+    # booking is refunded its full total; anything already cancelled refunds 0).
+    if booking.get("status") == "cancelled":
+        refund = booking.get("refund_amount", 0.0)
+    else:
+        refund = round(booking.get("total_price", 0.0), 2)
     booking["status"] = "cancelled"
-    _save_bookings(bookings)
+    booking["refund_amount"] = refund
+    db.save_item(SITE, "bookings", booking_id, booking)
     return redirect(url_for("flights-hotels.bookings_page"))
 
 

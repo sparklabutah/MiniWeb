@@ -181,6 +181,13 @@
                         <!-- play_by_playback -->
                         <button class="btn-action" id="btn-play" onclick="playArticle({{ article.id }})">Listen to Article</button>
 
+                        <!-- audio player UI (revealed once play starts) -->
+                        <div id="audio-player" class="audio-player" style="display:none; align-items:center; gap:8px; margin-left:8px;">
+                            <span id="audio-time" class="audio-time" style="font-size:.75rem; color:#666; font-variant-numeric:tabular-nums;">0:00</span>
+                            <progress id="audio-progress" value="0" max="100" style="width:140px; height:8px;"></progress>
+                            <span id="audio-duration" class="audio-time" style="font-size:.75rem; color:#666; font-variant-numeric:tabular-nums;">0:00</span>
+                        </div>
+
                         <!-- save_by_toggle (bookmark) -->
                         {% set bm_icon %}<svg width="12" height="15" viewBox="0 0 16 20" style="vertical-align:-2px;margin-right:5px;" fill="{{ 'currentColor' if is_bookmarked else 'none' }}" stroke="currentColor" stroke-width="1.6"><path d="M3 1h10a1 1 0 0 1 1 1v16l-6-4-6 4V2a1 1 0 0 1 1-1z"/></svg>{% endset %}
                         {% if user %}
@@ -290,14 +297,58 @@
     </footer>
 
     <script>
+    var _audioTimer = null;
+    var _audioPos = 0;
+    var _audioDur = 0;
+    function _fmt(s) { return Math.floor(s / 60) + ':' + ('0' + (Math.floor(s) % 60)).slice(-2); }
+    function _renderAudio() {
+        document.getElementById('audio-time').textContent = _fmt(_audioPos);
+        var pct = _audioDur > 0 ? (_audioPos / _audioDur) * 100 : 0;
+        document.getElementById('audio-progress').value = pct;
+    }
     function playArticle(articleId) {
         var btn = document.getElementById('btn-play');
+        // Toggle: if already playing, pause.
+        if (btn.classList.contains('playing')) {
+            if (_audioTimer) { clearInterval(_audioTimer); _audioTimer = null; }
+            btn.textContent = 'Resume';
+            btn.classList.remove('playing');
+            return;
+        }
+        // Resume without re-hitting the API if we've already loaded audio.
+        if (_audioDur > 0 && _audioPos > 0 && _audioPos < _audioDur) {
+            _startTicking(btn);
+            return;
+        }
         fetch('/sites/news/api/articles/' + articleId + '/play', {method: 'POST'})
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                btn.textContent = 'Playing (' + data.duration_seconds + 's)';
-                btn.classList.add('active');
+                _audioPos = data.position_seconds || 0;
+                _audioDur = data.duration_seconds || 0;
+                var player = document.getElementById('audio-player');
+                player.style.display = 'inline-flex';
+                document.getElementById('audio-progress').max = 100;
+                document.getElementById('audio-duration').textContent = data.duration_label || _fmt(_audioDur);
+                _renderAudio();
+                _startTicking(btn);
             });
+    }
+    function _startTicking(btn) {
+        btn.textContent = 'Pause';
+        btn.classList.add('active', 'playing');
+        if (_audioTimer) { clearInterval(_audioTimer); }
+        _audioTimer = setInterval(function() {
+            _audioPos += 1;
+            if (_audioPos >= _audioDur) {
+                _audioPos = _audioDur;
+                _renderAudio();
+                clearInterval(_audioTimer); _audioTimer = null;
+                btn.textContent = 'Replay';
+                btn.classList.remove('playing');
+                return;
+            }
+            _renderAudio();
+        }, 1000);
     }
     function followTarget(type, target) {
         fetch('/sites/news/api/follow', {

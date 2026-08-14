@@ -65,10 +65,10 @@
         <a href="{{ url_for('instant-messaging.index') }}" class="active">Chats</a>
         <a href="{{ url_for('instant-messaging.contacts_page') }}">Contacts</a>
         <span style="flex:1;"></span>
-        <select onchange="location.href='?sort='+this.value" style="padding:.3rem .5rem;background:#202c33;border:1px solid #2a3942;border-radius:.3rem;color:#e9edef;font-size:.82rem;">
-            <option value="recent">Sort: Recent</option>
-            <option value="name">Sort: Name</option>
-            <option value="unread">Sort: Unread</option>
+        <select id="sortSelect" onchange="applyView()" style="padding:.3rem .5rem;background:#202c33;border:1px solid #2a3942;border-radius:.3rem;color:#e9edef;font-size:.82rem;">
+            <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Sort: Recent</option>
+            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort: Name</option>
+            <option value="unread" {% if sort_by == 'unread' %}selected{% endif %}>Sort: Unread</option>
         </select> </nav>
 
     <div class="app-container">
@@ -79,9 +79,10 @@
                 </div>
                 <div style="display:flex;gap:4px;padding:4px 8px;align-items:center;">
                     <label style="font-size:.72rem;color:#8696a0;">From:</label>
-                    <input type="date" id="dateFrom" onchange="filterConversations()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    <input type="date" id="dateFrom" value="{{ date_from }}" onchange="applyView()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
                     <label style="font-size:.72rem;color:#8696a0;">To:</label>
-                    <input type="date" id="dateTo" onchange="filterConversations()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    <input type="date" id="dateTo" value="{{ date_to }}" onchange="applyView()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    {% if date_from or date_to %}<a href="{{ url_for('instant-messaging.index', sort=sort_by) }}" style="font-size:.72rem;color:#00a884;text-decoration:none;margin-left:2px;">Clear</a>{% endif %}
                 </div>
             </div>
             <div class="conversation-list" id="conversationList">
@@ -119,6 +120,20 @@
     </div>
 
     <script>
+        // Reload with the chosen sort + date range so the server re-orders and
+        // re-filters the conversation list (SQL-level date filter).
+        function applyView() {
+            const params = new URLSearchParams();
+            const sort = document.getElementById('sortSelect').value;
+            const from = document.getElementById('dateFrom').value;
+            const to = document.getElementById('dateTo').value;
+            if (sort && sort !== 'recent') params.set('sort', sort);
+            if (from) params.set('from', from);
+            if (to) params.set('to', to);
+            const qs = params.toString();
+            location.href = qs ? '?' + qs : location.pathname;
+        }
+
         function filterConversations() {
             const q = document.getElementById('searchInput').value.toLowerCase();
             document.querySelectorAll('.conv-item').forEach(item => {

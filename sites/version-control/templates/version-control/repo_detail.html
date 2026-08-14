@@ -331,7 +331,11 @@
                 </span>
                 <div class="issue-info">
                     <div>
+                        {% if is_raw %}
+                        <a class="issue-title" href="{{ url_for('version-control.issue_detail', issue_id=i.id) }}">#{{ i.id }} {{ i.title }}</a>
+                        {% else %}
                         <span class="issue-title">#{{ i.id }} {{ i.title }}</span>
+                        {% endif %}
                         <span class="issue-labels">
                             {% for label in i.labels %}
                             <span class="issue-label {% if label == 'bug' %}label-bug{% elif label == 'enhancement' %}label-enhancement{% elif label == 'security' %}label-security{% else %}label-default{% endif %}">{{ label }}</span>
@@ -371,8 +375,7 @@
         <div class="section-empty">No issues found for this repository.</div>
         {% endif %}
 
-        {% if not is_raw %}
-        <!-- New issue form (submit_by_form) -->
+        <!-- New issue form (submit_by_form) — available on all repos -->
         <div class="panel-box" id="new-issue-panel">
             <div class="panel-title">New issue</div>
             <div class="panel-body">
@@ -386,7 +389,6 @@
                 </form>
             </div>
         </div>
-        {% endif %}
     </div>
 
     <!-- Commits tab -->
@@ -428,8 +430,7 @@
         <div class="section-empty">No commits found.</div>
         {% endif %}
 
-        {% if not is_raw %}
-        <!-- New merge request form (submit_by_form) -->
+        <!-- New merge request form (submit_by_form) — available on all repos -->
         <div class="panel-box" id="new-mr-panel">
             <div class="panel-title">Open a merge request</div>
             <div class="panel-body">
@@ -447,7 +448,6 @@
                 </form>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 
@@ -459,7 +459,6 @@ function showTab(name) {
     event.currentTarget.classList.add('active');
 }
 </script>
-{% if not is_raw %}
 <script>
 (function() {
     var repoId = {{ repo.id }};
@@ -588,6 +587,5 @@ function showTab(name) {
     });
 })();
 </script>
-{% endif %}
 </body>
 </html>

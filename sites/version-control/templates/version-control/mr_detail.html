@@ -44,6 +44,18 @@
         .note-body { color: #c9d1d9; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; }
 
         .empty-notes { color: #8b949e; padding: 16px 0; }
+
+        .mr-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .btn-merge { background: #8957e5; color: #fff; border: 1px solid rgba(240,246,252,0.1); padding: 6px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-merge:hover { background: #9a6ff0; }
+        .btn-close-mr { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .btn-close-mr:hover { background: #30363d; }
+        .comment-box { margin-top: 20px; }
+        .comment-box textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 8px 10px; font-size: 14px; font-family: inherit; min-height: 70px; resize: vertical; }
+        .btn-comment { background: #238636; color: #fff; border: 1px solid rgba(240,246,252,0.1); padding: 6px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 8px; }
+        .btn-comment:hover { background: #2ea043; }
+        .comment-status { font-size: 13px; margin-top: 8px; color: #3fb950; }
+        .comment-status.error { color: #f85149; }
     </style>
 </head>
 <body>
@@ -87,6 +99,16 @@
             &rarr;
             <span class="branch-tag">{{ mr.target_branch }}</span>
         </div>
+        {% if mr.state_id == 1 %}
+        <div class="mr-actions">
+            <form method="post" action="{{ url_for('version-control.mr_merge', mr_id=mr.id) }}" style="display:inline;">
+                <button type="submit" class="btn-merge">Merge</button>
+            </form>
+            <form method="post" action="{{ url_for('version-control.mr_close', mr_id=mr.id) }}" style="display:inline;">
+                <button type="submit" class="btn-close-mr">Close</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 
     {% if mr.description %}
@@ -109,6 +131,32 @@
     {% else %}
     <p class="empty-notes">No discussion on this merge request yet.</p>
     {% endif %}
+
+    <div class="comment-box">
+        <form id="mr-comment-form">
+            <textarea id="mr-comment-body" placeholder="Leave a comment on this merge request..."></textarea>
+            <button type="submit" class="btn-comment">Comment</button>
+            <div class="comment-status" id="mr-comment-status"></div>
+        </form>
+    </div>
 </div>
+<script>
+(function() {
+    var form = document.getElementById('mr-comment-form');
+    var status = document.getElementById('mr-comment-status');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var body = document.getElementById('mr-comment-body').value.trim();
+        if (!body) { status.textContent = 'Comment cannot be empty.'; status.classList.add('error'); return; }
+        fetch('/sites/version-control/api/mr/{{ mr.id }}/comments', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({body: body})
+        })
+            .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { status.textContent = 'Could not post comment.'; status.classList.add('error'); });
+    });
+})();
+</script>
 </body>
 </html>

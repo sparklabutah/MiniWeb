@@ -47,6 +47,8 @@ TABLES = {
             ("user_id", "INTEGER NOT NULL DEFAULT 0"),
             ("timestamp", "TEXT NOT NULL DEFAULT ''"),
             ("summary", "TEXT NOT NULL DEFAULT ''"),
+            ("title", "TEXT NOT NULL DEFAULT ''"),
+            ("content", "TEXT NOT NULL DEFAULT ''"),
         ],
         "indexes": [
             "timestamp",

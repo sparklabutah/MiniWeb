@@ -117,7 +117,18 @@
                            style="padding:0.3rem 0.6rem;border:1px solid #dadce0;border-radius:4px;font-size:0.85rem;width:220px;">
                     <button type="submit" class="btn btn-primary btn-sm">Save</button>
                 </form>
+                <button class="btn btn-outline btn-sm" id="move-file-btn" onclick="var f=document.getElementById('move-form');f.style.display=f.style.display==='none'?'inline-flex':'none';">&#128194; Move</button>
+                <form id="move-form" method="post" action="{{ url_for('cloud-storage-file-transfer.form_file_move', file_id=file.id) }}" style="display:none;gap:4px;align-items:center;">
+                    <select name="folder_id" style="padding:0.3rem 0.5rem;border:1px solid #dadce0;border-radius:4px;font-size:0.85rem;max-width:220px;">
+                        <option value="root" {% if not file.folder_id %}selected{% endif %}>My Drive (root)</option>
+                        {% for opt in folder_options %}
+                        <option value="{{ opt.id }}" {% if file.folder_id == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">Move here</button>
+                </form>
                 <button class="btn btn-outline btn-sm" onclick="var b=this;navigator.clipboard.writeText(window.location.href);b.innerHTML='&#128279; Copied!';setTimeout(()=>b.innerHTML='&#128279; Share',2000)">&#128279; Share</button>
+                <a class="btn btn-outline btn-sm" href="{{ url_for('cloud-storage-file-transfer.transfers_new', file=file.id) }}">&#9993; Send</a>
                 <a class="btn btn-outline btn-sm" href="{{ url_for('cloud-storage-file-transfer.file_download', file_id=file.id) }}" download="{{ file.name }}" data-download-name="{{ file.name }}">&#8595; Download</a>
                 <button class="btn btn-outline btn-sm" id="delete-file-btn" style="color:#d93025;">&#128465; Delete</button>
                 <script>

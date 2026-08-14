@@ -72,6 +72,28 @@
                 <div><div class="detail-label">Tags</div><div class="detail-value">{% for k, v in instance.tags.items() %}<span class="tag">{{ k }}={{ v }}</span>{% endfor %}</div></div>
             </div>
         </div>
+        <!-- Power state controls (start / stop / reboot) -->
+        {% if instance.status != 'terminated' %}
+        <div class="section" id="power-controls-section">
+            <h2>Instance State</h2>
+            <p style="font-size:.85rem;color:#64748b;margin-bottom:.8rem;">Current state:
+                <span class="status-badge status-{{ instance.status }}">{{ instance.status }}</span></p>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                <form method="POST" action="{{ url_for('cloud-dev-consoles.form_start_instance', instance_id=instance.id) }}">
+                    <button type="submit" id="start-instance-btn" {% if instance.status == 'running' %}disabled{% endif %}
+                        style="padding:.45rem 1rem;border:1px solid #b6dfc0;background:#d4edda;color:#155724;border-radius:4px;cursor:pointer;font-size:.85rem;{% if instance.status == 'running' %}opacity:.5;cursor:not-allowed;{% endif %}">Start</button>
+                </form>
+                <form method="POST" action="{{ url_for('cloud-dev-consoles.form_stop_instance', instance_id=instance.id) }}">
+                    <button type="submit" id="stop-instance-btn" {% if instance.status != 'running' %}disabled{% endif %}
+                        style="padding:.45rem 1rem;border:1px solid #f5c6cb;background:#f8d7da;color:#721c24;border-radius:4px;cursor:pointer;font-size:.85rem;{% if instance.status != 'running' %}opacity:.5;cursor:not-allowed;{% endif %}">Stop</button>
+                </form>
+                <form method="POST" action="{{ url_for('cloud-dev-consoles.form_reboot_instance', instance_id=instance.id) }}">
+                    <button type="submit" id="reboot-instance-btn" {% if instance.status != 'running' %}disabled{% endif %}
+                        style="padding:.45rem 1rem;border:1px solid #cbd5e1;background:#fff;color:#232f3e;border-radius:4px;cursor:pointer;font-size:.85rem;{% if instance.status != 'running' %}opacity:.5;cursor:not-allowed;{% endif %}">Reboot</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
         <!-- Edit instance configuration (edit_by_form) -->
         <div class="section" id="edit-config-section">
             <h2>Edit Configuration</h2>

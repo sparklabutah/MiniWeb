@@ -123,26 +123,33 @@
         var type = document.getElementById('type').value;
 
         var checkboxes = document.querySelectorAll('input[name="participants"]:checked');
-        var participants = [];
-        checkboxes.forEach(function(cb) { participants.push(cb.value); });
 
-        var payload = {
-            title: title,
-            date: date,
-            duration_minutes: parseInt(duration),
-            type: type,
-            participants: participants
-        };
+        // Use FormData so the optional agenda/file attachment is sent along
+        // with the meeting details (multipart/form-data).
+        var fd = new FormData();
+        fd.append('title', title);
+        fd.append('date', date);
+        fd.append('duration_minutes', parseInt(duration));
+        fd.append('type', type);
+        checkboxes.forEach(function(cb) { fd.append('participants', cb.value); });
+
+        var fileInput = document.getElementById('attachment');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            fd.append('file', fileInput.files[0]);
+        }
 
         fetch('{{ url_for("remote-calls.api_meetings_create") }}', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+            body: fd
         })
         .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
         .then(function(result) {
             if (result.status === 201) {
-                document.getElementById('success-msg').textContent = 'Meeting "' + result.data.title + '" scheduled successfully! (ID: ' + result.data.id + ')';
+                var okMsg = 'Meeting "' + result.data.title + '" scheduled successfully! (ID: ' + result.data.id + ')';
+                if (result.data.attachment && result.data.attachment.filename) {
+                    okMsg += ' Attachment: ' + result.data.attachment.filename;
+                }
+                document.getElementById('success-msg').textContent = okMsg;
                 document.getElementById('success-msg').style.display = 'block';
                 document.getElementById('error-msg').style.display = 'none';
                 form.reset();

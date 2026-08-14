@@ -55,6 +55,27 @@ def _save_revisions(revisions):
     db.save_collection(SITE, "revisions", revisions)
 
 
+def _append_revision(revisions, *, document_id, user_id, timestamp, summary, doc):
+    """Append a new revision that captures a full content snapshot of ``doc``.
+
+    Storing the title + content on every revision is what makes the version
+    history restorable (Google-Docs style "see / restore a previous version"),
+    not just a log line. Revisions persist as full JSON blobs in the session
+    overlay, so these extra keys survive without a DB rebuild.
+    """
+    rev_id = max((r["id"] for r in revisions), default=0) + 1
+    revisions.append({
+        "id": rev_id,
+        "document_id": document_id,
+        "user_id": user_id,
+        "timestamp": timestamp,
+        "summary": summary,
+        "title": doc.get("title", ""),
+        "content": doc.get("content", ""),
+    })
+    return rev_id
+
+
 # ---------------------------------------------------------------------------
 # User helpers
 # ---------------------------------------------------------------------------
@@ -223,13 +244,14 @@ def editor(doc_id):
         abort(403)
     users = _load_users()
     user_map = {u["id"]: u for u in users}
+    folders = _load_folders()
     revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
     revisions.sort(key=lambda r: r["timestamp"], reverse=True)
     can_edit = user and _user_can_edit(doc, user["id"])
     permission = _user_permission(doc, user["id"]) if user else None
     return render_template("documents/editor.html", doc=doc, user=user,
                            user_map=user_map, users=users, revisions=revisions,
-                           can_edit=can_edit, permission=permission)
+                           folders=folders, can_edit=can_edit, permission=permission)
 
 
 @blueprint.route("/view/<int:doc_id>")
@@ -481,16 +503,94 @@ def form_update_document(doc_id):
         _save_documents(docs)
 
         revisions = _load_revisions()
-        rev_id = max((r["id"] for r in revisions), default=0) + 1
-        revisions.append({
-            "id": rev_id,
-            "document_id": doc_id,
-            "user_id": user["id"],
-            "timestamp": now,
-            "summary": "Updated via form",
-        })
+        _append_revision(revisions, document_id=doc_id, user_id=user["id"],
+                         timestamp=now, summary="Updated via form", doc=doc)
         _save_revisions(revisions)
 
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/document/<int:doc_id>/version/<int:rev_id>")
+def version_view(doc_id, rev_id):
+    """Show the historical content captured in a specific revision.
+
+    This is the Google-Docs "see this previous version" view: it renders the
+    title/content snapshot stored on the revision, not the document's current
+    body. Older seed revisions predate snapshots and carry no content -- those
+    are shown with a notice instead.
+    """
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    rev = next((r for r in _load_revisions()
+                if r["id"] == rev_id and r["document_id"] == doc_id), None)
+    if rev is None:
+        abort(404)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    has_snapshot = "content" in rev
+    can_edit = _user_can_edit(doc, user["id"])
+    return render_template("documents/version.html", doc=doc, rev=rev,
+                           user=user, user_map=user_map,
+                           has_snapshot=has_snapshot, can_edit=can_edit)
+
+
+@blueprint.route("/document/<int:doc_id>/version/<int:rev_id>/restore", methods=["POST"])
+def form_restore_version(doc_id, rev_id):
+    """Restore a previous version: overwrite the document with the revision's
+    snapshot and record a NEW revision capturing the restored content."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+    rev = next((r for r in _load_revisions()
+                if r["id"] == rev_id and r["document_id"] == doc_id), None)
+    if rev is None or "content" not in rev:
+        abort(404)
+
+    old_content = rev["content"]
+    doc["content"] = old_content
+    if rev.get("title"):
+        doc["title"] = rev["title"]
+    doc["word_count"] = len(old_content.split()) if old_content.strip() else 0
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    doc["updated_at"] = now
+    _save_documents(docs)
+
+    revisions = _load_revisions()
+    _append_revision(revisions, document_id=doc_id, user_id=user["id"],
+                     timestamp=now,
+                     summary=f"Restored version from {rev['timestamp'][:10]}",
+                     doc=doc)
+    _save_revisions(revisions)
+
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/document/<int:doc_id>/move", methods=["POST"])
+def form_move_document(doc_id):
+    """Move a document to a different folder from the editor UI."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+    folder_id = request.form.get("folder_id", type=int)  # blank -> None (no folder)
+    doc["folder_id"] = folder_id
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
     return redirect(url_for("documents.editor", doc_id=doc_id))
 
 
@@ -656,14 +756,8 @@ def form_create_document():
     _save_documents(docs)
 
     revisions = _load_revisions()
-    rev_id = max((r["id"] for r in revisions), default=0) + 1
-    revisions.append({
-        "id": rev_id,
-        "document_id": new_id,
-        "user_id": owner_id,
-        "timestamp": now,
-        "summary": "Created document",
-    })
+    _append_revision(revisions, document_id=new_id, user_id=owner_id,
+                     timestamp=now, summary="Created document", doc=new_doc)
     _save_revisions(revisions)
 
     emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
@@ -760,14 +854,8 @@ def api_create_document():
 
     # Create initial revision
     revisions = _load_revisions()
-    rev_id = max((r["id"] for r in revisions), default=0) + 1
-    revisions.append({
-        "id": rev_id,
-        "document_id": new_id,
-        "user_id": owner_id,
-        "timestamp": now,
-        "summary": "Created document",
-    })
+    _append_revision(revisions, document_id=new_id, user_id=owner_id,
+                     timestamp=now, summary="Created document", doc=new_doc)
     _save_revisions(revisions)
 
     emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
@@ -802,14 +890,8 @@ def api_update_document(doc_id):
         user_id = data.get("user_id", doc["owner_id"])
         summary = data.get("summary", "Updated document")
         revisions = _load_revisions()
-        rev_id = max((r["id"] for r in revisions), default=0) + 1
-        revisions.append({
-            "id": rev_id,
-            "document_id": doc_id,
-            "user_id": user_id,
-            "timestamp": now,
-            "summary": summary,
-        })
+        _append_revision(revisions, document_id=doc_id, user_id=user_id,
+                         timestamp=now, summary=summary, doc=doc)
         _save_revisions(revisions)
 
     return jsonify(doc)

@@ -4,10 +4,11 @@ Reads config/config.json for simulated_today. Synthesized event data with
 multiple users, categories (work/personal/health), recurring events, and
 shared calendars.
 """
+import calendar as _calendar
 import json
 import pathlib
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 
@@ -198,6 +199,104 @@ def _month_range(year, month):
 
 
 # ---------------------------------------------------------------------------
+# Recurrence expansion
+#
+# Recurring events are stored as a single row carrying a `recurring` rule
+# (daily/weekly/biweekly/monthly) with one `start` date. They are NEVER
+# persisted as duplicate rows. Instead, when a view is rendered we expand the
+# base event into concrete occurrences that fall inside the visible date
+# range, so a "weekly" meeting shows up on every matching day — not only on
+# its original start date. Expansion is read-only and range-bounded.
+# ---------------------------------------------------------------------------
+
+_RECURRENCE_RULES = {"daily", "weekly", "biweekly", "monthly"}
+
+
+def _add_months(d, n):
+    """Add n calendar months to date d, clamping the day to month length."""
+    m = d.month - 1 + n
+    y = d.year + m // 12
+    m = m % 12 + 1
+    last_day = _calendar.monthrange(y, m)[1]
+    return date(y, m, min(d.day, last_day))
+
+
+def _shift_iso(iso_str, delta):
+    """Shift an ISO datetime/date string by a timedelta, preserving the time
+    component. Returns the input unchanged when it can't be parsed/empty."""
+    if not iso_str:
+        return iso_str
+    try:
+        dt = datetime.fromisoformat(iso_str)
+    except (ValueError, TypeError):
+        return iso_str
+    return (dt + delta).isoformat()
+
+
+def _recurrence_occurrence_dates(base_date, rule, range_start, range_end):
+    """All occurrence dates of a recurring event within [range_start,
+    range_end] (inclusive). Occurrences never precede the base date."""
+    if base_date is None or base_date > range_end:
+        return []
+    occurrences = []
+    if rule == "monthly":
+        i = 0
+        while True:
+            occ = _add_months(base_date, i)
+            if occ > range_end:
+                break
+            if occ >= range_start:
+                occurrences.append(occ)
+            i += 1
+            if i > 1200:  # safety valve (~100 years)
+                break
+    else:
+        step = {"daily": 1, "weekly": 7, "biweekly": 14}[rule]
+        occ = base_date
+        if occ < range_start:
+            # Jump forward to the first occurrence on/after range_start.
+            gap = (range_start - occ).days
+            occ = occ + timedelta(days=(gap // step) * step)
+            while occ < range_start:
+                occ = occ + timedelta(days=step)
+        while occ <= range_end:
+            occurrences.append(occ)
+            occ = occ + timedelta(days=step)
+    return occurrences
+
+
+def _make_occurrence(event, base_date, occ_date):
+    """Return the event for a specific occurrence date. The base occurrence
+    is returned unchanged; other occurrences are shallow copies with shifted
+    start/end and instance markers (same id -> links to the series)."""
+    if occ_date == base_date:
+        return event
+    occ = dict(event)
+    delta = occ_date - base_date
+    occ["start"] = _shift_iso(event.get("start", ""), delta)
+    occ["end"] = _shift_iso(event.get("end", ""), delta)
+    occ["is_recurring_instance"] = True
+    occ["occurrence_date"] = occ_date.isoformat()
+    return occ
+
+
+def _expand_events_for_range(events, range_start, range_end):
+    """Expand recurring events into their occurrences within the given date
+    range. Non-recurring events pass through when their date falls in range.
+    Never mutates or persists — occurrences are ephemeral copies."""
+    out = []
+    for e in events:
+        rule = (e.get("recurring") or "").strip().lower()
+        base = _event_date(e)
+        if rule in _RECURRENCE_RULES and base is not None:
+            for od in _recurrence_occurrence_dates(base, rule, range_start, range_end):
+                out.append(_make_occurrence(e, base, od))
+        elif base is not None and range_start <= base <= range_end:
+            out.append(e)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # HTML routes
 # ---------------------------------------------------------------------------
 
@@ -251,6 +350,12 @@ def index():
     offset_date = today_d + timedelta(weeks=week_offset)
     ws, we = _week_range(offset_date.isoformat())
 
+    # Snapshot the (non-date-filtered) result set BEFORE the date-range filter
+    # below narrows it. The week grid is built by expanding recurring series
+    # across ws..we, and a series whose base start predates ws must survive
+    # into this expansion — the date filter would otherwise drop that base row.
+    grid_source = list(results)
+
     # Default date range based on view
     if not date_from and not date_to:
         if view == "week":
@@ -272,12 +377,19 @@ def index():
 
     results = _sort_events(results, sort)
 
+    # Expand recurring events across the visible week grid so a recurring
+    # event renders on every occurrence in the week — not just its original
+    # start date. Uses the un-date-filtered `results` so a series that began
+    # months ago still surfaces its current-week occurrences. No rows are
+    # persisted; occurrences are ephemeral (see _expand_events_for_range).
+    grid_events = _sort_events(_expand_events_for_range(grid_source, ws, we), sort)
+
     # Build structured week days for the grid
     week_days = []
     for i in range(7):
         day = ws + timedelta(days=i)
         day_iso = day.isoformat()
-        day_evts = [e for e in results if _event_date(e) == day]
+        day_evts = [e for e in grid_events if _event_date(e) == day]
         week_days.append({
             "date": day_iso,
             "weekday": day.strftime("%A"),
@@ -343,7 +455,8 @@ def day_view(date_str):
     d = _parse_date(date_str)
     if not d:
         abort(400)
-    day_events = [e for e in events if _event_date(e) == d]
+    # Expand recurring series so their occurrences on this day are shown.
+    day_events = _expand_events_for_range(events, d, d)
     day_events = _sort_events(day_events, "date")
     user = None
     if "user_id" in session:
@@ -360,7 +473,8 @@ def week_view(date_str):
         return gate
     events = _load_events()
     ws, we = _week_range(date_str)
-    week_events = [e for e in events if _event_date(e) and ws <= _event_date(e) <= we]
+    # Expand recurring series across the week so occurrences render per-day.
+    week_events = _expand_events_for_range(events, ws, we)
     week_events = _sort_events(week_events, "date")
     days = []
     for i in range(7):
@@ -406,7 +520,11 @@ def dashboard():
     my_events = _sort_events(my_events, "date")
     today = _simulated_today()
     today_d = _parse_date(today)
-    upcoming = [e for e in my_events if _event_date(e) and _event_date(e) >= today_d]
+    # Expand recurring series over the next ~60 days so an ongoing weekly
+    # standup appears among upcoming items, not only its original date.
+    horizon = today_d + timedelta(days=60)
+    upcoming = _expand_events_for_range(my_events, today_d, horizon)
+    upcoming = _sort_events(upcoming, "date")
     return render_template("calendar-todo/dashboard.html", user=user,
                            events=my_events, upcoming=upcoming,
                            today=today)
@@ -886,6 +1004,85 @@ def api_invite_to_event(event_id):
     _save_events(events)
     return jsonify({"action": "invited", "event_id": event_id, "email": email,
                     "total_attendees": len(attendees)})
+
+
+# ---------------------------------------------------------------------------
+# RSVP — an invited attendee accepts / declines. Persisted per-attendee in
+# the event's `rsvps` map (email -> accepted|declined|tentative). Stored in
+# the session overlay via db.save_item (single-row upsert; the overlay keeps
+# the full JSON so the extra `rsvps` field survives even though it is not a
+# base-table column).
+# ---------------------------------------------------------------------------
+
+_RSVP_STATES = {
+    "accept": "accepted", "accepted": "accepted",
+    "decline": "declined", "declined": "declined",
+    "tentative": "tentative", "maybe": "tentative",
+}
+
+
+def _apply_rsvp(event_id, email, response):
+    """Record an RSVP on an event. Returns (event, status) or (None, error)."""
+    status = _RSVP_STATES.get((response or "").strip().lower())
+    if not status:
+        return None, "response must be accept, decline, or tentative"
+    event = db.get_item(SITE, "events", event_id)
+    if event is None:
+        return None, "not found"
+    _normalize_events([event])
+    email = (email or "").strip()
+    if not email:
+        return None, "email required"
+    rsvps = event.get("rsvps")
+    if not isinstance(rsvps, dict):
+        rsvps = {}
+    rsvps[email] = status
+    event["rsvps"] = rsvps
+    # Keep the responder on the attendee list for consistency.
+    attendees = event.get("attendees")
+    if not isinstance(attendees, list):
+        attendees = []
+    if email not in attendees:
+        attendees.append(email)
+    event["attendees"] = attendees
+    db.save_item(SITE, "events", event_id, event)
+    return event, status
+
+
+def _current_user_email():
+    if "user_id" in session:
+        u = _get_user(session["user_id"])
+        if u:
+            return u.get("email", "")
+    return ""
+
+
+@blueprint.route("/api/events/<int:event_id>/rsvp", methods=["POST"])
+def api_rsvp_event(event_id):
+    """RSVP to an event invite. Body: {response: accept|decline|tentative,
+    email?: <attendee email; defaults to the logged-in user>}."""
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or _current_user_email()
+    event, result = _apply_rsvp(event_id, email, data.get("response", ""))
+    if event is None:
+        if result == "not found":
+            abort(404)
+        return jsonify({"error": result}), 400
+    return jsonify({"action": "rsvp", "event_id": event_id, "email": email,
+                    "status": result, "rsvps": event.get("rsvps", {})})
+
+
+@blueprint.route("/event/<int:event_id>/rsvp", methods=["POST"])
+def form_rsvp_event(event_id):
+    """RSVP via HTML form POST (non-JS fallback), then redirect back to the
+    event detail page."""
+    email = request.form.get("email", "").strip() or _current_user_email()
+    event, result = _apply_rsvp(event_id, email, request.form.get("response", ""))
+    if event is None:
+        if result == "not found":
+            abort(404)
+        return result, 400
+    return redirect(url_for("calendar-todo.event_detail", event_id=event_id))
 
 
 # ---------------------------------------------------------------------------

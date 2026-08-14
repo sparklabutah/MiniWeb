@@ -15,7 +15,10 @@ import os
 import pathlib
 import random
 import string
+import uuid
+from collections import Counter
 from datetime import datetime
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint, Response, abort, jsonify, redirect, render_template, request,
@@ -133,6 +136,353 @@ def _generate_password(length=20, uppercase=True, lowercase=True, digits=True,
     return "".join(pw_chars)
 
 
+# ---------------------------------------------------------------------------
+# Security analysis — computed LIVE from the user's vault entries
+# ---------------------------------------------------------------------------
+
+# Small, deterministic seeded breach dataset. An entry is considered breached if
+# its stored password appears on this known-compromised list, or its website's
+# domain is one of these previously-breached services.
+_BREACHED_PASSWORDS = {
+    "123456", "123456789", "12345678", "password", "password1", "qwerty",
+    "abc123", "letmein", "iloveyou", "admin", "welcome", "monkey", "dragon",
+    "111111", "123123", "000000", "sunshine", "pass123", "login", "trustno1",
+}
+_BREACHED_DOMAINS = {
+    "linkedin.com", "adobe.com", "dropbox.com", "myspace.com", "canva.com",
+    "tumblr.com", "github.com", "netflix.com", "lastpass.com", "twitter.com",
+}
+
+# Points awarded per strength tier, and rank used for vault averages.
+_STRENGTH_SCORE = {"excellent": 1.0, "strong": 0.8, "fair": 0.5, "weak": 0.15}
+_STRENGTH_RANK = {"weak": 1, "fair": 2, "strong": 3, "excellent": 4}
+
+# A password older than this many days is flagged as "aging".
+_STALE_DAYS = 365
+
+
+def _entry_domain(url):
+    """Extract a bare domain (no www.) from a URL for breach matching."""
+    if not url:
+        return ""
+    try:
+        net = urlparse(url if "://" in url else "http://" + url).netloc.lower()
+    except Exception:
+        return ""
+    if net.startswith("www."):
+        net = net[4:]
+    return net.split(":")[0]
+
+
+def _classify_password(pw):
+    """Derive a strength label from the actual password characters.
+
+    Returns (label, num_character_classes, length).
+    """
+    pw = pw or ""
+    length = len(pw)
+    lower = any(c.islower() for c in pw)
+    upper = any(c.isupper() for c in pw)
+    digit = any(c.isdigit() for c in pw)
+    symbol = any((not c.isalnum()) and (not c.isspace()) for c in pw)
+    classes = sum([lower, upper, digit, symbol])
+    if length < 8 or classes <= 1 or (length < 10 and classes <= 2):
+        return "weak", classes, length
+    if length < 12 or classes <= 2:
+        return "fair", classes, length
+    if length < 16 or classes == 3:
+        return "strong", classes, length
+    return "excellent", classes, length
+
+
+def _weakness_reason(label, classes, length):
+    if label == "weak":
+        if length < 8:
+            return f"Only {length} characters — far too short"
+        if classes <= 1:
+            return "Single character type — no complexity"
+        return f"{length} characters with limited character variety"
+    if length < 12:
+        return f"{length} characters — below the recommended length"
+    return "Only three character types — add symbols or mixed case"
+
+
+def _password_age_days(entry, now):
+    ts = entry.get("updated_at") or entry.get("created_at") or ""
+    try:
+        return (now - datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")).days
+    except Exception:
+        return 0
+
+
+def _is_breached(entry):
+    """Return (breached_bool, how) where how is 'password' or 'domain'."""
+    pw = entry.get("password", "")
+    if pw and pw.lower() in _BREACHED_PASSWORDS:
+        return True, "password"
+    if _entry_domain(entry.get("url", "")) in _BREACHED_DOMAINS:
+        return True, "domain"
+    return False, ""
+
+
+def _user_vault_entries(user):
+    """Fetch the entries in every vault the user can access.
+
+    Queried per-vault at the SQL level (each vault is a bounded, <100-row working
+    set), never a full-table scan of the shared entries table.
+    """
+    vaults = _user_accessible_vaults(user)
+    entries = []
+    for v in vaults:
+        entries.extend(db.query(SITE, "entries", where={"vault_id": v["id"]}))
+    return entries, vaults
+
+
+def _compute_security_report(user, entries=None, vaults=None):
+    """Build the security report by analysing the user's live vault entries.
+
+    The score, breach alerts, weak/reused/aging lists and per-vault health are all
+    derived from the actual stored passwords, so the report changes whenever an
+    entry is added, edited or removed.
+    """
+    if entries is None or vaults is None:
+        entries, vaults = _user_vault_entries(user)
+
+    now = datetime.utcnow()
+    pw_entries = [e for e in entries if e.get("password")]
+    denom = len(pw_entries) or 1
+
+    counts = Counter(e["password"] for e in pw_entries if e.get("password"))
+    reused_values = {p for p, c in counts.items() if c >= 2}
+
+    labels = {"excellent": 0, "strong": 0, "fair": 0, "weak": 0}
+    breakdown = []
+    reused_entries = []
+    old_entries = []
+    breached_entries = []
+    score_sum = 0.0
+
+    for e in pw_entries:
+        label, classes, length = _classify_password(e["password"])
+        labels[label] += 1
+        pts = _STRENGTH_SCORE[label]
+
+        reused = e["password"] in reused_values
+        breached, how = _is_breached(e)
+        age = _password_age_days(e, now)
+        old = age > _STALE_DAYS
+
+        if reused:
+            pts -= 0.3
+            reused_entries.append(e)
+        if breached:
+            pts -= 0.4
+            breached_entries.append((e, how))
+        if old:
+            pts -= 0.1
+            old_entries.append((e, age))
+        score_sum += max(0.0, pts)
+
+        if label in ("weak", "fair"):
+            breakdown.append({
+                "entry_id": e["id"],
+                "title": e.get("title", ""),
+                "strength": label,
+                "reason": _weakness_reason(label, classes, length),
+            })
+
+    overall = round(100 * score_sum / denom)
+    if overall >= 80:
+        rating = "Excellent"
+    elif overall >= 60:
+        rating = "Good"
+    elif overall >= 40:
+        rating = "Fair"
+    else:
+        rating = "Poor"
+
+    breakdown.sort(key=lambda b: 0 if b["strength"] == "weak" else 1)
+
+    # Reused-password groups (password values themselves are never exposed).
+    grouped = {}
+    for e in pw_entries:
+        if e["password"] in reused_values:
+            grouped.setdefault(e["password"], []).append(e)
+    reused_groups = [
+        {
+            "count": len(es),
+            "entries": [{"entry_id": x["id"], "title": x.get("title", "")} for x in es],
+        }
+        for es in grouped.values()
+    ]
+    reused_groups.sort(key=lambda g: -g["count"])
+
+    # Breach alerts.
+    breach_alerts = []
+    for e, how in breached_entries:
+        if how == "domain":
+            src = f"{_entry_domain(e.get('url', ''))} data breach"
+            exposed = ["email", "password"]
+        else:
+            src = "Known-compromised password list"
+            exposed = ["password"]
+        breach_alerts.append({
+            "id": f"breach_{e['id']}",
+            "severity": "high",
+            "detected_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "entry_id": e["id"],
+            "entry_title": e.get("title", ""),
+            "email_exposed": e.get("username", ""),
+            "breach_source": src,
+            "breach_date": (e.get("updated_at") or e.get("created_at") or "")[:10],
+            "data_exposed": exposed,
+            "recommendation": f"Change the password for {e.get('title', '')} "
+                              f"immediately and enable two-factor authentication.",
+        })
+    breach_alerts.sort(key=lambda a: a["entry_title"])
+
+    # Aging passwords.
+    old_entries.sort(key=lambda t: -t[1])
+    older_than_1_year = [
+        {"entry_id": e["id"], "title": e.get("title", ""), "age_days": age}
+        for e, age in old_entries[:12]
+    ]
+
+    # Per-vault health.
+    vault_health = []
+    for v in vaults:
+        ves = [e for e in entries if e["vault_id"] == v["id"]]
+        pw_ves = [e for e in ves if e.get("password")]
+        if pw_ves:
+            avg = sum(_STRENGTH_RANK[_classify_password(e["password"])[0]]
+                      for e in pw_ves) / len(pw_ves)
+        else:
+            avg = 0
+        issues = []
+        wk = sum(1 for e in pw_ves if _classify_password(e["password"])[0] == "weak")
+        ru = sum(1 for e in pw_ves if e["password"] in reused_values)
+        br = sum(1 for e in pw_ves if _is_breached(e)[0])
+        if wk:
+            issues.append(f"{wk} weak password{'s' if wk != 1 else ''}")
+        if ru:
+            issues.append(f"{ru} reused password{'s' if ru != 1 else ''}")
+        if br:
+            issues.append(f"{br} breached password{'s' if br != 1 else ''}")
+        if not issues:
+            issues.append("No critical issues detected")
+        vault_health.append({
+            "vault_name": v.get("name", ""),
+            "entries": len(ves),
+            "avg_strength_score": round(avg, 1),
+            "issues": issues,
+        })
+
+    # Recommendations.
+    recommendations = []
+    if breached_entries:
+        recommendations.append({
+            "priority": "critical",
+            "action": f"Change {len(breached_entries)} password(s) exposed in known breaches.",
+            "entry_id": breached_entries[0][0]["id"],
+        })
+    if reused_entries:
+        recommendations.append({
+            "priority": "high",
+            "action": f"Replace {len(reused_entries)} reused password(s) with unique ones.",
+            "entry_id": reused_entries[0]["id"],
+        })
+    if labels["weak"]:
+        recommendations.append({
+            "priority": "high",
+            "action": f"Strengthen {labels['weak']} weak password(s).",
+            "entry_id": breakdown[0]["entry_id"] if breakdown else "",
+        })
+    if old_entries:
+        recommendations.append({
+            "priority": "medium",
+            "action": f"Rotate {len(old_entries)} password(s) older than one year.",
+            "entry_id": old_entries[0][0]["id"],
+        })
+    if not recommendations:
+        recommendations.append({
+            "priority": "low",
+            "action": "Your vault looks healthy — keep it up!",
+            "entry_id": "",
+        })
+
+    cats = Counter(e.get("category", "login") for e in entries)
+
+    return {
+        "report_generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "user_id": user["id"] if user else 0,
+        "user_name": user.get("display_name", "") if user else "",
+        "overall_score": overall,
+        "overall_rating": rating,
+        "summary": {
+            "total_entries": len(entries),
+            "login_entries": cats.get("login", 0),
+            "secure_note_entries": cats.get("secure_note", 0),
+            "credit_card_entries": cats.get("credit_card", 0),
+            "total_vaults": len(vaults),
+            "shared_vaults": sum(1 for v in vaults if v.get("shared")),
+        },
+        "password_strength": {
+            "excellent": labels["excellent"],
+            "strong": labels["strong"],
+            "fair": labels["fair"],
+            "weak": labels["weak"],
+            "breakdown": breakdown[:15],
+        },
+        "reused_passwords": {
+            "count": len(reused_entries),
+            "group_count": len(reused_groups),
+            "groups": reused_groups[:12],
+        },
+        "breach_alerts": breach_alerts[:12],
+        "password_age": {
+            "older_than_1_year": older_than_1_year,
+            "count": len(old_entries),
+            "recommendation": "Passwords unchanged for over a year should be rotated, "
+                              "especially for financial and email accounts.",
+        },
+        "vault_health": vault_health,
+        "recommendations": recommendations,
+        # Convenience counters (used by the dashboard and tests).
+        "weak_count": labels["weak"],
+        "reused_count": len(reused_entries),
+        "old_count": len(old_entries),
+        "breach_count": len(breach_alerts),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Audit log — record real actions to session_overlay
+# ---------------------------------------------------------------------------
+
+def _log_audit(action, entry=None, details="", vault_id=""):
+    """Append a persisted audit-log row for a user action."""
+    user = _current_user()
+    uid = session.get("user_id") or (user["id"] if user else 0)
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = {
+        "id": f"audit_{uuid.uuid4().hex[:12]}",
+        "timestamp": now,
+        "user_id": uid,
+        "action": action,
+        "entry_id": entry.get("id", "") if entry else "",
+        "entry_title": entry.get("title", "") if entry else "",
+        "vault_id": vault_id or (entry.get("vault_id", "") if entry else ""),
+        "ip_address": request.remote_addr or "198.51.100.24",
+        "device": "VaultGuard Web",
+        "details": details,
+    }
+    try:
+        db.save_item(SITE, "audit_log", row["id"], row)
+    except Exception:
+        pass
+    return row
+
+
 def _compute_stats(entries, vaults, report):
     """Compute summary statistics."""
     categories = {}
@@ -168,24 +518,26 @@ def _compute_stats(entries, vaults, report):
 def index():
     """Vault overview dashboard."""
     user = _current_user()
-    entries = _load_entries()
-    vaults = _load_vaults()
-    report = _load_security_report()
-    accessible = _user_accessible_vaults(user)
-    accessible_ids = {v["id"] for v in accessible}
+    entries, accessible = _user_vault_entries(user)
+    report = _compute_security_report(user, entries, accessible)
 
     # Count entries per vault
     for v in accessible:
         v["_entry_count"] = sum(1 for e in entries if e["vault_id"] == v["id"])
 
-    stats = _compute_stats(
-        [e for e in entries if e["vault_id"] in accessible_ids],
-        accessible,
-        report,
-    )
+    ps = report["password_strength"]
+    stats = {
+        "total_entries": report["summary"]["total_entries"],
+        "total_vaults": report["summary"]["total_vaults"],
+        "favorites": sum(1 for e in entries if e.get("favorite")),
+        "strengths": {k: ps[k] for k in ("excellent", "strong", "fair", "weak")},
+        "weak_count": ps["weak"],
+        "fair_count": ps["fair"],
+        "breach_count": report["breach_count"],
+    }
 
     recent_entries = sorted(
-        [e for e in entries if e["vault_id"] in accessible_ids],
+        entries,
         key=lambda e: e.get("last_used", ""),
         reverse=True,
     )[:5]
@@ -263,8 +615,8 @@ def entry_detail(entry_id):
     # Mask password for display
     masked_pw = _mask_password(entry.get("password", ""))
 
-    audit_log = db.query(SITE, "audit_log", where={"entry_id": entry_id}, limit=10)
-    entry_audit = audit_log
+    entry_audit = db.query(SITE, "audit_log", where={"entry_id": entry_id},
+                           sort="-timestamp", limit=10)
 
     return render_template(
         "password-managers/entry_detail.html",
@@ -290,10 +642,10 @@ def generator_page():
 
 @blueprint.route("/security-report")
 def security_report_page():
-    """Security analysis page."""
+    """Security analysis page — computed live from the user's vault entries."""
     user = _current_user()
-    report = _load_security_report()
-    entries = _load_entries()
+    entries, vaults = _user_vault_entries(user)
+    report = _compute_security_report(user, entries, vaults)
 
     return render_template(
         "password-managers/security_report.html",
@@ -308,21 +660,28 @@ def security_report_page():
 def audit_log_page():
     """Access history page."""
     user = _current_user()
-    audit_log = _load_audit_log()
     users = _load_users()
     user_map = {u["id"]: u["display_name"] for u in users}
 
-    # Filters
+    # Filters — pushed into the SQL WHERE clause; newest events first.
     action_filter = request.args.get("action", "")
     vault_filter = request.args.get("vault", "")
-
+    where_f = {}
     if action_filter:
-        audit_log = [a for a in audit_log if a.get("action") == action_filter]
+        where_f["action"] = action_filter
     if vault_filter:
-        audit_log = [a for a in audit_log if a.get("vault_id") == vault_filter]
+        where_f["vault_id"] = vault_filter
+
+    audit_log = db.query(SITE, "audit_log", where=where_f or None,
+                         sort="-timestamp", limit=100)
 
     vaults = _load_vaults()
-    actions = sorted({a.get("action", "") for a in _load_audit_log()})
+    # Distinct action names for the filter dropdown (bounded set of labels).
+    known_actions = {"view_password", "reveal_password", "autofill",
+                     "create_entry", "edit_entry", "delete_entry",
+                     "login_success", "login_failed", "share_vault"}
+    known_actions.update(a.get("action", "") for a in audit_log)
+    actions = sorted(a for a in known_actions if a)
 
     return render_template(
         "password-managers/audit_log.html",
@@ -462,6 +821,8 @@ def api_entries_create():
 
     entries.append(new_entry)
     db.save_collection(SITE, "entries", entries)
+    _log_audit("create_entry", new_entry,
+               details=f"Created {new_entry.get('category', 'login')} entry via API")
 
     return jsonify(new_entry), 201
 
@@ -518,6 +879,7 @@ def api_entry_update(entry_id):
     entry["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     db.save_collection(SITE, "entries", entries)
+    _log_audit("edit_entry", entry, details="Entry updated via API")
     return jsonify(entry)
 
 
@@ -531,6 +893,7 @@ def api_entry_delete(entry_id):
 
     deleted = entries.pop(idx)
     db.save_collection(SITE, "entries", entries)
+    _log_audit("delete_entry", deleted, details="Entry deleted via API")
     return jsonify({"deleted": deleted["id"], "title": deleted["title"]})
 
 
@@ -559,8 +922,8 @@ def api_audit_log():
 
 @blueprint.route("/api/security-report")
 def api_security_report():
-    """Return the security report."""
-    report = _load_security_report()
+    """Return the security report, computed live from the user's vault entries."""
+    report = _compute_security_report(_current_user())
     return jsonify(report)
 
 
@@ -693,6 +1056,8 @@ def api_confirm_reveal(entry_id):
         abort(404)
 
     session.pop("_pw_reveal_pin", None)
+    _log_audit("reveal_password", entry,
+               details="Password revealed after PIN verification")
     return jsonify({
         "entry_id": entry_id,
         "title": entry.get("title", ""),
@@ -707,6 +1072,7 @@ def api_entry_reveal(entry_id):
     entry = db.get_item(SITE, "entries", entry_id)
     if not entry:
         abort(404)
+    _log_audit("reveal_password", entry, details="Password revealed")
     return jsonify({
         "entry_id": entry_id,
         "title": entry.get("title", ""),
@@ -961,6 +1327,8 @@ def form_delete_entry(entry_id):
     entries = _load_entries()
     entry = next((e for e in entries if e["id"] == entry_id), None)
     vault_id = entry["vault_id"] if entry else "vault_001"
+    if entry:
+        _log_audit("delete_entry", entry, details="Entry deleted")
     entries = [e for e in entries if e["id"] != entry_id]
     db.save_collection(SITE, "entries", entries)
     return redirect(url_for("password-managers.vault_detail", vault_id=vault_id))
@@ -1032,6 +1400,8 @@ def new_entry_submit():
 
     entries.append(new_entry)
     db.save_collection(SITE, "entries", entries)
+    _log_audit("create_entry", new_entry,
+               details=f"Created {new_entry.get('category', 'login')} entry")
 
     return redirect(url_for("password-managers.entry_detail", entry_id=new_id))
 
@@ -1080,6 +1450,8 @@ def edit_entry_submit(entry_id):
     entry["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     db.save_collection(SITE, "entries", entries)
+    _log_audit("edit_entry", entry,
+               details="Entry details updated" + (", password changed" if pw else ""))
     return redirect(url_for("password-managers.entry_detail", entry_id=entry_id))
 
 

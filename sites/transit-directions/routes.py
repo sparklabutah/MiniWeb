@@ -453,8 +453,8 @@ def trip_planner():
     trip_plans = []
     user_id = session.get("user_id")
     if user_id:
-        all_plans = _load_trip_plans()
-        trip_plans = [tp for tp in all_plans if tp.get("user_id") == user_id]
+        trip_plans = db.query(SITE, "trip_plans", where={"user_id": user_id},
+                              sort="-id", limit=50)
 
     # Handle trip-planning form
     origin = request.args.get("from", "").strip()
@@ -478,6 +478,72 @@ def trip_planner():
         departure=departure,
         travel_date=travel_date,
     )
+
+
+def _add_minutes(hhmm, minutes):
+    """Add `minutes` to an 'HH:MM' string, returning 'HH:MM' (wraps within a day)."""
+    try:
+        h, m = hhmm.split(":")
+        total = (int(h) * 60 + int(m) + int(minutes)) % (24 * 60)
+        return f"{total // 60:02d}:{total % 60:02d}"
+    except (ValueError, AttributeError):
+        return hhmm
+
+
+@blueprint.route("/trip-planner/save", methods=["POST"])
+def trip_planner_save():
+    """Persist a planned trip for the logged-in user (writes to trip_plans overlay)."""
+    user_id = session.get("user_id")
+    if not user_id:
+        abort(403)
+
+    origin = request.form.get("from", "").strip()
+    destination = request.form.get("to", "").strip()
+    route_pref = request.form.get("preference", "fastest")
+    departure = request.form.get("departure", "").strip()
+    travel_date = request.form.get("date", "").strip()
+    name = request.form.get("name", "").strip()
+    try:
+        option_index = int(request.form.get("option_index", "0"))
+    except ValueError:
+        option_index = 0
+
+    if not origin or not destination:
+        return redirect(url_for("transit-directions.trip_planner"))
+
+    # Re-plan server-side so the persisted legs/fare are trustworthy (not client-supplied).
+    result = _plan_trip(origin, destination, route_pref, departure, travel_date)
+    options = result.get("options", [])
+    if not options:
+        return redirect(url_for("transit-directions.trip_planner",
+                                **{"from": origin, "to": destination}))
+    if option_index < 0 or option_index >= len(options):
+        option_index = 0
+    opt = options[option_index]
+
+    dep_time = result.get("departure_time") or datetime.now().strftime("%H:%M")
+    arrival_time = _add_minutes(dep_time, opt["total_duration_minutes"])
+    if not name:
+        name = f"{origin} to {destination}"
+
+    plan_id = db.next_id(SITE, "trip_plans")
+    plan = {
+        "id": plan_id,
+        "user_id": user_id,
+        "name": name,
+        "origin": origin,
+        "destination": destination,
+        "departure_time": dep_time,
+        "arrival_time": arrival_time,
+        "total_duration_minutes": opt["total_duration_minutes"],
+        "legs": opt["legs"],
+        "fare": opt["fare"],
+        "saved_date": datetime.now().strftime("%Y-%m-%d"),
+        "frequency": request.form.get("frequency", "occasional"),
+        "notes": request.form.get("notes", ""),
+    }
+    db.save_item(SITE, "trip_plans", plan_id, plan)
+    return redirect(url_for("transit-directions.trip_planner", saved="1"))
 
 
 @blueprint.route("/fares")

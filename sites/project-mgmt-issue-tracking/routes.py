@@ -100,6 +100,33 @@ def _load_sprints():
     return db.query(SITE, "sprints")
 
 
+# Sprint lifecycle: planned -> active -> closed
+SPRINT_STATUS_ORDER = ["planned", "active", "closed"]
+
+
+def _get_sprint(sprint_id):
+    """Single sprint by id (overlay-aware)."""
+    return db.get_item(SITE, "sprints", sprint_id)
+
+
+def _save_sprint(sprint):
+    """Persist one sprint to the session overlay."""
+    db.save_item(SITE, "sprints", sprint["id"], sprint)
+
+
+def _get_issue(issue_id):
+    """Single issue by id, key-remapped (overlay-aware)."""
+    issue = db.get_item(SITE, "issues", issue_id)
+    if issue:
+        _ensure_issue_key(_remap_key(issue))
+    return issue
+
+
+def _save_issue(issue):
+    """Persist one issue to the session overlay (guard-compliant single write)."""
+    db.save_item(SITE, "issues", issue["id"], issue)
+
+
 def _load_users():
     return db.query(SITE, "users")
 
@@ -465,6 +492,7 @@ def sprints_page():
 
     return render_template("project-mgmt-issue-tracking/sprints.html",
                            sprint_data=sprint_data,
+                           projects=_load_projects(),
                            user=user)
 
 
@@ -489,6 +517,21 @@ def sprint_detail(sprint_id):
     total_points = sum(i.get("story_points", 0) or 0 for i in sprint_issues)
     done_points = sum((i.get("story_points", 0) or 0) for i in sprint_issues
                      if i["status"] in ("done", "closed"))
+    unfinished_count = sum(1 for i in sprint_issues
+                           if i["status"] not in ("done", "closed"))
+
+    # Candidate issues to plan into this sprint: same-project issues that are
+    # still in the backlog (no sprint) and not already completed.
+    candidate_issues = [i for i in issues
+                        if i["project_id"] == sprint["project_id"]
+                        and not i.get("sprint")
+                        and i["status"] not in ("done", "closed")]
+    candidate_issues = _sort_issues(candidate_issues, "priority")
+
+    # Other sprints of the same project (for "move unfinished issues to ...").
+    other_sprints = [s for s in _load_sprints()
+                     if s["project_id"] == sprint["project_id"]
+                     and s["id"] != sprint_id]
 
     user = None
     if "user_id" in session:
@@ -501,6 +544,9 @@ def sprint_detail(sprint_id):
                            status_order=STATUS_ORDER,
                            total_points=total_points,
                            done_points=done_points,
+                           unfinished_count=unfinished_count,
+                           candidate_issues=candidate_issues,
+                           other_sprints=other_sprints,
                            user=user,
                            user_lookup=user_lookup)
 
@@ -828,6 +874,114 @@ def form_transition_issue(issue_id):
 
 
 # ---------------------------------------------------------------------------
+# HTML form actions — sprint lifecycle (create / plan / start / complete)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/sprints/create", methods=["POST"])
+def form_create_sprint():
+    """Create a new sprint (starts in the 'planned' state)."""
+    name = request.form.get("name", "").strip()
+    project_id = request.form.get("project_id", type=int)
+    if not name:
+        return "Sprint name is required", 400
+    if not project_id or not _get_project(project_id):
+        return "A valid project is required", 400
+
+    sprint = {
+        "id": db.next_id(SITE, "sprints"),
+        "project_id": project_id,
+        "name": name,
+        "start_date": request.form.get("start_date", "").strip(),
+        "end_date": request.form.get("end_date", "").strip(),
+        "status": "planned",
+        "goal": request.form.get("goal", "").strip(),
+    }
+    _save_sprint(sprint)
+    return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                            sprint_id=sprint["id"]))
+
+
+@blueprint.route("/sprint/<int:sprint_id>/add-issue", methods=["POST"])
+def form_sprint_add_issue(sprint_id):
+    """Plan an issue into this sprint (sets issue.sprint)."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    issue_id = request.form.get("issue_id", type=int)
+    issue = _get_issue(issue_id) if issue_id else None
+    if issue:
+        issue["sprint"] = sprint_id
+        issue["updated_at"] = datetime.now().isoformat()
+        _log_activity(issue, session.get("user_id"),
+                      "added this to %s" % sprint["name"])
+        _save_issue(issue)
+    return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                            sprint_id=sprint_id))
+
+
+@blueprint.route("/sprint/<int:sprint_id>/remove-issue", methods=["POST"])
+def form_sprint_remove_issue(sprint_id):
+    """Remove an issue from this sprint, sending it back to the backlog."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    issue_id = request.form.get("issue_id", type=int)
+    issue = _get_issue(issue_id) if issue_id else None
+    if issue and issue.get("sprint") == sprint_id:
+        issue["sprint"] = None
+        issue["updated_at"] = datetime.now().isoformat()
+        _log_activity(issue, session.get("user_id"),
+                      "removed this from %s" % sprint["name"])
+        _save_issue(issue)
+    return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                            sprint_id=sprint_id))
+
+
+@blueprint.route("/sprint/<int:sprint_id>/start", methods=["POST"])
+def form_start_sprint(sprint_id):
+    """Start a planned sprint — moves it to the 'active' state."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    if sprint.get("status") == "planned":
+        sprint["status"] = "active"
+        _save_sprint(sprint)
+    return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                            sprint_id=sprint_id))
+
+
+@blueprint.route("/sprint/<int:sprint_id>/complete", methods=["POST"])
+def form_complete_sprint(sprint_id):
+    """Complete an active sprint — closes it and moves any unfinished issues
+    out to the backlog (or to a chosen target sprint)."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    if sprint.get("status") != "active":
+        return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                                sprint_id=sprint_id))
+
+    # Optional target sprint for unfinished work; blank => backlog (no sprint).
+    move_to = request.form.get("move_to", type=int)
+    target_id = move_to if move_to else None
+
+    # SQL-filtered fetch of this sprint's issues (a bounded set), then move the
+    # unfinished ones one at a time via the overlay.
+    for issue in db.query(SITE, "issues", where={"sprint": sprint_id}):
+        _ensure_issue_key(_remap_key(issue))
+        if issue["status"] in ("done", "closed"):
+            continue
+        issue["sprint"] = target_id
+        issue["updated_at"] = datetime.now().isoformat()
+        _save_issue(issue)
+
+    sprint["status"] = "closed"
+    _save_sprint(sprint)
+    return redirect(url_for("project-mgmt-issue-tracking.sprint_detail",
+                            sprint_id=sprint_id))
+
+
+# ---------------------------------------------------------------------------
 # API routes — read
 # ---------------------------------------------------------------------------
 
@@ -903,6 +1057,86 @@ def api_sprint(sprint_id):
     if not sprint:
         abort(404)
     return jsonify(sprint)
+
+
+@blueprint.route("/api/sprints", methods=["POST"])
+def api_create_sprint():
+    """Create a sprint (JSON). Starts in the 'planned' state."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    project_id = data.get("project_id")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    if not project_id or not _get_project(project_id):
+        return jsonify({"error": "valid project_id required"}), 400
+    sprint = {
+        "id": db.next_id(SITE, "sprints"),
+        "project_id": project_id,
+        "name": name,
+        "start_date": (data.get("start_date") or "").strip(),
+        "end_date": (data.get("end_date") or "").strip(),
+        "status": data.get("status", "planned"),
+        "goal": (data.get("goal") or "").strip(),
+    }
+    _save_sprint(sprint)
+    return jsonify(sprint), 201
+
+
+@blueprint.route("/api/sprints/<int:sprint_id>/add-issue", methods=["POST"])
+def api_sprint_add_issue(sprint_id):
+    """Plan an issue into a sprint (JSON: {"issue_id": N})."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    issue = _get_issue(data.get("issue_id"))
+    if not issue:
+        return jsonify({"error": "valid issue_id required"}), 400
+    issue["sprint"] = sprint_id
+    issue["updated_at"] = datetime.now().isoformat()
+    _log_activity(issue, session.get("user_id"), "added this to %s" % sprint["name"])
+    _save_issue(issue)
+    return jsonify(issue)
+
+
+@blueprint.route("/api/sprints/<int:sprint_id>/start", methods=["POST"])
+def api_start_sprint(sprint_id):
+    """Start a planned sprint (JSON)."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    if sprint.get("status") != "planned":
+        return jsonify({"error": "only planned sprints can be started",
+                        "status": sprint.get("status")}), 400
+    sprint["status"] = "active"
+    _save_sprint(sprint)
+    return jsonify(sprint)
+
+
+@blueprint.route("/api/sprints/<int:sprint_id>/complete", methods=["POST"])
+def api_complete_sprint(sprint_id):
+    """Complete an active sprint (JSON). Unfinished issues move to the backlog
+    or to an optional target sprint ({"move_to": N})."""
+    sprint = _get_sprint(sprint_id)
+    if not sprint:
+        abort(404)
+    if sprint.get("status") != "active":
+        return jsonify({"error": "only active sprints can be completed",
+                        "status": sprint.get("status")}), 400
+    data = request.get_json(silent=True) or {}
+    target_id = data.get("move_to") or None
+    moved = []
+    for issue in db.query(SITE, "issues", where={"sprint": sprint_id}):
+        _ensure_issue_key(_remap_key(issue))
+        if issue["status"] in ("done", "closed"):
+            continue
+        issue["sprint"] = target_id
+        issue["updated_at"] = datetime.now().isoformat()
+        _save_issue(issue)
+        moved.append(issue["id"])
+    sprint["status"] = "closed"
+    _save_sprint(sprint)
+    return jsonify({"sprint": sprint, "moved_issues": moved})
 
 
 @blueprint.route("/api/stats")

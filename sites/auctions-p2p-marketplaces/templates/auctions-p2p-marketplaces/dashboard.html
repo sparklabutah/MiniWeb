@@ -46,6 +46,7 @@
             <button class="tab active" onclick="showTab('listings')">My Listings</button>
             <button class="tab" onclick="showTab('bids')">My Bids</button>
             <button class="tab" onclick="showTab('watchlist')">Watchlist</button>
+            <button class="tab" onclick="showTab('orders')">Won / Purchases</button>
             <button class="tab" onclick="showTab('messages')">Messages</button>
         </div>
 
@@ -109,6 +110,35 @@
             {% endif %}
         </div>
 
+        <div class="section" id="tab-orders">
+            <h2>Won &amp; Purchased ({{ (orders|length) + (won_listings|length) }})</h2>
+            {% if orders or won_listings %}
+            <table>
+                <tr><th>Item</th><th>Order #</th><th>Type</th><th>Total</th><th>Feedback</th></tr>
+                {% for o in orders %}
+                <tr data-listing-id="{{ o.listing_id }}" data-seller-id="{{ o.seller_id }}">
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=o.listing_id) }}">{{ o.item_name[:40] }}</a></td>
+                    <td>{{ o.order_number }}</td>
+                    <td>Bought</td>
+                    <td>${{ "%.2f"|format(o.total) }}</td>
+                    <td class="feedback-cell"></td>
+                </tr>
+                {% endfor %}
+                {% for p in won_listings %}
+                <tr data-listing-id="{{ p.id }}" data-seller-id="{{ p.seller_id }}">
+                    <td><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=p.id) }}">{{ p.name[:40] }}</a></td>
+                    <td>Auction #{{ p.id }}</td>
+                    <td>Won auction</td>
+                    <td>${{ "%.2f"|format(p.current_price) }}</td>
+                    <td class="feedback-cell"></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="no-data">You haven't won or purchased anything yet.</div>
+            {% endif %}
+        </div>
+
         <div class="section" id="tab-messages">
             <h2>Messages ({{ messages|length }})</h2>
             {% if messages %}
@@ -130,6 +160,47 @@
     </div>
 
     <script>
+    var CURRENT_USER_ID = {{ user.id }};
+
+    // Build a "leave feedback" control on each won/purchased row and wire it
+    // to the real /api/ratings endpoint.
+    document.querySelectorAll('#tab-orders .feedback-cell').forEach(function(cell) {
+        var row = cell.closest('tr');
+        var listingId = parseInt(row.getAttribute('data-listing-id'), 10);
+        var sellerId = parseInt(row.getAttribute('data-seller-id'), 10);
+        cell.innerHTML =
+            '<select class="fb-score">' +
+            '<option value="5">5 - Excellent</option>' +
+            '<option value="4">4 - Good</option>' +
+            '<option value="3">3 - Okay</option>' +
+            '<option value="2">2 - Poor</option>' +
+            '<option value="1">1 - Bad</option>' +
+            '</select> ' +
+            '<input type="text" class="fb-comment" placeholder="Comment (optional)" style="width:140px;padding:.25rem;border:1px solid #ddd;border-radius:.2rem;font-size:.8rem"> ' +
+            '<button class="btn fb-submit" style="background:#e94560;color:#fff">Leave feedback</button>';
+        var btn = cell.querySelector('.fb-submit');
+        btn.addEventListener('click', function() {
+            var score = parseInt(cell.querySelector('.fb-score').value, 10);
+            var comment = cell.querySelector('.fb-comment').value;
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+            fetch('{{ url_for("auctions-p2p-marketplaces.api_submit_rating") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    listing_id: listingId,
+                    rater_id: CURRENT_USER_ID,
+                    rated_user_id: sellerId,
+                    score: score,
+                    comment: comment
+                })
+            })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+            .then(function() { cell.innerHTML = '<span style="color:#28a745;font-weight:600">Feedback submitted</span>'; })
+            .catch(function() { btn.textContent = 'Error'; btn.disabled = false; });
+        });
+    });
+
     function showTab(name) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));

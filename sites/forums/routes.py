@@ -105,12 +105,151 @@ def _save_messages(messages):
     db.save_collection(SITE, "messages", messages)
 
 
+# ---------------------------------------------------------------------------
+# Moderation infrastructure — reports queue + per-subreddit moderators
+#
+# The site DB was seeded WITHOUT a reports table (reports had nowhere to land —
+# db.query returns [] for an unregistered collection, so every report silently
+# overwrote rd_report_001 and nothing could ever read them back). It also models
+# no moderator role at all. We create + register both base tables on first use
+# (the forums_messages / auctions-orders runtime-seed pattern) and seed a
+# deterministic set of moderator assignments so the mod lifecycle has an owner.
+# Real reports / mod-state changes still go to the per-session overlay via
+# db.save_item, keeping sessions isolated.
+# ---------------------------------------------------------------------------
+
+_REPORTS_TABLE = "forums_reports"
+_MODS_TABLE = "forums_moderators"
+
+# Deterministic seed: cascadia_coder (root_user_id 1, the auto-login user)
+# moderates the communities they're most active in. Kept to real subreddits that
+# actually hold posts so the queue always has content to act on.
+_MOD_SEED = [
+    ("hiking", "cascadia_coder"),
+    ("programming", "cascadia_coder"),
+    ("boardgames", "cascadia_coder"),
+    ("photography", "cascadia_coder"),
+]
+
+_mod_tables_ready = False
+
+
+def _ensure_mod_tables():
+    """Create + register forums_reports and forums_moderators on first use.
+
+    Idempotent. The reports table gives db.query()/db.get_item() a real home so
+    the mod queue can actually read persisted reports; the moderators table backs
+    the ownership check. Both are created empty in the base DB — session reports
+    and mod actions live in the overlay."""
+    global _mod_tables_ready
+    if _mod_tables_ready and db.get_table_name(SITE, "reports"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_REPORTS_TABLE}] (
+            id TEXT PRIMARY KEY,
+            reporter_username TEXT NOT NULL DEFAULT '',
+            target_type TEXT NOT NULL DEFAULT '',
+            target_id TEXT NOT NULL DEFAULT '',
+            subreddit TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            created_utc TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            resolution TEXT NOT NULL DEFAULT '',
+            resolved_by TEXT NOT NULL DEFAULT '',
+            resolved_utc TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_forums_reports_subreddit "
+        f"ON [{_REPORTS_TABLE}] (subreddit)"
+    )
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_MODS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            subreddit TEXT NOT NULL DEFAULT '',
+            username TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_forums_moderators_username "
+        f"ON [{_MODS_TABLE}] (username)"
+    )
+    conn.commit()
+    db.register_table(SITE, "reports", _REPORTS_TABLE, "id")
+    db.register_table(SITE, "moderators", _MODS_TABLE, "id")
+    # Seed moderator assignments once (global config, shared across sessions).
+    have = conn.execute(f"SELECT COUNT(*) FROM [{_MODS_TABLE}]").fetchone()[0]
+    if not have:
+        conn.executemany(
+            f"INSERT INTO [{_MODS_TABLE}] (subreddit, username) VALUES (?, ?)",
+            _MOD_SEED,
+        )
+        conn.commit()
+    _mod_tables_ready = True
+
+
 def _load_reports():
-    return db.query(SITE, "reports")
+    _ensure_mod_tables()
+    return db.query(SITE, "reports", sort="-created_utc", limit=200)
 
 
-def _save_reports(reports):
-    db.save_collection(SITE, "reports", reports)
+def _truthy(v):
+    """A moderation flag column (removed/locked/sticky) counts as set when it
+    holds anything other than the empty/zero/false defaults."""
+    return str(v).strip().lower() not in ("", "0", "none", "false")
+
+
+def _is_removed(p):
+    return bool(p) and _truthy(p.get("removed"))
+
+
+def _is_locked(p):
+    return bool(p) and _truthy(p.get("locked"))
+
+
+def _is_sticky(p):
+    return bool(p) and _truthy(p.get("sticky"))
+
+
+def _moderators_of(subreddit):
+    """Usernames that moderate a subreddit (global assignment table)."""
+    _ensure_mod_tables()
+    bare = subreddit[2:] if isinstance(subreddit, str) and subreddit.startswith("r/") else subreddit
+    rows = db.execute(
+        f"SELECT username FROM [{_MODS_TABLE}] WHERE subreddit = ?", (bare,))
+    return [r["username"] for r in rows if r.get("username")]
+
+
+def _user_moderates(user, subreddit):
+    """True when the logged-in user owns/moderates this subreddit."""
+    if not user:
+        return False
+    return user.get("username") in _moderators_of(subreddit)
+
+
+def _moderated_subreddits(username):
+    """Subreddits this user moderates, for the mod dashboard / nav rail."""
+    if not username:
+        return []
+    _ensure_mod_tables()
+    rows = db.execute(
+        f"SELECT DISTINCT subreddit FROM [{_MODS_TABLE}] "
+        f"WHERE username = ? ORDER BY subreddit", (username,))
+    return [r["subreddit"] for r in rows if r.get("subreddit")]
+
+
+def _report_subreddit(target_type, target_id):
+    """Resolve which subreddit a reported post/comment belongs to."""
+    if target_type == "comment":
+        c = _get_comment(target_id)
+        if not c:
+            return ""
+        p = _get_post(c.get("post_id"))
+        return p.get("subreddit", "") if p else ""
+    p = _get_post(target_id)
+    return p.get("subreddit", "") if p else ""
 
 
 def _get_current_user():
@@ -313,16 +452,8 @@ def _next_message_id():
 
 
 def _next_report_id():
-    reports = _load_reports()
-    max_num = 0
-    for r in reports:
-        try:
-            num = int(r["id"].replace("rd_report_", ""))
-            if num > max_num:
-                max_num = num
-        except (ValueError, KeyError):
-            pass
-    return f"rd_report_{max_num + 1:03d}"
+    _ensure_mod_tables()
+    return _next_prefixed_id("reports", "rd_report_")
 
 
 
@@ -401,12 +532,17 @@ def _inject_helpers():
         "unread_messages": 0,
         "notif_count": 0,
         "notifications": [],
+        "mod_communities": [],
     }
     # Nav rail + notification data (skip on API/JSON routes to avoid queries)
     try:
         if user and "/api/" not in request.path:
             ctx["nav_communities"] = _top_communities(12)
             ctx["my_communities"] = _my_communities(user)
+            ctx["mod_communities"] = [
+                {"name": s, "color": _avatar_color(s)}
+                for s in _moderated_subreddits(user["username"])
+            ]
             me = user["username"]
             ctx["unread_messages"] = _unread_message_count(me)
             notifs = _build_notifications(me, limit=10)
@@ -485,6 +621,8 @@ def index():
     else:
         posts = []
 
+    # Hide moderator-removed posts from the public feed.
+    posts = [p for p in posts if not _is_removed(p)]
     _attach_feed_meta(posts)
 
     # "Recent Posts" widget (right rail). Raw SQL reads the base table only,
@@ -495,6 +633,8 @@ def index():
         rp = db.execute(f"SELECT * FROM [{table}] ORDER BY [created_utc] DESC LIMIT 12")
         rp = db.merge_overlay(SITE, "posts", rp, sort="-created_utc", limit=6)
         for r in rp:
+            if _is_removed(r):
+                continue
             r["_av"] = _avatar_color(r.get("subreddit") or "")
             recent_posts.append(r)
 
@@ -514,6 +654,9 @@ def subreddit_view(subreddit_name):
 
     sort_col = "score" if sort in ("top", "hot") else "created_utc"
     sub_posts = _load_posts(where={"subreddit": subreddit_name}, sort=f"-{sort_col}", limit=50)
+    # Hide moderator-removed posts, then float pinned/stickied posts to the top.
+    sub_posts = [p for p in sub_posts if not _is_removed(p)]
+    sub_posts.sort(key=lambda p: 0 if _is_sticky(p) else 1)
     # A community with no posts still gets a page (empty state) rather than a 404
     # dead-end — every /r/<name> resolves.
     _attach_feed_meta(sub_posts)
@@ -531,8 +674,14 @@ def subreddit_view(subreddit_name):
                      "description": "", "post_count": len(sub_posts)}
     community["color"] = _avatar_color(subreddit_name)
 
+    is_moderator = _user_moderates(_get_current_user(), subreddit_name)
+    pending_reports = 0
+    if is_moderator:
+        pending_reports = db.count(SITE, "reports",
+                                   where={"subreddit": subreddit_name, "status": "pending"})
     return render_template("forums/subreddit.html", posts=sub_posts, sort=sort,
-                           subreddit=subreddit_name, community=community)
+                           subreddit=subreddit_name, community=community,
+                           is_moderator=is_moderator, pending_reports=pending_reports)
 
 
 @blueprint.route("/post/<post_id>")
@@ -545,8 +694,13 @@ def post_detail(post_id):
     post["_comment_count"] = len(post_comments)
     post["_media"] = _post_media(post.get("url") or "")
     post["_av"] = _avatar_color(post.get("subreddit") or "")
+    is_moderator = _user_moderates(_get_current_user(), post.get("subreddit"))
     return render_template("forums/post_detail.html", post=post,
-                           comment_tree=comment_tree)
+                           comment_tree=comment_tree,
+                           is_moderator=is_moderator,
+                           is_removed=_is_removed(post),
+                           is_locked=_is_locked(post),
+                           is_sticky=_is_sticky(post))
 
 
 @blueprint.route("/user/<username>")
@@ -633,7 +787,9 @@ def search_page():
     sort = request.args.get("sort", "top")
     results = []
     if q:
-        results = db.search(SITE, "posts", q, limit=50)
+        raw = db.search(SITE, "posts", q, limit=50)
+        # FTS reads the base table; drop posts a moderator removed in this session.
+        results = [p for p in raw if not _is_removed(_get_post(p.get("id")) or p)]
         _attach_feed_meta(results)
     return render_template("forums/search.html", query=q, results=results, sort=sort)
 
@@ -830,6 +986,7 @@ def api_list_posts():
         SITE, "posts", posts, match=_match,
         sort="-created_utc" if sort == "new" else "-score", limit=50,
     )
+    posts = [p for p in posts if not _is_removed(p)]
     return jsonify(posts)
 
 
@@ -1049,6 +1206,10 @@ def api_add_comment(post_id):
     post = _get_post(post_id)
     if not post:
         return jsonify({"error": "Post not found"}), 404
+    if _is_removed(post):
+        return jsonify({"error": "This post has been removed by moderators"}), 403
+    if _is_locked(post):
+        return jsonify({"error": "This post is locked. New comments are disabled."}), 403
     data = request.get_json(silent=True)
     if not data:
         data = dict(request.form)
@@ -1208,7 +1369,8 @@ def api_search():
     if not q:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
     sort = request.args.get("sort", "top")
-    results = db.search(SITE, "posts", q, limit=50)
+    raw = db.search(SITE, "posts", q, limit=50)
+    results = [p for p in raw if not _is_removed(_get_post(p.get("id")) or p)]
     return jsonify({"query": q, "count": len(results), "posts": results})
 
 
@@ -1433,20 +1595,235 @@ def api_report():
         return jsonify({"error": "target_id is required"}), 400
     if not reason:
         return jsonify({"error": "reason is required"}), 400
+    _ensure_mod_tables()
     report = {
         "id": _next_report_id(),
         "reporter_username": user["username"],
         "target_type": target_type,
         "target_id": target_id,
+        # Stamp the owning subreddit so the mod queue can filter by community.
+        "subreddit": _report_subreddit(target_type, target_id),
         "reason": reason,
         "description": description,
         "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "status": "pending",
+        "resolution": "",
+        "resolved_by": "",
+        "resolved_utc": "",
     }
-    reports = _load_reports()
-    reports.append(report)
-    _save_reports(reports)
+    db.save_item(SITE, "reports", report["id"], report)
     return jsonify(report), 201
+
+
+# ---------------------------------------------------------------------------
+# Moderator lifecycle — a mod queue over persisted reports + actions that
+# persist and reflect on posts (remove / lock / pin). Every action is gated to
+# a moderator of the post's subreddit via _user_moderates().
+# ---------------------------------------------------------------------------
+
+def _target_preview(report):
+    """Attach a display snippet of the reported post/comment to a report row."""
+    r = dict(report)
+    if report.get("target_type") == "comment":
+        c = _get_comment(report.get("target_id"))
+        if c:
+            r["_target_author"] = c.get("author", "")
+            r["_target_text"] = (c.get("body") or "")[:220]
+            r["_target_post_id"] = c.get("post_id", "")
+            r["_target_title"] = "(comment)"
+        else:
+            r["_target_text"] = "[deleted]"
+    else:
+        p = _get_post(report.get("target_id"))
+        if p:
+            r["_target_author"] = p.get("author", "")
+            r["_target_title"] = p.get("title", "")
+            r["_target_text"] = (p.get("body") or "")[:220]
+            r["_target_post_id"] = p.get("id", "")
+            r["_target_removed"] = _is_removed(p)
+            r["_target_locked"] = _is_locked(p)
+            r["_target_sticky"] = _is_sticky(p)
+        else:
+            r["_target_text"] = "[deleted]"
+    r["_color"] = _avatar_color(report.get("reporter_username") or "")
+    return r
+
+
+def _reports_for_sub(subreddit, status=None):
+    """Persisted reports for one subreddit, newest first (SQL-filtered)."""
+    _ensure_mod_tables()
+    where = {"subreddit": subreddit}
+    if status:
+        where["status"] = status
+    reports = db.query(SITE, "reports", where=where, sort="-created_utc", limit=100)
+    return [_target_preview(r) for r in reports]
+
+
+@blueprint.route("/mod")
+def mod_dashboard():
+    """Overview of the communities the current user moderates + open-report counts."""
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("forums.login_page"))
+    subs = _moderated_subreddits(user["username"])
+    communities = []
+    for s in subs:
+        communities.append({
+            "name": s,
+            "color": _avatar_color(s),
+            "pending": db.count(SITE, "reports",
+                                where={"subreddit": s, "status": "pending"}),
+            "total": db.count(SITE, "reports", where={"subreddit": s}),
+        })
+    return render_template("forums/mod_dashboard.html", communities=communities)
+
+
+@blueprint.route("/r/<subreddit_name>/mod")
+def mod_queue(subreddit_name):
+    """Moderator queue for a subreddit: persisted reports + actionable posts."""
+    if subreddit_name.lower().startswith("r/"):
+        subreddit_name = subreddit_name[2:]
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("forums.login_page"))
+    if not _user_moderates(user, subreddit_name):
+        abort(403)
+    status = request.args.get("status", "pending")
+    status_filter = None if status == "all" else status
+    reports = _reports_for_sub(subreddit_name, status=status_filter)
+    pending_count = db.count(SITE, "reports",
+                             where={"subreddit": subreddit_name, "status": "pending"})
+    total_count = db.count(SITE, "reports", where={"subreddit": subreddit_name})
+    community = {"name": subreddit_name, "color": _avatar_color(subreddit_name)}
+    return render_template("forums/mod_queue.html", subreddit=subreddit_name,
+                           reports=reports, community=community, status=status,
+                           pending_count=pending_count, total_count=total_count)
+
+
+def _mod_guard_post(post_id):
+    """Shared gate for post-level mod actions.
+
+    Returns (post, user, None) on success or (None, None, response) on failure."""
+    user = _get_current_user()
+    if not user:
+        return None, None, (jsonify({"error": "Not logged in"}), 401)
+    post = _get_post(post_id)
+    if not post:
+        return None, None, (jsonify({"error": "Post not found"}), 404)
+    if not _user_moderates(user, post.get("subreddit")):
+        return None, None, (jsonify({"error": "You do not moderate this community"}), 403)
+    return post, user, None
+
+
+def _resolve_reports_for_target(target_id, moderator, resolution):
+    """Mark every pending report against a target as resolved (audit trail)."""
+    _ensure_mod_tables()
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    for rep in db.query(SITE, "reports", where={"target_id": target_id}, limit=100):
+        if rep.get("status") != "pending":
+            continue
+        rep["status"] = "resolved"
+        rep["resolution"] = resolution
+        rep["resolved_by"] = moderator
+        rep["resolved_utc"] = now
+        db.save_item(SITE, "reports", rep["id"], rep)
+
+
+@blueprint.route("/api/mod/posts/<post_id>/remove", methods=["POST"])
+def api_mod_remove_post(post_id):
+    """Moderator remove/restore a post. Removed posts are hidden from feeds,
+    search and the community, and reject new comments."""
+    post, user, err = _mod_guard_post(post_id)
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    # action: "remove" (default) or "approve"/"restore" to undo.
+    action = data.get("action", "remove")
+    if action in ("approve", "restore", "unremove"):
+        post["removed"] = ""
+        state = "approved"
+    else:
+        post["removed"] = "1"
+        state = "removed"
+    db.save_item(SITE, "posts", post_id, post)
+    if state == "removed":
+        _resolve_reports_for_target(post_id, user["username"], "post removed")
+    return jsonify({"id": post_id, "removed": _is_removed(post), "state": state})
+
+
+@blueprint.route("/api/mod/posts/<post_id>/lock", methods=["POST"])
+def api_mod_lock_post(post_id):
+    """Moderator lock/unlock a post. Locked posts reject new comments."""
+    post, user, err = _mod_guard_post(post_id)
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    if "locked" in data:
+        want = _truthy(data.get("locked"))
+    else:
+        want = not _is_locked(post)  # toggle
+    post["locked"] = "1" if want else ""
+    db.save_item(SITE, "posts", post_id, post)
+    return jsonify({"id": post_id, "locked": _is_locked(post)})
+
+
+@blueprint.route("/api/mod/posts/<post_id>/pin", methods=["POST"])
+def api_mod_pin_post(post_id):
+    """Moderator pin/sticky (or unpin) a post. Pinned posts float to the top
+    of the community and are flagged as stickied."""
+    post, user, err = _mod_guard_post(post_id)
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    if "sticky" in data:
+        want = _truthy(data.get("sticky"))
+    else:
+        want = not _is_sticky(post)  # toggle
+    post["sticky"] = "1" if want else ""
+    db.save_item(SITE, "posts", post_id, post)
+    return jsonify({"id": post_id, "sticky": _is_sticky(post), "pinned": _is_sticky(post)})
+
+
+@blueprint.route("/api/mod/reports/<report_id>/resolve", methods=["POST"])
+def api_mod_resolve_report(report_id):
+    """Moderator resolve/dismiss a single report in the queue."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+    _ensure_mod_tables()
+    report = db.get_item(SITE, "reports", report_id)
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+    if not _user_moderates(user, report.get("subreddit")):
+        return jsonify({"error": "You do not moderate this community"}), 403
+    data = request.get_json(silent=True) or {}
+    status = data.get("status", "resolved")
+    if status not in ("resolved", "dismissed", "pending"):
+        return jsonify({"error": "invalid status"}), 400
+    report["status"] = status
+    report["resolution"] = (data.get("resolution") or "").strip()
+    report["resolved_by"] = user["username"]
+    report["resolved_utc"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    db.save_item(SITE, "reports", report_id, report)
+    return jsonify(report)
+
+
+@blueprint.route("/api/mod/reports", methods=["GET"])
+def api_mod_reports():
+    """JSON mod queue: persisted reports for a subreddit the user moderates."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+    sub = (request.args.get("subreddit") or "").strip()
+    if sub.startswith("r/"):
+        sub = sub[2:]
+    if not sub:
+        return jsonify({"error": "subreddit is required"}), 400
+    if not _user_moderates(user, sub):
+        return jsonify({"error": "You do not moderate this community"}), 403
+    status = request.args.get("status")
+    status_filter = None if status in (None, "all") else status
+    return jsonify({"subreddit": sub, "reports": _reports_for_sub(sub, status=status_filter)})
 
 
 @blueprint.route("/api/users/<username>/block", methods=["POST"])

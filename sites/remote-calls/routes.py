@@ -708,18 +708,27 @@ def api_meetings_list():
 
 @blueprint.route("/api/meetings", methods=["POST"])
 def api_meetings_create():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    # Support both JSON and multipart/form-data (the latter carries the
+    # optional agenda/file attachment from the schedule form).
+    uploaded = request.files.get("file")
+    if uploaded is not None or request.form:
+        title = request.form.get("title", "").strip()
+        date_str = request.form.get("date", "")
+        duration = request.form.get("duration_minutes", 30)
+        meeting_type = request.form.get("type", "work")
+        participant_ids = request.form.getlist("participants")
+    else:
+        data = request.get_json(silent=True) or {}
+        title = data.get("title", "").strip()
+        date_str = data.get("date", "")
+        duration = data.get("duration_minutes", 30)
+        meeting_type = data.get("type", "work")
+        participant_ids = list(data.get("participants", []))
+
     if not title:
         return jsonify({"error": "Title is required"}), 400
-
-    date_str = data.get("date", "")
     if not date_str:
         return jsonify({"error": "Date is required"}), 400
-
-    duration = data.get("duration_minutes", 30)
-    meeting_type = data.get("type", "work")
-    participant_ids = data.get("participants", [])
 
     user = _current_user()
     if not user:
@@ -743,6 +752,17 @@ def api_meetings_create():
         "recording_available": False,
         "status": "scheduled",
     }
+
+    # Persist an attachment metadata record if a file was provided so the
+    # upload interaction is real and surfaced on the meeting detail page.
+    if uploaded is not None and uploaded.filename:
+        content = uploaded.read()
+        new_meeting["attachment"] = {
+            "filename": uploaded.filename,
+            "size_bytes": len(content),
+            "content_type": uploaded.mimetype or "application/octet-stream",
+            "uploaded_at": datetime.now().isoformat(),
+        }
 
     meetings.append(new_meeting)
     db.save_collection(SITE, "meetings", meetings)

@@ -45,6 +45,9 @@
         .book-form select, .book-form input { padding: .5rem .7rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .9rem; }
         .book-btn { background: #38a169; color: #fff; border: none; padding: .6rem 1.5rem; border-radius: .3rem; cursor: pointer; font-size: .95rem; font-weight: 600; }
         .book-btn:hover { background: #2f855a; }
+        .seat-error { background: #fed7d7; color: #9b2c2c; padding: .5rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; margin-bottom: .8rem; }
+        .step-tag { font-size: .72rem; font-weight: 600; color: #718096; background: #edf2f7; padding: .15rem .5rem; border-radius: .3rem; margin-left: .5rem; }
+        .wizard-note { font-size: .78rem; color: #a0aec0; margin-top: .7rem; }
         .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
     </style>
 </head>
@@ -120,11 +123,20 @@
             </div>
 
             <div class="book-form">
-                <h3>Book This Hotel</h3>
+                <h3>Book This Hotel <span class="step-tag">Step 1 of 2 &middot; Stay details</span></h3>
+                {% if form_error %}<div class="seat-error">{{ form_error }}</div>{% endif %}
                 <form method="post" action="{{ url_for('flights-hotels.book_hotel', hotel_id=hotel.id) }}">
                     <div class="form-row">
                         <div>
-                            <label for="nights">Nights</label>
+                            <label for="check_in_date">Check-in</label>
+                            <input type="date" name="check_in_date" id="check_in_date">
+                        </div>
+                        <div>
+                            <label for="check_out_date">Check-out</label>
+                            <input type="date" name="check_out_date" id="check_out_date">
+                        </div>
+                        <div>
+                            <label for="nights">Nights (if no dates)</label>
                             <select name="nights" id="nights">
                                 {% for n in range(1, 15) %}
                                 <option value="{{ n }}">{{ n }}</option>
@@ -132,24 +144,55 @@
                             </select>
                         </div>
                         <div>
+                            <label for="room_type">Room Type</label>
+                            <select name="room_type" id="room_type">
+                                {% for room in room_options %}
+                                <option value="{{ room.key }}">{{ room.label }} — ${{ "%.0f"|format(room.rate) }}/night</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
                             <label for="travelers">Guests</label>
-                            <select name="travelers" id="travelers">
+                            <select name="travelers" id="travelers" onchange="fhSyncGuests()">
                                 <option value="1">1</option>
                                 <option value="2">2</option>
                                 <option value="3">3</option>
                                 <option value="4">4</option>
                             </select>
                         </div>
-                        <div>
-                            <label for="account_type">Pay with:</label>
-                            <select name="account_type" id="account_type">
-                                <option value="checking">Checking Account</option>
-                                <option value="credit">Credit Card</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="book-btn">Book Now</button>
                     </div>
+                    <div class="form-row" id="guest-rows" style="margin-top:1rem;">
+                        <div id="guest-1">
+                            <label for="guest_name_1">Guest 1 (lead)</label>
+                            <input type="text" name="guest_name_1" id="guest_name_1" placeholder="Full name" required>
+                        </div>
+                        <div id="guest-2" style="display:none;">
+                            <label for="guest_name_2">Guest 2</label>
+                            <input type="text" name="guest_name_2" id="guest_name_2" placeholder="Full name">
+                        </div>
+                        <div id="guest-3" style="display:none;">
+                            <label for="guest_name_3">Guest 3</label>
+                            <input type="text" name="guest_name_3" id="guest_name_3" placeholder="Full name">
+                        </div>
+                        <div id="guest-4" style="display:none;">
+                            <label for="guest_name_4">Guest 4</label>
+                            <input type="text" name="guest_name_4" id="guest_name_4" placeholder="Full name">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:1.2rem;">
+                        <button type="submit" class="book-btn">Continue to Review &rarr;</button>
+                    </div>
+                    <p class="wizard-note">Next you'll review your stay &amp; pay. No booking is made yet.</p>
                 </form>
+                <script>
+                    function fhSyncGuests() {
+                        var n = parseInt(document.getElementById('travelers').value, 10) || 1;
+                        for (var i = 1; i <= 4; i++) {
+                            document.getElementById('guest-' + i).style.display = (i <= n) ? '' : 'none';
+                        }
+                    }
+                    fhSyncGuests();
+                </script>
             </div>
         </div>
     </div>

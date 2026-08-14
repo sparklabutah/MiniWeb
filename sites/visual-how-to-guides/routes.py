@@ -10,6 +10,7 @@ Macros supported:
 """
 import json
 import pathlib
+import re
 from collections import Counter
 from datetime import datetime
 
@@ -34,8 +35,28 @@ blueprint = Blueprint(
 # ---------------------------------------------------------------------------
 # Difficulty numeric mapping (for filter_by_slider)
 # ---------------------------------------------------------------------------
-DIFFICULTY_LEVEL = {"easy": 1, "medium": 2, "hard": 3}
+DIFFICULTY_LEVEL = {"Beginner": 1, "Intermediate": 2, "Advanced": 3}
 LEVEL_DIFFICULTY = {v: k for k, v in DIFFICULTY_LEVEL.items()}
+
+
+def _guide_minutes(g):
+    """Derive a duration in minutes for a guide.
+
+    Seeded guides store their real duration in the ``time_estimate`` string
+    (e.g. "5 min", "1 hour"); the numeric ``duration_minutes`` column is null.
+    Prefer the numeric column when present, otherwise parse ``time_estimate``.
+    """
+    val = g.get("duration_minutes")
+    if isinstance(val, (int, float)) and val:
+        return float(val)
+    text = str(g.get("time_estimate", "")).lower()
+    m = re.search(r"\d+(?:\.\d+)?", text)
+    if not m:
+        return 0.0
+    num = float(m.group(0))
+    if "hour" in text or "hr" in text:
+        num *= 60
+    return num
 
 # ---------------------------------------------------------------------------
 # Data access helpers
@@ -263,9 +284,9 @@ def guides_list():
     elif sort == "popular":
         results.sort(key=lambda g: g.get("views", 0), reverse=True)
     elif sort == "duration_asc":
-        results.sort(key=lambda g: g.get("duration_minutes", 0))
+        results.sort(key=_guide_minutes)
     elif sort == "duration_desc":
-        results.sort(key=lambda g: g.get("duration_minutes", 0), reverse=True)
+        results.sort(key=_guide_minutes, reverse=True)
 
     return render_template(
         "visual-how-to-guides/guides.html",
@@ -786,9 +807,9 @@ def api_guides_list():
     elif sort == "popular":
         results.sort(key=lambda g: g.get("views", 0), reverse=True)
     elif sort == "duration_asc":
-        results.sort(key=lambda g: g.get("duration_minutes", 0))
+        results.sort(key=_guide_minutes)
     elif sort == "duration_desc":
-        results.sort(key=lambda g: g.get("duration_minutes", 0), reverse=True)
+        results.sort(key=_guide_minutes, reverse=True)
     elif sort == "title":
         results.sort(key=lambda g: g.get("title", "").lower())
 

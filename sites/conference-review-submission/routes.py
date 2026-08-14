@@ -101,7 +101,23 @@ def _interpret_record(raw):
         except (json.JSONDecodeError, TypeError):
             authors = [a.strip() for a in authors.split(",")]
     authors_str = ", ".join(authors[:5]) + (" et al." if len(authors) > 5 else "")
-    accepted = raw.get("accepted", False)
+    accepted = bool(raw.get("accepted", False))
+
+    # Decision lifecycle. Legacy PeerRead papers only carry the boolean `accepted`
+    # (already-decided). Papers submitted through the site carry an explicit
+    # `status` (submitted / under_review / accepted / rejected) that a chair can
+    # advance, so prefer it when present.
+    raw_status = (raw.get("status") or "").strip().lower()
+    if raw_status in ("submitted", "under_review"):
+        status = raw_status
+        decision = "Under Review"
+    elif raw_status == "accepted":
+        status, accepted, decision = "accepted", True, "Accept"
+    elif raw_status == "rejected":
+        status, accepted, decision = "rejected", False, "Reject"
+    else:
+        status = "accepted" if accepted else "rejected"
+        decision = "Accept" if accepted else "Reject"
 
     raw_reviews = raw.get("reviews", [])
     if isinstance(raw_reviews, str):
@@ -124,7 +140,9 @@ def _interpret_record(raw):
         "conference": raw.get("conference", ""),
         "venue_id": raw.get("venue_id", ""),
         "accepted": accepted,
-        "decision": "Accept" if accepted else "Reject",
+        "status": status,
+        "track": raw.get("track", ""),
+        "decision": decision,
         "reviews": reviews,
         "num_reviews": num_reviews,
         "num_meta_reviews": len([r for r in reviews if r["is_meta_review"]]),
@@ -156,25 +174,19 @@ def _db_query_papers(venue_id="", q="", status="", sort="title",
         elif status == "rejected":
             papers = [p for p in papers if not p["accepted"]]
     else:
-        # --- Non-search path: normal SQL filters ---
-        conn = _db_conn()
-        clauses = []
-        params = []
-
+        # --- Non-search path: overlay-aware SQL filters ---
+        # Use db.query (not raw SQL) so newly-submitted papers living only in the
+        # session overlay are merged in alongside the base table.
+        where_eq = {}
         if venue_id:
-            clauses.append("venue_id = ?")
-            params.append(venue_id)
+            where_eq["venue_id"] = venue_id
         if status == "accepted":
-            clauses.append("accepted = 1")
+            where_eq["accepted"] = 1
         elif status == "rejected":
-            clauses.append("(accepted = 0)")
-
-        where = "WHERE " + " AND ".join(clauses) if clauses else ""
-        sql = f"SELECT * FROM conference_review_submission_papers {where} LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-
-        rows = conn.execute(sql, params).fetchall()
-        papers = [_interpret_record(_deserialize_row(row)) for row in rows]
+            where_eq["accepted"] = 0
+        rows = db.query(SITE, "papers", where=where_eq or None,
+                        limit=limit, offset=offset)
+        papers = [_interpret_record(r) for r in rows]
 
     # Post-filter on computed score fields (small result set)
     if score_min is not None:
@@ -199,31 +211,63 @@ def _db_query_papers(venue_id="", q="", status="", sort="title",
 
 
 def _db_get_paper(paper_id):
-    conn = _db_conn()
-    row = conn.execute(
-        "SELECT * FROM conference_review_submission_papers WHERE id = ?",
-        (str(paper_id),),
-    ).fetchone()
-    if not row:
+    # Overlay-aware: db.get_item checks the session overlay (newly submitted /
+    # chair-decided papers) before falling back to the base table.
+    raw = db.get_item(SITE, "papers", paper_id)
+    if not raw:
         return None
-    return _interpret_record(_deserialize_row(row))
+    return _interpret_record(raw)
 
 
 def _db_count_papers(venue_id="", status=""):
-    conn = _db_conn()
-    clauses = []
-    params = []
+    where_eq = {}
     if venue_id:
-        clauses.append("venue_id = ?")
-        params.append(venue_id)
+        where_eq["venue_id"] = venue_id
     if status == "accepted":
-        clauses.append("accepted = 1")
+        where_eq["accepted"] = 1
     elif status == "rejected":
-        clauses.append("accepted = 0")
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
-    return conn.execute(
-        f"SELECT COUNT(*) FROM conference_review_submission_papers {where}", params
-    ).fetchone()[0]
+        where_eq["accepted"] = 0
+    return db.count(SITE, "papers", where=where_eq or None)
+
+
+def _next_paper_id():
+    """Overlay-aware next integer id for the papers table.
+
+    db.next_id() cannot be used here: the papers PK is TEXT and holds
+    non-numeric ids (e.g. 'overlay-flownet-2026'), so its lexicographic
+    MAX(id) + int() cast raises ValueError. We cast to INTEGER instead and
+    still account for this session's overlay so a 2nd create won't collide.
+    """
+    conn = _db_conn()
+    try:
+        base = conn.execute(
+            "SELECT MAX(CAST(id AS INTEGER)) FROM conference_review_submission_papers"
+        ).fetchone()[0] or 0
+    except Exception:
+        base = 0
+    over = conn.execute(
+        "SELECT MAX(CAST(item_id AS INTEGER)) FROM session_overlay "
+        "WHERE session_id = ? AND site = ? AND collection = ?",
+        (db._get_session_id(), SITE, "papers"),
+    ).fetchone()[0] or 0
+    return max(int(base), int(over)) + 1
+
+
+def _overlay_papers():
+    """This session's overlay-upserted papers (raw dicts), for author-side views."""
+    conn = _db_conn()
+    rows = conn.execute(
+        "SELECT data FROM session_overlay "
+        "WHERE session_id = ? AND site = ? AND collection = ? AND op = 'upsert'",
+        (db._get_session_id(), SITE, "papers"),
+    ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            out.append(json.loads(r[0]))
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return out
 
 
 def _db_search_papers(query, venue_id=""):
@@ -562,8 +606,10 @@ def console():
         else:
             pending_tasks.append(p)
 
-    # Author submissions: papers where user is an author
+    # Author submissions: papers where user is an author. Base-table matches via
+    # LIKE, plus this session's freshly-submitted papers from the overlay.
     your_submissions = []
+    seen_ids = set()
     if user.get("name"):
         conn = _db_conn()
         rows = conn.execute(
@@ -572,7 +618,21 @@ def console():
         ).fetchall()
         for row in rows:
             p = _interpret_record(_deserialize_row(row))
-            your_submissions.append(p)
+            if str(p["id"]) not in seen_ids:
+                your_submissions.append(p)
+                seen_ids.add(str(p["id"]))
+    for raw in _overlay_papers():
+        if str(raw.get("id")) in seen_ids:
+            continue
+        authors = raw.get("authors", [])
+        if isinstance(authors, str):
+            try:
+                authors = json.loads(authors)
+            except (json.JSONDecodeError, TypeError):
+                authors = [authors]
+        if raw.get("submitted_by") == user["id"] or (user.get("name") and user["name"] in authors):
+            your_submissions.append(_interpret_record(raw))
+            seen_ids.add(str(raw.get("id")))
 
     # Venue participation
     active_venues = []
@@ -581,11 +641,16 @@ def console():
         if venue:
             active_venues.append({"venue": venue, "role": role})
 
+    # Venues open for submission (prefer those still accepting), for the submit form.
+    submit_venues = _get_all_venues()
+    submit_venues.sort(key=lambda v: (v.get("status") != "under_review", -(v.get("year") or 0)))
+
     return render_template("conference-review-submission/console.html",
                            user=user, pending_tasks=pending_tasks,
                            completed_tasks=completed_tasks,
                            your_submissions=your_submissions,
-                           active_venues=active_venues, bids=bids)
+                           active_venues=active_venues, bids=bids,
+                           submit_venues=submit_venues)
 
 
 @blueprint.route("/login", methods=["GET"])
@@ -619,12 +684,58 @@ def logout():
 
 @blueprint.route("/upload-paper", methods=["POST"])
 def form_upload_paper():
-    """Handle paper PDF upload from the console."""
+    """Submit a new paper to a venue: persists a real paper record owned by the
+    submitting author, in `under_review` status, then opens its detail page."""
     if not _is_logged_in():
         return redirect(url_for("conference-review-submission.login_page"))
-    # Accept file but just redirect back (no persistent storage needed)
-    _file = request.files.get("file")
-    return redirect(url_for("conference-review-submission.console"))
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("conference-review-submission.login_page"))
+
+    title = request.form.get("title", "").strip()
+    abstract = request.form.get("abstract", "").strip()
+    track = request.form.get("track", "").strip()
+    venue_id = request.form.get("venue_id", "").strip()
+    authors_raw = request.form.get("authors", "").strip()
+
+    uploaded = request.files.get("file")
+    manuscript_file = uploaded.filename if (uploaded and uploaded.filename) else ""
+
+    # A title and a real venue are required to create a submission.
+    if not title or not venue_id:
+        return redirect(url_for("conference-review-submission.console"))
+    venue = _get_venue(venue_id)
+    if not venue:
+        return redirect(url_for("conference-review-submission.console"))
+
+    authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
+    # The submitting author always owns the paper.
+    if user.get("name") and user["name"] not in authors:
+        authors.insert(0, user["name"])
+
+    new_id = _next_paper_id()
+    paper = {
+        "id": str(new_id),
+        "title": title,
+        "authors": authors,
+        "abstract": abstract,
+        "conference": venue.get("name", ""),
+        "venue_id": venue_id,
+        "accepted": 0,
+        "status": "under_review",
+        "track": track,
+        "reviews": [],
+        "histories": [],
+        "submitted_by": user["id"],
+        "manuscript_file": manuscript_file,
+        "_source_file": "",
+    }
+    db.save_item(SITE, "papers", new_id, paper)
+    _add_email(user["id"], "noreply@conference-review.lakeport.local",
+               "Submission received",
+               f'Your paper "{title}" has been submitted to {venue.get("name", venue_id)} '
+               f'and is now under review.')
+    return redirect(url_for("conference-review-submission.paper_detail", paper_id=new_id))
 
 
 @blueprint.route("/paper/<paper_id>/bid", methods=["POST"])
@@ -679,6 +790,40 @@ def form_withdraw(paper_id):
         abort(404)
     db.delete_item(SITE, "papers", paper_id)
     return redirect(url_for("conference-review-submission.console"))
+
+
+def _apply_decision(paper_id, decision):
+    """Write an accept/reject decision onto a paper (overlay-persisted).
+
+    Returns the updated raw paper dict, or None if the paper/decision is invalid.
+    """
+    decision = (decision or "").strip().lower()
+    if decision not in ("accept", "reject"):
+        return None
+    raw = db.get_item(SITE, "papers", paper_id)
+    if not raw:
+        return None
+    raw = dict(raw)
+    accept = decision == "accept"
+    raw["accepted"] = 1 if accept else 0
+    raw["status"] = "accepted" if accept else "rejected"
+    raw["decision"] = "Accept" if accept else "Reject"
+    db.save_item(SITE, "papers", paper_id, raw)
+    return raw
+
+
+@blueprint.route("/paper/<paper_id>/decision", methods=["POST"])
+def form_decision(paper_id):
+    """Chair-only accept/reject decision on a paper."""
+    if not _is_logged_in():
+        return redirect(url_for("conference-review-submission.login_page"))
+    chair = _get_current_user()
+    if not chair or chair.get("role") not in ("chair", "admin"):
+        abort(403)
+    if db.get_item(SITE, "papers", paper_id) is None:
+        abort(404)
+    _apply_decision(paper_id, request.form.get("decision", ""))
+    return redirect(url_for("conference-review-submission.paper_detail", paper_id=paper_id))
 
 
 # ---------------------------------------------------------------------------
@@ -856,6 +1001,29 @@ def api_decisions():
         "num_reviews": p["num_reviews"],
     } for p in papers]
     return jsonify(out)
+
+
+@blueprint.route("/api/papers/<paper_id>/decision", methods=["POST"])
+def api_decision(paper_id):
+    """Chair-only accept/reject decision (JSON). Body: {"decision": "accept"|"reject"}."""
+    if not _is_logged_in():
+        return jsonify({"error": "not authenticated"}), 401
+    chair = _get_current_user()
+    if not chair or chair.get("role") not in ("chair", "admin"):
+        return jsonify({"error": "chair role required"}), 403
+    if db.get_item(SITE, "papers", paper_id) is None:
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    updated = _apply_decision(paper_id, data.get("decision", ""))
+    if updated is None:
+        return jsonify({"error": "decision must be 'accept' or 'reject'"}), 400
+    paper = _interpret_record(updated)
+    return jsonify({
+        "id": paper["id"],
+        "decision": paper["decision"],
+        "status": paper["status"],
+        "accepted": paper["accepted"],
+    })
 
 
 @blueprint.route("/api/export")

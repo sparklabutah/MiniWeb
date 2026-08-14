@@ -146,6 +146,24 @@
             {% endif %}
         </div>
 
+        {% if user and user.role in ['chair', 'admin'] %}
+        <div class="section" id="chair-decision">
+            <div class="section-label">Chair Decision</div>
+            <div style="border:1px solid #eee;border-radius:6px;padding:14px 16px;">
+                <div style="font-size:13px;color:#555;margin-bottom:10px;">
+                    Current decision:
+                    {% if paper.status == 'accepted' %}<span class="badge badge-accept">Accept</span>
+                    {% elif paper.status == 'rejected' %}<span class="badge badge-reject">Reject</span>
+                    {% else %}<span class="badge badge-review">Under Review</span>{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('conference-review-submission.form_decision', paper_id=paper.id) }}" style="display:flex;gap:8px;margin:0;">
+                    <button type="submit" name="decision" value="accept" id="accept-btn" class="btn btn-primary" style="background:#137333;border-color:#137333;">Accept</button>
+                    <button type="submit" name="decision" value="reject" id="reject-btn" class="btn" style="color:#c5221f;border-color:#e6b8b5;">Reject</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="section">
             <div class="section-label">Abstract</div>
             <div class="abstract-text">{{ paper.abstract }}</div>

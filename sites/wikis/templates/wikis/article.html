@@ -43,6 +43,10 @@
         .rev-table th { background: #f8fafc; color: #1e3a5f; }
         .category-badge { display: inline-block; background: #eff6ff; color: #2563eb; padding: .2rem .6rem; border-radius: .25rem; font-size: .82rem; text-decoration: none; }
         .category-badge:hover { background: #dbeafe; }
+        .rev-table td a { color: #2563eb; text-decoration: none; }
+        .rev-table td a:hover { text-decoration: underline; }
+        .rev-actions a, .rev-actions button { font-size: .78rem; margin-right: .5rem; color: #2563eb; background: none; border: none; padding: 0; cursor: pointer; text-decoration: none; }
+        .rev-actions button:hover, .rev-actions a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -146,7 +150,18 @@
                     {% for rev in revisions[:5] %}
                     <tr>
                         <td>{{ rev.timestamp[:10] }}</td>
-                        <td>{{ rev.summary }}</td>
+                        <td>
+                            <a href="{{ url_for('wikis.view_revision', slug=page.slug, rev_id=rev.id) }}">{{ rev.summary }}</a>
+                            <div class="rev-actions">
+                                <a href="{{ url_for('wikis.view_revision', slug=page.slug, rev_id=rev.id) }}">view</a>
+                                <a href="{{ url_for('wikis.diff_revision', slug=page.slug, rev_id=rev.id) }}">diff</a>
+                                {% if not loop.first %}
+                                <form method="post" action="{{ url_for('wikis.revert_revision', slug=page.slug, rev_id=rev.id) }}" style="display:inline;">
+                                    <button type="submit">revert to this</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                     </tbody>

@@ -56,5 +56,28 @@
             <button type="submit" >Export</button>
         </form>
     </div>
+
+    <script>
+        (function () {
+            var userId = {{ user.id | tojson }};
+            var settingsUrl = "{{ url_for('translation.api_settings_update') }}";
+            ["auto_detect", "formal_mode", "auto_pronounce"].forEach(function (key) {
+                var box = document.getElementById(key);
+                if (!box) return;
+                box.addEventListener("change", function () {
+                    var body = {user_id: userId};
+                    body[key] = box.checked;
+                    fetch(settingsUrl, {
+                        method: "PUT",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify(body),
+                    }).catch(function () {
+                        // Revert the checkbox on failure so the UI matches stored state.
+                        box.checked = !box.checked;
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

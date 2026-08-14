@@ -50,6 +50,9 @@
         .asset-body h4 { font-size: .85rem; margin-bottom: .25rem; color: #1a1a2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .asset-body .asset-meta { font-size: .75rem; color: #94a3b8; display: flex; justify-content: space-between; }
         .asset-body .cat-label { background: #f1f0ff; color: #7c3aed; padding: .1rem .4rem; border-radius: .2rem; font-size: .7rem; }
+        .use-asset-form { margin-top: .6rem; }
+        .use-asset-btn { width: 100%; background: #7c3aed; color: #fff; border: none; border-radius: .35rem; padding: .45rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+        .use-asset-btn:hover { background: #6d28d9; }
 
         /* Colored placeholder previews by type */
         .ap-icon { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
@@ -61,6 +64,8 @@
         .ap-video { background: linear-gradient(135deg, #dc2626, #b91c1c); }
         .ap-default { background: linear-gradient(135deg, #94a3b8, #64748b); }
         .ap-label { color: rgba(255,255,255,.6); font-size: .8rem; font-weight: 600; }
+        .ap-svg { width: 96px; height: 96px; display: flex; }
+        .ap-svg svg { width: 100%; height: 100%; }
 
         .no-assets { text-align: center; color: #94a3b8; padding: 3rem; font-size: 1rem; }
     </style>
@@ -129,7 +134,7 @@
             {% for asset in assets %}
             <div class="asset-card" data-id="{{ asset.id }}">
                 <div class="asset-preview ap-{{ asset.type if asset.type in asset_types else 'default' }}">
-                    <span class="ap-label">{{ asset.type|upper }}</span>
+                    {% if asset.svg %}<span class="ap-svg">{{ asset.svg|safe }}</span>{% else %}<span class="ap-label">{{ asset.type|upper }}</span>{% endif %}
                     <span class="type-badge">{{ asset.type }}</span>
                 </div>
                 <div class="asset-body">
@@ -138,6 +143,11 @@
                         <span class="cat-label">{{ asset.category }}</span>
                         <span>{{ asset.tags|join(', ')|truncate(30, True) }}</span>
                     </div>
+                    {% if user %}
+                    <form method="post" action="{{ url_for('design-creative.use_asset', asset_id=asset.id) }}" class="use-asset-form">
+                        <button type="submit" class="use-asset-btn">Use in a design</button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

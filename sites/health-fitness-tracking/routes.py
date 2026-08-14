@@ -419,6 +419,23 @@ def workouts_page():
     sql = f"SELECT * FROM [{table}] WHERE {' AND '.join(where_parts)} ORDER BY date DESC LIMIT 50"
     user_workouts = db.execute(sql, tuple(params), fetch="all")
 
+    # Merge in workouts created/edited this session (they live in the overlay,
+    # invisible to raw db.execute). Mirror the SQL WHERE clauses in `match`.
+    def _match(w):
+        if w.get("user_id") != uid:
+            return False
+        if workout_type and w.get("type") != workout_type:
+            return False
+        if date_from and w.get("date", "") < date_from:
+            return False
+        if date_to and w.get("date", "") > date_to:
+            return False
+        return True
+
+    user_workouts = db.merge_overlay(
+        SITE, "workouts", user_workouts, match=_match, sort="-date", limit=50
+    )
+
     # Collect unique workout types for filter dropdown
     types_sql = f"SELECT DISTINCT type FROM [{table}] WHERE user_id = ? ORDER BY type"
     all_types = [r["type"] for r in db.execute(types_sql, (uid,), fetch="all")]
@@ -760,6 +777,51 @@ def log_workout_page():
         logged_in=user is not None,
         show_log_form=True,
     )
+
+
+@blueprint.route("/log-workout", methods=["POST"])
+def log_workout_submit():
+    """Persist a workout logged from the #log-workout-form UI form.
+
+    Mirrors the JSON API (POST /api/workouts) but accepts a plain HTML form
+    submission, writes a single row to the SESSION OVERLAY via db.save_item()
+    with an overlay-aware db.next_id() primary key, then redirects to the
+    Activity log so the new workout is visible.
+    """
+    user = _get_current_user()
+    uid = user["id"] if user else 1
+
+    def _to_int(name, default=0):
+        try:
+            return int(float(request.form.get(name, "").strip()))
+        except (ValueError, TypeError):
+            return default
+
+    workout_type = request.form.get("type", "").strip() or "other"
+    date = request.form.get("date", "").strip() or _today()
+
+    new_id = db.next_id(SITE, "workouts")
+    workout = {
+        "id": new_id,
+        "user_id": uid,
+        "type": workout_type,
+        "date": date,
+        "start_time": request.form.get("start_time", "").strip(),
+        "duration_minutes": _to_int("duration_minutes", 0),
+        "calories_burned": _to_int("calories_burned", 0),
+        "heart_rate_avg": 0,
+        "heart_rate_max": 0,
+        "location": request.form.get("location", "").strip(),
+        "notes": request.form.get("notes", "").strip(),
+        "exercises": "",
+        "distance_km": 0.0,
+        "elevation_gain_m": 0,
+        "companions": "",
+        "pace_min_per_km": 0.0,
+    }
+    db.save_item(SITE, "workouts", new_id, workout)
+    emit("booking", user_id=uid, title=f"Workout: {workout['type']}", start=workout["date"], location=workout.get("location", ""))
+    return redirect(url_for("health-fitness-tracking.workouts_page"))
 
 
 @blueprint.route("/login", methods=["GET"])

@@ -309,6 +309,47 @@ def _semantic_search(resources, query, fields=None):
 
 
 # ---------------------------------------------------------------------------
+# Value normalization (dropdowns store inconsistent casing/aliases)
+# ---------------------------------------------------------------------------
+
+# Database engines are stored with inconsistent casing/aliases
+# (e.g. "PostgreSQL" vs "postgres", "Redis" vs "redis").
+_ENGINE_ALIASES = {"postgres": "postgresql"}
+_ENGINE_LABELS = {
+    "postgresql": "PostgreSQL", "redis": "Redis",
+    "mongodb": "MongoDB", "mysql": "MySQL",
+}
+
+# Storage classes mix casing and separators
+# (e.g. "Standard" vs "STANDARD", "Standard-IA" vs "STANDARD_IA").
+_STORAGE_CLASS_LABELS = {
+    "STANDARD": "Standard", "STANDARD_IA": "Standard-IA",
+    "GLACIER": "Glacier", "INTELLIGENT_TIERING": "Intelligent-Tiering",
+}
+
+
+def _norm_engine(value):
+    """Canonicalize a database engine value for consistent matching."""
+    s = (value or "").strip().lower()
+    return _ENGINE_ALIASES.get(s, s)
+
+
+def _norm_storage_class(value):
+    """Canonicalize a storage class value for consistent matching."""
+    return (value or "").strip().upper().replace("-", "_")
+
+
+def _dropdown_options(values, normalizer, labels):
+    """Build deduped (canonical_value, label) option pairs from raw values."""
+    seen = {}
+    for v in values:
+        canon = normalizer(v)
+        if canon and canon not in seen:
+            seen[canon] = labels.get(canon, v)
+    return sorted(seen.items(), key=lambda kv: kv[1].lower())
+
+
+# ---------------------------------------------------------------------------
 # Service categories
 # ---------------------------------------------------------------------------
 
@@ -648,6 +689,37 @@ def form_edit_instance(instance_id):
     return redirect(url_for("cloud-dev-consoles.instance_detail", instance_id=instance_id))
 
 
+def _set_instance_power(instance_id, new_status):
+    """Transition an instance's power state, persisting to the session overlay."""
+    instance = db.get_item(SITE, "instances", instance_id)
+    if not instance:
+        abort(404)
+    instance["status"] = new_status
+    if new_status == "stopped":
+        # A stopped instance releases its ephemeral public IP (AWS behaviour).
+        instance["public_ip"] = ""
+    db.save_item(SITE, "instances", instance_id, instance)
+    return redirect(url_for("cloud-dev-consoles.instance_detail", instance_id=instance_id))
+
+
+@blueprint.route("/instance/<instance_id>/start", methods=["POST"])
+def form_start_instance(instance_id):
+    """Start a stopped instance -> running."""
+    return _set_instance_power(instance_id, "running")
+
+
+@blueprint.route("/instance/<instance_id>/stop", methods=["POST"])
+def form_stop_instance(instance_id):
+    """Stop a running instance -> stopped."""
+    return _set_instance_power(instance_id, "stopped")
+
+
+@blueprint.route("/instance/<instance_id>/reboot", methods=["POST"])
+def form_reboot_instance(instance_id):
+    """Reboot an instance -> cycles back to running."""
+    return _set_instance_power(instance_id, "running")
+
+
 @blueprint.route("/functions/create", methods=["POST"])
 def form_create_function():
     """Create a new function from the Functions page form (create_by_form)."""
@@ -669,6 +741,92 @@ def form_create_function():
     return redirect(url_for("cloud-dev-consoles.functions_page"))
 
 
+@blueprint.route("/databases/create", methods=["POST"])
+def form_create_database():
+    """Provision a new database from the Databases page form (create_by_form).
+
+    Uses overlay-aware count for a fresh id and db.save_item so the row lands in
+    session_overlay without loading the whole collection.
+    """
+    n = db.count(SITE, "databases") + 1
+    new_id = f"db-user{n:03d}"
+    region = request.form.get("region", "us-west-2").strip() or "us-west-2"
+    data = {
+        "id": new_id,
+        "name": request.form.get("name", "").strip() or f"new-database-{n}",
+        "engine": request.form.get("engine", "PostgreSQL").strip() or "PostgreSQL",
+        "version": request.form.get("version", "").strip() or "16.2",
+        "instance_class": request.form.get("instance_class", "db.t3.medium").strip() or "db.t3.medium",
+        "storage_gb": request.form.get("storage_gb", 100, type=int) or 100,
+        "storage_used_gb": 0,
+        "status": "available",
+        "region": region,
+        "multi_az": 1 if request.form.get("multi_az") else 0,
+        "encrypted": 1 if request.form.get("encrypted") else 0,
+        "backup_retention_days": request.form.get("backup_retention_days", 7, type=int) or 7,
+        "connections_active": 0,
+        "connections_max": request.form.get("connections_max", 100, type=int) or 100,
+        "iops": request.form.get("iops", 3000, type=int) or 3000,
+        "monthly_cost": 0.0,
+        "created_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "tags": {"env": request.form.get("env", "development").strip() or "development"},
+    }
+    db.save_item(SITE, "databases", new_id, data)
+    return redirect(url_for("cloud-dev-consoles.databases_page"))
+
+
+@blueprint.route("/storage/create", methods=["POST"])
+def form_create_bucket():
+    """Create a new storage bucket from the Storage page form (create_by_form)."""
+    n = db.count(SITE, "storage_buckets") + 1
+    new_id = f"bucket-user{n:03d}"
+    region = request.form.get("region", "us-west-2").strip() or "us-west-2"
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    data = {
+        "id": new_id,
+        "name": request.form.get("name", "").strip() or f"new-bucket-{n}",
+        "region": region,
+        "storage_class": request.form.get("storage_class", "Standard").strip() or "Standard",
+        "size_gb": 0.0,
+        "object_count": 0,
+        "versioning": 1 if request.form.get("versioning") else 0,
+        "encryption": request.form.get("encryption", "AES-256").strip() or "AES-256",
+        "public_access": 1 if request.form.get("public_access") else 0,
+        "lifecycle_rules": 0,
+        "monthly_cost": 0.0,
+        "created_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "last_modified": now_iso,
+        "tags": {"env": request.form.get("env", "development").strip() or "development"},
+    }
+    db.save_item(SITE, "storage_buckets", new_id, data)
+    return redirect(url_for("cloud-dev-consoles.storage_page"))
+
+
+@blueprint.route("/iam/create", methods=["POST"])
+def form_create_iam_user():
+    """Create a new IAM user from the IAM page form (create_by_form)."""
+    n = db.count(SITE, "iam_users") + 1
+    new_id = f"iam-user{n:03d}"
+    username = request.form.get("username", "").strip() or f"new-user-{n}"
+    data = {
+        "id": new_id,
+        "username": username,
+        "name": request.form.get("name", "").strip() or username,
+        "email": request.form.get("email", "").strip() or f"{username}@meridiansystems.com",
+        "role": request.form.get("role", "Developer").strip() or "Developer",
+        "department": request.form.get("department", "Engineering").strip() or "Engineering",
+        "status": "active",
+        "mfa_enabled": 1 if request.form.get("mfa_enabled") else 0,
+        "last_login": "",
+        "created_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "api_keys": request.form.get("api_keys", 0, type=int) or 0,
+        "policies": [],
+        "groups": [],
+    }
+    db.save_item(SITE, "iam_users", new_id, data)
+    return redirect(url_for("cloud-dev-consoles.iam_page"))
+
+
 @blueprint.route("/databases")
 def databases_page():
     databases = _get_databases()
@@ -681,7 +839,7 @@ def databases_page():
     if q:
         results = _search_resources(results, q, ["name", "engine", "tags"])
     if engine:
-        results = [d for d in results if d["engine"] == engine]
+        results = [d for d in results if _norm_engine(d["engine"]) == _norm_engine(engine)]
     if status:
         results = [d for d in results if d["status"] == status]
 
@@ -694,7 +852,8 @@ def databases_page():
     elif sort == "connections":
         results.sort(key=lambda d: -d["connections_active"])
 
-    engines = sorted(set(d["engine"] for d in databases))
+    engines = _dropdown_options(
+        (d["engine"] for d in databases), _norm_engine, _ENGINE_LABELS)
 
     user = None
     if "user_id" in session:
@@ -702,6 +861,7 @@ def databases_page():
 
     return render_template("cloud-dev-consoles/databases.html",
                            databases=results, engines=engines,
+                           regions=_get_regions(),
                            q=q, engine=engine, status=status,
                            sort=sort, user=user)
 
@@ -754,7 +914,8 @@ def storage_page():
     if q:
         results = _search_resources(results, q, ["name", "region", "tags"])
     if storage_class:
-        results = [b for b in results if b["storage_class"] == storage_class]
+        results = [b for b in results
+                   if _norm_storage_class(b["storage_class"]) == _norm_storage_class(storage_class)]
 
     if sort == "name":
         results.sort(key=lambda b: b["name"].lower())
@@ -765,7 +926,8 @@ def storage_page():
     elif sort == "cost":
         results.sort(key=lambda b: -b["monthly_cost"])
 
-    storage_classes = sorted(set(b["storage_class"] for b in buckets))
+    storage_classes = _dropdown_options(
+        (b["storage_class"] for b in buckets), _norm_storage_class, _STORAGE_CLASS_LABELS)
 
     user = None
     if "user_id" in session:
@@ -773,6 +935,7 @@ def storage_page():
 
     return render_template("cloud-dev-consoles/storage.html",
                            buckets=results, storage_classes=storage_classes,
+                           regions=_get_regions(),
                            q=q, storage_class=storage_class, sort=sort,
                            user=user)
 
@@ -808,6 +971,7 @@ def iam_page():
 
     return render_template("cloud-dev-consoles/iam.html",
                            iam_users=results, roles=roles,
+                           regions=_get_regions(),
                            q=q, role=role, status=status,
                            sort=sort, user=user)
 
@@ -1202,7 +1366,7 @@ def api_databases():
     if q:
         results = _search_resources(results, q, ["name", "engine", "tags"])
     if engine:
-        results = [d for d in results if d["engine"] == engine]
+        results = [d for d in results if _norm_engine(d["engine"]) == _norm_engine(engine)]
     if status:
         results = [d for d in results if d["status"] == status]
 
@@ -1242,7 +1406,8 @@ def api_storage():
     if q:
         results = _search_resources(results, q, ["name", "region", "tags"])
     if storage_class:
-        results = [b for b in results if b["storage_class"] == storage_class]
+        results = [b for b in results
+                   if _norm_storage_class(b["storage_class"]) == _norm_storage_class(storage_class)]
 
     if sort == "name":
         results.sort(key=lambda b: b["name"].lower())

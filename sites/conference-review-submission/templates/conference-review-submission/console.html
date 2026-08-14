@@ -134,9 +134,44 @@
         <!-- Submit a Paper -->
         <div class="section">
             <div class="section-title">Submit a Paper</div>
-            <form method="POST" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.form_upload_paper') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input type="file" name="file" accept=".pdf,.doc,.docx,.tex" style="font-size:12px;">
-                <button type="submit" class="btn btn-primary">Upload Paper</button>
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.form_upload_paper') }}" style="display:flex;flex-direction:column;gap:10px;max-width:640px;">
+                <div>
+                    <label for="paper-title" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Title</label>
+                    <input type="text" id="paper-title" name="title" placeholder="Paper title" required style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                </div>
+                <div>
+                    <label for="paper-venue" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Venue</label>
+                    <select id="paper-venue" name="venue_id" required style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                        <option value="">Select a venue&hellip;</option>
+                        {% for v in submit_venues %}
+                        <option value="{{ v.id }}">{{ v.name }}{% if v.status == 'under_review' %} (open){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="paper-track" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Track</label>
+                    <select id="paper-track" name="track" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                        <option value="Main Track">Main Track</option>
+                        <option value="Workshop">Workshop</option>
+                        <option value="Findings">Findings</option>
+                        <option value="Demo">Demo</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="paper-authors" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Co-authors (comma-separated, optional)</label>
+                    <input type="text" id="paper-authors" name="authors" placeholder="You are added automatically" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                </div>
+                <div>
+                    <label for="paper-abstract" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Abstract</label>
+                    <textarea id="paper-abstract" name="abstract" rows="4" placeholder="Paper abstract" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Manuscript</label>
+                    <input type="file" name="file" accept=".pdf,.doc,.docx,.tex" style="font-size:12px;">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Submit Paper</button>
+                </div>
             </form>
         </div>
 

@@ -4,6 +4,42 @@
 {% block heading %}Sprints{% endblock %}
 {% block content %}
 
+<details class="card" style="margin-bottom:16px;">
+    <summary style="cursor:pointer;font-weight:700;">&#43; New Sprint</summary>
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_create_sprint') }}" style="margin-top:14px;">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+                <label for="sp-name" style="display:block;font-weight:600;margin-bottom:5px;">Sprint name *</label>
+                <input type="text" id="sp-name" name="name" required placeholder="e.g. MF Sprint 16">
+            </div>
+            <div>
+                <label for="sp-project" style="display:block;font-weight:600;margin-bottom:5px;">Project *</label>
+                <select id="sp-project" name="project_id" required>
+                    <option value="">Select project...</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }} ({{ p.key }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+                <label for="sp-start" style="display:block;font-weight:600;margin-bottom:5px;">Start date</label>
+                <input type="date" id="sp-start" name="start_date">
+            </div>
+            <div>
+                <label for="sp-end" style="display:block;font-weight:600;margin-bottom:5px;">End date</label>
+                <input type="date" id="sp-end" name="end_date">
+            </div>
+        </div>
+        <div style="margin-bottom:14px;">
+            <label for="sp-goal" style="display:block;font-weight:600;margin-bottom:5px;">Sprint goal</label>
+            <input type="text" id="sp-goal" name="goal" placeholder="What should this sprint deliver?">
+        </div>
+        <button type="submit" class="btn btn-primary">Create Sprint</button>
+    </form>
+</details>
+
 <div class="sec-h" style="margin-top:0;">All Sprints <span class="count">{{ sprint_data|length }}</span></div>
 
 {% for sd in sprint_data %}

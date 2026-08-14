@@ -65,6 +65,112 @@ def _max_id(collection, id_col="id"):
 
 
 # ---------------------------------------------------------------------------
+# Orders — real, persisted buy-now / won-auction purchases
+# ---------------------------------------------------------------------------
+
+_ORDERS_TABLE = "auctions_p2p_marketplaces_orders"
+
+
+def _ensure_orders_table():
+    """Create + register the orders base table on first use (idempotent).
+
+    The site DB was seeded without an orders table, so buy-now purchases had
+    nowhere to persist. We create the empty base table + registry row once (the
+    forums_messages runtime-seed pattern); real order rows still go to the
+    session overlay via db.save_item, keeping sessions isolated.
+    """
+    if db.get_table_name(SITE, "orders"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_ORDERS_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            order_number TEXT NOT NULL DEFAULT '',
+            listing_id INTEGER NOT NULL DEFAULT 0,
+            buyer_id INTEGER NOT NULL DEFAULT 0,
+            seller_id INTEGER NOT NULL DEFAULT 0,
+            item_name TEXT NOT NULL DEFAULT '',
+            total REAL NOT NULL DEFAULT 0.0,
+            payment_method TEXT NOT NULL DEFAULT '',
+            card_last4 TEXT NOT NULL DEFAULT '',
+            full_name TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
+            city TEXT NOT NULL DEFAULT '',
+            zip TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT '',
+            timestamp TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_auctions_orders_buyer "
+        f"ON [{_ORDERS_TABLE}] (buyer_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "orders", _ORDERS_TABLE, "id")
+
+
+# ---------------------------------------------------------------------------
+# Auction resolution — deterministically close auctions whose end has passed
+# ---------------------------------------------------------------------------
+
+def _site_now():
+    """The site's notion of 'now'. No simulated site clock exists here, so
+    this is UTC wall-clock (matches how auction_start/end are written)."""
+    return datetime.utcnow()
+
+
+def _parse_iso(value):
+    if not value:
+        return None
+    s = str(value).strip().replace("Z", "")
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _resolve_auction(product):
+    """Award a winner to an auction that is ALREADY ended.
+
+    IMPORTANT: auction dates in this dataset are intentionally static/past, so we
+    must NOT expire 'active' listings by comparing auction_end to the wall clock
+    (that would end every active listing the moment it's viewed). Active listings
+    stay active and biddable; a listing only becomes 'ended' via an explicit
+    seller close, or is seeded 'ended'. For a listing that is already 'ended' and
+    has no winner yet, award the top bidder if the high bid clears reserve_price.
+    Idempotent; only writes when a winner is actually assigned.
+    """
+    if not product or product.get("status") != "ended" or product.get("winner_id"):
+        return product
+
+    top = db.query(SITE, "bids", where={"listing_id": product["id"]},
+                   sort="-amount", limit=1)
+    try:
+        reserve = float(product.get("reserve_price") or 0)
+    except (TypeError, ValueError):
+        reserve = 0.0
+
+    winner = ""
+    if top:
+        high = top[0]
+        try:
+            high_amt = float(high.get("amount") if high.get("amount") is not None
+                             else product.get("current_price") or 0)
+        except (TypeError, ValueError):
+            high_amt = 0.0
+        if high_amt >= reserve:
+            winner = high["bidder_id"]
+    if winner:
+        product["winner_id"] = winner
+        db.save_item(SITE, "products", product["id"], product)
+    return product
+
+
+# ---------------------------------------------------------------------------
 # Search / filter helpers
 # ---------------------------------------------------------------------------
 
@@ -258,6 +364,8 @@ def listing_detail(listing_id):
     product = _get_product(listing_id)
     if product is None:
         abort(404)
+    # Deterministically close the auction if its end has passed.
+    product = _resolve_auction(product)
     listing_bids = db.query(SITE, "bids",
                             where={"listing_id": listing_id},
                             sort="-amount", limit=50)
@@ -305,17 +413,29 @@ def dashboard():
     if not user:
         return render_template("auctions-p2p-marketplaces/login.html", error=None, mode="login")
 
-    # Items user is selling
+    _ensure_orders_table()
+
+    # Items user is selling — resolve any that have ended so status/winner are current.
     my_listings = db.query(SITE, "products", where={"seller_id": user["id"]}, limit=50)
+    my_listings = [_resolve_auction(p) for p in my_listings]
 
     # Items user has bid on — get unique listing IDs from bids
     user_bids = db.query(SITE, "bids", where={"bidder_id": user["id"]})
     my_bid_listing_ids = list(set(b["listing_id"] for b in user_bids))
     if my_bid_listing_ids:
         my_bids = [_get_product(lid) for lid in my_bid_listing_ids]
-        my_bids = [p for p in my_bids if p]
+        my_bids = [_resolve_auction(p) for p in my_bids if p]
     else:
         my_bids = []
+
+    # Won auctions: ended listings the user bid on where they are the winner.
+    won_listings = [p for p in my_bids
+                    if p.get("status") == "ended"
+                    and str(p.get("winner_id")) == str(user["id"])]
+
+    # Real persisted buy-now / purchase orders for this user.
+    my_orders = db.query(SITE, "orders", where={"buyer_id": user["id"]},
+                         sort="-id", limit=50)
 
     # Watchlist
     my_watchlist = db.query(SITE, "watchlist", where={"user_id": user["id"]})
@@ -334,7 +454,8 @@ def dashboard():
 
     return render_template("auctions-p2p-marketplaces/dashboard.html",
                            user=user, my_listings=my_listings, my_bids=my_bids,
-                           watched=watched, messages=my_messages)
+                           watched=watched, messages=my_messages,
+                           orders=my_orders, won_listings=won_listings)
 
 
 def _safe_next(value):
@@ -595,8 +716,32 @@ def checkout_submit(listing_id):
     emit("purchase", user_id=user["id"], amount=price, merchant="BidMarket",
          item=product["name"], account_type="checking")
 
+    # Persist the order so it survives the request and shows on the dashboard.
+    _ensure_orders_table()
+    order_id = db.next_id(SITE, "orders")
+    order_number = f"ORD-{listing_id}-{user['id']}"
+    order_record = {
+        "id": order_id,
+        "order_number": order_number,
+        "listing_id": listing_id,
+        "buyer_id": user["id"],
+        "seller_id": product.get("seller_id", 0),
+        "item_name": product["name"],
+        "total": price,
+        "payment_method": payment_method,
+        "card_last4": card_last4,
+        "full_name": full_name,
+        "address": address,
+        "city": city,
+        "zip": zip_code,
+        "source": "buy_now",
+        "status": "purchased",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    db.save_item(SITE, "orders", order_id, order_record)
+
     order = {
-        "id": f"ORD-{listing_id}-{user['id']}",
+        "id": order_number,
         "full_name": full_name,
         "address": address,
         "city": city,
@@ -1304,17 +1449,41 @@ def api_checkout():
         return jsonify({"error": "Listing not found"}), 404
 
     # Mark as sold
+    price = product.get("buy_now_price") or product["current_price"]
     product["status"] = "ended"
     product["winner_id"] = buyer_id
     db.save_item(SITE, "products", listing_id, product)
 
-    emit("purchase", user_id=buyer_id, amount=product["current_price"], merchant="BidMarket", item=product["name"], account_type=account_type)
+    emit("purchase", user_id=buyer_id, amount=price, merchant="BidMarket", item=product["name"], account_type=account_type)
+
+    # Persist the order so it shows on the buyer's dashboard.
+    _ensure_orders_table()
+    order_id = db.next_id(SITE, "orders")
+    order_number = f"ORD-{listing_id}-{buyer_id}"
+    db.save_item(SITE, "orders", order_id, {
+        "id": order_id,
+        "order_number": order_number,
+        "listing_id": listing_id,
+        "buyer_id": buyer_id,
+        "seller_id": product.get("seller_id", 0),
+        "item_name": product["name"],
+        "total": price,
+        "payment_method": payment_method,
+        "card_last4": "",
+        "full_name": "",
+        "address": shipping_address,
+        "city": "",
+        "zip": "",
+        "source": "buy_now",
+        "status": "purchased",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    })
 
     return jsonify({
         "success": True,
-        "order_id": f"ORD-{listing_id}-{buyer_id}",
+        "order_id": order_number,
         "listing_id": listing_id,
-        "total": product["current_price"],
+        "total": price,
         "payment_method": payment_method,
     })
 

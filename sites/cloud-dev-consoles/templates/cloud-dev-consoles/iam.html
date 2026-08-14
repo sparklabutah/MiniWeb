@@ -20,10 +20,33 @@
             <label>Role</label>
             <select name="role" id="role-filter"><option value="">All Roles</option>{% for r in roles %}<option value="{{ r }}" {% if role == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
             <label>Status</label>
-            <select name="status"><option value="">All</option><option value="active" {% if status == 'active' %}selected{% endif %}>Active</option><option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option></select>
+            <select name="status"><option value="">All</option><option value="active" {% if status == 'active' %}selected{% endif %}>Active</option><option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Inactive</option></select>
             <label>Sort</label>
             <select name="sort"><option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option><option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option><option value="last_login" {% if sort == 'last_login' %}selected{% endif %}>Last Login</option></select>
             <button type="submit">Apply</button>
+        </form>
+        <!-- Create IAM user (create_by_form) -->
+        <form class="filters" method="POST" action="{{ url_for('cloud-dev-consoles.form_create_iam_user') }}" id="create-iam-form">
+            <strong style="font-size:.85rem;">Create user</strong>
+            <label>Username</label><input type="text" name="username" placeholder="new_user" required>
+            <label>Name</label><input type="text" name="name" placeholder="Full Name">
+            <label>Email</label><input type="text" name="email" placeholder="user@meridiansystems.com">
+            <label>Role</label>
+            <select name="role">
+                <option value="Administrator">Administrator</option>
+                <option value="Developer" selected>Developer</option>
+                <option value="Manager">Manager</option>
+                <option value="ReadOnly">ReadOnly</option>
+            </select>
+            <label>Department</label>
+            <select name="department">
+                <option value="Engineering">Engineering</option>
+                <option value="Operations">Operations</option>
+                <option value="Security">Security</option>
+                <option value="Data">Data</option>
+            </select>
+            <label><input type="checkbox" name="mfa_enabled" checked> MFA</label>
+            <button type="submit" style="background:#ff9900;color:#232f3e;font-weight:600;">Create user</button>
         </form>
         <div class="result-count">{{ iam_users|length }} users</div>
         <table id="iam-table">

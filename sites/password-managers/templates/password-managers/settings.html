@@ -44,38 +44,42 @@
             </div>
             {% endif %}
 
+            {% set s = user.settings or {} %}
             <div class="card card-pad">
                 <div class="card-title">Security Settings</div>
                 <div class="field">
                     <label class="form-label" for="autoLock">Auto-Lock Timeout</label>
                     <p class="muted" style="margin-bottom:.4rem;">Lock vault after period of inactivity</p>
-                    <select id="autoLock">
-                        <option value="1">1 minute</option>
-                        <option value="5" selected>5 minutes</option>
-                        <option value="15">15 minutes</option>
-                        <option value="30">30 minutes</option>
-                        <option value="60">1 hour</option>
+                    <select id="autoLock" name="auto_lock_minutes" data-setting="auto_lock_minutes" data-type="int">
+                        {% set al = s.get('auto_lock_minutes', 5)|string %}
+                        <option value="1" {% if al == '1' %}selected{% endif %}>1 minute</option>
+                        <option value="5" {% if al == '5' %}selected{% endif %}>5 minutes</option>
+                        <option value="15" {% if al == '15' %}selected{% endif %}>15 minutes</option>
+                        <option value="30" {% if al == '30' %}selected{% endif %}>30 minutes</option>
+                        <option value="60" {% if al == '60' %}selected{% endif %}>1 hour</option>
                     </select>
                 </div>
                 <div class="field">
                     <label class="form-label" for="clipboardClear">Clipboard Clear</label>
                     <p class="muted" style="margin-bottom:.4rem;">Clear clipboard after copying a password</p>
-                    <select id="clipboardClear">
-                        <option value="10">10 seconds</option>
-                        <option value="30" selected>30 seconds</option>
-                        <option value="60">1 minute</option>
-                        <option value="0">Never</option>
+                    <select id="clipboardClear" name="clipboard_clear_seconds" data-setting="clipboard_clear_seconds" data-type="int">
+                        {% set cc = s.get('clipboard_clear_seconds', 30)|string %}
+                        <option value="10" {% if cc == '10' %}selected{% endif %}>10 seconds</option>
+                        <option value="30" {% if cc == '30' %}selected{% endif %}>30 seconds</option>
+                        <option value="60" {% if cc == '60' %}selected{% endif %}>1 minute</option>
+                        <option value="0" {% if cc == '0' %}selected{% endif %}>Never</option>
                     </select>
                 </div>
                 <div class="field" style="margin-bottom:0;">
                     <label class="form-label" for="pwLength">Default Password Length</label>
                     <p class="muted" style="margin-bottom:.4rem;">Default length for generated passwords</p>
-                    <select id="pwLength">
-                        <option value="12">12 characters</option>
-                        <option value="16">16 characters</option>
-                        <option value="20" selected>20 characters</option>
-                        <option value="32">32 characters</option>
-                        <option value="64">64 characters</option>
+                    <select id="pwLength" name="password_length" data-setting="password_length" data-type="int">
+                        {% set pl = s.get('password_length', 20)|string %}
+                        <option value="12" {% if pl == '12' %}selected{% endif %}>12 characters</option>
+                        <option value="16" {% if pl == '16' %}selected{% endif %}>16 characters</option>
+                        <option value="20" {% if pl == '20' %}selected{% endif %}>20 characters</option>
+                        <option value="32" {% if pl == '32' %}selected{% endif %}>32 characters</option>
+                        <option value="64" {% if pl == '64' %}selected{% endif %}>64 characters</option>
                     </select>
                 </div>
             </div>
@@ -85,13 +89,41 @@
                 <div class="field" style="margin-bottom:0;">
                     <label class="form-label" for="theme">Theme</label>
                     <p class="muted" style="margin-bottom:.4rem;">Appearance theme for the vault</p>
-                    <select id="theme">
-                        <option value="dark" selected>Dark</option>
-                        <option value="light">Light</option>
-                        <option value="midnight">Midnight Blue</option>
+                    <select id="theme" name="theme" data-setting="theme" data-type="str">
+                        {% set th = s.get('theme', 'dark') %}
+                        <option value="dark" {% if th == 'dark' %}selected{% endif %}>Dark</option>
+                        <option value="light" {% if th == 'light' %}selected{% endif %}>Light</option>
+                        <option value="midnight" {% if th == 'midnight' %}selected{% endif %}>Midnight Blue</option>
                     </select>
                 </div>
             </div>
+
+            <p class="muted" id="settings-status" style="margin-top:.4rem;" aria-live="polite"></p>
+
+            <script>
+            (function () {
+                var status = document.getElementById('settings-status');
+                var selects = document.querySelectorAll('select[data-setting]');
+                Array.prototype.forEach.call(selects, function (sel) {
+                    sel.addEventListener('change', function () {
+                        var key = sel.getAttribute('data-setting');
+                        var raw = sel.value;
+                        var val = sel.getAttribute('data-type') === 'int' ? parseInt(raw, 10) : raw;
+                        var payload = {};
+                        payload[key] = val;
+                        status.textContent = 'Saving…';
+                        fetch('{{ url_for("password-managers.api_settings_update") }}', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload)
+                        })
+                        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                        .then(function () { status.textContent = 'Settings saved.'; })
+                        .catch(function () { status.textContent = 'Could not save settings.'; });
+                    });
+                });
+            })();
+            </script>
         </main>
     </div>
 </body>

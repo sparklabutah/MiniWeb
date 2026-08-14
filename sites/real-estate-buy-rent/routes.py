@@ -31,7 +31,10 @@ blueprint = Blueprint(
 # ---------------------------------------------------------------------------
 
 _property_types = ["house", "apartment", "condo", "townhouse"]
-_statuses = ["for_sale", "for_rent", "sold", "rented"]
+# No listings carry a "sold" status in the dataset, so it is intentionally
+# omitted from the filterable statuses to avoid a dropdown option that always
+# returns 0 results.
+_statuses = ["for_sale", "for_rent", "rented"]
 
 
 _LISTINGS_TABLE = "real_estate_buy_rent_listings"
@@ -46,7 +49,8 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
         results = db.search(SITE, "listings", q, limit=limit)
         # Post-filter for additional constraints on small FTS result set
         if prop_type:
-            results = [l for l in results if l.get("type") == prop_type]
+            results = [l for l in results
+                       if str(l.get("type", "")).lower() == prop_type.lower()]
         if status:
             results = [l for l in results if l.get("status") == status]
         if features:
@@ -58,7 +62,9 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
     clauses = []
     params = []
     if prop_type:
-        clauses.append("[type] = ?")
+        # DB stores capitalized types (e.g. "House") while the dropdown submits
+        # lowercase values; match case-insensitively so the filter works.
+        clauses.append("LOWER([type]) = LOWER(?)")
         params.append(prop_type)
     if status:
         clauses.append("[status] = ?")

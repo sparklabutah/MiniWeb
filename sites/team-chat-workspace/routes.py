@@ -113,6 +113,38 @@ def _thread_for_message(msg_id):
     return None
 
 
+# ---------------------------------------------------------------------------
+# Direct-message helpers
+#
+# DMs live in an overlay-only collection ("direct_messages"): each row is a
+# single 1:1 message. There is no base table — every message is written to the
+# session overlay via db.save_item and read back with db.merge_overlay, so DMs
+# are per-session isolated and never touch shared base data. A conversation is
+# keyed by the sorted pair of the two user ids.
+# ---------------------------------------------------------------------------
+
+DM_COLLECTION = "direct_messages"
+
+
+def _dm_conversation_id(user_a, user_b):
+    """Stable conversation key for a 1:1 pair (order-independent)."""
+    return "__".join(sorted([user_a, user_b]))
+
+
+def _dm_all():
+    """All DM rows visible to this session (overlay-only)."""
+    return db.merge_overlay(SITE, DM_COLLECTION, [], sort="timestamp")
+
+
+def _dm_thread(conv_id):
+    """Ordered messages for one conversation."""
+    return db.merge_overlay(
+        SITE, DM_COLLECTION, [],
+        match=lambda m: m.get("conversation_id") == conv_id,
+        sort="timestamp",
+    )
+
+
 def _enrich_messages(msgs):
     """Add user info, reactions, and thread data to messages."""
     user_map = _user_map()
@@ -156,7 +188,17 @@ def index():
         c["message_count"] = channel_msg_counts.get(c["id"], 0)
         c["latest_message"] = channel_latest.get(c["id"], "")
 
-    # Show general channel by default
+    # Reorder the channel list per the top-bar sort dropdown
+    sort = request.args.get("sort", "recent")
+    if sort == "name":
+        channels.sort(key=lambda c: c.get("name", "").lower())
+    elif sort == "activity":
+        channels.sort(key=lambda c: c.get("message_count", 0), reverse=True)
+    else:  # recent
+        sort = "recent"
+        channels.sort(key=lambda c: c.get("latest_message", ""), reverse=True)
+
+    # Show first channel (per current sort) by default
     default_channel = channels[0] if channels else None
     channel_messages = []
     if default_channel:
@@ -171,6 +213,7 @@ def index():
         messages=channel_messages,
         user_map=user_map,
         current_user=current_user,
+        sort=sort,
     )
 
 
@@ -219,6 +262,20 @@ def channel_view(channel_id):
     channel_messages.sort(key=lambda m: m["timestamp"])
     channel_messages = _enrich_messages(channel_messages)
 
+    # Invite feedback (set by form_channel_invite redirect)
+    invite_msg = None
+    invited = request.args.get("invited")
+    invite_status = request.args.get("invite_status")
+    invite_error = request.args.get("invite_error")
+    if invite_status == "added" and invited:
+        invite_msg = f"Added {invited} to #{channel['name']}."
+    elif invite_status == "already" and invited:
+        invite_msg = f"{invited} is already a member of #{channel['name']}."
+    elif invite_error == "notfound":
+        invite_msg = "No member found for that email."
+    elif invite_error == "empty":
+        invite_msg = "Enter an email to invite a member."
+
     return render_template(
         "team-chat-workspace/channel.html",
         channels=channels,
@@ -228,6 +285,7 @@ def channel_view(channel_id):
         current_user=current_user,
         date_filter=date_filter,
         user_filter=user_filter,
+        invite_msg=invite_msg,
     )
 
 
@@ -371,6 +429,74 @@ def members_view():
         current_user=current_user,
         dept_filter=dept_filter,
         search_q=search_q,
+    )
+
+
+@blueprint.route("/dms")
+def dms_index():
+    """Direct-messages hub: existing 1:1 conversations + everyone to start one."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
+    channels = _channels()
+    users = _users()
+    current_user = _current_user()
+    user_map = _user_map()
+
+    me_id = current_user["id"] if current_user else "tc-u001"
+    # Build a preview (latest message) per conversation partner.
+    conversations = {}
+    for m in _dm_all():
+        if m.get("from_user_id") != me_id and m.get("to_user_id") != me_id:
+            continue
+        other = m["to_user_id"] if m["from_user_id"] == me_id else m["from_user_id"]
+        # rows come back timestamp-ascending, so the last write wins as "latest".
+        conversations[other] = {
+            "user": user_map.get(other, {}),
+            "last_text": m.get("text", ""),
+            "last_time": m.get("timestamp", ""),
+        }
+    convo_list = sorted(
+        conversations.values(), key=lambda c: c["last_time"], reverse=True
+    )
+
+    # Everyone except me is available to start/continue a DM with.
+    directory = [u for u in users if u["id"] != me_id]
+
+    return render_template(
+        "team-chat-workspace/dms.html",
+        channels=channels,
+        current_user=current_user,
+        conversations=convo_list,
+        directory=directory,
+    )
+
+
+@blueprint.route("/dm/<user_id>")
+def dm_view(user_id):
+    """1:1 direct-message thread with another member."""
+    if not _current_user():
+        return redirect(url_for("team-chat-workspace.login_page"))
+    channels = _channels()
+    current_user = _current_user()
+    user_map = _user_map()
+
+    other = user_map.get(user_id)
+    if not other:
+        abort(404)
+
+    me_id = current_user["id"] if current_user else "tc-u001"
+    conv_id = _dm_conversation_id(me_id, user_id)
+    messages = _dm_thread(conv_id)
+    for m in messages:
+        m["user"] = user_map.get(m.get("from_user_id"), {})
+        m["is_me"] = m.get("from_user_id") == me_id
+
+    return render_template(
+        "team-chat-workspace/dm.html",
+        channels=channels,
+        current_user=current_user,
+        other=other,
+        messages=messages,
     )
 
 
@@ -739,6 +865,101 @@ def api_message_react(message_id):
     return jsonify({"status": "added", "reaction": new_rxn}), 201
 
 
+@blueprint.route("/api/messages/<message_id>/thread", methods=["POST"])
+def api_message_start_thread(message_id):
+    """Start (or continue) a thread on ANY channel message.
+
+    If the message has no thread yet, create one whose parent is this message,
+    then append the caller's first reply. If a thread already exists, just add
+    the reply. Persists the thread and updates the parent message's
+    ``thread_count`` so the channel timeline shows the "N replies" affordance.
+    """
+    msgs = _messages()
+    msg = next((m for m in msgs if m["id"] == message_id), None)
+    if not msg:
+        return jsonify({"error": "Message not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Reply text is required"}), 400
+
+    current_user = _current_user()
+    uid = current_user["id"] if current_user else "tc-u001"
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    thread = _thread_for_message(message_id)
+    created = thread is None
+    if created:
+        thread = {
+            # Deterministic, collision-free id keyed on the parent message.
+            "id": f"thr-{message_id}",
+            "parent_message_id": message_id,
+            "channel_id": msg["channel_id"],
+            "topic": msg.get("text", "")[:60],
+            "replies": [],
+        }
+    else:
+        thread = dict(thread)
+
+    replies = list(thread.get("replies", []))
+    reply = {
+        "id": f"{thread['id']}-r{len(replies) + 1}",
+        "user_id": uid,
+        "timestamp": now,
+        "text": text,
+    }
+    replies.append(reply)
+    thread["replies"] = replies
+
+    # Persist just this thread (overlay upsert) — small and session-isolated.
+    db.save_item(SITE, "threads", thread["id"], thread)
+
+    # Reflect the reply count on the parent message (single-row overlay upsert).
+    msg = dict(msg)
+    msg["thread_count"] = len(replies)
+    db.save_item(SITE, "messages", message_id, msg)
+
+    return jsonify({
+        "status": "created" if created else "updated",
+        "thread_id": thread["id"],
+        "reply_count": len(replies),
+        "reply": reply,
+    }), 201
+
+
+@blueprint.route("/api/dm/<user_id>", methods=["POST"])
+def api_dm_send(user_id):
+    """Send a direct message to another member (persisted in the overlay)."""
+    user_map = _user_map()
+    if user_id not in user_map:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Message text is required"}), 400
+
+    current_user = _current_user()
+    me_id = current_user["id"] if current_user else "tc-u001"
+    if user_id == me_id:
+        return jsonify({"error": "Cannot DM yourself"}), 400
+
+    conv_id = _dm_conversation_id(me_id, user_id)
+    # Unique per-session id: overlay grows as messages are added.
+    new_id = f"dm-{len(_dm_all()) + 1:04d}"
+    dm = {
+        "id": new_id,
+        "conversation_id": conv_id,
+        "from_user_id": me_id,
+        "to_user_id": user_id,
+        "text": text,
+        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    db.save_item(SITE, DM_COLLECTION, new_id, dm)
+    return jsonify({"status": "sent", "message": dm}), 201
+
+
 @blueprint.route("/api/messages/search", methods=["GET"])
 def api_messages_search():
     """Search messages by query string."""
@@ -1087,9 +1308,54 @@ def api_member_block(member_id):
 
 @blueprint.route("/channel/<channel_id>/invite", methods=["POST"])
 def form_channel_invite(channel_id):
-    """Invite a member to a channel via form POST."""
-    _email = request.form.get("email", "").strip()
-    return redirect(url_for("team-chat-workspace.channel_view", channel_id=channel_id))
+    """Invite a member to a channel via form POST.
+
+    Looks the invitee up by email (or username / display name), adds the
+    channel to their ``joined_channels`` membership list, bumps the channel
+    ``member_count``, persists both collections, and redirects back with
+    feedback.
+    """
+    channels = _channels()
+    channel = next((c for c in channels if c["id"] == channel_id), None)
+    if not channel:
+        abort(404)
+
+    query = request.form.get("email", "").strip()
+    if not query:
+        return redirect(url_for("team-chat-workspace.channel_view",
+                                channel_id=channel_id, invite_error="empty"))
+
+    q_lower = query.lower()
+    users = _users()
+    invitee = next(
+        (u for u in users if q_lower in (
+            u.get("email", "").lower(),
+            u.get("username", "").lower(),
+            u.get("display_name", "").lower(),
+        )),
+        None,
+    )
+    if not invitee:
+        return redirect(url_for("team-chat-workspace.channel_view",
+                                channel_id=channel_id, invite_error="notfound"))
+
+    joined = invitee.get("joined_channels", [])
+    if channel_id in joined:
+        return redirect(url_for("team-chat-workspace.channel_view",
+                                channel_id=channel_id,
+                                invited=invitee["display_name"],
+                                invite_status="already"))
+
+    joined.append(channel_id)
+    invitee["joined_channels"] = joined
+    channel["member_count"] = channel.get("member_count", 0) + 1
+    db.save_collection(SITE, "users", users)
+    db.save_collection(SITE, "channels", channels)
+
+    return redirect(url_for("team-chat-workspace.channel_view",
+                            channel_id=channel_id,
+                            invited=invitee["display_name"],
+                            invite_status="added"))
 
 
 @blueprint.route("/api/channels/<channel_id>/invite", methods=["POST"])

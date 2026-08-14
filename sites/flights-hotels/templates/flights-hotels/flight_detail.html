@@ -48,6 +48,24 @@
         .book-form select, .book-form input { padding: .5rem .7rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .9rem; }
         .book-btn { background: #38a169; color: #fff; border: none; padding: .6rem 1.5rem; border-radius: .3rem; cursor: pointer; font-size: .95rem; font-weight: 600; }
         .book-btn:hover { background: #2f855a; }
+        .seat-error { background: #fed7d7; color: #9b2c2c; padding: .5rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; margin-bottom: .8rem; }
+        .step-tag { font-size: .72rem; font-weight: 600; color: #718096; background: #edf2f7; padding: .15rem .5rem; border-radius: .3rem; margin-left: .5rem; }
+        .wizard-note { font-size: .78rem; color: #a0aec0; margin-top: .7rem; }
+        .seatmap { margin: .3rem 0 .3rem; }
+        .seat-legend { font-size: .78rem; color: #718096; margin-bottom: .6rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .seat-legend span { display: inline-flex; align-items: center; gap: .3rem; }
+        .seat-swatch { width: 1rem; height: 1rem; border-radius: .2rem; display: inline-block; border: 1px solid #cbd5e0; }
+        .seat-swatch.free { background: #fff; }
+        .seat-swatch.sel { background: #38a169; border-color: #2f855a; }
+        .seat-swatch.taken { background: #e2e8f0; }
+        .seat-row { display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+        .seat-row .row-label { width: 1.6rem; font-size: .8rem; font-weight: 600; color: #718096; text-align: right; }
+        .seat-cell { position: relative; }
+        .seat-cell input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .seat-cell label { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2rem; margin: 0; font-size: .78rem; font-weight: 600; border: 1px solid #cbd5e0; border-radius: .3rem; background: #fff; color: #2d3748; cursor: pointer; }
+        .seat-cell input:checked + label { background: #38a169; border-color: #2f855a; color: #fff; }
+        .seat-cell input:disabled + label { background: #e2e8f0; color: #a0aec0; cursor: not-allowed; text-decoration: line-through; }
+        .seat-aisle { width: .9rem; }
         .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
     </style>
 </head>
@@ -118,12 +136,13 @@
             </div>
 
             <div class="book-form">
-                <h3>Book This Flight</h3>
+                <h3>Book This Flight <span class="step-tag">Step 1 of 3 &middot; Trip details</span></h3>
+                {% if form_error %}<div class="seat-error">{{ form_error }}</div>{% endif %}
                 <form method="post" action="{{ url_for('flights-hotels.book_flight', flight_id=flight.id) }}">
                     <div class="form-row">
                         <div>
                             <label for="travelers">Travelers</label>
-                            <select name="travelers" id="travelers">
+                            <select name="travelers" id="travelers" onchange="fhSyncPax()">
                                 <option value="1">1</option>
                                 <option value="2">2</option>
                                 <option value="3">3</option>
@@ -131,15 +150,65 @@
                             </select>
                         </div>
                         <div>
-                            <label for="account_type">Pay with:</label>
-                            <select name="account_type" id="account_type">
-                                <option value="checking">Checking Account</option>
-                                <option value="credit">Credit Card</option>
+                            <label for="cabin_class">Cabin Class</label>
+                            <select name="cabin_class" id="cabin_class">
+                                {% for key, cab in cabin_classes.items() %}
+                                <option value="{{ key }}">{{ cab.label }}{% if cab.mult != 1.0 %} (+{{ ((cab.mult - 1) * 100)|round|int }}%){% endif %}</option>
+                                {% endfor %}
                             </select>
                         </div>
-                        <button type="submit" class="book-btn">Book Now</button>
+                        <div>
+                            <label for="trip_type">Trip</label>
+                            <select name="trip_type" id="trip_type" onchange="fhSyncTrip()">
+                                <option value="one_way">One-way</option>
+                                <option value="round_trip">Round-trip</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="depart_date">Departure Date</label>
+                            <input type="date" name="depart_date" id="depart_date" value="{{ flight.date }}">
+                        </div>
+                        <div id="return-wrap" style="display:none;">
+                            <label for="return_date">Return Date</label>
+                            <input type="date" name="return_date" id="return_date">
+                        </div>
                     </div>
+                    <div class="form-row" id="pax-rows" style="margin-top:1rem;">
+                        <div id="pax-1">
+                            <label for="passenger_name_1">Passenger 1 (lead)</label>
+                            <input type="text" name="passenger_name_1" id="passenger_name_1" placeholder="Full name" required>
+                        </div>
+                        <div id="pax-2" style="display:none;">
+                            <label for="passenger_name_2">Passenger 2</label>
+                            <input type="text" name="passenger_name_2" id="passenger_name_2" placeholder="Full name">
+                        </div>
+                        <div id="pax-3" style="display:none;">
+                            <label for="passenger_name_3">Passenger 3</label>
+                            <input type="text" name="passenger_name_3" id="passenger_name_3" placeholder="Full name">
+                        </div>
+                        <div id="pax-4" style="display:none;">
+                            <label for="passenger_name_4">Passenger 4</label>
+                            <input type="text" name="passenger_name_4" id="passenger_name_4" placeholder="Full name">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:1.2rem;">
+                        <button type="submit" class="book-btn">Continue to Seat Selection &rarr;</button>
+                    </div>
+                    <p class="wizard-note">Next you'll pick your seats, then review &amp; pay. No booking is made yet.</p>
                 </form>
+                <script>
+                    function fhSyncPax() {
+                        var n = parseInt(document.getElementById('travelers').value, 10) || 1;
+                        for (var i = 1; i <= 4; i++) {
+                            document.getElementById('pax-' + i).style.display = (i <= n) ? '' : 'none';
+                        }
+                    }
+                    function fhSyncTrip() {
+                        var rt = document.getElementById('trip_type').value === 'round_trip';
+                        document.getElementById('return-wrap').style.display = rt ? '' : 'none';
+                    }
+                    fhSyncPax(); fhSyncTrip();
+                </script>
             </div>
         </div>
     </div>

@@ -15,7 +15,43 @@
     <span class="badge st-{{ 'in_progress' if sprint.status == 'active' else ('done' if sprint.status == 'closed' else 'open') }}"><span class="bd"></span>{{ sprint.status|title }}</span>
     {% if project %}<span class="chip">{{ project.name }}</span>{% endif %}
     <span style="font-size:.85rem;color:var(--faint);">{{ sprint.start_date }} to {{ sprint.end_date }}</span>
+    <div class="spacer" style="flex:1;"></div>
+    {% if sprint.status == 'planned' %}
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_start_sprint', sprint_id=sprint.id) }}" style="margin:0;">
+        <button type="submit" class="btn btn-primary">Start Sprint</button>
+    </form>
+    {% elif sprint.status == 'active' %}
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_complete_sprint', sprint_id=sprint.id) }}" style="margin:0;display:flex;gap:8px;align-items:center;">
+        {% if unfinished_count %}
+        <select name="move_to" title="Where should unfinished issues go?">
+            <option value="">Move {{ unfinished_count }} unfinished to Backlog</option>
+            {% for s in other_sprints %}
+            <option value="{{ s.id }}">Move unfinished to {{ s.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Complete Sprint</button>
+    </form>
+    {% endif %}
 </div>
+
+{% if sprint.status != 'closed' %}
+<div class="card" style="margin-bottom:14px;">
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_sprint_add_issue', sprint_id=sprint.id) }}" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:0;">
+        <div style="flex:1;min-width:240px;">
+            <label for="add-issue" style="display:block;font-weight:600;margin-bottom:5px;">Plan issue into sprint</label>
+            <select id="add-issue" name="issue_id" required style="width:100%;">
+                <option value="">Select a backlog issue...</option>
+                {% for i in candidate_issues %}
+                <option value="{{ i.id }}">{{ i.key }} — {{ i.title[:60] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Add to Sprint</button>
+    </form>
+    {% if not candidate_issues %}<div style="font-size:.8rem;color:var(--faint);margin-top:8px;">No unplanned backlog issues left in {{ project.name if project else 'this project' }}.</div>{% endif %}
+</div>
+{% endif %}
 {% if sprint.goal %}<div style="font-size:.9rem;color:var(--muted);margin-bottom:14px;line-height:1.45;">{{ sprint.goal }}</div>{% endif %}
 
 <div style="display:flex;gap:26px;font-size:.88rem;margin-bottom:10px;">
@@ -44,6 +80,12 @@
                 <span class="avatar" style="width:22px;height:22px;font-size:.65rem;background:{{ user_lookup[issue.assignee_id].avatar_color }}" title="{{ user_lookup[issue.assignee_id].name }}">{{ user_lookup[issue.assignee_id].name[0] }}</span>
                 {% endif %}
             </div>
+            {% if sprint.status != 'closed' %}
+            <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_sprint_remove_issue', sprint_id=sprint.id) }}" style="margin:6px 0 0;">
+                <input type="hidden" name="issue_id" value="{{ issue.id }}">
+                <button type="submit" class="btn" style="padding:2px 8px;font-size:.7rem;">Remove from sprint</button>
+            </form>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

@@ -13,6 +13,7 @@ export_by_dropdown, upload_by_upload, react_by_toggle, follow_by_dropdown,
 follow_by_toggle, subscribe_by_toggle, share_by_dropdown, save_by_toggle,
 report_by_form, block_by_toggle
 """
+import base64
 import csv
 import io
 import json
@@ -139,6 +140,62 @@ def _next_id(prefix, items):
         except (ValueError, KeyError):
             pass
     return f"{prefix}-{max(nums, default=0) + 1:03d}"
+
+
+# ---------------------------------------------------------------------------
+# Direct messages (DMs) — persisted 1:1 conversations
+# ---------------------------------------------------------------------------
+#
+# The site DB was seeded without any DM table, so PixShare had no way to send or
+# store private messages at all. We create + register an empty base table on
+# first use (the forums_messages / auctions-orders runtime-seed pattern); actual
+# messages are written to the session overlay via db.save_item, keeping every
+# session isolated. A conversation is keyed on the sorted pair of participant
+# ids, so compose -> thread -> reply all land in the same conversation.
+
+_DM_TABLE = "multimedia_posting_dm_messages"
+
+
+def _ensure_dm_table():
+    """Create + register the DM base table once (idempotent)."""
+    if db.get_table_name(SITE, "dm_messages"):
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_DM_TABLE}] (
+            id INTEGER PRIMARY KEY,
+            conversation_id TEXT NOT NULL DEFAULT '',
+            sender_id TEXT NOT NULL DEFAULT '',
+            recipient_id TEXT NOT NULL DEFAULT '',
+            text TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT ''
+        )"""
+    )
+    conn.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_mp_dm_conv "
+        f"ON [{_DM_TABLE}] (conversation_id)"
+    )
+    conn.commit()
+    db.register_table(SITE, "dm_messages", _DM_TABLE, "id")
+
+
+def _conversation_id(a, b):
+    """Deterministic conversation id for the unordered pair {a, b}."""
+    return "dm-" + "__".join(sorted([str(a), str(b)]))
+
+
+def _thread_messages(conversation_id):
+    """All messages in a conversation (base + this session's overlay), oldest first."""
+    rows = db.execute(
+        f"SELECT * FROM [{_DM_TABLE}] WHERE conversation_id=? "
+        f"ORDER BY created_at ASC LIMIT 200",
+        (conversation_id,),
+    )
+    return db.merge_overlay(
+        SITE, "dm_messages", rows,
+        match=lambda m: m.get("conversation_id") == conversation_id,
+        sort="created_at", limit=200,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +359,58 @@ def settings_page():
                            user=user, logged_in=logged_in)
 
 
+@blueprint.route("/messages")
+def messages_inbox():
+    """Direct-messages inbox — one row per conversation the user is part of."""
+    _ensure_dm_table()
+    user, logged_in = _get_browsing_user()
+    uid = user["id"]
+    rows = db.execute(
+        f"SELECT * FROM [{_DM_TABLE}] WHERE sender_id=? OR recipient_id=? "
+        f"ORDER BY created_at DESC LIMIT 500",
+        (uid, uid),
+    )
+    msgs = db.merge_overlay(
+        SITE, "dm_messages", rows,
+        match=lambda m: m.get("sender_id") == uid or m.get("recipient_id") == uid,
+        sort="-created_at", limit=500,
+    )
+    um = _users_map()
+    convos = {}
+    for m in msgs:
+        other = m["recipient_id"] if m["sender_id"] == uid else m["sender_id"]
+        if other not in convos:
+            convos[other] = {"other": um.get(other, {"id": other, "username": other,
+                                                     "display_name": other}),
+                             "last": m}
+    conversations = sorted(convos.values(),
+                           key=lambda c: c["last"].get("created_at", ""), reverse=True)
+    # Directory of other users to start a new conversation with.
+    others = [u for u in _load_users() if u["id"] != uid]
+    others.sort(key=lambda u: u.get("username", ""))
+    return render_template("multimedia-posting/messages_inbox.html",
+                           user=user, conversations=conversations,
+                           directory=others, logged_in=logged_in)
+
+
+@blueprint.route("/messages/<other_id>")
+def messages_thread(other_id):
+    """A single DM conversation with reply box (compose -> thread -> reply)."""
+    _ensure_dm_table()
+    user, logged_in = _get_browsing_user()
+    other = _get_user(other_id)
+    if not other:
+        abort(404)
+    cid = _conversation_id(user["id"], other_id)
+    msgs = _thread_messages(cid)
+    um = _users_map()
+    for m in msgs:
+        m["sender"] = um.get(m["sender_id"], {})
+    return render_template("multimedia-posting/messages_thread.html",
+                           user=user, other=other, messages=msgs,
+                           conversation_id=cid, logged_in=logged_in)
+
+
 @blueprint.route("/login", methods=["GET"])
 def login_page():
     return render_template("multimedia-posting/login.html", error=None)
@@ -417,11 +526,17 @@ def api_posts_create():
     tags = data.get("tags", [])
     if not tags:
         tags = re.findall(r"#(\w+)", caption)
+    # Media resolution: an explicit image_url from the client wins; otherwise
+    # fall back to the bytes persisted by the most recent /api/upload for this
+    # session, so a post created right after uploading shows the real content.
+    last_upload = session.get("last_upload") or {}
+    image_url = data.get("image_url") or last_upload.get("media_url") \
+        or f"https://pixshare.io/photos/{new_id}.jpg"
     post = {
         "id": new_id,
         "author_id": user["id"],
         "type": data.get("type", "photo"),
-        "image_url": data.get("image_url", f"https://pixshare.io/photos/{new_id}.jpg"),
+        "image_url": image_url,
         "caption": caption,
         "location": data.get("location", ""),
         "likes_count": 0,
@@ -431,8 +546,14 @@ def api_posts_create():
     }
     if data.get("additional_images"):
         post["additional_images"] = data["additional_images"]
-    if data.get("video_url"):
-        post["video_url"] = data["video_url"]
+    video_url = data.get("video_url")
+    if not video_url and last_upload.get("type") == "video":
+        video_url = last_upload.get("media_url")
+    if video_url:
+        post["video_url"] = video_url
+    # Consume the upload so it isn't silently reattached to the next post.
+    if last_upload and not data.get("image_url"):
+        session.pop("last_upload", None)
     posts.append(post)
     _save_posts(posts)
     return jsonify(post), 201
@@ -919,6 +1040,53 @@ def api_follow_by_dropdown():
 
 
 # ---------------------------------------------------------------------------
+# API Routes -- Direct messages
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/messages", methods=["POST"])
+def api_dm_send():
+    """Send a direct message (message_from_free_text).
+
+    Body: {"recipient_id": "<user id>", "text": "..."}. Persists the message in
+    the session overlay under a conversation keyed on the participant pair.
+    """
+    _ensure_dm_table()
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+    data = request.get_json(silent=True) or {}
+    recipient_id = (data.get("recipient_id") or "").strip()
+    text = (data.get("text") or "").strip()
+    if not recipient_id or not text:
+        return jsonify({"error": "recipient_id and text are required"}), 400
+    if recipient_id == user["id"]:
+        return jsonify({"error": "Cannot message yourself"}), 400
+    if not _get_user(recipient_id):
+        return jsonify({"error": "Recipient not found"}), 404
+    cid = _conversation_id(user["id"], recipient_id)
+    new_id = db.next_id(SITE, "dm_messages")
+    msg = {
+        "id": new_id,
+        "conversation_id": cid,
+        "sender_id": user["id"],
+        "recipient_id": recipient_id,
+        "text": text,
+        "created_at": _now_iso(),
+    }
+    db.save_item(SITE, "dm_messages", new_id, msg)
+    return jsonify(msg), 201
+
+
+@blueprint.route("/api/messages/<other_id>", methods=["GET"])
+def api_dm_thread(other_id):
+    """Fetch the conversation between the current user and other_id (oldest first)."""
+    _ensure_dm_table()
+    user, _ = _get_browsing_user()
+    cid = _conversation_id(user["id"], other_id)
+    return jsonify(_thread_messages(cid))
+
+
+# ---------------------------------------------------------------------------
 # API Routes -- Search
 # ---------------------------------------------------------------------------
 
@@ -1070,9 +1238,22 @@ def api_export():
 # API Routes -- Upload
 # ---------------------------------------------------------------------------
 
+# Cap persisted upload bytes so a data-URI-backed post stays well within the
+# session-cookie / overlay budget. Larger files still upload but fall back to a
+# hosted-style URL (no inline bytes) rather than bloating the record.
+_MAX_INLINE_UPLOAD = 3 * 1024 * 1024  # 3 MB
+
+
 @blueprint.route("/api/upload", methods=["POST"])
 def api_upload():
-    """Upload media file (upload_by_upload). Returns a simulated media URL."""
+    """Upload media file (upload_by_upload).
+
+    Persists the uploaded BYTES as a base64 data URI so a post created from this
+    upload renders the user's actual content (previously only a placeholder URL
+    and session-only metadata were kept, so uploads never showed up). The data
+    URI is returned as ``media_url`` and stashed as ``last_upload`` so the create
+    flow can attach it to the new post.
+    """
     user = _get_current_user()
     if not user:
         return jsonify({"error": "Not logged in"}), 401
@@ -1083,17 +1264,33 @@ def api_upload():
         return jsonify({"error": "Empty filename"}), 400
     content = uploaded.read()
     file_id = str(uuid.uuid4())[:8]
+    mime = uploaded.mimetype or "application/octet-stream"
+    is_video = mime.startswith("video") or uploaded.filename.lower().endswith(
+        (".mp4", ".mov", ".webm", ".avi"))
+    if content and len(content) <= _MAX_INLINE_UPLOAD:
+        media_url = f"data:{mime};base64," + base64.b64encode(content).decode("ascii")
+    else:
+        # Too large to inline — keep the hosted-style reference.
+        media_url = f"https://pixshare.io/uploads/{file_id}_{uploaded.filename}"
     result = {
         "id": file_id,
         "filename": uploaded.filename,
         "size": len(content),
-        "media_url": f"https://pixshare.io/uploads/{file_id}_{uploaded.filename}",
+        "media_url": media_url,
+        "type": "video" if is_video else "photo",
         "uploaded_at": _now_iso(),
         "uploaded_by": user["id"],
     }
     uploads = session.get("uploads", [])
-    uploads.append(result)
+    # Store metadata (not the raw data URI) in the uploads history to keep the
+    # session cookie small; the newest upload keeps its media_url for attaching.
+    uploads.append({k: v for k, v in result.items() if k != "media_url"})
     session["uploads"] = uploads
+    session["last_upload"] = {
+        "media_url": media_url,
+        "filename": uploaded.filename,
+        "type": result["type"],
+    }
     return jsonify(result), 201
 
 

@@ -72,6 +72,12 @@
         .reaction-badge { display: inline-flex; align-items: center; gap: 4px; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
         .reaction-badge:hover { background: #3a3d41; }
         .reaction-badge .rxn-count { color: #1d9bd1; font-weight: 600; }
+        .react-add { display: inline-flex; align-items: center; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; color: #ababad; }
+        .react-add:hover { background: #3a3d41; color: #fff; }
+        .emoji-picker { display: none; gap: 4px; align-items: center; background: #232629; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 6px; }
+        .emoji-picker.open { display: inline-flex; }
+        .emoji-opt { cursor: pointer; font-size: 15px; padding: 1px 3px; border-radius: 6px; }
+        .emoji-opt:hover { background: #3a3d41; }
 
         .thread-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #1d9bd1; margin-top: 4px; cursor: pointer; padding: 2px 0; }
         .thread-link:hover { text-decoration: underline; }
@@ -114,6 +120,7 @@
                 <ul class="sidebar-nav">
                     <li><a href="{{ url_for('team-chat-workspace.index') }}"><span class="nav-icon">&#x1F4AC;</span> All Channels</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.threads_view') }}"><span class="nav-icon">&#x1F9F5;</span> Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}"><span class="nav-icon">&#x1F4E8;</span> Direct Messages</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.members_view') }}"><span class="nav-icon">&#x1F465;</span> Members</a></li>
                     <li><a href="{{ url_for('team-chat-workspace.search_view') }}"><span class="nav-icon">&#x1F50D;</span> Search</a></li>
                 </ul>
@@ -161,6 +168,9 @@
                         <input type="text" name="email" placeholder="Invite member" style="padding:.3rem .5rem;background:#383838;color:#d1d2d3;border:1px solid #4a4a4a;border-radius:4px;font-size:.78rem;width:130px;">
                         <button type="submit" style="background:#2b6cb0;color:#fff;border:none;padding:.35rem .6rem;border-radius:4px;font-size:.78rem;cursor:pointer;">Invite</button>
                     </form>
+                    {% if invite_msg %}
+                    <span class="invite-feedback" style="font-size:.75rem;color:#9fd6a0;white-space:nowrap;">{{ invite_msg }}</span>
+                    {% endif %}
                     <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" style="background:#383838;color:#ababad;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">Share</button>
                 </div>
             </div>
@@ -216,18 +226,27 @@
                                         style="background:none;border:none;color:{{ '#d4a72c' if msg_saved else '#ababad' }};font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Save message">
                                     {{ '★ saved' if msg_saved else '☆ save' }}
                                 </button>
-                                {% if msg.reactions %}
                                 <div class="reactions">
                                     {% for rxn in msg.reactions %}
-                                    <span class="reaction-badge" title="{{ rxn.users|join(', ') }}">
+                                    <span class="reaction-badge" title="{{ rxn.users|join(', ') }}"
+                                          onclick="addReaction('{{ msg.id }}', '{{ rxn.emoji }}')">
                                         {{ rxn.emoji }} <span class="rxn-count">{{ rxn.count }}</span>
                                     </span>
                                     {% endfor %}
+                                    <span class="react-add" onclick="toggleEmojiPicker(this)" title="Add reaction">&#128578;+</span>
+                                    <span class="emoji-picker">
+                                        {% for glyph, code in [('\U0001F44D', ':thumbsup:'), ('❤️', ':heart:'), ('\U0001F389', ':tada:'), ('\U0001F440', ':eyes:'), ('\U0001F680', ':rocket:'), ('✅', ':white_check_mark:'), ('\U0001F604', ':smile:'), ('\U0001F64C', ':raised_hands:')] %}
+                                        <span class="emoji-opt" onclick="addReaction('{{ msg.id }}', '{{ code }}')">{{ glyph }}</span>
+                                        {% endfor %}
+                                    </span>
                                 </div>
-                                {% endif %}
                                 {% if msg.thread %}
                                 <a class="thread-link" href="{{ url_for('team-chat-workspace.thread_detail', thread_id=msg.thread.id) }}">
                                     &#x1F9F5; {{ msg.thread.replies|length }} replies &mdash; View thread
+                                </a>
+                                {% else %}
+                                <a class="thread-link reply-in-thread" onclick="startThread('{{ msg.id }}')">
+                                    &#x1F9F5; Reply in thread
                                 </a>
                                 {% endif %}
                             </div>
@@ -270,6 +289,37 @@
             .then(function() { btn.textContent = 'done!'; window.location.reload(); })
             .catch(function() { btn.textContent = 'error'; setTimeout(function() { btn.textContent = '\u2715 delete'; btn.disabled = false; }, 2000); });
     });
+    var API_BASE = '{{ url_for("team-chat-workspace.index") }}';
+    function toggleEmojiPicker(btn) {
+        var picker = btn.parentNode.querySelector('.emoji-picker');
+        if (picker) picker.classList.toggle('open');
+    }
+    function addReaction(msgId, emoji) {
+        fetch(API_BASE + 'api/messages/' + encodeURIComponent(msgId) + '/react', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({emoji: emoji})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+    }
+    function startThread(msgId) {
+        var text = window.prompt('Start a thread — your first reply:');
+        if (text === null) return;
+        text = text.trim();
+        if (!text) return;
+        fetch(API_BASE + 'api/messages/' + encodeURIComponent(msgId) + '/thread', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d && d.thread_id) {
+                window.location.href = API_BASE + 'thread/' + encodeURIComponent(d.thread_id);
+            } else {
+                location.reload();
+            }
+        });
+    }
     function sendMessage(e) {
         e.preventDefault();
         var text = document.getElementById('msg-input').value.trim();

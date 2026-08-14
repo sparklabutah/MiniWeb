@@ -44,7 +44,10 @@
                     </div>
                     <div class="field">
                         <label class="form-label" for="password">Password</label>
-                        <input type="text" name="password" id="password" placeholder="Enter password">
+                        <div style="display:flex; gap:.5rem;">
+                            <input type="text" name="password" id="password" placeholder="Enter password" style="flex:1;">
+                            <button type="button" class="btn btn-outline" id="generate-password-btn">Generate</button>
+                        </div>
                     </div>
                 </div>
 
@@ -98,6 +101,22 @@
                     <a class="btn btn-outline" href="{{ url_for('password-managers.index') }}">Cancel</a>
                 </div>
             </form>
+
+            <script>
+            document.getElementById('generate-password-btn').addEventListener('click', function () {
+                var btn = this;
+                btn.disabled = true;
+                var prev = btn.textContent;
+                btn.textContent = 'Generating…';
+                fetch('{{ url_for("password-managers.api_generate_password") }}?length=20')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        document.getElementById('password').value = data.password;
+                    })
+                    .catch(function () {})
+                    .then(function () { btn.disabled = false; btn.textContent = prev; });
+            });
+            </script>
         </main>
     </div>
 </body>

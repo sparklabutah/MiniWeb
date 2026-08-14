@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }} (revision {{ rev.id }}) - LakeportWiki</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; gap: 1rem; align-items: center; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; }
+        .header-nav a:hover { color: #2563eb; }
+        .search-bar { display: flex; gap: .4rem; }
+        .search-bar input { padding: .4rem .7rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .88rem; width: 200px; }
+        .search-bar button { padding: .4rem .8rem; background: #2563eb; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        .main { max-width: 960px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .rev-banner { background: #fef9c3; border: 1px solid #fde047; border-radius: .5rem; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .9rem; color: #713f12; }
+        .rev-banner a { color: #2563eb; text-decoration: none; }
+        .article-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+        .article-header h2 { font-size: 1.5rem; color: #1e3a5f; }
+        .article-actions { font-size: .85rem; }
+        .article-actions a, .article-actions button { color: #2563eb; text-decoration: none; margin-left: 1rem; background: none; border: none; cursor: pointer; font-size: .85rem; padding: 0; }
+        .article-meta { font-size: .82rem; color: #64748b; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid #e2e8f0; }
+        .article-meta span { margin-right: 1.5rem; }
+        .article-content { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.5rem; line-height: 1.7; font-size: .95rem; margin-bottom: 1.5rem; }
+        .article-content h2 { font-size: 1.15rem; margin-top: 1.2rem; margin-bottom: .5rem; color: #1e3a5f; border-bottom: 1px solid #e2e8f0; padding-bottom: .2rem; }
+        .article-content p { margin-bottom: .8rem; }
+        .article-content ul, .article-content ol { margin: .5rem 0 .8rem 1.5rem; }
+        .article-content li { margin-bottom: .3rem; }
+        .no-snapshot { background: #fff; border: 1px dashed #cbd5e1; border-radius: .5rem; padding: 1.5rem; color: #64748b; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+            <a href="{{ url_for('wikis.recent_changes') }}">Recent Changes</a>
+            <a href="{{ url_for('wikis.compare_page') }}">Compare Pages</a>
+            <a href="{{ url_for('wikis.create_page') }}">Create Article</a>
+            <form class="search-bar" action="{{ url_for('wikis.search') }}" method="get">
+                <input type="text" name="q" placeholder="Search wiki...">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="rev-banner">
+            You are viewing an <strong>old revision</strong> of this page (revision #{{ rev.id }}),
+            saved on {{ rev.timestamp[:19] }} by {{ editor.display_name if editor else 'Unknown' }}.
+            {% if is_current %}This is the current version.{% endif %}
+            &nbsp;·&nbsp;
+            <a href="{{ url_for('wikis.wiki_page', slug=page.slug) }}">back to current article</a>
+            {% if prev_rev %}
+            &nbsp;·&nbsp;<a href="{{ url_for('wikis.diff_revision', slug=page.slug, rev_id=rev.id) }}">see what changed in this edit</a>
+            {% endif %}
+        </div>
+
+        <div class="article-header">
+            <div>
+                <h2>{{ page.title }}</h2>
+            </div>
+            <div class="article-actions">
+                {% if not is_current %}
+                <form method="post" action="{{ url_for('wikis.revert_revision', slug=page.slug, rev_id=rev.id) }}" style="display:inline;">
+                    <button type="submit">Revert to this revision</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="article-meta">
+            <span>Revision: #{{ rev.id }}</span>
+            <span>Edited: {{ rev.timestamp[:10] }}</span>
+            <span>Editor: {{ editor.display_name if editor else 'Unknown' }}</span>
+            <span>Summary: {{ rev.summary }}</span>
+        </div>
+
+        {% if has_snapshot %}
+        <div class="article-content" id="article-body">
+            {% if '<' in content and '>' in content %}
+                {{ content|safe }}
+            {% else %}
+                {% for paragraph in content.split('\n\n') %}
+                    {% if paragraph.startswith('## ') %}
+                        <h2>{{ paragraph[3:] }}</h2>
+                    {% elif paragraph.startswith('- ') %}
+                        <ul>
+                        {% for line in paragraph.split('\n') %}
+                            {% if line.startswith('- ') %}
+                            <li>{{ line[2:] }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>{{ paragraph }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="no-snapshot">
+            No content snapshot was stored for this revision (it predates snapshot tracking).
+            Only its metadata is available.
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

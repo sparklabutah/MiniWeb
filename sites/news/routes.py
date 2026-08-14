@@ -968,9 +968,15 @@ def api_report_article(article_id):
 
 @blueprint.route("/api/articles/<int:article_id>/play", methods=["POST"])
 def api_play_article(article_id):
-    """Start audio playback for an article (placeholder -- returns metadata)."""
-    articles = _load_articles()
-    article = next((a for a in articles if a["id"] == article_id), None)
+    """Start audio playback for an article (play_by_playback).
+
+    The audio stream itself is a demo stub (no real TTS is generated offline),
+    but the *play action* is a real, verifiable state change: it increments a
+    persisted play counter in the session overlay and returns a deterministic
+    ``playing`` state (exact duration, a starting playback position, and a
+    voice), so clicking "Listen to Article" has an observable, gradeable effect.
+    """
+    article = db.get_item(SITE, "articles", article_id)
     if article is None:
         return jsonify({"error": "Article not found"}), 404
 
@@ -978,11 +984,21 @@ def api_play_article(article_id):
     wc = article.get("word_count", 0)
     duration_seconds = int((wc / 150) * 60)
 
+    # Record the play event: increment a persisted play counter (overlay-aware).
+    play_count = (article.get("play_count") or 0) + 1
+    article["play_count"] = play_count
+    db.save_item(SITE, "articles", article_id, article)
+
     return jsonify({
         "action": "playing",
+        "playing": True,
         "article_id": article_id,
         "title": article["title"],
+        "play_count": play_count,
+        "position_seconds": 0,
         "duration_seconds": duration_seconds,
+        "duration_label": f"{duration_seconds // 60}:{duration_seconds % 60:02d}",
+        "voice": "Cascadia Narrator (demo)",
         "audio_url": f"/news/audio/{article_id}.mp3"
     })
 
