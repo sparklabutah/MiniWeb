@@ -1,61 +1,35 @@
-"""Generate real fixture files mirroring the fake file picker's catalog.
+"""Real files the browser-use agent may upload — sourced from the simulated
+file system (the ``filesystem/`` VFS, the same tree the in-page file explorer
+shows). ``available_file_paths`` points at these real files, so a native
+``upload_file`` action sends the exact bytes a human upload through the explorer
+would, and verifiers that inspect the uploaded body see identical data.
 
-The sites' injected file-picker.js simulates the OS file dialog with a fixed
-list of fake files (photo.jpg, letter.docx, ...). Human annotators "upload"
-those. Browser agents (browser_use) instead need real files on disk passed
-via available_file_paths. This script derives evaluation/fixtures/* from the
-FILES array in app/static/file-picker.js so names AND byte content match what
-a human upload produces — verifiers that inspect the uploaded POST body see
-identical data either way.
+Previously this parsed a fixed catalog out of ``app/static/file-picker.js`` and
+wrote copies under ``evaluation/fixtures/``. That flat picker was replaced by the
+universal file explorer over ``filesystem/`` (see ``app/vfs.py``), so we now hand
+the agent the real VFS files directly — no fixtures to generate.
 
 Usage:
-    python evaluation/generate_fixtures.py          # (re)generate
-    from generate_fixtures import ensure_fixtures   # returns list[str] paths
+    from generate_fixtures import ensure_fixtures   # -> list[str] of abs paths
+    python evaluation/generate_fixtures.py           # print the list
 """
-
-import re
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PICKER_JS = PROJECT_ROOT / "app" / "static" / "file-picker.js"
-FIXTURES_DIR = PROJECT_ROOT / "evaluation" / "fixtures"
-
-_ENTRY_RE = re.compile(
-    r"\{\s*name:\s*'(?P<name>[^']+)'\s*,\s*type:\s*'[^']*'\s*,\s*"
-    r"ext:\s*\[[^\]]*\]\s*,\s*content:\s*'(?P<content>(?:[^'\\]|\\.)*)'"
-)
-
-
-def _unescape_js(s):
-    """Interpret escapes inside a single-quoted JS string literal."""
-    return (s.replace("\\\\", "\x00")
-             .replace("\\n", "\n")
-             .replace("\\t", "\t")
-             .replace("\\'", "'")
-             .replace("\x00", "\\"))
-
-
-def parse_picker_files():
-    src = PICKER_JS.read_text()
-    files = {}
-    for m in _ENTRY_RE.finditer(src):
-        files[m.group("name")] = _unescape_js(m.group("content"))
-    if not files:
-        raise RuntimeError(f"no FILES entries parsed from {PICKER_JS}")
-    return files
+# Mirror app/vfs.py's default + MINIWEB_VFS_DIR override so the agent sees the
+# same file system the explorer serves.
+VFS_DIR = Path(os.environ.get("MINIWEB_VFS_DIR", str(PROJECT_ROOT / "filesystem")))
 
 
 def ensure_fixtures():
-    """Write fixture files (if missing or stale) and return their paths."""
-    FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
-    paths = []
-    for name, content in parse_picker_files().items():
-        p = FIXTURES_DIR / name
-        data = content.encode()
-        if not p.exists() or p.read_bytes() != data:
-            p.write_bytes(data)
-        paths.append(str(p))
-    return sorted(paths)
+    """Return abs paths of the real files in the VFS the agent may upload."""
+    if not VFS_DIR.exists():
+        return []
+    return sorted(
+        str(p) for p in VFS_DIR.rglob("*")
+        if p.is_file() and not p.name.startswith(".")
+    )
 
 
 if __name__ == "__main__":
