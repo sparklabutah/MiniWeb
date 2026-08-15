@@ -184,8 +184,14 @@ def team_detail(team_id):
                for m in _load_matches()
                if m["home_team_id"] == team_id or m["away_team_id"] == team_id]
     matches.sort(key=lambda m: m["date"], reverse=True)
+    user = _get_current_user()
+    is_favorited = False
+    if user:
+        fav = next((f for f in _load_favorites() if f["user_id"] == user["id"]), None)
+        is_favorited = bool(fav and team_id in fav.get("team_ids", []))
     return render_template("sports-esports/team.html",
-                           team=team, league=league, players=players, matches=matches)
+                           team=team, league=league, players=players, matches=matches,
+                           is_favorited=is_favorited)
 
 
 @blueprint.route("/match/<int:match_id>")

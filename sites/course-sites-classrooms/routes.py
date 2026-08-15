@@ -558,7 +558,7 @@ def form_save_gradebook(course_id):
         course["enrollment_count"] = len(enrolled)
         db.save_item(SITE, "courses", course_id, course)
 
-    return redirect(url_for(f"{BP}.gradebook", course_id=course_id))
+    return redirect(url_for(f"{BP}.gradebook", course_id=course_id, saved=changes))
 
 
 @blueprint.route("/course/<int:course_id>/discussions/new", methods=["POST"])
