@@ -133,25 +133,34 @@ def build_trajectory(base):
     /_admin/record -> the recorder action+observation stream (human schema)
     /_admin/log    -> the server request log (network); mapped to type=network.
     """
+    from urllib.parse import urlencode
+
     recorded = fetch(base, "/_admin/record?all=1").get("entries", []) or []
     log = fetch(base, "/_admin/log?all=1").get("entries", []) or []
     beacons = fetch(base, "/_admin/beacon?all=1").get("entries", []) or []
 
-    traj = list(recorded)
-    # ensure action entries exist even if the recorder stream is thin: fold in beacons
+    # Keep the recorder's actions + observations, but take NETWORK authoritatively
+    # from the server request log — the complete server-side view, which includes
+    # native form POSTs and navigations the recorder's fetch/XHR wrapper misses.
+    # (The old code only folded in the log when the recorder had zero network, and
+    # mapped url=path — dropping the query string, so query-gated search/filter
+    # checks false-negatived even though the request was in the log.)
+    traj = [e for e in recorded if e.get("type") != "network"]
     if not any(e.get("type") == "action" for e in traj):
         for b in beacons:
             traj.append({"type": "action", **b})
-    # network events from the request log (the recorder stream usually lacks these)
-    if not any(e.get("type") == "network" for e in traj):
-        for e in log:
-            traj.append({
-                "type": "network",
-                "method": e.get("method"),
-                "url": e.get("path"),
-                "status": e.get("status"),
-                "requestBody": e.get("body"),
-            })
+    for e in log:
+        url = e.get("path", "")
+        query = e.get("query") or {}
+        if query:
+            url = url + "?" + urlencode(query)
+        traj.append({
+            "type": "network",
+            "method": e.get("method"),
+            "url": url,
+            "status": e.get("status"),
+            "requestBody": e.get("body"),
+        })
     return synthesize_network_events(traj), recorded, log, beacons
 
 
