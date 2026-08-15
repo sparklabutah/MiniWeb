@@ -814,31 +814,49 @@ def api_video_delete(video_id):
 
 @blueprint.route("/api/videos", methods=["POST"])
 def api_video_create():
-    """Upload / create a new video (upload_by_upload)."""
-    data = request.get_json(force=True)
+    """Upload / create a new video (upload_by_upload).
+
+    Accepts EITHER a JSON body or a normal form POST (the upload page is a plain
+    <form>). ``channel_id`` is derived from the logged-in user, not required in the
+    payload — previously the handler forced JSON and required channel_id, so the
+    form POST 400'd ('could not understand') and required-field'd.
+    """
+    data = request.get_json(silent=True)
+    if data is None:
+        data = request.form.to_dict()
+        if isinstance(data.get("tags"), str):
+            data["tags"] = [t.strip() for t in data["tags"].split(",") if t.strip()]
+
+    if not data.get("title"):
+        return jsonify({"error": "Missing required field: title"}), 400
+
+    # A video file may ride along as a multipart part; record a reference.
+    up = request.files.get("file") or request.files.get("video")
+    if up and up.filename and not data.get("video_url"):
+        data["video_url"] = f"uploaded://{up.filename}"
+
+    channel_id = data.get("channel_id") or _current_user_id()
+    if channel_id is None:                      # browse-only fallback
+        users = _users()
+        channel_id = users[0]["id"] if users else 1
+
     videos = _videos()
-
-    required = ("title", "channel_id")
-    for field in required:
-        if field not in data:
-            return jsonify({"error": f"Missing required field: {field}"}), 400
-
     new_video = {
         "id": _next_id(videos),
         "title": data["title"],
-        "channel_id": data["channel_id"],
-        "user_id": data.get("user_id", data["channel_id"]),
+        "channel_id": channel_id,
+        "user_id": data.get("user_id", channel_id),
         "description": data.get("description", ""),
         "duration_seconds": data.get("duration_seconds", 0),
         "views": 0,
         "likes": 0,
         "dislikes": 0,
         "upload_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "category": data.get("category", "Entertainment"),
+        "category": data.get("category") or "Entertainment",
         "tags": data.get("tags", []),
         "thumbnail_url": data.get("thumbnail_url", ""),
         "video_url": data.get("video_url", ""),
-        "status": data.get("status", "published"),
+        "status": data.get("status") or "published",
     }
 
     videos.append(new_video)

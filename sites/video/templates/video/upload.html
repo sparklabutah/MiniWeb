@@ -164,6 +164,8 @@
                 <span class="hint">Enter a URL for the video thumbnail image.</span>
             </div>
 
+            <input type="hidden" id="video_url" name="video_url">
+
             <div class="submit-section">
                 <a href="{{ url_for('video.index') }}" class="cancel-btn" style="background:transparent; color:#fff; border:1px solid #303030; padding:10px 24px; border-radius:20px; font-size:14px;">Cancel</a>
                 <button type="submit" class="publish-btn">Publish</button>
@@ -171,5 +173,44 @@
         </form>
         {% endif %}
     </div>
+    <script>
+    (function () {
+        var fi = document.getElementById('file-input');
+        var form = document.querySelector('.upload-form');
+        var dropText = document.querySelector('.drop-text');
+        var vurl = document.getElementById('video_url');
+        if (fi) fi.addEventListener('change', function () {
+            if (!fi.files || !fi.files.length) return;
+            var f = fi.files[0];
+            if (dropText) dropText.textContent = '✓ ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB) ready to publish';
+            if (vurl) vurl.value = 'uploaded://' + f.name;
+        });
+        if (form) form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var title = (document.getElementById('title') || {}).value || '';
+            if (!title.trim()) { alert('Please add a title.'); return; }
+            // Send as multipart so the chosen video file rides along (real upload),
+            // then redirect to the new video like a real publish flow.
+            var fd = new FormData(form);
+            if (fi && fi.files && fi.files.length) fd.append('file', fi.files[0]);
+            var btn = form.querySelector('.publish-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+            fetch(form.getAttribute('action'), { method: 'POST', body: fd })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (res.ok && res.d && res.d.id) {
+                        window.location.href = '/sites/video/watch/' + res.d.id;
+                    } else {
+                        if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+                        alert((res.d && res.d.error) || 'Upload failed');
+                    }
+                })
+                .catch(function () {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+                    alert('Upload failed');
+                });
+        });
+    })();
+    </script>
 </body>
 </html>
