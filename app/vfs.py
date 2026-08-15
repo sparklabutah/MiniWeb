@@ -200,18 +200,30 @@ def _ensure_parent_chain(parent: str):
 
 
 def save_file(parent: str, name: str, content: str = "", mime: str = "",
-              source: str = "download") -> dict:
-    """Write a file into the local FS overlay under ``parent`` (session-isolated)."""
+              source: str = "download", content_b64: str = "") -> dict:
+    """Write a file into the local FS overlay under ``parent`` (session-isolated).
+
+    Binary downloads (PDFs, images, media) arrive base64-encoded in ``content_b64``
+    so their real bytes survive the round-trip; text files use ``content``.
+    """
     _ensure()
     parent = _norm(parent)
     _ensure_parent_chain(parent)
     name = (name or "untitled").strip().replace("/", "_")
     path = _norm(posixpath.join(parent, name))
+    if content_b64:
+        import base64
+        try:
+            size = len(base64.b64decode(content_b64))
+        except Exception:
+            size = 0
+    else:
+        size = len((content or "").encode("utf-8"))
     rec = {
         "id": path, "path": path, "parent": parent, "name": name, "kind": "file",
         "ext": _ext(name), "mime": mime or mime_for(name),
-        "size": len((content or "").encode("utf-8")), "modified": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "content": content or "", "source": source,
+        "size": size, "modified": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "content": content or "", "content_b64": content_b64 or "", "source": source,
     }
     db.save_item(SITE, COLLECTION, path, rec)
     return rec
@@ -248,11 +260,19 @@ def api_download():
     rec = get_file(request.args.get("path", ""))
     if not rec or rec["kind"] != "file":
         abort(404)
-    # Binary file on disk → stream the real bytes; else serve the (text) content.
+    # Binary file on disk → stream the real bytes.
     if rec.get("_binary") and rec.get("_disk"):
         return send_file(rec["_disk"], mimetype=rec.get("mime"),
                          as_attachment=True, download_name=rec["name"])
-    data = (rec.get("content") or "").encode("utf-8")
+    # Saved binary (base64 in the overlay) → decode to real bytes.
+    if rec.get("content_b64"):
+        import base64
+        try:
+            data = base64.b64decode(rec["content_b64"])
+        except Exception:
+            data = b""
+    else:
+        data = (rec.get("content") or "").encode("utf-8")
     resp = Response(data, mimetype=rec.get("mime") or "application/octet-stream")
     resp.headers["Content-Disposition"] = f'attachment; filename="{rec["name"]}"'
     resp.headers["Content-Length"] = str(len(data))
@@ -267,12 +287,15 @@ def api_save():
     if not name:
         return jsonify({"ok": False, "error": "name required"}), 400
     content = body.get("content") or ""
+    content_b64 = body.get("content_b64") or ""
     src = body.get("source_path")
-    if src and not content:
+    if src and not content and not content_b64:
         s = get_file(src)
         if s:
             content = s.get("content", "")
-    rec = save_file(folder, name, content, body.get("mime", ""), body.get("origin", "download"))
+            content_b64 = s.get("content_b64", "")
+    rec = save_file(folder, name, content, body.get("mime", ""),
+                    body.get("origin", "download"), content_b64=content_b64)
     return jsonify({"ok": True, "file": {k: rec[k] for k in ("path", "name", "parent", "mime", "size")}})
 
 

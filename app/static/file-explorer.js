@@ -313,11 +313,26 @@
   };
 
   // ── intercept <input type=file> → OPEN ───────────────────────────────────
+  // Open the picker where the requested files actually live, so a media picker
+  // doesn't strand the user in Documents. Mixed media (image+video) → root, so
+  // every folder is one click away and you're never "stuck".
+  function startPathForAccept(accept) {
+    if (!accept || !accept.length) return null;  // general files → default (Documents)
+    var img = accept.some(function (a) { return a === 'image/*' || ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.heic'].indexOf(a) >= 0; });
+    var vid = accept.some(function (a) { return a === 'video/*' || ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v'].indexOf(a) >= 0; });
+    var aud = accept.some(function (a) { return a === 'audio/*' || ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'].indexOf(a) >= 0; });
+    if ((img ? 1 : 0) + (vid ? 1 : 0) + (aud ? 1 : 0) > 1) return '/';  // mixed → root
+    if (img) return '/Pictures';
+    if (vid) return '/Movies';
+    if (aud) return '/Music';
+    return null;
+  }
   document.addEventListener('click', function (e) {
     var input = e.target.closest('input[type="file"]');
     if (!input) return;
     e.preventDefault(); e.stopPropagation();
-    openDialog({ mode: 'open', accept: parseAccept(input.getAttribute('accept')) });
+    var accept = parseAccept(input.getAttribute('accept'));
+    openDialog({ mode: 'open', accept: accept, startPath: startPathForAccept(accept) });
     // stash the input so confirmPick can set its files
     var poll = setInterval(function () { if (st) { st.input = input; clearInterval(poll); } }, 10);
     setTimeout(function () { clearInterval(poll); }, 2000);
@@ -343,17 +358,72 @@
     }
     if (!name) return;  // not a recognizable file download — let it proceed
     e.preventDefault(); e.stopPropagation();
-    // Try to fetch the real bytes so the saved copy has content.
-    var startSave = function (content) {
-      window.MiniWebFS.saveAs({ name: name, content: content || '',
-        origin: (location.pathname.split('/')[2] || 'download') });
+    var origin = (location.pathname.split('/')[2] || 'download');
+    var chip = downloadChip(name);
+    // Realistic browser download: fetch the real bytes (binary-safe) and save to
+    // Downloads, with a progress chip. Text stays text; binary rides base64.
+    var save = function (body) {
+      body.name = name; body.folder = '/Downloads'; body.origin = origin;
+      fetch(FS + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); })
+        .then(function () { chip.done(); })
+        .catch(function () { chip.fail(); });
     };
     if (href && href.indexOf('javascript:') !== 0) {
       fetch(href, { credentials: 'same-origin' })
-        .then(function (r) { return r.text(); })
-        .then(function (txt) { startSave(txt.length < 200000 ? txt : ''); })
-        .catch(function () { startSave(''); });
-    } else { startSave(''); }
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) {
+          var mime = blob.type || '';
+          var textish = (/^text\/|json|csv|xml|svg|javascript|x-www-form/.test(mime) || mime === '');
+          if (textish && blob.size < 500000) {
+            blob.text().then(function (t) { save({ content: t, mime: mime }); });
+          } else {
+            blobToB64(blob).then(function (b64) { save({ content_b64: b64, mime: mime }); });
+          }
+        })
+        .catch(function () { save({ content: '' }); });
+    } else { save({ content: '' }); }
   }, true);
+
+  function blobToB64(blob) {
+    return new Promise(function (resolve) {
+      var r = new FileReader();
+      r.onload = function () { resolve((r.result.split(',')[1]) || ''); };
+      r.onerror = function () { resolve(''); };
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // Browser-style download shelf chip (bottom-left), with a progress sweep.
+  function downloadChip(name) {
+    var el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:18px;left:18px;min-width:220px;max-width:300px;background:#fff;color:#1f2937;border:1px solid #e2e6ea;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px 12px;font:500 12.5px -apple-system,BlinkMacSystemFont,sans-serif;z-index:2147483002;';
+    el.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;"><span class="_dc-ic" style="font-size:16px;">⬇️</span>' +
+      '<div style="flex:1;min-width:0;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + name + '</div>' +
+      '<div class="_dc-status" style="font-size:11px;color:#6b7280;">Downloading…</div></div></div>' +
+      '<div style="height:3px;background:#eef1f4;border-radius:2px;margin-top:8px;overflow:hidden;">' +
+      '<div class="_dc-bar" style="height:100%;width:15%;background:#2f7cf6;border-radius:2px;transition:width .25s ease;"></div></div>';
+    document.body.appendChild(el);
+    var bar = el.querySelector('._dc-bar');
+    var w = 15;
+    var iv = setInterval(function () { w = Math.min(w + 12, 90); bar.style.width = w + '%'; }, 180);
+    function remove(delay) { setTimeout(function () { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; }, delay); setTimeout(function () { if (el.parentNode) el.remove(); }, delay + 500); }
+    return {
+      done: function () {
+        clearInterval(iv); bar.style.width = '100%'; bar.style.background = '#22a06b';
+        el.querySelector('._dc-ic').textContent = '✅';
+        el.querySelector('._dc-status').textContent = 'Saved to Downloads';
+        remove(2600);
+      },
+      fail: function () {
+        clearInterval(iv); bar.style.background = '#e5484d';
+        el.querySelector('._dc-ic').textContent = '⚠️';
+        el.querySelector('._dc-status').textContent = 'Download failed';
+        remove(2600);
+      }
+    };
+  }
 
 })();

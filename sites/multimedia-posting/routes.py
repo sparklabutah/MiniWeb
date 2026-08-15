@@ -91,11 +91,19 @@ def _get_current_user():
 
 
 def _get_browsing_user():
-    """Return logged-in user, or fall back to first user for browse-only."""
+    """Return logged-in user, or fall back to a real user for browse-only.
+
+    Never returns None for the user — the index/feed routes dereference it, so an
+    unresolvable id (session pointing at a missing/replaced user) must not 500.
+    """
     user = _get_current_user()
     if user:
         return user, True
-    return _get_user("mp-u-001"), False
+    fallback = _get_user("mp-u-001")
+    if not fallback:
+        rows = db.query(SITE, "users", limit=1)
+        fallback = rows[0] if rows else None
+    return fallback, False
 
 
 def _get_following_ids(user_id):
