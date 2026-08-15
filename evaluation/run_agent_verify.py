@@ -2,10 +2,9 @@
 """Run a browser-use agent against an annotated task and grade it with the
 task's macro verifier (verifier.json + evaluation/verifiers.py::verify_task).
 
-Unlike run_eval.py (which uses the per-site sites/<site>/verifiers.py state
-checkers) and run_annotated.py (LLM-as-judge on expected_outcome), this grades
-the agent's *trajectory* against the per-task macro verifier — the same spec
-the annotate UI builds and the gold self-check uses.
+This grades the agent's *trajectory* against the per-task macro verifier — the
+same spec the annotate UI builds and the gold self-check uses (as opposed to an
+LLM-as-judge on expected_outcome).
 
 Pipeline:
   1. locate the task dir + its verifier.json under data/annotations/*/<task_id>/

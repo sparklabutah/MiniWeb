@@ -93,9 +93,8 @@ def _load_sites():
     for site_json in sorted(SITES_DIR.glob("*/site.json")):
         if site_json.parent.name.startswith("_"):
             continue
-        if not (site_json.parent / "tasks.json").exists():
-            continue
-        if (site_json.parent / "routes.py").stat().st_size < 500:
+        routes = site_json.parent / "routes.py"
+        if not routes.exists() or routes.stat().st_size < 500:
             continue
         meta = json.loads(site_json.read_text())
         meta["url"] = f"/sites/{meta['id']}/"

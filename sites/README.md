@@ -11,7 +11,6 @@ real apps but read/write a shared trimmed dataset with per-session isolation.
 | `schema.py` | Table definitions registered into the site registry (`db.register_table`). A collection used with `db.query`/`save_collection` MUST have a real base table here, or overlay writes are invisible on read. |
 | `templates/`, `static/` | Jinja templates + assets. |
 | `site.json` | Site metadata (name, description). |
-| `tasks.json` | Site-local eval tasks (used by `evaluation/run_eval.py`). |
 | `generate_data.py` | (some sites) deterministic synthetic-data generation for the site's tables. |
 
 ## Data rules (enforced — see root `CLAUDE.md`)
