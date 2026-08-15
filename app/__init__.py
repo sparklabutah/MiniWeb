@@ -1165,6 +1165,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
 
     _RECORDER_SCRIPT = b'<script src="/static/recorder.js"></script>'
     _FILE_EXPLORER_SCRIPT = b'<script src="/static/file-explorer.js"></script>'
+    _DIALOG_SHIM_SCRIPT = b'<script src="/static/dialog-shim.js"></script>'
     _EXPORT_FEEDBACK_SCRIPT = b'<script src="/static/export-feedback.js"></script>'
     _SHARE_SCRIPT = b'<script src="/static/miniweb-share.js"></script>'
     # Shared video player — enhances any [data-mini-player] container across all sites.
@@ -1211,7 +1212,8 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
             parts = request.path.split("/", 3)  # ['', 'sites', '<id>', ...]
             site_id = parts[2] if len(parts) > 2 else ""
             logo_css = (_BRAND_FONTS_CSS + _logo_font_style(site_id)) if site_id else b""
-            inject = (_BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_EXPLORER_SCRIPT
+            inject = (_DIALOG_SHIM_SCRIPT + b"\n" + _BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT
+                      + b"\n" + _FILE_EXPLORER_SCRIPT
                       + b"\n" + _EXPORT_FEEDBACK_SCRIPT + b"\n" + _PLAYER_ASSETS
                       + b"\n" + _SHARE_SCRIPT + b"\n" + logo_css)
             idx = data.rfind(b"</body>")
