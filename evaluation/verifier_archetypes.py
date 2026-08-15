@@ -25,7 +25,7 @@ FORM_MACROS = {  # a form is filled and submitted; the mutation is the gate
     "create_by_form", "edit_by_form", "compare_by_form", "pay_by_form",
     "checkout_by_form", "book_by_form", "cancel_by_form", "configure_by_form",
     "authenticate_by_form", "share_by_form", "sort_by_form", "feedback_by_star",
-    "feedback_by_text", "get_nav_route",
+    "feedback_by_text", "get_nav_route", "save_by_form", "sign_by_text",
 }
 FILTER_MACROS = {"filter_by_dropdown", "filter_by_date_range", "filter_by_options"}
 TOGGLE_MACROS = {"toggle_relationship", "feedback_by_react"}
