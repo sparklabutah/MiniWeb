@@ -421,7 +421,7 @@ def _register_recovery_routes(app):
     import threading
     import time as _time
 
-    from flask import jsonify, request as _req
+    from flask import jsonify, request as _req, send_file
 
     from app import db as _db
 
@@ -605,6 +605,65 @@ def _register_recovery_routes(app):
 
         return jsonify({"replaced_tasks": len(replaced_dirs), "files": files,
                         "pruned_to_trash": pruned})
+
+    @app.route("/recovery/annotations/download", methods=["GET"])
+    def _recovery_annotations_download():
+        """Stream a tar.gz of the whole annotations dir (for scripts/pull_from_railway.py)."""
+        if not _authed():
+            return "not found", 404
+        import tarfile
+        import tempfile
+        ann = _annotations_dir()
+        tmp = tempfile.NamedTemporaryFile(prefix="ann_dl_", suffix=".tar.gz", delete=False)
+        tmp.close()
+        with tarfile.open(tmp.name, "w:gz") as tar:
+            if ann.exists():
+                for item in sorted(ann.iterdir()):
+                    if item.name.startswith("."):        # skip .trash / .tmp
+                        continue
+                    tar.add(item, arcname=item.name)
+        resp = send_file(tmp.name, mimetype="application/gzip",
+                         as_attachment=True, download_name="annotations.tar.gz")
+
+        @resp.call_on_close
+        def _cleanup():
+            try:
+                os.remove(tmp.name)
+            except OSError:
+                pass
+        return resp
+
+    @app.route("/recovery/macros/download", methods=["GET"])
+    def _recovery_macros_download():
+        """Stream a tar.gz of the 3 macro YAMLs (macros / locations / templates)."""
+        if not _authed():
+            return "not found", 404
+        import tarfile
+        import tempfile
+        from annotation.macros import macro_data_path
+        import annotation.macro_templates as _mt
+        yamls = {
+            "macros.yaml": macro_data_path("macros.yaml", "MINIWEB_MACROS"),
+            "macro_locations.yaml": macro_data_path("macro_locations.yaml", "MINIWEB_MACRO_LOCATIONS"),
+            "macro_templates.yaml": str(_mt.TEMPLATES_PATH),
+        }
+        tmp = tempfile.NamedTemporaryFile(prefix="macros_dl_", suffix=".tar.gz", delete=False)
+        tmp.close()
+        with tarfile.open(tmp.name, "w:gz") as tar:
+            for name, path in yamls.items():
+                p = pathlib.Path(path)
+                if p.exists():
+                    tar.add(p, arcname=name)
+        resp = send_file(tmp.name, mimetype="application/gzip",
+                         as_attachment=True, download_name="macros.tar.gz")
+
+        @resp.call_on_close
+        def _cleanup():
+            try:
+                os.remove(tmp.name)
+            except OSError:
+                pass
+        return resp
 
 
 def create_app():
