@@ -1,0 +1,32 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Verify Identity - City of Lakeport{% endblock %}
+{% block content %}
+<div class="main-content" style="max-width:600px;">
+    <h2 class="section-title">Verify Your Identity</h2>
+
+    {% if result == 'success' %}
+    <div class="alert alert-success">
+        Identity verified successfully for <strong>{{ verified_user.name }}</strong>. Your account now has full access.
+    </div>
+    {% elif result == 'error' %}
+    <div class="alert alert-error">
+        Invalid verification code. Please check your code and try again.
+    </div>
+    {% endif %}
+
+    {% if result != 'success' %}
+    <div class="detail-body">
+        <p style="margin-bottom:1rem;font-size:.9rem;">
+            Enter the verification code that was provided when you registered.
+        </p>
+        <form method="post" action="{{ url_for('agency-portals.verify_identity_submit') }}">
+            <div class="form-group">
+                <label for="verification_code">Verification Code *</label>
+                <input type="text" id="verification_code" name="verification_code" placeholder="VRF-XXXXXX" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Verify</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

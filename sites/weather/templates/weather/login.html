@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+
+        .login-container { max-width: 420px; margin: 4rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .login-container h2 { color: #1565c0; margin-bottom: .5rem; font-size: 1.5rem; }
+        .login-container .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .form-group input:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .btn-login { width: 100%; padding: .8rem; background: #1565c0; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-login:hover { background: #0d47a1; }
+        .error { background: #fce4ec; color: #c62828; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #f8bbd0; }
+        .login-hint { text-align: center; margin-top: 1.5rem; font-size: .8rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}">Alerts</a>
+        <a href="{{ url_for('weather.locations_page') }}">Locations</a>
+        <a href="{{ url_for('weather.login_page') }}" class="active">Sign In</a>
+    </nav>
+
+    <form class="login-container" method="post" action="{{ url_for('weather.login_submit') }}">
+        <h2>Sign In</h2>
+        <p class="subtitle">Sign in to manage your saved locations and preferences.</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" required placeholder="Enter your password">
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
+        <div class="login-hint">Sign in to save locations and customize your weather dashboard.</div>
+    </form>
+</body>
+</html>

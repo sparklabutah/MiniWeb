@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goals - FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+</head>
+<body>
+    {% set active_page = 'goals' %}
+    {% include 'health-fitness-tracking/_topnav.html' %}
+    <div class="ft-shell">
+        <div class="ft-page-title">
+            <h1>Goals</h1>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-h"><h3>Daily Targets</h3></div>
+            <div class="panel-b" id="targets-panel">
+                <div style="font-size:.78rem; color:var(--muted); margin-bottom:12px;">Adjust your daily targets with the sliders and save.</div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="cfg-steps" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Steps</label>
+                    <input type="range" id="cfg-steps" min="2000" max="20000" step="500" value="10000" style="flex:1;">
+                    <span class="slider-value" id="cfg-steps-val" style="flex:0 0 90px; text-align:right; font-weight:700;">10000</span>
+                </div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="cfg-calories" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Calories (kcal)</label>
+                    <input type="range" id="cfg-calories" min="1200" max="4000" step="50" value="2200" style="flex:1;">
+                    <span class="slider-value" id="cfg-calories-val" style="flex:0 0 90px; text-align:right; font-weight:700;">2200</span>
+                </div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="cfg-water" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Water (ml)</label>
+                    <input type="range" id="cfg-water" min="1000" max="5000" step="100" value="2500" style="flex:1;">
+                    <span class="slider-value" id="cfg-water-val" style="flex:0 0 90px; text-align:right; font-weight:700;">2500</span>
+                </div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="cfg-sleep" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Sleep (hours)</label>
+                    <input type="range" id="cfg-sleep" min="5" max="10" step="0.5" value="7.5" style="flex:1;">
+                    <span class="slider-value" id="cfg-sleep-val" style="flex:0 0 90px; text-align:right; font-weight:700;">7.5</span>
+                </div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="cfg-hr" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Heart rate alert (bpm)</label>
+                    <input type="range" id="cfg-hr" min="120" max="210" step="5" value="180" style="flex:1;">
+                    <span class="slider-value" id="cfg-hr-val" style="flex:0 0 90px; text-align:right; font-weight:700;">180</span>
+                </div>
+                <button class="ft-btn" id="save-targets">Save Targets</button>
+                <div class="result-msg" id="targets-result" style="font-size:.85rem; margin-top:.8rem;"></div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-h"><h3>Days Above Threshold</h3></div>
+            <div class="panel-b" id="threshold-panel">
+                <div style="font-size:.78rem; color:var(--muted); margin-bottom:12px;">How many days did a metric exceed the threshold?</div>
+                <div class="ft-field" style="margin-bottom:.8rem; max-width:260px;">
+                    <label for="thr-metric">Metric</label>
+                    <select id="thr-metric">
+                        <option value="steps" data-min="0" data-max="25000" data-step="500">Steps</option>
+                        <option value="calories_burned" data-min="0" data-max="1500" data-step="25">Calories burned</option>
+                        <option value="active_minutes" data-min="0" data-max="180" data-step="5">Active minutes</option>
+                        <option value="sleep_hours" data-min="0" data-max="12" data-step="0.5">Sleep hours</option>
+                        <option value="water_ml" data-min="0" data-max="5000" data-step="100">Water (ml)</option>
+                    </select>
+                </div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="thr-value" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Threshold</label>
+                    <input type="range" id="thr-value" min="0" max="25000" step="500" value="10000" style="flex:1;">
+                    <span class="slider-value" id="thr-value-val" style="flex:0 0 90px; text-align:right; font-weight:700;">10000</span>
+                </div>
+                <button class="ft-btn" id="compute-threshold">Compute</button>
+                <div class="result-msg" id="threshold-result" style="font-size:.85rem; margin-top:.8rem;"></div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-h"><h3>Verify Goals</h3></div>
+            <div class="panel-b" id="verify-panel">
+                <div style="font-size:.78rem; color:var(--muted); margin-bottom:12px;">Check each goal against your recent activity, with an adjustable tolerance margin.</div>
+                <div class="slider-row" style="display:flex; align-items:center; gap:.8rem; margin-bottom:.8rem;">
+                    <label for="verify-tolerance" style="flex:0 0 160px; font-size:.85rem; color:var(--muted);">Tolerance</label>
+                    <input type="range" id="verify-tolerance" min="0" max="25" step="1" value="10" style="flex:1;">
+                    <span class="slider-value" id="verify-tolerance-val" style="flex:0 0 90px; text-align:right; font-weight:700;">10%</span>
+                </div>
+                <button class="ft-btn" id="verify-goals">Verify Goals</button>
+                <div class="result-msg" id="verify-result" style="font-size:.85rem; margin-top:.8rem;"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-h"><h3>Your Goals</h3></div>
+            <div class="panel-b" style="padding:0;">
+                {% for g in goals %}
+                <div class="goal-row" data-goal-id="{{ g.goal_id }}">
+                    <div class="goal-top">
+                        <div class="goal-cat">{{ g.category | replace('_', ' ') }}</div>
+                        <span class="status-tag status-{{ g.status }}">{{ g.status }}</span>
+                    </div>
+                    <div class="goal-target">Target: {{ g.target }} {{ g.unit }}{% if g.target_date %} &middot; by {{ g.target_date }}{% endif %}</div>
+                    <div class="gp-track"><div class="gp-fill {{ 'done' if g.status == 'achieved' }}" style="width:{{ 100 if g.status == 'achieved' else 55 }}%;"></div></div>
+                    {% if g.progress_note %}
+                    <div class="goal-note">{{ g.progress_note }}</div>
+                    {% endif %}
+                    <div class="goal-verdict" style="display:none;"></div>
+                </div>
+                {% else %}
+                <div style="text-align:center; color:var(--muted); padding:2rem;">No goals set.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var uid = {{ user.id if user else 1 }};
+        var settingsUrl = '{{ url_for("health-fitness-tracking.api_user_settings_get", user_id=(user.id if user else 1)) }}';
+
+        // ---- Daily Targets (configure_by_slider) ----
+        var cfg = [
+            ['cfg-steps', 'daily_step_target'],
+            ['cfg-calories', 'daily_calorie_target'],
+            ['cfg-water', 'daily_water_target_ml'],
+            ['cfg-sleep', 'sleep_target_hours'],
+            ['cfg-hr', 'heart_rate_alert_bpm']
+        ];
+        cfg.forEach(function(pair) {
+            var el = document.getElementById(pair[0]);
+            el.addEventListener('input', function() {
+                document.getElementById(pair[0] + '-val').textContent = el.value;
+            });
+        });
+        fetch(settingsUrl).then(function(r) { return r.json(); }).then(function(d) {
+            if (!d.settings) return;
+            cfg.forEach(function(pair) {
+                if (d.settings[pair[1]] !== undefined) {
+                    var el = document.getElementById(pair[0]);
+                    el.value = d.settings[pair[1]];
+                    document.getElementById(pair[0] + '-val').textContent = el.value;
+                }
+            });
+        });
+        document.getElementById('save-targets').addEventListener('click', function() {
+            var body = {};
+            cfg.forEach(function(pair) {
+                body[pair[1]] = parseFloat(document.getElementById(pair[0]).value);
+            });
+            fetch(settingsUrl, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                var el = document.getElementById('targets-result');
+                el.style.color = d.settings ? '#16a34a' : '#b91c1c';
+                el.textContent = d.settings ? 'Targets saved.' : (d.error || 'Error saving targets.');
+            });
+        });
+
+        // ---- Days Above Threshold (compute_by_slider) ----
+        var thrMetric = document.getElementById('thr-metric');
+        var thrValue = document.getElementById('thr-value');
+        function syncThrRange() {
+            var opt = thrMetric.options[thrMetric.selectedIndex];
+            thrValue.min = opt.dataset.min;
+            thrValue.max = opt.dataset.max;
+            thrValue.step = opt.dataset.step;
+            thrValue.value = Math.round((parseFloat(opt.dataset.max)) / 2);
+            document.getElementById('thr-value-val').textContent = thrValue.value;
+        }
+        thrMetric.addEventListener('change', syncThrRange);
+        thrValue.addEventListener('input', function() {
+            document.getElementById('thr-value-val').textContent = thrValue.value;
+        });
+        document.getElementById('compute-threshold').addEventListener('click', function() {
+            var url = '{{ url_for("health-fitness-tracking.api_stats_threshold") }}' +
+                '?metric=' + encodeURIComponent(thrMetric.value) +
+                '&min_value=' + encodeURIComponent(thrValue.value) + '&user_id=' + uid;
+            fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+                var el = document.getElementById('threshold-result');
+                if (d.error) { el.style.color = '#b91c1c'; el.textContent = d.error; return; }
+                el.style.color = '#333';
+                el.textContent = d.days_above + ' of ' + d.total_days + ' days above threshold (' +
+                    d.percentage + '%). Average on those days: ' + d.avg_value + '.';
+            });
+        });
+
+        // ---- Goal verification (verify_by_slider) ----
+        var tolSlider = document.getElementById('verify-tolerance');
+        tolSlider.addEventListener('input', function() {
+            document.getElementById('verify-tolerance-val').textContent = tolSlider.value + '%';
+        });
+        document.getElementById('verify-goals').addEventListener('click', function() {
+            var cards = document.querySelectorAll('.goal-row[data-goal-id]');
+            var tolerance = parseFloat(tolSlider.value) / 100;
+            var done = 0, met = 0;
+            if (!cards.length) return;
+            cards.forEach(function(card) {
+                var url = '{{ url_for("health-fitness-tracking.api_goals_verify") }}' +
+                    '?user_id=' + uid + '&goal_id=' + encodeURIComponent(card.dataset.goalId) +
+                    '&tolerance=' + tolerance;
+                fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+                    var verdict = card.querySelector('.goal-verdict');
+                    done++;
+                    verdict.style.display = 'block';
+                    verdict.style.marginTop = '6px';
+                    verdict.style.fontSize = '.78rem';
+                    verdict.style.fontWeight = '600';
+                    if (d.error || d.met === undefined) {
+                        verdict.style.color = '#b91c1c';
+                        verdict.textContent = d.error || 'Could not verify goal.';
+                    } else {
+                        if (d.met) met++;
+                        verdict.style.color = d.met ? '#16a34a' : '#b91c1c';
+                        verdict.textContent = (d.met ? 'On track' : 'Off track') +
+                            (d.actual !== null && d.actual !== undefined ? ' — ' + d.metric_name + ': ' + d.actual + ' vs target ' + d.target : ' — ' + (d.detail || ''));
+                    }
+                    if (done === cards.length) {
+                        var el = document.getElementById('verify-result');
+                        el.style.color = '#333';
+                        el.textContent = met + ' of ' + cards.length + ' goals on track (tolerance ' + tolSlider.value + '%).';
+                    }
+                });
+            });
+        });
+    })();
+    </script>
+    <div class="ft-foot">FitTrack &mdash; Your Nutrition &amp; Fitness Dashboard</div>
+</body>
+</html>

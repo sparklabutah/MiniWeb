@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicles - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'vehicles' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <h2>Registered Vehicles</h2>
+        <a class="action-btn green" href="{{ url_for('tax-filing-dmv-permits.register_vehicle_page') }}">+ Register New Vehicle</a>
+        <form class="filters" method="get">
+            <div>
+                <label for="body_type">Body Type</label>
+                <select name="body_type" id="body_type">
+                    <option value="">All Types</option>
+                    {% for bt in body_types %}
+                    <option value="{{ bt }}" {% if selected_body_type == bt %}selected{% endif %}>{{ bt|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="renewal_status">Renewal Status</label>
+                <select name="renewal_status" id="renewal_status">
+                    <option value="">All</option>
+                    <option value="current" {% if selected_renewal == 'current' %}selected{% endif %}>Current</option>
+                    <option value="expired" {% if selected_renewal == 'expired' %}selected{% endif %}>Expired</option>
+                </select>
+            </div>
+            <button type="submit">Filter</button>
+        </form>
+        <table>
+            <thead><tr><th>Vehicle</th><th>Plate</th><th>Registration ID</th><th>Renewal Fee</th><th>Renewal Status</th></tr></thead>
+            <tbody>
+                {% for v in vehicles %}
+                <tr>
+                    <td><a href="{{ url_for('tax-filing-dmv-permits.vehicle_detail', vehicle_id=v.id) }}">{{ v.vehicle.year }} {{ v.vehicle.make }} {{ v.vehicle.model }}</a></td>
+                    <td>{{ v.plate_number }}</td>
+                    <td>{{ v.registration_id }}</td>
+                    <td>${{ "%.2f"|format(v.renewal_fee) }}</td>
+                    <td><span class="badge badge-{{ v.renewal_status }}">{{ v.renewal_status|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

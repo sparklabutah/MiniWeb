@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookVerse -- Discover Books & Comics</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; color: #2d2d2d; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .header-nav { display: flex; align-items: center; gap: .5rem; }
+        .header-nav a { font-size: .85rem; color: #6b5b4f; text-decoration: none; padding: .3rem .5rem; border-radius: .25rem; }
+        .header-nav a:hover { background: #f5efe6; color: #8b4513; }
+        .login-btn { background: #8b4513 !important; color: #fff !important; padding: .5rem 1.2rem !important; border-radius: .3rem !important; font-weight: bold !important; font-size: .95rem !important; }
+        .login-btn:hover { background: #a0522d !important; }
+        .cat-dropdown { position: relative; display: inline-block; }
+        .cat-dropdown-btn { font-size: .85rem; color: #6b5b4f; text-decoration: none; padding: .3rem .5rem; border-radius: .25rem; cursor: pointer; background: none; border: none; font-family: inherit; }
+        .cat-dropdown-btn:hover { background: #f5efe6; color: #8b4513; }
+        .cat-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #e8dfd3; border-radius: .4rem; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; min-width: 220px; max-height: 400px; overflow-y: auto; }
+        .cat-dropdown:hover .cat-dropdown-menu { display: block; }
+        .cat-dropdown-menu a { display: block; padding: .5rem 1rem; font-size: .85rem; color: #6b5b4f; text-decoration: none; border-bottom: 1px solid #f5efe6; }
+        .cat-dropdown-menu a:hover { background: #f5efe6; color: #8b4513; }
+        .cat-dropdown-menu a:last-child { border-bottom: none; }
+        .cat-bar { background: #f5efe6; padding: .5rem 2rem; display: flex; flex-wrap: wrap; gap: .3rem; border-bottom: 1px solid #e8dfd3; }
+        .cat-bar a { font-size: .8rem; color: #6b5b4f; text-decoration: none; padding: .25rem .6rem; border-radius: .25rem; }
+        .cat-bar a:hover, .cat-bar a.active { background: #8b4513; color: #fff; }
+        .search-section { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .search-form { display: flex; gap: .5rem; }
+        .search-form input[type="text"] { flex: 1; padding: .7rem 1rem; border: 2px solid #d4c5b0; border-radius: .4rem; font-size: 1rem; background: #fff; }
+        .search-form input[type="text"]:focus { border-color: #8b4513; outline: none; }
+        .search-form button { padding: .7rem 1.5rem; background: #8b4513; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .95rem; }
+        .search-form button:hover { background: #a0522d; }
+        .goto-box { display: flex; gap: .5rem; margin-top: .8rem; align-items: center; }
+        .goto-box label { font-size: .85rem; color: #6b5b4f; font-weight: 600; }
+        .goto-box input[type="number"] { width: 80px; padding: .5rem .6rem; border: 2px solid #d4c5b0; border-radius: .4rem; font-size: .95rem; background: #fff; }
+        .goto-box input[type="number"]:focus { border-color: #8b4513; outline: none; }
+        .goto-box button { padding: .5rem 1rem; background: #8b4513; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .85rem; }
+        .goto-box button:hover { background: #a0522d; }
+        .filters { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1rem; align-items: center; }
+        .filters label { font-size: .85rem; color: #6b5b4f; }
+        .filters select, .filters input[type="number"] { padding: .4rem .6rem; border: 1px solid #d4c5b0; border-radius: .3rem; font-size: .85rem; background: #fff; }
+        .main { max-width: 900px; margin: 0 auto; padding: 0 1.5rem 3rem; }
+        .result-count { font-size: .85rem; color: #8b7b6f; margin: 1rem 0; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.2rem; }
+        .book-card { background: #fff; border: 1px solid #e8dfd3; border-radius: .5rem; overflow: hidden; transition: box-shadow .2s, transform .1s; }
+        .book-card:hover { box-shadow: 0 4px 16px rgba(139,69,19,0.12); transform: translateY(-2px); }
+        .cover-placeholder { height: 180px; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; color: #fff; overflow: hidden; }
+        .cover-placeholder img { width: 100%; height: 100%; object-fit: cover; }
+        .book-info { padding: .8rem; }
+        .book-title { margin: 0 0 .3rem; font-size: .95rem; line-height: 1.3; }
+        .book-title a { color: #2d2d2d; text-decoration: none; }
+        .book-title a:hover { color: #8b4513; }
+        .book-author { font-size: .8rem; color: #8b7b6f; margin-bottom: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .book-meta { font-size: .75rem; color: #a09080; display: flex; justify-content: space-between; align-items: center; }
+        .book-rating { color: #d4a574; }
+        .book-price { font-weight: 600; color: #8b4513; }
+        .book-price.free { color: #2e7d32; }
+        .cat-tag { font-size: .7rem; display: inline-block; background: #f5efe6; padding: .1rem .4rem; border-radius: .2rem; color: #6b5b4f; margin-top: .3rem; }
+        .no-results { text-align: center; color: #a09080; padding: 3rem; }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: .5rem; margin: 2rem 0; }
+        .pagination a, .pagination span { padding: .4rem .8rem; border: 1px solid #d4c5b0; border-radius: .3rem; font-size: .85rem; color: #6b5b4f; text-decoration: none; }
+        .pagination a:hover { background: #f5efe6; color: #8b4513; }
+        .pagination .current { background: #8b4513; color: #fff; border-color: #8b4513; }
+        .pagination .disabled { color: #ccc; border-color: #eee; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('books-comics.index') }}">Browse</a>
+            <div class="cat-dropdown">
+                <button class="cat-dropdown-btn" onclick="var m=this.nextElementSibling;m.style.display=m.style.display==='block'?'none':'block'">Categories &#9662;</button>
+                <div class="cat-dropdown-menu">
+                    <a href="{{ url_for('books-comics.index') }}">All Categories</a>
+                    {% for c in categories %}
+                    <a href="{{ url_for('books-comics.category_page', slug=c.slug) }}">{{ c.name }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if user %}
+            <a href="{{ url_for('books-comics.dashboard') }}">My Library</a>
+            <a href="{{ url_for('books-comics.cart_page') }}">Cart</a>
+            <a href="{{ url_for('books-comics.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('books-comics.login_page') }}" class="login-btn">Login</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="cat-bar">
+        <a href="{{ url_for('books-comics.index') }}" class="{{ 'active' if not cat }}">All</a>
+        {% for c in categories %}
+        <a href="{{ url_for('books-comics.category_page', slug=c.slug) }}" class="{{ 'active' if cat == c.slug }}">{{ c.name }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="search-section">
+        <form class="search-form" method="get" action="{{ url_for('books-comics.index') }}">
+            <input type="text" name="q" placeholder="Search books by title, author, or genre..." value="{{ q }}" autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+        <div class="goto-box">
+            <label for="goto-book-id">Go to Book ID:</label>
+            <input type="number" id="goto-book-id" min="1" placeholder="e.g. 3" aria-label="Book ID">
+            <button type="button" onclick="goToBookId()">Go</button>
+        </div>
+        <div class="filters">
+            <label>Category:
+                <select name="category" id="filter-cat" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c.slug }}" {{ 'selected' if cat == c.slug }}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Min Rating:
+                <select name="min_rating" id="filter-rating" onchange="applyFilters()">
+                    <option value="">Any</option>
+                    <option value="3" {{ 'selected' if min_rating == '3' }}>3+</option>
+                    <option value="3.5" {{ 'selected' if min_rating == '3.5' }}>3.5+</option>
+                    <option value="4" {{ 'selected' if min_rating == '4' }}>4+</option>
+                    <option value="4.5" {{ 'selected' if min_rating == '4.5' }}>4.5+</option>
+                </select>
+            </label>
+            <label>Sort:
+                <select name="sort" id="filter-sort" onchange="applyFilters()">
+                    <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest</option>
+                    <option value="title" {{ 'selected' if sort == 'title' }}>Title A-Z</option>
+                    <option value="rating" {{ 'selected' if sort == 'rating' }}>Top Rated</option>
+                    <option value="price_low" {{ 'selected' if sort == 'price_low' }}>Price: Low-High</option>
+                    <option value="price_high" {{ 'selected' if sort == 'price_high' }}>Price: High-Low</option>
+                    <option value="relevance" {{ 'selected' if sort == 'relevance' }}>Relevance</option>
+                </select>
+            </label>
+            <label>Price:
+                <select name="price" id="filter-price" onchange="applyFilters()">
+                    <option value="" {{ 'selected' if not price_filter }}>All</option>
+                    <option value="free" {{ 'selected' if price_filter == 'free' }}>Free</option>
+                    <option value="paid" {{ 'selected' if price_filter == 'paid' }}>Paid</option>
+                </select>
+            </label>
+        </div>
+    </div>
+
+    <div class="main">
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='books-comics-ad2') %}
+        {% include "ads/_product_ads.html" %}
+
+        <div class="result-count">{{ total_results }} books found (page {{ page }} of {{ total_pages }})</div>
+
+        {% if books %}
+        <div class="book-grid">
+            {% for book in books %}
+            <div class="book-card" data-book-id="{{ book.id }}">
+                {% set colors = ['#8b4513','#2e5090','#6b4c6e','#2e7d32','#c44536','#4a6fa5','#7b5e3b','#5c6b4f'] %}
+                <div class="cover-placeholder" style="background: {{ colors[loop.index0 % 8] }}">
+                    <img src="{{ book.cover_url }}" alt="{{ book.title }}" loading="lazy">
+                </div>
+                <div class="book-info">
+                    <h3 class="book-title">
+                        <a href="{{ url_for('books-comics.book_detail', book_id=book.id) }}">{{ book.title[:60] }}{% if book.title|length > 60 %}...{% endif %} <span style="font-size:.7em;color:#888">(#{{ book.id }})</span></a>
+                    </h3>
+                    <div class="book-author">{{ book.authors_str }}</div>
+                    <div class="book-meta">
+                        <span class="book-rating">{{ '* ' * (book.rating|int) }} {{ book.rating }}</span>
+                        <span class="book-price {{ 'free' if book.price == 0 }}">{{ book.price_str }}</span>
+                    </div>
+                    <span class="cat-tag">{{ book.category }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('books-comics.index', q=q, category=cat, min_rating=min_rating, sort=sort, price=price_filter, page=page-1) }}">Previous</a>
+            {% else %}
+            <span class="disabled">Previous</span>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <span class="current">{{ p }}</span>
+                {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+                <a href="{{ url_for('books-comics.index', q=q, category=cat, min_rating=min_rating, sort=sort, price=price_filter, page=p) }}">{{ p }}</a>
+                {% elif p == 4 and page > 5 %}
+                <span>...</span>
+                {% elif p == total_pages - 2 and page < total_pages - 4 %}
+                <span>...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('books-comics.index', q=q, category=cat, min_rating=min_rating, sort=sort, price=price_filter, page=page+1) }}">Next</a>
+            {% else %}
+            <span class="disabled">Next</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="no-results">No books match your search criteria.</div>
+        {% endif %}
+
+        {% set ad_format = 'grid' %}
+        {% set ads = product_ads(4, seed='books-comics-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <script>
+    function goToBookId() {
+        const idInput = document.getElementById('goto-book-id');
+        const bookId = parseInt(idInput.value);
+        if (bookId && bookId > 0) {
+            window.location.href = '{{ url_for("books-comics.book_detail", book_id=0) }}'.replace('/0', '/' + bookId);
+        }
+    }
+    document.getElementById('goto-book-id').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); goToBookId(); }
+    });
+
+    function applyFilters() {
+        const params = new URLSearchParams();
+        const q = document.querySelector('input[name="q"]');
+        if (q && q.value) params.set('q', q.value);
+        const cat = document.getElementById('filter-cat').value;
+        if (cat) params.set('category', cat);
+        const rating = document.getElementById('filter-rating').value;
+        if (rating) params.set('min_rating', rating);
+        const sort = document.getElementById('filter-sort').value;
+        if (sort) params.set('sort', sort);
+        const price = document.getElementById('filter-price').value;
+        if (price) params.set('price', price);
+        window.location.href = '{{ url_for("books-comics.index") }}?' + params.toString();
+    }
+    </script>
+</body>
+</html>

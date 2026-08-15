@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AppVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --gp-green: #01875f; --gp-green-light: #e6f4ea;
+            --gp-blue: #1a73e8; --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa; --gp-surface: #fff;
+            --gp-text: #202124; --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0; --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+        .topbar { background: var(--gp-surface); border-bottom: 1px solid var(--gp-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .6rem 1.5rem; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
+        .logo-icon { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
+        .nav-links { display: flex; gap: .25rem; align-items: center; margin-left: auto; }
+        .nav-links a { padding: .45rem .85rem; border-radius: 20px; text-decoration: none; font-size: .85rem; font-weight: 500; color: var(--gp-text-secondary); transition: background .15s; white-space: nowrap; }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+        .nav-links .login-btn { background: var(--gp-blue); color: #fff; }
+        .nav-links .login-btn:hover { background: #1557b0; color: #fff; }
+.login-container { max-width: 400px; margin: 4rem auto; padding: 0 1.5rem; }
+        .login-box { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 2rem; }
+        .login-box h2 { font-size: 1.4rem; margin-bottom: .5rem; text-align: center; }
+        .login-box .subtitle { color: #64748b; font-size: .9rem; text-align: center; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .88rem; font-weight: 600; color: #475569; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1px solid #cbd5e1; border-radius: .4rem; font-size: .95rem; outline: none; }
+        .form-group input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+        .btn { width: 100%; padding: .75rem; background: #2563eb; color: #fff; border: none; border-radius: .5rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn:hover { background: #1d4ed8; }
+        .error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: .75rem; border-radius: .4rem; margin-bottom: 1rem; font-size: .9rem; text-align: center; }
+        .demo-accounts { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+        .demo-accounts h4 { font-size: .88rem; color: #64748b; margin-bottom: .5rem; }
+        .demo-accounts table { width: 100%; font-size: .82rem; border-collapse: collapse; }
+        .demo-accounts td { padding: .3rem .5rem; color: #64748b; }
+        .demo-accounts td:first-child { font-weight: 600; color: #475569; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+            <div class="logo-icon">A</div>
+            AppVault
+        </a>
+        <div class="nav-links">
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+            {% if false %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+                <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+                <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="login-btn">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+</div>
+    <div class="login-container">
+        <div class="login-box">
+            <h2>Sign In</h2>
+            <p class="subtitle">Log in to install apps and write reviews</p>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('software-marketplace.login_submit') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn">Sign In</button>
+            </form>
+
+            <div class="demo-accounts">
+                <h4>Demo Accounts</h4>
+                <table>
+                    <tr><td>alex_dev</td><td>pass123</td></tr>
+                    <tr><td>samantha_k</td><td>pass123</td></tr>
+                    <tr><td>marcus_j</td><td>pass123</td></tr>
+                    <tr><td>priya_s</td><td>pass123</td></tr>
+                    <tr><td>jordan_w</td><td>pass123</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

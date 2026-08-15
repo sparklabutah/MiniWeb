@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lakeport Medical Center - Patient Portal</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'home' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="wrap">
+        <!-- Patient banner -->
+        <table class="patient-banner">
+            <tr>
+                <td class="pb-cell pb-photo"><div class="id-badge">{{ user.first_name[0] }}{{ user.last_name[0] }}</div></td>
+                <td class="pb-cell">
+                    <div class="pb-name">{{ user.full_name }}</div>
+                    <div class="pb-meta">
+                        DOB: <b>{{ user.date_of_birth }}</b> &nbsp;&middot;&nbsp; Sex: <b>{{ user.gender|capitalize }}</b>
+                        {% if user.blood_type %}&nbsp;&middot;&nbsp; Blood Type: <b>{{ user.blood_type }}</b>{% endif %}<br>
+                        {% for c in care_team if c.is_primary %}Primary Care Provider: <b>{{ c.full_name }}</b> &nbsp;&middot;&nbsp; {% endfor %}
+                        Insurance: <b>{{ user.insurance_provider or 'Self-Pay' }}</b>
+                    </div>
+                </td>
+                <td class="pb-cell pb-next">
+                    <div class="h">Next Appointment</div>
+                    {% if upcoming %}
+                    <div class="v">{{ upcoming[0].date }} at {{ upcoming[0].time }}</div>
+                    <div class="s">{{ upcoming[0].category }} &middot; {{ upcoming[0].provider_name }}</div>
+                    {% else %}
+                    <div class="v">None scheduled</div>
+                    <div class="s"><a href="{{ url_for('health-portals.schedule_page') }}">Request an appointment &raquo;</a></div>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Forms awaiting signature (e-signature notifications) -->
+        {% if pending_forms %}
+        <div class="sign-notice">
+            <div class="sign-notice-head">
+                <span class="sign-notice-icon">🖊</span>
+                <span class="sign-notice-title">You have {{ pending_forms|length }} form{{ 's' if pending_forms|length != 1 }} awaiting your signature</span>
+                <span class="sign-notice-badge">{{ pending_forms|length }}</span>
+            </div>
+            <ul class="sign-notice-list">
+                {% for f in pending_forms %}
+                <li>
+                    <span class="sign-notice-doc">{{ f.title }}</span>
+                    <span class="sign-notice-formno">Form {{ f.form_no }}</span>
+                    <a class="sign-notice-btn" href="{{ url_for('health-portals.sign_form_page', form_id=f.id) }}">Review &amp; Sign &raquo;</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Announcements -->
+        <div class="portlet">
+            <div class="portlet-head">Announcements &amp; Health Bulletins</div>
+            <div class="portlet-body">
+                {% for a in announcements %}
+                <div class="ann">
+                    <span class="ann-date">{{ a.date }}</span>
+                    <span class="ann-cat" style="background: {{ a.color }};">{{ a.category }}</span>
+                    <span class="ann-title">{{ a.title }}</span>
+                    <div class="ann-body">{{ a.body }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cols">
+            <!-- ===== Main column ===== -->
+            <div class="col-main">
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>{% if upcoming %}Upcoming Appointments{% else %}Recent Appointments{% endif %}</span>
+                        <a href="{{ url_for('health-portals.appointments_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% set appts = upcoming if upcoming else recent_appts %}
+                        {% if appts %}
+                        <table class="dtable">
+                            <tr><th>Date</th><th>Time</th><th>Type</th><th>Provider</th><th>Status</th></tr>
+                            {% for a in appts %}
+                            <tr>
+                                <td>{{ a.date }}</td><td>{{ a.time }}</td>
+                                <td><a href="{{ url_for('health-portals.appointment_detail', appt_id=a.id) }}">{{ a.category }}</a></td>
+                                <td>{{ a.provider_name }}<br><span class="muted">{{ a.provider_specialty }}</span></td>
+                                <td><span class="lab lab-{{ a.status }}">{{ a.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No appointments on file.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Recent Lab &amp; Test Results</span>
+                        <a href="{{ url_for('health-portals.records_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if labs %}
+                        <table class="dtable">
+                            <tr><th>Test</th><th>Result</th><th>Collected</th></tr>
+                            {% for t in labs.tests %}
+                            <tr>
+                                <td><a href="{{ url_for('health-portals.record_detail', record_id=labs.record_id) }}" title="{{ t.details }}">{{ t.test }}</a></td>
+                                <td><span class="lab {{ 'lab-normal' if t.result|lower == 'normal' else 'lab-abn' }}">{{ t.result }}</span></td>
+                                <td class="muted">{{ labs.date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <div style="padding:4px 8px;font-size:10px;color:#7a8a91;">Ordered by {{ labs.provider }}</div>
+                        {% else %}<div class="empty">No lab results available.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Recent Visits &amp; Documents</span>
+                        <a href="{{ url_for('health-portals.records_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if recent_records %}
+                        <table class="dtable">
+                            <tr><th>Date</th><th>Type</th><th>Provider</th><th>Summary</th></tr>
+                            {% for r in recent_records %}
+                            <tr>
+                                <td>{{ r.date }}</td>
+                                <td><a href="{{ url_for('health-portals.record_detail', record_id=r.id) }}">{{ r.type_label }}</a></td>
+                                <td>{{ r.provider_name }}</td>
+                                <td class="muted">{{ r.summary[:60] if r.summary }}{% if r.summary and r.summary|length > 60 %}…{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No records on file.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head">
+                        <span>Message Center</span>
+                        <a href="{{ url_for('health-portals.messages_page') }}">View All &raquo;</a>
+                    </div>
+                    <div class="portlet-body tight">
+                        {% if recent_msgs %}
+                        <table class="dtable">
+                            <tr><th>Subject</th><th>From</th><th>Date</th></tr>
+                            {% for m in recent_msgs[:4] %}
+                            <tr>
+                                <td><a href="{{ url_for('health-portals.message_detail', msg_id=m.id) }}">{{ m.subject }}</a>
+                                    {% if not m.read and m.recipient_id == user.id %} <span class="lab lab-unread">NEW</span>{% endif %}</td>
+                                <td>{{ m.sender_name }}</td><td class="muted">{{ m.date[:10] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}<div class="empty">No messages.</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== Side column ===== -->
+            <div class="col-side">
+                <div class="portlet">
+                    <div class="portlet-head"><span>Your Care Team</span></div>
+                    <div class="portlet-body">
+                        {% if care_team %}
+                            {% for c in care_team %}
+                            <div class="ct-row">
+                                <div class="ct-badge">{{ c.full_name.split(' ')[-2][0] if c.full_name.split(' ')|length > 1 else c.full_name[0] }}{{ c.full_name.split(' ')[-1][0] }}</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div class="ct-nm">{{ c.full_name }}</div>
+                                    <div class="ct-sp">{{ c.specialty or c.department or 'Provider' }}</div>
+                                </div>
+                                {% if c.is_primary %}<span class="ct-pri">PCP</span>{% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}<div class="empty">No care team on file.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Current Medications</span><a href="{{ url_for('health-portals.prescriptions_page') }}">Manage &raquo;</a></div>
+                    <div class="portlet-body">
+                        {% if meds %}
+                            {% for m in meds %}
+                            <div class="rx">
+                                <div class="rx-nm">{{ m.medication }}</div>
+                                <div class="rx-dt">{{ m.dosage }} &middot; {{ m.frequency }}</div>
+                                <div class="rx-ft"><span>Dr. {{ m.prescriber_name.split(' ')[-1] }}</span><span>{{ m.refills_remaining }} refill{{ 's' if m.refills_remaining != 1 }} left</span></div>
+                            </div>
+                            {% endfor %}
+                        {% else %}<div class="empty">No active medications.</div>{% endif %}
+                    </div>
+                </div>
+
+                {% if latest_vitals %}
+                <div class="portlet">
+                    <div class="portlet-head"><span>Latest Vitals</span></div>
+                    <div class="portlet-body">
+                        <table class="vt">
+                            {% if latest_vitals.blood_pressure_systolic %}<tr><td class="k">Blood Pressure</td><td class="v">{{ latest_vitals.blood_pressure_systolic }}/{{ latest_vitals.blood_pressure_diastolic }} mmHg</td></tr>{% endif %}
+                            {% if latest_vitals.heart_rate_bpm %}<tr><td class="k">Heart Rate</td><td class="v">{{ latest_vitals.heart_rate_bpm }} bpm</td></tr>{% endif %}
+                            {% if latest_vitals.temperature_f %}<tr><td class="k">Temperature</td><td class="v">{{ latest_vitals.temperature_f }} °F</td></tr>{% endif %}
+                            {% if latest_vitals.oxygen_saturation_pct %}<tr><td class="k">O₂ Saturation</td><td class="v">{{ latest_vitals.oxygen_saturation_pct }} %</td></tr>{% endif %}
+                            {% if latest_vitals.respiratory_rate %}<tr><td class="k">Respiratory Rate</td><td class="v">{{ latest_vitals.respiratory_rate }} /min</td></tr>{% endif %}
+                            {% if latest_vitals.bmi %}<tr><td class="k">BMI</td><td class="v">{{ latest_vitals.bmi }}</td></tr>{% endif %}
+                            {% if latest_vitals.weight_lbs %}<tr><td class="k">Weight</td><td class="v">{{ latest_vitals.weight_lbs }} lbs</td></tr>{% endif %}
+                        </table>
+                        {% if vitals_date %}<div style="font-size:10px;color:#8a99a0;margin-top:5px;">Recorded {{ vitals_date }}</div>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Allergies &amp; Alerts</span></div>
+                    <div class="portlet-body">
+                        {% if allergies %}
+                            {% for a in allergies %}<span class="allergy">⚠ {{ a }}</span>{% endfor %}
+                        {% else %}<div style="font-size:11px;color:#55636a;">No known drug allergies.</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Account Balance</span><a href="{{ url_for('health-portals.billing_page') }}">Billing &raquo;</a></div>
+                    <div class="portlet-body">
+                        <div class="bal {{ 'zero' if total_due == 0 }}">${{ "%.2f"|format(total_due) }}</div>
+                        <div style="font-size:11px;color:#55636a;margin-top:2px;">{% if pending_bills %}{{ pending_bills|length }} statement{{ 's' if pending_bills|length != 1 }} due{% else %}Account paid in full.{% endif %}</div>
+                    </div>
+                </div>
+
+                <div class="portlet">
+                    <div class="portlet-head"><span>Quick Links</span></div>
+                    <div class="portlet-body">
+                        <a class="btn primary block" href="{{ url_for('health-portals.schedule_page') }}">Request Appointment</a>
+                        <a class="btn block" href="{{ url_for('health-portals.compose_page') }}">Message Provider</a>
+                        <a class="btn block" href="{{ url_for('health-portals.prescriptions_page') }}">Request Refill</a>
+                        <a class="btn block" href="{{ url_for('health-portals.records_page') }}">View Medical Records</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

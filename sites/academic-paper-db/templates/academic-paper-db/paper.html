@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ paper.title }} — Scholar Search</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #fff; color: #222; }
+        a { color: #1a0dab; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #fff; border-bottom: 1px solid #ebebeb; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 22px; }
+        .logo span.blue { color: #4285f4; }
+        .logo span.red { color: #ea4335; }
+        .logo span.yellow { color: #fbbc04; }
+        .logo span.green { color: #34a853; }
+        .header .spacer { flex: 1; }
+        .header a.nav { color: #222; font-size: 13px; margin-left: 16px; }
+
+        .main { max-width: 780px; padding: 24px 20px 60px; margin-left: 150px; }
+        .back { font-size: 13px; color: #70757a; margin-bottom: 16px; display: inline-block; }
+        .back:hover { color: #1a0dab; }
+
+        .paper-title { font-size: 22px; line-height: 1.3; color: #222; margin-bottom: 8px; }
+        .paper-authors { font-size: 14px; color: #006621; margin-bottom: 6px; }
+        .paper-authors a { color: #006621; }
+        .paper-meta { font-size: 13px; color: #70757a; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .paper-meta .tag { background: #f1f3f4; padding: 2px 8px; border-radius: 3px; font-size: 12px; color: #3c4043; }
+
+        .actions { display: flex; gap: 8px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #ebebeb; }
+        .btn { padding: 6px 16px; border: 1px solid #dadce0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; color: #3c4043; }
+        .btn:hover { background: #f1f3f4; }
+        .btn-blue { background: #4285f4; color: #fff; border-color: #4285f4; }
+        .btn-blue:hover { background: #3367d6; }
+
+        .abstract { margin-bottom: 24px; }
+        .abstract h3 { font-size: 14px; color: #222; margin-bottom: 8px; }
+        .abstract p { font-size: 14px; line-height: 1.7; color: #545454; }
+
+        .info-table { width: 100%; font-size: 13px; margin-bottom: 24px; }
+        .info-table tr { border-bottom: 1px solid #f5f5f5; }
+        .info-table th { text-align: left; color: #70757a; padding: 8px 12px; width: 140px; font-weight: normal; }
+        .info-table td { padding: 8px 12px; color: #222; }
+
+        .related { border-top: 1px solid #ebebeb; padding-top: 16px; }
+        .related h3 { font-size: 14px; color: #222; margin-bottom: 12px; }
+        .related-item { padding: 8px 0; }
+        .related-item .title { font-size: 15px; color: #1a0dab; }
+        .related-item .meta { font-size: 12px; color: #006621; margin-top: 2px; }
+
+        @media (max-width: 768px) {
+            .main { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('academic-paper-db.index') }}" class="logo">
+            <span class="blue">S</span><span class="red">c</span><span class="yellow">h</span><span class="blue">o</span><span class="green">l</span><span class="red">a</span><span class="blue">r</span>
+        </a>
+        <div class="spacer"></div>
+        {% if user %}
+        <a href="{{ url_for('academic-paper-db.author_profile', author_name=user.name) }}" class="nav">My Profile</a>
+        <a href="{{ url_for('academic-paper-db.dashboard') }}" class="nav">My Library</a>
+        <a href="{{ url_for('academic-paper-db.logout') }}" class="nav">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('academic-paper-db.login_page') }}" class="nav">Sign in</a>
+        {% endif %}
+        <a href="/" class="nav">MiniWeb</a>
+    </div>
+
+    <div class="main">
+        <a href="{{ url_for('academic-paper-db.index') }}" class="back">&larr; Back to results</a>
+
+        <h1 class="paper-title">{{ paper.title }}</h1>
+
+        <div class="paper-authors">
+            {% for a in paper.authors %}
+            <a href="{{ url_for('academic-paper-db.author_profile', author_name=a) }}">{{ a }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="paper-meta">
+            <span>{{ paper.year }}</span>
+            {% for c in paper.categories %}
+            <a class="tag" href="{{ url_for('academic-paper-db.category_page', cat_name=c) }}">{{ c }}</a>
+            {% endfor %}
+            <span>arXiv:{{ paper.arxiv_id }}</span>
+            {% if paper.doi %}<span>DOI: {{ paper.doi }}</span>{% endif %}
+        </div>
+
+        <div class="actions">
+            <button type="button" class="btn" data-miniweb-share data-share-title="{{ paper.title }}">Share</button>
+            {% if user %}
+            <form method="post" action="{{ url_for('academic-paper-db.form_save_paper', paper_id=paper.id) }}" style="display:inline">
+                <button type="submit" class="btn btn-blue">
+                    {% if paper.id in user.get('saved_papers', []) %}&#9733; Saved{% else %}&#9734; Save{% endif %}
+                </button>
+            </form>
+            {% if paper.authors %}
+            <form method="post" action="{{ url_for('academic-paper-db.form_follow_author', author_name=paper.authors[0]) }}" style="display:inline">
+                <input type="hidden" name="redirect_to" value="{{ url_for('academic-paper-db.paper_detail', paper_id=paper.id) }}">
+                <button type="submit" class="btn">
+                    {% if paper.authors[0] in user.get('followed_authors', []) %}Unfollow{% else %}Follow{% endif %} {{ paper.authors[0] }}
+                </button>
+            </form>
+            {% endif %}
+            <button type="button" class="btn" onclick="openCite()">Cite</button>
+            {% else %}
+            <a class="btn btn-blue" href="{{ url_for('academic-paper-db.login_page') }}">Sign in to save</a>
+            {% endif %}
+        </div>
+
+        <div class="abstract">
+            <h3>Abstract</h3>
+            <p>{{ paper.abstract }}</p>
+        </div>
+
+        <table class="info-table">
+            <tr><th>arXiv ID</th><td>{{ paper.arxiv_id }}</td></tr>
+            <tr><th>Categories</th><td>{{ paper.categories | join(', ') }}</td></tr>
+            <tr><th>Year</th><td>{{ paper.year }}</td></tr>
+            {% if paper.doi %}<tr><th>DOI</th><td>{{ paper.doi }}</td></tr>{% endif %}
+            {% if paper.journal_ref %}<tr><th>Journal</th><td>{{ paper.journal_ref }}</td></tr>{% endif %}
+            {% if paper.comments %}<tr><th>Comments</th><td>{{ paper.comments }}</td></tr>{% endif %}
+            <tr><th>Last Updated</th><td>{{ paper.update_date }}</td></tr>
+            <tr><th>Authors</th><td>{{ paper.authors | join(', ') }}</td></tr>
+        </table>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related papers in {{ paper.primary_category }}</h3>
+            {% for r in related %}
+            <div class="related-item">
+                <div class="title"><a href="{{ url_for('academic-paper-db.paper_detail', paper_id=r.id) }}">{{ r.title }}</a></div>
+                <div class="meta">{{ r.authors_str }} - {{ r.year }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Cite / BibTeX modal -->
+    <div id="cite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeCite()">
+        <div style="background:#fff;border-radius:8px;width:min(560px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.28);overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #ebebeb;">
+                <span style="font-size:15px;font-weight:600;color:#222;">Cite &mdash; BibTeX</span>
+                <button onclick="closeCite()" aria-label="Close" style="border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#70757a;">&times;</button>
+            </div>
+            <div style="padding:16px 18px;">
+                <pre id="bibtex-text" style="background:#f8f9fa;border:1px solid #ebebeb;border-radius:6px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;color:#202124;white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto;">{{ bibtex }}</pre>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+                    <button id="bibtex-copy" onclick="copyBibtex()" class="btn btn-blue">Copy to clipboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    function openCite() { document.getElementById('cite-modal').style.display = 'flex'; }
+    function closeCite() { document.getElementById('cite-modal').style.display = 'none'; }
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeCite(); });
+    function copyBibtex() {
+        var txt = document.getElementById('bibtex-text').textContent;
+        var btn = document.getElementById('bibtex-copy');
+        navigator.clipboard.writeText(txt).then(function(){
+            btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy to clipboard'; }, 1600);
+        }).catch(function(){
+            // Fallback: select the text so the user can copy manually.
+            var r = document.createRange(); r.selectNodeContents(document.getElementById('bibtex-text'));
+            var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        });
+    }
+    </script>
+</body>
+</html>

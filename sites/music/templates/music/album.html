@@ -1,0 +1,83 @@
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}{{ album.title }} — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<!-- Album header -->
+<div style="display:flex;align-items:flex-end;gap:24px;margin-bottom:26px;flex-wrap:wrap;">
+    <div class="art" style="width:220px;height:220px;margin:0;flex-shrink:0;background: {{ album.cover_color }};">{{ art_note }}</div>
+    <div style="flex:1;min-width:240px;">
+        <div style="font-size:.8rem;color:#ccc;text-transform:uppercase;letter-spacing:1px;">Album</div>
+        <h1 class="page-h" style="margin:6px 0;font-size:2.4rem;">{{ album.title }}</h1>
+        <div style="font-size:.95rem;color:#ccc;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" style="color:#fff;font-weight:600;">{{ album.artist_name }}</a>
+            <span>&middot; {{ album.release_date }}</span>
+            <span>&middot; {{ tracks|length }} songs, {{ total_duration }}</span>
+        </div>
+        <div style="font-size:.85rem;color:#888;margin-top:6px;">{{ album.genre }}</div>
+        <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-green" onclick="MusicPlayer.play('album', {{ album.id }})">&#9654; Play</button>
+            <button class="btn-outline {% if is_liked %}liked{% endif %}" onclick="toggleLikeAlbum({{ album.id }})" id="like-album-btn"{% if is_liked %} style="border-color:#1db954;color:#1db954;"{% endif %}>
+                {% if is_liked %}Saved{% else %}Save to Library{% endif %}
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <ul class="tracks">
+        {% for track in tracks %}
+        <li class="trow">
+            <span class="tnum">{{ track.track_number }}</span>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tplays">{{ track.plays_formatted }}</span>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+            <button class="tplay" style="opacity:1;" onclick="toggleLikeTrack({{ track.id }}, this)" title="Like track">&#9825;</button>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleLikeAlbum(albumId) {
+    fetch("{{ url_for('music.api_like_album') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({album_id: albumId})
+    }).then(r => r.json()).then(data => {
+        const btn = document.getElementById("like-album-btn");
+        if (data.action === "liked") {
+            btn.textContent = "Saved";
+            btn.classList.add("liked");
+            btn.style.borderColor = "#1db954"; btn.style.color = "#1db954";
+        } else {
+            btn.textContent = "Save to Library";
+            btn.classList.remove("liked");
+            btn.style.borderColor = ""; btn.style.color = "";
+        }
+    });
+}
+function toggleLikeTrack(trackId, btn) {
+    fetch("/sites/music/api/tracks/" + trackId + "/like", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"}
+    }).then(r => r.json()).then(data => {
+        if (data.action === "liked") {
+            btn.classList.add("liked");
+            btn.style.color = "#1db954";
+            btn.innerHTML = "&#9829;";
+        } else {
+            btn.classList.remove("liked");
+            btn.style.color = "";
+            btn.innerHTML = "&#9825;";
+        }
+    });
+}
+</script>
+{% endblock %}

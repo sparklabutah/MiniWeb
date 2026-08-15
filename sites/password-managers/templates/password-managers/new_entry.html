@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Entry - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+</head>
+<body>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <h2>Create New Entry</h2>
+                <a class="back-link" href="{{ url_for('password-managers.index') }}">&lsaquo; Back to Vaults</a>
+            </div>
+
+            <form class="card card-pad" method="post" action="{{ url_for('password-managers.new_entry_submit') }}" enctype="multipart/form-data">
+                <div class="card-title">Login Details</div>
+
+                <div class="field">
+                    <label class="form-label" for="vault_id">Vault</label>
+                    <select name="vault_id" id="vault_id">
+                        {% for v in vaults %}
+                        <option value="{{ v.id }}">{{ v.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" name="title" id="title" required placeholder="e.g., Netflix, Gmail...">
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="username">Username / Email</label>
+                        <input type="text" name="username" id="username" placeholder="user@example.com">
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="password">Password</label>
+                        <div style="display:flex; gap:.5rem;">
+                            <input type="text" name="password" id="password" placeholder="Enter password" style="flex:1;">
+                            <button type="button" class="btn btn-outline" id="generate-password-btn">Generate</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="url">Website URL</label>
+                    <input type="text" name="url" id="url" placeholder="https://example.com">
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="category">Category</label>
+                        <select name="category" id="category">
+                            <option value="login">Login</option>
+                            <option value="secure_note">Secure Note</option>
+                            <option value="credit_card">Credit Card</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="strength">Strength</label>
+                        <select name="strength" id="strength">
+                            <option value="excellent">Excellent</option>
+                            <option value="strong" selected>Strong</option>
+                            <option value="fair">Fair</option>
+                            <option value="weak">Weak</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="tags">Tags (comma-separated)</label>
+                    <input type="text" name="tags" id="tags" placeholder="social, personal, work">
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="notes">Notes</label>
+                    <textarea name="notes" id="notes" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="icon">Icon Image (optional)</label>
+                    <input type="file" name="icon" id="icon" accept="image/*">
+                </div>
+
+                <div class="checkline">
+                    <input type="checkbox" name="favorite" id="favorite">
+                    <label for="favorite">Mark as favorite</label>
+                </div>
+
+                <div style="margin-top:1.2rem; display:flex; gap:.6rem;">
+                    <button type="submit" class="btn btn-primary">Create Entry</button>
+                    <a class="btn btn-outline" href="{{ url_for('password-managers.index') }}">Cancel</a>
+                </div>
+            </form>
+
+            <script>
+            document.getElementById('generate-password-btn').addEventListener('click', function () {
+                var btn = this;
+                btn.disabled = true;
+                var prev = btn.textContent;
+                btn.textContent = 'Generating…';
+                fetch('{{ url_for("password-managers.api_generate_password") }}?length=20')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        document.getElementById('password').value = data.password;
+                    })
+                    .catch(function () {})
+                    .then(function () { btn.disabled = false; btn.textContent = prev; });
+            });
+            </script>
+        </main>
+    </div>
+</body>
+</html>

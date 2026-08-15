@@ -1,0 +1,86 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>AI Chatbots Hub</h1>
+    <div>
+        {% if user %}
+        <span style="font-size:13px;color:#8e8ea0;">Welcome, {{ user.display_name }}</span>
+        {% else %}
+        <a href="{{ url_for('ai-chatbots.login_page') }}" class="btn-small btn-primary">Login</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="text-align:center; margin-top:40px;">
+    <h1>Welcome to AI Chatbots Hub</h1>
+    <p>Chat with AI assistants powered by advanced language models</p>
+</div>
+
+{% set ad_format = 'banner' %}
+{% set ads = product_ads(4, seed='ai-chatbots-ad2') %}
+{% include "ads/_product_ads.html" %}
+
+<div class="card-grid" style="max-width:800px; margin-top:32px;">
+    {% for bot_name in bots %}
+    <div class="card" style="text-align:center; cursor:pointer;" onclick="window.location='{{ url_for('ai-chatbots.chat_page') }}?bot={{ bot_name }}'">
+        <h3>{{ bot_name }}</h3>
+        <p style="margin-top:8px;">Start a conversation with {{ bot_name }}</p>
+        <button class="btn-small btn-primary" style="margin-top:12px;" onclick="event.stopPropagation();this.textContent='Loading...';this.disabled=true;.finally(()=>{window.location='{{ url_for('ai-chatbots.chat_page') }}?bot={{ bot_name }}'})">Chat Now</button>
+    </div>
+    {% endfor %}
+</div>
+
+<div style="max-width:800px; margin:40px auto 0;">
+    <h2 style="font-size:18px; margin-bottom:16px;">Recent Conversations</h2>
+    {% if conversations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Bot</th>
+                <th>Messages</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conv in conversations %}
+            <tr>
+                <td><a href="{{ url_for('ai-chatbots.chat_page', conv_id=conv.id) }}" style="color:#19c37d;text-decoration:none;">{{ conv.title }}</a></td>
+                <td>{{ conv.bot }}</td>
+                <td>{{ conv.messages|length }}</td>
+                <td>{{ conv.updated_at[:10] }}</td>
+                <td>
+                    <button class="btn-small aichat-delete-btn" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=conv.id) }}">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#8e8ea0;">No conversations yet. Start chatting!</p>
+    {% endif %}
+</div>
+
+{% set ad_format = 'native' %}
+{% set ads = product_ads(4, seed='ai-chatbots-index') %}
+{% include "ads/_product_ads.html" %}
+
+<script>
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.aichat-delete-btn');
+    if (!btn) return;
+    btn.textContent = 'Deleting...';
+    btn.disabled = true;
+    fetch(btn.getAttribute('data-url'), {method: 'POST'})
+        .then(function(r) { return r.ok ? r : Promise.reject(); })
+        .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+        .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+});
+</script>
+
+{% endblock %}

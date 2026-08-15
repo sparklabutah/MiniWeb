@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Meridian Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; flex-direction: column; }
+        a { color: #1d9bd1; text-decoration: none; } a:hover { text-decoration: underline; }
+        .topbar { background: #19171d; height: 38px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #383838; }
+        .topbar .workspace-name { color: #fff; font-weight: 700; font-size: 15px; }
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 260px; background: #19171d; border-right: 1px solid #383838; overflow-y: auto; flex-shrink: 0; }
+        .sidebar-section { padding: 12px 16px 4px; }
+        .sidebar-section-title { font-size: 13px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .sidebar-nav { list-style: none; } .sidebar-nav li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .sidebar-nav li a:hover { background: #27242c; text-decoration: none; color: #fff; } .sidebar-nav li a.active { background: #1264a3; color: #fff; }
+        .channel-list { list-style: none; } .channel-list li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .channel-list li a:hover { background: #27242c; text-decoration: none; color: #fff; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; }
+        .search-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .search-bar input { flex: 1; background: #222529; border: 1px solid #3f3f42; color: #d1d2d3; padding: 10px 14px; border-radius: 6px; font-size: 14px; min-width: 200px; }
+        .search-bar select { background: #222529; border: 1px solid #3f3f42; color: #d1d2d3; padding: 10px 12px; border-radius: 6px; font-size: 13px; }
+        .search-bar button { background: #1264a3; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .result-count { color: #ababad; font-size: 13px; margin-bottom: 16px; }
+        .result-item { background: #222529; padding: 12px 16px; border-radius: 6px; margin-bottom: 8px; }
+        .result-item .author { color: #fff; font-weight: 700; font-size: 14px; }
+        .result-item .meta { color: #8b8b8d; font-size: 12px; margin-left: 8px; }
+        .result-item .text { margin-top: 4px; font-size: 14px; }
+        a.result-link { display: block; text-decoration: none; color: inherit; position: relative; transition: background .12s; }
+        a.result-link:hover { background: #2b2f36; }
+        a.result-link .text { color: #d1d2d3; }
+        a.result-link .jump-hint { display: block; margin-top: 6px; font-size: 12px; color: #4fa3f7; opacity: 0; transition: opacity .12s; }
+        a.result-link:hover .jump-hint { opacity: 1; }
+        .result-section { margin-bottom: 24px; }
+        .result-section h3 { color: #fff; font-size: 15px; margin-bottom: 8px; border-bottom: 1px solid #383838; padding-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <div class="topbar"><span class="workspace-name">Meridian Systems</span></div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <ul class="sidebar-nav">
+                    <li><a href="{{ url_for('team-chat-workspace.index') }}">All Channels</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.threads_view') }}">Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.members_view') }}">Members</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.search_view') }}" class="active">Search</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Channels</div>
+                <ul class="channel-list">
+                    {% for ch in channels %}
+                    <li><a href="{{ url_for('team-chat-workspace.channel_view', channel_id=ch.id) }}">#{{ ch.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="content">
+            <h2 style="color:#fff;margin-bottom:16px;">Search Messages</h2>
+            <form class="search-bar" method="get">
+                <input type="text" name="q" value="{{ query }}" placeholder="Search messages, threads, and members...">
+                <select name="channel">
+                    <option value="">All Channels</option>
+                    {% for ch in channels %}
+                    <option value="{{ ch.id }}" {% if channel_filter == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="user">
+                    <option value="">All Users</option>
+                    {% for u in all_users %}
+                    <option value="{{ u.id }}" {% if user_filter == u.id %}selected{% endif %}>{{ u.display_name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="date" value="{{ date_filter or '' }}" style="background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:10px;border-radius:6px;">
+                <button type="submit">Search</button>
+            </form>
+            {% if query %}
+            <div class="result-count">{{ results|length + thread_results|length }} result(s) for "{{ query }}"</div>
+            {% if results %}
+            <div class="result-section">
+                <h3>Messages ({{ results|length }})</h3>
+                {% for r in results %}
+                <a class="result-item result-link" href="{{ url_for('team-chat-workspace.channel_view', channel_id=r.channel_id) }}?jump={{ r.id }}">
+                    <span class="author">{{ r.user.display_name if r.user else 'Unknown' }}</span>
+                    <span class="meta">in #{{ r.channel.name if r.channel else 'unknown' }} - {{ r.timestamp[:16].replace('T', ' ') }}</span>
+                    <div class="text">{{ r.text }}</div>
+                    <span class="jump-hint">Jump to message →</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if thread_results %}
+            <div class="result-section">
+                <h3>Thread Replies ({{ thread_results|length }})</h3>
+                {% for r in thread_results %}
+                <div class="result-item">
+                    <span class="author">{{ r.user.display_name if r.user else 'Unknown' }}</span>
+                    <span class="meta">in thread "{{ r.thread_topic }}" - {{ r.timestamp[:16].replace('T', ' ') }}</span>
+                    <div class="text">{{ r.text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

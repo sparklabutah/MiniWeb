@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make a Payment - Cascadia Insurance &amp; Lending</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #1a3c5e, #2b5f8a); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8fe; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a3c5e; text-decoration: none; font-size: .88rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef4fb; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        nav .btn-login { background: #1a3c5e; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        .container { max-width: 680px; margin: 1.5rem auto; padding: 0 1.5rem 2.5rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #2563eb; text-decoration: none; }
+        .card { background: #fff; border-radius: .5rem; padding: 1.8rem 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .card h2 { color: #1a3c5e; font-size: 1.25rem; margin-bottom: .3rem; }
+        .card .sub { font-size: .88rem; color: #64748b; margin-bottom: 1.4rem; }
+        .field { margin-bottom: 1rem; }
+        .field label { display: block; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #475569; margin-bottom: .3rem; }
+        .field input, .field select { width: 100%; padding: .55rem .7rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .95rem; font-family: inherit; background: #fff; }
+        .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+        .error-box { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; border-radius: .4rem; padding: .7rem .9rem; font-size: .86rem; margin-bottom: 1.2rem; }
+        .note { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: .4rem; padding: .7rem .9rem; font-size: .82rem; margin: 1rem 0 1.2rem; }
+        .submit-btn { background: #2d6a4f; color: #fff; border: none; padding: .65rem 1.5rem; border-radius: .35rem; font-size: .95rem; font-weight: 700; cursor: pointer; }
+        .submit-btn:hover { background: #245c43; }
+        .empty { background: #fff; border-radius: .5rem; padding: 2rem; text-align: center; color: #64748b; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('insurance-loans.index') }}">Cascadia <span>Insurance &amp; Lending</span></a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('insurance-loans.index') }}">Dashboard</a>
+        <a href="{{ url_for('insurance-loans.policies_page') }}">Policies</a>
+        <a href="{{ url_for('insurance-loans.claims_page') }}">Claims</a>
+        <a href="{{ url_for('insurance-loans.loans_page') }}">Loans</a>
+        <a href="{{ url_for('insurance-loans.payments_page') }}" class="active">Payments</a>
+        {% if logged_in %}
+        <a href="{{ url_for('insurance-loans.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('insurance-loans.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('insurance-loans.payments_page') }}">Payments</a> / Make a Payment
+        </div>
+
+        {% if error %}
+        <div class="error-box">{{ error }}</div>
+        {% endif %}
+
+        {% if targets %}
+        <div class="card">
+            <h2>Make a Payment</h2>
+            <div class="sub">Pay toward one of your loans or insurance policies.</div>
+
+            <form method="post" action="{{ url_for('insurance-loans.make_payment_submit') }}">
+                <div class="field">
+                    <label for="target">Pay Toward</label>
+                    <select id="target" name="target" required onchange="prefillAmount()">
+                        <option value="" disabled {% if not preselect %}selected{% endif %}>Choose a loan or policy…</option>
+                        {% for t in targets %}
+                        <option value="{{ t.key }}" data-amount="{{ t.default_amount }}" {% if preselect == t.key %}selected{% endif %}>{{ t.label }} ({{ t.sub }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row2">
+                    <div class="field">
+                        <label for="amount">Amount ($)</label>
+                        <input type="number" id="amount" name="amount" step="0.01" min="0.01" placeholder="0.00">
+                    </div>
+                    <div class="field">
+                        <label for="method">Payment Method</label>
+                        <select id="method" name="method">
+                            {% for m in methods %}
+                            <option value="{{ m }}">{{ m|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row2">
+                    <div class="field">
+                        <label for="account_type">Pay From Account</label>
+                        <select id="account_type" name="account_type">
+                            <option value="checking">Checking</option>
+                            <option value="savings">Savings</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="account_last_four">Account (last 4, optional)</label>
+                        <input type="text" id="account_last_four" name="account_last_four" maxlength="4" placeholder="1234">
+                    </div>
+                </div>
+
+                <div class="note">&#128274; For your security, payments are confirmed with a one-time verification code sent to your email.</div>
+
+                <button type="submit" class="submit-btn">Submit Payment</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="empty">You have no loans or active policies to pay toward right now.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">Cascadia Insurance &amp; Lending</div>
+
+    <script>
+    // Prefill the amount with the selected item's default (monthly payment / premium)
+    // when the user hasn't typed one, so a one-click monthly payment is easy.
+    function prefillAmount() {
+        var sel = document.getElementById('target');
+        var amt = document.getElementById('amount');
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt) return;
+        var def = opt.getAttribute('data-amount');
+        if (def && (!amt.value || amt.dataset.autofilled === '1')) {
+            amt.value = def;
+            amt.dataset.autofilled = '1';
+        }
+    }
+    document.getElementById('amount').addEventListener('input', function() {
+        this.dataset.autofilled = '';
+    });
+    // Prefill on initial load if an item is preselected.
+    prefillAmount();
+    </script>
+</body>
+</html>

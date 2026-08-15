@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = '' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <h2>Search Government Records</h2>
+        <form class="search-form" method="get">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search filings, vehicles, permits, payments...">
+            <select name="category">
+                <option value="all" {% if category == 'all' %}selected{% endif %}>All Categories</option>
+                <option value="filings" {% if category == 'filings' %}selected{% endif %}>Tax Filings</option>
+                <option value="vehicles" {% if category == 'vehicles' %}selected{% endif %}>Vehicles</option>
+                <option value="permits" {% if category == 'permits' %}selected{% endif %}>Permits</option>
+                <option value="payments" {% if category == 'payments' %}selected{% endif %}>Payments</option>
+            </select>
+            <button type="submit">Search</button>
+        </form>
+        {% if query %}
+        <p style="margin-bottom:1rem;color:#64748b;">{{ total }} result(s) for "{{ query }}"</p>
+        {% if results.filings %}
+        <div class="result-section"><h3>Tax Filings ({{ results.filings|length }})</h3>
+            {% for f in results.filings %}
+            <div class="result-item"><a href="{{ url_for('tax-filing-dmv-permits.tax_filing_detail', filing_id=f.id) }}">{{ f.filing_id }}</a>
+                <div class="result-meta">{{ f.type|replace("_"," ")|title }} &mdash; {{ f.tax_year }} &mdash; ${{ "%.2f"|format(f.tax_owed) }} &mdash; {{ f.status|title }}</div>
+            </div>{% endfor %}
+        </div>{% endif %}
+        {% if results.vehicles %}
+        <div class="result-section"><h3>Vehicles ({{ results.vehicles|length }})</h3>
+            {% for v in results.vehicles %}
+            <div class="result-item"><a href="{{ url_for('tax-filing-dmv-permits.vehicle_detail', vehicle_id=v.id) }}">{{ v.vehicle.year }} {{ v.vehicle.make }} {{ v.vehicle.model }}</a>
+                <div class="result-meta">{{ v.plate_number }} &mdash; {{ v.registration_id }} &mdash; {{ v.renewal_status|title }}</div>
+            </div>{% endfor %}
+        </div>{% endif %}
+        {% if results.permits %}
+        <div class="result-section"><h3>Permits ({{ results.permits|length }})</h3>
+            {% for p in results.permits %}
+            <div class="result-item"><a href="{{ url_for('tax-filing-dmv-permits.permit_detail', permit_id=p.id) }}">{{ p.permit_id }}</a>
+                <div class="result-meta">{{ p.type }} &mdash; {{ p.address }} &mdash; {{ p.status|title }}</div>
+            </div>{% endfor %}
+        </div>{% endif %}
+        {% if results.payments %}
+        <div class="result-section"><h3>Payments ({{ results.payments|length }})</h3>
+            {% for p in results.payments %}
+            <div class="result-item">{{ p.payment_id }}
+                <div class="result-meta">{{ p.type|replace("_"," ")|title }} &mdash; ${{ "%.2f"|format(p.amount) }} &mdash; {{ p.payment_date }}</div>
+            </div>{% endfor %}
+        </div>{% endif %}
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

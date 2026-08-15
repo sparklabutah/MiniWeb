@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheetDeck - Files</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #0f9d58; text-decoration: none; display: flex; align-items: center; gap: 0.4rem; }
+        .logo svg { width: 28px; height: 28px; }
+        .search-bar { display: flex; align-items: center; background: #f1f3f4; border-radius: 8px; padding: 0.4rem 0.8rem; flex: 1; max-width: 500px; margin: 0 1rem; }
+        .search-bar input { border: none; background: none; outline: none; font-size: 0.95rem; width: 100%; padding: 0.3rem; color: #202124; }
+        .header-nav { display: flex; align-items: center; gap: 0.8rem; }
+        .header-nav a { font-size: 0.85rem; color: #5f6368; text-decoration: none; padding: 0.4rem 0.7rem; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; color: #202124; }
+        .btn { padding: 0.4rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .btn-primary { background: #0f9d58; color: #fff; }
+        .btn-primary:hover { background: #0b8043; }
+
+        .sidebar { position: fixed; left: 0; top: 52px; bottom: 0; width: 220px; background: #fff; border-right: 1px solid #dadce0; padding: 1rem 0; overflow-y: auto; }
+        .sidebar a { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 1.2rem; color: #5f6368; text-decoration: none; font-size: 0.9rem; border-radius: 0 25px 25px 0; margin-right: 0.5rem; }
+        .sidebar a:hover { background: #f1f3f4; }
+        .sidebar a.active { background: #e6f4ea; color: #0f9d58; font-weight: 500; }
+        .sidebar .section-title { font-size: 0.75rem; color: #80868b; text-transform: uppercase; letter-spacing: 0.5px; padding: 1rem 1.2rem 0.4rem; }
+
+        .main { margin-left: 220px; padding: 1.5rem 2rem; }
+        .sort-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+        .sort-bar .title { font-size: 0.9rem; color: #5f6368; }
+        .sort-bar select { border: 1px solid #dadce0; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; background: #fff; color: #5f6368; }
+        .filters { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+        .file-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s; text-decoration: none; color: inherit; }
+        .file-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08); }
+        .file-preview { height: 120px; padding: 0.8rem; border-bottom: 1px solid #e8eaed; display: flex; align-items: center; justify-content: center; }
+        .file-preview.spreadsheet { background: #e6f4ea; }
+        .file-preview.presentation { background: #fef7e0; }
+        .file-preview svg { opacity: 0.4; }
+        .file-info { padding: 0.7rem 0.8rem; }
+        .file-title { font-size: 0.85rem; font-weight: 500; color: #202124; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
+        .file-meta { font-size: 0.75rem; color: #80868b; display: flex; align-items: center; justify-content: space-between; }
+        .file-type-badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 500; }
+        .file-type-badge.spreadsheet { background: #e6f4ea; color: #0f9d58; }
+        .file-type-badge.presentation { background: #fef7e0; color: #f9ab00; }
+        .avatar-sm { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.6rem; font-weight: 600; }
+
+        .empty-state { text-align: center; padding: 4rem 1rem; color: #80868b; }
+        .empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #5f6368; }
+
+        .api-info { margin-top: 2rem; padding: 1rem; background: #fff; border: 1px solid #dadce0; border-radius: 8px; font-size: 0.82rem; color: #5f6368; }
+        .api-info summary { cursor: pointer; font-weight: 500; color: #0f9d58; }
+        .api-info code { background: #f1f3f4; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.8rem; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .search-bar { max-width: 250px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="{{ url_for('spreadsheets-slides.index') }}" class="logo">
+                <svg viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path d="M7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/></svg>
+                SheetDeck
+            </a>
+            <form class="search-bar" method="get" action="{{ url_for('spreadsheets-slides.index') }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#80868b"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <input type="text" name="q" placeholder="Search files..." value="{{ q }}" autocomplete="off">
+                {% if sort != 'updated' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+                {% if file_type %}<input type="hidden" name="type" value="{{ file_type }}">{% endif %}
+            </form>
+        </div>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:0.85rem;color:#5f6368;">{{ user.name }}</span>
+            <a href="{{ url_for('spreadsheets-slides.logout') }}">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('spreadsheets-slides.login_page') }}" class="btn btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <a href="{{ url_for('spreadsheets-slides.create_page') }}" style="background:#0f9d58;color:#fff;margin:0 0.8rem 0.8rem;border-radius:25px;justify-content:center;font-weight:500;">
+            + New
+        </a>
+        <a href="{{ url_for('spreadsheets-slides.index') }}" class="{{ 'active' if not file_type and not owner_filter }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            All Files
+        </a>
+        <a href="{{ url_for('spreadsheets-slides.index', type='spreadsheet') }}" class="{{ 'active' if file_type == 'spreadsheet' }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm4-4h6v2h-6zm0 4h6v2h-6z"/></svg>
+            Spreadsheets
+        </a>
+        <a href="{{ url_for('spreadsheets-slides.index', type='presentation') }}" class="{{ 'active' if file_type == 'presentation' }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM6 6h12v2H6z"/></svg>
+            Presentations
+        </a>
+        <a href="{{ url_for('spreadsheets-slides.shared_page') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            Shared with Me
+        </a>
+        <a href="{{ url_for('spreadsheets-slides.templates_page') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+            Templates
+        </a>
+
+        <div class="section-title">Filter by Owner</div>
+        {% for u in users %}
+        <a href="{{ url_for('spreadsheets-slides.index', owner_id=u.id) }}" class="{{ 'active' if owner_filter == u.id|string }}">
+            <span class="avatar-sm" style="background:{{ u.avatar_color }}">{{ u.name[0] }}</span>
+            {{ u.name }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="main">
+        <div class="sort-bar">
+            <span class="title">{{ files|length }} file{{ 's' if files|length != 1 else '' }}{% if q %} matching "{{ q }}"{% endif %}{% if file_type %} ({{ file_type }}s){% endif %}{% if owner_filter %} by owner {{ owner_filter }}{% endif %}</span>
+            <div class="filters">
+                <label style="font-size:0.85rem;color:#5f6368;">Sort: </label>
+                <select onchange="applySort(this.value)">
+                    <option value="updated" {{ 'selected' if sort == 'updated' }}>Last modified</option>
+                    <option value="created" {{ 'selected' if sort == 'created' }}>Date created</option>
+                    <option value="title" {{ 'selected' if sort == 'title' }}>Title A-Z</option>
+                </select>
+            </div>
+        </div>
+
+        {% if files %}
+        <div class="file-grid">
+            {% for f in files %}
+            {% if f.file_type == 'spreadsheet' %}
+            <a href="{{ url_for('spreadsheets-slides.spreadsheet_view', sid=f.id) }}" class="file-card">
+            {% else %}
+            <a href="{{ url_for('spreadsheets-slides.presentation_view', pid=f.id) }}" class="file-card">
+            {% endif %}
+                <div class="file-preview {{ f.file_type }}">
+                    {% if f.file_type == 'spreadsheet' %}
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/></svg>
+                    {% else %}
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="#f9ab00"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM6 6h12v2H6zm0 4h12v6H6z"/></svg>
+                    {% endif %}
+                </div>
+                <div class="file-info">
+                    <div class="file-title">{{ f.title }}</div>
+                    <div class="file-meta">
+                        <div>
+                            <span class="file-type-badge {{ f.file_type }}">{{ f.file_type|capitalize }}</span>
+                            {% if user_map.get(f.owner_id) %}
+                            <span class="avatar-sm" style="background:{{ user_map[f.owner_id].avatar_color }};margin-left:4px;">{{ user_map[f.owner_id].name[0] }}</span>
+                            {% endif %}
+                        </div>
+                        <span>{{ f.updated_at[:10] if f.updated_at else '' }}</span>
+                    </div>
+                    <div style="margin-top:0.5rem;text-align:right;">
+                        <button type="button" class="btn file-delete-btn"
+                                data-file-type="{{ f.file_type }}" data-file-id="{{ f.id }}" data-file-title="{{ f.title }}"
+                                style="background:#fce8e6;color:#c5221f;font-size:0.75rem;padding:0.25rem 0.7rem;"
+                                onclick="deleteFile(event, this)">Delete</button>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>No files found</h3>
+            <p>{% if q %}Try a different search term.{% else %}Create a new spreadsheet or presentation to get started.{% endif %}</p>
+        </div>
+        {% endif %}
+
+        <div class="api-info">
+            <details>
+                <summary>API Endpoints</summary>
+                <ul style="margin-top:0.5rem;padding-left:1.2rem;line-height:2;">
+                    <li><code>GET /sites/spreadsheets-slides/api/files</code> - List all files (?q=, &type=, &owner_id=, &sort=)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/spreadsheets</code> - List spreadsheets</li>
+                    <li><code>POST /sites/spreadsheets-slides/api/spreadsheets</code> - Create spreadsheet (JSON: title, owner_id)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/&lt;id&gt;</code> - Get spreadsheet with data</li>
+                    <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/&lt;id&gt;</code> - Update spreadsheet</li>
+                    <li><code>DELETE /sites/spreadsheets-slides/api/spreadsheets/&lt;id&gt;</code> - Delete spreadsheet</li>
+                    <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/&lt;id&gt;/cell</code> - Update cell (JSON: sheet, row, col, value)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/presentations</code> - List presentations</li>
+                    <li><code>POST /sites/spreadsheets-slides/api/presentations</code> - Create presentation (JSON: title, owner_id)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/presentations/&lt;id&gt;</code> - Get presentation with slides</li>
+                    <li><code>PUT /sites/spreadsheets-slides/api/presentations/&lt;id&gt;</code> - Update presentation</li>
+                    <li><code>DELETE /sites/spreadsheets-slides/api/presentations/&lt;id&gt;</code> - Delete presentation</li>
+                    <li><code>POST /sites/spreadsheets-slides/api/presentations/&lt;id&gt;/slides</code> - Add slide (JSON: title, content, notes, position)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/templates</code> - List templates (?type=, &category=)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/stats</code> - File statistics</li>
+                    <li><code>POST /sites/spreadsheets-slides/api/login</code> - Login (JSON: username, password)</li>
+                    <li><code>GET /sites/spreadsheets-slides/api/users</code> - List users</li>
+                </ul>
+            </details>
+        </div>
+    </div>
+
+    <script>
+    function applySort(val) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('sort', val);
+        window.location.href = '{{ url_for("spreadsheets-slides.index") }}?' + params.toString();
+    }
+
+    function deleteFile(event, btn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const type = btn.dataset.fileType;
+        const id = btn.dataset.fileId;
+        const title = btn.dataset.fileTitle;
+        if (!confirm('Delete "' + title + '"? This cannot be undone.')) return;
+        const base = type === 'spreadsheet'
+            ? '{{ url_for("spreadsheets-slides.api_spreadsheets_list") }}'
+            : '{{ url_for("spreadsheets-slides.api_presentations_list") }}';
+        fetch(base + '/' + id, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(() => window.location.reload())
+            .catch(() => alert('Failed to delete file.'));
+    }
+    </script>
+</body>
+</html>

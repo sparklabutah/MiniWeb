@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SoundWave{% endblock %}</title>
+    <link rel="stylesheet" href="/static/musichub.css">
+</head>
+<body>
+{% set note_svg %}<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+<div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <a href="{{ url_for('music.index') }}" class="sb-logo">SoundWave</a>
+        <nav class="sb-nav">
+            <a href="{{ url_for('music.index') }}" class="{{ 'active' if active == 'home' }}"><span class="ic">&#8962;</span> Home</a>
+            <a href="{{ url_for('music.browse') }}" class="{{ 'active' if active == 'browse' }}"><span class="ic">&#9635;</span> Browse</a>
+            <a href="{{ url_for('music.search_page') }}" class="{{ 'active' if active == 'search' }}"><span class="ic">&#128269;</span> Search</a>
+            <a href="{{ url_for('music.library_page') }}" class="{{ 'active' if active == 'library' }}"><span class="ic">&#9834;</span> Your Library</a>
+        </nav>
+        <div class="sb-sep"></div>
+        <button class="sb-create" onclick="toggleNewPlaylist()"><span class="plus">+</span> Create Playlist</button>
+        <div class="sb-newform" id="sb-newform">
+            <input type="text" id="new-pl-name" placeholder="Playlist name" autocomplete="off">
+            <div class="row">
+                <button class="save" onclick="createPlaylist()">Create</button>
+                <button class="cancel" onclick="toggleNewPlaylist()">Cancel</button>
+            </div>
+        </div>
+        <div class="sb-plist">
+            {% for pl in sidebar_playlists %}
+            <a href="{{ url_for('music.playlist_detail', playlist_id=pl.id) }}">{{ pl.name }}</a>
+            {% else %}
+            <div class="empty">No playlists yet. Create one above.</div>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="topbar">
+            <form class="search" action="{{ url_for('music.search_page') }}" method="get">
+                <span class="mag">&#128269;</span>
+                <input type="text" name="q" placeholder="Search artists, albums, tracks..." value="{{ request.args.get('q','') }}" autocomplete="off">
+            </form>
+            <div class="spacer"></div>
+            {% if music_user %}
+            <span class="tb-user">{{ music_user.display_name }}</span>
+            <a href="{{ url_for('music.logout') }}" class="tb-user">Logout</a>
+            {% else %}
+            <a href="{{ url_for('music.login_page') }}" class="btn-login">Log in</a>
+            {% endif %}
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Bottom playbar -->
+    <div class="playbar" id="playbar">
+        <div class="pb-now">
+            <div class="pb-art" id="pb-art">{{ note_svg }}</div>
+            <div class="pb-meta">
+                <div class="pb-title" id="pb-title"><span class="pb-empty">Nothing playing</span></div>
+                <div class="pb-artist" id="pb-artist"></div>
+            </div>
+        </div>
+        <div class="pb-center">
+            <div class="pb-ctrls">
+                <button title="Previous">&#9198;</button>
+                <button class="pb-play" id="pb-play" onclick="MusicPlayer.toggle()">&#9654;</button>
+                <button title="Next">&#9197;</button>
+            </div>
+            <div class="pb-seek">
+                <span id="pb-cur">0:00</span>
+                <div class="pb-bar" id="pb-bar"><div class="pb-fill" id="pb-fill"></div></div>
+                <span id="pb-dur">0:00</span>
+            </div>
+        </div>
+        <div class="pb-right">
+            <button class="pb-mute" id="pb-mute" title="Mute" onclick="MusicPlayer.toggleMute()"
+                    style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;padding:0;line-height:1;">{{ ('&#128263;' if player_muted|default(false) else '&#128266;') | safe }}</button>
+            <div class="pb-vol" id="pb-vol" title="Volume"
+                 data-volume="{{ player_volume|default(70) }}" data-muted="{{ 'true' if player_muted|default(false) else 'false' }}">
+                <div class="pb-fill" id="pb-vol-fill" style="width: {{ 0 if player_muted|default(false) else player_volume|default(70) }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sidebar create-playlist
+function toggleNewPlaylist() {
+    var f = document.getElementById('sb-newform');
+    f.classList.toggle('open');
+    if (f.classList.contains('open')) document.getElementById('new-pl-name').focus();
+}
+function createPlaylist() {
+    var name = document.getElementById('new-pl-name').value.trim();
+    if (!name) return;
+    fetch('{{ url_for("music.index") }}api/playlists', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, is_public: true})
+    }).then(function(r){ if(!r.ok) throw new Error(); return r.json(); })
+      .then(function(pl){ window.location = '/sites/music/playlist/' + pl.id; })
+      .catch(function(){ alert('Please sign in to create a playlist.'); });
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Enter' && document.activeElement.id==='new-pl-name'){ e.preventDefault(); createPlaylist(); }});
+
+// Bottom playbar
+var MusicPlayer = (function () {
+    var NOTE = '{{ note_svg | replace("\n","") }}';
+    var playing = false, timer = null, pos = 0, dur = 210;
+    var volume = 70, muted = false;
+    var volEl = null, volFillEl = null, muteEl = null;
+    function mmss(s){ s=Math.max(0,Math.floor(s)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+    function renderVolume(){
+        if(volFillEl) volFillEl.style.width = (muted ? 0 : volume) + '%';
+        if(muteEl) muteEl.innerHTML = (muted || volume === 0) ? '&#128263;' : '&#128266;';
+        var audio = document.getElementById('pb-audio');
+        if(audio) audio.volume = muted ? 0 : volume/100;
+    }
+    function persistVolume(){
+        fetch('{{ url_for("music.index") }}api/playback/volume', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({volume: volume, muted: muted})
+        }).catch(function(){});
+    }
+    function setVolume(pct, persist){
+        volume = Math.max(0, Math.min(100, Math.round(pct)));
+        if(volume > 0) muted = false;
+        renderVolume();
+        if(persist !== false) persistVolume();
+    }
+    function toggleMute(){ muted = !muted; renderVolume(); persistVolume(); }
+    function tick(){ pos += 1; if(pos>dur){ pos=dur; stop(); } render(); }
+    function render(){
+        document.getElementById('pb-fill').style.width = (dur? (pos/dur*100):0)+'%';
+        document.getElementById('pb-cur').textContent = mmss(pos);
+        document.getElementById('pb-play').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+    }
+    function start(){ playing=true; if(timer) clearInterval(timer); timer=setInterval(tick,1000); render(); }
+    function stop(){ playing=false; if(timer) clearInterval(timer); timer=null; render(); }
+    function play(type, id) {
+        fetch('{{ url_for("music.index") }}api/play', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({type: type, id: id})
+        }).then(function(r){ return r.json(); }).then(function(d){
+            var t = d.track || {};
+            document.getElementById('pb-title').textContent = t.title || d.now_playing || 'Unknown';
+            document.getElementById('pb-artist').textContent = t.artist || '';
+            var art = document.getElementById('pb-art');
+            art.style.background = t.cover || '#333'; art.innerHTML = NOTE;
+            pos = 0;
+            var parts = (t.duration||'').split(':'); dur = parts.length===2 ? (+parts[0]*60 + +parts[1]) : 210;
+            document.getElementById('pb-dur').textContent = t.duration || mmss(dur);
+            start();
+        }).catch(function(){});
+    }
+    function toggle(){ if(!timer && pos===0) return; if(playing) stop(); else start(); }
+    // Seek by clicking the bar + wire volume slider/mute
+    document.addEventListener('DOMContentLoaded', function(){
+        var bar = document.getElementById('pb-bar');
+        if(bar) bar.addEventListener('click', function(e){
+            var r = bar.getBoundingClientRect(); pos = Math.round((e.clientX-r.left)/r.width*dur); render();
+        });
+        volEl = document.getElementById('pb-vol');
+        volFillEl = document.getElementById('pb-vol-fill');
+        muteEl = document.getElementById('pb-mute');
+        if(volEl){
+            var v = parseInt(volEl.getAttribute('data-volume'), 10);
+            if(!isNaN(v)) volume = v;
+            muted = volEl.getAttribute('data-muted') === 'true';
+            renderVolume();
+            var dragging = false;
+            function volFromEvent(e){
+                var r = volEl.getBoundingClientRect();
+                var cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+                setVolume((cx - r.left) / r.width * 100);
+            }
+            volEl.addEventListener('mousedown', function(e){ dragging = true; volFromEvent(e); e.preventDefault(); });
+            document.addEventListener('mousemove', function(e){ if(dragging) volFromEvent(e); });
+            document.addEventListener('mouseup', function(){ dragging = false; });
+        }
+    });
+    return { play: play, toggle: toggle, setVolume: setVolume, toggleMute: toggleMute };
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

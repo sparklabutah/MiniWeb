@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ team.name }} - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = '' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('sports-esports.index') }}">Home</a> /
+            {% if league %}<a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}">{{ league.abbreviation }}</a> / {% endif %}
+            {{ team.name }}
+        </div>
+
+        <div class="detail-card" style="display:flex;align-items:center;gap:1.25rem;">
+            <div class="team-logo" style="background: {{ team.logo_color }};width:64px;height:64px;font-size:1.3rem;">{{ team.abbreviation }}</div>
+            <div class="team-info" style="border:none;padding:0;margin:0;background:none;">
+                <div class="page-title">{{ team.name }}</div>
+                <div class="meta">{{ team.city }} &middot; {% if league %}{{ league.name }}{% endif %}</div>
+                <div class="team-record" style="display:flex;gap:1.5rem;margin-top:.5rem;">
+                    <div class="record-item" style="border:none;padding:0;display:block;font-size:1.1rem;font-weight:700;">{{ team.wins }} <span class="label">W</span></div>
+                    <div class="record-item" style="border:none;padding:0;display:block;font-size:1.1rem;font-weight:700;">{{ team.losses }} <span class="label">L</span></div>
+                    <div class="record-item" style="border:none;padding:0;display:block;font-size:1.1rem;font-weight:700;">{{ "%.3f"|format(team.wins / (team.wins + team.losses)) if (team.wins + team.losses) > 0 else "0.000" }} <span class="label">PCT</span></div>
+                    <div class="record-item" style="border:none;padding:0;display:block;font-size:1.1rem;font-weight:700;">#{{ team.standing }} <span class="label">Rank</span></div>
+                </div>
+            </div>
+            <form action="{{ url_for('sports-esports.toggle_favorite') }}" method="post" style="margin-left: auto;">
+                <input type="hidden" name="team_id" value="{{ team.id }}">
+                <input type="hidden" name="action" value="{{ 'remove' if is_favorited else 'add' }}">
+                <button type="submit" class="fav-btn {{ 'favorited' if is_favorited else '' }}">{% if is_favorited %}&#10003; Favorited{% else %}+ Favorite{% endif %}</button>
+            </form>
+        </div>
+
+        {% if players %}
+        <div class="section-title">Roster</div>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Player</th><th>Position</th><th>Key Stat</th></tr>
+            </thead>
+            <tbody>
+                {% for p in players %}
+                <tr>
+                    <td>{% if p.jersey_number %}{{ p.jersey_number }}{% else %}-{% endif %}</td>
+                    <td><a href="{{ url_for('sports-esports.player_detail', player_id=p.id) }}">{{ p.name }}</a></td>
+                    <td>{{ p.position }}</td>
+                    <td>
+                        {% if p.stats %}
+                        {% for k, v in p.stats.items() %}{% if loop.index <= 2 %}{{ k.replace('_',' ').title() }}: {{ v }}{% if not loop.last and loop.index < 2 %} | {% endif %}{% endif %}{% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <div class="section-title">Matches</div>
+        <div class="card-list">
+            {% for m in matches %}{% include "sports-esports/_mcard.html" %}{% endfor %}
+        </div>
+    </div>
+</body>
+</html>

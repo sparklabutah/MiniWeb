@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #f8f9fa; color: #3c4043; font-size: 14px; line-height: 1.5; }
+
+        /* ── Header bar ── */
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 24px; border-bottom: 1px solid #dadce0;
+            background: #fff; position: sticky; top: 0; z-index: 100; height: 64px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left .hamburger {
+            font-size: 22px; color: #5f6368; cursor: pointer;
+            padding: 8px 10px; border-radius: 50%; border: none; background: none;
+            transition: background 0.15s;
+        }
+        .header-left .hamburger:hover { background: #f1f3f4; }
+        .header-left .logo { font-size: 24px; font-weight: 400; color: #5f6368; white-space: nowrap; letter-spacing: -0.5px; }
+        .header-left .logo span { color: #1a73e8; font-weight: 500; }
+
+        .header-center { display: flex; align-items: center; gap: 12px; }
+        .header-center .nav-btn {
+            width: 40px; height: 40px; border-radius: 50%; border: none; background: none;
+            cursor: pointer; font-size: 18px; color: #5f6368;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s; text-decoration: none;
+        }
+        .header-center .nav-btn:hover { background: #f1f3f4; }
+        .header-center .today-btn {
+            padding: 8px 20px; border: 1px solid #dadce0; border-radius: 6px;
+            background: #fff; font-size: 14px; color: #3c4043; cursor: pointer;
+            font-weight: 500; text-decoration: none; transition: background 0.15s;
+        }
+        .header-center .today-btn:hover { background: #f1f3f4; }
+        .header-center .week-label { font-size: 24px; font-weight: 400; color: #3c4043; min-width: 220px; }
+        .header-nav { display: flex; align-items: center; gap: 6px; }
+        .header-nav a, .header-nav button {
+            font-size: 14px; color: #5f6368; text-decoration: none;
+            padding: 8px 16px; border-radius: 6px; border: none; background: none;
+            cursor: pointer; white-space: nowrap; font-weight: 500;
+            transition: background 0.15s;
+        }
+        .header-nav a:hover, .header-nav button:hover { background: #f1f3f4; }
+        .header-nav .btn-primary { background: #1a73e8; color: #fff; border-radius: 20px; }
+        .header-nav .btn-primary:hover { background: #1557b0; }
+        .header-nav .search-toggle { font-size: 20px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; }
+
+        /* ── App layout ── */
+        .app-layout { display: flex; height: calc(100vh - 64px); overflow: hidden; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 280px; border-right: 1px solid #dadce0; padding: 20px;
+            flex-shrink: 0; overflow-y: auto; background: #fff;
+        }
+        .sidebar .create-btn {
+            display: flex; align-items: center; gap: 12px;
+            width: auto; height: 56px; border-radius: 28px; border: none;
+            background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+            cursor: pointer; padding: 0 24px 0 12px; margin-bottom: 24px;
+            transition: box-shadow 0.2s; font-size: 16px; font-weight: 500;
+            color: #3c4043; font-family: inherit;
+        }
+        .sidebar .create-btn:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.16); }
+        .sidebar .create-btn svg { width: 36px; height: 36px; flex-shrink: 0; }
+
+        /* ── Mini calendar ── */
+        .mini-cal { margin-bottom: 20px; }
+        .mini-cal .mini-cal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px; padding: 0 4px;
+        }
+        .mini-cal .mini-cal-header .month-label { font-size: 15px; font-weight: 500; color: #3c4043; }
+        .mini-cal .mini-cal-header a {
+            text-decoration: none; color: #5f6368; font-size: 16px;
+            padding: 4px 8px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; transition: background 0.15s;
+        }
+        .mini-cal .mini-cal-header a:hover { background: #f1f3f4; }
+        .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; text-align: center; }
+        .mini-cal-grid .mc-hdr { font-size: 11px; color: #70757a; padding: 6px 0; font-weight: 500; text-transform: uppercase; }
+        .mini-cal-grid .mc-day {
+            font-size: 12px; padding: 0; cursor: pointer; border-radius: 50%;
+            width: 32px; height: 32px; display: flex; align-items: center;
+            justify-content: center; margin: 1px auto; color: #3c4043;
+            transition: background 0.15s; font-weight: 400;
+        }
+        .mini-cal-grid .mc-day.out-month { color: #bdc1c6; }
+        .mini-cal-grid .mc-day.is-today { background: #1a73e8; color: #fff; font-weight: 600; }
+        .mini-cal-grid .mc-day.in-week { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+        .mini-cal-grid .mc-day.in-week.is-today { background: #1a73e8; color: #fff; }
+        .mini-cal-grid .mc-day:hover { background: #f1f3f4; }
+        .mini-cal-grid .mc-day.is-today:hover { background: #1557b0; }
+
+        /* ── Upcoming events sidebar ── */
+        .upcoming-section { margin-bottom: 16px; }
+        .upcoming-section h3 {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: #5f6368; margin: 0 0 10px 0; font-weight: 600;
+        }
+        .upcoming-event {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 10px; border-radius: 8px; margin-bottom: 4px;
+            cursor: pointer; transition: background 0.15s; text-decoration: none; color: inherit;
+        }
+        .upcoming-event:hover { background: #f1f3f4; }
+        .upcoming-event .ue-dot {
+            width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+        }
+        .upcoming-event .ue-dot.cat-work { background: #1a73e8; }
+        .upcoming-event .ue-dot.cat-personal { background: #0b8043; }
+        .upcoming-event .ue-dot.cat-health { background: #d50000; }
+        .upcoming-event .ue-dot.cat-default { background: #7986cb; }
+        .upcoming-event .ue-info { flex: 1; min-width: 0; }
+        .upcoming-event .ue-title { font-size: 13px; font-weight: 500; color: #202124; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .upcoming-event .ue-time { font-size: 12px; color: #70757a; }
+
+        /* ── Sidebar filters ── */
+        .sidebar h3 {
+            font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: #5f6368; margin: 16px 0 8px; font-weight: 600;
+        }
+        .sidebar label {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 14px; color: #3c4043; padding: 4px 0; cursor: pointer;
+        }
+        .sidebar label input[type="checkbox"] { accent-color: #1a73e8; width: 16px; height: 16px; }
+        .sidebar select, .sidebar input[type="text"], .sidebar input[type="date"] {
+            width: 100%; padding: 8px 10px; border: 1px solid #dadce0; border-radius: 6px;
+            font-size: 13px; margin-bottom: 8px; background: #fff;
+            transition: border-color 0.15s; font-family: inherit;
+        }
+        .sidebar select:focus, .sidebar input:focus { outline: none; border-color: #1a73e8; }
+
+        /* ── Search bar ── */
+        .search-bar {
+            padding: 10px 24px; border-bottom: 1px solid #dadce0;
+            display: none; gap: 10px; align-items: center; background: #fff;
+        }
+        .search-bar.open { display: flex; }
+        .search-bar input[type="text"] {
+            flex: 1; padding: 10px 20px; border: 1px solid #dadce0; border-radius: 24px;
+            font-size: 15px; background: #f1f3f4; font-family: inherit;
+            transition: all 0.2s;
+        }
+        .search-bar input[type="text"]:focus { outline: none; border-color: #1a73e8; background: #fff; box-shadow: 0 0 0 3px #e8f0fe; }
+        .search-bar button {
+            padding: 10px 24px; background: #1a73e8; color: #fff; border: none;
+            border-radius: 24px; font-size: 14px; cursor: pointer; font-weight: 500;
+            font-family: inherit; transition: background 0.15s;
+        }
+        .search-bar button:hover { background: #1557b0; }
+
+        /* ── Main content: week grid ── */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+        .week-grid-wrapper { flex: 1; overflow-y: auto; position: relative; }
+
+        /* Day column headers (sticky) */
+        .day-headers {
+            display: grid; grid-template-columns: 64px repeat(7, 1fr);
+            border-bottom: 1px solid #dadce0; background: #fff;
+            position: sticky; top: 0; z-index: 10;
+        }
+        .day-headers .gutter { border-right: 1px solid #e0e0e0; }
+        .day-header { text-align: center; padding: 12px 0 8px; border-right: 1px solid #eeeeee; }
+        .day-header:last-child { border-right: none; }
+        .day-header .weekday {
+            font-size: 12px; text-transform: uppercase; color: #70757a;
+            letter-spacing: 0.8px; font-weight: 500; margin-bottom: 4px;
+        }
+        .day-header .date-num {
+            font-size: 28px; font-weight: 400; color: #3c4043;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+            transition: background 0.15s; line-height: 1;
+        }
+        .day-header .date-num:hover { background: #f1f3f4; }
+        .day-header.is-today .weekday { color: #1a73e8; font-weight: 600; }
+        .day-header.is-today .date-num { background: #1a73e8; color: #fff; font-weight: 500; }
+        .day-header.is-today .date-num:hover { background: #1557b0; }
+
+        /* All-day row */
+        .allday-row {
+            display: grid; grid-template-columns: 64px repeat(7, 1fr);
+            border-bottom: 1px solid #dadce0; min-height: 32px;
+        }
+        .allday-row .gutter {
+            border-right: 1px solid #e0e0e0; font-size: 11px; color: #70757a;
+            display: flex; align-items: center; justify-content: center; font-weight: 500;
+        }
+        .allday-row .allday-cell { border-right: 1px solid #eeeeee; padding: 3px 4px; }
+        .allday-row .allday-cell:last-child { border-right: none; }
+        .allday-event {
+            font-size: 12px; padding: 2px 8px; border-radius: 4px; color: #fff;
+            margin-bottom: 2px; cursor: pointer; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; font-weight: 500;
+        }
+        .allday-event a { color: #fff; text-decoration: none; }
+
+        /* Hour grid */
+        .hour-grid { display: grid; grid-template-columns: 64px repeat(7, 1fr); position: relative; }
+        .hour-gutter { position: relative; }
+        .hour-label {
+            position: absolute; right: 12px; font-size: 11px; color: #70757a;
+            transform: translateY(-50%); white-space: nowrap; font-weight: 400;
+        }
+        .day-col { border-right: 1px solid #eeeeee; position: relative; }
+        .day-col:last-child { border-right: none; }
+        .hour-line {
+            border-top: 1px solid #e8eaed; height: 60px; cursor: pointer;
+            transition: background 0.1s;
+        }
+        .hour-line:hover { background: #f8f9fa; }
+        .hour-line-gutter { border-top: 1px solid #e8eaed; height: 60px; }
+
+        /* Events in grid */
+        .grid-event {
+            position: absolute; left: 3px; right: 3px; border-radius: 6px;
+            padding: 4px 8px; font-size: 12px; color: #fff; overflow: hidden;
+            cursor: pointer; z-index: 5; min-height: 24px; line-height: 1.4;
+            border-left: 4px solid rgba(0,0,0,0.12);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            transition: filter 0.15s, box-shadow 0.15s;
+        }
+        .grid-event a { color: #fff; text-decoration: none; display: block; }
+        .grid-event .ge-edit { display: none; position: absolute; top: 2px; right: 3px; font-size: 11px; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.25); z-index: 2; }
+        .grid-event:hover .ge-edit { display: block; }
+        .grid-event .ge-edit:hover { background: rgba(255,255,255,.5); }
+        .grid-event .ge-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+        .grid-event .ge-time { font-size: 11px; opacity: 0.9; font-weight: 400; }
+        .grid-event .ge-loc { font-size: 11px; opacity: 0.8; font-weight: 400; }
+        .grid-event:hover { filter: brightness(0.92); z-index: 6; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+
+        /* Category colors */
+        .bg-work { background: #1a73e8; }
+        .bg-personal { background: #0b8043; }
+        .bg-health { background: #d50000; }
+        .bg-default { background: #7986cb; }
+
+        /* Current time line */
+        .current-time-line { position: absolute; left: 0; right: 0; z-index: 8; pointer-events: none; }
+        .current-time-line::before {
+            content: ''; position: absolute; left: -6px; top: -6px;
+            width: 12px; height: 12px; background: #ea4335; border-radius: 50%;
+        }
+        .current-time-line::after {
+            content: ''; position: absolute; left: 0; right: 0; top: 0;
+            height: 2px; background: #ea4335;
+        }
+
+        /* ── Create modal ── */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 200; backdrop-filter: blur(2px);
+        }
+        .modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: #fff; border-radius: 12px; padding: 0; width: 500px;
+            max-width: 92vw; z-index: 201; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+        .modal .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; cursor: move; border-bottom: 1px solid #f1f3f4;
+        }
+        .modal .modal-header h2 { font-size: 18px; color: #202124; font-weight: 500; }
+        .modal .modal-header .close-btn {
+            background: none; border: none; font-size: 22px; color: #5f6368;
+            cursor: pointer; padding: 6px 10px; border-radius: 50%;
+            transition: background 0.15s;
+        }
+        .modal .modal-header .close-btn:hover { background: #f1f3f4; }
+        .modal .modal-body { padding: 8px 20px 20px; }
+        .modal .modal-body input[type="text"],
+        .modal .modal-body input[type="datetime-local"],
+        .modal .modal-body select,
+        .modal .modal-body textarea {
+            width: 100%; padding: 10px 0; border: none; border-bottom: 2px solid #e8eaed;
+            font-size: 15px; outline: none; font-family: inherit; margin-bottom: 4px;
+            transition: border-color 0.2s; background: transparent;
+        }
+        .modal .modal-body input:focus, .modal .modal-body select:focus, .modal .modal-body textarea:focus { border-bottom-color: #1a73e8; }
+        .modal .modal-body .title-input {
+            font-size: 24px; font-weight: 400; border-bottom: 2px solid #dadce0;
+            padding: 12px 0 8px; color: #202124;
+        }
+        .modal .modal-body .title-input:focus { border-bottom-color: #1a73e8; }
+        .modal .modal-body textarea {
+            height: 56px; resize: vertical; border: 1px solid #dadce0;
+            border-radius: 8px; padding: 10px 12px; margin-top: 12px;
+            font-size: 14px;
+        }
+        .modal .modal-body .field-row {
+            display: flex; align-items: center; gap: 14px; margin-top: 10px;
+        }
+        .modal .modal-body .field-row label { font-size: 13px; color: #5f6368; min-width: 64px; font-weight: 500; }
+        .modal .modal-body .field-row select, .modal .modal-body .field-row input { flex: 1; }
+        .modal .modal-actions {
+            display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px 20px;
+        }
+        .modal .modal-actions button {
+            padding: 10px 28px; border-radius: 24px; border: none;
+            font-size: 14px; cursor: pointer; font-weight: 500; font-family: inherit;
+            transition: all 0.15s;
+        }
+        .modal .btn-cancel { background: none; color: #1a73e8; }
+        .modal .btn-cancel:hover { background: #e8f0fe; }
+        .modal .btn-save { background: #1a73e8; color: #fff; }
+        .modal .btn-save:hover { background: #1557b0; }
+
+        /* ── Filter panel (collapsible in sidebar) ── */
+        .filter-section { border-top: 1px solid #e8eaed; margin-top: 12px; padding-top: 12px; }
+        .sidebar .export-links a {
+            font-size: 13px; color: #1a73e8; text-decoration: none;
+            display: inline-block; padding: 4px 12px 4px 0; font-weight: 500;
+            transition: color 0.15s;
+        }
+        .sidebar .export-links a:hover { color: #1557b0; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <!-- ═══ HEADER ═══ -->
+    <div class="header">
+        <div class="header-left">
+            <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('collapsed');" title="Menu">&#9776;</button>
+            <div class="logo"><span>Calendar</span>Todo</div>
+        </div>
+        <div class="header-center">
+            <a class="today-btn" href="{{ url_for('calendar-todo.index', week_offset=0) }}">Today</a>
+            <a class="nav-btn" href="{{ url_for('calendar-todo.index', week_offset=week_offset - 1) }}" title="Previous week">&#9664;</a>
+            <a class="nav-btn" href="{{ url_for('calendar-todo.index', week_offset=week_offset + 1) }}" title="Next week">&#9654;</a>
+            <span class="week-label">
+                {% set ws_parts = week_start.split('-') %}
+                {% set we_parts = week_end.split('-') %}
+                {% set months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+                {{ months[ws_parts[1]|int] }} {{ ws_parts[2]|int }} &ndash; {{ months[we_parts[1]|int] }} {{ we_parts[2]|int }}, {{ we_parts[0] }}
+            </span>
+        </div>
+        <div class="header-nav">
+            <button class="search-toggle" onclick="toggleSearch()" title="Search">&#128269;</button>
+            <a href="{{ url_for('calendar-todo.day_view', date_str=today) }}">Day</a>
+            <a href="{{ url_for('calendar-todo.index', week_offset=0) }}" style="font-weight:600;color:#1a73e8">Week</a>
+            {% if user %}
+            <a href="{{ url_for('calendar-todo.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('calendar-todo.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('calendar-todo.login_page') }}" class="btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <!-- ═══ SEARCH BAR ═══ -->
+    <div class="search-bar {{ 'open' if q }}" id="search-bar">
+        <form method="get" action="{{ url_for('calendar-todo.index') }}" style="display:flex;gap:10px;flex:1">
+            <input type="text" name="q" placeholder="Search events..." value="{{ q }}" autocomplete="off">
+            <input type="hidden" name="week_offset" value="{{ week_offset }}">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <!-- ═══ APP LAYOUT ═══ -->
+    <div class="app-layout">
+        <!-- ── Sidebar ── -->
+        <div class="sidebar">
+            <button class="create-btn" onclick="openCreateModal()" title="Create event">
+                <svg viewBox="0 0 36 36"><path fill="#1a73e8" d="M16 16V4h4v12h12v4H20v12h-4V20H4v-4z"/></svg>
+                Create
+            </button>
+
+            <!-- Mini calendar -->
+            <div class="mini-cal">
+                <div class="mini-cal-header">
+                    <a href="{{ url_for('calendar-todo.index', week_offset=week_offset - 4) }}" title="Previous month">&#9664;</a>
+                    <span class="month-label">{{ mini_cal_month }}</span>
+                    <a href="{{ url_for('calendar-todo.index', week_offset=week_offset + 4) }}" title="Next month">&#9654;</a>
+                </div>
+                <div class="mini-cal-grid">
+                    <div class="mc-hdr">M</div><div class="mc-hdr">T</div><div class="mc-hdr">W</div><div class="mc-hdr">T</div><div class="mc-hdr">F</div><div class="mc-hdr">S</div><div class="mc-hdr">S</div>
+                    {% for d in mini_cal_days %}
+                    <div class="mc-day {{ 'out-month' if not d.in_month }} {{ 'is-today' if d.is_today }} {{ 'in-week' if d.in_week }}" title="{{ d.date }}">{{ d.day_num }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Upcoming events -->
+            <div class="upcoming-section">
+                <h3>Upcoming Events</h3>
+                {% set upcoming_shown = [] %}
+                {% for day in week_days %}
+                    {% for event in day.events %}
+                        {% if upcoming_shown|length < 6 %}
+                        <a class="upcoming-event" href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">
+                            <div class="ue-dot cat-{{ event.category|default('default') }}"></div>
+                            <div class="ue-info">
+                                <div class="ue-title">{{ event.title }}</div>
+                                <div class="ue-time">{{ event.start[11:16] if event.start|length > 11 else 'All day' }} &middot; {{ day.weekday_short }}</div>
+                            </div>
+                        </a>
+                        {% if upcoming_shown.append(1) %}{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+                {% if upcoming_shown|length == 0 %}
+                <div style="font-size:13px;color:#70757a;padding:4px 10px;">No events this week</div>
+                {% endif %}
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <h3>Calendars</h3>
+                {% for c in calendars %}
+                <label><input type="checkbox" value="{{ c }}" checked onchange="applyFilters()"> {{ c }}</label>
+                {% endfor %}
+
+                <h3>Category</h3>
+                <select id="filter-category" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {{ 'selected' if cat == c }}>{{ c|capitalize }}</option>
+                    {% endfor %}
+                </select>
+
+                <h3>Priority</h3>
+                <select id="filter-priority" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="high" {{ 'selected' if priority == 'high' }}>High</option>
+                    <option value="medium" {{ 'selected' if priority == 'medium' }}>Medium</option>
+                    <option value="low" {{ 'selected' if priority == 'low' }}>Low</option>
+                </select>
+
+                <h3>User</h3>
+                <select id="filter-user" onchange="applyFilters()">
+                    <option value="">All</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {{ 'selected' if uid == u.id }}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <h3>Sort</h3>
+                <select id="filter-sort" onchange="applyFilters()">
+                    <option value="date" {{ 'selected' if sort == 'date' }}>Date</option>
+                    <option value="title" {{ 'selected' if sort == 'title' }}>Title</option>
+                    <option value="priority" {{ 'selected' if sort == 'priority' }}>Priority</option>
+                </select>
+
+                <h3>Date Range</h3>
+                {# no onchange here: native date pickers fire change per
+                   segment, which reloaded the page mid-selection #}
+                <label style="font-size:12px;font-weight:500">From:</label>
+                <input type="date" id="filter-date-from" value="{{ date_from }}">
+                <label style="font-size:12px;font-weight:500">To:</label>
+                <input type="date" id="filter-date-to" value="{{ date_to }}">
+                <button type="button" id="apply-date-range" onclick="applyFilters()"
+                        style="margin-top:6px;padding:5px 14px;border:1px solid #dadce0;border-radius:4px;background:#1a73e8;color:#fff;font-size:12px;cursor:pointer">
+                    Apply Date Range
+                </button>
+            </div>
+
+            <div class="filter-section export-links">
+                <h3>Export</h3>
+                <a href="{{ url_for('calendar-todo.api_export', format='csv') }}" >CSV</a>
+                <a href="{{ url_for('calendar-todo.api_export', format='ics') }}" >ICS</a>
+                <a href="{{ url_for('calendar-todo.api_export', format='json') }}" >JSON</a>
+            </div>
+        </div>
+
+        <!-- ── Main content: Week grid ── -->
+        <div class="main-content">
+            <!-- Day column headers -->
+            <div class="day-headers">
+                <div class="gutter"></div>
+                {% for day in week_days %}
+                <div class="day-header {{ 'is-today' if day.is_today }}">
+                    <div class="weekday">{{ day.weekday_short }}</div>
+                    <div class="date-num" onclick="openCreateModalForDay('{{ day.date }}')">{{ day.day_num }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- All-day events row -->
+            <div class="allday-row">
+                <div class="gutter">all-day</div>
+                {% for day in week_days %}
+                <div class="allday-cell">
+                    {% for event in day.events %}
+                    {% if event.all_day %}
+                    <div class="allday-event bg-{{ event.category }}">
+                        <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">{{ event.title }}</a>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hour grid -->
+            <div class="week-grid-wrapper" id="week-grid-wrapper">
+                <div class="hour-grid" id="hour-grid">
+                    <!-- Hour gutter (labels) -->
+                    <div class="hour-gutter">
+                        {% for h in range(6, 23) %}
+                        <div class="hour-line-gutter" data-hour="{{ h }}">
+                            <span class="hour-label" style="top: 0;">{% if h == 12 %}12 PM{% elif h > 12 %}{{ h - 12 }} PM{% else %}{{ h }} AM{% endif %}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 7 day columns -->
+                    {% for day in week_days %}
+                    <div class="day-col" data-date="{{ day.date }}" data-day-index="{{ loop.index0 }}">
+                        <!-- Hour slots for clicking -->
+                        {% for h in range(6, 23) %}
+                        <div class="hour-line" data-hour="{{ h }}" onclick="openCreateModalForSlot('{{ day.date }}', {{ h }})"></div>
+                        {% endfor %}
+
+                        <!-- Positioned events -->
+                        {% for event in day.events %}
+                        {% if not event.all_day %}
+                        {% set start_h = event.start[11:13]|int %}
+                        {% set start_m = event.start[14:16]|int %}
+                        {% set end_h = event.end[11:13]|int %}
+                        {% set end_m = event.end[14:16]|int %}
+                        {% set top_px = ((start_h - 6) * 60 + start_m * 60 // 60) %}
+                        {% set duration_min = (end_h - start_h) * 60 + (end_m - start_m) %}
+                        {% set height_px = (duration_min * 60 // 60) %}
+                        {% if height_px < 24 %}{% set height_px = 24 %}{% endif %}
+                        <div class="grid-event bg-{{ event.category }}" style="top: {{ top_px }}px; height: {{ height_px }}px;" title="{{ event.title }} ({{ event.start[11:16] }}-{{ event.end[11:16] }}){% if event.location %} @ {{ event.location }}{% endif %}">
+                            <a class="ge-edit" href="{{ url_for('calendar-todo.event_edit_page', event_id=event.id) }}" title="Edit event">&#9998;</a>
+                            <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">
+                                <div class="ge-title">{{ event.title }}</div>
+                                <div class="ge-time">{{ event.start[11:16] }} - {{ event.end[11:16] }}</div>
+                                {% if event.location and height_px > 44 %}
+                                <div class="ge-loc">{{ event.location }}</div>
+                                {% endif %}
+                            </a>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                        <!-- Current time line -->
+                        {% if day.is_today %}
+                        <div class="current-time-line" id="current-time-line" style="display:none;"></div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ CREATE EVENT MODAL ═══ -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeCreateModal()"></div>
+    <div class="modal" id="create-modal">
+        <form method="post" action="{{ url_for('calendar-todo.form_create_event') }}" id="create-event-form">
+        <div class="modal-header">
+            <h2>New Event</h2>
+            <button type="button" class="close-btn" onclick="closeCreateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" class="title-input" id="new-title" name="title" placeholder="Add title" required>
+            <div class="field-row">
+                <label>Start</label>
+                <input type="datetime-local" id="new-start" name="start" required>
+            </div>
+            <div class="field-row">
+                <label>End</label>
+                <input type="datetime-local" id="new-end" name="end" required>
+            </div>
+            <div class="field-row">
+                <label>Category</label>
+                <select id="new-category" name="category">
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="health">Health</option>
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Calendar</label>
+                <select id="new-calendar" name="calendar">
+                    {% for c in calendars %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Priority</label>
+                <select id="new-priority" name="priority">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="field-row">
+                <label>Location</label>
+                <input type="text" id="new-location" name="location" placeholder="Add location">
+            </div>
+            <div class="field-row">
+                <label>Invite people</label>
+                <input type="text" id="new-attendees" name="attendees" placeholder="Comma-separated names or emails">
+            </div>
+            <div class="field-row">
+                <label>User</label>
+                <select id="new-user-id" name="user_id">
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <textarea id="new-desc" name="description" placeholder="Add description"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn-save">Save</button>
+        </div>
+        </form>
+    </div>
+
+    <script>
+    /* ── Scroll to ~8am on load ── */
+    (function() {
+        var wrapper = document.getElementById('week-grid-wrapper');
+        if (wrapper) {
+            // 8am = hour index 2 (from 6am) * 60px
+            wrapper.scrollTop = 2 * 60;
+        }
+    })();
+
+    /* ── Current time indicator ── */
+    (function() {
+        var today = '{{ today }}';
+        var line = document.getElementById('current-time-line');
+        if (!line) return;
+        var now = new Date();
+        var h = now.getHours();
+        var m = now.getMinutes();
+        if (h >= 6 && h <= 22) {
+            var top = (h - 6) * 60 + (m * 60 / 60);
+            line.style.top = top + 'px';
+            line.style.display = 'block';
+        }
+    })();
+
+    /* ── Search toggle ── */
+    function toggleSearch() {
+        document.getElementById('search-bar').classList.toggle('open');
+        var input = document.querySelector('#search-bar input[name="q"]');
+        if (input) input.focus();
+    }
+
+    /* ── Filters ── */
+    function applyFilters() {
+        var params = new URLSearchParams();
+        params.set('week_offset', '{{ week_offset }}');
+        var q = document.querySelector('#search-bar input[name="q"]');
+        if (q && q.value) params.set('q', q.value);
+        var cat = document.getElementById('filter-category').value;
+        if (cat) params.set('category', cat);
+        var pri = document.getElementById('filter-priority').value;
+        if (pri) params.set('priority', pri);
+        var uid = document.getElementById('filter-user').value;
+        if (uid) params.set('user_id', uid);
+        var sort = document.getElementById('filter-sort').value;
+        if (sort) params.set('sort', sort);
+        var df = document.getElementById('filter-date-from').value;
+        if (df) params.set('date_from', df);
+        var dt = document.getElementById('filter-date-to').value;
+        if (dt) params.set('date_to', dt);
+        window.location.href = '{{ url_for("calendar-todo.index") }}?' + params.toString();
+    }
+
+    /* ── Create modal ── */
+    function openCreateModal() {
+        document.getElementById('modal-overlay').style.display = 'block';
+        document.getElementById('create-modal').style.display = 'block';
+        document.getElementById('new-title').focus();
+    }
+
+    function openCreateModalForDay(dateStr) {
+        openCreateModal();
+        document.getElementById('new-start').value = dateStr + 'T09:00';
+        document.getElementById('new-end').value = dateStr + 'T10:00';
+    }
+
+    function openCreateModalForSlot(dateStr, hour) {
+        openCreateModal();
+        var hh = String(hour).padStart(2, '0');
+        var hhEnd = String(hour + 1).padStart(2, '0');
+        document.getElementById('new-start').value = dateStr + 'T' + hh + ':00';
+        document.getElementById('new-end').value = dateStr + 'T' + hhEnd + ':00';
+    }
+
+    function closeCreateModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('create-modal').style.display = 'none';
+    }
+
+    /* createEvent is now handled by form submission */
+    </script>
+</body>
+</html>

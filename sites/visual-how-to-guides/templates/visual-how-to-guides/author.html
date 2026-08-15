@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ author.display_name }} - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        .author-profile { display: flex; align-items: flex-start; gap: 24px; padding: 40px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 32px; }
+        .author-avatar-lg { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, #4CAF50, #388E3C); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 700; flex-shrink: 0; }
+        .author-details { flex: 1; }
+        .author-details h1 { font-size: 28px; color: #333; margin-bottom: 8px; }
+        .author-details .username { font-size: 15px; color: #999; margin-bottom: 12px; }
+        .author-details .bio { font-size: 15px; color: #555; line-height: 1.6; margin-bottom: 16px; }
+        .author-stats { display: flex; gap: 24px; margin-bottom: 16px; }
+        .author-stats .stat { text-align: center; }
+        .author-stats .stat-value { font-size: 22px; font-weight: 700; color: #4CAF50; }
+        .author-stats .stat-label { font-size: 12px; color: #999; text-transform: uppercase; }
+
+        .follow-btn { display: inline-block; padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
+        .follow-btn-follow { background: #4CAF50; color: #fff; }
+        .follow-btn-follow:hover { background: #45a049; text-decoration: none; }
+        .follow-btn-following { background: #fff; color: #4CAF50; border: 2px solid #4CAF50; }
+        .follow-btn-following:hover { background: #ffebee; color: #c62828; border-color: #c62828; text-decoration: none; }
+
+        .section-title { font-size: 22px; margin-bottom: 24px; color: #333; border-left: 4px solid #4CAF50; padding-left: 12px; }
+
+        .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding-bottom: 40px; }
+        .guide-card { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; background: #fff; }
+        .guide-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .guide-card .thumb { width: 100%; height: 160px; background: #e8f5e9; display: flex; align-items: center; justify-content: center; color: #4CAF50; font-size: 14px; }
+        .guide-card .card-body { padding: 16px; }
+        .guide-card .card-body h3 { font-size: 16px; margin-bottom: 8px; }
+        .guide-card .card-body h3 a { color: #333; }
+        .guide-card .card-body h3 a:hover { color: #4CAF50; }
+        .guide-card .meta { font-size: 13px; color: #777; display: flex; gap: 12px; flex-wrap: wrap; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: #999; }
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="author-profile">
+            <div class="author-avatar-lg">{{ author.name[0] }}</div>
+            <div class="author-details">
+                <h1>{{ author.name }}</h1>
+                <div class="username"><a href="{{ url_for('visual-how-to-guides.authors_directory') }}">&larr; All authors</a></div>
+                <div class="author-stats">
+                    <div class="stat">
+                        <div class="stat-value">{{ author.guide_count }}</div>
+                        <div class="stat-label">Guides</div>
+                    </div>
+                </div>
+                {% if user %}
+                <form action="{{ url_for('visual-how-to-guides.form_follow_author', name=author.name) }}" method="post" style="display:inline;">
+                    <button type="submit" class="follow-btn {% if is_following %}follow-btn-following{% else %}follow-btn-follow{% endif %}">
+                        {% if is_following %}Following{% else %}Follow{% endif %}
+                    </button>
+                </form>
+                {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}" class="follow-btn follow-btn-follow">Log in to follow</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <h2 class="section-title">Guides by {{ author.name }}</h2>
+
+        {% if guides %}
+        <div class="guide-grid">
+            {% for guide in guides %}
+            <div class="guide-card">
+                <div class="thumb">{% if guide.cover_image %}<img src="{{ guide.cover_image }}" alt="" style="width:100%;height:100%;object-fit:cover">{% else %}{{ guide.title[:30] }}{% endif %}</div>
+                <div class="card-body">
+                    <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                    <div class="meta">
+                        <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                        <span>{{ guide.time_estimate }}</span>
+                        <span>{{ guide.rating }}/5</span>
+                        <span>{{ guide.steps|length }} steps</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>This author hasn't published any guides yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+</body>
+</html>

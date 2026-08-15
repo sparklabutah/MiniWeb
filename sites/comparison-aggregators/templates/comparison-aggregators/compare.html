@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Phones — PhoneCompare</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a237e; color: #fff; padding: .7rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; margin-left: .8rem; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+
+        .main { max-width: 1100px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+        .main h2 { font-size: 1.3rem; color: #1a237e; margin-bottom: 1rem; }
+
+        .selector-bar { background: #fff; padding: 1rem; border-radius: .4rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .selector-group { display: flex; flex-direction: column; gap: .3rem; }
+        .selector-group label { font-size: .75rem; color: #888; text-transform: uppercase; font-weight: 600; letter-spacing: .03em; }
+        .selector-group select { padding: .45rem .7rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .85rem; min-width: 220px; }
+        .btn { padding: .45rem 1.2rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
+        .btn-compare { background: #ff6600; color: #fff; }
+        .btn-compare:hover { background: #e55b00; }
+        .btn-reset { background: #eee; color: #555; }
+        .btn-reset:hover { background: #ddd; }
+
+        .empty-state { text-align: center; color: #999; padding: 3rem; background: #fff; border-radius: .4rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .empty-state p { margin-bottom: .5rem; }
+
+        /* Comparison table */
+        .compare-table { width: 100%; border-collapse: collapse; background: #fff; font-size: .85rem; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .compare-table thead th { background: #1a237e; color: #fff; padding: .7rem 1rem; text-align: center; font-weight: 600; }
+        .compare-table thead th:first-child { background: #13195e; text-align: left; }
+        .compare-table thead th a { color: #fff; text-decoration: none; }
+        .compare-table thead th a:hover { text-decoration: underline; }
+        .compare-table thead .phone-brand { font-size: .75rem; font-weight: 400; color: #bbdefb; display: block; }
+
+        .compare-table tbody tr { border-bottom: 1px solid #f0f0f0; }
+        .compare-table tbody tr:nth-child(even) { background: #fafafa; }
+        .compare-table tbody th { text-align: left; padding: .55rem 1rem; color: #666; font-weight: 500; background: #f8f8f8; white-space: nowrap; width: 140px; }
+        .compare-table tbody td { padding: .55rem 1rem; text-align: center; color: #333; }
+
+        .compare-table .section-row th { background: #f0f0f0; color: #1a237e; font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; padding: .4rem 1rem; }
+        .compare-table .section-row td { background: #f0f0f0; }
+
+        /* Highlight winner (better spec) */
+        .spec-winner { background: #e8f5e9 !important; font-weight: 600; color: #2e7d32 !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('comparison-aggregators.index') }}">PhoneCompare</a></h1>
+                <div class="header-nav">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Browse</a>
+            <a href="{{ url_for('comparison-aggregators.compare_page') }}">Compare</a>
+            {% if user %}
+            <a href="{{ url_for('comparison-aggregators.favorites_page') }}">Favorites</a>
+            <a href="{{ url_for('comparison-aggregators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('comparison-aggregators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('comparison-aggregators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h2>Compare Phones</h2>
+
+        <form class="selector-bar" method="get" action="{{ url_for('comparison-aggregators.compare_page') }}">
+            <div class="selector-group">
+                <label>Phone 1</label>
+                <select name="phone1" id="phone1">
+                    <option value="">-- Select Phone --</option>
+                    {% for p in phones %}
+                    <option value="{{ p.id }}" {% if selected|length > 0 and selected[0].id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="selector-group">
+                <label>Phone 2</label>
+                <select name="phone2" id="phone2">
+                    <option value="">-- Select Phone --</option>
+                    {% for p in phones %}
+                    <option value="{{ p.id }}" {% if selected|length > 1 and selected[1].id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn btn-compare" type="submit" onclick="buildCompareUrl(event)">Compare</button>
+            <a class="btn btn-reset" href="{{ url_for('comparison-aggregators.compare_page') }}">Reset</a>
+        </form>
+
+        {% if selected|length >= 2 %}
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Specification</th>
+                    {% for p in selected %}
+                    <th>
+                        <a href="{{ url_for('comparison-aggregators.phone_detail', phone_id=p.id) }}">{{ p.name }}</a>
+                        <span class="phone-brand">{{ p.brand }}</span>
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <!-- General -->
+                <tr class="section-row"><th>General</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Released</th>
+                    {% for p in selected %}<td>{{ p.released_at or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>OS</th>
+                    {% for p in selected %}<td>{{ p.os or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>Body</th>
+                    {% for p in selected %}<td>{{ p.body or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>Weight</th>
+                    {% for p in selected %}<td>{{ p.weight or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>SIM</th>
+                    {% for p in selected %}<td>{{ p.sim or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>Colors</th>
+                    {% for p in selected %}<td>{{ p.colors or '-' }}</td>{% endfor %}
+                </tr>
+
+                <!-- Display -->
+                <tr class="section-row"><th>Display</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Size</th>
+                    {% for p in selected %}
+                    <td {% if selected|length == 2 %}{% set vals = selected|map(attribute='display_size_num')|select('ne', none)|list %}{% if vals|length == 2 and p.display_size_num == vals|max %}class="spec-winner"{% endif %}{% endif %}>{{ p.display_size or '-' }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <th>Resolution</th>
+                    {% for p in selected %}<td>{{ p.display_resolution or '-' }}</td>{% endfor %}
+                </tr>
+
+                <!-- Performance -->
+                <tr class="section-row"><th>Performance</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Chipset</th>
+                    {% for p in selected %}<td>{{ p.chipset or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>RAM</th>
+                    {% for p in selected %}
+                    <td {% if selected|length == 2 %}{% set vals = selected|map(attribute='ram_num')|select('ne', none)|list %}{% if vals|length == 2 and p.ram_num is not none and p.ram_num == vals|max and vals[0] != vals[1] %}class="spec-winner"{% endif %}{% endif %}>{{ p.ram or '-' }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <th>Storage</th>
+                    {% for p in selected %}<td>{{ p.storage or '-' }}</td>{% endfor %}
+                </tr>
+
+                <!-- Camera -->
+                <tr class="section-row"><th>Camera</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Main Camera</th>
+                    {% for p in selected %}
+                    <td {% if selected|length == 2 %}{% set vals = selected|map(attribute='camera_num')|select('ne', none)|list %}{% if vals|length == 2 and p.camera_num is not none and p.camera_num == vals|max and vals[0] != vals[1] %}class="spec-winner"{% endif %}{% endif %}>{{ p.camera_pixels or '-' }}</td>
+                    {% endfor %}
+                </tr>
+
+                <!-- Battery -->
+                <tr class="section-row"><th>Battery</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Capacity</th>
+                    {% for p in selected %}
+                    <td {% if selected|length == 2 %}{% set vals = selected|map(attribute='battery_mah')|select('ne', none)|list %}{% if vals|length == 2 and p.battery_mah is not none and p.battery_mah == vals|max and vals[0] != vals[1] %}class="spec-winner"{% endif %}{% endif %}>{{ p.battery_size or '-' }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <th>Type</th>
+                    {% for p in selected %}<td>{{ p.battery_type or '-' }}</td>{% endfor %}
+                </tr>
+
+                <!-- Connectivity -->
+                <tr class="section-row"><th>Connectivity</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>WLAN</th>
+                    {% for p in selected %}<td>{{ p.wlan or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>Bluetooth</th>
+                    {% for p in selected %}<td>{{ p.bluetooth or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>GPS</th>
+                    {% for p in selected %}<td>{{ p.gps or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>NFC</th>
+                    {% for p in selected %}<td>{{ p.nfc or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>USB</th>
+                    {% for p in selected %}<td>{{ p.usb or '-' }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <th>Sensors</th>
+                    {% for p in selected %}<td>{{ p.sensors or '-' }}</td>{% endfor %}
+                </tr>
+
+                <!-- Price -->
+                <tr class="section-row"><th>Price</th>{% for p in selected %}<td></td>{% endfor %}</tr>
+                <tr>
+                    <th>Price</th>
+                    {% for p in selected %}
+                    <td {% if selected|length == 2 %}{% set vals = selected|map(attribute='price')|select('ne', none)|list %}{% if vals|length == 2 and p.price is not none and p.price == vals|min and vals[0] != vals[1] %}class="spec-winner"{% endif %}{% endif %} style="font-weight:600;">
+                        {% if p.price is not none %}${{ "%.2f"|format(p.price) }}{% elif p.price_raw %}{{ p.price_raw }}{% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+
+        {% elif selected|length == 1 %}
+        <div class="empty-state">
+            <p>Select a second phone above to compare with <strong>{{ selected[0].name }}</strong>.</p>
+        </div>
+
+        {% else %}
+        <div class="empty-state">
+            <p>Select two phones above to see a side-by-side comparison.</p>
+            <p style="font-size:.8rem;">Or select phones from the <a href="{{ url_for('comparison-aggregators.index') }}" style="color:#1a237e;">phone list</a> using the checkboxes.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function buildCompareUrl(e) {
+        e.preventDefault();
+        var p1 = document.getElementById('phone1').value;
+        var p2 = document.getElementById('phone2').value;
+        var ids = [p1, p2].filter(function(v) { return v !== ''; });
+        if (ids.length === 0) {
+            window.location.href = '{{ url_for("comparison-aggregators.compare_page") }}';
+        } else {
+            window.location.href = '{{ url_for("comparison-aggregators.compare_page") }}?ids=' + ids.join(',');
+        }
+    }
+    </script>
+</body>
+</html>

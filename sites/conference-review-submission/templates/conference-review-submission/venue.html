@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ venue.name }} | PeerPortal</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
+
+        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
+        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
+        .topbar a:hover { color: #fff; }
+        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
+        .topbar .right a { margin-right: 0; }
+
+        .venue-header { border-bottom: 1px solid #e8e8e8; background: #fafafa; padding: 20px 0; }
+        .venue-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+        .venue-title { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
+        .venue-subtitle { font-size: 13px; color: #777; }
+        .venue-nav { margin-top: 12px; display: flex; gap: 4px; }
+        .venue-nav a { display: inline-block; padding: 6px 14px; font-size: 13px; font-weight: 500; color: #555; text-decoration: none; border-radius: 4px; }
+        .venue-nav a:hover { background: #eee; color: #333; }
+        .venue-nav a.active { background: #1a73e8; color: #fff; }
+
+        .stats-row { max-width: 1100px; margin: 0 auto; padding: 14px 24px 0; display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; color: #555; }
+        .stats-row .chip { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; }
+        .stats-row .chip .num { font-weight: 700; color: #333; }
+        .stats-row .chip.green .num { color: #1b7a2b; }
+        .stats-row .chip.red .num { color: #c0392b; }
+
+        .main-layout { max-width: 1100px; margin: 0 auto; padding: 16px 24px 48px; display: flex; gap: 28px; }
+        .sidebar { width: 220px; flex-shrink: 0; }
+        .filter-section { margin-bottom: 16px; }
+        .filter-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #999; font-weight: 600; margin-bottom: 8px; }
+        .filter-section label { display: block; font-size: 13px; color: #444; padding: 3px 0; cursor: pointer; }
+        .filter-section label:hover { color: #1a73e8; }
+        .filter-section input[type="radio"] { margin-right: 6px; accent-color: #1a73e8; }
+        .filter-section input[type="number"] { width: 56px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px; }
+        .filter-section .score-range { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; }
+        .search-input { width: 100%; padding: 8px 10px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 13px; margin-bottom: 12px; background: #fff; }
+        .search-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+        .apply-btn { width: 100%; padding: 7px; background: #1a73e8; color: #fff; border: none; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; }
+        .apply-btn:hover { background: #1557b0; }
+
+        .paper-list { flex: 1; min-width: 0; }
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e8e8e8; }
+        .list-header .count { font-size: 13px; color: #888; }
+
+        .note { border-bottom: 1px solid #eee; padding: 14px 0; }
+        .note:last-child { border-bottom: none; }
+        .note-title { font-family: Georgia, 'Times New Roman', serif; font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 3px; }
+        .note-title a { color: #1a73e8; text-decoration: none; }
+        .note-title a:hover { text-decoration: underline; }
+        .note-authors { font-size: 12.5px; color: #999; font-style: italic; margin-bottom: 4px; }
+        .note-abstract { font-size: 13px; color: #555; line-height: 1.55; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+        .note-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+        .badge-accept { background: #e6f4ea; color: #137333; }
+        .badge-reject { background: #fce8e6; color: #c5221f; }
+        .badge-review { background: #e8f0fe; color: #1967d2; }
+        .badge-pending { background: #fef7e0; color: #b06d00; }
+        .dot { color: #ccc; }
+
+        .score-indicator { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+        .score-indicator .bar { width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; }
+        .score-indicator .fill { height: 100%; border-radius: 2px; }
+        .score-indicator .fill.high { background: #137333; }
+        .score-indicator .fill.mid { background: #e37400; }
+        .score-indicator .fill.low { background: #c5221f; }
+
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
+        .pagination a, .pagination span { display: inline-block; padding: 6px 12px; font-size: 13px; border-radius: 4px; text-decoration: none; color: #555; }
+        .pagination a:hover { background: #f0f0f0; }
+        .pagination .current { background: #1a73e8; color: #fff; font-weight: 600; }
+        .pagination .disabled { color: #ccc; pointer-events: none; }
+        .no-results { text-align: center; color: #999; padding: 48px 16px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">PeerPortal</a>
+        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+        <div class="right">
+            {% if user %}
+            <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('conference-review-submission.login_page') }}">Login</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="venue-header">
+        <div class="venue-inner">
+            <div class="venue-title">{{ venue.name }}</div>
+            <div class="venue-subtitle">{{ venue.full_name }}{% if venue.location %} &mdash; {{ venue.location }}{% endif %}{% if venue.dates %}, {{ venue.dates }}{% endif %}</div>
+            <div class="venue-nav">
+                <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}" class="active">Submissions</a>
+                <a href="{{ url_for('conference-review-submission.stats_page', venue_id=venue.id) }}">Statistics</a>
+                {% if user %}
+                <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-row">
+        <div class="chip"><span class="num">{{ count_all }}</span> Submissions</div>
+        <div class="chip green"><span class="num">{{ count_accepted }}</span> Accepted</div>
+        <div class="chip red"><span class="num">{{ count_rejected }}</span> Rejected</div>
+        {% if count_all > 0 %}
+        <div class="chip"><span class="num">{{ "%.1f"|format(count_accepted / count_all * 100) }}%</span> Accept Rate</div>
+        {% endif %}
+    </div>
+
+    <div class="main-layout">
+        <form class="sidebar" method="get" action="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">
+            <input type="text" class="search-input" name="q" placeholder="Search by title or keyword..." value="{{ q }}">
+            <div class="filter-section">
+                <h4>Decision</h4>
+                <label><input type="radio" name="status" value="" {{ 'checked' if not status }}> All Submissions</label>
+                <label><input type="radio" name="status" value="accepted" {{ 'checked' if status == 'accepted' }}> Accepted</label>
+                <label><input type="radio" name="status" value="rejected" {{ 'checked' if status == 'rejected' }}> Rejected</label>
+            </div>
+            {% if show_scores %}
+            <div class="filter-section">
+                <h4>Avg. Score</h4>
+                <div class="score-range">
+                    <input type="number" name="score_min" value="{{ score_min }}" min="1" max="10" step="0.5" placeholder="Min">
+                    <span>to</span>
+                    <input type="number" name="score_max" value="{{ score_max }}" min="1" max="10" step="0.5" placeholder="Max">
+                </div>
+            </div>
+            {% endif %}
+            <div class="filter-section">
+                <h4>Sort</h4>
+                <label><input type="radio" name="sort" value="title" {{ 'checked' if sort == 'title' }}> Title</label>
+                {% if show_scores %}
+                <label><input type="radio" name="sort" value="score_desc" {{ 'checked' if sort == 'score_desc' }}> Score (high first)</label>
+                <label><input type="radio" name="sort" value="score_asc" {{ 'checked' if sort == 'score_asc' }}> Score (low first)</label>
+                {% endif %}
+                <label><input type="radio" name="sort" value="reviews" {{ 'checked' if sort == 'reviews' }}> Most reviewed</label>
+            </div>
+            <button type="submit" class="apply-btn">Apply Filters</button>
+        </form>
+
+        <div class="paper-list">
+            <div class="list-header">
+                <span class="count">
+                    {% if q %}Search results for "{{ q }}" &mdash; {% endif %}
+                    Showing {{ papers|length }} of {{ total_count }} submissions
+                </span>
+            </div>
+
+            {% if papers %}
+            {% for paper in papers %}
+            <div class="note">
+                <div class="note-title">
+                    <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a>
+                </div>
+                <div class="note-authors">Anonymous</div>
+                {% if paper.abstract %}
+                <div class="note-abstract">{{ paper.abstract }}</div>
+                {% endif %}
+                <div class="note-meta">
+                    {% if venue.status == 'decisions_posted' %}
+                        {% if paper.accepted %}
+                        <span class="badge badge-accept">Accept</span>
+                        {% else %}
+                        <span class="badge badge-reject">Reject</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge badge-review">Under Review</span>
+                    {% endif %}
+
+                    {% if show_scores and paper.avg_score is not none %}
+                    {% set score_class = 'high' if paper.avg_score >= 7 else ('mid' if paper.avg_score >= 5 else 'low') %}
+                    <span class="score-indicator">
+                        <span class="bar"><span class="fill {{ score_class }}" style="width:{{ paper.avg_score / 10 * 100 }}%"></span></span>
+                        {{ paper.avg_score }}
+                    </span>
+                    {% endif %}
+
+                    <span class="dot">&middot;</span>
+                    <span>{{ paper.num_reviews }} review{{ 's' if paper.num_reviews != 1 }}</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id, q=q, status=status, sort=sort, score_min=score_min, score_max=score_max, page=page-1) }}">&laquo; Prev</a>
+                {% else %}
+                <span class="disabled">&laquo; Prev</span>
+                {% endif %}
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="current">{{ p }}</span>
+                    {% elif p <= 3 or p >= total_pages - 1 or (p >= page - 2 and p <= page + 2) %}
+                    <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id, q=q, status=status, sort=sort, score_min=score_min, score_max=score_max, page=p) }}">{{ p }}</a>
+                    {% elif p == 4 or p == total_pages - 2 %}
+                    <span style="color:#aaa">...</span>
+                    {% endif %}
+                {% endfor %}
+                {% if page < total_pages %}
+                <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id, q=q, status=status, sort=sort, score_min=score_min, score_max=score_max, page=page+1) }}">Next &raquo;</a>
+                {% else %}
+                <span class="disabled">Next &raquo;</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="no-results">
+                {% if count_all == 0 %}
+                No submissions have been posted for this venue yet.
+                {% else %}
+                No submissions match your criteria.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

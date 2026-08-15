@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order History -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .header-nav a { margin-left: 1rem; font-size: .85rem; color: #6b5b4f; text-decoration: none; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .page-title { font-size: 1.4rem; color: #2d2d2d; margin-bottom: .3rem; }
+        .subtitle { font-size: .9rem; color: #a09080; margin-bottom: 1.5rem; }
+        .order-card { border: 1px solid #e8dfd3; border-radius: .5rem; background: #fff; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+        .order-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: .5rem; }
+        .order-number { font-weight: 600; color: #8b4513; font-size: 1rem; }
+        .order-date { font-size: .85rem; color: #a09080; }
+        .order-lines { list-style: none; padding: 0; margin: .6rem 0; }
+        .order-lines li { font-size: .9rem; color: #4a4a4a; padding: .2rem 0; display: flex; justify-content: space-between; }
+        .order-lines li a { color: #8b4513; text-decoration: none; }
+        .order-lines li a:hover { text-decoration: underline; }
+        .order-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f5efe6; padding-top: .5rem; margin-top: .5rem; }
+        .order-total { font-weight: 600; color: #2d2d2d; font-size: .95rem; }
+        .status-pill { font-size: .75rem; color: #2e7d32; background: #e8f5e9; padding: .15rem .55rem; border-radius: 1rem; }
+        .btn-sm { padding: .35rem .8rem; border: 1px solid #d4c5b0; border-radius: .25rem; background: #fff; cursor: pointer; font-size: .8rem; color: #6b5b4f; text-decoration: none; }
+        .btn-sm:hover { background: #f5efe6; }
+        .empty { color: #a09080; font-size: .95rem; padding: 2rem 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('books-comics.index') }}">Browse</a>
+            <a href="{{ url_for('books-comics.dashboard') }}">My Library</a>
+            <a href="{{ url_for('books-comics.cart_page') }}">Cart</a>
+            <a href="{{ url_for('books-comics.logout') }}">Logout</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h1 class="page-title">Order History</h1>
+        <p class="subtitle">Your purchase records and receipts. This is separate from your <a href="{{ url_for('books-comics.dashboard') }}" style="color:#8b4513">reading library</a>.</p>
+
+        {% if orders %}
+        {% for o in orders %}
+        <div class="order-card" id="order-{{ o.id }}">
+            <div class="order-top">
+                <span class="order-number">Order {{ o.order_number }}</span>
+                <span class="order-date">{{ o.created_at }}</span>
+            </div>
+            <ul class="order-lines">
+                {% for item in o["items"] %}
+                <li>
+                    <a href="{{ url_for('books-comics.book_detail', book_id=item.book_id) }}">{{ item.title }}</a>
+                    <span>{% if item.price and item.price > 0 %}${{ "%.2f"|format(item.price) }}{% else %}Free{% endif %}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="order-foot">
+                <span class="order-total">{{ o.item_count }} item(s) &middot; Total ${{ "%.2f"|format(o.total) }}</span>
+                <span>
+                    <span class="status-pill">{{ o.status }}</span>
+                    <a class="btn-sm" href="{{ url_for('books-comics.order_receipt', order_id=o.id) }}">View Receipt</a>
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty">You have no orders yet. Books you purchase at checkout will be recorded here as receipts.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

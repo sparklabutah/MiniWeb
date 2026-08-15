@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} — TumblrVibe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1a1a2e; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.7; }
+        a { color: #7c83ff; text-decoration: none; }
+        a:hover { color: #a5aaff; }
+
+        .top-bar { background: #16213e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #7c83ff; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .nav-links .btn-login { background: #e94560; color: #fff; padding: .45rem 1.2rem; border-radius: 1rem; font-size: .9rem; font-weight: 700; }
+        .top-bar .nav-links .btn-login:hover { background: #c03050; }
+
+        .post-container { max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
+
+        .back-link { display: inline-block; margin-bottom: 1rem; font-size: .9rem; color: #7c83ff; font-weight: 600; padding: .3rem 0; }
+        .back-link:hover { color: #a5aaff; }
+
+        .post-full { background: #16213e; border-radius: .6rem; overflow: hidden; }
+        .post-full img.hero { width: 100%; max-height: 400px; object-fit: cover; }
+        .post-body-wrap { padding: 1.5rem 1.8rem; }
+        .post-header { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
+        .post-header img.avatar { width: 44px; height: 44px; border-radius: 50%; }
+        .post-header .author-info .name { font-weight: 700; font-size: 1rem; }
+        .post-header .author-info .username { font-size: .8rem; color: #888; }
+        .post-header .post-date { margin-left: auto; font-size: .8rem; color: #888; }
+
+        h1.post-title { font-size: 1.6rem; font-weight: 800; margin-bottom: .8rem; color: #f0f0f5; }
+        .post-body { font-size: .95rem; color: #c5c5d0; white-space: pre-line; margin-bottom: 1.2rem; }
+        .post-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+        .post-tags a { font-size: .8rem; color: #7c83ff; background: #1a1a2e; padding: .2rem .5rem; border-radius: .3rem; }
+        .post-meta { display: flex; gap: 1rem; font-size: .8rem; color: #888; padding-top: .8rem; border-top: 1px solid #0f3460; align-items: center; flex-wrap: wrap; }
+        .post-meta .cat-badge { background: #0f3460; color: #7c83ff; padding: .15rem .5rem; border-radius: .25rem; }
+
+        /* Action buttons row */
+        .action-bar { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid #0f3460; }
+        .action-bar button, .action-bar a.btn { background: #0f3460; color: #b0b0c0; border: 1px solid #0f3460; padding: .45rem .9rem; border-radius: .4rem; cursor: pointer; font-size: .85rem; font-weight: 600; display: inline-flex; align-items: center; gap: .3rem; }
+        .action-bar button:hover, .action-bar a.btn:hover { background: #7c83ff; color: #fff; border-color: #7c83ff; }
+        .action-bar button.btn-follow { background: #7c83ff; color: #fff; border-color: #7c83ff; }
+        .action-bar button.btn-follow:hover { background: #6b72e8; }
+        .action-bar button.btn-save { background: #e94560; color: #fff; border-color: #e94560; }
+        .action-bar button.btn-save:hover { background: #c03050; }
+        .action-bar button.btn-subscribe { background: #2ecc71; color: #fff; border-color: #2ecc71; }
+        .action-bar button.btn-subscribe:hover { background: #27ae60; }
+        .action-bar button.btn-like { background: #e94560; color: #fff; border-color: #e94560; }
+        .action-bar button.btn-like:hover { background: #c03050; }
+        .action-bar button.btn-like.liked { background: #ff6b81; border-color: #ff6b81; }
+        .action-bar button.btn-reblog { background: #2ecc71; color: #fff; border-color: #2ecc71; }
+        .action-bar button.btn-reblog:hover { background: #27ae60; }
+
+        .reblog-banner { background: #0f3460; color: #b0b0c0; font-size: .8rem; padding: .5rem .8rem; border-radius: .4rem; margin-bottom: 1rem; }
+        .reblog-banner a { font-weight: 600; }
+        .action-bar .btn-report { background: transparent; color: #888; border: 1px solid #333; }
+        .action-bar .btn-report:hover { color: #e94560; border-color: #e94560; }
+
+        .share-dropdown { position: relative; display: inline-block; }
+        .share-options { display: none; position: absolute; right: 0; top: 100%; background: #16213e; border: 1px solid #0f3460; border-radius: .3rem; min-width: 120px; z-index: 10; }
+        .share-options.open { display: block; }
+        .share-options a { display: block; padding: .4rem .7rem; font-size: .8rem; color: #b0b0c0; }
+        .share-options a:hover { background: #0f3460; color: #fff; }
+
+        .action-status { margin-top: .5rem; padding: .4rem .7rem; border-radius: .3rem; font-size: .85rem; display: none; }
+        .action-status.show { display: block; }
+        .action-status.success { background: #0f3460; color: #7c83ff; }
+        .action-status.error { background: #3d1a2e; color: #e94560; }
+
+        .comments-section { margin-top: 1.5rem; }
+        .comments-section h3 { font-size: 1rem; color: #7c83ff; margin-bottom: 1rem; }
+        .comment { background: #1a1a2e; border-radius: .4rem; padding: .8rem 1rem; margin-bottom: .6rem; border-left: 3px solid #7c83ff; }
+        .comment .c-header { display: flex; gap: .5rem; align-items: center; margin-bottom: .3rem; }
+        .comment .c-author { font-weight: 600; font-size: .85rem; }
+        .comment .c-date { font-size: .75rem; color: #888; margin-left: auto; }
+        .comment .c-body { font-size: .85rem; color: #b0b0c0; }
+
+        .related-section { margin-top: 2rem; }
+        .related-section h3 { font-size: 1rem; color: #7c83ff; margin-bottom: .8rem; }
+        .related-card { background: #16213e; border-radius: .4rem; padding: .8rem 1rem; margin-bottom: .5rem; }
+        .related-card .r-title { font-weight: 600; font-size: .9rem; }
+        .related-card .r-meta { font-size: .75rem; color: #888; }
+
+        .back-bottom { display: inline-block; margin-top: 2rem; margin-bottom: 2rem; font-size: .9rem; color: #7c83ff; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('blogs.index') }}" class="logo">TumblrVibe</a>
+        <div class="nav-links">
+            <a href="{{ url_for('blogs.index') }}">Home</a>
+            <a href="{{ url_for('blogs.index') }}">Feed</a>
+            {% if user %}
+            <a href="{{ url_for('blogs.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('blogs.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('blogs.login_page') }}" class="btn-login">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="post-container">
+        <a href="{{ url_for('blogs.index') }}" class="back-link">&larr; Back to posts</a>
+
+        <div class="post-full">
+            {% if post.image_url %}
+            <img src="{{ post.image_url }}" alt="" class="hero">
+            {% endif %}
+            <div class="post-body-wrap">
+                {% if post.reblog_of %}
+                <div class="reblog-banner">
+                    {{ post.author_display_name }} reblogged
+                    <a href="{{ url_for('blogs.post_detail', post_id=post.reblog_of) }}">"{{ post.reblog_of_title }}"</a>
+                    from @{{ post.reblog_of_author }}
+                </div>
+                {% endif %}
+                <div class="post-header">
+                    <img src="{{ post.author_avatar }}" alt="" class="avatar">
+                    <div class="author-info">
+                        <div class="name">{{ post.author_display_name }}</div>
+                        <div class="username">@{{ post.author_username }}</div>
+                    </div>
+                    <span class="post-date">{{ post.date }}</span>
+                </div>
+                <h1 class="post-title">{{ post.title }}</h1>
+                <div class="post-body">{{ post.body }}</div>
+                <div class="post-tags">
+                    {% for t in post.tags %}
+                    <a href="{{ url_for('blogs.tag_page', tag_name=t) }}">#{{ t }}</a>
+                    {% endfor %}
+                </div>
+                <div class="post-meta">
+                    <span class="cat-badge">{{ post.category }}</span>
+                    <span>{{ post.notes_count }} notes</span>
+                    <span>{{ post.shared_count }} shares</span>
+                    <button data-miniweb-share data-share-title="{{ post.title }}" style="background:#0f3460;color:#fff;border:none;padding:.3rem .6rem;border-radius:.3rem;cursor:pointer;font-size:.8rem;margin-left:.5rem;">Share</button>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="action-bar">
+                    {% if user %}
+                    <form method="post" action="{{ url_for('blogs.form_like_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-like{% if post.id in user.get('liked_posts', []) %} liked{% endif %}" id="like-btn">
+                            {% if post.id in user.get('liked_posts', []) %}&#9829; Liked{% else %}&#9825; Like{% endif %}
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('blogs.form_reblog_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-reblog" id="reblog-btn">&#8635; Reblog</button>
+                    </form>
+                    <form method="post" action="{{ url_for('blogs.form_follow_blog', post_id=post.id) }}" style="display:inline">
+                        <input type="hidden" name="blog" value="{{ post.author_username }}">
+                        <button type="submit" class="btn-follow" id="follow-btn">
+                            {% if post.author_username in user.get('followed_blogs', []) %}Unfollow{% else %}Follow{% endif %} @{{ post.author_username }}
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('blogs.form_save_post', post_id=post.id) }}" style="display:inline">
+                        <button type="submit" class="btn-save" id="save-btn">
+                            {% if post.id in user.get('saved_posts', []) %}Unsave{% else %}Save{% endif %} Post
+                        </button>
+                    </form>
+                    {% for t in post.tags %}
+                    <form method="post" action="{{ url_for('blogs.form_subscribe_tag', post_id=post.id) }}" style="display:inline">
+                        <input type="hidden" name="tag" value="{{ t }}">
+                        <button type="submit" class="btn-subscribe">
+                            {% if t in user.get('subscribed_tags', []) %}Unsubscribe{% else %}Subscribe{% endif %} #{{ t }}
+                        </button>
+                    </form>
+                    {% endfor %}
+                    {% endif %}
+                    <a class="btn btn-report" href="{{ url_for('blogs.report_page', post_id=post.id) }}">Report</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="comments-section">
+            <h3>{{ comments|length }} Comments</h3>
+            {% if user %}
+            <form method="post" action="{{ url_for('blogs.form_add_comment', post_id=post.id) }}" style="margin-bottom:1rem;display:flex;flex-direction:column;gap:.5rem;">
+                <input type="hidden" name="author_username" value="{{ user.username }}">
+                <textarea name="body" id="comment-body" placeholder="Write a comment..." rows="3" required style="background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:.4rem;padding:.6rem;font-size:.85rem;resize:vertical;"></textarea>
+                <button type="submit" style="align-self:flex-end;background:#7c83ff;color:#fff;border:none;padding:.45rem 1rem;border-radius:.4rem;cursor:pointer;font-weight:600;">Post Comment</button>
+            </form>
+            {% endif %}
+            {% for c in comments %}
+            <div class="comment">
+                <div class="c-header">
+                    <span class="c-author">{{ c.author_display_name }}</span>
+                    <span class="c-date">{{ c.date }}</span>
+                </div>
+                <div class="c-body">{{ c.body }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if related %}
+        <div class="related-section">
+            <h3>More in {{ post.category }}</h3>
+            {% for r in related %}
+            <div class="related-card">
+                <div class="r-title"><a href="{{ url_for('blogs.post_detail', post_id=r.id) }}">{{ r.title }}</a></div>
+                <div class="r-meta">{{ r.author_display_name }} &middot; {{ r.date }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <a href="{{ url_for('blogs.index') }}" class="back-bottom">&larr; Back to posts</a>
+    </div>
+
+    <!-- All actions are now form-based, no JavaScript needed -->
+</body>
+</html>

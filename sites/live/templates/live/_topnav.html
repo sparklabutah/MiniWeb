@@ -1,0 +1,30 @@
+<header class="tw-topnav">
+    <div class="tw-topnav-left">
+        <a class="tw-logo" href="{{ url_for('live.index') }}">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#9147ff"/><path d="M6 16h4l2.5-7 4 14 3-9 1.8 4H26" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            PulseLive
+        </a>
+        <a class="tw-navlink {{ 'active' if active_nav == 'following' }}" href="{{ url_for('live.subscriptions_page') }}">Following</a>
+        <a class="tw-navlink {{ 'active' if active_nav == 'browse' }}" href="{{ url_for('live.index') }}">Browse</a>
+    </div>
+
+    <form class="tw-search" method="get" action="{{ url_for('live.index') }}">
+        <input type="text" name="q" value="{{ q|default('') }}" placeholder="Search" autocomplete="off">
+        <button type="submit" aria-label="Search">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M14 14l4 4M8.5 15a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+    </form>
+
+    <div class="tw-topnav-right">
+        {% if logged_in %}
+            <a class="tw-user" href="{{ url_for('live.subscriptions_page') }}">
+                <span class="tw-avatar" style="width:30px;height:30px;font-size:.78rem;background:#9147ff;">{{ user.display_name[0]|upper if user else '?' }}</span>
+                {{ user.display_name }}
+            </a>
+            <a class="tw-btn-2 tw-btn-sm" href="{{ url_for('live.logout') }}">Log Out</a>
+        {% else %}
+            <a class="tw-btn-2" href="{{ url_for('live.login_page') }}">Log In</a>
+            <a class="tw-btn" href="{{ url_for('live.register_page') }}">Sign Up</a>
+        {% endif %}
+    </div>
+</header>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Snippets -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .btn-login-nav { background: #89b4fa; color: #1e1e2e !important; padding: .3rem .8rem !important; border-radius: .3rem; font-weight: 600; }
+        .breadcrumb { padding: .6rem 2rem; font-size: .85rem; color: #6c7086; }
+        .breadcrumb a { color: #89b4fa; }
+        .content { max-width: 700px; margin: 1rem auto 2rem; padding: 0 1.5rem; }
+        .content h2 { font-family: monospace; font-size: 1.3rem; margin-bottom: 1.2rem; }
+        .export-section { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .export-section h3 { font-size: 1rem; color: #a6adc8; margin-bottom: .8rem; }
+        .export-section p { font-size: .9rem; color: #6c7086; margin-bottom: 1rem; }
+        .export-links { display: flex; gap: .8rem; flex-wrap: wrap; }
+        .export-links a { padding: .6rem 1.2rem; border-radius: .3rem; font-size: .9rem; font-weight: 600; display: inline-block; }
+        .btn-csv { background: #a6e3a1; color: #1e1e2e; }
+        .btn-json { background: #89b4fa; color: #1e1e2e; }
+        .btn-csv:hover, .btn-json:hover { text-decoration: none; opacity: .9; }
+        .category-list { margin-top: 1rem; }
+        .category-item { display: flex; align-items: center; justify-content: space-between; padding: .5rem .8rem; border-bottom: 1px solid #313244; }
+        .category-item:last-child { border-bottom: none; }
+        .category-name { color: #a6e3a1; font-size: .9rem; }
+        .category-links a { font-size: .8rem; margin-left: .5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        {% if user %}
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('code-editor-execution.login_page') }}" class="btn-login-nav">Login / Sign In</a>
+        {% endif %}
+    </div>
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a> &rarr; Export
+    </div>
+
+    <div class="content">
+        <h2>Export Snippets</h2>
+
+        <div class="export-section">
+            <h3>Export All Snippets</h3>
+            <p>Download all snippets in your preferred format.</p>
+            <div class="export-links">
+                <a class="btn-csv" href="{{ url_for('code-editor-execution.api_export', format='csv') }}" >Download CSV</a>
+                <a class="btn-json" href="{{ url_for('code-editor-execution.api_export', format='json') }}" >Download JSON</a>
+            </div>
+        </div>
+
+        <div class="export-section">
+            <h3>Export by Category</h3>
+            <p>Download snippets filtered by category.</p>
+            <div class="category-list">
+                {% for cat in categories %}
+                <div class="category-item">
+                    <span class="category-name">{{ cat }}</span>
+                    <div class="category-links">
+                        <a href="{{ url_for('code-editor-execution.api_export', format='csv', category=cat) }}" >CSV</a>
+                        <a href="{{ url_for('code-editor-execution.api_export', format='json', category=cat) }}" >JSON</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

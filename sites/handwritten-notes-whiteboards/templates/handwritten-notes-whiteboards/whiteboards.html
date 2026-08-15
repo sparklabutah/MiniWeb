@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whiteboards - NoteCanvas</title>
+    <style>
+        :root {
+            --amber: #f59e0b;
+            --amber-dark: #d97706;
+            --text-primary: #1c1917;
+            --text-secondary: #57534e;
+            --text-muted: #a8a29e;
+            --bg-page: #fafaf9;
+            --bg-card: #ffffff;
+            --border: #e7e5e4;
+            --border-light: #f5f5f4;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,.07);
+            --radius: .5rem;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-page); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; line-height: 1.5; }
+        a { color: var(--amber-dark); text-decoration: none; }
+        a:hover { color: var(--amber); }
+        .top-bar {
+            background: var(--bg-card); padding: .55rem 1.25rem;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 200;
+        }
+        .logo { font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; color: var(--text-primary); }
+        .nav-links { display: flex; gap: .6rem; align-items: center; }
+        .nav-links a { color: var(--text-secondary); font-size: .85rem; font-weight: 500; padding: .35rem .65rem; border-radius: var(--radius); }
+        .nav-links a:hover { background: var(--border-light); color: var(--text-primary); }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 1.75rem 1.25rem; }
+        .page-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.25rem; }
+        .page-head h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+        .page-head .count { color: var(--text-muted); font-size: .85rem; }
+        .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+        .board-card {
+            display: block; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden;
+            transition: box-shadow .15s, transform .15s;
+        }
+        .board-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .board-preview {
+            height: 120px; position: relative;
+            background-color: #fff;
+            background-image:
+                linear-gradient(var(--border-light) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-light) 1px, transparent 1px);
+            background-size: 18px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+        .board-body { padding: .7rem .85rem; }
+        .board-title { font-weight: 700; font-size: .95rem; color: var(--text-primary); margin-bottom: .2rem; }
+        .board-meta { font-size: .75rem; color: var(--text-muted); }
+        .empty { text-align: center; color: var(--text-muted); padding: 3rem 1rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('handwritten-notes-whiteboards.index') }}" class="logo">NoteCanvas</a>
+        <div class="nav-links">
+            <a href="{{ url_for('handwritten-notes-whiteboards.index') }}">All Notes</a>
+            <a href="{{ url_for('handwritten-notes-whiteboards.whiteboards_page') }}">Whiteboards</a>
+            {% if user %}<span style="color:var(--text-muted);font-size:.8rem;">{{ user.display_name }}</span>{% endif %}
+        </div>
+    </div>
+
+    <div class="wrap">
+        <div class="page-head">
+            <h1>Whiteboards</h1>
+            <span class="count">{{ whiteboards | length }} board{{ '' if whiteboards|length == 1 else 's' }}</span>
+        </div>
+
+        {% if whiteboards %}
+        <div class="board-grid">
+            {% for wb in whiteboards %}
+            <a class="board-card" href="{{ url_for('handwritten-notes-whiteboards.whiteboard_detail', wb_id=wb.id) }}">
+                <div class="board-preview">
+                    {% for el in wb.elements[:8] %}
+                    <div style="position:absolute;
+                                left:{{ (el.x / 6) | round(0, 'floor') }}px;
+                                top:{{ (el.y / 6) | round(0, 'floor') }}px;
+                                width:{{ [(el.width / 6) | round(0, 'floor'), 8] | max }}px;
+                                height:{{ [(el.height / 6) | round(0, 'floor'), 6] | max }}px;
+                                background:{{ el.color }};
+                                border-radius:2px;opacity:.9;"></div>
+                    {% endfor %}
+                </div>
+                <div class="board-body">
+                    <div class="board-title">{{ wb.title }}</div>
+                    <div class="board-meta">{{ wb.element_count }} element{{ '' if wb.element_count == 1 else 's' }} &middot; updated {{ (wb.updated_at or '')[:10] }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            {% if user %}You have no whiteboards yet.{% else %}<a href="{{ url_for('handwritten-notes-whiteboards.login_page') }}">Sign in</a> to see your whiteboards.{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

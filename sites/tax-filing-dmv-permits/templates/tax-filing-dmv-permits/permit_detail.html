@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permit {{ permit.permit_id }} - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'permits' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <a class="back" href="{{ url_for('tax-filing-dmv-permits.permits_page') }}">&larr; Back to Permits</a>
+        <div class="detail-card">
+            <h2>{{ permit.permit_id }} &mdash; {{ permit.type }}</h2>
+            <div class="detail-grid">
+                <div><div class="field-label">Applicant</div><div class="field-value">{{ permit.applicant_name }}</div></div>
+                <div><div class="field-label">Status</div><div class="field-value"><span class="badge badge-{{ permit.status }}">{{ permit.status|title }}</span></div></div>
+                <div><div class="field-label">Address</div><div class="field-value">{{ permit.address }}</div></div>
+                <div><div class="field-label">Fee</div><div class="field-value">${{ "%.2f"|format(permit.fee) }} ({{ 'Paid' if permit.fee_paid else 'Unpaid' }})</div></div>
+                <div><div class="field-label">Date Submitted</div><div class="field-value">{{ permit.date_submitted }}</div></div>
+                <div><div class="field-label">Date Approved</div><div class="field-value">{{ permit.date_approved or 'Pending' }}</div></div>
+                <div><div class="field-label">Valid From</div><div class="field-value">{{ permit.valid_from or 'N/A' }}</div></div>
+                <div><div class="field-label">Valid To</div><div class="field-value">{{ permit.valid_to or 'N/A' }}</div></div>
+                {% if permit.reviewed_by %}<div><div class="field-label">Reviewed By</div><div class="field-value">{{ permit.reviewed_by }}</div></div>{% endif %}
+                <div style="grid-column:span 2"><div class="field-label">Description</div><div class="field-value">{{ permit.description }}</div></div>
+                {% if permit.notes %}<div style="grid-column:span 2"><div class="field-label">Notes</div><div class="field-value">{{ permit.notes }}</div></div>{% endif %}
+            </div>
+        </div>
+        {% if payments %}
+        <div class="payments-section">
+            <h3>Related Payments</h3>
+            <table>
+                <thead><tr><th>Payment ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr><td>{{ p.payment_id }}</td><td>${{ "%.2f"|format(p.amount) }}</td><td>{{ p.method|replace("_"," ")|title }}</td><td>{{ p.payment_date }}</td><td>{{ p.status|title }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

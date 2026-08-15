@@ -1,0 +1,127 @@
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}{{ artist.name }} — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<!-- Artist header -->
+<div style="display:flex;align-items:flex-end;gap:24px;margin-bottom:30px;flex-wrap:wrap;">
+    <div class="art" style="width:200px;height:200px;border-radius:50%;margin:0;flex-shrink:0;background:linear-gradient(135deg, {{ artist.avatar_color | default('#1db954') }}, #191414);">{{ art_note }}</div>
+    <div style="flex:1;min-width:240px;">
+        <h1 class="page-h" style="margin-bottom:6px;">{{ artist.name }}{% if artist.verified %}<span style="background:#1db954;color:#000;padding:2px 8px;border-radius:3px;font-size:.7rem;font-weight:700;text-transform:uppercase;margin-left:10px;vertical-align:middle;">Verified</span>{% endif %}</h1>
+        <div style="color:#b3b3b3;font-size:.95rem;margin-bottom:6px;">{{ artist.genre }}</div>
+        <div style="color:#a7a7a7;font-size:.9rem;max-width:600px;margin-bottom:10px;">{{ artist.bio }}</div>
+        <div style="display:flex;gap:26px;font-size:.85rem;color:#888;">
+            <span>{{ "{:,}".format(artist.monthly_listeners) }} monthly listeners</span>
+            <span>{{ albums|length }} albums</span>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <!-- Follow toggle (follow_by_toggle) -->
+            <button type="button" class="btn-outline {% if is_following %}following{% endif %}" onclick="toggleFollow({{ artist.id }})" id="follow-btn"{% if is_following %} style="border-color:#1db954;color:#1db954;"{% endif %}>
+                {% if is_following %}Following{% else %}Follow{% endif %}
+            </button>
+            <!-- Follow dropdown (follow_by_dropdown) -->
+            <div class="dropdown-wrap" style="position:relative;display:inline-block;">
+                <button class="btn-outline" onclick="toggleDropdown('follow-menu')">More</button>
+                <div class="dropdown-menu" id="follow-menu" style="display:none;position:absolute;top:110%;left:0;background:#282828;border-radius:6px;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:50;overflow:hidden;">
+                    <button class="dropdown-item" onclick="toggleFollow({{ artist.id }})" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">{% if is_following %}Unfollow{% else %}Follow{% endif %} Artist</button>
+                </div>
+            </div>
+            <!-- Share (global MiniWebShare) -->
+            <button type="button" class="btn-outline" data-miniweb-share data-share-title="{{ artist.name }}">Share</button>
+            <!-- Subscribe toggle (subscribe_by_toggle) -->
+            <button type="button" class="btn-outline {% if is_subscribed %}subscribed{% endif %}" onclick="toggleSubscribe({{ artist.id }})" id="subscribe-btn"{% if is_subscribed %} style="background:#f59e0b;border-color:#f59e0b;color:#000;"{% endif %}>
+                {% if is_subscribed %}Subscribed{% else %}Subscribe{% endif %}
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2 class="section-title">Popular Tracks</h2>
+    <ul class="tracks">
+        {% for track in tracks[:10] %}
+        <li class="trow">
+            <span class="tnum">{{ loop.index }}</span>
+            <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                <div class="tartist"><a href="{{ url_for('music.album_detail', album_id=track.album_id) }}">{{ track.album_title }}</a></div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tplays">{{ track.plays_formatted }}</span>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="section">
+    <h2 class="section-title">Discography</h2>
+    <div class="grid">
+        {% for album in albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.release_date }} &middot; {{ album.tracks_count }} tracks</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFollow(artistId) {
+    fetch("{{ url_for('music.api_follow_artist') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({artist_id: artistId})
+    }).then(r => r.json()).then(data => {
+        const btn = document.getElementById("follow-btn");
+        if (data.action === "followed") {
+            btn.textContent = "Following";
+            btn.classList.add("following");
+            btn.style.borderColor = "#1db954"; btn.style.color = "#1db954";
+        } else {
+            btn.textContent = "Follow";
+            btn.classList.remove("following");
+            btn.style.borderColor = ""; btn.style.color = "";
+        }
+        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
+    });
+}
+function toggleSubscribe(artistId) {
+    fetch("/sites/music/api/subscribe", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({type: "artist", id: artistId})
+    }).then(r => r.json()).then(data => {
+        const btn = document.getElementById("subscribe-btn");
+        if (data.action === "subscribed") {
+            btn.textContent = "Subscribed";
+            btn.classList.add("subscribed");
+            btn.style.background = "#f59e0b"; btn.style.borderColor = "#f59e0b"; btn.style.color = "#000";
+        } else {
+            btn.textContent = "Subscribe";
+            btn.classList.remove("subscribed");
+            btn.style.background = ""; btn.style.borderColor = ""; btn.style.color = "";
+        }
+    });
+}
+function toggleDropdown(menuId) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => {
+        if (m.id !== menuId) m.style.display = "none";
+    });
+    var el = document.getElementById(menuId);
+    el.style.display = (el.style.display === "block") ? "none" : "block";
+}
+document.addEventListener("click", function(e) {
+    if (!e.target.closest(".dropdown-wrap")) {
+        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
+    }
+});
+</script>
+{% endblock %}

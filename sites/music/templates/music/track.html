@@ -1,0 +1,119 @@
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}{{ track.title }} — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<!-- Track header -->
+<div style="display:flex;align-items:flex-end;gap:24px;margin-bottom:26px;flex-wrap:wrap;">
+    <div class="art" style="width:220px;height:220px;margin:0;flex-shrink:0;background: {{ track.album_cover_color }};">{{ art_note }}</div>
+    <div style="flex:1;min-width:240px;">
+        <div style="font-size:.8rem;color:#ccc;text-transform:uppercase;letter-spacing:1px;">Song</div>
+        <h1 class="page-h" style="margin:6px 0;font-size:2.4rem;">{{ track.title }}</h1>
+        <div style="font-size:.95rem;color:#ccc;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" style="color:#fff;font-weight:600;">{{ track.artist_name }}</a>
+            <span>&middot;</span>
+            <a href="{{ url_for('music.album_detail', album_id=album.id) }}" style="color:#fff;font-weight:600;">{{ track.album_title }}</a>
+            <span>&middot; {{ track.duration_formatted }}</span>
+        </div>
+        <div style="font-size:.9rem;color:#888;margin-top:6px;">{{ track.plays_formatted }} plays</div>
+        <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-green" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654; Play</button>
+            <button class="btn-outline {% if is_liked %}liked{% endif %}" onclick="toggleLike({{ track.id }})" id="like-btn"{% if is_liked %} style="border-color:#1db954;color:#1db954;"{% endif %}>
+                {% if is_liked %}Liked{% else %}Like{% endif %}
+            </button>
+            <!-- Share (global MiniWebShare) -->
+            <button class="btn-outline" data-miniweb-share data-share-title="{{ track.title }}">Share</button>
+            <!-- Add to playlist dropdown (add_by_button / select_by_dropdown) -->
+            {% if user and playlists %}
+            <div class="dropdown-wrap" style="position:relative;display:inline-block;">
+                <button class="btn-outline" onclick="toggleDropdown('add-pl-menu')">Add to Playlist</button>
+                <div class="dropdown-menu" id="add-pl-menu" style="display:none;position:absolute;top:110%;left:0;background:#282828;border-radius:6px;min-width:180px;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:50;overflow:hidden;">
+                    {% for pl in playlists %}
+                    <button class="dropdown-item" onclick="addToPlaylist({{ pl.id }}, {{ track.id }})" style="padding:10px 16px;font-size:.85rem;color:#e0e0e0;cursor:pointer;display:block;border:none;background:none;width:100%;text-align:left;">{{ pl.name }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="form-card" style="max-width:none;margin:0 0 26px;">
+    <dl>
+        <dt style="font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Album</dt>
+        <dd style="font-size:1rem;color:#e0e0e0;margin-bottom:16px;"><a href="{{ url_for('music.album_detail', album_id=album.id) }}" style="color:#1db954;">{{ album.title }}</a></dd>
+        <dt style="font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Artist</dt>
+        <dd style="font-size:1rem;color:#e0e0e0;margin-bottom:16px;"><a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" style="color:#1db954;">{{ artist.name }}</a></dd>
+        <dt style="font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Track Number</dt>
+        <dd style="font-size:1rem;color:#e0e0e0;margin-bottom:16px;">{{ track.track_number }}</dd>
+        <dt style="font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Duration</dt>
+        <dd style="font-size:1rem;color:#e0e0e0;margin-bottom:16px;">{{ track.duration_formatted }}</dd>
+        <dt style="font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Plays</dt>
+        <dd style="font-size:1rem;color:#e0e0e0;">{{ "{:,}".format(track.plays) }}</dd>
+    </dl>
+</div>
+
+{% if album_tracks %}
+<div class="section">
+    <h2 class="section-title">More from {{ album.title }}</h2>
+    <ul class="tracks">
+        {% for t in album_tracks %}
+        <li class="trow">
+            <span class="tnum">{{ t.track_number }}</span>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=t.id) }}">{{ t.title }}</a></div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ t.id }})">&#9654;</button>
+            <span class="tdur">{{ t.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleLike(trackId) {
+    fetch("/sites/music/api/tracks/" + trackId + "/like", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"}
+    }).then(r => r.json()).then(data => {
+        const btn = document.getElementById("like-btn");
+        if (data.action === "liked") {
+            btn.textContent = "Liked";
+            btn.classList.add("liked");
+            btn.style.borderColor = "#1db954"; btn.style.color = "#1db954";
+        } else {
+            btn.textContent = "Like";
+            btn.classList.remove("liked");
+            btn.style.borderColor = ""; btn.style.color = "";
+        }
+    });
+}
+function toggleDropdown(menuId) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => {
+        if (m.id !== menuId) m.style.display = "none";
+    });
+    var el = document.getElementById(menuId);
+    el.style.display = (el.style.display === "block") ? "none" : "block";
+}
+function addToPlaylist(playlistId, trackId) {
+    fetch("/sites/music/api/playlists/" + playlistId + "/add_track", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({track_id: trackId})
+    }).then(r => r.json()).then(data => {
+        if (data.error) alert(data.error);
+        else alert("Added to playlist! (" + data.total_tracks + " tracks)");
+        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
+    });
+}
+document.addEventListener("click", function(e) {
+    if (!e.target.closest(".dropdown-wrap")) {
+        document.querySelectorAll(".dropdown-menu").forEach(m => m.style.display = "none");
+    }
+});
+</script>
+{% endblock %}

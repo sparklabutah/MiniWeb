@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ folder.name }} - MeridianCloud</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #1a73e8; text-decoration: none; }
+        .header-right { display: flex; align-items: center; gap: 0.6rem; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.8rem; font-weight: 600; }
+        .btn { padding: 0.4rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-outline { background: #fff; border: 1px solid #dadce0; color: #5f6368; }
+        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+
+        .sidebar { position: fixed; left: 0; top: 52px; bottom: 0; width: 240px; background: #fff; border-right: 1px solid #dadce0; padding: 1rem 0; overflow-y: auto; }
+        .sidebar a { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 1.2rem; color: #5f6368; text-decoration: none; font-size: 0.9rem; border-radius: 0 25px 25px 0; margin-right: 0.5rem; }
+        .sidebar a:hover { background: #f1f3f4; }
+        .sidebar a.active { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+        .sidebar .section-title { font-size: 0.75rem; color: #80868b; text-transform: uppercase; letter-spacing: 0.5px; padding: 1rem 1.2rem 0.4rem; }
+        .folder-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+        .main { margin-left: 240px; padding: 1.5rem 2rem; }
+        .breadcrumb { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 1rem; font-size: 0.88rem; flex-wrap: wrap; }
+        .breadcrumb a { color: #1a73e8; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb .sep { color: #80868b; }
+
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; }
+        .page-header h2 { font-size: 1.2rem; font-weight: 500; color: #202124; display: flex; align-items: center; gap: 0.5rem; }
+
+        .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; margin-bottom: 1.5rem; }
+        .folder-card { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1rem; background: #fff; border: 1px solid #dadce0; border-radius: 8px; text-decoration: none; color: #202124; transition: box-shadow 0.15s; }
+        .folder-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.12); background: #f8f9fa; }
+        .folder-card .folder-icon { font-size: 1.3rem; }
+        .folder-card .folder-name { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .file-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #dadce0; }
+        .file-table th { text-align: left; padding: 0.6rem 1rem; font-size: 0.8rem; color: #5f6368; font-weight: 500; border-bottom: 1px solid #dadce0; background: #fafafa; }
+        .file-table td { padding: 0.55rem 1rem; font-size: 0.88rem; border-bottom: 1px solid #f1f3f4; }
+        .file-table tr:hover { background: #f8f9fa; }
+        .file-table tr:last-child td { border-bottom: none; }
+        .file-name-cell { display: flex; align-items: center; gap: 0.5rem; }
+        .file-name-cell a { color: #202124; text-decoration: none; font-weight: 500; }
+        .file-name-cell a:hover { color: #1a73e8; }
+        .file-type-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+        .star-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: #dadce0; }
+        .star-btn.starred { color: #f4b400; }
+        .owner-tag { display: inline-flex; align-items: center; gap: 0.3rem; }
+        .avatar-xs { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.55rem; font-weight: 600; }
+
+        .empty-state { text-align: center; padding: 4rem 1rem; color: #80868b; }
+        .empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #5f6368; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="logo">&#9729; MeridianCloud</a>
+        </div>
+        <div class="header-right">
+            {% if user %}
+            <span style="font-size:0.85rem;color:#5f6368;">{{ user.name }}</span>
+            <a href="{{ url_for('cloud-storage-file-transfer.logout') }}" class="btn btn-outline btn-sm">Logout</a>
+            <div class="avatar" style="background:{{ user.avatar_color }};">{{ user.name[0] }}</div>
+            {% else %}
+            <a href="{{ url_for('cloud-storage-file-transfer.login_page') }}" class="btn btn-primary btn-sm">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <a href="{{ url_for('cloud-storage-file-transfer.index') }}">&#128193; My Files</a>
+        <a href="{{ url_for('cloud-storage-file-transfer.shared') }}">&#128101; Shared</a>
+        <a href="{{ url_for('cloud-storage-file-transfer.recent') }}">&#128336; Recent</a>
+        <a href="{{ url_for('cloud-storage-file-transfer.starred') }}">&#11088; Starred</a>
+        <a href="{{ url_for('cloud-storage-file-transfer.trash') }}">&#128465; Trash</a>
+
+        <div class="section-title">Folders</div>
+        {% for f in folders if f.parent_id is none %}
+        <a href="{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=f.id) }}" {% if f.id == folder.id %}class="active"{% endif %}>
+            <span class="folder-dot" style="background:{{ f.color }};"></span>
+            {{ f.name }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="main">
+        <nav class="breadcrumb">
+            <a href="{{ url_for('cloud-storage-file-transfer.index') }}">My Files</a>
+            {% for bc in breadcrumb %}
+            <span class="sep">&#8250;</span>
+            {% if loop.last %}
+            <span style="color:#202124;font-weight:500;">{{ bc.name }}</span>
+            {% else %}
+            <a href="{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=bc.id) }}">{{ bc.name }}</a>
+            {% endif %}
+            {% endfor %}
+        </nav>
+
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <h2>
+                <span style="color:{{ folder.color }};">&#128193;</span>
+                {{ folder.name }}
+            </h2>
+            <select class="sort-select" style="border:1px solid #dadce0;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff;color:#3c4043;cursor:pointer;"
+                    onchange="window.location.href='{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=folder.id) }}?sort='+this.value">
+                <option value="modified" {% if sort == 'modified' %}selected{% endif %}>Last modified</option>
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+                <option value="size" {% if sort == 'size' %}selected{% endif %}>File size</option>
+                <option value="created" {% if sort == 'created' %}selected{% endif %}>Date created</option>
+            </select>
+        </div>
+
+        {% if subfolders %}
+        <div class="folder-grid">
+            {% for sf in subfolders %}
+            <a href="{{ url_for('cloud-storage-file-transfer.folder_view', folder_id=sf.id) }}" class="folder-card">
+                <span class="folder-icon" style="color:{{ sf.color }};">&#128193;</span>
+                <span class="folder-name">{{ sf.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if files %}
+        <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 12px;padding:8px 14px;background:#e8f0fe;border:1px solid #d2e3fc;border-radius:8px;">
+            <span id="bulkCount" style="font-size:0.85rem;color:#1a73e8;font-weight:500;">0 selected</span>
+            <button type="button" id="deleteSelectedBtn" style="padding:6px 16px;background:#c5221f;color:#fff;border:none;border-radius:16px;font-size:0.82rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <span>&#128465;</span> Delete selected
+            </button>
+            <button type="button" id="bulkClearBtn" style="padding:6px 14px;background:none;color:#5f6368;border:none;border-radius:16px;font-size:0.82rem;cursor:pointer;">Clear</button>
+        </div>
+        <table class="file-table">
+            <thead>
+                <tr>
+                    <th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllFiles" title="Select all"></th>
+                    <th style="width:40px;"></th>
+                    <th>Name</th>
+                    <th>Owner</th>
+                    <th>Modified</th>
+                    <th>Size</th>
+                    <th>Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr data-file-id="{{ file.id }}">
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="file-select" value="{{ file.id }}" title="Select {{ file.name }}">
+                    </td>
+                    <td>
+                        <button class="star-btn {% if file.starred %}starred{% endif %}" title="Star" onclick="var b=this;fetch('/sites/cloud-storage-file-transfer/api/files/{{ file.id }}/star', {method:'POST'}).then(()=>{var s=b.classList.toggle('starred');b.innerHTML=s?'&#9733;':'&#9734;'})">
+                            {% if file.starred %}&#9733;{% else %}&#9734;{% endif %}
+                        </button>
+                    </td>
+                    <td>
+                        <div class="file-name-cell">
+                            <span class="file-type-icon">{{ file_icon(file.type)|safe }}</span>
+                            <a href="{{ url_for('cloud-storage-file-transfer.file_detail', file_id=file.id) }}">{{ file.name }}</a>
+                        </div>
+                    </td>
+                    <td>
+                        {% if file.owner_id in user_map %}
+                        <span class="owner-tag">
+                            <span class="avatar-xs" style="background:{{ user_map[file.owner_id].avatar_color }};">{{ user_map[file.owner_id].name[0] }}</span>
+                            {{ user_map[file.owner_id].name.split()[0] }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="color:#5f6368;font-size:0.82rem;">{{ file.modified_at[:10] }}</td>
+                    <td style="color:#5f6368;font-size:0.82rem;">{{ format_size(file.size_bytes) }}</td>
+                    <td><span style="font-size:0.78rem;background:#f1f3f4;padding:0.15rem 0.5rem;border-radius:10px;color:#5f6368;">{{ file.type }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% elif not subfolders %}
+        <div class="empty-state">
+            <h3>This folder is empty</h3>
+            <p>Upload files or create subfolders to get started.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    /* ── Bulk multi-select + delete (delete_by_checkbox) ──────────
+       Check file rows (or "Select all"), then "Delete selected" trashes them
+       all in a single POST to /files/delete-selected. */
+    (function() {
+        var bulkBar = document.getElementById('bulkBar');
+        if (!bulkBar) return;
+        var selectAll = document.getElementById('selectAllFiles');
+        var countEl = document.getElementById('bulkCount');
+        var deleteBtn = document.getElementById('deleteSelectedBtn');
+        var clearBtn = document.getElementById('bulkClearBtn');
+
+        function boxes() {
+            return Array.prototype.slice.call(document.querySelectorAll('.file-select'));
+        }
+        function checkedBoxes() {
+            return boxes().filter(function(b) { return b.checked; });
+        }
+        function refresh() {
+            var n = checkedBoxes().length;
+            countEl.textContent = n + ' selected';
+            bulkBar.style.display = n > 0 ? 'flex' : 'none';
+            if (selectAll) {
+                var all = boxes();
+                selectAll.checked = all.length > 0 && n === all.length;
+                selectAll.indeterminate = n > 0 && n < all.length;
+            }
+        }
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                boxes().forEach(function(b) { b.checked = selectAll.checked; });
+                refresh();
+            });
+        }
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('file-select')) refresh();
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                boxes().forEach(function(b) { b.checked = false; });
+                refresh();
+            });
+        }
+        deleteBtn.addEventListener('click', function() {
+            var ids = checkedBoxes().map(function(b) { return b.value; });
+            if (!ids.length) return;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = 'Deleting...';
+            var fd = new FormData();
+            ids.forEach(function(id) { fd.append('file_ids', id); });
+            fd.append('next', window.location.pathname + window.location.search);
+            fetch('/sites/cloud-storage-file-transfer/files/delete-selected', {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: fd
+            })
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = '<span>&#128465;</span> Delete selected';
+                });
+        });
+        refresh();
+    })();
+    </script>
+</body>
+</html>

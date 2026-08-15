@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FundSpark - Sign In</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fafafa; color: #282828; line-height: 1.5; }
+        a { text-decoration: none; color: inherit; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e6e6e6; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+        .navbar-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #282828; }
+        .navbar-brand em { font-style: normal; color: #2bde73; }
+        .navbar-links { display: flex; align-items: center; gap: 1.5rem; }
+        .navbar-links a { font-size: .875rem; font-weight: 500; color: #656969; transition: color .15s; }
+        .navbar-links a:hover { color: #282828; }
+
+        .login-wrap { max-width: 400px; margin: 4rem auto; padding: 0 1.5rem; }
+        .login-card { background: #fff; padding: 2.5rem 2rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); border: 1px solid #eee; }
+        .tab-bar { display: flex; border-bottom: 2px solid #eee; margin-bottom: 1.5rem; }
+        .tab-btn { flex: 1; padding: .7rem 0; text-align: center; font-size: .9rem; font-weight: 600; color: #999; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s; }
+        .tab-btn:hover { color: #555; }
+        .tab-btn.active { color: #2bde73; border-bottom-color: #2bde73; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .8rem; color: #555; margin-bottom: .3rem; font-weight: 600; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: .9rem; outline: none; transition: border-color .15s; }
+        .form-group input:focus { border-color: #2bde73; }
+        .btn-login { width: 100%; padding: .8rem; background: #2bde73; color: #fff; border: none; border-radius: 8px; font-size: .95rem; font-weight: 700; cursor: pointer; margin-top: .5rem; transition: background .15s; }
+        .btn-login:hover { background: #25c766; }
+        .error-msg { color: #ef4444; font-size: .82rem; margin-bottom: 1rem; text-align: center; background: #fef2f2; padding: .5rem; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{{ url_for('crowdfunding-donations.index') }}" class="navbar-brand"><em>Fund</em>Spark</a>
+    <div class="navbar-links">
+        <a href="{{ url_for('crowdfunding-donations.index') }}">Explore</a>
+    </div>
+</nav>
+
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="tab-bar">
+            <button class="tab-btn {{ 'active' if tab != 'register' }}" onclick="switchTab('login')">Sign In</button>
+            <button class="tab-btn {{ 'active' if tab == 'register' }}" onclick="switchTab('register')">Create Account</button>
+        </div>
+
+        {% if error %}
+        <div class="error-msg">{{ error }}</div>
+        {% endif %}
+
+        <!-- Sign In tab -->
+        <div class="tab-panel {{ 'active' if tab != 'register' }}" id="tab-login">
+            <form method="POST" action="{{ url_for('crowdfunding-donations.login_submit') }}">
+                <input type="hidden" name="next" value="{{ next_url }}">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" name="username" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn-login">Sign In</button>
+            </form>
+        </div>
+
+        <!-- Create Account tab -->
+        <div class="tab-panel {{ 'active' if tab == 'register' }}" id="tab-register">
+            <form method="POST" action="{{ url_for('crowdfunding-donations.register_submit') }}">
+                <input type="hidden" name="next" value="{{ next_url }}">
+                <div class="form-group">
+                    <label for="reg-name">Full Name</label>
+                    <input type="text" id="reg-name" name="name" placeholder="Your full name" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-email">Email</label>
+                    <input type="email" id="reg-email" name="email" placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="reg-username">Username</label>
+                    <input type="text" id="reg-username" name="username" placeholder="Choose a username" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" name="password" placeholder="Create a password" required>
+                </div>
+                <button type="submit" class="btn-login">Create Account</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    if (tab === 'register') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-register').classList.add('active');
+    } else {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tab-login').classList.add('active');
+    }
+}
+</script>
+</body>
+</html>

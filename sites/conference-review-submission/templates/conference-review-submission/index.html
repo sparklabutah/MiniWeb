@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeerPortal — Venues</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
+
+        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
+        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
+        .topbar a:hover { color: #fff; }
+        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
+        .topbar .right a { margin-right: 0; }
+
+        .page-header { border-bottom: 1px solid #e8e8e8; background: #fafafa; padding: 28px 0 20px; }
+        .page-inner { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+        .page-title { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+        .page-subtitle { font-size: 14px; color: #777; }
+
+        .content { max-width: 900px; margin: 0 auto; padding: 24px 24px 64px; }
+
+        .pending-banner { background: #e8f0fe; border: 1px solid #c6dafc; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #1967d2; }
+        .pending-banner strong { font-weight: 600; }
+        .pending-banner a { color: #1967d2; font-weight: 600; text-decoration: none; }
+        .pending-banner a:hover { text-decoration: underline; }
+
+        .search-box { margin-bottom: 24px; }
+        .search-input { width: 100%; max-width: 500px; padding: 10px 14px; border: 1px solid #d0d0d0; border-radius: 6px; font-size: 14px; background: #fff; }
+        .search-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+
+        .venue-card { border: 1px solid #e8e8e8; border-radius: 8px; padding: 18px 20px; margin-bottom: 12px; transition: box-shadow .15s; }
+        .venue-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .venue-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .venue-name { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 600; }
+        .venue-name a { color: #1a73e8; text-decoration: none; }
+        .venue-name a:hover { text-decoration: underline; }
+        .venue-fullname { font-size: 13px; color: #777; margin-bottom: 4px; }
+        .venue-desc { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .venue-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+        .venue-meta .dot { color: #ccc; }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+        .badge-posted { background: #e6f4ea; color: #137333; }
+        .badge-review { background: #e8f0fe; color: #1967d2; }
+        .badge-archived { background: #f5f5f5; color: #888; }
+        .badge-conf { background: #fef7e0; color: #b06d00; }
+        .badge-workshop { background: #f3e8fd; color: #7b2cbf; }
+
+        .empty-state { text-align: center; color: #999; padding: 48px 16px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">PeerPortal</a>
+        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+        <div class="right">
+            {% if user %}
+            <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
+            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('conference-review-submission.login_page') }}">Login</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <div class="page-inner">
+            <div class="page-title">Open Venues</div>
+            <div class="page-subtitle">Browse conferences, workshops, and journals hosted on PeerPortal</div>
+        </div>
+    </div>
+
+    <div class="content">
+        {% if user and pending_count > 0 %}
+        <div class="pending-banner">
+            <strong>{{ pending_count }}</strong> pending review task{{ 's' if pending_count != 1 }} assigned to you.
+            <a href="{{ url_for('conference-review-submission.console') }}">Go to Console</a>
+        </div>
+        {% endif %}
+
+        <div class="search-box" style="display:flex;gap:12px;align-items:center;">
+            <input type="text" class="search-input" placeholder="Search venues..." id="venueSearch" oninput="filterVenues()">
+            <a href="{{ url_for('conference-review-submission.api_export', format='csv') }}" style="padding:10px 20px;background:#1a73e8;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap;" >Export CSV</a>
+        </div>
+
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='conference-review-submission-ad2') %}
+        {% include "ads/_product_ads.html" %}
+
+        <div id="venueList">
+        {% for venue in venues %}
+        <div class="venue-card" data-name="{{ venue.name|lower }} {{ venue.full_name|lower }}">
+            <div class="venue-top">
+                <div>
+                    <div class="venue-name">
+                        {% if venue.paper_count > 0 %}
+                        <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>
+                        {% else %}
+                        <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}" style="color:#555">{{ venue.name }}</a>
+                        {% endif %}
+                    </div>
+                    <div class="venue-fullname">{{ venue.full_name }}</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                    {% if venue.type == 'workshop' %}
+                    <span class="badge badge-workshop">Workshop</span>
+                    {% else %}
+                    <span class="badge badge-conf">Conference</span>
+                    {% endif %}
+                    {% if venue.status == 'decisions_posted' %}
+                    <span class="badge badge-posted">Decisions Posted</span>
+                    {% elif venue.status == 'under_review' %}
+                    <span class="badge badge-review">Under Review</span>
+                    {% elif venue.status == 'archived' %}
+                    <span class="badge badge-archived">Archived</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if venue.description %}
+            <div class="venue-desc">{{ venue.description }}</div>
+            {% endif %}
+            <div class="venue-meta">
+                {% if venue.location %}<span>{{ venue.location }}</span><span class="dot">&middot;</span>{% endif %}
+                {% if venue.dates %}<span>{{ venue.dates }}</span><span class="dot">&middot;</span>{% endif %}
+                <span>{{ venue.paper_count }} submission{{ 's' if venue.paper_count != 1 }}</span>
+                {% if venue.paper_count > 0 and venue.status == 'decisions_posted' %}
+                <span class="dot">&middot;</span>
+                <span>{{ venue.accepted_count }} accepted ({{ "%.0f"|format(venue.accepted_count / venue.paper_count * 100) }}%)</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+
+        {% if not venues %}
+        <div class="empty-state">No venues available.</div>
+        {% endif %}
+
+        {% set ad_format = 'native' %}
+        {% set ads = product_ads(4, seed='conference-review-submission-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <script>
+    function filterVenues() {
+        var q = document.getElementById('venueSearch').value.toLowerCase();
+        var cards = document.querySelectorAll('.venue-card');
+        cards.forEach(function(card) {
+            var name = card.getAttribute('data-name');
+            card.style.display = (q === '' || name.indexOf(q) >= 0) ? '' : 'none';
+        });
+    }
+    </script>
+</body>
+</html>

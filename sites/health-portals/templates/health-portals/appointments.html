@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointments - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'appointments' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="main">
+        <div class="page-header">
+            <h2>My Appointments</h2>
+            <a href="{{ url_for('health-portals.schedule_page') }}" class="btn-primary">Schedule New</a>
+        </div>
+
+        <div class="filters">
+            <form method="get">
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="">All</option>
+                        <option value="scheduled" {{ 'selected' if filters.status == 'scheduled' }}>Scheduled</option>
+                        <option value="completed" {{ 'selected' if filters.status == 'completed' }}>Completed</option>
+                        <option value="cancelled" {{ 'selected' if filters.status == 'cancelled' }}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Provider</label>
+                    <select name="provider">
+                        <option value="">All</option>
+                        {% for p in providers %}
+                        <option value="{{ p.id }}" {{ 'selected' if filters.provider == p.id|string }}>{{ p.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>From</label>
+                    <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+                </div>
+                <div class="filter-group">
+                    <label>To</label>
+                    <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
+                </div>
+                <div class="filter-group">
+                    <label>Department</label>
+                    <select name="department">
+                        <option value="">All</option>
+                        <option value="Primary Care" {{ 'selected' if filters.department == 'Primary Care' }}>Primary Care</option>
+                        <option value="Physical Therapy" {{ 'selected' if filters.department == 'Physical Therapy' }}>Physical Therapy</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-filter">Filter</button>
+                <a href="{{ url_for('health-portals.appointments_page') }}" class="btn-clear">Clear</a>
+            </form>
+        </div>
+
+        {% if appointments %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Provider</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for appt in appointments %}
+                <tr>
+                    <td><a href="{{ url_for('health-portals.appointment_detail', appt_id=appt.id) }}">{{ appt.date }}</a></td>
+                    <td>{{ appt.time }}</td>
+                    <td>{{ appt.category }}</td>
+                    <td>{{ appt.provider_name }}</td>
+                    <td style="font-size: .8rem; color: #64748b;">{{ appt.location.split(',')[0] }}</td>
+                    <td>
+                        <span class="badge badge-{{ appt.status }}">{{ appt.status|capitalize }}</span>
+                        {% if appt.status == 'scheduled' %}
+                        <a href="{{ url_for('health-portals.cancel_appointment_page', appt_id=appt.id) }}"
+                           style="font-size:.75rem;color:#dc2626;margin-left:.4rem">Cancel</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No appointments found matching your filters.</div>
+        {% endif %}
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

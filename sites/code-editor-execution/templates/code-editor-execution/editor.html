@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .header h1 { font-size: 1.1rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; color: #cdd6f4; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .btn-login-nav { background: #89b4fa; color: #1e1e2e !important; padding: .3rem .8rem !important; border-radius: .3rem; font-weight: 600; }
+
+        .breadcrumb { padding: .4rem 1.5rem; font-size: .85rem; color: #6c7086; background: #181825; border-bottom: 1px solid #313244; flex-shrink: 0; }
+        .breadcrumb a { color: #89b4fa; }
+
+        .editor-container { display: flex; flex: 1; overflow: hidden; }
+        .code-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #313244; }
+        .output-panel { flex: 1; display: flex; flex-direction: column; }
+        .panel-header { background: #181825; padding: .5rem 1rem; font-size: .85rem; color: #a6adc8; border-bottom: 1px solid #313244; display: flex; align-items: center; justify-content: space-between; }
+        .panel-header .title { font-weight: 600; }
+        .code-editor-wrap {
+            flex: 1; position: relative; overflow: hidden; background: #11111b;
+        }
+        #code-highlight, textarea#code-input {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 1rem; margin: 0; border: none;
+            font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+            font-size: {{ font_size }}px; line-height: 1.5; tab-size: {{ tab_size }};
+            white-space: pre-wrap; word-wrap: break-word;
+            overflow: auto;
+        }
+        #code-highlight {
+            color: #cdd6f4; pointer-events: none; z-index: 1;
+        }
+        textarea#code-input {
+            background: transparent; color: transparent; caret-color: #cdd6f4;
+            resize: none; outline: none; z-index: 2;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Syntax token colors (Catppuccin Mocha) */
+        .tok-kw { color: #cba6f7; }
+        .tok-str { color: #a6e3a1; }
+        .tok-num { color: #fab387; }
+        .tok-com { color: #6c7086; font-style: italic; }
+        .tok-fn { color: #89b4fa; }
+        .tok-cls { color: #f9e2af; }
+        .tok-dec { color: #f5c2e7; }
+        .tok-bool { color: #fab387; }
+        .tok-self { color: #f38ba8; }
+        .tok-op { color: #89dceb; }
+        .tok-brace { color: #f9e2af; }
+        .tok-builtin { color: #94e2d5; }
+        .output-area {
+            flex: 1; background: #11111b; padding: 1rem; overflow: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: {{ font_size }}px; line-height: 1.5; white-space: pre-wrap;
+        }
+        .output-stdout { color: #a6e3a1; }
+        .output-stderr { color: #f38ba8; }
+        .toolbar { background: #181825; padding: .5rem 1rem; border-top: 1px solid #313244; display: flex; align-items: center; gap: .8rem; flex-shrink: 0; flex-wrap: wrap; }
+        .toolbar button, .toolbar a.btn { padding: .5rem 1.2rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .9rem; font-weight: 600; display: inline-block; text-decoration: none; text-align: center; }
+        .btn-run { background: #a6e3a1; color: #1e1e2e; }
+        .btn-run:hover { background: #94e2d5; }
+        .btn-clear { background: #45475a; color: #cdd6f4; }
+        .btn-clear:hover { background: #585b70; }
+        .btn-share { background: #cba6f7; color: #1e1e2e; }
+        .btn-share:hover { background: #b4befe; }
+        .btn-export { background: #f9e2af; color: #1e1e2e; }
+        .btn-export:hover { background: #f5c2e7; }
+        .settings { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+        .settings label { font-size: .8rem; color: #a6adc8; display: flex; align-items: center; gap: .3rem; }
+        .settings input[type="range"], .settings select { background: #313244; border: 1px solid #45475a; border-radius: .2rem; color: #cdd6f4; padding: .2rem .4rem; font-size: .8rem; }
+        .settings input[type="range"] { width: 80px; }
+        .snippet-info { font-size: .85rem; color: #f9e2af; padding: .4rem 1.5rem; background: #181825; border-bottom: 1px solid #313244; flex-shrink: 0; }
+        /* Hidden data attributes for font_size and tab_size so they appear in page source */
+        .editor-config { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner Editor</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        {% if user %}
+        <a href="{{ url_for('code-editor-execution.dashboard') }}">Dashboard ({{ user.name }})</a>
+        <a href="{{ url_for('code-editor-execution.settings_page') }}">Settings</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('code-editor-execution.login_page') }}" class="btn-login-nav">Login / Sign In</a>
+        {% endif %}
+    </div>
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a> &rarr;
+        {% if snippet %}
+        <a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=snippet.id) }}">{{ snippet.title }}</a> &rarr;
+        {% endif %}
+        Editor
+    </div>
+
+    <!-- Editor configuration: font_size={{ font_size }}, tab_size={{ tab_size }} -->
+    <div class="editor-config" data-font_size="{{ font_size }}" data-tab_size="{{ tab_size }}">
+        font_size={{ font_size }} tab_size={{ tab_size }}
+    </div>
+
+    {% if snippet %}
+    <div class="snippet-info">
+        Editing: <strong>{{ snippet.title }}</strong> ({{ snippet.category }} / {{ snippet.difficulty }})
+        | <a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=snippet.id) }}" style="color:#89b4fa">View Details</a>
+    </div>
+    {% endif %}
+
+    <div class="editor-container">
+        <div class="code-panel">
+            <div class="panel-header">
+                <span class="title">Python 3</span>
+                <span id="line-count">Lines: 1</span>
+            </div>
+            <div class="code-editor-wrap">
+                <pre id="code-highlight" aria-hidden="true"></pre>
+                <textarea id="code-input" spellcheck="false" placeholder="# Write your Python code here...">{% if code is defined and code %}{{ code }}{% elif snippet %}{{ snippet.code }}{% else %}# Write your Python code here
+print("Hello, World!"){% endif %}</textarea>
+            </div>
+        </div>
+        <div class="output-panel">
+            <div class="panel-header">
+                <span class="title">Output</span>
+                <span id="exec-status">{% if returncode is defined and returncode is not none %}Exit code: {{ returncode }}{% else %}Ready{% endif %}</span>
+            </div>
+            <div class="output-area">{% if stdout is defined and stdout %}<span class="output-stdout">{{ stdout }}</span>{% endif %}{% if stderr is defined and stderr %}<span class="output-stderr">{{ stderr }}</span>{% endif %}{% if not (stdout is defined and stdout) and not (stderr is defined and stderr) %}<span style="color:#6c7086">Output will appear here after execution...</span>{% endif %}</div>
+        </div>
+    </div>
+
+    <div class="stdin-panel" style="margin-top:12px;background:#181825;border:1px solid #313244;border-radius:6px;padding:10px;">
+        <label for="stdin-input" style="display:block;color:#a6adc8;font-size:13px;margin-bottom:6px;">Standard Input (stdin)</label>
+        <textarea id="stdin-input" spellcheck="false" placeholder="Type input for the program here. Each line is fed to input()..." style="width:100%;min-height:60px;background:#1e1e2e;color:#cdd6f4;border:1px solid #313244;border-radius:4px;padding:8px;font-family:'Fira Code',monospace;font-size:13px;resize:vertical;box-sizing:border-box;">{% if stdin is defined and stdin %}{{ stdin }}{% endif %}</textarea>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn-run" onclick="runCode()">Run Code</button>
+        <button class="btn-clear" onclick="clearOutput()">Clear Output</button>
+        {% if snippet %}
+        <button class="btn-share" onclick="shareSnippet({{ snippet.id }})">Share Snippet</button>
+        {% endif %}
+        <a class="btn btn-export" href="{{ url_for('code-editor-execution.export_page') }}">Export Snippets</a>
+        <div class="settings">
+            <label>Font Size:
+                <input type="range" id="font-size-slider" min="8" max="28" value="{{ font_size }}" oninput="changeFontSize(this.value)">
+                <span id="font-size-val">{{ font_size }}px</span>
+            </label>
+            <label>Tab Size:
+                <select id="tab-size-select" onchange="changeTabSize(this.value)">
+                    <option value="2" {{ 'selected' if tab_size == '2' }}>2</option>
+                    <option value="4" {{ 'selected' if tab_size == '4' }}>4</option>
+                    <option value="8" {{ 'selected' if tab_size == '8' }}>8</option>
+                </select>
+            </label>
+        </div>
+    </div>
+
+    <script>
+    const codeInput = document.getElementById('code-input');
+    const codeHighlight = document.getElementById('code-highlight');
+    const outputArea = document.querySelector('.output-area');
+    const execStatus = document.getElementById('exec-status');
+    const lineCount = document.getElementById('line-count');
+
+    // ---- Python syntax highlighter ----
+    const PY_KW = new Set(['False','None','True','and','as','assert','async','await','break',
+        'class','continue','def','del','elif','else','except','finally','for','from',
+        'global','if','import','in','is','lambda','nonlocal','not','or','pass','raise',
+        'return','try','while','with','yield']);
+    const PY_BUILTIN = new Set(['print','len','range','int','str','float','list','dict','set',
+        'tuple','type','isinstance','enumerate','zip','map','filter','sorted','reversed',
+        'open','input','abs','max','min','sum','any','all','hasattr','getattr','setattr',
+        'super','property','staticmethod','classmethod','ValueError','TypeError','KeyError',
+        'IndexError','Exception','StopIteration','RuntimeError','AttributeError','ImportError',
+        'FileNotFoundError','OSError','IOError','NotImplementedError','ZeroDivisionError']);
+
+    function highlightPython(code) {
+        // Escape HTML first
+        let html = '';
+        let i = 0;
+        while (i < code.length) {
+            // Comments
+            if (code[i] === '#') {
+                let end = code.indexOf('\n', i);
+                if (end === -1) end = code.length;
+                html += '<span class="tok-com">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Triple-quoted strings
+            if ((code.slice(i, i+3) === '"""' || code.slice(i, i+3) === "'''")) {
+                let q = code.slice(i, i+3);
+                let end = code.indexOf(q, i+3);
+                if (end === -1) end = code.length; else end += 3;
+                html += '<span class="tok-str">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Strings
+            if (code[i] === '"' || code[i] === "'") {
+                let q = code[i], j = i + 1;
+                while (j < code.length && code[j] !== q && code[j] !== '\n') {
+                    if (code[j] === '\\') j++;
+                    j++;
+                }
+                if (j < code.length && code[j] === q) j++;
+                html += '<span class="tok-str">' + esc(code.slice(i, j)) + '</span>';
+                i = j;
+                continue;
+            }
+            // Decorators
+            if (code[i] === '@' && (i === 0 || code[i-1] === '\n')) {
+                let end = code.indexOf('\n', i);
+                if (end === -1) end = code.length;
+                html += '<span class="tok-dec">' + esc(code.slice(i, end)) + '</span>';
+                i = end;
+                continue;
+            }
+            // Numbers
+            if (/\d/.test(code[i]) && (i === 0 || /[\s(=,+\-*\/:[\]{}<>!]/.test(code[i-1]))) {
+                let j = i;
+                while (j < code.length && /[\d.xXoObBeE_]/.test(code[j])) j++;
+                html += '<span class="tok-num">' + esc(code.slice(i, j)) + '</span>';
+                i = j;
+                continue;
+            }
+            // Words (keywords, builtins, identifiers)
+            if (/[a-zA-Z_]/.test(code[i])) {
+                let j = i;
+                while (j < code.length && /[a-zA-Z0-9_]/.test(code[j])) j++;
+                let word = code.slice(i, j);
+                if (word === 'self' || word === 'cls') {
+                    html += '<span class="tok-self">' + word + '</span>';
+                } else if (word === 'True' || word === 'False' || word === 'None') {
+                    html += '<span class="tok-bool">' + word + '</span>';
+                } else if (PY_KW.has(word)) {
+                    html += '<span class="tok-kw">' + word + '</span>';
+                } else if (PY_BUILTIN.has(word)) {
+                    html += '<span class="tok-builtin">' + word + '</span>';
+                } else if (j < code.length && code[j] === '(') {
+                    html += '<span class="tok-fn">' + word + '</span>';
+                } else if (word[0] === word[0].toUpperCase() && word[0] !== '_') {
+                    html += '<span class="tok-cls">' + word + '</span>';
+                } else {
+                    html += esc(word);
+                }
+                i = j;
+                continue;
+            }
+            // Operators
+            if ('+-*/%=<>!&|^~'.includes(code[i])) {
+                html += '<span class="tok-op">' + esc(code[i]) + '</span>';
+                i++;
+                continue;
+            }
+            // Braces
+            if ('()[]{}:,'.includes(code[i])) {
+                html += '<span class="tok-brace">' + esc(code[i]) + '</span>';
+                i++;
+                continue;
+            }
+            html += esc(code[i]);
+            i++;
+        }
+        // Add trailing newline so pre matches textarea height
+        return html + '\n';
+    }
+
+    function esc(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function syncHighlight() {
+        codeHighlight.innerHTML = highlightPython(codeInput.value);
+        // Sync scroll
+        codeHighlight.scrollTop = codeInput.scrollTop;
+        codeHighlight.scrollLeft = codeInput.scrollLeft;
+    }
+
+    codeInput.addEventListener('input', function() { updateLineCount(); syncHighlight(); });
+    codeInput.addEventListener('scroll', function() {
+        codeHighlight.scrollTop = codeInput.scrollTop;
+        codeHighlight.scrollLeft = codeInput.scrollLeft;
+    });
+    syncHighlight();
+    codeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const tabSize = parseInt(document.getElementById('tab-size-select').value);
+            const spaces = ' '.repeat(tabSize);
+            this.value = this.value.substring(0, start) + spaces + this.value.substring(this.selectionEnd);
+            this.selectionStart = this.selectionEnd = start + tabSize;
+        }
+    });
+
+    function updateLineCount() {
+        const lines = codeInput.value.split('\n').length;
+        lineCount.textContent = 'Lines: ' + lines;
+    }
+    updateLineCount();
+
+    function runCode() {
+        const code = codeInput.value;
+        const stdinEl = document.getElementById('stdin-input');
+        const stdin = stdinEl ? stdinEl.value : '';
+        execStatus.textContent = 'Running...';
+        outputArea.innerHTML = '<span style="color:#f9e2af">Executing...</span>';
+
+        fetch('{{ url_for("code-editor-execution.api_execute") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: code, timeout: 5, stdin: stdin})
+        })
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (data.stdout) html += '<span class="output-stdout">' + escapeHtml(data.stdout) + '</span>';
+            if (data.stderr) html += '<span class="output-stderr">' + escapeHtml(data.stderr) + '</span>';
+            if (!data.stdout && !data.stderr) html = '<span style="color:#6c7086">(no output)</span>';
+            outputArea.innerHTML = html;
+            execStatus.textContent = 'Exit code: ' + data.returncode;
+        })
+        .catch(err => {
+            outputArea.innerHTML = '<span class="output-stderr">Network error: ' + escapeHtml(err.toString()) + '</span>';
+            execStatus.textContent = 'Error';
+        });
+    }
+
+    function clearOutput() {
+        outputArea.innerHTML = '<span style="color:#6c7086">Output will appear here after execution...</span>';
+        execStatus.textContent = 'Ready';
+    }
+
+    function shareSnippet(snippetId) {
+        fetch('{{ url_for("code-editor-execution.api_share", snippet_id=0) }}'.replace('/0', '/' + snippetId))
+        .then(r => r.json())
+        .then(data => {
+            const url = window.location.origin + data.share_url;
+            navigator.clipboard.writeText(url)
+                .then(() => alert('Link copied to clipboard!'))
+                .catch(() => prompt('Share this link:', url));
+        });
+    }
+
+    function changeFontSize(val) {
+        document.getElementById('font-size-val').textContent = val + 'px';
+        codeInput.style.fontSize = val + 'px';
+        codeHighlight.style.fontSize = val + 'px';
+        outputArea.style.fontSize = val + 'px';
+    }
+
+    function changeTabSize(val) {
+        codeInput.style.tabSize = val;
+        codeHighlight.style.tabSize = val;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>

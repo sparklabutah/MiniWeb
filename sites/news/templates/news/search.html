@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search{% if q %}: {{ q }}{% endif %} - Lakeport Tribune</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f4f4f4; color: #222; font-family: Georgia, 'Times New Roman', serif; line-height: 1.6; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { color: #0d3b5e; text-decoration: underline; }
+        .site-header { background: #1a1a2e; color: #fff; }
+        .header-top { display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto; padding: .6rem 1.5rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #aaa; }
+        .header-top a { color: #ccc; font-size: .8rem; }
+        .header-top .user-links { display: flex; gap: 1rem; align-items: center; }
+        .header-brand { text-align: center; padding: 1rem 1rem .6rem; border-bottom: 3px double #444; }
+        .header-brand h1 { font-size: 2rem; letter-spacing: 2px; color: #fff; }
+        .header-brand h1 a { color: #fff; text-decoration: none; }
+        .nav-bar { background: #16213e; border-bottom: 1px solid #0f3460; }
+        .nav-bar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; }
+        .nav-bar a { color: #ccc; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; padding: .7rem 1.2rem; }
+        .nav-bar a:hover { color: #fff; background: rgba(255,255,255,.06); text-decoration: none; }
+        .nav-search { margin-left: auto; padding: .4rem; }
+        .nav-search form { display: flex; }
+        .nav-search input { padding: .35rem .6rem; border: 1px solid #0f3460; border-radius: .3rem 0 0 .3rem; background: #1a1a2e; color: #ddd; font-size: .8rem; width: 160px; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .nav-search button { padding: .35rem .7rem; background: #e74c3c; color: #fff; border: none; border-radius: 0 .3rem .3rem 0; font-size: .8rem; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+        .search-header { margin-bottom: 1.5rem; }
+        .search-header h1 { font-size: 1.4rem; color: #1a1a2e; margin-bottom: .5rem; }
+        .search-header .count { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #888; }
+        .search-form { margin-bottom: 1.5rem; }
+        .search-form form { display: flex; gap: .5rem; }
+        .search-form input { flex: 1; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .search-form button { padding: .6rem 1.5rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 600; }
+        .article-list .article-item { display: flex; gap: 1rem; background: #fff; border-radius: .4rem; padding: 1.2rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .article-item .article-info { flex: 1; }
+        .article-item h3 { font-size: 1.1rem; line-height: 1.3; margin-bottom: .3rem; }
+        .article-item h3 a { color: #1a1a2e; }
+        .article-item h3 a:hover { color: #e74c3c; text-decoration: none; }
+        .article-item .meta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .75rem; color: #888; }
+        .article-item .meta span { margin-right: .8rem; }
+        .article-item .excerpt { font-size: .88rem; color: #555; margin-top: .4rem; }
+        .no-results { background: #fff; border-radius: .4rem; padding: 2rem; text-align: center; color: #888; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .date-filter { display: flex; gap: .5rem; align-items: center; margin-top: .6rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #666; flex-wrap: wrap; }
+        .date-filter input[type="date"] { padding: .4rem .6rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .85rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .semantic-search { background: #fff; border-radius: .4rem; padding: 1.2rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .semantic-search h2 { font-size: 1.05rem; color: #1a1a2e; margin-bottom: .3rem; }
+        .semantic-search p { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; color: #888; margin-bottom: .7rem; }
+        .semantic-search form { display: flex; gap: .5rem; }
+        .semantic-search input { flex: 1; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .95rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .semantic-search button { padding: .6rem 1.2rem; background: #1a5276; color: #fff; border: none; border-radius: .3rem; font-size: .95rem; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 600; }
+        .semantic-results { margin-top: 1rem; }
+        .semantic-results .sem-item { padding: .7rem 0; border-top: 1px solid #eee; }
+        .semantic-results .sem-item h4 { font-size: 1rem; line-height: 1.3; }
+        .semantic-results .sem-item h4 a { color: #1a1a2e; }
+        .semantic-results .sem-meta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .75rem; color: #888; margin-top: .15rem; }
+        .semantic-results .sem-score { color: #1a5276; font-weight: 700; }
+        .semantic-results .sem-empty { padding: .7rem 0; border-top: 1px solid #eee; color: #888; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; }
+        .site-footer { background: #1a1a2e; color: #888; padding: 2rem 1.5rem; margin-top: 2rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-top">
+            <span>Lakeport, Cascadia County</span>
+            <div class="user-links">
+                {% if user %}
+                    <span>Hi, {{ user.display_name }}</span>
+                    <a href="{{ url_for('news.bookmarks_page') }}">Bookmarks</a>
+                    <a href="{{ url_for('news.logout') }}">Sign Out</a>
+                {% else %}
+                    <a href="{{ url_for('news.login_page') }}">Sign In</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="header-brand">
+            <h1><a href="{{ url_for('news.index') }}">Lakeport Tribune</a></h1>
+        </div>
+        <nav class="nav-bar">
+            <div class="nav-bar-inner">
+                <a href="{{ url_for('news.index') }}">Home</a>
+                {% for cat in categories %}
+                <a href="{{ url_for('news.category_page', slug=cat.slug) }}">{{ cat.name }}</a>
+                {% endfor %}
+                <div class="nav-search">
+                    <form action="{{ url_for('news.search_page') }}" method="get">
+                        <input type="text" name="q" placeholder="Search articles..." value="{{ q }}">
+                        <button type="submit">Search</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="search-header">
+            <h1>{% if q %}Search results for "{{ q }}"{% else %}Search Articles{% endif %}</h1>
+            {% if q %}
+            <div class="count">{{ results|length }} result{{ 's' if results|length != 1 else '' }} found</div>
+            {% endif %}
+        </div>
+
+        <div class="search-form">
+            <form action="{{ url_for('news.search_page') }}" method="get">
+                <input type="text" name="q" value="{{ q }}" placeholder="Search articles..." autofocus>
+                <button type="submit">Search</button>
+            </form>
+            <form action="{{ url_for('news.search_page') }}" method="get" class="date-filter">
+                <input type="hidden" name="q" value="{{ q }}">
+                <label for="date_from">From</label>
+                <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+                <label for="date_to">To</label>
+                <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+                <button type="submit">Filter by Date</button>
+            </form>
+        </div>
+
+        <div class="semantic-search">
+            <h2>Smart Search</h2>
+            <p>Describe what you're looking for in plain language and we'll rank the most relevant stories.</p>
+            <form id="semantic-search-form">
+                <input type="text" id="semantic-q" placeholder="e.g. city council votes on waterfront development funding">
+                <button type="submit">Find Stories</button>
+            </form>
+            <div class="semantic-results" id="semantic-results"></div>
+        </div>
+
+        {% if results %}
+        <div class="article-list">
+            {% for article in results %}
+            <div class="article-item">
+                <div class="article-info">
+                    <h3><a href="{{ url_for('news.article_detail', article_id=article.id) }}">{{ article.title }}</a></h3>
+                    <div class="meta">
+                        <span>{{ article.category }}</span>
+                        <span>{{ article.author }}</span>
+                        <span>{{ article.date }}</span>
+                        <span>{{ article.comments_count }} comments</span>
+                    </div>
+                    <p class="excerpt">{{ article.body[:180] }}...</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif q %}
+        <div class="no-results">
+            <p>No articles found matching "{{ q }}". Try different keywords.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <footer class="site-footer">
+        <p>&copy; Lakeport Tribune</p>
+    </footer>
+
+    <script>
+    document.getElementById('semantic-search-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var q = document.getElementById('semantic-q').value.trim();
+        var box = document.getElementById('semantic-results');
+        if (!q) return;
+        var articleBase = '{{ url_for("news.article_detail", article_id=999999) }}'.replace('999999', '');
+        fetch('{{ url_for("news.api_semantic_search") }}?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(items) {
+                box.innerHTML = '';
+                if (!items.length) {
+                    var div = document.createElement('div');
+                    div.className = 'sem-empty';
+                    div.textContent = 'No relevant stories found for "' + q + '".';
+                    box.appendChild(div);
+                    return;
+                }
+                items.slice(0, 10).forEach(function(entry) {
+                    var a = entry.article;
+                    var item = document.createElement('div');
+                    item.className = 'sem-item';
+                    var h4 = document.createElement('h4');
+                    var link = document.createElement('a');
+                    link.href = articleBase + a.id;
+                    link.textContent = a.title;
+                    h4.appendChild(link);
+                    var meta = document.createElement('div');
+                    meta.className = 'sem-meta';
+                    var score = document.createElement('span');
+                    score.className = 'sem-score';
+                    score.textContent = 'Relevance ' + Math.round(entry.score * 100) + '%';
+                    meta.appendChild(score);
+                    meta.appendChild(document.createTextNode(' — ' + a.author + ' — ' + a.date));
+                    item.appendChild(h4);
+                    item.appendChild(meta);
+                    box.appendChild(item);
+                });
+            });
+    });
+    </script>
+</body>
+</html>

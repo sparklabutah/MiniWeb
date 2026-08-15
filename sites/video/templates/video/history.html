@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch History - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+
+        /* Page */
+        .page-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+        .page-container h1 { font-size: 24px; font-weight: 600; margin-bottom: 24px; }
+
+        /* History list */
+        .history-date-group { margin-bottom: 24px; }
+        .history-date-label { font-size: 16px; font-weight: 500; padding: 8px 0; margin-bottom: 8px; border-bottom: 1px solid #272727; }
+        .history-item { display: flex; gap: 16px; padding: 8px 0; align-items: center; border-radius: 8px; }
+        .history-item:hover { background: #1a1a1a; }
+        .hi-thumb { position: relative; width: 200px; height: 112px; background: #1a1a1a; border-radius: 8px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .hi-dur { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); font-size: 11px; padding: 1px 4px; border-radius: 3px; }
+        .hi-progress-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: #ff0000; }
+        .hi-info { flex: 1; min-width: 0; }
+        .hi-title { font-size: 15px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+        .hi-channel { font-size: 13px; color: #aaa; margin-bottom: 2px; }
+        .hi-meta { font-size: 12px; color: #666; }
+
+        .empty-state { text-align: center; padding: 60px 24px; color: #aaa; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="{{ url_for("video.search") }}" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <h1>Watch History</h1>
+
+        {% if history %}
+            {% set ns = namespace(current_date='') %}
+            {% for entry in history %}
+                {% set entry_date = entry.watched_at[:10] if entry.watched_at else 'Unknown' %}
+                {% if entry_date != ns.current_date %}
+                    {% set ns.current_date = entry_date %}
+                    <div class="history-date-group">
+                        <div class="history-date-label">{{ entry_date }}</div>
+                    </div>
+                {% endif %}
+
+                {% set video = video_map.get(entry.video_id) %}
+                <a href="{{ url_for('video.watch', video_id=entry.video_id) }}" class="history-item">
+                    {% set htg = thumb_gradient(video.category if video else '') %}
+                    <div class="hi-thumb" style="background: {{ htg[0] }};">
+                        {% if video and video.thumbnail_url and video.thumbnail_url.startswith('/static') %}
+                        <img src="{{ video.thumbnail_url }}" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover">
+                        {% else %}
+                        <span style="color: {{ htg[1] }}; font-size: 24px; opacity: 0.7;">&#9654;</span>
+                        {% endif %}
+                        {% if video %}
+                        <span class="hi-dur">{{ format_duration(video.duration_seconds) }}</span>
+                        {% endif %}
+                        {% if entry.progress_percent %}
+                        <div class="hi-progress-bar" style="width: {{ entry.progress_percent }}%;"></div>
+                        {% endif %}
+                    </div>
+                    <div class="hi-info">
+                        <div class="hi-title">{{ entry.video_title or (video.title if video else 'Unknown Video') }}</div>
+                        <div class="hi-channel">{{ entry.channel_name }}</div>
+                        <div class="hi-meta">
+                            {% if video %}{{ format_views(video.views) }} views &middot; {% endif %}
+                            Watched {{ time_ago(entry.watched_at) }}
+                            {% if entry.progress_percent %} &middot; {{ entry.progress_percent }}% watched{% endif %}
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <p>Your watch history is empty.</p>
+                <p style="margin-top:8px;"><a href="{{ url_for('video.index') }}" style="color:#3ea6ff;">Browse videos</a> to start building your history.</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

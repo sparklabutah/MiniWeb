@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ entry.word }} - WordRef Dictionary</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; background: #f5f5f0; color: #2d2d2d; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #1a3c5e; color: #fff; }
+        .header-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem; }
+        .header h1 { font-size: 1.5rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header h1 span { color: #e74c3c; }
+
+        .nav-bar { background: #15334f; border-bottom: 2px solid #e74c3c; }
+        .nav-bar-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 0; padding: 0 1.5rem; }
+        .nav-bar a { color: #ccc; font-size: .95rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: .6rem 1rem; display: inline-block; }
+        .nav-bar a:hover { color: #fff; background: rgba(255,255,255,.08); text-decoration: none; }
+        .nav-bar .btn-signin { background: #e74c3c; color: #fff; padding: .35rem .9rem; border-radius: .25rem; margin-left: .5rem; }
+
+        .search-strip { background: #1a3c5e; padding: .5rem 1.5rem 1rem; }
+        .search-strip form { max-width: 960px; margin: 0 auto; display: flex; }
+        .search-strip input { flex: 1; padding: .6rem 1rem; font-size: 1rem; border: 2px solid #2c6faa; border-radius: .3rem 0 0 .3rem; border-right: none; font-family: inherit; outline: none; }
+        .search-strip input:focus { border-color: #e74c3c; }
+        .search-strip button { padding: .6rem 1.2rem; background: #e74c3c; color: #fff; border: none; border-radius: 0 .3rem .3rem 0; cursor: pointer; font-size: 1rem; font-weight: 600; font-family: -apple-system, sans-serif; }
+
+        .main { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+
+        .word-header { margin-bottom: 1.5rem; }
+        .word-title { font-size: 2.5rem; font-weight: 700; color: #1a3c5e; line-height: 1.2; }
+        .word-pronunciation { font-family: 'Lucida Sans Unicode', sans-serif; font-size: 1.1rem; color: #555; margin: .3rem 0; }
+        .word-pos-line { font-size: 1rem; margin: .3rem 0; }
+        .pos-badge { display: inline-block; background: #eef2f7; color: #1a5276; font-family: -apple-system, sans-serif; font-size: .8rem; font-weight: 700; text-transform: uppercase; padding: .15rem .6rem; border-radius: .2rem; letter-spacing: .5px; }
+        .word-forms { font-size: .88rem; color: #666; margin-top: .3rem; font-family: -apple-system, sans-serif; }
+        .word-forms span { font-style: italic; color: #333; }
+
+        .save-form { display: inline-block; margin-left: 1rem; }
+        .save-btn { background: none; border: 1px solid #1a5276; color: #1a5276; padding: .25rem .7rem; border-radius: .25rem; cursor: pointer; font-size: .8rem; font-family: -apple-system, sans-serif; }
+        .save-btn:hover { background: #1a5276; color: #fff; }
+        .save-btn.saved { background: #1a5276; color: #fff; }
+
+        .section { margin-bottom: 2rem; }
+        .section-title { font-size: 1rem; font-weight: 700; color: #e74c3c; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, sans-serif; border-bottom: 1px solid #ddd; padding-bottom: .3rem; margin-bottom: .8rem; }
+
+        .def-list { list-style: none; counter-reset: defnum; }
+        .def-item { margin-bottom: 1rem; padding-left: 2rem; position: relative; }
+        .def-item::before { counter-increment: defnum; content: counter(defnum); position: absolute; left: 0; top: 0; font-weight: 700; color: #1a3c5e; font-size: 1.05rem; font-family: -apple-system, sans-serif; }
+        .def-gloss { font-size: 1.05rem; line-height: 1.6; color: #333; }
+        .def-tags { font-family: -apple-system, sans-serif; font-size: .75rem; color: #888; margin-bottom: .2rem; }
+        .def-tags span { background: #f0f0f0; padding: .1rem .4rem; border-radius: .15rem; margin-right: .3rem; }
+        .def-example { font-style: italic; color: #555; font-size: .92rem; margin: .3rem 0 .2rem 0; padding-left: 1rem; border-left: 2px solid #ddd; }
+        .def-synonyms { font-family: -apple-system, sans-serif; font-size: .85rem; color: #666; margin-top: .3rem; }
+        .def-synonyms strong { color: #333; }
+
+        .synonym-list, .related-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .synonym-tag, .related-tag { display: inline-block; background: #eef2f7; color: #1a5276; padding: .2rem .6rem; border-radius: .25rem; font-size: .88rem; font-family: -apple-system, sans-serif; }
+        .synonym-tag:hover, .related-tag:hover { background: #1a5276; color: #fff; text-decoration: none; }
+
+        .etymology-text { font-size: .95rem; line-height: 1.7; color: #444; }
+
+        .antonym-tag { display: inline-block; background: #fde8e8; color: #922; padding: .2rem .6rem; border-radius: .25rem; font-size: .88rem; font-family: -apple-system, sans-serif; }
+        .antonym-tag:hover { background: #922; color: #fff; text-decoration: none; }
+
+        .categories-list { font-family: -apple-system, sans-serif; font-size: .82rem; color: #888; line-height: 1.8; }
+        .categories-list span { background: #f5f5f5; padding: .1rem .4rem; border-radius: .15rem; margin-right: .3rem; }
+
+        .entry-divider { border: none; border-top: 2px dashed #ddd; margin: 2rem 0; }
+
+        .footer { text-align: center; padding: 2rem; color: #999; font-size: .8rem; border-top: 1px solid #ddd; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-inner">
+            <h1><a href="{{ url_for('dictionaries-language-tools.index') }}">Word<span>Ref</span> Dictionary</a></h1>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-bar-inner">
+            <a href="{{ url_for('dictionaries-language-tools.index') }}">Home</a>
+            <a href="{{ url_for('dictionaries-language-tools.index') }}">Search</a>
+            <a href="{{ url_for('dictionaries-language-tools.browse', letter='A') }}">Browse A-Z</a>
+            {% if user %}
+            <a href="{{ url_for('dictionaries-language-tools.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('dictionaries-language-tools.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('dictionaries-language-tools.login_page') }}" class="btn-signin">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="search-strip">
+        <form method="get" action="{{ url_for('dictionaries-language-tools.index') }}">
+            <input type="text" name="q" placeholder="Search for another word..." autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="main">
+        {% for ent in all_entries %}
+        {% if not loop.first %}
+        <hr class="entry-divider">
+        {% endif %}
+
+        <div class="word-header">
+            <div class="word-title">
+                {{ ent.word }}
+                {% if user %}
+                <form class="save-form" method="post" action="{{ url_for('dictionaries-language-tools.form_save_word', word_text=ent.word) }}" style="display:inline">
+                    <button type="submit" class="save-btn {{ 'saved' if is_saved }}">{{ 'Saved' if is_saved else 'Save Word' }}</button>
+                </form>
+                {% endif %}
+            </div>
+            {% if ent.ipa %}
+            <div class="word-pronunciation">
+                {% for p in ent.ipa %}
+                <span>{{ p }}</span>{% if not loop.last %} &middot; {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="word-pos-line">
+                <span class="pos-badge">{{ ent.pos }}</span>
+            </div>
+            {% if ent.forms %}
+            <div class="word-forms">
+                {% for f in ent.forms[:6] %}
+                <span>{{ f.form }}</span>{% if f.tags %} ({{ f.tags|join(', ') }}){% endif %}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Definitions -->
+        {% if ent.definitions %}
+        <div class="section">
+            <div class="section-title">Definitions</div>
+            <ol class="def-list">
+                {% for d in ent.definitions %}
+                <li class="def-item">
+                    {% if d.tags %}
+                    <div class="def-tags">
+                        {% for t in d.tags[:5] %}
+                        <span>{{ t }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="def-gloss">{{ d.gloss }}</div>
+                    {% for ex in d.examples %}
+                    <div class="def-example">"{{ ex }}"</div>
+                    {% endfor %}
+                    {% if d.synonyms %}
+                    <div class="def-synonyms"><strong>Synonyms:</strong> {{ d.synonyms|join(', ') }}</div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <!-- Synonyms -->
+        {% if entry.synonyms %}
+        <div class="section">
+            <div class="section-title">Synonyms</div>
+            <div class="synonym-list">
+                {% for s in entry.synonyms %}
+                {% if s in linked_synonyms %}
+                <a href="{{ url_for('dictionaries-language-tools.word_detail', word_text=s) }}" class="synonym-tag">{{ s }}</a>
+                {% else %}
+                <span class="synonym-tag">{{ s }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Antonyms -->
+        {% if entry.antonyms %}
+        <div class="section">
+            <div class="section-title">Antonyms</div>
+            <div class="synonym-list">
+                {% for a in entry.antonyms %}
+                <span class="antonym-tag">{{ a }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Etymology -->
+        {% if entry.etymology %}
+        <div class="section">
+            <div class="section-title">Etymology</div>
+            <div class="etymology-text">{{ entry.etymology }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Related Words -->
+        {% if entry.related %}
+        <div class="section">
+            <div class="section-title">Related Words</div>
+            <div class="related-list">
+                {% for r in entry.related %}
+                {% if r in linked_related %}
+                <a href="{{ url_for('dictionaries-language-tools.word_detail', word_text=r) }}" class="related-tag">{{ r }}</a>
+                {% else %}
+                <span class="related-tag">{{ r }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Hyphenation -->
+        {% if entry.hyphenations %}
+        <div class="section">
+            <div class="section-title">Hyphenation</div>
+            <div class="etymology-text">
+                {% for h in entry.hyphenations %}
+                {% if h is string %}{{ h }}{% elif h is iterable %}{{ h|join('-') }}{% endif %}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Categories -->
+        {% if entry.categories %}
+        <div class="section">
+            <div class="section-title">Categories</div>
+            <div class="categories-list">
+                {% for c in entry.categories %}
+                <span>{{ c }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <a href="{{ url_for('dictionaries-language-tools.index') }}">Back to Dictionary</a> &middot;
+        <a href="/">MiniWeb</a>
+    </div>
+</body>
+</html>

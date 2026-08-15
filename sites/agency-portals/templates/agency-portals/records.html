@@ -1,0 +1,71 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Public Records - City of Lakeport{% endblock %}
+{% block content %}
+<div class="main-content">
+    <h2 class="section-title">Public Records</h2>
+
+    <form class="filters" method="get" action="{{ url_for('agency-portals.records_page') }}">
+        <div class="form-group">
+            <label for="q">Search</label>
+            <input type="text" id="q" name="q" value="{{ q }}" placeholder="Search records...">
+        </div>
+        <div class="form-group">
+            <label for="type">Record Type</label>
+            <select id="type" name="type">
+                <option value="">All Types</option>
+                {% for rt in record_types %}
+                <option value="{{ rt }}" {{ 'selected' if rtype == rt }}>{{ rt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="date_from">From Date</label>
+            <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="form-group">
+            <label for="date_to">To Date</label>
+            <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+
+    <p class="result-count">{{ total if total is defined else records|length }} record(s) found</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Record ID</th>
+                <th>Type</th>
+                <th>Owner</th>
+                <th>Address</th>
+                <th>Date Filed</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>{{ r.record_id }}</td>
+                <td>{{ r.type }}</td>
+                <td>{{ r.owner }}</td>
+                <td>{{ r.address }}</td>
+                <td>{{ r.date_filed }}</td>
+                <td>{{ r.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if pages is defined and pages > 1 %}
+    <div class="pagination" style="display:flex; align-items:center; gap:1rem; margin-top:1.5rem;">
+        {% if page > 1 %}
+        <a class="btn btn-secondary" href="{{ url_for('agency-portals.records_page', q=q or None, type=rtype or None, date_from=date_from or None, date_to=date_to or None, page=page-1) }}">&laquo; Previous</a>
+        {% endif %}
+        <span class="result-count" style="margin-bottom:0;">Page {{ page }} of {{ pages }}</span>
+        {% if page < pages %}
+        <a class="btn btn-primary" href="{{ url_for('agency-portals.records_page', q=q or None, type=rtype or None, date_from=date_from or None, date_to=date_to or None, page=page+1) }}">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

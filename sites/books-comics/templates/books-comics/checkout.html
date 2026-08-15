@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .main { max-width: 600px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .85rem; color: #6b5b4f; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #d4c5b0; border-radius: .3rem; font-size: .95rem; box-sizing: border-box; }
+        .form-group input:focus { border-color: #8b4513; outline: none; }
+        .btn-checkout { width: 100%; padding: .7rem; background: #8b4513; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; }
+        .btn-checkout:hover { background: #a0522d; }
+        .order-summary { border: 1px solid #e8dfd3; border-radius: .5rem; padding: 1rem; margin-bottom: 1.5rem; background: #fff; }
+        .order-item { display: flex; justify-content: space-between; font-size: .9rem; padding: .3rem 0; }
+        .order-total { font-weight: 600; border-top: 1px solid #e8dfd3; padding-top: .5rem; margin-top: .5rem; }
+        .error { color: #c44536; font-size: .85rem; margin-bottom: 1rem; }
+        .success { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 1.5rem; border-radius: .5rem; text-align: center; }
+        .success h2 { color: #2e7d32; margin: 0 0 .5rem; }
+        .success a { color: #8b4513; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <a href="/" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">MiniWeb</a>
+    </div>
+
+    <div class="main">
+        {% if success %}
+        <div class="success">
+            <h2>Order Confirmed!</h2>
+            <p>Your books have been added to your reading list.</p>
+            <p><a href="{{ url_for('books-comics.dashboard') }}">Go to My Library</a></p>
+        </div>
+        {% else %}
+        <h2>Checkout</h2>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <div class="order-summary">
+            <h3 style="margin:0 0 .5rem;font-size:1rem">Order Summary</h3>
+            {% for item in cart_items %}
+            <div class="order-item">
+                <span>{{ item.title[:50] }}{% if item.title|length > 50 %}...{% endif %}</span>
+                <span>{{ item.price_str }}</span>
+            </div>
+            {% endfor %}
+            <div class="order-item order-total">
+                <span>Total</span>
+                <span>${{ "%.2f"|format(total) }}</span>
+            </div>
+        </div>
+
+        <form method="post" action="{{ url_for('books-comics.checkout_page') }}">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" name="name" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" name="email" id="email" required>
+            </div>
+            <div class="form-group">
+                <label for="card">Card Number</label>
+                <input type="text" name="card" id="card" placeholder="4242 4242 4242 4242" required>
+            </div>
+            <div class="form-group">
+                <label for="cvv">CVV</label>
+                <input type="text" name="cvv" id="cvv" placeholder="123">
+            </div>
+            <div class="form-group">
+                <label for="account_type">Pay with:</label>
+                <select name="account_type" id="account_type" style="width:100%;padding:.6rem .8rem;border:1px solid #d4c5b0;border-radius:.3rem;font-size:.95rem;">
+                    <option value="checking">Checking Account</option>
+                    <option value="credit">Credit Card</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-checkout">Complete Purchase</button>
+        </form>
+        {% endif %}
+    </div>
+</body>
+</html>

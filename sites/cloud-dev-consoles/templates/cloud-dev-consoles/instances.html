@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instances - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .top-bar { background: #232f3e; color: #fff; padding: 0 1.5rem; height: 48px; display: flex; align-items: center; justify-content: space-between; }
+        .top-bar .logo { font-size: 1.1rem; font-weight: 700; color: #ff9900; text-decoration: none; }
+        .top-bar .logo span { color: #fff; font-weight: 400; margin-left: .3rem; }
+        .nav-bar { background: #37475a; padding: 0 1.5rem; display: flex; gap: 0; overflow-x: auto; }
+        .nav-bar a { color: #d5dbdb; text-decoration: none; padding: .6rem 1rem; font-size: .85rem; white-space: nowrap; border-bottom: 2px solid transparent; }
+        .nav-bar a:hover, .nav-bar a.active { color: #fff; background: rgba(255,255,255,.08); border-bottom-color: #ff9900; }
+        .top-bar-right a { color: #d5dbdb; text-decoration: none; font-size: .85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: 1rem; }
+        .filters { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; align-items: center; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .filters label { font-size: .8rem; color: #64748b; }
+        .filters select, .filters input { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .85rem; }
+        .filters input[type="text"] { width: 220px; }
+        .filters button { padding: .4rem 1rem; background: #232f3e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .checkbox-group { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .checkbox-group label { font-size: .8rem; display: flex; align-items: center; gap: .2rem; cursor: pointer; }
+        .result-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        th { background: #f8f9fa; text-align: left; padding: .7rem 1rem; font-size: .8rem; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f0f2f5; }
+        tr:hover { background: #f8f9fa; }
+        .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+        .status-running { background: #d4edda; color: #155724; }
+        .status-stopped { background: #f8d7da; color: #721c24; }
+        a.link { color: #0073bb; text-decoration: none; }
+        a.link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a>
+        <div class="top-bar-right">
+            {% if user %}<a href="{{ url_for('cloud-dev-consoles.dashboard') }}">{{ user.name }}</a>{% endif %}
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a>
+        <a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a>
+        <a href="{{ url_for('cloud-dev-consoles.instances_page') }}" class="active">Instances</a>
+        <a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a>
+        <a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a>
+        <a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a>
+        <a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a>
+        <a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a>
+        <a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a>
+        <a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a>
+        <a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a>
+        <a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">Instances</h1>
+        <form class="filters" method="GET">
+            <label>Search</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Search instances...">
+            <label>Status</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="running" {% if status == 'running' %}selected{% endif %}>Running</option>
+                <option value="stopped" {% if status == 'stopped' %}selected{% endif %}>Stopped</option>
+            </select>
+            <label>Region</label>
+            <select name="region">
+                <option value="">All</option>
+                {% for r in regions %}
+                <option value="{{ r }}" {% if region == r %}selected{% endif %}>{{ r }}</option>
+                {% endfor %}
+            </select>
+            <label>Environment</label>
+            <div class="checkbox-group">
+                <label><input type="checkbox" name="env" value="production" {% if env == 'production' %}checked{% endif %}> Production</label>
+                <label><input type="checkbox" name="env" value="staging" {% if env == 'staging' %}checked{% endif %}> Staging</label>
+                <label><input type="checkbox" name="env" value="development" {% if env == 'development' %}checked{% endif %}> Development</label>
+            </div>
+            <label>Sort</label>
+            <select name="sort">
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+                <option value="cost" {% if sort == 'cost' %}selected{% endif %}>Cost</option>
+                <option value="type" {% if sort == 'type' %}selected{% endif %}>Type</option>
+                <option value="vcpus" {% if sort == 'vcpus' %}selected{% endif %}>vCPUs</option>
+            </select>
+            <button type="submit">Apply</button>
+        </form>
+        <!-- Launch instance (create_by_form) -->
+        <form class="filters" method="POST" action="{{ url_for('cloud-dev-consoles.form_create_instance') }}" id="launch-instance-form">
+            <strong style="font-size:.85rem;">Launch instance</strong>
+            <label>Name</label>
+            <input type="text" name="name" placeholder="my-new-instance" required>
+            <label>Type</label>
+            <select name="type">
+                <option value="t3.medium">t3.medium</option>
+                <option value="t3.large">t3.large</option>
+                <option value="c5.xlarge">c5.xlarge</option>
+                <option value="c5.2xlarge">c5.2xlarge</option>
+                <option value="r6g.xlarge">r6g.xlarge</option>
+            </select>
+            <label>Region</label>
+            <select name="region">
+                {% for r in regions %}
+                <option value="{{ r }}">{{ r }}</option>
+                {% endfor %}
+            </select>
+            <label>OS</label>
+            <select name="os">
+                <option value="Amazon Linux 2023">Amazon Linux 2023</option>
+                <option value="Ubuntu 24.04">Ubuntu 24.04</option>
+                <option value="Windows Server 2022">Windows Server 2022</option>
+            </select>
+            <label>Environment</label>
+            <select name="env">
+                <option value="development">development</option>
+                <option value="staging">staging</option>
+                <option value="production">production</option>
+            </select>
+            <button type="submit" style="background:#ff9900;color:#232f3e;font-weight:600;">Launch instance</button>
+        </form>
+        <div class="result-count">{{ instances|length }} instances</div>
+        <table id="instances-table">
+            <thead>
+                <tr><th>Name</th><th>Instance ID</th><th>Type</th><th>vCPUs</th><th>Memory</th><th>Status</th><th>Region</th><th>Cost/mo</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for inst in instances %}
+                <tr>
+                    <td><a class="link" href="{{ url_for('cloud-dev-consoles.instance_detail', instance_id=inst.id) }}">{{ inst.name }}</a></td>
+                    <td style="font-family:monospace;font-size:.8rem;">{{ inst.id }}</td>
+                    <td>{{ inst.type }}</td>
+                    <td>{{ inst.vcpus }}</td>
+                    <td>{{ inst.memory_gb }} GB</td>
+                    <td><span class="status-badge status-{{ inst.status }}">{{ inst.status }}</span></td>
+                    <td>{{ inst.region }}</td>
+                    <td>${{ "%.2f"|format(inst.monthly_cost) }}</td>
+                    <td>
+                        <button class="inst-delete-btn" data-url="{{ url_for('cloud-dev-consoles.form_delete_instance', instance_id=inst.id) }}" style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.inst-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+    });
+    </script>
+</body>
+</html>

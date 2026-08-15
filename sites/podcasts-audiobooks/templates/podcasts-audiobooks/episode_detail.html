@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ episode.title }} - SoundShelf</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f1a; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; }
+        a { color: #8b5cf6; text-decoration: none; }
+        a:hover { color: #a78bfa; }
+
+        .top-bar { background: #1a1a2e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #2d2d44; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #8b5cf6; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+
+        .container { max-width: 700px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+        .back-link { display: inline-block; margin-bottom: 1rem; font-size: .85rem; color: #8b5cf6; }
+
+        .player-card { background: #1a1a2e; border-radius: .8rem; padding: 2rem; margin-bottom: 1.5rem; }
+        .player-card .ep-number { font-size: .8rem; color: #8b5cf6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: .3rem; }
+        .player-card h1 { font-size: 1.5rem; color: #f0f0f0; margin-bottom: .5rem; }
+        .player-card .podcast-name { font-size: 1rem; color: #8b5cf6; margin-bottom: .8rem; }
+        .player-card .description { font-size: .95rem; color: #aaa; line-height: 1.7; margin-bottom: 1.2rem; }
+        .player-card .stats { display: flex; gap: 1.5rem; font-size: .85rem; color: #888; flex-wrap: wrap; }
+        .player-card .stats span { display: flex; align-items: center; gap: .3rem; }
+
+        .player-bar { background: #2d2d44; border-radius: .5rem; padding: 1rem; margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .play-btn { width: 48px; height: 48px; border-radius: 50%; background: #8b5cf6; border: none; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .play-btn:hover { background: #7c3aed; }
+        .progress-bar { flex: 1; height: 6px; background: #0f0f1a; border-radius: 3px; position: relative; }
+        .progress-fill { height: 100%; width: 0; background: #8b5cf6; border-radius: 3px; transition: width .3s; }
+        .time-display { font-size: .8rem; color: #888; white-space: nowrap; }
+
+        .actions-row { display: flex; gap: .8rem; margin-top: 1.2rem; align-items: center; flex-wrap: wrap; }
+        .action-btn { padding: .4rem 1rem; border-radius: 1.5rem; font-size: .85rem; cursor: pointer; border: 1px solid #2d2d44; background: #1a1a2e; color: #b0b0c0; transition: all .2s; }
+        .action-btn:hover { border-color: #8b5cf6; color: #fff; }
+        .action-btn.active { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
+
+        .speed-control { display: flex; align-items: center; gap: .5rem; margin-top: 1rem; }
+        .speed-control label { font-size: .85rem; color: #888; }
+        .speed-control select { background: #0f0f1a; color: #e0e0e0; border: 1px solid #2d2d44; border-radius: .3rem; padding: .3rem .5rem; font-size: .85rem; }
+
+        #action-msg { display: none; margin-top: .5rem; font-size: .85rem; color: #10b981; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('podcasts-audiobooks.index') }}" class="logo">SoundShelf</a>
+        <div class="nav-links">
+            <a href="{{ url_for('podcasts-audiobooks.index') }}">Discover</a>
+            <a href="{{ url_for('podcasts-audiobooks.podcasts_list') }}">Podcasts</a>
+            <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}">Audiobooks</a>
+            {% if user %}
+            <a href="{{ url_for('podcasts-audiobooks.library_page') }}">Library</a>
+            {% else %}
+            <a href="{{ url_for('podcasts-audiobooks.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        {% if podcast %}
+        <a href="{{ url_for('podcasts-audiobooks.podcast_detail', podcast_id=podcast.id) }}" class="back-link">&larr; {{ podcast.title }}</a>
+        {% endif %}
+
+        <div class="player-card">
+            <div class="ep-number">Episode {{ episode.episode_number }}</div>
+            <h1>{{ episode.title }}</h1>
+            {% if podcast %}
+            <a href="{{ url_for('podcasts-audiobooks.podcast_detail', podcast_id=podcast.id) }}" class="podcast-name">{{ podcast.title }}</a>
+            {% endif %}
+            <div class="description">{{ episode.description }}</div>
+            <div class="stats">
+                <span>{{ episode.duration_minutes }} minutes</span>
+                <span>{{ episode.publish_date }}</span>
+                <span>{{ "{:,}".format(episode.listens) }} listens</span>
+                <span id="like-count">{{ episode.liked_by|length if episode.liked_by else 0 }} likes</span>
+            </div>
+
+            <div class="player-bar">
+                <button class="play-btn" id="play-btn" onclick="togglePlay()">&#9654;</button>
+                <div class="progress-bar" id="progress-bar" style="cursor:pointer;" title="Seek">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="time-display" id="time-display">0:00 / {{ episode.duration_minutes }}:00</div>
+            </div>
+
+            <div class="speed-control">
+                <label for="speed-select">Playback Speed:</label>
+                <select id="speed-select" onchange="setSpeed(this.value)">
+                    <option value="0.5">0.5x</option>
+                    <option value="0.75">0.75x</option>
+                    <option value="1.0" selected>1.0x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2.0">2.0x</option>
+                    <option value="3.0">3.0x</option>
+                </select>
+            </div>
+
+            <div class="actions-row">
+                <button id="btn-like" class="action-btn {{ 'active' if liked else '' }}" onclick="toggleLike({{ episode.id }})">
+                    {{ 'Liked' if liked else 'Like' }}
+                </button>
+                <button id="btn-save" class="action-btn {{ 'active' if saved else '' }}" onclick="toggleSave({{ episode.id }})">
+                    {{ 'Saved' if saved else 'Save' }}
+                </button>
+            </div>
+            <div id="action-msg"></div>
+        </div>
+    </div>
+
+    <script>
+    // Fully simulated audio player: the progress bar advances in real time,
+    // honours playback speed, pauses/resumes, and is seekable by clicking.
+    // Playback position is persisted per user+episode so "Continue Listening"
+    // and resume-on-reload reflect real progress.
+    const EPISODE_ID = {{ episode.id }};
+    const totalSec = {{ episode.duration_minutes }} * 60;
+    let playing = false, speed = 1.0, timer = null;
+    // Resume from the last persisted position for this listener.
+    let pos = Math.min(totalSec, Math.max(0, {{ resume_position|default(0)|round|int }}));
+    function fmtTime(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+    function renderPlayer() {
+        document.getElementById('progress-fill').style.width = (totalSec ? Math.min(100, pos / totalSec * 100) : 0) + '%';
+        document.getElementById('time-display').textContent = fmtTime(pos) + ' / ' + fmtTime(totalSec);
+        document.getElementById('play-btn').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+    }
+    function saveProgress() {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/progress`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                item_type: 'episode',
+                item_id: EPISODE_ID,
+                position: pos,
+                duration: totalSec
+            })
+        }).catch(() => {});
+    }
+    function tickPlayer() { pos += speed; if (pos >= totalSec) { pos = totalSec; stopPlayer(); } renderPlayer(); }
+    function startPlayer() { playing = true; if (timer) clearInterval(timer); timer = setInterval(tickPlayer, 1000); renderPlayer(); }
+    function stopPlayer() { playing = false; if (timer) clearInterval(timer); timer = null; renderPlayer(); saveProgress(); }
+    function togglePlay() {
+        if (playing) stopPlayer(); else startPlayer();
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({speed: speed})});
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        renderPlayer();
+        var bar = document.getElementById('progress-bar');
+        if (bar) bar.addEventListener('click', function (e) {
+            var r = bar.getBoundingClientRect();
+            pos = Math.round((e.clientX - r.left) / r.width * totalSec);
+            renderPlayer();
+            saveProgress();
+        });
+    });
+    // Persist progress if the listener navigates away mid-play.
+    window.addEventListener('beforeunload', function () { if (pos > 0) saveProgress(); });
+
+    function setSpeed(speedVal) {
+        speed = parseFloat(speedVal);
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/speed`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({speed: parseFloat(speed)})
+        })
+        .then(r => r.json())
+        .then(data => {
+            const msg = document.getElementById('action-msg');
+            if (data.action === 'speed_set') {
+                msg.textContent = 'Playback speed set to ' + data.speed + 'x';
+                msg.style.color = '#10b981';
+            } else {
+                msg.textContent = data.error || 'Error';
+                msg.style.color = '#ef4444';
+            }
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        })
+        .catch(() => {
+            window.location.href = '{{ url_for("podcasts-audiobooks.login_page") }}';
+        });
+    }
+
+    function toggleLike(episodeId) {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/episodes/${episodeId}/like`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('btn-like');
+            const msg = document.getElementById('action-msg');
+            if (data.action === 'liked') {
+                btn.textContent = 'Liked';
+                btn.classList.add('active');
+                msg.textContent = 'Episode liked!';
+            } else {
+                btn.textContent = 'Like';
+                btn.classList.remove('active');
+                msg.textContent = 'Like removed.';
+            }
+            document.getElementById('like-count').textContent = data.likes + ' likes';
+            msg.style.color = '#10b981';
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        })
+        .catch(() => {
+            window.location.href = '{{ url_for("podcasts-audiobooks.login_page") }}';
+        });
+    }
+
+    function toggleSave(episodeId) {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/episodes/${episodeId}/save`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('btn-save');
+            const msg = document.getElementById('action-msg');
+            if (data.action === 'saved') {
+                btn.textContent = 'Saved';
+                btn.classList.add('active');
+                msg.textContent = 'Episode saved to library!';
+            } else {
+                btn.textContent = 'Save';
+                btn.classList.remove('active');
+                msg.textContent = 'Removed from saved.';
+            }
+            msg.style.color = '#10b981';
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        })
+        .catch(() => {
+            window.location.href = '{{ url_for("podcasts-audiobooks.login_page") }}';
+        });
+    }
+    </script>
+</body>
+</html>

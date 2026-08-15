@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TradeVista{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Capsule Sans Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1E2124; color: #E8E8E8; min-height: 100vh; }
+        a { color: #E8E8E8; text-decoration: none; }
+        a:hover { color: #00C805; }
+
+        /* ---- Top Nav (TradeVista style) ---- */
+        .rh-nav { background: #1E2124; border-bottom: 1px solid #2F3336; height: 64px; display: flex; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 100; }
+        .rh-nav .rh-logo { display: flex; align-items: center; gap: 8px; margin-right: 32px; }
+        .rh-nav .rh-logo svg { width: 32px; height: 32px; }
+        .rh-nav .rh-logo-text { font-size: 20px; font-weight: 700; color: #00C805; letter-spacing: -0.5px; }
+        .rh-nav .rh-search { flex: 1; max-width: 400px; position: relative; }
+        .rh-nav .rh-search input { width: 100%; background: #2F3336; border: 1px solid #3B4043; color: #E8E8E8; padding: 10px 16px 10px 40px; border-radius: 24px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .rh-nav .rh-search input:focus { border-color: #00C805; }
+        .rh-nav .rh-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6F7782; }
+        .rh-nav-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+        .rh-nav-links a { font-size: 14px; font-weight: 500; color: #C9CACC; padding: 8px 16px; border-radius: 24px; transition: all 0.15s; }
+        .rh-nav-links a:hover { color: #00C805; background: rgba(0,200,5,0.08); }
+        .rh-nav-links a.active { color: #00C805; }
+        .rh-nav-links .nav-account { display: flex; align-items: center; gap: 6px; }
+        .rh-nav-links .avatar-sm { width: 28px; height: 28px; background: #00C805; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #1E2124; }
+
+        /* ---- Layout ---- */
+        .rh-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .rh-main { display: flex; gap: 24px; padding-top: 24px; padding-bottom: 80px; }
+        .rh-content { flex: 1; min-width: 0; }
+        .rh-sidebar { width: 320px; flex-shrink: 0; }
+
+        /* ---- Cards ---- */
+        .rh-card { background: #1E2124; border: 1px solid #2F3336; border-radius: 8px; margin-bottom: 16px; }
+        .rh-card-header { padding: 16px 20px; border-bottom: 1px solid #2F3336; display: flex; align-items: center; justify-content: space-between; }
+        .rh-card-header h2 { font-size: 18px; font-weight: 700; color: #E8E8E8; }
+        .rh-card-body { padding: 20px; }
+
+        /* ---- Typography ---- */
+        .rh-price-hero { font-size: 48px; font-weight: 700; letter-spacing: -1.5px; line-height: 1.1; color: #E8E8E8; }
+        .rh-price-lg { font-size: 32px; font-weight: 700; letter-spacing: -1px; color: #E8E8E8; }
+        .rh-change { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+        .rh-change-sm { font-size: 13px; font-weight: 500; }
+        .rh-label { font-size: 13px; color: #6F7782; font-weight: 400; }
+        .rh-section-title { font-size: 20px; font-weight: 700; color: #E8E8E8; margin-bottom: 16px; }
+
+        /* ---- Colors ---- */
+        .rh-green, .positive { color: #00C805; }
+        .rh-red, .negative { color: #FF5000; }
+        .rh-muted { color: #6F7782; }
+
+        /* ---- Buttons ---- */
+        .rh-btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 24px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; }
+        .rh-btn-primary { background: #00C805; color: #1E2124; }
+        .rh-btn-primary:hover { background: #00E006; color: #1E2124; }
+        .rh-btn-sell { background: #FF5000; color: #fff; }
+        .rh-btn-sell:hover { background: #FF6A20; }
+        .rh-btn-outline { background: transparent; border: 1px solid #2F3336; color: #E8E8E8; }
+        .rh-btn-outline:hover { border-color: #00C805; color: #00C805; }
+        .rh-btn-sm { padding: 6px 16px; font-size: 13px; border-radius: 20px; }
+        .rh-btn-xs { padding: 4px 12px; font-size: 12px; border-radius: 16px; }
+
+        /* ---- Tables ---- */
+        .rh-table { width: 100%; border-collapse: collapse; }
+        .rh-table th { text-align: left; padding: 12px 16px; font-size: 12px; color: #6F7782; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #2F3336; }
+        .rh-table th.right, .rh-table td.right { text-align: right; }
+        .rh-table td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid rgba(47,51,54,0.5); }
+        .rh-table tbody tr { transition: background 0.1s; }
+        .rh-table tbody tr:hover { background: rgba(47,51,54,0.3); }
+
+        /* ---- Watchlist Sidebar ---- */
+        .wl-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(47,51,54,0.5); transition: background 0.1s; cursor: pointer; }
+        .wl-item:hover { background: rgba(47,51,54,0.3); }
+        .wl-item:last-child { border-bottom: none; }
+        .wl-sym { font-size: 14px; font-weight: 700; }
+        .wl-name { font-size: 12px; color: #6F7782; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+        .wl-right { text-align: right; }
+        .wl-price { font-size: 14px; font-weight: 600; }
+        .wl-change { font-size: 12px; font-weight: 500; }
+        .wl-sparkline { margin: 0 12px; }
+
+        /* ---- Sparkline SVG ---- */
+        .sparkline-svg { display: block; }
+
+        /* ---- Tag/Badge ---- */
+        .rh-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+        .rh-tag-stock { background: rgba(0,200,5,0.12); color: #00C805; }
+        .rh-tag-crypto { background: rgba(255,152,0,0.12); color: #FF9800; }
+        .rh-tag-index_fund { background: rgba(130,177,255,0.12); color: #82B1FF; }
+        .rh-tag-futures { background: rgba(186,104,255,0.12); color: #BA68FF; }
+
+        /* ---- Period Selector ---- */
+        .period-selector { display: flex; gap: 4px; margin-top: 12px; }
+        .period-btn { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; background: transparent; color: #6F7782; border: none; cursor: pointer; transition: all 0.15s; }
+        .period-btn:hover { color: #E8E8E8; }
+        .period-btn.active { color: #00C805; background: rgba(0,200,5,0.08); }
+
+        /* ---- Chart Tooltip ---- */
+        .chart-tooltip { position: absolute; background: #2F3336; color: #E8E8E8; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; transform: translateX(-50%); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+        /* ---- Stats Grid ---- */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+        .stat-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(47,51,54,0.5); }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-key { font-size: 13px; color: #6F7782; }
+        .stat-val { font-size: 13px; font-weight: 600; color: #E8E8E8; }
+
+        /* ---- Options Chain ---- */
+        .options-tabs { display: flex; border-bottom: 2px solid #2F3336; margin-bottom: 16px; }
+        .options-tab { padding: 8px 24px; font-size: 14px; font-weight: 600; color: #6F7782; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+        .options-tab:hover { color: #E8E8E8; }
+        .options-tab.active { color: #00C805; border-bottom-color: #00C805; }
+        .itm-row { background: rgba(0,200,5,0.04); }
+        .otm-row { }
+
+        /* ---- Trade Panel ---- */
+        .trade-panel { background: #1E2124; border: 1px solid #2F3336; border-radius: 8px; position: sticky; top: 80px; }
+        .trade-panel-header { padding: 16px 20px; border-bottom: 1px solid #2F3336; }
+        .trade-toggle { display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #2F3336; }
+        .trade-toggle-btn { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; background: transparent; color: #6F7782; border: none; }
+        .trade-toggle-btn.active-buy { background: #00C805; color: #1E2124; }
+        .trade-toggle-btn.active-sell { background: #FF5000; color: #fff; }
+
+        .trade-input-group { padding: 12px 20px; border-bottom: 1px solid rgba(47,51,54,0.5); display: flex; justify-content: space-between; align-items: center; }
+        .trade-input-group label { font-size: 14px; color: #E8E8E8; font-weight: 500; }
+        .trade-input-group input, .trade-input-group select { background: transparent; border: none; color: #E8E8E8; font-size: 14px; text-align: right; outline: none; font-weight: 600; width: 120px; }
+        .trade-input-group select { cursor: pointer; appearance: none; -webkit-appearance: none; }
+        .trade-input-group select option { background: #2F3336; color: #E8E8E8; }
+
+        .trade-estimate { padding: 16px 20px; border-top: 1px solid #2F3336; }
+        .trade-estimate-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
+        .trade-estimate-row:last-child { margin-bottom: 0; }
+
+        /* ---- Flash Animations ---- */
+        @keyframes flash-green { 0% { background: rgba(0,200,5,0.2); } 100% { background: transparent; } }
+        @keyframes flash-red { 0% { background: rgba(255,80,0,0.2); } 100% { background: transparent; } }
+        .tick-up { animation: flash-green 0.5s ease-out; }
+        .tick-down { animation: flash-red 0.5s ease-out; }
+
+        /* ---- Form Controls ---- */
+        select, input[type="text"], input[type="number"], input[type="password"] {
+            background: #2F3336; border: 1px solid #3B4043; color: #E8E8E8; padding: 10px 16px;
+            border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s;
+        }
+        select:focus, input:focus { border-color: #00C805; }
+
+        /* ---- Messages ---- */
+        .msg { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; display: none; }
+        .msg-success { background: rgba(0,200,5,0.1); color: #00C805; border: 1px solid rgba(0,200,5,0.2); }
+        .msg-error { background: rgba(255,80,0,0.1); color: #FF5000; border: 1px solid rgba(255,80,0,0.2); }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .rh-main { flex-direction: column; }
+            .rh-sidebar { width: 100%; }
+            .rh-nav { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 8px; }
+            .rh-nav .rh-search { max-width: 100%; order: 3; width: 100%; }
+            .rh-nav-links { gap: 2px; }
+            .rh-nav-links a { padding: 6px 10px; font-size: 13px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .rh-price-hero { font-size: 36px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="rh-nav">
+        <a href="{{ url_for('brokerage.index') }}" class="rh-logo">
+            <svg viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="16" fill="#00C805"/>
+                <path d="M10 22V12l6-4 6 4v10l-6 4-6-4z" fill="#1E2124" opacity="0.9"/>
+                <path d="M16 8l6 4v10l-6 4" fill="none" stroke="#1E2124" stroke-width="1.5"/>
+            </svg>
+            <span class="rh-logo-text">TradeVista</span>
+        </a>
+        <div class="rh-search">
+            <span class="search-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.007 1.007 0 00-.115-.1zM12 6.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z"/></svg>
+            </span>
+            <form method="GET" action="{{ url_for('brokerage.index') }}">
+                <input type="text" name="q" placeholder="Search" value="{{ request.args.get('q', '') }}">
+            </form>
+        </div>
+        <div class="rh-nav-links">
+            {% if user %}
+            <a href="{{ url_for('brokerage.portfolio_page') }}">Portfolio</a>
+            <a href="{{ url_for('brokerage.watchlist_page') }}">Lists</a>
+            <a href="{{ url_for('brokerage.orders_page') }}">History</a>
+            <a href="{{ url_for('brokerage.trade_page') }}">Trade</a>
+            <a href="{{ url_for('brokerage.logout') }}" class="nav-account">
+                <span class="avatar-sm">{{ user.name[0]|upper if user.name else 'U' }}</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('brokerage.login_page') }}">Log In</a>
+            {% endif %}
+            <a href="/" style="color:#6F7782;font-size:12px;">MiniWeb</a>
+        </div>
+    </div>
+    <div class="rh-container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Shared price state manager -->
+    <script>
+    var RH = window.RH || {};
+
+    // Shared price state via sessionStorage
+    RH.prices = (function() {
+        var KEY = 'rh_live_prices';
+        var state = {};
+
+        function load() {
+            try {
+                var stored = sessionStorage.getItem(KEY);
+                if (stored) state = JSON.parse(stored);
+            } catch(e) {}
+            return state;
+        }
+
+        function save() {
+            try {
+                sessionStorage.setItem(KEY, JSON.stringify(state));
+            } catch(e) {}
+        }
+
+        function update(sym, data) {
+            state[sym] = {
+                price: data.price,
+                change: data.change,
+                change_pct: data.change_pct,
+                direction: data.direction,
+                ts: Date.now()
+            };
+            save();
+        }
+
+        function get(sym) {
+            load();
+            return state[sym] || null;
+        }
+
+        function getAll() {
+            load();
+            return state;
+        }
+
+        load();
+        return { update: update, get: get, getAll: getAll, load: load };
+    })();
+
+    RH.fmt = function(p) {
+        if (p === null || p === undefined) return '$0.00';
+        return p >= 1 ? '$' + p.toFixed(2) : '$' + p.toFixed(4);
+    };
+
+    RH.fmtComma = function(n) {
+        return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    RH.fmtPct = function(pct) {
+        var sign = pct >= 0 ? '+' : '';
+        return sign + pct.toFixed(2) + '%';
+    };
+
+    RH.fmtChange = function(change, pct) {
+        var sign = change >= 0 ? '+' : '';
+        return sign + '$' + Math.abs(change).toFixed(2) + ' (' + sign + pct.toFixed(2) + '%)';
+    };
+
+    // Poll live prices for given symbols
+    RH.startPolling = function(symbols, callback, intervalMs) {
+        intervalMs = intervalMs || 2000;
+        if (!symbols || !symbols.length) return;
+
+        function tick() {
+            fetch("{{ url_for('brokerage.api_prices_live') }}?symbols=" + symbols.join(","))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    for (var sym in data) {
+                        RH.prices.update(sym, data[sym]);
+                    }
+                    if (callback) callback(data);
+                })
+                .catch(function() {});
+        }
+
+        tick();
+        return setInterval(tick, intervalMs);
+    };
+
+    window.RH = RH;
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

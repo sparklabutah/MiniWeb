@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlists - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+
+        /* Page header */
+        .page-header { padding: 24px 24px 0; max-width: 1200px; margin: 0 auto; }
+        .page-header h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+
+        /* Playlist grid */
+        .playlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 24px; max-width: 1200px; margin: 0 auto; }
+        .playlist-card { background: #1a1a1a; border-radius: 12px; overflow: hidden; transition: transform 0.15s; }
+        .playlist-card:hover { transform: translateY(-2px); }
+        .playlist-thumb { position: relative; width: 100%; padding-top: 56.25%; background: #272727; }
+        .playlist-thumb-inner { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; }
+        .playlist-thumb-main { flex: 3; background: #222; display: flex; align-items: center; justify-content: center; }
+        .playlist-thumb-side { flex: 1; background: rgba(0,0,0,0.7); display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 2px solid #0f0f0f; }
+        .playlist-count-badge { font-size: 18px; font-weight: 700; }
+        .playlist-count-label { font-size: 10px; color: #aaa; text-transform: uppercase; }
+        .playlist-info { padding: 12px 16px; }
+        .playlist-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; line-height: 1.3; }
+        .playlist-creator { font-size: 13px; color: #aaa; margin-bottom: 2px; }
+        .playlist-meta { font-size: 12px; color: #666; }
+        .playlist-visibility { display: inline-block; font-size: 11px; color: #aaa; background: #272727; padding: 2px 8px; border-radius: 4px; margin-top: 4px; }
+        .empty-state { text-align: center; padding: 60px 24px; color: #aaa; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="{{ url_for("video.search") }}" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <h1>Playlists</h1>
+    </div>
+
+    {% if playlists %}
+    <div class="playlist-grid">
+        {% for playlist in playlists %}
+        <a href="{{ url_for('video.playlist_detail', playlist_id=playlist.id) }}">
+            <div class="playlist-card">
+                <div class="playlist-thumb">
+                    <div class="playlist-thumb-inner">
+                        {% set first_item = playlist["items"][0] if playlist["items"] else None %}
+                        {% set first_vid = video_map.get(first_item.video_id) if first_item else None %}
+                        {% set ptg = thumb_gradient(first_vid.category if first_vid else '') %}
+                        <div class="playlist-thumb-main" style="background: {{ ptg[0] }};">
+                            <span style="font-size:36px; color:{{ ptg[1] }}; opacity:0.7;">&#9654;</span>
+                        </div>
+                        <div class="playlist-thumb-side">
+                            <span class="playlist-count-badge">{{ playlist["items"]|length if playlist["items"] else 0 }}</span>
+                            <span class="playlist-count-label">videos</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="playlist-info">
+                    <div class="playlist-title">{{ playlist.title }}</div>
+                    {% set creator = user_map.get(playlist.user_id) %}
+                    {% if creator %}
+                    <div class="playlist-creator">{{ creator.channel_name or creator.display_name }}</div>
+                    {% endif %}
+                    <div class="playlist-meta">Updated {{ playlist.updated_date or playlist.created_date }}</div>
+                    {% if playlist.visibility == 'private' %}
+                    <span class="playlist-visibility">Private</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No playlists found.</div>
+    {% endif %}
+</body>
+</html>

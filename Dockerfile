@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["python", "run.py"]
+CMD ["gunicorn", "run:app", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120"]

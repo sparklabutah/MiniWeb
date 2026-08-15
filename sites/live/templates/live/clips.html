@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clips - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
+</head>
+<body>
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <main class="tw-main">
+            <div class="tw-content">
+                <div class="tw-page-head">
+                    <h1>{% if q %}Clip results for &ldquo;{{ q }}&rdquo;{% else %}Clips{% endif %} <span style="color:var(--text-dim);font-weight:500;font-size:1rem;">({{ clips|length }})</span></h1>
+                </div>
+
+                <form class="tw-filters" method="get" action="{{ url_for('live.clips_page') }}" style="margin-bottom:1.4rem;">
+                    <div class="tw-fg">
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ q }}" placeholder="Search clips...">
+                    </div>
+                    <div class="tw-fg">
+                        <label>Channel</label>
+                        <select name="channel">
+                            <option value="">All Channels</option>
+                            {% for s in streamers %}
+                            <option value="{{ s.id }}" {{ 'selected' if selected_channel == s.id }}>{{ s.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="tw-btn">Search</button>
+                    {% if q or selected_channel %}
+                    <a href="{{ url_for('live.clips_page') }}" class="tw-btn-2">Clear</a>
+                    {% endif %}
+                </form>
+
+                {% if clips %}
+                <div class="tw-grid">
+                    {% for clip in clips %}
+                    {% set channel = user_map.get(clip.channel_id) %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.clip_detail', clip_id=clip.id) }}" style="background: {{ clip.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                <span class="tw-viewers">{{ fmt_count(clip.views) }} views</span>
+                                <span class="tw-dur">{{ clip.duration_seconds }}s</span>
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ channel.avatar_color if channel else '#9147ff' }};">{{ channel.display_name[0]|upper if channel else '?' }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.clip_detail', clip_id=clip.id) }}" title="{{ clip.title }}">{{ clip.title }}</a>
+                                <a class="tw-card-chan" href="{{ url_for('live.channel_page', user_id=clip.channel_id) }}">{{ channel.display_name if channel else 'Unknown' }}</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>{% if q %}No clips match &ldquo;{{ q }}&rdquo;.{% else %}No clips found.{% endif %}</p></div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

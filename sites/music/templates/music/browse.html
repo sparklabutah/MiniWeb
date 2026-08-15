@@ -1,0 +1,52 @@
+{% extends "music/base.html" %}
+{% set active = 'browse' %}
+{% block title %}Browse — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<h1 class="page-h">{% if selected_genre %}{{ selected_genre }}{% else %}Browse{% endif %}</h1>
+
+<!-- Genre filtering: click a pill (the only way to filter) -->
+<div class="pills">
+    <a href="{{ url_for('music.browse') }}" class="pill {% if not selected_genre %}active{% endif %}">All</a>
+    {% for g in genres %}
+    <a href="{{ url_for('music.browse', genre=g) }}" class="pill {% if selected_genre == g %}active{% endif %}">{{ g }}</a>
+    {% endfor %}
+</div>
+
+{% if artists %}
+<div class="section">
+    <h2 class="section-title">Artists{% if selected_genre %} in {{ selected_genre }}{% endif %}</h2>
+    <div class="grid">
+        {% for artist in artists %}
+        <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="card artist">
+            <div class="art" style="background: linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+            <div class="nm">{{ artist.name }}</div>
+            <div class="mt">{{ artist.genre }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if albums %}
+<div class="section">
+    <h2 class="section-title">{% if selected_genre %}{{ selected_genre }} Albums{% else %}New Releases{% endif %}</h2>
+    <div class="grid">
+        {% for album in albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.release_date }} &middot; {{ album.genre }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if not artists and not albums %}
+<div class="empty-state">No results found for this genre.</div>
+{% endif %}
+{% endblock %}

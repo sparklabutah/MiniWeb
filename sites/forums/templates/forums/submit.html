@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+    <div class="rd-page">
+        <div class="rd-panel">
+            <h1>Create a post</h1>
+            {% if error %}
+            <div class="rd-err">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('forums.submit_post_form') }}">
+                <div class="rd-field">
+                    <label for="subreddit">Community</label>
+                    <select name="subreddit" id="subreddit" required>
+                        <option value="">Choose a community</option>
+                        {% for sub in subreddits %}
+                        <option value="{{ sub }}">r/{{ sub }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="rd-field">
+                    <label for="title">Title</label>
+                    <input type="text" name="title" id="title" placeholder="Title" required maxlength="300">
+                </div>
+                <div class="rd-field">
+                    <label for="body">Body (optional)</label>
+                    <textarea name="body" id="body" placeholder="Text (optional)" style="height:160px;resize:vertical;"></textarea>
+                </div>
+                <div class="rd-field">
+                    <label for="flair">Flair (optional)</label>
+                    <input type="text" name="flair" id="flair" placeholder="e.g. Discussion, Question, OC">
+                </div>
+                <button type="submit" class="rd-btn">Post</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

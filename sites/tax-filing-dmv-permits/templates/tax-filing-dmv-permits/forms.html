@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forms & Publications - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'forms' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="content">
+        <h1 class="page-title">Forms & Publications</h1>
+        <p class="page-desc">Download tax forms, DMV applications, and permit documents. All forms are available as PDF.</p>
+
+        <div class="filters">
+            <select id="categoryFilter" onchange="filterForms()">
+                <option value="">All Categories</option>
+                <option value="tax" {% if category == 'tax' %}selected{% endif %}>Tax Forms</option>
+                <option value="dmv" {% if category == 'dmv' %}selected{% endif %}>Motor Vehicle Forms</option>
+                <option value="permits" {% if category == 'permits' %}selected{% endif %}>Permit Applications</option>
+            </select>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search forms by number or title..." oninput="filterForms()">
+        </div>
+
+        {% for cat_name, cat_forms in form_categories.items() %}
+        <div class="form-category" data-category="{{ cat_forms[0].category if cat_forms else '' }}">
+            <div class="category-header">{{ cat_name }}</div>
+            <div class="form-list">
+                {% for form in cat_forms %}
+                <div class="form-item" data-category="{{ form.category }}" data-search="{{ form.form_number|lower }} {{ form.title|lower }} {{ form.description|lower }}">
+                    <div class="form-info">
+                        <div class="form-number">{{ form.form_number }}</div>
+                        <div class="form-title">{{ form.title }}</div>
+                        <div class="form-desc">{{ form.description }}</div>
+                        <div class="form-meta">Last revised: {{ form.revised }} &bull; {{ form.pages }} page{{ 's' if form.pages != 1 }}</div>
+                    </div>
+                    <div class="form-actions">
+                        <a href="{{ url_for('tax-filing-dmv-permits.form_pdf', form_id=form.id) }}" class="btn-download" onclick="var b=this;b.innerHTML='Downloading...';setTimeout(function(){b.innerHTML='&#128196; PDF'},2000)">&#128196; PDF</a>
+                        {% if form.has_instructions %}
+                        <a href="{{ url_for('tax-filing-dmv-permits.form_pdf', form_id=form.id, instructions='1') }}" class="btn-inst">Instructions</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+
+    <script>
+    function filterForms() {
+        var cat = document.getElementById('categoryFilter').value.toLowerCase();
+        var q = document.getElementById('searchInput').value.toLowerCase();
+        fetch('{{ url_for("tax-filing-dmv-permits.api_forms") }}?category=' + encodeURIComponent(cat) + '&q=' + encodeURIComponent(q));
+        document.querySelectorAll('.form-item').forEach(function(item) {
+            var itemCat = item.getAttribute('data-category');
+            var searchText = item.getAttribute('data-search');
+            var catMatch = !cat || itemCat === cat;
+            var queryMatch = !q || searchText.indexOf(q) >= 0;
+            item.style.display = (catMatch && queryMatch) ? '' : 'none';
+        });
+        // Hide empty category headers
+        document.querySelectorAll('.form-category').forEach(function(section) {
+            var visible = section.querySelectorAll('.form-item[style=""], .form-item:not([style])');
+            var hasVisible = false;
+            section.querySelectorAll('.form-item').forEach(function(item) {
+                if (item.style.display !== 'none') hasVisible = true;
+            });
+            section.style.display = hasVisible ? '' : 'none';
+        });
+    }
+    // Apply initial filter if category is set
+    {% if category %}filterForms();{% endif %}
+    </script>
+</body>
+</html>

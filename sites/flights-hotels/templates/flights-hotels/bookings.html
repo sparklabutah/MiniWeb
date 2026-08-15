@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .page-title { font-size: 1.4rem; color: #1a365d; margin-bottom: .3rem; }
+        .page-subtitle { color: #718096; font-size: .9rem; margin-bottom: 1.5rem; }
+        .booking-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; gap: 1.2rem; text-decoration: none; color: inherit; transition: box-shadow .15s; border-left: 4px solid #2b6cb0; }
+        .booking-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .booking-card.flight { border-left-color: #4299e1; }
+        .booking-card.hotel { border-left-color: #38a169; }
+        .booking-card.cancelled { border-left-color: #e53e3e; opacity: .7; }
+        .booking-type { min-width: 60px; text-align: center; }
+        .booking-type .icon { font-size: 1.5rem; }
+        .booking-type .label { font-size: .72rem; text-transform: uppercase; font-weight: 700; color: #718096; }
+        .booking-info { flex: 1; }
+        .booking-title { font-weight: 600; font-size: 1rem; color: #1a365d; }
+        .booking-desc { font-size: .85rem; color: #718096; margin-top: .15rem; }
+        .booking-date { font-size: .78rem; color: #a0aec0; margin-top: .2rem; }
+        .booking-meta { text-align: right; min-width: 120px; }
+        .booking-price { font-size: 1.2rem; font-weight: 700; color: #2b6cb0; }
+        .booking-status { display: inline-block; font-size: .72rem; text-transform: uppercase; font-weight: 700; padding: .15rem .5rem; border-radius: .2rem; margin-top: .3rem; }
+        .booking-status.confirmed { background: #c6f6d5; color: #22543d; }
+        .booking-status.pending { background: #fefcbf; color: #744210; }
+        .booking-status.cancelled { background: #fed7d7; color: #9b2c2c; }
+        .no-bookings { text-align: center; color: #a0aec0; padding: 3rem; background: #fff; border-radius: .5rem; }
+        .no-bookings a { color: #4299e1; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}" class="active">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2 class="page-title">My Bookings</h2>
+        <p class="page-subtitle">{{ user.name }} &middot; {{ bookings|length }} booking{{ 's' if bookings|length != 1 else '' }}</p>
+
+        {% if bookings %}
+        {% for b in bookings %}
+        <a class="booking-card {{ b.type }} {{ b.status }}" href="{{ url_for('flights-hotels.booking_detail', booking_id=b.id) }}">
+            <div class="booking-type">
+                <div class="icon">{% if b.type == 'flight' %}&#9992;{% else %}&#127976;{% endif %}</div>
+                <div class="label">{{ b.type }}</div>
+            </div>
+            <div class="booking-info">
+                {% if b.type == 'flight' and b.ref_detail %}
+                <div class="booking-title">{{ b.ref_detail.airline }} {{ b.ref_detail.flight_number }}</div>
+                <div class="booking-desc">{{ b.ref_detail.origin_city }} &rarr; {{ b.ref_detail.dest_city }} &middot; {{ b.ref_detail.date }}</div>
+                {% elif b.type == 'hotel' and b.ref_detail %}
+                <div class="booking-title">{{ b.ref_detail.name }}</div>
+                <div class="booking-desc">{{ b.ref_detail.city }}</div>
+                {% else %}
+                <div class="booking-title">{{ b.type|capitalize }} Booking #{{ b.reference_id }}</div>
+                {% endif %}
+                <div class="booking-date">Booked: {{ b.booking_date }} &middot; {{ b.travelers }} traveler{{ 's' if b.travelers != 1 else '' }}</div>
+            </div>
+            <div class="booking-meta">
+                <div class="booking-price">${{ "%.2f"|format(b.total_price) }}</div>
+                <span class="booking-status {{ b.status }}">{{ b.status }}</span>
+            </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="no-bookings">
+            <p>No bookings yet.</p>
+            <p style="margin-top:.5rem;">
+                <a href="{{ url_for('flights-hotels.flights_page') }}">Search flights</a> or
+                <a href="{{ url_for('flights-hotels.hotels_page') }}">find a hotel</a> to get started.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

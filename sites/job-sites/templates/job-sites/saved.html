@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saved Jobs - JobQuest</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #1f2937; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; color: #4338ca; }
+        nav .spacer { flex: 1; }
+        nav .btn-logout { color: #dc2626; }
+        .login-banner { max-width: 1100px; margin: .5rem auto 0; padding: .6rem 2rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: .3rem; font-size: .85rem; color: #92400e; }
+        .login-banner a { color: #4338ca; font-weight: 600; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+        .page-title { font-size: 1.3rem; color: #1e1b4b; margin-bottom: .3rem; }
+        .subtitle { font-size: .9rem; color: #6b7280; margin-bottom: 1.5rem; }
+        .job-list { display: flex; flex-direction: column; gap: .8rem; }
+        .job-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid #6366f1; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+        .job-info h3 { margin-bottom: .2rem; }
+        .job-info h3 a { color: #1e1b4b; text-decoration: none; font-size: 1rem; }
+        .job-info h3 a:hover { color: #6366f1; text-decoration: underline; }
+        .job-info .company { color: #374151; font-size: .9rem; font-weight: 500; }
+        .job-info .rating { color: #f59e0b; }
+        .job-info .meta { font-size: .8rem; color: #6b7280; margin-top: .3rem; }
+        .job-info .notes { font-size: .8rem; color: #92400e; background: #fffbeb; padding: .3rem .6rem; border-radius: .3rem; margin-top: .4rem; display: inline-block; }
+        .job-info .tags { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .4rem; }
+        .job-info .tag { background: #e0e7ff; color: #3730a3; padding: .1rem .4rem; border-radius: .2rem; font-size: .75rem; }
+        .job-actions { display: flex; flex-direction: column; gap: .4rem; min-width: 100px; }
+        .btn-sm { padding: .35rem .8rem; border-radius: .3rem; font-size: .8rem; font-weight: 600; cursor: pointer; border: none; text-align: center; text-decoration: none; }
+        .btn-apply { background: #6366f1; color: #fff; }
+        .btn-apply:hover { background: #4f46e5; }
+        .btn-unsave { background: #fff; color: #dc2626; border: 1px solid #dc2626; }
+        .btn-unsave:hover { background: #fef2f2; }
+        .empty { text-align: center; padding: 3rem; color: #6b7280; }
+        .empty a { color: #6366f1; }
+        .footer { text-align: center; padding: 2rem; color: #9ca3af; font-size: .8rem; border-top: 1px solid #e5e7eb; margin-top: 3rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}" class="active">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <span class="spacer"></span>
+        {% if logged_in %}
+        <a href="{{ url_for('job-sites.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('job-sites.login_page') }}">Sign In</a>
+        {% endif %}
+    </nav>
+
+    {% if not logged_in %}
+    <div class="login-banner">
+        Browsing as {{ user.display_name }} (demo mode). <a href="{{ url_for('job-sites.login_page') }}">Sign in</a> to manage your saved jobs.
+    </div>
+    {% endif %}
+
+    <div class="main">
+        <h2 class="page-title">Saved Jobs</h2>
+        <p class="subtitle">{{ jobs|length }} saved job{{ 's' if jobs|length != 1 else '' }}</p>
+
+        {% if jobs %}
+        <div class="job-list">
+            {% for job in jobs %}
+            <div class="job-card" id="saved-{{ job.id }}">
+                <div class="job-info">
+                    <h3><a href="{{ url_for('job-sites.saved_job_detail', saved_id=job.id) }}">{{ job.job_title }}</a></h3>
+                    <div class="company">{{ job.company }} {% if job.company_rating %}<span class="rating">&#9733; {{ job.company_rating }}</span>{% endif %}</div>
+                    <div class="meta">{{ job.location }} &bull; {{ job.salary_range }} &bull; Saved {{ job.saved_date }}</div>
+                    {% if job.tags %}
+                    <div class="tags">
+                        {% for tag in job.tags %}
+                        <span class="tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if job.notes %}
+                    <div class="notes">{{ job.notes }}</div>
+                    {% endif %}
+                </div>
+                <div class="job-actions">
+                    <a href="{{ url_for('job-sites.saved_job_detail', saved_id=job.id) }}" class="btn-sm btn-apply">View</a>
+                    <a href="{{ url_for('job-sites.apply_saved_page', saved_id=job.id) }}" class="btn-sm btn-apply">Apply</a>
+                    <button class="btn-sm btn-unsave" onclick="unsave({{ job.id }})">Unsave</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            <p>No saved jobs yet.</p>
+            <p style="margin-top:.5rem;"><a href="{{ url_for('job-sites.jobs_page') }}">Browse jobs to save some</a></p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        JobQuest &mdash; Your job search, simplified. &copy; 2026
+    </div>
+
+    <script>
+    function unsave(jobId) {
+        fetch("{{ url_for('job-sites.index') }}api/jobs/" + jobId + "/save", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === "unsaved") {
+                const el = document.getElementById("saved-" + jobId);
+                if (el) el.style.display = "none";
+            }
+        });
+    }
+    </script>
+</body>
+</html>

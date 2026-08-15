@@ -1,0 +1,88 @@
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% block title %}Create Issue - Meridian Tracker{% endblock %}
+{% block heading %}New Issue{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width:700px;">
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_create_issue') }}">
+        <div style="margin-bottom:16px;">
+            <label for="title" style="display:block;font-weight:600;margin-bottom:5px;">Title *</label>
+            <input type="text" id="title" name="title" required placeholder="Brief summary of the issue" autofocus>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label for="description" style="display:block;font-weight:600;margin-bottom:5px;">Description</label>
+            <textarea id="description" name="description" placeholder="Detailed description, steps to reproduce, expected behavior..." style="min-height:120px;resize:vertical;"></textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+                <label for="project_id" style="display:block;font-weight:600;margin-bottom:5px;">Project *</label>
+                <select id="project_id" name="project_id" required>
+                    <option value="">Select project...</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>{{ p.name }} ({{ p.key }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="type" style="display:block;font-weight:600;margin-bottom:5px;">Type</label>
+                <select id="type" name="type">
+                    <option value="bug">Bug</option>
+                    <option value="feature">Feature</option>
+                    <option value="task" selected>Task</option>
+                    <option value="story">Story</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+                <label for="priority" style="display:block;font-weight:600;margin-bottom:5px;">Priority</label>
+                <select id="priority" name="priority">
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div>
+                <label for="assignee_id" style="display:block;font-weight:600;margin-bottom:5px;">Assignee</label>
+                <select id="assignee_id" name="assignee_id">
+                    <option value="">Unassigned</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+                <label for="story_points" style="display:block;font-weight:600;margin-bottom:5px;">Story Points</label>
+                <input type="number" id="story_points" name="story_points" min="0" placeholder="e.g. 5">
+            </div>
+            <div>
+                <label for="sprint" style="display:block;font-weight:600;margin-bottom:5px;">Sprint</label>
+                <select id="sprint" name="sprint">
+                    <option value="">Backlog (no sprint)</option>
+                    {% for s in sprints %}
+                    <option value="{{ s.id }}">{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label for="labels" style="display:block;font-weight:600;margin-bottom:5px;">Labels</label>
+            <input type="text" id="labels" name="labels" placeholder="e.g. security, api, performance">
+            <div style="font-size:.78rem;color:var(--faint);margin-top:4px;">Comma-separated list of labels</div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px;">
+            <button type="submit" class="btn btn-primary">Create Issue</button>
+            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

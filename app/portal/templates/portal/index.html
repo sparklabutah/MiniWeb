@@ -3,151 +3,709 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MiniWeb</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        .hero {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 40vh;
-            padding: 2rem;
-        }
-        .hero h1 {
-            font-size: 2.8rem;
-            font-weight: 700;
-            margin-bottom: .25rem;
-            letter-spacing: -.02em;
-        }
-        .hero p {
-            color: #64748b;
-            margin-bottom: 2rem;
-            font-size: 1.05rem;
-        }
-        .search-box {
-            width: 100%;
-            max-width: 540px;
-            position: relative;
-        }
-        .search-box input {
-            width: 100%;
-            padding: .85rem 1.2rem .85rem 2.8rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 9999px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color .15s;
-            box-sizing: border-box;
-        }
-        .search-box input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59,130,246,.15);
-        }
-        .search-box .icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #94a3b8;
-            pointer-events: none;
-        }
-        .sites-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.25rem;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 1rem 2rem 3rem;
-        }
-        .site-card {
-            border: 1px solid #e2e8f0;
-            border-radius: .75rem;
-            padding: 1.5rem;
-            transition: box-shadow .15s, border-color .15s;
-            text-decoration: none;
-            color: inherit;
-            display: block;
-        }
-        .site-card:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 4px 12px rgba(0,0,0,.06);
-        }
-        .site-card h2 {
-            font-size: 1.15rem;
-            margin: 0 0 .4rem;
-        }
-        .site-card .desc {
-            color: #64748b;
-            font-size: .9rem;
-            margin: 0 0 .75rem;
-        }
-        .tag {
-            display: inline-block;
-            background: #f1f5f9;
-            color: #475569;
-            font-size: .75rem;
-            padding: .15rem .55rem;
-            border-radius: 9999px;
-            margin-right: .35rem;
-        }
-        .no-results {
-            text-align: center;
-            color: #94a3b8;
-            padding: 3rem 1rem;
-            display: none;
-        }
-    </style>
+    <title>MiniWeb Browser</title>
+    <link rel="stylesheet" href="/static/browser.css">
 </head>
-<body>
-    <div class="hero">
-        <h1>MiniWeb</h1>
-        <p>Lightweight web for agentic benchmarking</p>
-        <div class="search-box">
-            <span class="icon">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-                     viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            </span>
-            <input type="text" id="search" placeholder="Search sites..." autofocus autocomplete="off">
+<body id="browser-shell">
+
+    <!-- Tab bar -->
+    <div id="tab-bar">
+        <div id="tabs-container"></div>
+        <button id="new-tab-btn" title="New tab">+</button>
+    </div>
+
+    <!-- Navigation bar -->
+    <div id="nav-bar">
+        <button id="btn-back" class="nav-btn" title="Back" disabled>
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <button id="btn-forward" class="nav-btn" title="Forward" disabled>
+            <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+        </button>
+        <button id="btn-refresh" class="nav-btn" title="Refresh">
+            <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>
+        <div id="url-bar-wrapper">
+            <input id="url-bar" type="text" placeholder="Search MiniWeb or type a URL..." autocomplete="off" spellcheck="false">
+            <button id="url-go-btn" onclick="navigateTo(document.getElementById('url-bar').value)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#5f6368;font-size:14px;padding:2px 6px;border-radius:4px;" title="Go">&#10132;</button>
+        </div>
+        <a href="/annotate/" target="_top" style="padding:4px 14px;background:#7c3aed;color:#fff;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;margin-left:8px" title="Open annotation interface">Annotate</a>
+    </div>
+
+    <!-- Content area -->
+    <div id="content-area">
+        <div id="new-tab-page">
+            <div class="ntp-logo">MiniWeb</div>
+            <div class="ntp-subtitle">Alex Rivera's Web</div>
+            <div class="ntp-search-box">
+                <span class="search-icon">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                         viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+                <input id="ntp-search" type="text" placeholder="Search the web..." autocomplete="off">
+                <div id="ntp-search-results"></div>
+            </div>
+            <!-- Search results page (hidden by default) -->
+            <div id="search-results-page" style="display:none;max-width:680px;width:100%;padding:0 16px;">
+                <div id="search-results-header" style="font-size:13px;color:#70757a;margin-bottom:12px;"></div>
+                <div id="search-results-list"></div>
+            </div>
+            <div id="ntp-categories"></div>
         </div>
     </div>
 
-    <div class="sites-grid" id="sites-grid">
-        {% for site in sites %}
-        <a class="site-card" href="{{ site.path }}" data-name="{{ site.name|lower }}"
-           data-desc="{{ site.description|lower }}" data-tags="{{ site.tags|join(' ')|lower }}">
-            <h2>{{ site.name }}</h2>
-            <p class="desc">{{ site.description }}</p>
-            <div>
-                {% for tag in site.tags %}
-                <span class="tag">{{ tag }}</span>
-                {% endfor %}
-            </div>
-        </a>
-        {% endfor %}
-    </div>
+<script>
+const SITES = JSON.parse('{{ sites_json | safe }}');
+const MAX_TABS = 10;
 
-    <div class="no-results" id="no-results">No sites match your search.</div>
+let tabs = [];
+let activeTabId = null;
+let tabIdCounter = 0;
 
-    <script>
-    const input = document.getElementById("search");
-    const grid = document.getElementById("sites-grid");
-    const cards = grid.querySelectorAll(".site-card");
-    const noResults = document.getElementById("no-results");
+// Build domain <-> path mappings from site metadata
+const DOMAIN_TO_PATH = {};
+const PATH_TO_DOMAIN = {};
+SITES.forEach(s => {
+    if (s.domain) {
+        DOMAIN_TO_PATH[s.domain] = s.path;
+        PATH_TO_DOMAIN[s.id] = s.domain;
+    }
+});
 
-    input.addEventListener("input", () => {
-        const q = input.value.toLowerCase().trim();
-        let visible = 0;
-        cards.forEach(card => {
-            const match = !q
-                || card.dataset.name.includes(q)
-                || card.dataset.desc.includes(q)
-                || card.dataset.tags.includes(q);
-            card.style.display = match ? "" : "none";
-            if (match) visible++;
-        });
-        noResults.style.display = visible === 0 ? "block" : "none";
+function pathToDisplayUrl(path) {
+    // Convert /sites/banking/dashboard?x=1 -> securebank.com/dashboard?x=1
+    const m = path.match(/^\/sites\/([^/]+)(\/.*)?$/);
+    if (m) {
+        const siteId = m[1];
+        const rest = m[2] || '/';
+        const domain = PATH_TO_DOMAIN[siteId];
+        if (domain) return domain + rest;
+    }
+    return path;
+}
+
+function displayUrlToPath(url) {
+    // Convert https://securebank.com/dashboard -> /sites/banking/dashboard
+    let u = url.trim();
+    // Strip protocol
+    u = u.replace(/^https?:\/\//, '');
+    // Try matching domain
+    for (const [domain, sitePath] of Object.entries(DOMAIN_TO_PATH)) {
+        if (u === domain || u.startsWith(domain + '/')) {
+            const rest = u.slice(domain.length) || '/';
+            return sitePath.replace(/\/$/, '') + rest;
+        }
+    }
+    // If it starts with / it's already a path
+    if (url.startsWith('/')) return url;
+    return null;
+}
+
+const CATEGORY_ORDER = [
+    "Communication", "Productivity", "Shopping & Transactional", "Financial",
+    "Social Media", "Streaming & Media", "Search & Reference", "Dynamic Info & Feeds",
+    "Static & Informational", "Editing", "Education & LMS", "Government & Civic",
+    "Health", "Maps & Navigation", "Utilities", "Other"
+];
+
+const CATEGORY_ICONS = {
+    "Communication": "\u{1F4AC}", "Productivity": "\u{1F4CB}", "Shopping & Transactional": "\u{1F6D2}",
+    "Financial": "\u{1F4B3}", "Social Media": "\u{1F465}", "Streaming & Media": "\u{1F3AC}",
+    "Search & Reference": "\u{1F50D}", "Dynamic Info & Feeds": "\u{1F4F0}",
+    "Static & Informational": "\u{1F4C4}", "Editing": "\u{270F}\uFE0F", "Education & LMS": "\u{1F393}",
+    "Government & Civic": "\u{1F3DB}\uFE0F", "Health": "\u{2764}\uFE0F",
+    "Maps & Navigation": "\u{1F5FA}\uFE0F", "Utilities": "\u{1F527}", "Other": "\u{1F4E6}"
+};
+
+const ICON_COLORS = [
+    '#4285f4','#ea4335','#fbbc04','#34a853','#ff6d01','#46bdc6','#7baaf7',
+    '#f07b72','#fcd04f','#57bb8a','#e8710a','#9334e6','#d93025','#1967d2',
+    '#188038','#a142f4','#c5221f','#0d652d','#b31412','#0b57d0',
+];
+function hashColor(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+    return ICON_COLORS[Math.abs(h) % ICON_COLORS.length];
+}
+
+// Realistic site search: match by brand name AND by functionality/intent
+// keywords, ranked. Mirrors app/portal/routes.py::site_search_score.
+const SEARCH_STOP = new Set(['a','an','the','my','to','find','for','on','in','of',
+    'me','i','want','how','do','can','with','and','or','is','it','get','go','new',
+    'some','that','this','at','by','your','our','we','you']);
+function siteSearchScore(s, query) {
+    const ql = (query || '').toLowerCase().trim();
+    if (!ql) return 0;
+    const name = (s.name || '').toLowerCase();
+    const text = [s.name, s.description, s.category, s.keywords]
+        .filter(Boolean).join(' ').toLowerCase();
+    let score = 0;
+    if (name.includes(ql)) score += 20;
+    else if (text.includes(ql)) score += 10;
+    const toks = ql.split(/[^a-z0-9]+/).filter(t => t.length >= 3 && !SEARCH_STOP.has(t));
+    for (const t of toks) {
+        if (name.includes(t)) score += 4;
+        else if (text.includes(t)) score += 3;
+    }
+    return score;
+}
+
+// ---- Tab management ----
+
+function createTab(siteId, opts) {
+    opts = opts || {};
+    if (tabs.length >= MAX_TABS) return;
+    const id = ++tabIdCounter;
+    const tab = {
+        id, siteId: siteId || null, title: 'New Tab', url: '',
+        iframeEl: null, tabEl: null, syncInterval: null,
+        history: [], historyIdx: -1, navigating: false
+    };
+
+    const tabEl = document.createElement('div');
+    tabEl.className = 'tab';
+    tabEl.dataset.tabId = id;
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'tab-title';
+    titleSpan.textContent = 'New Tab';
+    tabEl.appendChild(titleSpan);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tab-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeTab(id); });
+    tabEl.appendChild(closeBtn);
+
+    tabEl.addEventListener('click', () => switchTab(id));
+    // Insert next to the currently active tab when requested (e.g. opening a
+    // site from the landing page); otherwise append at the end (+ button).
+    const container = document.getElementById('tabs-container');
+    const activeIdx = tabs.findIndex(t => t.id === activeTabId);
+    if (opts.insertAfterActive && activeIdx !== -1) {
+        const activeEl = tabs[activeIdx].tabEl;
+        container.insertBefore(tabEl, activeEl.nextSibling);
+    } else {
+        container.appendChild(tabEl);
+    }
+    tab.tabEl = tabEl;
+
+    if (siteId) {
+        const site = SITES.find(s => s.id === siteId);
+        if (site) {
+            tab.title = site.name;
+            titleSpan.textContent = site.name;
+            tab.url = site.path;
+            createIframe(tab, site.path);
+        }
+    }
+
+    // Keep the tabs array in the same order as the tab bar DOM.
+    if (opts.insertAfterActive && activeIdx !== -1) {
+        tabs.splice(activeIdx + 1, 0, tab);
+    } else {
+        tabs.push(tab);
+    }
+    updateNewTabBtn();
+    switchTab(id);
+    return tab;
+}
+
+function createIframe(tab, url) {
+    const iframe = document.createElement('iframe');
+    iframe.dataset.tabId = tab.id;
+    iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms allow-popups');
+    iframe.src = url;
+    document.getElementById('content-area').appendChild(iframe);
+    tab.iframeEl = iframe;
+    tab.url = url;
+    // Push initial URL to history
+    tab.history = [url];
+    tab.historyIdx = 0;
+    startUrlSync(tab);
+}
+
+function switchTab(tabId) {
+    const prevTab = tabs.find(t => t.id === activeTabId);
+    activeTabId = tabId;
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.tabEl.classList.add('active');
+    const ntp = document.getElementById('new-tab-page');
+    document.querySelectorAll('#content-area iframe').forEach(f => f.classList.remove('active'));
+    if (tab.iframeEl) {
+        ntp.classList.remove('active');
+        tab.iframeEl.classList.add('active');
+        syncUrlBar(tab);
+    } else {
+        ntp.classList.add('active');
+        document.getElementById('url-bar').value = '';
+    }
+    updateNavButtons();
+    tab.tabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    // Post tab switch action to parent (annotation page)
+    if (prevTab && prevTab.id !== tabId) {
+        try {
+            window.top.postMessage({
+                mw: 'action',
+                action: 'tab_switch',
+                target: "tab '" + tab.title + "'",
+                selector: '',
+                from_tab: prevTab.title,
+                to_tab: tab.title,
+                url: tab.url || '',
+                timestamp: new Date().toISOString(),
+            }, '*');
+        } catch(e) {}
+    }
+}
+
+function closeTab(tabId) {
+    const idx = tabs.findIndex(t => t.id === tabId);
+    if (idx === -1) return;
+    const tab = tabs[idx];
+    if (tab.syncInterval) clearInterval(tab.syncInterval);
+    if (tab.iframeEl) tab.iframeEl.remove();
+    tab.tabEl.remove();
+    tabs.splice(idx, 1);
+    if (activeTabId === tabId) {
+        if (tabs.length === 0) createTab();
+        else switchTab(tabs[Math.min(idx, tabs.length - 1)].id);
+    }
+    updateNewTabBtn();
+}
+
+function updateNewTabBtn() {
+    document.getElementById('new-tab-btn').disabled = tabs.length >= MAX_TABS;
+}
+
+// ---- Navigation with history ----
+
+function updateNavButtons() {
+    const tab = tabs.find(t => t.id === activeTabId);
+    const backBtn = document.getElementById('btn-back');
+    const fwdBtn = document.getElementById('btn-forward');
+    if (!tab || !tab.iframeEl) {
+        backBtn.disabled = true;
+        fwdBtn.disabled = true;
+        return;
+    }
+    backBtn.disabled = tab.historyIdx <= 0;
+    fwdBtn.disabled = tab.historyIdx >= tab.history.length - 1;
+}
+
+function pushHistory(tab, url) {
+    if (tab.navigating) return;
+    if (tab.history[tab.historyIdx] === url) return;
+    // Truncate forward history
+    tab.history = tab.history.slice(0, tab.historyIdx + 1);
+    tab.history.push(url);
+    tab.historyIdx = tab.history.length - 1;
+    if (activeTabId === tab.id) updateNavButtons();
+}
+
+function goBack() {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab || !tab.iframeEl || tab.historyIdx <= 0) return;
+    tab.navigating = true;
+    tab.historyIdx--;
+    const url = tab.history[tab.historyIdx];
+    tab.iframeEl.src = url;
+    tab.url = url;
+    document.getElementById('url-bar').value = url;
+    updateNavButtons();
+    setTimeout(() => { tab.navigating = false; }, 500);
+}
+
+function goForward() {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab || !tab.iframeEl || tab.historyIdx >= tab.history.length - 1) return;
+    tab.navigating = true;
+    tab.historyIdx++;
+    const url = tab.history[tab.historyIdx];
+    tab.iframeEl.src = url;
+    tab.url = url;
+    document.getElementById('url-bar').value = url;
+    updateNavButtons();
+    setTimeout(() => { tab.navigating = false; }, 500);
+}
+
+function refresh() {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab || !tab.iframeEl) return;
+    try { tab.iframeEl.contentWindow.location.reload(); } catch (e) {
+        tab.iframeEl.src = tab.url;
+    }
+}
+
+function navigateTo(input) {
+    try {
+        const tab = tabs.find(t => t.id === activeTabId);
+        if (!tab) { createTab(); return; }
+        let url = input.trim();
+        if (!url) return;
+
+        // Strip protocol for matching
+        const bare = url.replace(/^https?:\/\//, '');
+
+        // Special case: snplnk.io/CODE -> resolve short link
+        const snplnk = bare.match(/^snplnk\.io\/([A-Za-z0-9_-]+)/);
+        if (snplnk) {
+            fetch('/sites/url-shorteners-qr/api/resolve/' + snplnk[1])
+                .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+                .then(data => {
+                    if (data.original_url && data.original_url.startsWith('/')) {
+                        loadUrlInTab(tab, data.original_url);
+                    } else {
+                        loadUrlInTab(tab, '/sites/url-shorteners-qr/s/' + snplnk[1]);
+                    }
+                })
+                .catch(() => loadUrlInTab(tab, '/sites/url-shorteners-qr/s/' + snplnk[1]));
+            return;
+        }
+
+        // Try resolving simulated domain URL (with or without https://)
+        for (const [domain, sitePath] of Object.entries(DOMAIN_TO_PATH)) {
+            if (bare === domain || bare.startsWith(domain + '/')) {
+                const rest = bare.slice(domain.length) || '/';
+                loadUrlInTab(tab, sitePath.replace(/\/$/, '') + rest);
+                return;
+            }
+        }
+
+        // Direct path
+        if (url.startsWith('/')) { loadUrlInTab(tab, url); return; }
+
+        // Fuzzy match by site name, id, or domain
+        const lower = bare.toLowerCase();
+        const matched = SITES.find(s =>
+            s.id === lower || s.name.toLowerCase() === lower ||
+            (s.domain && s.domain.toLowerCase() === lower)
+        ) || SITES.find(s =>
+            s.id.includes(lower) || s.name.toLowerCase().includes(lower) ||
+            (s.domain && s.domain.toLowerCase().includes(lower))
+        );
+        if (matched) { loadUrlInTab(tab, matched.path); return; }
+
+        // Fall back to search
+        showSearchResults(url);
+    } catch (err) {
+        console.error('navigateTo error:', err);
+    }
+}
+
+function loadUrlInTab(tab, url) {
+    if (tab.iframeEl) {
+        tab.iframeEl.src = url;
+    } else {
+        createIframe(tab, url);
+        document.getElementById('new-tab-page').classList.remove('active');
+        tab.iframeEl.classList.add('active');
+    }
+    tab.url = url;
+    pushHistory(tab, url);
+    document.getElementById('url-bar').value = pathToDisplayUrl(url);
+
+    const siteMatch = url.match(/^\/sites\/([^/]+)/);
+    if (siteMatch) {
+        tab.siteId = siteMatch[1];
+        tab.tabEl.dataset.siteId = siteMatch[1];
+        const site = SITES.find(s => s.id === siteMatch[1]);
+        if (site) {
+            tab.title = site.name;
+            tab.tabEl.querySelector('.tab-title').textContent = site.name;
+        }
+    } else if (url === '/verify-payment') {
+        tab.title = 'Verify Payment';
+        tab.tabEl.querySelector('.tab-title').textContent = 'Verify Payment';
+    } else if (url.startsWith('/_admin')) {
+        tab.title = 'Admin';
+        tab.tabEl.querySelector('.tab-title').textContent = 'Admin';
+    }
+}
+
+// ---- URL bar sync ----
+
+function startUrlSync(tab) {
+    if (tab.syncInterval) clearInterval(tab.syncInterval);
+    tab.syncInterval = setInterval(() => {
+        if (!tab.iframeEl) return;
+        try {
+            const loc = tab.iframeEl.contentWindow.location;
+            const currentUrl = loc.pathname + loc.search;
+
+            if (currentUrl === '/' || currentUrl === '') {
+                // User navigated to portal root — open new tab page but keep iframe alive
+                // so back button still works
+                tab.url = '/';
+                tab.title = 'New Tab';
+                tab.tabEl.querySelector('.tab-title').textContent = 'New Tab';
+                if (activeTabId === tab.id) {
+                    tab.iframeEl.classList.remove('active');
+                    document.getElementById('new-tab-page').classList.add('active');
+                    document.getElementById('url-bar').value = '';
+                    updateNavButtons();
+                }
+                return;
+            }
+
+            if (currentUrl !== tab.url) {
+                tab.url = currentUrl;
+                pushHistory(tab, currentUrl);
+                if (activeTabId === tab.id) {
+                    document.getElementById('url-bar').value = pathToDisplayUrl(currentUrl);
+                }
+            }
+
+            const title = tab.iframeEl.contentDocument.title;
+            if (title && title !== tab.title) {
+                tab.title = title;
+                tab.tabEl.querySelector('.tab-title').textContent = title;
+            }
+        } catch (e) {}
+    }, 300);
+}
+
+function syncUrlBar(tab) {
+    if (!tab) return;
+    try {
+        if (tab.iframeEl) {
+            const loc = tab.iframeEl.contentWindow.location;
+            const raw = loc.pathname + loc.search;
+            document.getElementById('url-bar').value = pathToDisplayUrl(raw);
+        } else {
+            document.getElementById('url-bar').value = '';
+        }
+    } catch (e) {
+        document.getElementById('url-bar').value = pathToDisplayUrl(tab.url || '');
+    }
+}
+
+// ---- Bookmarks by category ----
+
+function openBookmark(siteId) {
+    // Always open the clicked site in a new tab, inserted right next to the
+    // tab the user clicked from (instead of replacing it or appending at the end).
+    createTab(siteId, { insertAfterActive: true });
+}
+
+function _hoverMeta(site) {
+    // The type/category, shown ONLY on hover — never as a visible label.
+    const parts = [];
+    if (site.category) parts.push(site.category);
+    if (site.description && site.description !== site.name) parts.push(site.description);
+    return parts.join(' · ') || site.name;
+}
+
+function buildCategories() {
+    const container = document.getElementById('ntp-categories');
+    container.innerHTML = '';
+
+    // One flat grid of every site, sorted by NAME. Each tile shows only the site's
+    // actual name; its type/category is revealed on hover (title tooltip), not as a
+    // visible header/label — so what's shown is exactly the site name an agent or
+    // user is looking for.
+    const grid = document.createElement('div');
+    grid.className = 'ntp-category-grid';
+
+    SITES.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(site => {
+        const tile = document.createElement('div');
+        tile.className = 'bookmark-tile';
+        tile.dataset.siteId = site.id;
+        tile.title = _hoverMeta(site);
+        tile.addEventListener('click', () => openBookmark(site.id));
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'bookmark-icon';
+        iconEl.textContent = site.name.charAt(0).toUpperCase();
+        iconEl.style.background = hashColor(site.id);
+
+        const label = document.createElement('div');
+        label.className = 'bookmark-label';
+        label.textContent = site.name;
+        label.title = _hoverMeta(site);
+
+        tile.appendChild(iconEl);
+        tile.appendChild(label);
+        grid.appendChild(tile);
     });
-    </script>
+
+    container.appendChild(grid);
+}
+
+// ---- NTP Search (web search with MiniWeb results on top) ----
+
+var searchDebounce = null;
+
+function showSearchResults(query) {
+    const q = query.trim();
+    const dropdown = document.getElementById('ntp-search-results');
+
+    if (!q) {
+        dropdown.classList.remove('visible');
+        dropdown.innerHTML = '';
+        // Show bookmarks again
+        document.getElementById('ntp-categories').style.display = '';
+        document.getElementById('search-results-page').style.display = 'none';
+        return;
+    }
+
+    // Quick autocomplete from local SITES data — match by brand name AND by
+    // functionality/intent (keywords), ranked by relevance so "spreadsheet",
+    // "edit a spreadsheet", or "file my taxes" all resolve realistically.
+    const matches = SITES
+        .map(s => ({ s, score: siteSearchScore(s, q) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(x => x.s);
+
+    dropdown.innerHTML = '';
+    matches.slice(0, 5).forEach(site => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.addEventListener('click', () => { dropdown.classList.remove('visible'); openBookmark(site.id); });
+        const iconEl = document.createElement('div');
+        iconEl.className = 'search-result-icon';
+        iconEl.textContent = site.name.charAt(0).toUpperCase();
+        iconEl.style.background = hashColor(site.id);
+        const info = document.createElement('div');
+        info.className = 'search-result-info';
+        // Only the site name is shown; type/category is on hover (title), not visible.
+        info.innerHTML = `<div class="search-result-name">${site.name}</div>`;
+        item.title = _hoverMeta(site);
+        item.appendChild(iconEl);
+        item.appendChild(info);
+        dropdown.appendChild(item);
+    });
+    if (matches.length > 0) dropdown.classList.add('visible');
+    else dropdown.classList.remove('visible');
+}
+
+function doWebSearch(query) {
+    const q = query.trim();
+    if (!q) return;
+
+    document.getElementById('ntp-search-results').classList.remove('visible');
+    document.getElementById('ntp-categories').style.display = 'none';
+    const resultsPage = document.getElementById('search-results-page');
+    resultsPage.style.display = '';
+    document.getElementById('search-results-header').textContent = 'Searching...';
+    document.getElementById('search-results-list').innerHTML = '';
+
+    fetch('/api/search?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(results => {
+            document.getElementById('search-results-header').textContent =
+                results.length + ' results for "' + q + '"';
+            const list = document.getElementById('search-results-list');
+            list.innerHTML = '';
+
+            results.forEach(r => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:12px 0;border-bottom:1px solid #ebebeb;';
+
+                const domain = document.createElement('div');
+                domain.style.cssText = 'font-size:12px;color:#202124;margin-bottom:2px;display:flex;align-items:center;gap:6px;';
+                if (r.is_miniweb) {
+                    domain.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#4285f4;color:#fff;text-align:center;line-height:16px;font-size:9px;font-weight:700;">M</span>' +
+                        '<span style="color:#4285f4;">' + r.domain + '</span>';
+                } else {
+                    domain.innerHTML = '<span style="color:#4d5156;">' + r.domain + '</span>';
+                }
+
+                const title = document.createElement('div');
+                title.style.cssText = 'font-size:18px;line-height:1.3;margin-bottom:3px;';
+                const link = document.createElement('a');
+                link.textContent = r.title;
+                if (r.is_miniweb) {
+                    link.href = '#';
+                    link.style.cssText = 'color:#1a0dab;text-decoration:none;';
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        // Open in current tab
+                        const tab = tabs.find(t => t.id === activeTabId);
+                        if (tab) loadUrlInTab(tab, r.url);
+                        // Reset search
+                        document.getElementById('ntp-search').value = '';
+                        resultsPage.style.display = 'none';
+                        document.getElementById('ntp-categories').style.display = '';
+                    });
+                } else {
+                    link.href = '#';
+                    link.style.cssText = 'color:#70757a;text-decoration:none;cursor:default;';
+                    link.title = 'External site — not available in MiniWeb';
+                }
+                title.appendChild(link);
+
+                const snippet = document.createElement('div');
+                snippet.style.cssText = 'font-size:14px;color:#4d5156;line-height:1.5;';
+                snippet.textContent = r.snippet || '';
+
+                item.appendChild(domain);
+                item.appendChild(title);
+                item.appendChild(snippet);
+                list.appendChild(item);
+            });
+
+            if (results.length === 0) {
+                list.innerHTML = '<div style="color:#70757a;padding:20px 0;">No results found for "' + q + '"</div>';
+            }
+        });
+}
+
+// ---- Event listeners ----
+
+document.addEventListener('DOMContentLoaded', () => {
+    buildCategories();
+
+    // Support ?open=site1,site2 to pre-open tabs
+    const openParam = new URLSearchParams(window.location.search).get('open');
+    if (openParam) {
+        openParam.split(',').filter(Boolean).forEach(siteId => createTab(siteId.trim()));
+    } else {
+        createTab();
+    }
+
+    document.getElementById('new-tab-btn').addEventListener('click', () => createTab());
+    document.getElementById('btn-back').addEventListener('click', goBack);
+    document.getElementById('btn-forward').addEventListener('click', goForward);
+    document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+    // Listen for rewind navigation commands from parent (annotation interface)
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'navigate' && e.data.url) {
+            navigateTo(e.data.url);
+        }
+    });
+
+    const urlBar = document.getElementById('url-bar');
+    urlBar.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); navigateTo(urlBar.value); urlBar.blur(); }
+    });
+
+    const ntpSearch = document.getElementById('ntp-search');
+    ntpSearch.addEventListener('input', () => showSearchResults(ntpSearch.value));
+    ntpSearch.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doWebSearch(ntpSearch.value);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        const box = document.querySelector('.ntp-search-box');
+        if (box && !box.contains(e.target)) document.getElementById('ntp-search-results').classList.remove('visible');
+    });
+
+    document.addEventListener('keydown', (e) => {
+        const ntp = document.getElementById('new-tab-page');
+        if (!ntp.classList.contains('active')) return;
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) ntpSearch.focus();
+    });
+});
+</script>
+
 </body>
 </html>

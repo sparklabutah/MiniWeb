@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ vault.name }} - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .vault-head { display: flex; align-items: center; gap: 1rem; }
+        .vault-icon-lg { width: 46px; height: 46px; border-radius: .5rem; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .filter-bar { display: flex; gap: .9rem; flex-wrap: wrap; align-items: flex-end; }
+        .filter-bar .field { margin-bottom: 0; }
+        .filter-bar .field select, .filter-bar .field input[type=text] { min-width: 160px; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <div class="vault-head">
+                    <div class="vault-icon-lg" style="background: {{ vault.color }};">{{ vault.name[0]|upper }}</div>
+                    <div>
+                        <h2>{{ vault.name }}</h2>
+                        <p class="muted">{{ vault.type|title }} vault{% if vault.shared %} &middot; Shared with {{ vault.members|length }} member{{ 's' if vault.members|length > 1 }}{% endif %}</p>
+                    </div>
+                </div>
+                <a href="{{ url_for('password-managers.index') }}" class="back-link">&larr; Vaults</a>
+            </div>
+
+            <div class="card card-pad">
+                <form class="filter-bar" method="get" action="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}">
+                    <div class="field">
+                        <label class="form-label" for="f-category">Category</label>
+                        <select name="category" id="f-category">
+                            <option value="">All</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if filter_category == cat %}selected{% endif %}>{{ cat|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="form-label" for="f-strength">Strength</label>
+                        <select name="strength" id="f-strength">
+                            <option value="">All</option>
+                            <option value="excellent" {% if filter_strength == 'excellent' %}selected{% endif %}>Excellent</option>
+                            <option value="strong" {% if filter_strength == 'strong' %}selected{% endif %}>Strong</option>
+                            <option value="fair" {% if filter_strength == 'fair' %}selected{% endif %}>Fair</option>
+                            <option value="weak" {% if filter_strength == 'weak' %}selected{% endif %}>Weak</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="form-label" for="f-q">Search</label>
+                        <input type="text" name="q" id="f-q" value="{{ filter_search }}" placeholder="Search entries...">
+                    </div>
+
+                    <div class="field">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn btn-outline">Clear</a>
+                    </div>
+                </form>
+            </div>
+
+            <div>
+                <div class="section-title">{{ entries|length }} item{{ 's' if entries|length != 1 }}</div>
+
+                {% if entries %}
+                <div class="card list">
+                    {% for entry in entries %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="list-row">
+                        <div class="row-icon" style="background: {{ vault.color }};">{{ entry.title[0]|upper }}</div>
+                        <div class="row-main">
+                            <div class="row-title">{{ entry.title }}</div>
+                            <div class="row-sub">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(50) }}{% endif %}</div>
+                        </div>
+                        <div class="row-meta">
+                            <span class="chip">{{ entry.category|replace('_', ' ') }}</span>
+                            {% if entry.strength %}
+                            <span class="strength-dot strength-{{ entry.strength }}" title="{{ entry.strength }}"></span>
+                            {% endif %}
+                            <span class="row-time">{{ entry.last_used[:10] if entry.last_used else '' }}</span>
+                            <span class="chev">&rsaquo;</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="card card-pad" style="text-align:center;">
+                    <p class="muted" style="margin-bottom:.6rem;">No entries match your filters.</p>
+                    <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="btn btn-outline">Clear filters</a>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

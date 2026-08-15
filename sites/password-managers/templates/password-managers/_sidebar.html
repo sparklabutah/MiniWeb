@@ -1,0 +1,21 @@
+{# Shared VaultGuard left sidebar. Set {% set active_side = 'all'|'security'|'generator'|'audit'|'settings' %} before include.
+   `stats` is optional (counts render only when present). #}
+<aside class="sidebar">
+    <div class="side-group">
+        <div class="side-h">Filters</div>
+        <a class="side-item{% if active_side == 'all' %} active{% endif %}" href="{{ url_for('password-managers.index') }}"><span class="lbl">All Items</span>{% if stats %}<span class="side-count">{{ stats.total_entries }}</span>{% endif %}</a>
+        <a class="side-item" href="{{ url_for('password-managers.index') }}"><span class="lbl">Favorites</span>{% if stats %}<span class="side-count">{{ stats.favorites }}</span>{% endif %}</a>
+    </div>
+    <div class="side-group">
+        <div class="side-h">Reports <span class="side-badge">SECURITY</span></div>
+        <a class="side-item{% if active_side == 'security' %} active{% endif %}" href="{{ url_for('password-managers.security_report_page') }}"><span class="lbl">Security Score</span></a>
+        <a class="side-item" href="{{ url_for('password-managers.security_report_page') }}#breach"><span class="lbl">Breach Alerts</span>{% if stats and stats.breach_count %}<span class="side-count danger">{{ stats.breach_count }}</span>{% endif %}</a>
+        <a class="side-item" href="{{ url_for('password-managers.security_report_page') }}#weak"><span class="lbl">Weak Passwords</span>{% if stats and stats.weak_count %}<span class="side-count warn">{{ stats.weak_count }}</span>{% endif %}</a>
+    </div>
+    <div class="side-group">
+        <div class="side-h">Tools</div>
+        <a class="side-item{% if active_side == 'generator' %} active{% endif %}" href="{{ url_for('password-managers.generator_page') }}"><span class="lbl">Password Generator</span></a>
+        <a class="side-item{% if active_side == 'audit' %} active{% endif %}" href="{{ url_for('password-managers.audit_log_page') }}"><span class="lbl">Audit Log</span></a>
+        <a class="side-item{% if active_side == 'settings' %} active{% endif %}" href="{{ url_for('password-managers.settings_page') }}"><span class="lbl">Settings</span></a>
+    </div>
+</aside>

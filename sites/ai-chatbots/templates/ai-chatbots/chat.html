@@ -1,0 +1,140 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}Chat - AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1 id="chat-title">{% if current_conv %}{{ current_conv.title }}{% else %}New Chat{% endif %}</h1>
+    <div style="display:flex;gap:8px;align-items:center;">
+        {% if current_conv %}
+        <form method="post" action="{{ url_for('ai-chatbots.form_edit_title', conv_id=current_conv.id) }}" style="display:inline-flex;gap:4px;align-items:center;">
+            <input type="text" name="title" placeholder="New title" value="{{ current_conv.title }}" style="width:150px;padding:4px 8px;font-size:13px;">
+            <button type="submit" class="btn-small" title="Edit conversation title">Edit Title</button>
+        </form>
+        <form method="post" action="{{ url_for('ai-chatbots.form_share_conversation', conv_id=current_conv.id) }}" style="display:inline;">
+            <input type="hidden" name="share_with" value="public">
+            <button type="submit" class="btn-small" title="Share conversation">{% if current_conv.shared %}&#10003; Shared{% else %}Share{% endif %}</button>
+        </form>
+        {% if current_conv.messages %}
+        <form method="post" action="{{ url_for('ai-chatbots.form_regenerate', conv_id=current_conv.id) }}" style="display:inline;">
+            <button type="submit" class="btn-small" id="regenerate-btn" title="Regenerate the last assistant reply">Regenerate</button>
+        </form>
+        {% endif %}
+        <button class="btn-small btn-danger" title="Delete conversation" id="delete-conv-btn" data-url="{{ url_for('ai-chatbots.form_delete_conversation', conv_id=current_conv.id) }}">Delete</button>
+        <script>
+        document.getElementById('delete-conv-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+            fetch(btn.getAttribute('data-url'), {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("ai-chatbots.chat_page") }}'; })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+        });
+        </script>
+        {% endif %}
+        <div class="bot-selector">
+            <select id="bot-select" onchange="switchBot(this.value)">
+                {% for b in bots %}
+                <option value="{{ b }}" {% if b == bot %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if current_conv %}
+{% if request.args.get('shared') == '1' or current_conv.shared %}
+<div id="share-banner" style="margin:0 0 12px;border:1px solid #2e7d32;border-radius:8px;padding:10px 14px;background:#1e3a24;color:#c8e6c9;font-size:13px;">
+    <div style="font-weight:600;margin-bottom:6px;">&#10003; This conversation is shared publicly &mdash; anyone with the link can view it.</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <input id="share-link" readonly value="{{ request.host_url }}sites/ai-chatbots/chat/{{ current_conv.id }}" style="flex:1;padding:6px 8px;font-size:12px;background:#12241a;color:#a5d6a7;border:1px solid #2e7d32;border-radius:5px;">
+        <button type="button" class="btn-small" id="copy-share-link">Copy link</button>
+    </div>
+</div>
+<script>
+(function () {
+    var b = document.getElementById('copy-share-link');
+    if (b) b.addEventListener('click', function () {
+        var inp = document.getElementById('share-link');
+        inp.select();
+        try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); }
+        b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy link'; }, 1500);
+    });
+})();
+</script>
+{% endif %}
+<details class="custom-instructions" id="custom-instructions" {% if current_conv.system_prompt %}open{% endif %} style="margin:0 0 12px;border:1px solid #4a4a5a;border-radius:8px;padding:8px 12px;background:#2a2a3a;">
+    <summary style="cursor:pointer;font-size:13px;color:#c5c5d2;">Custom Instructions{% if current_conv.system_prompt %} (active){% endif %}</summary>
+    <form method="post" action="{{ url_for('ai-chatbots.form_system_prompt', conv_id=current_conv.id) }}" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+        <textarea name="system_prompt" id="system-prompt-input" rows="2" placeholder="e.g. Respond concisely and in a formal tone." style="width:100%;padding:6px 8px;font-size:13px;resize:vertical;">{{ current_conv.system_prompt or '' }}</textarea>
+        <div>
+            <button type="submit" class="btn-small" title="Save custom instructions for this conversation">Save Instructions</button>
+        </div>
+    </form>
+</details>
+{% endif %}
+<div id="messages-container">
+    {% if current_conv and current_conv.messages %}
+        {% for msg in current_conv.messages %}
+        <div class="message {% if msg.role == 'user' %}user-msg{% else %}assistant-msg{% endif %}">
+            <div class="message-role">{% if msg.role == 'user' %}You{% else %}{{ current_conv.bot }}{% endif %}</div>
+            <div class="message-content">{{ msg.content }}</div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div style="text-align:center; margin-top:100px; color:#8e8ea0;">
+        <h2 style="font-size:24px; margin-bottom:8px;">{{ bot }}</h2>
+        <p>How can I help you today?</p>
+        <div style="margin-top:24px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+            <div class="card" style="max-width:200px; cursor:pointer;" onclick="sendSuggestion('Explain machine learning')">
+                <p>Explain machine learning in simple terms</p>
+            </div>
+            <div class="card" style="max-width:200px; cursor:pointer;" onclick="sendSuggestion('What is Python?')">
+                <p>What is Python programming?</p>
+            </div>
+            <div class="card" style="max-width:200px; cursor:pointer;" onclick="sendSuggestion('How do databases work?')">
+                <p>How do databases work?</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block bottom %}
+<div class="chat-input-area">
+    <div class="chat-input-container">
+        <form id="chat-form" method="post" action="{{ url_for('ai-chatbots.form_chat') }}">
+            <input type="hidden" name="conversation_id" value="{{ current_conv.id if current_conv else '' }}">
+            <input type="hidden" name="bot" id="bot-hidden" value="{{ bot }}">
+            <textarea id="chat-input" class="chat-input" name="message" rows="1" placeholder="Send a message..." onkeydown="handleKey(event)"></textarea>
+            <button type="submit" class="send-btn" id="send-btn">Send</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function switchBot(bot) {
+    document.getElementById('bot-hidden').value = bot;
+    document.getElementById('chat-title').textContent = 'New Chat with ' + bot;
+}
+
+function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('chat-form').submit();
+    }
+}
+
+function sendSuggestion(text) {
+    document.getElementById('chat-input').value = text;
+    document.getElementById('chat-form').submit();
+}
+
+// Auto-scroll
+var mc = document.getElementById('messages-container');
+if (mc) mc.scrollTop = mc.scrollHeight;
+</script>
+{% endblock %}

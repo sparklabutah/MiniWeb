@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trip Planner - Lakeport Transit Authority</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 16px; color: #1a237e; }
+        .plan-form { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .plan-form h3 { font-size: 18px; margin-bottom: 16px; color: #1a237e; }
+        .form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .form-row input, .form-row select { flex: 1; min-width: 180px; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .form-row label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+        .form-group { flex: 1; min-width: 180px; }
+        .radio-group { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; padding: 10px 0; }
+        .radio-group label { font-size: 14px; color: #333; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .radio-group input[type="radio"] { margin: 0; }
+        .btn { background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:hover { background: #283593; }
+        .results { margin-top: 24px; }
+        .result-option { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px; }
+        .result-option h4 { font-size: 16px; margin-bottom: 8px; color: #1a237e; }
+        .result-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+        .result-meta span { font-size: 13px; padding: 4px 10px; border-radius: 4px; background: #f0f0f0; }
+        .leg { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .leg:last-child { border-bottom: none; }
+        .leg .leg-type { font-weight: 600; color: #1a237e; }
+        .saved-plans { margin-top: 24px; }
+        .saved-plan { background: white; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 8px; }
+        .saved-plan h4 { font-size: 15px; margin-bottom: 4px; }
+        .saved-plan p { font-size: 13px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Public Transit for Lakeport and the Region</div>
+    </div>
+    <div class="nav">
+        <a href="{{ url_for('transit-directions.index') }}">Home</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}">Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}">Stops</a>
+        <a href="{{ url_for('transit-directions.trip_planner') }}" class="active">Trip Planner</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}">Fares</a>
+        <a href="{{ url_for('transit-directions.login') }}">Sign In</a>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">Trip Planner</h2>
+
+        {% if request.args.get('saved') %}
+        <div class="saved-banner" style="background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;">
+            Trip saved. It now appears under &ldquo;Your Saved Trips&rdquo; below.
+        </div>
+        {% endif %}
+
+        <div class="plan-form">
+            <h3>Plan Your Journey</h3>
+            <form method="get" action="{{ url_for('transit-directions.trip_planner') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="from">From (origin)</label>
+                        <input type="text" id="from" name="from" placeholder="Address or stop name" value="{{ origin }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="to">To (destination)</label>
+                        <input type="text" id="to" name="to" placeholder="Address or stop name" value="{{ destination }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">Travel Date</label>
+                        <input type="date" id="date" name="date" value="{{ travel_date }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="departure">Departure Time</label>
+                        <input type="time" id="departure" name="departure" value="{{ departure }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Route Preference</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="preference" value="fastest" {% if route_pref == 'fastest' %}checked{% endif %}> Fastest</label>
+                            <label><input type="radio" name="preference" value="cheapest" {% if route_pref == 'cheapest' %}checked{% endif %}> Cheapest</label>
+                            <label><input type="radio" name="preference" value="fewest_transfers" {% if route_pref == 'fewest_transfers' %}checked{% endif %}> Fewest Transfers</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn">Plan Trip</button>
+            </form>
+        </div>
+
+        {% if plan_result %}
+        <div class="results">
+            <h3 class="page-title">{{ plan_result.options_count }} Route Option{{ 's' if plan_result.options_count != 1 else '' }}</h3>
+            <p style="font-size: 14px; color: #666; margin-bottom: 16px;">
+                {{ plan_result.origin }} &rarr; {{ plan_result.destination }}
+                (sorted by: {{ plan_result.route_preference }})
+            </p>
+            {% for option in plan_result.options %}
+            <div class="result-option">
+                <h4>Option {{ loop.index }}: {{ option.option_label }}</h4>
+                <div class="result-meta">
+                    <span>{{ option.total_duration_minutes }} min total</span>
+                    <span>{{ option.transfers }} transfer{{ 's' if option.transfers != 1 else '' }}</span>
+                    <span>${{ "%.2f"|format(option.fare) }} fare</span>
+                    <span>Zone {{ option.fare_zone }}</span>
+                </div>
+                {% for leg in option.legs %}
+                <div class="leg">
+                    <span class="leg-type">{{ leg.type | upper }}:</span>
+                    {% if leg.type == 'walk' %}
+                        Walk from {{ leg.from }} to {{ leg.to }} ({{ leg.duration_minutes }} min, {{ leg.distance_km }} km)
+                    {% elif leg.type == 'bus' %}
+                        {{ leg.route }} from {{ leg.from_stop }} to {{ leg.to_stop }} ({{ leg.duration_minutes }} min, {{ leg.stops_count }} stops)
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% if session.user_id %}
+                <form class="save-trip-form" method="post" action="{{ url_for('transit-directions.trip_planner_save') }}"
+                      style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <input type="hidden" name="from" value="{{ plan_result.origin }}">
+                    <input type="hidden" name="to" value="{{ plan_result.destination }}">
+                    <input type="hidden" name="preference" value="{{ plan_result.route_preference }}">
+                    <input type="hidden" name="departure" value="{{ departure }}">
+                    <input type="hidden" name="date" value="{{ travel_date }}">
+                    <input type="hidden" name="option_index" value="{{ loop.index0 }}">
+                    <input type="text" name="name" placeholder="Name this trip (optional)"
+                           style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                    <button type="submit" class="btn" style="padding:8px 18px;">Save this trip</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if trip_plans %}
+        <div class="saved-plans">
+            <h3 class="page-title">Your Saved Trips</h3>
+            {% for plan in trip_plans %}
+            <div class="saved-plan">
+                <h4>{{ plan.name }}</h4>
+                <p>{{ plan.origin }} &rarr; {{ plan.destination }}</p>
+                <p>Departs {{ plan.departure_time }}, arrives {{ plan.arrival_time }} ({{ plan.total_duration_minutes }} min) &bull; ${{ "%.2f"|format(plan.fare) }}</p>
+                <div style="margin-top:8px;">
+                    <button type="button" class="share-plan-toggle" data-plan-id="{{ plan.id }}" aria-pressed="false"
+                            style="background:white;color:#1a237e;border:1px solid #1a237e;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;">
+                        Sharing: Off
+                    </button>
+                    <span class="share-plan-result" style="display:none;font-size:13px;color:#666;margin-left:10px;"></span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    // Trip plan sharing toggles (share_by_toggle)
+    document.querySelectorAll('.share-plan-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var on = btn.getAttribute('aria-pressed') !== 'true';
+            var out = btn.parentElement.querySelector('.share-plan-result');
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.textContent = on ? 'Sharing: On' : 'Sharing: Off';
+            btn.style.background = on ? '#1a237e' : 'white';
+            btn.style.color = on ? 'white' : '#1a237e';
+            if (!on) { out.style.display = 'none'; return; }
+            out.style.display = 'inline';
+            out.textContent = 'Generating share link...';
+            fetch('{{ url_for("transit-directions.api_share") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: 'link', content_type: 'trip_plan',
+                                      content_id: parseInt(btn.dataset.planId, 10)})
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(d) { out.textContent = 'Share link: ' + d.url; })
+                .catch(function() { out.textContent = 'Could not generate share link.'; });
+        });
+    });
+    </script>
+</body>
+</html>

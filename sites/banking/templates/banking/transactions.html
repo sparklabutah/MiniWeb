@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transactions - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .main { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
+        .main h2 { color: #0a2463; margin-bottom: 1rem; }
+        .search-bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+        .search-bar input[type="text"] { flex: 1; padding: .6rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; }
+        .search-bar button { padding: .6rem 1.2rem; background: #0a2463; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; }
+        .filters { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; align-items: center; }
+        .filters label { font-size: .82rem; color: #475569; }
+        .filters select, .filters input { padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .82rem; }
+        .filters input[type="date"] { width: 140px; }
+        .filters input[type="number"] { width: 90px; }
+        .result-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        th { background: #f8fafc; text-align: left; padding: .7rem 1rem; font-size: .78rem; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .65rem 1rem; font-size: .88rem; border-bottom: 1px solid #f1f5f9; }
+        .credit { color: #059669; }
+        .debit { color: #dc2626; }
+        .pending { color: #d97706; font-style: italic; }
+        .pagination { display: flex; gap: .5rem; margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+        .pagination a, .pagination span { padding: .4rem .8rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; text-decoration: none; color: #0a2463; }
+        .pagination span.current { background: #0a2463; color: #fff; border-color: #0a2463; }
+        .pagination a:hover { background: #f0f4ff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    {% set nav_active = 'transactions' %}
+    {% include 'banking/_nav.html' %}
+
+    <div class="main">
+        <h2>Transaction History for {{ user.name }} (User ID: {{ user.id }})</h2>
+
+        <form class="search-bar" method="get" action="{{ url_for('banking.transactions_page') }}">
+            <input type="text" name="q" placeholder="Search transactions by description, category, or reference..." value="{{ q }}" autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+
+        <form class="filters" method="get" action="{{ url_for('banking.transactions_page') }}">
+            {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+            <label>Category:
+                <select name="category" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {{ 'selected' if category == c }}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Type:
+                <select name="type" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    <option value="debit" {{ 'selected' if tx_type == 'debit' }}>Debit</option>
+                    <option value="credit" {{ 'selected' if tx_type == 'credit' }}>Credit</option>
+                </select>
+            </label>
+            <label>From: <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()"></label>
+            <label>To: <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()"></label>
+            <label>Sort:
+                <select name="sort" onchange="this.form.submit()">
+                    <option value="date" {{ 'selected' if sort == 'date' }}>Date (newest)</option>
+                    <option value="amount_desc" {{ 'selected' if sort == 'amount_desc' }}>Amount (high to low)</option>
+                    <option value="amount_asc" {{ 'selected' if sort == 'amount_asc' }}>Amount (low to high)</option>
+                    <option value="description" {{ 'selected' if sort == 'description' }}>Description (A-Z)</option>
+                </select>
+            </label>
+            <label>Min $: <input type="number" name="min_amount" step="0.01" value="{{ min_amount }}" onchange="this.form.submit()"></label>
+            <label>Max $: <input type="number" name="max_amount" step="0.01" value="{{ max_amount }}" onchange="this.form.submit()"></label>
+        </form>
+
+        <div class="filters" id="export-controls">
+            <label>Export transactions:
+                <select id="export-format">
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                </select>
+            </label>
+            <button type="button" id="export-btn"
+                    style="padding:.4rem .9rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.82rem;background:#f8fafc;color:#1e3a8a;cursor:pointer;"
+                    onclick="window.location='{{ url_for('banking.api_export') }}?type=transactions&user_id={{ user.id }}&format=' + document.getElementById('export-format').value;">
+                Export
+            </button>
+        </div>
+
+        <div class="result-count">Showing {{ transactions|length }} of {{ total_count }} transactions (page {{ page }} of {{ total_pages }})</div>
+
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Type</th><th>Status</th><th>Ref</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td>{{ tx.date }}</td>
+                    <td>{{ tx.description }}</td>
+                    <td>{{ tx.category }}</td>
+                    <td class="{{ tx.type }}">{{ '-' if tx.type == 'debit' else '+' }}${{ "%.2f"|format(tx.amount) }}</td>
+                    <td>{{ tx.type }}</td>
+                    <td class="{% if tx.status == 'pending' %}pending{% endif %}">{{ tx.status }}</td>
+                    <td style="font-size:.8rem;color:#94a3b8">{{ tx.reference }}</td>
+                    <td style="white-space:nowrap">
+                        <form method="post" action="{{ url_for('banking.flag_transaction_submit') }}" style="display:inline">
+                            <input type="hidden" name="tx_id" value="{{ tx.id }}">
+                            <button type="submit" style="background:{% if tx.flagged %}#f59e0b{% else %}#e2e8f0{% endif %};border:none;padding:.25rem .5rem;border-radius:.2rem;cursor:pointer;font-size:.75rem;" title="Flag for review">{{ 'Flagged' if tx.flagged else 'Flag' }}</button>
+                        </form>
+                        <button class="tx-delete-btn" data-url="{{ url_for('banking.delete_transaction_submit') }}" data-tx-id="{{ tx.id }}" style="background:#fee2e2;color:#991b1b;border:none;padding:.25rem .5rem;border-radius:.2rem;cursor:pointer;font-size:.75rem;" title="Delete transaction">Del</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('banking.transactions_page', q=q, category=category, type=tx_type, date_from=date_from, date_to=date_to, sort=sort, min_amount=min_amount, max_amount=max_amount, page=page-1) }}">Previous</a>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <span class="current">{{ p }}</span>
+                {% else %}
+                <a href="{{ url_for('banking.transactions_page', q=q, category=category, type=tx_type, date_from=date_from, date_to=date_to, sort=sort, min_amount=min_amount, max_amount=max_amount, page=p) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('banking.transactions_page', q=q, category=category, type=tx_type, date_from=date_from, date_to=date_to, sort=sort, min_amount=min_amount, max_amount=max_amount, page=page+1) }}">Next</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.tx-delete-btn');
+        if (!btn) return;
+        btn.textContent = '...';
+        btn.disabled = true;
+        var formData = new FormData();
+        formData.append('tx_id', btn.getAttribute('data-tx-id'));
+        fetch(btn.getAttribute('data-url'), {method: 'POST', body: formData})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { window.location.reload(); })
+            .catch(function() { btn.textContent = 'Err'; setTimeout(function() { btn.textContent = 'Del'; btn.disabled = false; }, 2000); });
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Form - Lakeport Medical Center Patient Portal</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'home' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="wrap">
+        {% if not form.signed %}
+        <div class="sign-required">✍️ Signature required — this consent form is not complete until you sign it below.</div>
+        {% endif %}
+
+        <div class="paper-doc">
+            <div class="doc-head">
+                <div class="agency">LAKEPORT MEDICAL CENTER · PATIENT SERVICES</div>
+                <h2>{{ form.title }}</h2>
+                <div class="formno">Form {{ form.form_no }} · Patient: {{ user.full_name }} · MRN: LMC-{{ '%07d'|format(1000000 + user.id) }}</div>
+            </div>
+
+            <div id="sign-msg" class="sign-msg"></div>
+
+            <p class="cert-text">{{ form.body }}</p>
+
+            {% if form.signed %}
+            <div class="signed-note">
+                <div class="sn-title">✓ Signed on {{ form.signed_date }} ({{ 'drawn' if form.signed_method == 'drawn' else 'typed' }})</div>
+                <div class="sn-sub">This consent form has been recorded in your chart.</div>
+                <a href="{{ url_for('health-portals.index') }}" class="btn primary" style="display:inline-block;margin-top:10px;text-decoration:none;">Back to Dashboard</a>
+            </div>
+            {% else %}
+            <div class="signer">
+                <div class="signer-tabs">
+                    <button type="button" class="signer-tab active" data-mode="draw" onclick="switchTab('draw')">Draw</button>
+                    <button type="button" class="signer-tab" data-mode="type" onclick="switchTab('type')">Type</button>
+                </div>
+
+                <!-- Draw tab: freeform canvas (sign_by_freeformdrawing) -->
+                <div class="signer-panel active" id="panel-draw">
+                    <div class="sign-field">
+                        <div class="sign-tab-label">Sign here</div>
+                        <div class="sign-box">
+                            <canvas id="signature-canvas" width="528" height="130"></canvas>
+                            <span class="sign-x">✗</span>
+                            <div class="sign-baseline"></div>
+                            <div class="sign-caption">Draw your signature with your mouse or finger</div>
+                        </div>
+                    </div>
+                    <div class="sig-tools">
+                        <button type="button" onclick="clearSignature()">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Type tab: adopt a typed signature (sign_by_text) -->
+                <div class="signer-panel" id="panel-type">
+                    <div class="typed-name">
+                        <label for="typed-name-input">Type your full legal name</label>
+                        <input type="text" id="typed-name-input" placeholder="e.g. Alex Rivera"
+                               oninput="document.getElementById('typed-preview').textContent = this.value;">
+                        <div class="typed-preview" id="typed-preview"></div>
+                    </div>
+                </div>
+
+                <div class="sign-actions">
+                    <button type="button" class="btn primary" id="adopt-btn" onclick="signForm()">Adopt &amp; Sign</button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+
+    {% if not form.signed %}
+    <script>
+    var signMode = 'draw';
+    function switchTab(mode) {
+        signMode = mode;
+        document.querySelectorAll('.signer-tab').forEach(function(t) {
+            t.classList.toggle('active', t.getAttribute('data-mode') === mode);
+        });
+        document.getElementById('panel-draw').classList.toggle('active', mode === 'draw');
+        document.getElementById('panel-type').classList.toggle('active', mode === 'type');
+    }
+
+    var canvas = document.getElementById('signature-canvas');
+    var ctx = canvas.getContext('2d');
+    var drawing = false;
+    var sigPoints = [];
+
+    function getPos(e) {
+        var r = canvas.getBoundingClientRect();
+        var t = (e.touches && e.touches[0]) || e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+    }
+    function startDraw(e) {
+        e.preventDefault(); drawing = true;
+        var p = getPos(e);
+        sigPoints.push([Math.round(p.x), Math.round(p.y)]);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    }
+    function moveDraw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        var p = getPos(e);
+        ctx.strokeStyle = '#14356b'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.lineTo(p.x, p.y); ctx.stroke();
+        var last = sigPoints[sigPoints.length - 1];
+        if (!last || Math.abs(p.x - last[0]) + Math.abs(p.y - last[1]) > 4) {
+            sigPoints.push([Math.round(p.x), Math.round(p.y)]);
+        }
+    }
+    function endDraw() { drawing = false; }
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+    canvas.addEventListener('touchstart', startDraw, {passive: false});
+    canvas.addEventListener('touchmove', moveDraw, {passive: false});
+    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchcancel', endDraw);
+
+    function isCanvasBlank() {
+        var px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (var i = 3; i < px.length; i += 4) { if (px[i] !== 0) return false; }
+        return true;
+    }
+    function clearSignature() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        sigPoints = [];
+    }
+
+    function showMsg(text, ok) {
+        var m = document.getElementById('sign-msg');
+        m.className = 'sign-msg ' + (ok ? 'success' : 'error');
+        m.textContent = text;
+    }
+
+    function signForm() {
+        var body = { form_id: '{{ form.id }}' };
+        if (signMode === 'draw') {
+            if (isCanvasBlank() || sigPoints.length < 8) {
+                showMsg('Please draw your signature in the "Sign here" box.', false);
+                return;
+            }
+            body.signature_points = sigPoints.slice(0, 400);
+            body.signature_drawing = canvas.toDataURL('image/png');
+        } else {
+            var name = document.getElementById('typed-name-input').value.trim();
+            if (!name) {
+                showMsg('Please type your full legal name to adopt a typed signature.', false);
+                return;
+            }
+            body.typed_name = name;
+        }
+        fetch('{{ url_for("health-portals.sign_form_submit", form_id=form.id) }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.status === 'signed') {
+                window.location.href = '{{ url_for("health-portals.index") }}';
+            } else {
+                showMsg(d.error || 'Could not sign this form.', false);
+            }
+        }).catch(function() { showMsg('Could not sign this form.', false); });
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

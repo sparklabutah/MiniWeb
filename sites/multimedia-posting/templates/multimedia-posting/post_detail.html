@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Post</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .container { max-width: 935px; margin: 0 auto; padding: 20px; }
+        .post-detail { background: #fff; border: 1px solid #dbdbdb; display: flex; height: calc(100vh - 120px); max-height: 720px; min-height: 460px; }
+        .post-media { flex: 1; background: #efefef; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; overflow: hidden; }
+        .post-media .placeholder { font-size: 72px; color: #c7c7c7; }
+        /* Video posts render as a square tile (1:1) consistent with image posts,
+           cropped/fit to the square with no overflow past the tile. */
+        .post-media .video-tile { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 100%; overflow: hidden; }
+        .post-media .video-tile [data-mini-player] { width: 100%; height: 100%; object-fit: cover; }
+        .post-media .video-tile .mp-root { width: 100%; height: 100%; aspect-ratio: 1 / 1; border-radius: 0; }
+        .post-media .type-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+        .post-sidebar { width: 340px; display: flex; flex-direction: column; border-left: 1px solid #dbdbdb; }
+        .post-header { display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #efefef; }
+        .post-avatar { width: 32px; height: 32px; border-radius: 50%; background: #0095f6; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 14px; margin-right: 12px; }
+        .post-author { font-weight: 600; font-size: 14px; color: #262626; }
+        .post-location { font-size: 12px; color: #8e8e8e; }
+        .post-caption-section { padding: 16px; border-bottom: 1px solid #efefef; }
+        .post-caption-section .author-name { font-weight: 600; margin-right: 4px; }
+        .post-tags a { color: #00376b; font-size: 13px; }
+        .comments-section { flex: 1; overflow-y: auto; padding: 16px; }
+        .comment { margin-bottom: 12px; font-size: 14px; line-height: 1.4; }
+        .comment .author-name { font-weight: 600; margin-right: 4px; }
+        .comment .time { font-size: 11px; color: #8e8e8e; display: block; margin-top: 2px; }
+        .post-actions-bar { padding: 8px 16px; border-top: 1px solid #efefef; display: flex; gap: 12px; align-items: center; }
+        .post-actions-bar button { background: none; border: none; cursor: pointer; font-size: 22px; color: #262626; padding: 4px; }
+        .post-actions-bar button:hover { color: #8e8e8e; }
+        .post-actions-bar button.active { color: #ed4956; }
+        .post-actions-bar .spacer { flex: 1; }
+        .post-actions-bar .save-btn.active { color: #262626; }
+        .likes-line { padding: 4px 16px; font-weight: 600; font-size: 14px; }
+        .time-line { padding: 4px 16px 8px; font-size: 10px; color: #8e8e8e; text-transform: uppercase; }
+        .comment-form { display: flex; padding: 8px 16px; border-top: 1px solid #efefef; }
+        .comment-form input { flex: 1; border: none; outline: none; font-size: 14px; padding: 8px 0; }
+        .comment-form button { background: none; border: none; color: #0095f6; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .comment-form button:hover { color: #00376b; }
+        .action-dropdown { position: relative; display: inline-block; }
+        .action-dropdown-content { display: none; position: absolute; right: 0; bottom: 100%; background: #fff; border: 1px solid #dbdbdb; border-radius: 8px; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; }
+        .action-dropdown-content.show { display: block; }
+        .action-dropdown-content a, .action-dropdown-content button { display: block; width: 100%; text-align: left; padding: 12px 16px; border: none; background: none; cursor: pointer; font-size: 14px; color: #262626; }
+        .action-dropdown-content a:hover, .action-dropdown-content button:hover { background: #fafafa; text-decoration: none; }
+        .action-dropdown-content .danger { color: #ed4956; }
+        @media (max-width: 735px) {
+            .post-detail { flex-direction: column; height: auto; max-height: none; }
+            .post-sidebar { width: 100%; }
+            .post-media { min-height: 300px; }
+            .comments-section { max-height: 320px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}">Messages</a>
+            <a href="{{ url_for('multimedia-posting.settings_page') }}">Settings</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="post-detail">
+            <div class="post-media">
+                {% if post.type == 'video' %}
+                <div class="video-tile">
+                <div data-mini-player
+                     data-badge="Video"
+                     data-accent="#e1306c"
+                     data-title="{{ (post.caption or 'Video post')[:60]|e }}"
+                     data-subtitle="{{ post.author.username if post.author else post.author_id }}"
+                     data-duration="{{ post.video_duration or 30 }}"
+                     data-qualities="auto,1080p,720p,480p"
+                     data-play-url="/sites/multimedia-posting/api/posts/{{ post.id }}/play"
+                     data-seek-url="/sites/multimedia-posting/api/posts/{{ post.id }}/seek"
+                     style="aspect-ratio:1/1;width:100%;height:100%;object-fit:cover"></div>
+                </div>
+                {% else %}
+                {% if post.type == 'carousel' %}
+                <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>
+                {% endif %}
+                {% if post.image_url %}
+                <img src="{{ post.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                {% else %}
+                <span class="placeholder">&#128247;</span>
+                {% endif %}
+                {% endif %}
+            </div>
+            <div class="post-sidebar">
+                <div class="post-header">
+                    <div class="post-avatar">{{ post.author.display_name[0] if post.author else '?' }}</div>
+                    <div>
+                        <a href="{{ url_for('multimedia-posting.profile', user_id=post.author_id) }}" class="post-author">{{ post.author.username if post.author else post.author_id }}</a>
+                        {% if post.location %}
+                        <div class="post-location">{{ post.location }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="post-caption-section">
+                    <span class="author-name">{{ post.author.username if post.author else post.author_id }}</span>
+                    {{ post.caption }}
+                    {% if post.tags %}
+                    <div class="post-tags" style="margin-top: 8px;">
+                        {% for tag in post.tags %}
+                        <a href="{{ url_for('multimedia-posting.explore', tag=tag) }}">#{{ tag }}</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="comments-section">
+                    {% if post.comments_list %}
+                        {% for c in post.comments_list %}
+                        <div class="comment">
+                            <span class="author-name">{{ c.author.username if c.author else c.author_id }}</span>
+                            {{ c.text }}
+                            <span class="time">{{ c.created_at[:10] if c.created_at else '' }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: #8e8e8e; font-size: 14px;">No comments yet.</p>
+                    {% endif %}
+                </div>
+                <div class="post-actions-bar">
+                    <button id="like-btn" class="{{ 'active' if is_liked else '' }}" onclick="toggleLike()" title="Like">{% if is_liked %}&#9829;{% else %}&#9825;{% endif %}</button>
+                    <button title="Comment" onclick="document.getElementById('comment-input').focus()">&#128172;</button>
+                    <div class="action-dropdown">
+                        <button onclick="toggleShareMenu()" title="Share">&#10149;</button>
+                        <div id="share-menu" class="action-dropdown-content">
+                            <button onclick="sharePost('link')">Copy Link</button>
+                            <button onclick="sharePost('dm')">Send as DM</button>
+                            <button onclick="sharePost('email')">Share via Email</button>
+                            <button onclick="sharePost('embed')">Embed</button>
+                        </div>
+                    </div>
+                    <span class="spacer"></span>
+                    <button id="save-btn" class="save-btn {{ 'active' if is_saved else '' }}" onclick="toggleSave()" title="Save">{% if is_saved %}&#9733;{% else %}&#9734;{% endif %}</button>
+                    <div class="action-dropdown">
+                        <button onclick="toggleMoreMenu()" title="More">&#8943;</button>
+                        <div id="more-menu" class="action-dropdown-content">
+                            {% if logged_in and user and user.id == post.author_id %}
+                            <button class="danger" id="delete-post-btn" onclick="deletePost()">Delete Post</button>
+                            {% endif %}
+                            <button class="danger" onclick="reportPost()">Report</button>
+                            <button class="danger" onclick="blockUser()">Block User</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="likes-line" id="likes-count">{{ post.likes_count }} likes</div>
+                <div class="time-line">{{ post.created_at[:10] }}</div>
+                <form class="comment-form" onsubmit="addComment(event)">
+                    <input type="text" id="comment-input" placeholder="Add a comment..." autocomplete="off">
+                    <button type="submit">Post</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const postId = "{{ post.id }}";
+    const baseUrl = "{{ url_for('multimedia-posting.index') }}";
+
+    function toggleLike() {
+        fetch(`${baseUrl}api/posts/${postId}/like`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const btn = document.getElementById('like-btn');
+                const likesEl = document.getElementById('likes-count');
+                if (data.status === 'liked') {
+                    btn.classList.add('active');
+                    btn.innerHTML = '&#9829;';
+                } else {
+                    btn.classList.remove('active');
+                    btn.innerHTML = '&#9825;';
+                }
+                likesEl.textContent = data.likes_count + ' likes';
+            });
+    }
+
+    function toggleSave() {
+        fetch(`${baseUrl}api/posts/${postId}/save`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const btn = document.getElementById('save-btn');
+                if (data.status === 'saved') {
+                    btn.classList.add('active');
+                    btn.innerHTML = '&#9733;';
+                } else {
+                    btn.classList.remove('active');
+                    btn.innerHTML = '&#9734;';
+                }
+            });
+    }
+
+    function toggleShareMenu() {
+        document.getElementById('share-menu').classList.toggle('show');
+        document.getElementById('more-menu').classList.remove('show');
+        fetch(`${baseUrl}api/posts/${postId}/share`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method:'link'})});
+    }
+
+    function toggleMoreMenu() {
+        document.getElementById('more-menu').classList.toggle('show');
+        document.getElementById('share-menu').classList.remove('show');
+    }
+
+    function sharePost(method) {
+        fetch(`${baseUrl}api/posts/${postId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ method: method })
+        }).then(r => r.json()).then(data => {
+            document.getElementById('share-menu').classList.remove('show');
+            if (method === 'link') {
+                navigator.clipboard.writeText(window.location.href)
+                    .then(() => alert('Link copied to clipboard!'))
+                    .catch(() => alert('Share link: ' + window.location.href));
+            } else if (method === 'embed') {
+                var embed = '<iframe src="' + window.location.href + '" width="400" height="500"></iframe>';
+                navigator.clipboard.writeText(embed)
+                    .then(() => alert('Embed code copied!'))
+                    .catch(() => alert('Embed: ' + embed));
+            } else { alert('Shared via ' + method); }
+        });
+    }
+
+    function reportPost() {
+        const reason = prompt('Reason for reporting (spam, inappropriate, harassment, other):');
+        if (reason) {
+            fetch(`${baseUrl}api/posts/${postId}/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason, details: '' })
+            }).then(r => r.json()).then(() => {
+                document.getElementById('more-menu').classList.remove('show');
+                alert('Report submitted');
+            });
+        }
+    }
+
+    function blockUser() {
+        const authorId = "{{ post.author_id }}";
+        fetch(`${baseUrl}api/users/${authorId}/block`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('more-menu').classList.remove('show');
+                alert(data.status === 'blocked' ? 'User blocked' : 'User unblocked');
+            });
+    }
+
+    function deletePost() {
+        if (!confirm('Delete this post? This cannot be undone.')) return;
+        fetch(`${baseUrl}api/posts/${postId}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+                window.location.href = baseUrl;
+            });
+    }
+
+    function addComment(e) {
+        e.preventDefault();
+        const input = document.getElementById('comment-input');
+        const text = input.value.trim();
+        if (!text) return;
+        fetch(`${baseUrl}api/posts/${postId}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        }).then(r => r.json()).then(c => {
+            if (c.error) { alert(c.error); return; }
+            const section = document.querySelector('.comments-section');
+            const noComments = section.querySelector('p');
+            if (noComments) noComments.remove();
+            const div = document.createElement('div');
+            div.className = 'comment';
+            div.innerHTML = `<span class="author-name">${c.author.username || c.author_id}</span> ${c.text}`;
+            section.appendChild(div);
+            input.value = '';
+        });
+    }
+    </script>
+</body>
+</html>

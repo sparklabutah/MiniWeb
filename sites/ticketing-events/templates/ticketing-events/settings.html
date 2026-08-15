@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Lakeport Events</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .container { max-width: 600px; margin: 0 auto; padding: 2rem; }
+        h2 { font-size: 1.4rem; margin-bottom: 1.5rem; }
+        .settings-card { background: #fff; border-radius: .6rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .user-info { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .user-info p { font-size: .9rem; color: #666; margin-bottom: .3rem; }
+        .user-info strong { color: #1a1a2e; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group select, .form-group input[type="text"], .form-group input[type="number"] { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; background: #fff; }
+        .checkbox-group { display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; }
+        .checkbox-group label { font-size: .9rem; color: #333; font-weight: 500; }
+        .section-title { font-size: .95rem; font-weight: 700; color: #333; margin-bottom: .8rem; margin-top: 1.5rem; }
+        .info { font-size: .78rem; color: #9ca3af; margin-top: .2rem; }
+        .btn-save { padding: .7rem 1.5rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        .btn-save:hover { background: #c0392b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+    </div>
+    <div class="container">
+        <h2>Settings</h2>
+        <div class="settings-card">
+            <div class="user-info">
+                <p><strong>{{ user.display_name }}</strong></p>
+                <p>{{ user.email }}</p>
+                <p>Member since {{ user.joined_date }}</p>
+            </div>
+            <form method="POST" action="{{ url_for('ticketing-events.settings_submit') }}">
+                <div class="section-title">Location</div>
+                <div class="form-group">
+                    <label for="location">Your Location</label>
+                    <select id="location" name="location">
+                        <option value="Lakeport, WA" {% if user.location == 'Lakeport, WA' %}selected{% endif %}>Lakeport, WA</option>
+                        <option value="Seattle, WA" {% if user.location == 'Seattle, WA' %}selected{% endif %}>Seattle, WA</option>
+                        <option value="Portland, OR" {% if user.location == 'Portland, OR' %}selected{% endif %}>Portland, OR</option>
+                        <option value="Other" {% if user.location == 'Other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+
+                <div class="section-title">Notifications</div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="email_notifications" name="email_notifications" {% if user.notification_preferences.email %}checked{% endif %}>
+                    <label for="email_notifications">Email notifications</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="sms_notifications" name="sms_notifications" {% if user.notification_preferences.sms %}checked{% endif %}>
+                    <label for="sms_notifications">SMS notifications</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="push_notifications" name="push_notifications" {% if user.notification_preferences.push %}checked{% endif %}>
+                    <label for="push_notifications">Push notifications</label>
+                </div>
+
+                <div class="section-title">Price Alert</div>
+                <div class="form-group">
+                    <label for="max_price_alert">Max price alert threshold ($)</label>
+                    <input type="number" id="max_price_alert" name="max_price_alert" step="5" min="0" max="500" value="{{ user.get('max_price_alert', 100) }}">
+                    <div class="info">Get notified when events under this price go on sale</div>
+                </div>
+
+                <button type="submit" class="btn-save">Save Settings</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

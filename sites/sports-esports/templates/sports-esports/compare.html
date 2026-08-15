@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Teams - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = 'compare' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="page-title">Compare Teams</div>
+
+        <form class="add-form card" method="get" action="{{ url_for('sports-esports.compare_page') }}" style="align-items:end;">
+            <div class="form-group">
+                <label class="label">Team A</label>
+                <select name="team_a" id="team_a">
+                    <option value="">Select team...</option>
+                    {% for t in teams %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="label">Team B</label>
+                <select name="team_b" id="team_b">
+                    <option value="">Select team...</option>
+                    {% for t in teams %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" onclick="buildIds()">Compare</button>
+        </form>
+
+        {% if selected and selected|length >= 2 %}
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Stat</th>
+                    <th>{{ selected[0].name }}</th>
+                    <th>{{ selected[1].name }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>City</td>
+                    <td>{{ selected[0].city }}</td>
+                    <td>{{ selected[1].city }}</td>
+                </tr>
+                <tr>
+                    <td>League</td>
+                    <td>{{ selected[0].league_name }}</td>
+                    <td>{{ selected[1].league_name }}</td>
+                </tr>
+                <tr>
+                    <td>Wins</td>
+                    <td>{{ selected[0].wins }}</td>
+                    <td>{{ selected[1].wins }}</td>
+                </tr>
+                <tr>
+                    <td>Losses</td>
+                    <td>{{ selected[0].losses }}</td>
+                    <td>{{ selected[1].losses }}</td>
+                </tr>
+                <tr>
+                    <td>Games Played</td>
+                    <td>{{ selected[0].games_played }}</td>
+                    <td>{{ selected[1].games_played }}</td>
+                </tr>
+                <tr>
+                    <td>Win %</td>
+                    <td>{{ "%.3f"|format(selected[0].win_pct) }}</td>
+                    <td>{{ "%.3f"|format(selected[1].win_pct) }}</td>
+                </tr>
+                <tr>
+                    <td>Standing</td>
+                    <td>#{{ selected[0].standing }}</td>
+                    <td>#{{ selected[1].standing }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% elif selected and selected|length == 1 %}
+        <p>Please select two teams to compare.</p>
+        {% endif %}
+    </div>
+    <script>
+        function buildIds() {
+            var a = document.getElementById('team_a').value;
+            var b = document.getElementById('team_b').value;
+            if (a && b) {
+                window.location.href = '{{ url_for("sports-esports.compare_page") }}?ids=' + a + ',' + b;
+                event.preventDefault();
+            }
+        }
+    </script>
+</body>
+</html>

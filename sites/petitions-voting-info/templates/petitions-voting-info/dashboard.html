@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Lakeport Civic Hub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b4332, #2d6a4f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.4rem; }
+        .header h1 span { color: #95d5b2; }
+        .header-nav a { color: #b7e4c7; text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav .btn-login { background: #40916c; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .page-title { font-size: 1.5rem; color: #1b4332; margin-bottom: 1.5rem; }
+        .section { background: #fff; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .section h3 { color: #1b4332; margin-bottom: 1rem; }
+        .item { border-bottom: 1px solid #f1f5f9; padding: .6rem 0; }
+        .item:last-child { border-bottom: none; }
+        .item a { color: #1b4332; text-decoration: none; font-weight: 600; }
+        .item a:hover { text-decoration: underline; }
+        .empty { color: #94a3b8; font-style: italic; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('petitions-voting-info.index') }}" style="color:#fff;text-decoration:none;">Lakeport <span>Civic Hub</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a>
+            <a href="{{ url_for('petitions-voting-info.elections_list') }}">Elections</a>
+            <a href="{{ url_for('petitions-voting-info.voter_info_page') }}">Voter Info</a>
+            <a href="{{ url_for('petitions-voting-info.dashboard') }}">Saved &amp; Following</a>
+            <a href="{{ url_for('petitions-voting-info.logout') }}" class="btn-login">Logout ({{ user.display_name }})</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <h2 class="page-title">Dashboard - {{ user.display_name }}</h2>
+
+        <div class="section">
+            <h3>Saved Petitions ({{ saved_petitions|length }})</h3>
+            {% for p in saved_petitions %}
+            <div class="item">
+                <a href="{{ url_for('petitions-voting-info.petition_detail', petition_id=p.id) }}">{{ p.title }}</a>
+                <span style="color:#64748b;font-size:.85rem;"> - {{ p.status }}</span>
+            </div>
+            {% endfor %}
+            {% if not saved_petitions %}
+            <p class="empty">No saved petitions yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Subscribed Petitions ({{ subscribed_petitions|length }})</h3>
+            {% for p in subscribed_petitions %}
+            <div class="item">
+                <a href="{{ url_for('petitions-voting-info.petition_detail', petition_id=p.id) }}">{{ p.title }}</a>
+                <span style="color:#64748b;font-size:.85rem;"> - {{ p.status }}</span>
+            </div>
+            {% endfor %}
+            {% if not subscribed_petitions %}
+            <p class="empty">No subscriptions yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Your Info</h3>
+            <p><strong>Precinct:</strong> {{ user.precinct }}</p>
+            <p><strong>Registration:</strong> {{ user.voter_registration_status }}</p>
+            <p><strong>Address:</strong> {{ user.registered_address }}</p>
+        </div>
+    </div>
+    <div class="footer">Lakeport Civic Hub</div>
+</body>
+</html>

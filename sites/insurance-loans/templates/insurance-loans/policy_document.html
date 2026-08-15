@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Policy {{ policy.policy_number }} — Cascadia Mutual Insurance</title>
+<style>
+@media print { .no-print { display: none !important; } body { margin: 0; } }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Times New Roman', Times, Georgia, serif; font-size: 10.5pt; line-height: 1.4; color: #1a1a1a; background: #e8e8e8; }
+.doc-wrapper { max-width: 8.5in; margin: 20px auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+.page { padding: 0.75in 1in; position: relative; min-height: 11in; border-bottom: 2px dashed #ccc; }
+.page:last-child { border-bottom: none; }
+.toolbar { position: fixed; top: 0; left: 0; right: 0; background: #2d3748; color: #fff; padding: 8px 20px; display: flex; align-items: center; gap: 16px; z-index: 100; font-family: Arial, sans-serif; font-size: 13px; }
+.toolbar a { color: #90cdf4; text-decoration: none; }
+.toolbar button { background: #4299e1; color: #fff; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.toolbar button:hover { background: #3182ce; }
+.doc-wrapper { margin-top: 52px; }
+
+/* Header */
+.doc-header { text-align: center; border-bottom: 3px double #1a1a1a; padding-bottom: 12px; margin-bottom: 16px; }
+.doc-header .company { font-size: 16pt; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+.doc-header .subtitle { font-size: 9pt; color: #555; margin-top: 2px; letter-spacing: 2px; }
+.doc-header .doc-title { font-size: 13pt; font-weight: bold; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.doc-header .policy-num { font-size: 10pt; color: #333; margin-top: 4px; }
+
+/* Sections */
+h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #333; padding-bottom: 3px; margin: 18px 0 8px; }
+h3 { font-size: 10.5pt; font-weight: bold; margin: 12px 0 4px; }
+p { margin: 4px 0; text-align: justify; }
+.indent { margin-left: 24px; }
+.small { font-size: 9pt; color: #444; }
+.bold { font-weight: bold; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10pt; }
+th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; vertical-align: top; }
+th { background: #f0f0f0; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; }
+td.amount { text-align: right; font-family: 'Courier New', monospace; }
+
+/* Legal text */
+.legal { font-size: 8.5pt; color: #333; line-height: 1.35; margin-top: 12px; }
+.legal p { margin: 3px 0; }
+ol, ul { margin: 4px 0 4px 24px; font-size: 10pt; }
+ol li, ul li { margin: 2px 0; }
+
+/* Signature */
+.sig-block { margin-top: 40px; display: flex; justify-content: space-between; }
+.sig-line { width: 45%; border-top: 1px solid #333; padding-top: 4px; font-size: 9pt; color: #555; }
+
+/* Footer */
+.page-footer { position: absolute; bottom: 0.5in; left: 1in; right: 1in; font-size: 8pt; color: #888; display: flex; justify-content: space-between; border-top: 1px solid #ddd; padding-top: 4px; }
+
+/* Watermark */
+.watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg); font-size: 72pt; color: rgba(0,0,0,.03); font-weight: bold; pointer-events: none; z-index: 0; }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+    <a href="{{ url_for('insurance-loans.policy_detail', policy_id=policy.id) }}">&larr; Back to Policy</a>
+    <span style="flex:1"></span>
+    <span>Policy Document — {{ policy.policy_number }}</span>
+    <span style="flex:1"></span>
+    <span id="save-status" style="color:#9ae6b4;font-size:12px;"></span>
+    <button id="save-to-files-btn" type="button"
+            data-save-url="{{ url_for('insurance-loans.policy_save_to_files', policy_id=policy.id) }}">
+        Save to my files
+    </button>
+    <a href="/">MiniWeb</a>
+</div>
+
+<script>
+(function () {
+    var btn = document.getElementById("save-to-files-btn");
+    var status = document.getElementById("save-status");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+        btn.disabled = true;
+        var original = btn.textContent;
+        btn.textContent = "Saving…";
+        status.textContent = "";
+        fetch(btn.getAttribute("data-save-url"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+            if (res.ok && res.d.status === "saved") {
+                status.textContent = "✓ " + res.d.message;
+                btn.textContent = "Saved ✓";
+            } else {
+                status.style.color = "#feb2b2";
+                status.textContent = "Could not save. Please try again.";
+                btn.textContent = original;
+                btn.disabled = false;
+            }
+        })
+        .catch(function () {
+            status.style.color = "#feb2b2";
+            status.textContent = "Could not save. Please try again.";
+            btn.textContent = original;
+            btn.disabled = false;
+        });
+    });
+})();
+</script>
+
+{% if policy.requires_signature and not policy.signed %}
+<div class="no-print" style="max-width:8.5in;margin:14px auto 0;background:#fef3c7;border:2px solid #f59e0b;border-radius:.4rem;padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div style="color:#92400e;font-weight:700;font-size:1rem">&#9997;&#65039; This document requires your signature &mdash; the policy is not in force until you sign it.</div>
+    <a href="{{ url_for('insurance-loans.policy_sign_page', policy_id=policy.id) }}" style="background:#b45309;color:#fff;text-decoration:none;padding:.6rem 1.4rem;border-radius:.3rem;font-weight:700;white-space:nowrap">Sign this document &rarr;</a>
+</div>
+{% elif policy.signed %}
+<div class="no-print" style="max-width:8.5in;margin:14px auto 0;background:#f0fdf4;border:1px solid #16a34a;border-radius:.4rem;padding:.6rem 1.2rem;color:#166534;font-weight:600">&#10003; Signed{% if policy.signed_date %} on {{ policy.signed_date }}{% endif %}</div>
+{% endif %}
+
+<div class="doc-wrapper">
+
+<!-- PAGE 1: DECLARATIONS -->
+<div class="page">
+    <div class="watermark">CASCADIA</div>
+    <div class="doc-header">
+        <div class="company">Cascadia Mutual Insurance Company</div>
+        <div class="subtitle">A Mutual Insurance Company &bull; Est. 1947 &bull; Portland, Oregon</div>
+        <div class="doc-title">
+            {% if policy.type == 'auto' %}Personal Automobile Insurance Policy
+            {% elif policy.type == 'renters' %}Renters Insurance Policy
+            {% elif policy.type == 'homeowners' %}Homeowners Insurance Policy
+            {% elif policy.type == 'life' %}Term Life Insurance Policy
+            {% elif policy.type == 'health' %}Individual Health Insurance Policy
+            {% else %}Insurance Policy{% endif %}
+        </div>
+        <div class="policy-num">Policy Number: {{ policy.policy_number }}</div>
+    </div>
+
+    <h2>Declarations Page</h2>
+
+    <table>
+        <tr><th width="35%">Named Insured</th><td>{{ policy.policyholder_name }}</td></tr>
+        <tr><th>Policy Number</th><td>{{ policy.policy_number }}</td></tr>
+        <tr><th>Policy Period</th><td>{{ policy.effective_date }} to {{ policy.expiration_date }}</td></tr>
+        <tr><th>Renewal Date</th><td>{{ policy.renewal_date }}</td></tr>
+        <tr><th>Policy Type</th><td>{{ policy.type|title }} — {{ policy.subtype|replace('_',' ')|title }}</td></tr>
+        <tr><th>Status</th><td>{{ policy.status|upper }}</td></tr>
+        <tr><th>Underwriter</th><td>{{ policy.underwriter }}</td></tr>
+        <tr><th>Agent</th><td>{{ policy.agent }} &bull; {{ policy.agent_phone }}</td></tr>
+        {% if policy.property_address %}<tr><th>Property Address</th><td>{{ policy.property_address }}</td></tr>{% endif %}
+    </table>
+
+    {% if vehicle and vehicle.make %}
+    <h3>Described Vehicle</h3>
+    <table>
+        <tr><th>Year</th><th>Make</th><th>Model</th><th>Trim</th><th>VIN (last 6)</th></tr>
+        <tr><td>{{ vehicle.year }}</td><td>{{ vehicle.make }}</td><td>{{ vehicle.model }}</td><td>{{ vehicle.get('trim','') }}</td><td>{{ vehicle.get('vin_last_six','') }}</td></tr>
+    </table>
+    {% endif %}
+
+    <h3>Premium Schedule</h3>
+    <table>
+        <tr><th>Monthly Premium</th><th>Annual Premium</th><th>Deductible</th></tr>
+        <tr><td class="amount">${{ "%.2f"|format(policy.premium_monthly) }}</td><td class="amount">${{ "%.2f"|format(policy.premium_annual) }}</td><td class="amount">${{ "{:,}".format(policy.deductible) }}</td></tr>
+    </table>
+
+    <h3>Coverage Summary</h3>
+    <table>
+        <tr><th>Coverage Type</th><th>Limit / Status</th></tr>
+        {% for key, val in coverage.items() %}
+        <tr>
+            <td>{{ key|replace('_',' ')|title }}</td>
+            <td>{% if val is sameas true %}Included{% elif val is sameas false %}Not Included{% else %}{{ val }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    {% if policy.notes %}
+    <h3>Endorsements &amp; Notes</h3>
+    <p class="indent">{{ policy.notes }}</p>
+    {% endif %}
+
+    <div class="page-footer">
+        <span>{{ policy.policy_number }} &mdash; Declarations</span>
+        <span>Page 1 of 3</span>
+        <span>Cascadia Mutual Insurance Co.</span>
+    </div>
+</div>
+
+<!-- PAGE 2: TERMS & CONDITIONS -->
+<div class="page">
+    <div class="watermark">CASCADIA</div>
+    <h2>Part I &mdash; General Provisions</h2>
+
+    <h3>Section 1. Agreement</h3>
+    <p>In consideration of the premium paid, Cascadia Mutual Insurance Company ("the Company," "we," "us," or "our") agrees to provide the insurance described in this policy to the Named Insured ("you" or "your") shown in the Declarations, subject to all the terms, conditions, limitations, and exclusions of this policy. This policy is a legal contract between you and the Company.</p>
+
+    <h3>Section 2. Definitions</h3>
+    <p class="indent"><span class="bold">"Bodily Injury"</span> means physical harm, sickness, disease, or death sustained by a person, including mental anguish or emotional distress resulting therefrom.</p>
+    <p class="indent"><span class="bold">"Covered Loss"</span> means a loss or damage to covered property caused by a peril insured against under this policy, subject to the deductible and coverage limits shown in the Declarations.</p>
+    <p class="indent"><span class="bold">"Occurrence"</span> means an accident, including continuous or repeated exposure to substantially the same general harmful conditions, which results in bodily injury or property damage during the policy period. All damages arising out of the same accident or from the same general conditions shall be deemed to arise out of one occurrence.</p>
+    <p class="indent"><span class="bold">"Property Damage"</span> means physical damage to tangible property, including the loss of use of that property. All such loss of use shall be deemed to occur at the time of the physical damage that caused it.</p>
+    <p class="indent"><span class="bold">"Premium"</span> means the amount shown in the Declarations or as subsequently amended by endorsement, payable by the Named Insured as consideration for the coverage provided.</p>
+
+    <h3>Section 3. Policy Territory</h3>
+    <p>This policy applies only to losses and occurrences within the fifty (50) United States of America, the District of Columbia, and the territories and possessions of the United States. Coverage extends to Canada when the insured vehicle is temporarily driven across the border for a period not exceeding thirty (30) days.</p>
+
+    <h3>Section 4. Policy Period and Cancellation</h3>
+    <p>This policy is effective from {{ policy.effective_date }} to {{ policy.expiration_date }}, 12:01 A.M. standard time at the address of the Named Insured as shown in the Declarations. The Company may cancel this policy by mailing to the Named Insured a notice of cancellation at least thirty (30) days before the effective date of cancellation (ten (10) days for non-payment of premium). The Named Insured may cancel this policy at any time by advising the Company in writing.</p>
+
+    <h2>Part II &mdash; Coverage Provisions</h2>
+
+    <h3>Section 5. Insuring Agreement</h3>
+    <p>Subject to the limits of liability, exclusions, conditions, and other terms of this policy, the Company will pay on behalf of the insured those sums that the insured becomes legally obligated to pay as damages because of bodily injury or property damage to which this insurance applies, caused by an occurrence during the policy period. The Company shall have the right and duty to defend any action seeking such damages, even if the allegations of the action are groundless, false, or fraudulent.</p>
+
+    <h3>Section 6. Deductible</h3>
+    <p>The deductible amount shown in the Declarations (${{ "{:,}".format(policy.deductible) }}) applies separately to each occurrence. The Company's obligation to pay damages on your behalf applies only to the amount of damages in excess of the deductible amount. The deductible does not apply to liability coverage.</p>
+
+    <h3>Section 7. Limits of Liability</h3>
+    <p>The Company's maximum liability for all damages arising from any one occurrence shall not exceed the applicable limit of liability shown in the Declarations. If the coverage is shown as split limits (e.g., 100/300/100), the first number represents the per-person bodily injury limit in thousands of dollars, the second number represents the per-occurrence bodily injury limit, and the third number represents the property damage limit per occurrence.</p>
+
+    <div class="page-footer">
+        <span>{{ policy.policy_number }} &mdash; Terms &amp; Conditions</span>
+        <span>Page 2 of 3</span>
+        <span>Cascadia Mutual Insurance Co.</span>
+    </div>
+</div>
+
+<!-- PAGE 3: EXCLUSIONS, CONDITIONS, SIGNATURES -->
+<div class="page">
+    <div class="watermark">CASCADIA</div>
+
+    <h2>Part III &mdash; Exclusions</h2>
+
+    <p>This policy does not apply to:</p>
+    <ol>
+        <li>Liability assumed under any contract or agreement, except as specifically provided by endorsement.</li>
+        <li>Bodily injury or property damage arising out of the ownership, maintenance, use, or entrustment of any aircraft, watercraft, or motor vehicle not described in the Declarations, except as provided in Section 12 (Temporary Substitute Vehicle).</li>
+        <li>Any obligation for which the insured may be held liable under any workers' compensation, unemployment compensation, disability benefits, or similar law.</li>
+        <li>Bodily injury or property damage caused intentionally by or at the direction of the insured.</li>
+        <li>Property damage to property owned by, rented to, in the charge of, or occupied by the insured, except as specifically provided under the comprehensive or collision coverage sections.</li>
+        <li>Bodily injury to any insured or any member of the insured's family residing in the insured's household, to the extent that any valid and collectible personal injury protection, medical payments, or similar coverage applies.</li>
+        <li>Damage due to war, invasion, insurrection, rebellion, revolution, civil war, or any act incident to the foregoing.</li>
+        <li>Nuclear hazard, meaning any nuclear reaction, radiation, or radioactive contamination, all whether controlled or uncontrolled.</li>
+        <li>Any fine, penalty, punitive damages, or exemplary damages assessed against the insured.</li>
+        <li>Loss or damage resulting from wear and tear, gradual deterioration, mechanical or electrical breakdown, or any consequential loss therefrom.</li>
+    </ol>
+
+    <h2>Part IV &mdash; Conditions</h2>
+
+    <h3>Section 8. Duties After a Loss</h3>
+    <p>In the event of an occurrence reasonably likely to involve the Company under this policy, the Named Insured shall: (a) give written notice to the Company or its authorized agent as soon as practicable, including the time, place, and circumstances of the occurrence and the names and addresses of any injured persons and witnesses; (b) cooperate with the Company in the investigation, settlement, or defense of any claim or suit; (c) not admit liability or voluntarily make payments, except at the insured's own cost.</p>
+
+    <h3>Section 9. Subrogation</h3>
+    <p>If the Company makes a payment under this policy, the Company shall be subrogated to all the insured's rights of recovery against any person or organization. The insured shall execute all papers required and shall cooperate with the Company in exercising such rights.</p>
+
+    <h3>Section 10. Other Insurance</h3>
+    <p>If other valid and collectible insurance is available to the insured for a loss covered by this policy, the Company's obligations shall be limited to the proportion that the applicable limit of liability under this policy bears to the total applicable limit of all valid insurance against the loss.</p>
+
+    <h3>Section 11. Conformity to Statute</h3>
+    <p>When this policy is certified as proof of financial responsibility, this policy shall comply with the law to the extent required. Terms of this policy that do not comply with applicable state statutes are hereby amended to conform to such statutes.</p>
+
+    <h2>Part V &mdash; Signatures</h2>
+
+    <p class="small" style="margin-top:16px;">IN WITNESS WHEREOF, Cascadia Mutual Insurance Company has caused this policy to be executed and attested, effective as of the date and hour stated in the Declarations.</p>
+
+    <div class="sig-block">
+        <div class="sig-line">
+            <em style="font-size:11pt;">Margaret L. Chen</em><br>
+            President &amp; Chief Executive Officer<br>
+            Cascadia Mutual Insurance Company
+        </div>
+        <div class="sig-line">
+            <em style="font-size:11pt;">Robert J. Williams</em><br>
+            Corporate Secretary<br>
+            Cascadia Mutual Insurance Company
+        </div>
+    </div>
+
+    <div class="legal" style="margin-top:30px;">
+        <p><strong>IMPORTANT NOTICE:</strong> This document is a summary of your insurance policy. Please read your complete policy carefully and discuss any questions with your agent, {{ policy.agent }}, at {{ policy.agent_phone }}. This policy was underwritten by {{ policy.underwriter }}. If you believe that you have been treated unfairly, you may contact the Insurance Division of the Department of Consumer and Business Services.</p>
+        <p style="margin-top:8px;">Form CMI-{{ policy.type|upper }}-2026 &bull; Edition: January 2026 &bull; Filed and approved in all states where Cascadia Mutual Insurance Company is licensed to transact business.</p>
+    </div>
+
+    <div class="page-footer">
+        <span>{{ policy.policy_number }} &mdash; Exclusions &amp; Conditions</span>
+        <span>Page 3 of 3</span>
+        <span>Cascadia Mutual Insurance Co.</span>
+    </div>
+</div>
+
+</div><!-- /doc-wrapper -->
+</body>
+</html>

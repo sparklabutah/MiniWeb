@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prescriptions - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'prescriptions' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <h2>My Prescriptions</h2>
+        {% for rx in prescriptions %}
+        <div class="rx-card">
+            <div class="rx-header">
+                <div class="rx-name">{{ rx.medication }}</div>
+                <span class="badge badge-{{ rx.status }}">{{ rx.status }}</span>
+            </div>
+            <div class="rx-details">
+                <div><strong>Dosage:</strong> {{ rx.dosage }} &mdash; {{ rx.frequency }}</div>
+                <div><strong>Prescribed by:</strong> {{ rx.prescriber_name }} on {{ rx.date_prescribed }}</div>
+                <div><strong>Pharmacy:</strong> {{ rx.pharmacy }}</div>
+                <div><strong>Refills remaining:</strong> {{ rx.refills_remaining }}</div>
+                {% if rx.reason %}<div><strong>Reason:</strong> {{ rx.reason }}</div>{% endif %}
+                {% if rx.notes %}<div><strong>Notes:</strong> {{ rx.notes }}</div>{% endif %}
+            </div>
+            {% if rx.status == 'active' and rx.refills_remaining > 0 %}
+            <button class="refill-btn" onclick="requestRefill({{ rx.id }})">Request Refill</button>
+            {% elif rx.refills_remaining <= 0 %}
+            <span class="refill-btn disabled">No Refills</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <div style="text-align:center; color:#94a3b8; padding:2rem;">No prescriptions found.</div>
+        {% endfor %}
+    </div>
+    {% include "health-portals/_footer.html" %}
+    <script>
+    function requestRefill(rxId) {
+        fetch('/sites/health-portals/api/prescriptions/' + rxId + '/refill', {method:'POST'})
+        .then(function(r){return r.json();})
+        .then(function(d){alert(d.message || d.error); location.reload();});
+    }
+    </script>
+</body>
+</html>

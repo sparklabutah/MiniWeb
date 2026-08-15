@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity — FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+</head>
+<body>
+    {% set active_page = 'activity' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
+
+    <div class="ft-shell">
+        {% if show_log_form %}
+        <div class="ft-page-title"><h1>Log Workout</h1><a class="ft-btn ghost" href="{{ url_for('health-fitness-tracking.workouts_page') }}">← Back to log</a></div>
+        <div class="panel">
+            <div class="panel-b">
+                <form id="log-workout-form" method="POST" action="{{ url_for('health-fitness-tracking.log_workout_submit') }}">
+                    <div class="ft-filters" style="padding:0;">
+                        <div class="ft-field"><label>Workout Type</label>
+                            <select id="wtype" name="type">
+                                {% for t in workout_types %}<option value="{{ t }}">{{ t|replace('_',' ')|title }}</option>{% endfor %}
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="ft-field"><label>Date</label><input type="date" id="wdate" name="date"></div>
+                        <div class="ft-field"><label>Duration (min)</label><input type="number" id="wduration" name="duration_minutes" min="1" value="30"></div>
+                        <div class="ft-field"><label>Calories Burned</label><input type="number" id="wcalories" name="calories_burned" min="0" value="200"></div>
+                    </div>
+                    <div class="ft-field" style="margin-top:12px;"><label>Notes</label>
+                        <textarea id="wnotes" name="notes" rows="3" placeholder="How was your workout?" style="padding:8px;border:1px solid var(--line);border-radius:6px;font-family:var(--font);font-size:.85rem;"></textarea>
+                    </div>
+                    <button type="submit" class="ft-btn" style="margin-top:12px;">Log Workout</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="ft-page-title">
+            <div><h1>Activity Log</h1><div class="sub">{{ workouts|length }} workouts shown</div></div>
+            <a class="ft-btn" href="{{ url_for('health-fitness-tracking.log_workout_page') }}">+ Log Workout</a>
+        </div>
+
+        <!-- summary strip -->
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr);">
+            <div class="kpi"><div class="k-lbl">Workouts</div><div class="k-val">{{ workouts|length }}</div></div>
+            <div class="kpi"><div class="k-lbl">Total Time</div><div class="k-val">{{ workouts|sum(attribute='duration_minutes') }}<span class="u"> min</span></div></div>
+            <div class="kpi"><div class="k-lbl">Distance</div><div class="k-val">{{ '%.1f'|format(workouts|sum(attribute='distance_km')) }}<span class="u"> km</span></div></div>
+            <div class="kpi"><div class="k-lbl">Calories</div><div class="k-val">{{ "{:,}".format(workouts|sum(attribute='calories_burned')) }}</div></div>
+        </div>
+
+        <div class="panel">
+            <form class="ft-filters" method="GET" action="{{ url_for('health-fitness-tracking.workouts_page') }}">
+                <div class="ft-field"><label>Type</label>
+                    <select name="type">
+                        <option value="">All Types</option>
+                        {% for t in workout_types %}<option value="{{ t }}" {% if current_type == t %}selected{% endif %}>{{ t|replace('_',' ')|title }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="ft-field"><label>From</label><input type="date" name="from" value="{{ date_from }}"></div>
+                <div class="ft-field"><label>To</label><input type="date" name="to" value="{{ date_to }}"></div>
+                <button type="submit" class="ft-btn">Filter</button>
+                {% if current_type or date_from or date_to %}<a class="ft-btn ghost" href="{{ url_for('health-fitness-tracking.workouts_page') }}">Clear</a>{% endif %}
+            </form>
+        </div>
+
+        <div class="panel">
+            <table class="dt">
+                <tr><th>Date</th><th>Activity</th><th>Duration</th><th>Distance</th><th>Calories</th><th>Avg HR</th><th></th></tr>
+                {% for w in workouts %}
+                <tr>
+                    <td>{{ w.date }}</td>
+                    <td><span class="type-tag tt-{{ w.type }}">{{ w.type|replace('_',' ') }}</span></td>
+                    <td>{{ w.duration_minutes }} min</td>
+                    <td>{{ (w.distance_km ~ ' km') if w.distance_km else '—' }}</td>
+                    <td>{{ w.calories_burned }}</td>
+                    <td>{{ (w.heart_rate_avg ~ ' bpm') if w.heart_rate_avg else '—' }}</td>
+                    <td><a href="{{ url_for('health-fitness-tracking.workout_detail', workout_id=w.id) }}">View →</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center;color:var(--faint);padding:24px;">No workouts found matching your filters.</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard</div>
+</body>
+</html>

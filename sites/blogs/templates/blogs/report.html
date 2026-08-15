@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Post — TumblrVibe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1a1a2e; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        a { color: #7c83ff; text-decoration: none; }
+        .top-bar { background: #16213e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #7c83ff; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .85rem; margin-left: 1rem; }
+
+        .report-wrap { max-width: 500px; margin: 2rem auto; padding: 0 1rem; }
+        .report-wrap h1 { font-size: 1.2rem; color: #e94560; margin-bottom: .5rem; }
+        .report-wrap .post-ref { font-size: .9rem; color: #888; margin-bottom: 1.5rem; }
+        .field { margin-bottom: 1rem; }
+        .field label { display: block; font-size: .85rem; color: #888; margin-bottom: .3rem; }
+        .field select, .field textarea, .field input { width: 100%; padding: .7rem 1rem; background: #16213e; border: 1px solid #0f3460; border-radius: .4rem; color: #e0e0e0; font-size: .9rem; font-family: inherit; }
+        .field textarea { min-height: 100px; resize: vertical; }
+        .submit-btn { padding: .7rem 2rem; background: #e94560; color: #fff; border: none; border-radius: .4rem; font-size: .95rem; cursor: pointer; }
+        .submit-btn:hover { background: #c03050; }
+        .result { margin-top: 1rem; padding: .8rem; border-radius: .4rem; display: none; }
+        .result.success { background: #0f3460; color: #7c83ff; display: block; }
+        .result.error { background: #3d1a2e; color: #e94560; display: block; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('blogs.index') }}" class="logo">TumblrVibe</a>
+        <div class="nav-links">
+            <a href="{{ url_for('blogs.index') }}">Feed</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="report-wrap">
+        <h1>Report Post</h1>
+        <div class="post-ref">Reporting: "{{ post.title }}" by @{{ post.author_username }}</div>
+        <form method="post" action="{{ url_for('blogs.form_report_post', post_id=post.id) }}">
+            <div class="field">
+                <label>Reason</label>
+                <select name="reason" id="reason" required>
+                    <option value="">Select a reason...</option>
+                    <option value="spam">Spam</option>
+                    <option value="harassment">Harassment</option>
+                    <option value="misinformation">Misinformation</option>
+                    <option value="copyright">Copyright violation</option>
+                    <option value="inappropriate">Inappropriate content</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Additional details (optional)</label>
+                <textarea name="details" id="details" placeholder="Provide more context..."></textarea>
+            </div>
+            <div class="field">
+                <label>Your username (optional)</label>
+                <input type="text" name="reporter" id="reporter" value="{{ user.username if user else '' }}" placeholder="anonymous">
+            </div>
+            <button type="submit" class="submit-btn">Submit Report</button>
+        </form>
+    </div>
+</body>
+</html>

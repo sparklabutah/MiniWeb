@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Stories</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a1a; color: #fff; }
+        a { color: #0095f6; text-decoration: none; }
+        .top-nav { background: #262626; border-bottom: 1px solid #363636; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #fff; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #e0e0e0; font-size: 14px; }
+        .stories-container { max-width: 600px; margin: 40px auto; }
+        .story-group { margin-bottom: 40px; background: #262626; border-radius: 8px; overflow: hidden; }
+        .story-group-header { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
+        .story-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 16px; }
+        .story-username { font-weight: 600; font-size: 14px; }
+        .story-items { display: flex; gap: 8px; padding: 0 16px 16px; overflow-x: auto; }
+        .story-card { min-width: 200px; height: 300px; background: #363636; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+        .story-card .placeholder { font-size: 48px; color: #555; }
+        .story-card .caption { position: absolute; bottom: 12px; left: 12px; right: 12px; font-size: 12px; color: #e0e0e0; }
+        .story-card .views { position: absolute; top: 8px; right: 8px; font-size: 11px; color: #aaa; }
+        .story-card .play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 36px; color: #fff; opacity: 0; transition: opacity 0.2s; }
+        .story-card:hover .play-btn { opacity: 1; }
+        .empty-state { text-align: center; padding: 60px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}" style="color:#fff;font-weight:600;">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}">Messages</a>
+            <a href="{{ url_for('multimedia-posting.settings_page') }}" style="color:#fff;">Settings</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="stories-container">
+        {% if story_groups %}
+            {% for author_id, group in story_groups.items() %}
+            <div class="story-group">
+                <div class="story-group-header">
+                    <div class="story-avatar" style="background: hsl({{ loop.index * 60 }}, 50%, 45%);">
+                        {{ group.author.display_name[0] if group.author else '?' }}
+                    </div>
+                    <a href="{{ url_for('multimedia-posting.profile', user_id=author_id) }}" class="story-username" style="color:#fff;">
+                        {{ group.author.username if group.author else author_id }}
+                    </a>
+                </div>
+                <div class="story-items">
+                    {% for story in group.stories %}
+                    <div class="story-card" onclick="playStory('{{ story.id }}')" data-story-id="{{ story.id }}">
+                        {% if story.media_url and story.media_url.startswith('/static') %}
+                        <img src="{{ story.media_url }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                        {% else %}
+                        <span class="placeholder">&#128247;</span>
+                        {% endif %}
+                        <span class="play-btn">&#9654;</span>
+                        <span class="views">{{ story.views_count }} views</span>
+                        {% if story.caption %}
+                        <span class="caption">{{ story.caption }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <h2>No active stories</h2>
+                <p>Stories from people you follow will appear here.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function playStory(storyId) {
+        fetch(`{{ url_for('multimedia-posting.index') }}api/stories/${storyId}/play`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const card = document.querySelector(`[data-story-id="${storyId}"]`);
+                if (card) {
+                    const viewsEl = card.querySelector('.views');
+                    viewsEl.textContent = data.views_count + ' views';
+                }
+            });
+    }
+    </script>
+</body>
+</html>

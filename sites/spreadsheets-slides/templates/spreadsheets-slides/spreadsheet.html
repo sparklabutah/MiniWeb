@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ss.title }} - SheetDeck</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #202124; }
+        .toolbar { background: #f8f9fa; border-bottom: 1px solid #dadce0; padding: 0.4rem 1rem; display: flex; align-items: center; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 0.8rem; }
+        .toolbar-left a.back { color: #0f9d58; text-decoration: none; font-size: 0.85rem; }
+        .doc-title { font-size: 1.1rem; font-weight: 500; color: #202124; border: none; background: none; padding: 0.2rem 0.4rem; border-radius: 4px; }
+        .doc-title:hover { background: #e8eaed; }
+        .toolbar-right { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: #5f6368; }
+        .btn { padding: 0.3rem 0.8rem; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; font-size: 0.82rem; background: #fff; color: #5f6368; text-decoration: none; }
+        .btn:hover { background: #f1f3f4; }
+        .btn-green { background: #0f9d58; color: #fff; border-color: #0f9d58; }
+        .btn-green:hover { background: #0b8043; }
+
+        .meta-bar { background: #f8f9fa; border-bottom: 1px solid #e8eaed; padding: 0.3rem 1rem; font-size: 0.8rem; color: #80868b; display: flex; gap: 1.5rem; }
+
+        .sheet-tabs { display: flex; border-bottom: 2px solid #dadce0; background: #f8f9fa; padding: 0 0.5rem; }
+        .sheet-tab { padding: 0.5rem 1rem; font-size: 0.85rem; color: #5f6368; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; text-decoration: none; }
+        .sheet-tab.active { color: #0f9d58; border-bottom-color: #0f9d58; font-weight: 500; }
+        .sheet-tab:hover { background: #e8eaed; }
+
+        .grid-container { overflow: auto; max-height: calc(100vh - 160px); }
+        table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+        th, td { border: 1px solid #e8eaed; padding: 0.35rem 0.6rem; text-align: left; min-width: 80px; white-space: nowrap; }
+        th { background: #f8f9fa; color: #5f6368; font-weight: 500; position: sticky; top: 0; z-index: 1; }
+        .row-header { background: #f8f9fa; color: #80868b; font-weight: 400; text-align: center; min-width: 40px; width: 40px; }
+        td:focus-within { outline: 2px solid #4285F4; outline-offset: -1px; }
+        td:has(input.cell-input):hover { background: #f1f8f4; cursor: text; }
+        input.cell-input { border: none; background: none; width: 100%; font-size: 0.85rem; padding: 0; outline: none; cursor: text; }
+        input.cell-input:focus { background: #fff; }
+        input.cell-input.is-formula { color: #0b8043; font-family: 'SFMono-Regular', Consolas, monospace; }
+        td.cell-cell { position: relative; }
+        .formula-val { position: absolute; right: 2px; top: 1px; font-size: 0.62rem; color: #80868b; background: #e6f4ea; padding: 0 0.25rem; border-radius: 3px; pointer-events: none; }
+
+        .mode-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 1rem; font-size: 0.82rem; }
+        .mode-banner .mode-icon { font-weight: 700; }
+        .mode-banner.edit { background: #e6f4ea; color: #0b8043; border-bottom: 1px solid #ceead6; }
+        .mode-banner.readonly { background: #fef7e0; color: #a56900; border-bottom: 1px solid #feefc3; }
+        .mode-banner a { color: inherit; font-weight: 600; text-decoration: underline; }
+
+        .share-section { padding: 1rem; border-top: 1px solid #dadce0; background: #f8f9fa; }
+        .share-section h4 { font-size: 0.85rem; color: #5f6368; margin-bottom: 0.5rem; }
+        .shared-users { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+        .shared-user { font-size: 0.75rem; background: #e8eaed; padding: 0.2rem 0.5rem; border-radius: 12px; color: #5f6368; }
+
+        .api-info { margin: 1rem; padding: 0.8rem; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; font-size: 0.8rem; color: #5f6368; }
+        .api-info summary { cursor: pointer; font-weight: 500; color: #0f9d58; }
+        .api-info code { background: #e8eaed; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('spreadsheets-slides.index') }}" class="back">SheetDeck</a>
+            <span class="doc-title">{{ ss.title }}</span>
+        </div>
+        <div class="toolbar-right">
+            <span>Owner: {{ user_map.get(ss.owner_id, {}).get('name', 'Unknown') }}</span>
+            <span>Updated: {{ ss.updated_at[:10] if ss.updated_at else '' }}</span>
+            <button class="btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
+            {% if can_edit %}
+            <select id="export-format" class="btn" title="Export format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button class="btn btn-green" onclick="window.location='{{ url_for('spreadsheets-slides.api_spreadsheet_export', sid=ss.id) }}?format='+document.getElementById('export-format').value">Export</button>
+            {% endif %}
+            {% if user %}
+            <a href="{{ url_for('spreadsheets-slides.logout') }}" class="btn">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('spreadsheets-slides.login_page') }}" class="btn">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="meta-bar">
+        <span>{{ ss.rows }} rows x {{ ss.cols }} cols</span>
+        <span>{{ ss.sheets|length }} sheet{{ 's' if ss.sheets|length != 1 else '' }}</span>
+        {% if ss.shared_with %}
+        <span>Shared with {{ ss.shared_with|length }} user{{ 's' if ss.shared_with|length != 1 else '' }}</span>
+        {% endif %}
+    </div>
+
+    {% if can_edit %}
+    <div class="mode-banner edit">
+        <span class="mode-icon">✎</span>
+        <span>You have edit access. Click any cell to type a value, then press <strong>Save Changes</strong> at the bottom to save your edits.</span>
+    </div>
+    {% elif user %}
+    <div class="mode-banner readonly">
+        <span class="mode-icon">🔒</span>
+        <span>Read-only &mdash; you have view access to this spreadsheet. Only the owner
+            ({{ user_map.get(ss.owner_id, {}).get('name', 'the owner') }}) and people granted edit access can change cells.
+            Ask the owner to share it with you for editing.</span>
+    </div>
+    {% else %}
+    <div class="mode-banner readonly">
+        <span class="mode-icon">🔒</span>
+        <span>Read-only &mdash;
+            <a href="{{ url_for('spreadsheets-slides.login_page', next=request.path) }}">sign in</a>
+            as the owner ({{ user_map.get(ss.owner_id, {}).get('name', 'the owner') }}) or a shared editor to change cells.</span>
+    </div>
+    {% endif %}
+
+    {% if ss.sheets|length > 1 %}
+    <div class="sheet-tabs">
+        {% for sheet in ss.sheets %}
+        <a href="{{ url_for('spreadsheets-slides.spreadsheet_view', sid=ss.id, sheet=loop.index0) }}"
+           class="sheet-tab {{ 'active' if loop.index0 == sheet_index }}">{{ sheet.name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% set current_sheet = ss.sheets[sheet_index] if sheet_index < ss.sheets|length else ss.sheets[0] %}
+    <div class="grid-container">
+        <form method="post" action="{{ url_for('spreadsheets-slides.form_submit_spreadsheet', sid=ss.id) }}">
+        <input type="hidden" name="sheet" value="{{ sheet_index }}">
+        <table>
+            <thead>
+                <tr>
+                    <th class="row-header"></th>
+                    {% for col_idx in range(current_sheet.data[0]|length) %}
+                    <th>{{ "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[col_idx] if col_idx < 26 else "Col" ~ col_idx }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody id="ss-grid-body" data-cols="{{ current_sheet.data[0]|length }}">
+                {% for row in current_sheet.data %}
+                {% set row_idx = loop.index0 %}
+                <tr>
+                    <td class="row-header">{{ loop.index }}</td>
+                    {% for cell in row %}
+                    {% set fkey = row_idx ~ '_' ~ loop.index0 %}
+                    {% set raw_formula = current_sheet.formulas.get(fkey) if current_sheet.formulas else None %}
+                    <td class="cell-cell">
+                        {% if can_edit %}
+                        <input type="text"
+                               class="cell-input{{ ' is-formula' if raw_formula }}"
+                               name="cell_{{ row_idx }}_{{ loop.index0 }}"
+                               value="{{ raw_formula if raw_formula is not none else cell }}">
+                        {% if raw_formula %}<span class="formula-val" title="Computed value (recomputed on save)">{{ cell }}</span>{% endif %}
+                        {% else %}
+                        {{ cell }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if can_edit %}
+        <div style="padding: 0.5rem 1rem; display:flex; gap:0.5rem; align-items:center;">
+            <button type="button" class="btn" onclick="ssAddRow()"
+                    style="border:1px solid #dadce0;background:#fff;color:#3c4043;">+ Add row</button>
+            <button type="submit" class="btn btn-green">Save Changes</button>
+            <span style="font-size:0.72rem;color:#80868b;">Type into cells (or a new row), then Save Changes. Start a cell with <code>=</code> for a formula &mdash; e.g. <code>=SUM(A1:A5)</code>, <code>=AVERAGE(B1:B9)</code>, <code>=A1*2</code>, <code>=(A1+B2)/2</code>. Formulas recompute on save; the small green badge shows the computed value.</span>
+        </div>
+        {% endif %}
+        </form>
+    </div>
+
+    {% if can_edit %}
+    <script>
+    // Append an empty, editable row to the grid — realistic spreadsheet add-row:
+    // the new row's cells post as cell_<row>_<col>, which the save endpoint
+    // auto-expands the grid to persist (no bespoke per-column form).
+    function ssAddRow() {
+        var body = document.getElementById('ss-grid-body');
+        var cols = parseInt(body.dataset.cols, 10) || 0;
+        var r = body.querySelectorAll('tr').length;      // next 0-based row index
+        var tr = document.createElement('tr');
+        var rh = document.createElement('td');
+        rh.className = 'row-header'; rh.textContent = r + 1; tr.appendChild(rh);
+        for (var c = 0; c < cols; c++) {
+            var td = document.createElement('td');
+            var inp = document.createElement('input');
+            inp.type = 'text'; inp.className = 'cell-input';
+            inp.name = 'cell_' + r + '_' + c;
+            td.appendChild(inp); tr.appendChild(td);
+        }
+        body.appendChild(tr);
+        var first = tr.querySelector('input'); if (first) first.focus();
+    }
+    </script>
+    {% endif %}
+
+    <div class="share-section">
+        <h4>Share via Email</h4>
+        <form method="post" action="{{ url_for('spreadsheets-slides.form_share_spreadsheet', sid=ss.id) }}" style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem">
+            <input type="email" name="email" placeholder="Enter email address" required style="flex:1;padding:.4rem;border:1px solid #dadce0;border-radius:4px;font-size:.82rem">
+            <select name="permission" style="padding:.4rem;border:1px solid #dadce0;border-radius:4px;font-size:.82rem">
+                <option value="view">View</option>
+                <option value="edit">Edit</option>
+            </select>
+            <button type="submit" style="background:#1a73e8;color:#fff;border:none;padding:.4rem .8rem;border-radius:4px;cursor:pointer;font-size:.82rem">Send Invite</button>
+        </form>
+        {% if ss.shared_with %}
+        <h4>Shared with</h4>
+        <div class="shared-users">
+            {% for uid in ss.shared_with %}
+            {% if user_map.get(uid) %}
+            <span class="shared-user">{{ user_map[uid].name }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="api-info">
+        <details>
+            <summary>API Endpoints for this spreadsheet</summary>
+            <ul style="margin-top:0.5rem;padding-left:1.2rem;line-height:2;">
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}</code> - Full data</li>
+                <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/cell</code> - Update cell</li>
+                <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/edit</code> - Edit by ref (A1)</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/ref/A1</code> - Get cell by ref</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/range/A1:C5</code> - Get range</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/compute?column=1&operation=sum</code> - Compute</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/extremum?column=1&direction=max</code> - Extremum</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/filter?column=1&min_value=0</code> - Filter</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/select?column=2&contains=text</code> - Select</li>
+                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/export?format=csv</code> - Export CSV</li>
+                <li><code>DELETE /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/row/1</code> - Delete row</li>
+            </ul>
+        </details>
+    </div>
+</body>
+</html>

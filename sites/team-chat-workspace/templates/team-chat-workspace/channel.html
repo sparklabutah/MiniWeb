@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>#{{ active_channel.name }} - Meridian Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; flex-direction: column; }
+        a { color: #1d9bd1; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .topbar { background: #19171d; height: 38px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #383838; flex-shrink: 0; }
+        .topbar .workspace-name { color: #fff; font-weight: 700; font-size: 15px; }
+        .topbar .search-box { margin-left: auto; }
+        .topbar .search-box input { background: #3f3f42; border: none; color: #d1d2d3; padding: 4px 12px; border-radius: 4px; width: 300px; font-size: 13px; }
+        .topbar .search-box input::placeholder { color: #8b8b8d; }
+        .topbar .user-info { margin-left: 12px; font-size: 13px; color: #ababad; }
+
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar { width: 260px; background: #19171d; border-right: 1px solid #383838; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+        .sidebar-section { padding: 12px 16px 4px; }
+        .sidebar-section-title { font-size: 13px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .sidebar-nav li a:hover { background: #27242c; text-decoration: none; color: #fff; }
+        .sidebar-nav li a.active { background: #1264a3; color: #fff; }
+        .sidebar-nav li .nav-icon { margin-right: 8px; font-size: 16px; }
+        .channel-list { list-style: none; }
+        .channel-list li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .channel-list li a:hover { background: #27242c; text-decoration: none; color: #fff; }
+        .channel-list li a.active { background: #1264a3; color: #fff; }
+        .channel-list .ch-icon { margin-right: 6px; font-size: 13px; opacity: 0.6; }
+        .channel-list .msg-count { margin-left: auto; font-size: 11px; background: #3f3f42; padding: 1px 6px; border-radius: 8px; color: #ababad; }
+
+        .content { flex: 1; display: flex; flex-direction: column; background: #1a1d21; min-width: 0; }
+
+        .channel-header { padding: 12px 20px; border-bottom: 1px solid #383838; flex-shrink: 0; }
+        .channel-header h2 { font-size: 16px; color: #fff; font-weight: 700; }
+        .channel-header h2 .hash { color: #ababad; margin-right: 2px; }
+        .channel-header .ch-topic { font-size: 13px; color: #ababad; margin-top: 2px; }
+        .channel-header .ch-meta { font-size: 12px; color: #8b8b8d; margin-top: 4px; }
+
+        /* Filters */
+        .filters-bar { padding: 8px 20px; border-bottom: 1px solid #2a2d31; display: flex; gap: 12px; align-items: center; flex-shrink: 0; background: #1e2024; }
+        .filters-bar label { font-size: 12px; color: #8b8b8d; }
+        .filters-bar select, .filters-bar input[type="date"] { background: #3f3f42; border: 1px solid #555; color: #d1d2d3; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .filters-bar .filter-btn { background: #1264a3; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .filters-bar .clear-btn { background: #3f3f42; color: #ababad; border: none; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+
+        .messages-container { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+        /* Date divider */
+        .date-divider { display: flex; align-items: center; padding: 16px 20px 8px; }
+        .date-divider::before, .date-divider::after { content: ''; flex: 1; border-bottom: 1px solid #383838; }
+        .date-divider span { padding: 0 12px; font-size: 12px; font-weight: 700; color: #ababad; background: #1a1d21; }
+
+        .message { padding: 8px 20px; display: flex; gap: 10px; }
+        .message:hover { background: #222529; }
+        /* highlight a message jumped to from search */
+        .message.jump-highlight { background: #3a3d16; box-shadow: inset 3px 0 0 #f2c744; animation: jumpflash 2.4s ease-out; }
+        @keyframes jumpflash { 0% { background: #5a5d20; } 60% { background: #3a3d16; } 100% { background: transparent; box-shadow: inset 3px 0 0 transparent; } }
+        .message .avatar { width: 36px; height: 36px; border-radius: 4px; background: #3f3f42; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .message .msg-body { flex: 1; min-width: 0; }
+        .message .msg-header { display: flex; align-items: baseline; gap: 8px; }
+        .message .msg-author { font-weight: 700; color: #fff; font-size: 14px; }
+        .message .msg-time { font-size: 11px; color: #8b8b8d; }
+        .message .msg-text { font-size: 14px; line-height: 1.5; color: #d1d2d3; margin-top: 2px; word-wrap: break-word; white-space: pre-wrap; }
+
+        .reactions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .reaction-badge { display: inline-flex; align-items: center; gap: 4px; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+        .reaction-badge:hover { background: #3a3d41; }
+        .reaction-badge .rxn-count { color: #1d9bd1; font-weight: 600; }
+        .react-add { display: inline-flex; align-items: center; background: #2a2d31; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; color: #ababad; }
+        .react-add:hover { background: #3a3d41; color: #fff; }
+        .emoji-picker { display: none; gap: 4px; align-items: center; background: #232629; border: 1px solid #3f3f42; border-radius: 12px; padding: 2px 6px; }
+        .emoji-picker.open { display: inline-flex; }
+        .emoji-opt { cursor: pointer; font-size: 15px; padding: 1px 3px; border-radius: 6px; }
+        .emoji-opt:hover { background: #3a3d41; }
+
+        .thread-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #1d9bd1; margin-top: 4px; cursor: pointer; padding: 2px 0; }
+        .thread-link:hover { text-decoration: underline; }
+
+        .message-input-area { padding: 12px 20px; border-top: 1px solid #383838; flex-shrink: 0; }
+        .message-input-area form { display: flex; gap: 8px; }
+        .message-input-area textarea { flex: 1; background: #222529; border: 1px solid #3f3f42; color: #d1d2d3; padding: 10px 12px; border-radius: 6px; font-size: 14px; font-family: inherit; resize: none; min-height: 42px; }
+        .message-input-area textarea::placeholder { color: #8b8b8d; }
+        .message-input-area button { background: #007a5a; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .message-input-area button:hover { background: #148567; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #8b8b8d; }
+        .empty-state h3 { color: #ababad; margin-bottom: 8px; }
+
+        .avatar-0 { background: #e04e4e !important; }
+        .avatar-1 { background: #e07b2e !important; }
+        .avatar-2 { background: #d4a72c !important; }
+        .avatar-3 { background: #2ea854 !important; }
+        .avatar-4 { background: #1d9bd1 !important; }
+        .avatar-5 { background: #7b68ee !important; }
+        .avatar-6 { background: #e05eb3 !important; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <span class="workspace-name">Meridian Systems</span>
+        <div class="search-box">
+            <form action="{{ url_for('team-chat-workspace.search_view') }}" method="get">
+                <input type="text" name="q" placeholder="Search messages..." />
+            </form>
+        </div>
+        {% if current_user %}
+        <span class="user-info">{{ current_user.display_name }}</span>
+        {% endif %}
+    </div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <ul class="sidebar-nav">
+                    <li><a href="{{ url_for('team-chat-workspace.index') }}"><span class="nav-icon">&#x1F4AC;</span> All Channels</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.threads_view') }}"><span class="nav-icon">&#x1F9F5;</span> Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}"><span class="nav-icon">&#x1F4E8;</span> Direct Messages</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.members_view') }}"><span class="nav-icon">&#x1F465;</span> Members</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.search_view') }}"><span class="nav-icon">&#x1F50D;</span> Search</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Channels</div>
+                <ul class="channel-list">
+                    {% for ch in channels %}
+                    <li>
+                        <a href="{{ url_for('team-chat-workspace.channel_view', channel_id=ch.id) }}"
+                           {% if active_channel and active_channel.id == ch.id %}class="active"{% endif %}>
+                            <span class="ch-icon">#</span>
+                            {{ ch.name }}
+                            {% if ch.message_count %}
+                            <span class="msg-count">{{ ch.message_count }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="channel-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+                <div>
+                    <h2><span class="hash">#</span> {{ active_channel.name }}</h2>
+                    {% if active_channel.topic %}
+                    <div class="ch-topic">{{ active_channel.topic }}</div>
+                    {% endif %}
+                    <div class="ch-meta">{{ active_channel.member_count }} members &middot; {{ active_channel.description }}</div>
+                </div>
+                <div style="display:flex;gap:.4rem;align-items:center;">
+                    {% set joined = active_channel.id in (current_user.get('joined_channels') or []) if current_user else false %}
+                    <button id="join-toggle-btn" onclick="toggleJoin(this)" data-joined="{{ '1' if joined else '0' }}"
+                            style="background:{{ '#3f3f42' if joined else '#007a5a' }};color:#fff;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        {{ 'Leave Channel' if joined else 'Join Channel' }}
+                    </button>
+                    {% set followed = active_channel.id in (current_user.get('followed_channels') or []) if current_user else false %}
+                    <button id="follow-toggle-btn" onclick="toggleFollow(this)" data-following="{{ '1' if followed else '0' }}"
+                            style="background:{{ '#3f3f42' if followed else '#1264a3' }};color:#fff;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        {{ '★ Following' if followed else '☆ Follow' }}
+                    </button>
+                    <form method="POST" action="{{ url_for('team-chat-workspace.form_channel_invite', channel_id=active_channel.id) }}" style="display:flex;gap:.3rem;align-items:center;">
+                        <input type="text" name="email" placeholder="Invite member" style="padding:.3rem .5rem;background:#383838;color:#d1d2d3;border:1px solid #4a4a4a;border-radius:4px;font-size:.78rem;width:130px;">
+                        <button type="submit" style="background:#2b6cb0;color:#fff;border:none;padding:.35rem .6rem;border-radius:4px;font-size:.78rem;cursor:pointer;">Invite</button>
+                    </form>
+                    {% if invite_msg %}
+                    <span class="invite-feedback" style="font-size:.75rem;color:#9fd6a0;white-space:nowrap;">{{ invite_msg }}</span>
+                    {% endif %}
+                    <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" style="background:#383838;color:#ababad;border:none;padding:.35rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer;white-space:nowrap;">Share</button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <form method="get" action="{{ url_for('team-chat-workspace.channel_view', channel_id=active_channel.id) }}" style="display:flex; gap:12px; align-items:center;">
+                    <label>Date:</label>
+                    <input type="date" name="date" value="{{ date_filter or '' }}" />
+                    <label>User:</label>
+                    <select name="user">
+                        <option value="">All users</option>
+                        {% for uid, u in user_map.items() %}
+                        <option value="{{ uid }}" {% if user_filter == uid %}selected{% endif %}>{{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="filter-btn">Filter</button>
+                    <a href="{{ url_for('team-chat-workspace.channel_view', channel_id=active_channel.id) }}" class="clear-btn" style="text-decoration:none;">Clear</a>
+                </form>
+            </div>
+
+            <div class="messages-container">
+                {% if messages %}
+                    {% set ns = namespace(current_date='') %}
+                    {% for msg in messages %}
+                        {% set msg_date = msg.timestamp[:10] %}
+                        {% if msg_date != ns.current_date %}
+                            {% set ns.current_date = msg_date %}
+                            <div class="date-divider"><span>{{ msg_date }}</span></div>
+                        {% endif %}
+                        <div class="message" id="msg-{{ msg.id }}" data-message-id="{{ msg.id }}">
+                            <div class="avatar avatar-{{ (msg.user.root_user_id|default(loop.index0)) % 7 }}">
+                                {{ msg.user.display_name[:1] if msg.user else '?' }}
+                            </div>
+                            <div class="msg-body">
+                                <div class="msg-header">
+                                    <span class="msg-author">{{ msg.user.display_name if msg.user else 'Unknown' }}</span>
+                                    <span class="msg-time">{{ msg.timestamp[11:16] }}</span>
+                                </div>
+                                <div class="msg-text">{{ msg.text }}</div>
+                                {% if current_user and msg.user_id == current_user.id %}
+                                <form class="msg-edit-form" data-message-id="{{ msg.id }}" onsubmit="return saveEdit(event, this)" style="display:none;gap:6px;margin-top:4px;">
+                                    <input type="text" name="text" value="{{ msg.text }}" style="flex:1;background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:5px 8px;border-radius:4px;font-size:13px;">
+                                    <button type="submit" style="background:#007a5a;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Save</button>
+                                    <button type="button" onclick="this.closest('.msg-edit-form').style.display='none'" style="background:#3f3f42;color:#ababad;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Cancel</button>
+                                </form>
+                                <button class="msg-edit-btn" onclick="showEditForm(this)" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;margin-right:8px;" title="Edit message">&#9998; edit</button>
+                                <button class="msg-delete-btn" data-url="{{ url_for('team-chat-workspace.form_delete_message', message_id=msg.id) }}" style="background:none;border:none;color:#ababad;font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;margin-right:8px;" title="Delete message">&#10005; delete</button>
+                                {% endif %}
+                                {% set msg_saved = msg.id in (current_user.get('saved_messages') or []) if current_user else false %}
+                                <button class="msg-save-btn" data-url="{{ url_for('team-chat-workspace.api_message_save', message_id=msg.id) }}"
+                                        onclick="toggleSave(this)"
+                                        style="background:none;border:none;color:{{ '#d4a72c' if msg_saved else '#ababad' }};font-size:.7rem;cursor:pointer;padding:0;margin-top:2px;" title="Save message">
+                                    {{ '★ saved' if msg_saved else '☆ save' }}
+                                </button>
+                                <div class="reactions">
+                                    {% for rxn in msg.reactions %}
+                                    <span class="reaction-badge" title="{{ rxn.users|join(', ') }}"
+                                          onclick="addReaction('{{ msg.id }}', '{{ rxn.emoji }}')">
+                                        {{ rxn.emoji }} <span class="rxn-count">{{ rxn.count }}</span>
+                                    </span>
+                                    {% endfor %}
+                                    <span class="react-add" onclick="toggleEmojiPicker(this)" title="Add reaction">&#128578;+</span>
+                                    <span class="emoji-picker">
+                                        {% for glyph, code in [('\U0001F44D', ':thumbsup:'), ('❤️', ':heart:'), ('\U0001F389', ':tada:'), ('\U0001F440', ':eyes:'), ('\U0001F680', ':rocket:'), ('✅', ':white_check_mark:'), ('\U0001F604', ':smile:'), ('\U0001F64C', ':raised_hands:')] %}
+                                        <span class="emoji-opt" onclick="addReaction('{{ msg.id }}', '{{ code }}')">{{ glyph }}</span>
+                                        {% endfor %}
+                                    </span>
+                                </div>
+                                {% if msg.thread %}
+                                <a class="thread-link" href="{{ url_for('team-chat-workspace.thread_detail', thread_id=msg.thread.id) }}">
+                                    &#x1F9F5; {{ msg.thread.replies|length }} replies &mdash; View thread
+                                </a>
+                                {% else %}
+                                <a class="thread-link reply-in-thread" onclick="startThread('{{ msg.id }}')">
+                                    &#x1F9F5; Reply in thread
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <h3>No messages found</h3>
+                        {% if date_filter or user_filter %}
+                        <p>Try adjusting your filters.</p>
+                        {% else %}
+                        <p>Be the first to say something in #{{ active_channel.name }}!</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="message-input-area">
+                <form method="POST" enctype="multipart/form-data" action="{{ url_for('team-chat-workspace.api_upload') }}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem;">
+                    <input type="hidden" name="channel_id" value="{{ active_channel.id }}">
+                    <input type="file" name="file" style="font-size:.8rem;flex:1;">
+                    <button type="submit" style="padding:.3rem .7rem;font-size:.8rem;background:#2b6cb0;color:#fff;border:none;border-radius:.3rem;cursor:pointer;">Upload</button>
+                </form>
+                <form id="send-form" onsubmit="return sendMessage(event)">
+                    <textarea id="msg-input" placeholder="Message #{{ active_channel.name }}" rows="1"></textarea>
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.msg-delete-btn');
+        if (!btn) return;
+        btn.textContent = 'deleting...';
+        btn.disabled = true;
+        fetch(btn.getAttribute('data-url'), {method: 'POST'})
+            .then(function(r) { return r.ok ? r : Promise.reject(); })
+            .then(function() { btn.textContent = 'done!'; window.location.reload(); })
+            .catch(function() { btn.textContent = 'error'; setTimeout(function() { btn.textContent = '\u2715 delete'; btn.disabled = false; }, 2000); });
+    });
+    var API_BASE = '{{ url_for("team-chat-workspace.index") }}';
+    function toggleEmojiPicker(btn) {
+        var picker = btn.parentNode.querySelector('.emoji-picker');
+        if (picker) picker.classList.toggle('open');
+    }
+    function addReaction(msgId, emoji) {
+        fetch(API_BASE + 'api/messages/' + encodeURIComponent(msgId) + '/react', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({emoji: emoji})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+    }
+    function startThread(msgId) {
+        var text = window.prompt('Start a thread — your first reply:');
+        if (text === null) return;
+        text = text.trim();
+        if (!text) return;
+        fetch(API_BASE + 'api/messages/' + encodeURIComponent(msgId) + '/thread', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d && d.thread_id) {
+                window.location.href = API_BASE + 'thread/' + encodeURIComponent(d.thread_id);
+            } else {
+                location.reload();
+            }
+        });
+    }
+    function sendMessage(e) {
+        e.preventDefault();
+        var text = document.getElementById('msg-input').value.trim();
+        if (!text) return false;
+        fetch('{{ url_for("team-chat-workspace.api_channel_send_message", channel_id=active_channel.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+        return false;
+    }
+    function toggleJoin(btn) {
+        fetch('{{ url_for("team-chat-workspace.api_channel_join", channel_id=active_channel.id) }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var joined = d.action === 'joined';
+            btn.dataset.joined = joined ? '1' : '0';
+            btn.textContent = joined ? 'Leave Channel' : 'Join Channel';
+            btn.style.background = joined ? '#3f3f42' : '#007a5a';
+        });
+    }
+    function toggleFollow(btn) {
+        fetch('{{ url_for("team-chat-workspace.api_channel_follow", channel_id=active_channel.id) }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var following = d.action === 'followed';
+            btn.dataset.following = following ? '1' : '0';
+            btn.textContent = following ? '★ Following' : '☆ Follow';
+            btn.style.background = following ? '#3f3f42' : '#1264a3';
+        });
+    }
+    function toggleSave(btn) {
+        fetch(btn.getAttribute('data-url'), {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var saved = d.action === 'saved';
+            btn.textContent = saved ? '★ saved' : '☆ save';
+            btn.style.color = saved ? '#d4a72c' : '#ababad';
+        });
+    }
+    function showEditForm(btn) {
+        var form = btn.closest('.msg-body').querySelector('.msg-edit-form');
+        form.style.display = 'flex';
+        form.querySelector('input[name="text"]').focus();
+    }
+    function saveEdit(e, form) {
+        e.preventDefault();
+        var text = form.querySelector('input[name="text"]').value.trim();
+        if (!text) return false;
+        fetch('{{ url_for("team-chat-workspace.index") }}api/messages/' + encodeURIComponent(form.dataset.messageId), {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        }).then(function(r) { return r.json(); }).then(function() {
+            location.reload();
+        });
+        return false;
+    }
+
+    // Default view: open at the bottom on the most recent messages, like any
+    // chat app, instead of the top with the oldest. Skipped when jumping to a
+    // specific search result (handled below).
+    (function () {
+        if (new URLSearchParams(window.location.search).get('jump')) return;
+        function toBottom() {
+            var c = document.querySelector('.messages-container');
+            if (c) c.scrollTop = c.scrollHeight;
+        }
+        toBottom();
+        requestAnimationFrame(toBottom);   // after layout settles
+        window.addEventListener('load', toBottom);  // after images/fonts
+    })();
+
+    // Jump-to-message: when arriving from a search result (?jump=<msg-id>),
+    // scroll that message into view and flash it, then drop the param so a
+    // reload/back doesn't re-trigger the highlight.
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        var target = params.get('jump');
+        if (!target) return;
+        var el = document.getElementById('msg-' + target) ||
+                 document.querySelector('[data-message-id="' + target + '"]');
+        if (el) {
+            el.scrollIntoView({ block: 'center' });
+            el.classList.add('jump-highlight');
+            setTimeout(function () { el.classList.remove('jump-highlight'); }, 2600);
+        }
+        params.delete('jump');
+        var qs = params.toString();
+        history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    })();
+    </script>
+</body>
+</html>

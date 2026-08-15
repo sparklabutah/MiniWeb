@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ player.name }} - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = 'players' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('sports-esports.index') }}">Home</a> /
+            <a href="{{ url_for('sports-esports.players_page') }}">Players</a> /
+            {{ player.name }}
+        </div>
+
+        <div class="detail-card" style="display:flex;align-items:flex-start;gap:1.5rem;">
+            <div class="logo" style="background: {{ team.logo_color if team else '#999' }};width:80px;height:80px;font-size:1.8rem;flex-shrink:0;">
+                {% if player.jersey_number %}{{ player.jersey_number }}{% else %}?{% endif %}
+            </div>
+            <div class="player-info">
+                <div class="page-title">{{ player.name }}</div>
+                <div class="meta">
+                    {{ player.position }}
+                    {% if team %} &middot; <a href="{{ url_for('sports-esports.team_detail', team_id=team.id) }}" class="team-link">{{ team.name }}</a>{% endif %}
+                    {% if league %} &middot; <a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}" class="team-link">{{ league.abbreviation }}</a>{% endif %}
+                    {% if player.jersey_number %} &middot; #{{ player.jersey_number }}{% endif %}
+                </div>
+            </div>
+            <form action="{{ url_for('sports-esports.toggle_favorite') }}" method="post" style="margin-left: auto;">
+                <input type="hidden" name="player_id" value="{{ player.id }}">
+                <input type="hidden" name="action" value="add">
+                <button type="submit" class="fav-btn">+ Favorite</button>
+            </form>
+        </div>
+
+        {% if player.stats %}
+        <div class="section-title">Statistics</div>
+        <div class="detail-card">
+            {% for key, value in player.stats.items() %}
+            <div class="detail-row">
+                <span class="label">{{ key.replace('_', ' ').title() }}</span>
+                <span>{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File a Claim - Cascadia Insurance &amp; Lending</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; }
+        .header { background: linear-gradient(135deg, #1a3c5e, #2b5f8a); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8fe; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a3c5e; text-decoration: none; font-size: .88rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef4fb; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #1a3c5e; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        .card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        h2 { color: #1a3c5e; font-size: 1.2rem; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .82rem; font-weight: 600; color: #475569; margin-bottom: .3rem; }
+        .form-group select, .form-group input, .form-group textarea { width: 100%; padding: .6rem .8rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .92rem; }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        .btn-submit { background: #059669; color: #fff; border: none; padding: .7rem 2rem; border-radius: .3rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { background: #047857; }
+        .alert { padding: 1rem; border-radius: .3rem; margin-bottom: 1rem; font-size: .9rem; }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('insurance-loans.index') }}">Cascadia <span>Insurance &amp; Lending</span></a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('insurance-loans.index') }}">Dashboard</a>
+        <a href="{{ url_for('insurance-loans.policies_page') }}">Policies</a>
+        <a href="{{ url_for('insurance-loans.claims_page') }}">Claims</a>
+        <a href="{{ url_for('insurance-loans.file_claim_page') }}" class="active">File Claim</a>
+        <a href="{{ url_for('insurance-loans.loans_page') }}">Loans</a>
+        <a href="{{ url_for('insurance-loans.payments_page') }}">Payments</a>
+        {% if logged_in %}
+        <a href="{{ url_for('insurance-loans.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('insurance-loans.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+    <div class="container">
+        <div class="card">
+            <h2>File a New Claim</h2>
+            {% if result == 'success' %}
+            <div class="alert alert-success">Claim <strong>{{ claim_number }}</strong> filed successfully. {% if new_claim_id %}<a href="{{ url_for('insurance-loans.claim_detail', claim_id=new_claim_id) }}">View claim</a> or {% endif %}<a href="{{ url_for('insurance-loans.claims_page') }}">view all claims</a>.</div>
+            {% elif result == 'error_missing' %}
+            <div class="alert alert-error">Please fill in all required fields.</div>
+            {% elif result == 'error_policy' %}
+            <div class="alert alert-error">Policy not found. Please select a valid policy.</div>
+            {% endif %}
+            <form method="post" enctype="multipart/form-data" action="{{ url_for('insurance-loans.file_claim_submit') }}">
+                <div class="form-group">
+                    <label>Policy</label>
+                    <select name="policy_number" required>
+                        <option value="">Select a policy</option>
+                        {% for p in policies %}
+                        <option value="{{ p.policy_number }}">{{ p.policy_number }} - {{ p.type|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Claim Type</label>
+                    <select name="type">
+                        <option value="auto_collision">Auto Collision</option>
+                        <option value="auto_comprehensive">Auto Comprehensive</option>
+                        <option value="homeowners_property">Homeowners Property</option>
+                        <option value="commercial_property_damage">Commercial Property Damage</option>
+                        <option value="commercial_liability">Commercial Liability</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date of Incident</label>
+                    <input type="date" name="date_of_incident" required>
+                </div>
+                <div class="form-group">
+                    <label>Incident Location</label>
+                    <input type="text" name="incident_location" placeholder="Address or location">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" required placeholder="Describe what happened..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Police Report Number (if applicable)</label>
+                    <input type="text" name="police_report_number" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>Supporting Documents (optional)</label>
+                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                </div>
+                <button type="submit" class="btn-submit">Submit Claim</button>
+            </form>
+        </div>
+    </div>
+    <div class="footer">Cascadia Insurance &amp; Lending</div>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{% extends "brokerage/base.html" %}
+{% block title %}Options | TradeVista{% endblock %}
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;padding-top:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <h1 class="rh-section-title" style="font-size:28px;margin-bottom:0;">Options Chain</h1>
+        <form method="GET" action="{{ url_for('brokerage.options_page') }}" style="display:flex;gap:8px;align-items:center;">
+            <select name="underlying" onchange="this.form.submit()" style="padding:8px 16px;border-radius:20px;font-size:13px;">
+                <option value="">All Underlyings</option>
+                {% for u in underlyings %}
+                <option value="{{ u }}" {% if underlying == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+            <select name="type" onchange="this.form.submit()" style="padding:8px 16px;border-radius:20px;font-size:13px;">
+                <option value="">All Types</option>
+                <option value="call" {% if opt_type == 'call' %}selected{% endif %}>Calls</option>
+                <option value="put" {% if opt_type == 'put' %}selected{% endif %}>Puts</option>
+            </select>
+        </form>
+    </div>
+
+    <div class="rh-card">
+        <div style="overflow-x:auto;">
+            <table class="rh-table">
+                <thead>
+                    <tr>
+                        <th>Underlying</th>
+                        <th class="right">Spot</th>
+                        <th>Type</th>
+                        <th class="right">Strike</th>
+                        <th>Expiry</th>
+                        <th class="right">Premium</th>
+                        <th class="right">IV</th>
+                        <th class="right">Delta</th>
+                        <th class="right">Volume</th>
+                        <th class="right">OI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in options %}
+                    <tr>
+                        <td><a href="{{ url_for('brokerage.ticker_detail', symbol=o.underlying) }}" style="font-weight:700;">{{ o.underlying }}</a></td>
+                        <td class="right">{% if o.underlying in tickers_map %}${{ "%.2f"|format(tickers_map[o.underlying].current_price) }}{% endif %}</td>
+                        <td><span class="rh-tag {% if o.type == 'call' %}rh-tag-stock{% else %}rh-tag-crypto{% endif %}">{{ o.type }}</span></td>
+                        <td class="right" style="font-weight:600;">${{ "%.2f"|format(o.strike) }}</td>
+                        <td style="font-size:13px;color:#C9CACC;">{{ o.expiry }}</td>
+                        <td class="right">${{ "%.2f"|format(o.premium) }}</td>
+                        <td class="right">{{ "%.0f"|format(o.iv * 100) }}%</td>
+                        <td class="right">{{ "%.2f"|format(o.delta) }}</td>
+                        <td class="right">{{ "{:,}".format(o.volume) }}</td>
+                        <td class="right">{{ "{:,}".format(o.open_interest) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not options %}
+        <div style="padding:40px;text-align:center;">
+            <div class="rh-label">No options found for the selected filters.</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

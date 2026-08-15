@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Petition - Lakeport Civic Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b4332, #2d6a4f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.4rem; font-weight: 700; }
+        .header h1 span { color: #95d5b2; }
+        .header-nav a { color: #b7e4c7; text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-login { background: #40916c; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #40916c; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .form-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .form-card h2 { font-size: 1.4rem; color: #1b4332; margin-bottom: .4rem; }
+        .form-card .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; color: #334155; margin-bottom: .3rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: .6rem .8rem; border: 1px solid #d1d5db; border-radius: .3rem;
+            font-family: inherit; font-size: .9rem;
+        }
+        .form-group textarea { resize: vertical; min-height: 120px; }
+        .form-group .help { font-size: .75rem; color: #94a3b8; margin-top: .2rem; }
+        .btn-submit { background: #40916c; color: #fff; border: none; padding: .7rem 2rem; border-radius: .4rem; cursor: pointer; font-size: 1rem; font-weight: 600; }
+        .btn-submit:hover { background: #2d6a4f; }
+        .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+        .login-prompt { background: #fef3c7; border: 1px solid #fbbf24; border-radius: .5rem; padding: 1.5rem; text-align: center; }
+        .login-prompt a { color: #92400e; font-weight: 600; }
+        #form-result { margin-top: 1rem; font-size: .9rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('petitions-voting-info.index') }}" style="color:#fff;text-decoration:none;">Lakeport <span>Civic Hub</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a>
+            <a href="{{ url_for('petitions-voting-info.elections_list') }}">Elections</a>
+            <a href="{{ url_for('petitions-voting-info.voter_info_page') }}">Voter Info</a>
+            {% if logged_in %}
+                <a href="{{ url_for('petitions-voting-info.dashboard') }}">Saved &amp; Following</a>
+                <a href="{{ url_for('petitions-voting-info.logout') }}" class="btn-login">Logout ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('petitions-voting-info.login_page') }}" class="btn-login">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('petitions-voting-info.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a> &rsaquo;
+            Create Petition
+        </div>
+
+        {% if not logged_in %}
+        <div class="login-prompt">
+            <p>You need to <a href="{{ url_for('petitions-voting-info.login_page') }}">sign in</a> to create a petition.</p>
+        </div>
+        {% else %}
+        <div class="form-card">
+            <h2>Start a New Petition</h2>
+            <p class="subtitle">Rally your community around an issue that matters.</p>
+            <form id="create-form">
+                <div class="form-group">
+                    <label for="title">Petition Title</label>
+                    <input type="text" id="title" name="title" required placeholder="e.g., Add crosswalk at Elm and 5th">
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" required placeholder="Describe the issue and what action you want taken..."></textarea>
+                    <div class="help">Be specific about the problem and the solution you are proposing.</div>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" name="category">
+                        {% for c in categories %}
+                        <option value="{{ c }}">{{ c | replace('_', ' ') | title }}</option>
+                        {% endfor %}
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="signatures_required">Signature Goal</label>
+                    <input type="number" id="signatures_required" name="signatures_required" value="300" min="50" max="5000">
+                    <div class="help">How many signatures do you want to collect?</div>
+                </div>
+                <div class="form-group">
+                    <label for="deadline">Deadline (optional)</label>
+                    <input type="date" id="deadline" name="deadline">
+                </div>
+                <div class="form-group">
+                    <label for="tags">Tags (comma-separated)</label>
+                    <input type="text" id="tags" name="tags" placeholder="e.g., safety, downtown, schools">
+                </div>
+                <button type="submit" class="btn-submit" id="btn-submit">Create Petition</button>
+                <div id="form-result"></div>
+            </form>
+        </div>
+        <script>
+        document.getElementById('create-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('btn-submit');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            var tagsRaw = document.getElementById('tags').value;
+            var tags = tagsRaw ? tagsRaw.split(',').map(function(t){ return t.trim(); }).filter(Boolean) : [];
+            var deadline = document.getElementById('deadline').value;
+            var body = {
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                category: document.getElementById('category').value,
+                signatures_required: parseInt(document.getElementById('signatures_required').value) || 300,
+                tags: tags,
+                deadline: deadline ? deadline + 'T23:59:59Z' : ''
+            };
+            fetch('{{ url_for("petitions-voting-info.api_petitions_create") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            }).then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                var el = document.getElementById('form-result');
+                if (res.ok) {
+                    el.style.color = '#065f46';
+                    el.innerHTML = 'Petition created! <a href="/sites/petitions-voting-info/petition/' + res.data.id + '">View it here</a>.';
+                } else {
+                    el.style.color = '#b91c1c';
+                    el.textContent = res.data.error || 'Error creating petition.';
+                    btn.disabled = false;
+                    btn.textContent = 'Create Petition';
+                }
+            });
+        });
+        </script>
+        {% endif %}
+    </div>
+
+    <div class="footer">Lakeport Civic Hub</div>
+</body>
+</html>

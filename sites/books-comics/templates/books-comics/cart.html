@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cart -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .cart-item { border-bottom: 1px solid #f5efe6; padding: .8rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .cart-item a { color: #8b4513; text-decoration: none; font-size: .95rem; }
+        .cart-item a:hover { text-decoration: underline; }
+        .cart-meta { font-size: .82rem; color: #a09080; }
+        .cart-price { font-weight: 600; color: #8b4513; }
+        .cart-total { font-size: 1.2rem; font-weight: 600; color: #2d2d2d; margin: 1rem 0; text-align: right; }
+        .btn { padding: .5rem 1rem; border: 1px solid #d4c5b0; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #6b5b4f; }
+        .btn:hover { background: #f5efe6; }
+        .btn-primary { background: #8b4513; color: #fff; border-color: #8b4513; text-decoration: none; display: inline-block; }
+        .btn-primary:hover { background: #a0522d; }
+        .empty { color: #a09080; text-align: center; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div>
+            <a href="{{ url_for('books-comics.dashboard') }}" style="font-size:.85rem;color:#6b5b4f;text-decoration:none;margin-right:1rem">My Library</a>
+            <a href="/" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h2>Shopping Cart</h2>
+
+        {% if cart_items %}
+        {% for item in cart_items %}
+        <div class="cart-item">
+            <div>
+                <a href="{{ url_for('books-comics.book_detail', book_id=item.id) }}">{{ item.title }}</a>
+                <div class="cart-meta">{{ item.authors_str }} -- {{ item.category }}</div>
+            </div>
+            <span class="cart-price">{{ item.price_str }}</span>
+        </div>
+        {% endfor %}
+
+        <div class="cart-total">Total: ${{ "%.2f"|format(total) }}</div>
+        <div style="text-align:right">
+            <a href="{{ url_for('books-comics.checkout_page') }}" class="btn btn-primary">Proceed to Checkout</a>
+        </div>
+        {% else %}
+        <div class="empty">
+            <p>Your cart is empty.</p>
+            <a href="{{ url_for('books-comics.index') }}" class="btn btn-primary">Browse Books</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

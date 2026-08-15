@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Base Converter -- CalcTools</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a73e8; color: #fff; padding: .9rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: rgba(255,255,255,.85); text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .container { max-width: 600px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .tool-title { font-size: 1.5rem; color: #1a73e8; margin-bottom: .5rem; }
+        .tool-desc { color: #666; margin-bottom: 1.5rem; }
+        .converter-box { background: #fff; border: 1px solid #e0e0e0; border-radius: .5rem; padding: 1.5rem; }
+        .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-end; }
+        .form-group { flex: 1; }
+        .form-group label { display: block; font-size: .85rem; color: #555; margin-bottom: .3rem; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: 1rem; }
+        .btn-convert { width: 100%; padding: .75rem; background: #1a73e8; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; cursor: pointer; margin-top: .5rem; }
+        .btn-convert:hover { background: #1557b0; }
+        .result-box { margin-top: 1.5rem; padding: 1.2rem; background: #e8f0fe; border-radius: .4rem; text-align: center; display: none; }
+        .result-box .result-value { font-size: 1.8rem; color: #1a73e8; font-weight: 700; word-break: break-all; }
+        .result-box .result-label { font-size: .9rem; color: #555; margin-top: .3rem; }
+        .back-link { display: inline-block; margin-bottom: 1rem; color: #1a73e8; text-decoration: none; font-size: .9rem; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('converters-calculators.index') }}">CalcTools</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('converters-calculators.index') }}">Home</a>
+            {% if user %}
+            <a href="{{ url_for('converters-calculators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('converters-calculators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('converters-calculators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="{{ url_for('converters-calculators.index') }}" class="back-link">&larr; All Tools</a>
+        <h2 class="tool-title">{{ tool.name }}</h2>
+        <p class="tool-desc">{{ tool.description }}</p>
+
+        <div class="converter-box">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="from-value">Number</label>
+                    <input type="text" id="from-value" value="255" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="from-base">From Base</label>
+                    <select id="from-base">
+                        <option value="10" selected>Decimal (10)</option>
+                        <option value="2">Binary (2)</option>
+                        <option value="8">Octal (8)</option>
+                        <option value="16">Hexadecimal (16)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="to-base">To Base</label>
+                    <select id="to-base">
+                        <option value="10">Decimal (10)</option>
+                        <option value="2" selected>Binary (2)</option>
+                        <option value="8">Octal (8)</option>
+                        <option value="16">Hexadecimal (16)</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn-convert" onclick="doConvert()">Convert</button>
+        </div>
+
+        <div class="result-box" id="result-box">
+            <div class="result-value" id="result-value"></div>
+            <div class="result-label" id="result-label"></div>
+        </div>
+    </div>
+
+    <script>
+    function doConvert() {
+        var value = document.getElementById('from-value').value;
+        var fromBase = document.getElementById('from-base').value;
+        var toBase = document.getElementById('to-base').value;
+        fetch('{{ url_for("converters-calculators.api_convert_base") }}?value=' + encodeURIComponent(value) + '&from=' + fromBase + '&to=' + toBase)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    document.getElementById('result-value').textContent = 'Error';
+                    document.getElementById('result-label').textContent = data.error;
+                } else {
+                    document.getElementById('result-value').textContent = data.result;
+                    var fromSel = document.getElementById('from-base');
+                    var toSel = document.getElementById('to-base');
+                    document.getElementById('result-label').textContent =
+                        value + ' (base ' + fromBase + ') = ' + data.result + ' (base ' + toBase + ') [decimal: ' + data.decimal + ']';
+                }
+                document.getElementById('result-box').style.display = 'block';
+            });
+    }
+    </script>
+</body>
+</html>

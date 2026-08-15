@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petitions - Lakeport Civic Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b4332, #2d6a4f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.4rem; font-weight: 700; }
+        .header h1 span { color: #95d5b2; }
+        .header-nav a { color: #b7e4c7; text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-login { background: #40916c; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .page-title { font-size: 1.5rem; color: #1b4332; margin-bottom: .5rem; }
+        .page-subtitle { color: #64748b; font-size: .9rem; margin-bottom: 1.5rem; }
+        .filters { background: #fff; border-radius: .5rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        .filters label { font-size: .8rem; color: #64748b; font-weight: 600; }
+        .filters select { padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; background: #fff; }
+        .filters .btn-filter { background: #40916c; color: #fff; border: none; padding: .45rem 1rem; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
+        .filters .btn-filter:hover { background: #2d6a4f; }
+        .filters .btn-create { background: #52b788; color: #fff; padding: .45rem 1rem; border-radius: .3rem; text-decoration: none; font-size: .85rem; font-weight: 600; margin-left: auto; }
+        .filters .btn-create:hover { background: #40916c; }
+        .petition-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: .8rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .petition-card h3 { font-size: 1.05rem; margin-bottom: .4rem; }
+        .petition-card h3 a { color: #1b4332; text-decoration: none; }
+        .petition-card h3 a:hover { text-decoration: underline; }
+        .petition-card .desc { font-size: .85rem; color: #475569; line-height: 1.5; margin-bottom: .6rem; }
+        .petition-card .meta { font-size: .8rem; color: #64748b; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; font-weight: 600; }
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-won { background: #fef3c7; color: #92400e; }
+        .badge-closed { background: #e5e7eb; color: #374151; }
+        .progress-bar { background: #e5e7eb; border-radius: .25rem; height: 6px; width: 120px; overflow: hidden; display: inline-block; vertical-align: middle; }
+        .progress-bar-fill { background: #40916c; height: 100%; border-radius: .25rem; }
+        .tag { display: inline-block; background: #f0fdf4; color: #166534; padding: .1rem .4rem; border-radius: .2rem; font-size: .7rem; margin-right: .3rem; }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('petitions-voting-info.index') }}" style="color:#fff;text-decoration:none;">Lakeport <span>Civic Hub</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a>
+            <a href="{{ url_for('petitions-voting-info.elections_list') }}">Elections</a>
+            <a href="{{ url_for('petitions-voting-info.voter_info_page') }}">Voter Info</a>
+            {% if logged_in %}
+                <a href="{{ url_for('petitions-voting-info.dashboard') }}">Saved &amp; Following</a>
+                <a href="{{ url_for('petitions-voting-info.logout') }}" class="btn-login">Logout ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('petitions-voting-info.login_page') }}" class="btn-login">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">Community Petitions</h2>
+        <p class="page-subtitle">Browse, filter, and sign petitions that matter to Lakeport.</p>
+
+        <form class="filters" method="get" action="{{ url_for('petitions-voting-info.petitions_list') }}">
+            <div style="flex:1 1 200px;">
+                <label>Search</label><br>
+                <input type="text" name="q" value="{{ q }}" placeholder="Search petitions..." style="padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;width:100%;">
+            </div>
+            <div>
+                <label>Status</label><br>
+                <select name="status">
+                    <option value="">All</option>
+                    {% for s in statuses %}
+                    <option value="{{ s }}" {% if s == current_status %}selected{% endif %}>{{ s | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Category</label><br>
+                <select name="category">
+                    <option value="">All</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {% if c == current_category %}selected{% endif %}>{{ c | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Sort by</label><br>
+                <select name="sort">
+                    <option value="date" {% if current_sort == 'date' %}selected{% endif %}>Date</option>
+                    <option value="signatures" {% if current_sort == 'signatures' %}selected{% endif %}>Signatures</option>
+                    <option value="title" {% if current_sort == 'title' %}selected{% endif %}>Title</option>
+                </select>
+            </div>
+            <div>
+                <label>Order</label><br>
+                <select name="order">
+                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Descending</option>
+                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Ascending</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-filter">Filter</button>
+            <a href="{{ url_for('petitions-voting-info.create_petition_page') }}" class="btn-create">+ New Petition</a>
+        </form>
+
+        {% if petitions %}
+            {% for p in petitions %}
+            <div class="petition-card">
+                <h3><a href="{{ url_for('petitions-voting-info.petition_detail', petition_id=p.id) }}">{{ p.title }}</a></h3>
+                <div class="desc">{{ p.description[:180] }}{% if p.description|length > 180 %}...{% endif %}</div>
+                <div class="meta">
+                    <span class="badge badge-{{ p.status }}">{{ p.status }}</span>
+                    <span>{{ p.category | replace('_', ' ') | title }}</span>
+                    <span>by {{ p.creator_name }}</span>
+                    <span>
+                        {{ p.signatures_current }} / {{ p.signatures_required }} signatures
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: {{ (p.signatures_current / p.signatures_required * 100) | round(1) }}%"></div>
+                        </div>
+                    </span>
+                </div>
+                {% if p.tags %}
+                <div style="margin-top:.4rem;">
+                    {% for tag in p.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">No petitions match your filters.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">Lakeport Civic Hub</div>
+</body>
+</html>

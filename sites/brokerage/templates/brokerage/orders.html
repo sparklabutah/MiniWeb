@@ -1,0 +1,78 @@
+{% extends "brokerage/base.html" %}
+{% block title %}History | TradeVista{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding-top:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+        <h1 class="rh-section-title" style="font-size:28px;margin-bottom:0;">History</h1>
+        <form method="GET" action="{{ url_for('brokerage.orders_page') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select name="status" style="padding:8px 16px;border-radius:20px;font-size:13px;">
+                <option value="">All Orders</option>
+                <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open</option>
+                <option value="filled" {% if status_filter == 'filled' %}selected{% endif %}>Filled</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+            <label style="font-size:13px;color:#6F7782;">From: <input type="date" name="date_from" value="{{ date_from }}" style="padding:6px 10px;border-radius:20px;font-size:13px;border:1px solid #2F3336;background:#1E2124;color:#fff;"></label>
+            <label style="font-size:13px;color:#6F7782;">To: <input type="date" name="date_to" value="{{ date_to }}" style="padding:6px 10px;border-radius:20px;font-size:13px;border:1px solid #2F3336;background:#1E2124;color:#fff;"></label>
+            <button type="submit" style="padding:6px 16px;border-radius:20px;font-size:13px;background:#00C805;color:#fff;border:none;cursor:pointer;">Apply</button>
+        </form>
+    </div>
+
+    <div class="rh-card">
+        <div style="overflow-x:auto;">
+            <table class="rh-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Side</th>
+                        <th>Type</th>
+                        <th class="right">Qty</th>
+                        <th class="right">Price</th>
+                        <th class="right">Filled</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('brokerage.ticker_detail', symbol=o.symbol) }}" style="font-weight:700;">{{ o.symbol }}</a>
+                        </td>
+                        <td>
+                            <span class="{% if o.side == 'buy' %}rh-green{% else %}rh-red{% endif %}" style="font-weight:600;text-transform:uppercase;font-size:13px;">
+                                {{ o.side }}
+                            </span>
+                        </td>
+                        <td style="font-size:13px;color:#C9CACC;">{{ o.order_type|title }}</td>
+                        <td class="right">{{ o.quantity }}</td>
+                        <td class="right">{% if o.price %}${{ "%.2f"|format(o.price) }}{% else %}<span class="rh-muted">Market</span>{% endif %}</td>
+                        <td class="right">{% if o.filled_price %}${{ "%.2f"|format(o.filled_price) }}{% else %}<span class="rh-muted">--</span>{% endif %}</td>
+                        <td>
+                            <span class="rh-tag {% if o.status == 'filled' %}rh-tag-stock{% elif o.status == 'open' %}rh-tag-index_fund{% else %}rh-tag-crypto{% endif %}">
+                                {{ o.status|title }}
+                            </span>
+                        </td>
+                        <td style="font-size:13px;color:#6F7782;">{{ o.created_at[:16].replace('T', ' ') }}</td>
+                        <td>
+                            {% if o.status == 'open' %}
+                            <form method="post" action="{{ url_for('brokerage.form_cancel_order', order_id=o.id) }}" style="display:inline;">
+                                <button type="submit" class="rh-btn rh-btn-outline rh-btn-xs">Cancel</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not orders %}
+        <div style="padding:40px;text-align:center;">
+            <div style="font-size:18px;font-weight:700;margin-bottom:8px;">No orders yet</div>
+            <div class="rh-label" style="margin-bottom:16px;">Your order history will appear here.</div>
+            <a href="{{ url_for('brokerage.trade_page') }}" class="rh-btn rh-btn-primary">Place a Trade</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MiniWeb — Macro Template Builder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+.top-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: 1rem; }
+.top-bar h1 { font-size: 1rem; font-weight: 700; }
+.top-bar a { color: #2563eb; font-size: .85rem; text-decoration: none; }
+.container { display: flex; height: calc(100vh - 45px); }
+.sidebar { width: 320px; background: #fff; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: .8rem; }
+.main { flex: 1; overflow-y: auto; padding: 1rem; }
+
+.macro-card { padding: .4rem .5rem; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .3rem; cursor: pointer; font-size: .78rem; }
+.macro-card:hover { background: #f1f5f9; }
+.macro-card.active { border-color: #2563eb; background: #eff6ff; }
+.macro-card .mc-name { font-weight: 600; color: #1e293b; font-family: monospace; font-size: .74rem; }
+.macro-card .mc-meta { color: #94a3b8; font-size: .66rem; margin-top: .1rem; }
+.verb-head { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; font-weight: 700; margin: .7rem 0 .3rem; }
+
+.section { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .8rem; margin-bottom: .8rem; }
+.section h3 { font-size: .9rem; margin-bottom: .4rem; }
+.section .hint { font-size: .78rem; color: #64748b; margin-bottom: .5rem; }
+label { display: block; font-size: .72rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: .2rem; }
+.badge { display: inline-block; font-size: .63rem; padding: .1rem .4rem; border-radius: 1rem; font-weight: 600; }
+.badge-tmpl { background: #dcfce7; color: #166534; }
+.badge-none { background: #f1f5f9; color: #94a3b8; }
+.badge-sugg { background: #ede9fe; color: #6d28d9; }
+.sugg-banner { background:#f5f3ff; border:1px solid #ddd6fe; color:#5b21b6; border-radius:.35rem; padding:.45rem .6rem; font-size:.76rem; margin-bottom:.5rem; }
+.sig-high { color: #166534; font-weight: 700; }
+.sig-medium { color: #a16207; font-weight: 600; }
+.sig-low { color: #94a3b8; }
+.sig-noise { color: #cbd5e1; }
+
+.btn { padding: .35rem .7rem; border-radius: .3rem; border: 1px solid #d1d5db; background:#fff; cursor: pointer; font-size: .76rem; font-weight: 500; }
+.btn-primary { background: #2563eb; color: #fff; border-color:#2563eb; } .btn-primary:hover { background: #1d4ed8; }
+.btn-sm { padding: .15rem .45rem; font-size: .68rem; }
+.btn-danger { color:#b91c1c; border-color:#fecaca; }
+
+table.obs { width:100%; border-collapse: collapse; font-size:.74rem; }
+table.obs th { text-align:left; color:#94a3b8; font-weight:600; font-size:.66rem; text-transform:uppercase; padding:.2rem .4rem; border-bottom:1px solid #e2e8f0; }
+table.obs td { padding:.25rem .4rem; border-bottom:1px solid #f1f5f9; font-family:monospace; }
+
+/* tree editor */
+.group { border:1px solid #cbd5e1; border-radius:.4rem; padding:.5rem; margin:.4rem 0; background:#fafbfc; }
+.group.op-OR { border-color:#f59e0b; background:#fffbeb; }
+.group-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
+.op-toggle { font-weight:700; font-size:.72rem; padding:.15rem .5rem; border-radius:.3rem; cursor:pointer; border:1px solid; }
+.op-AND { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.op-OR2 { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+.leaf { border:1px solid #e2e8f0; border-radius:.35rem; padding:.5rem; margin:.35rem 0; background:#fff; }
+.leaf-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }
+.param-row { display:flex; align-items:center; gap:.5rem; margin:.2rem 0; font-size:.76rem; }
+.param-name { font-family:monospace; min-width:90px; color:#475569; font-size:.72rem; }
+.mode-btn { font-size:.64rem; padding:.1rem .4rem; border-radius:.25rem; border:1px solid #d1d5db; background:#fff; cursor:pointer; }
+.mode-fixed { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.mode-open  { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
+.mode-unset { background:#f8fafc; color:#94a3b8; }
+.param-input { flex:1; padding:.25rem .4rem; border:1px solid #cbd5e1; border-radius:.25rem; font-size:.75rem; font-family:inherit; }
+select.param-input { font-family:inherit; }
+.mono { font-family:monospace; font-size:.72rem; background:#0f172a; color:#e2e8f0; padding:.6rem; border-radius:.35rem; white-space:pre; overflow:auto; max-height:340px; }
+.helptext { font-size:.68rem; color:#94a3b8; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+    <h1>Macro Template Builder</h1>
+    <a href="/annotate/verify">← Verifier Builder</a>
+    <a href="/annotate/">Annotator</a>
+    <span style="flex:1"></span>
+    <a href="/annotate/api/macro_sheet.csv" download="refined_macro_set.csv" class="btn"
+        style="padding:.25rem .7rem;font-size:.74rem;background:#ecfdf5;color:#047857;border-color:#a7f3d0;font-weight:600;text-decoration:none"
+        title="Download all macros + reasoning ops as a CSV">⬇ Macro set CSV</a>
+    <button onclick="suggestAll()" id="suggest-all-btn" class="btn"
+        style="padding:.25rem .7rem;font-size:.74rem;background:#ede9fe;color:#6d28d9;border-color:#ddd6fe;font-weight:600">
+        Suggest rest with AI
+    </button>
+    <span id="tmpl-count" style="font-size:.75rem;color:#94a3b8"></span>
+</div>
+
+<div class="container">
+    <div class="sidebar">
+        <input type="text" id="macro-search" placeholder="Search macros..." oninput="filterMacros(this.value)"
+            style="width:100%;padding:.3rem .5rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem;margin-bottom:.3rem">
+        <div id="macro-list">
+        {% set ns = namespace(verb='') %}
+        {% for m in macros %}
+            {% if m.verb != ns.verb %}<div class="verb-head">{{ m.verb }}</div>{% set ns.verb = m.verb %}{% endif %}
+            <div class="macro-card {% if m.macro == selected %}active{% endif %}"
+                 data-macro="{{ m.macro }}" data-search="{{ m.macro }} {{ m.description|lower }}"
+                 onclick="selectMacro('{{ m.macro }}')">
+                <div class="mc-name">{{ m.macro }}
+                    {% if m.suggested %}<span class="badge badge-sugg" data-tmpl-badge>AI</span>
+                    {% elif m.has_template %}<span class="badge badge-tmpl" data-tmpl-badge>✓</span>
+                    {% else %}<span class="badge badge-none" data-tmpl-badge>—</span>{% endif %}
+                </div>
+                <div class="mc-meta">{{ m.task_count }} tasks · {{ m.site_count }} sites</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="main" id="main">
+        <div class="section"><p class="hint">Loading…</p></div>
+    </div>
+</div>
+
+<script>
+var CHECK_SCHEMA = {{ check_schema | tojson }};
+var SELECTED = {{ selected | tojson }};
+var TREE = null;   // current template UI model (root group) or null
+
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------- sidebar ----------
+function filterMacros(q) {
+    q = (q||'').toLowerCase();
+    document.querySelectorAll('.macro-card').forEach(function(c){
+        c.style.display = c.dataset.search.indexOf(q) >= 0 ? '' : 'none';
+    });
+}
+function selectMacro(macro) {
+    SELECTED = macro;
+    document.querySelectorAll('.macro-card').forEach(function(c){
+        c.classList.toggle('active', c.dataset.macro === macro);
+    });
+    history.replaceState(null, '', '/annotate/macro-templates?macro=' + encodeURIComponent(macro));
+    loadMacro(macro);
+}
+
+// ---------- load ----------
+function loadMacro(macro) {
+    document.getElementById('main').innerHTML = '<div class="section"><p class="hint">Loading ' + macro + '…</p></div>';
+    Promise.all([
+        fetch('/annotate/api/macro_usage/' + macro).then(function(r){return r.json();}),
+        fetch('/annotate/api/macro_template/' + macro).then(function(r){return r.json();})
+    ]).then(function(res){
+        var usage = res[0], tmpl = res[1].template;
+        TREE = tmpl ? fromStorage(tmpl) : {kind:'group', op:'AND', checks:[]};
+        renderMain(macro, usage, tmpl && tmpl._suggested);
+    });
+}
+
+// ---------- storage <-> UI model ----------
+function fromStorage(node) {
+    if (node && node.op) {
+        return {kind:'group', op:node.op, label:node.label||'', checks:(node.checks||[]).map(fromStorage)};
+    }
+    var type = node.type;
+    var schema = CHECK_SCHEMA[type];
+    var params = {};
+    if (schema) {
+        Object.keys(schema.params).forEach(function(p){
+            var v = node[p];
+            if (v === undefined) params[p] = {mode:'unset'};
+            else if (v && typeof v === 'object' && v.open === true) params[p] = {mode:'open'};
+            else params[p] = {mode:'fixed', value:v};
+        });
+    }
+    return {kind:'leaf', type:type, label:node.label||'', params:params};
+}
+function toStorage(node) {
+    if (node.kind === 'group') {
+        var g = {op:node.op, checks:node.checks.map(toStorage)};
+        if (node.label) g.label = node.label;
+        return g;
+    }
+    var out = {type:node.type};
+    if (node.label) out.label = node.label;
+    var schema = CHECK_SCHEMA[node.type];
+    Object.keys(node.params).forEach(function(p){
+        var pr = node.params[p], kind = schema.params[p].kind;
+        if (pr.mode === 'open') out[p] = {open:true};
+        else if (pr.mode === 'fixed') {
+            var v = pr.value;
+            if (v === undefined || v === '' || v === null) return;  // fixed-but-empty = not asserted
+            if (kind === 'list' && typeof v === 'string') v = v.split(',').map(function(s){return s.trim();}).filter(Boolean);
+            if (kind === 'dict' && typeof v === 'string') { try { v = JSON.parse(v); } catch(e){ /* leave as string, save will surface it */ } }
+            out[p] = v;
+        }
+        // unset -> omit
+    });
+    return out;
+}
+
+// ---------- render main ----------
+function renderMain(macro, usage, suggested) {
+    var m = document.getElementById('main');
+    m.innerHTML = '';
+    if (suggested) {
+        var b = document.createElement('div');
+        b.className = 'sugg-banner';
+        b.innerHTML = '🤖 <b>AI-suggested draft</b> — review the checks, fix anything wrong, then <b>Save</b> to confirm it (the AI badge clears once you do).';
+        m.appendChild(b);
+    }
+
+    // header + usage
+    var head = document.createElement('div');
+    head.className = 'section';
+    var obsRows = usage.observed.map(function(o){
+        var shapes = Object.keys(o.value_shapes).map(function(s){return s+':'+o.value_shapes[s];}).join(' ');
+        var ex = (o.examples||[]).join(', ');
+        return '<tr><td class="sig-'+o.signal+'">'+o.action+'</td><td>'+o.count+'</td>'+
+               '<td class="sig-'+o.signal+'">'+o.signal+'</td><td>'+shapes+'</td>'+
+               '<td style="color:#94a3b8">'+ex+'</td></tr>';
+    }).join('');
+    // per-website locations
+    var locRows = (usage.locations||[]).map(function(l){
+        var items = l.locations.map(function(s){return '<div style="color:#475569">'+esc(s)+'</div>';}).join('');
+        return '<tr><td style="font-family:monospace;color:#2563eb;vertical-align:top;white-space:nowrap">'+esc(l.site)+'</td>'+
+               '<td style="font-family:inherit">'+(items||'<span class="helptext">—</span>')+'</td></tr>';
+    }).join('');
+    head.innerHTML =
+        // NL description above
+        '<div style="font-size:1rem;font-weight:600;line-height:1.4;color:#1e293b">'+esc(usage.description||'(no description)')+'</div>'+
+        // tag name below
+        '<div style="margin-top:.25rem"><span style="font-family:monospace;font-size:.82rem;color:#2563eb;background:#eff6ff;padding:.1rem .45rem;border-radius:.25rem">'+esc(macro)+'</span>'+
+          (usage.verb ? ' <span class="helptext">'+esc(usage.verb)+' · '+esc(usage.modality)+'</span>' : '')+'</div>'+
+        (usage.example ? '<div class="helptext" style="margin-top:.35rem;font-style:italic">e.g. '+esc(usage.example)+'</div>' : '')+
+        '<div style="font-size:.8rem;color:#475569;margin:.6rem 0 .3rem">Used in <b>'+usage.task_count+'</b> tasks across <b>'+usage.site_count+'</b> websites</div>'+
+        // locations on different websites
+        (locRows ?
+          '<details style="margin-bottom:.5rem"><summary style="cursor:pointer;font-size:.75rem;font-weight:600;color:#64748b;text-transform:uppercase">Where it appears ('+usage.site_count+' sites)</summary>'+
+            '<table class="obs" style="margin-top:.3rem"><tr><th>website</th><th>location</th></tr>'+locRows+'</table></details>'
+          : '')+
+        (usage.observed.length ?
+          '<label>Observed actions in this macro\'s spans</label>'+
+          '<table class="obs"><tr><th>action</th><th>#</th><th>signal</th><th>value shapes</th><th>examples</th></tr>'+obsRows+'</table>'
+          : '<p class="helptext">No tagged action spans recorded for this macro yet.</p>');
+    m.appendChild(head);
+
+    // builder
+    var build = document.createElement('div');
+    build.className = 'section';
+    build.innerHTML =
+        '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">'+
+          '<h3 style="margin:0">Verifier Template</h3>'+
+          '<span class="helptext" style="flex:1">arbitrarily nested AND / OR of check primitives · fix a param or leave it open</span>'+
+          '<label style="margin:0">Prefill from</label>'+
+          '<select id="prefill-select" onchange="prefillFrom(this.value)" '+
+            'style="width:auto;padding:.2rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.72rem">'+
+            '<option value="">— copy an existing template —</option>'+
+          '</select>'+
+        '</div>'+
+        '<div id="tree-root"></div>'+
+        '<div style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center">'+
+          '<button class="btn btn-primary" onclick="saveTemplate()">Save template</button>'+
+          '<button class="btn btn-danger" onclick="deleteTemplate()">Delete</button>'+
+          '<span id="save-msg" class="helptext"></span>'+
+        '</div>';
+    m.appendChild(build);
+    renderTree();
+    populatePrefill(macro);
+
+    // spec preview
+    var prev = document.createElement('div');
+    prev.className = 'section';
+    prev.innerHTML = '<label>Stored spec (YAML on disk, shown as JSON)</label><div id="spec-preview" class="mono"></div>';
+    m.appendChild(prev);
+    renderPreview();
+}
+
+// ---------- prefill from an existing template ----------
+function populatePrefill(currentMacro) {
+    fetch('/annotate/api/macro_templates').then(function(r){return r.json();}).then(function(d){
+        var sel = document.getElementById('prefill-select');
+        if (!sel) return;
+        (d.macros||[]).forEach(function(m){
+            if (m === currentMacro) return;   // don't offer to copy from itself
+            var o = document.createElement('option'); o.value = m; o.textContent = m;
+            sel.appendChild(o);
+        });
+    });
+}
+function prefillFrom(macro) {
+    if (!macro) return;
+    if (TREE && TREE.checks && TREE.checks.length &&
+        !confirm('Replace the current template with a copy of "' + macro + '"?')) {
+        document.getElementById('prefill-select').value = '';
+        return;
+    }
+    fetch('/annotate/api/macro_template/' + macro).then(function(r){return r.json();}).then(function(d){
+        if (!d.template) return;
+        TREE = fromStorage(d.template);   // a copy — not saved until you Save
+        renderTree();
+        document.getElementById('prefill-select').value = '';
+        document.getElementById('save-msg').textContent = 'copied from ' + macro + ' — edit and Save';
+    });
+}
+
+// ---------- tree editor ----------
+function renderTree() {
+    var root = document.getElementById('tree-root');
+    root.innerHTML = '';
+    root.appendChild(renderGroup(TREE, null, null));
+    renderPreview();
+}
+function renderGroup(node, parent, idx) {
+    var box = document.createElement('div');
+    box.className = 'group op-' + node.op;
+    var head = document.createElement('div');
+    head.className = 'group-head';
+    var op = document.createElement('button');
+    op.className = 'op-toggle ' + (node.op === 'AND' ? 'op-AND' : 'op-OR2');
+    op.textContent = node.op;
+    op.title = 'toggle AND / OR';
+    op.onclick = function(){ node.op = (node.op === 'AND' ? 'OR' : 'AND'); renderTree(); };
+    head.appendChild(op);
+    head.insertAdjacentHTML('beforeend', '<span class="helptext">'+(node.op==='AND'?'all must pass':'any may pass')+'</span>');
+    head.appendChild(mkLabelInput(node, 'name this group (e.g. "rating submitted")'));
+    var spacer = document.createElement('span'); spacer.style.flex='1'; head.appendChild(spacer);
+    var addC = mkBtn('+ check', function(){ node.checks.push(newLeaf()); renderTree(); });
+    var addG = mkBtn('+ group', function(){ node.checks.push({kind:'group', op:'AND', label:'', checks:[]}); renderTree(); });
+    head.appendChild(addC); head.appendChild(addG);
+    if (parent) {
+        var del = mkBtn('✕', function(){ parent.checks.splice(idx,1); renderTree(); });
+        del.classList.add('btn-danger');
+        head.appendChild(del);
+    }
+    box.appendChild(head);
+    node.checks.forEach(function(ch, i){
+        box.appendChild(ch.kind === 'group' ? renderGroup(ch, node, i) : renderLeaf(ch, node, i));
+    });
+    if (!node.checks.length) box.insertAdjacentHTML('beforeend', '<p class="helptext" style="margin-left:.3rem">empty — add a check or group</p>');
+    return box;
+}
+function renderLeaf(node, parent, idx) {
+    var box = document.createElement('div');
+    box.className = 'leaf';
+    var head = document.createElement('div'); head.className = 'leaf-head';
+    var sel = document.createElement('select'); sel.className = 'param-input'; sel.style.flex='0 0 200px';
+    Object.keys(CHECK_SCHEMA).forEach(function(t){
+        if (t.charAt(0)==='_') return;
+        var o = document.createElement('option'); o.value=t; o.textContent=CHECK_SCHEMA[t].label||t;
+        if (t===node.type) o.selected=true; sel.appendChild(o);
+    });
+    sel.onchange = function(){ var l = newLeaf(sel.value); l.label = node.label||''; parent.checks[idx]=l; renderTree(); };
+    head.appendChild(sel);
+    head.appendChild(mkLabelInput(node, 'name this check (optional)'));
+    head.insertAdjacentHTML('beforeend', '<span class="helptext" style="flex:1">'+(CHECK_SCHEMA[node.type].help||'')+'</span>');
+    var del = mkBtn('✕', function(){ parent.checks.splice(idx,1); renderTree(); });
+    del.classList.add('btn-danger','btn-sm'); head.appendChild(del);
+    box.appendChild(head);
+
+    var schema = CHECK_SCHEMA[node.type];
+    Object.keys(schema.params).forEach(function(p){
+        box.appendChild(renderParam(node, p, schema.params[p]));
+    });
+    return box;
+}
+function renderParam(node, p, pspec) {
+    var row = document.createElement('div'); row.className='param-row';
+    var pr = node.params[p];
+    row.insertAdjacentHTML('beforeend', '<span class="param-name">'+p+'</span>');
+    // mode cycle: fixed -> open -> unset
+    var mode = document.createElement('button');
+    mode.className = 'mode-btn mode-' + pr.mode;
+    mode.textContent = pr.mode;
+    mode.title = 'cycle fixed / open / unset';
+    mode.onclick = function(){
+        pr.mode = pr.mode === 'fixed' ? 'open' : (pr.mode === 'open' ? 'unset' : 'fixed');
+        renderTree();
+    };
+    row.appendChild(mode);
+    if (pr.mode === 'fixed') {
+        row.appendChild(renderFixedInput(pr, pspec));
+    } else if (pr.mode === 'open') {
+        row.insertAdjacentHTML('beforeend', '<span class="helptext">filled per task</span>');
+    } else {
+        row.insertAdjacentHTML('beforeend', '<span class="helptext">not asserted</span>');
+    }
+    return row;
+}
+function renderFixedInput(pr, pspec) {
+    var el;
+    if (pspec.kind === 'enum') {
+        el = document.createElement('select'); el.className='param-input';
+        var blank = document.createElement('option'); blank.value=''; blank.textContent='— choose —'; el.appendChild(blank);
+        pspec.options.forEach(function(opt){
+            var o=document.createElement('option'); o.value=opt; o.textContent=opt;
+            if (String(pr.value)===String(opt)) o.selected=true; el.appendChild(o);
+        });
+        el.onchange=function(){ pr.value = el.value; renderPreview(); };
+    } else {
+        el = document.createElement('input'); el.className='param-input';
+        el.value = (pr.value !== undefined && typeof pr.value === 'object') ? JSON.stringify(pr.value) : (pr.value || '');
+        el.placeholder = pspec.kind === 'dict' ? '{"field":"value"}' : (pspec.kind === 'list' ? 'a, b, c' : 'value');
+        el.oninput=function(){ pr.value = el.value; renderPreview(); };
+    }
+    return el;
+}
+function newLeaf(type) {
+    type = type || 'action_included';
+    var schema = CHECK_SCHEMA[type], params = {};
+    Object.keys(schema.params).forEach(function(p){
+        params[p] = {mode: schema.params[p].default_open ? 'open' : 'unset'};
+    });
+    return {kind:'leaf', type:type, label:'', params:params};
+}
+function mkBtn(txt, fn){ var b=document.createElement('button'); b.className='btn btn-sm'; b.textContent=txt; b.onclick=fn; return b; }
+function mkLabelInput(node, placeholder) {
+    var inp = document.createElement('input');
+    inp.className = 'param-input';
+    inp.style.cssText = 'flex:0 0 220px;font-size:.72rem;padding:.2rem .4rem';
+    inp.placeholder = placeholder;
+    inp.value = node.label || '';
+    inp.title = 'A short name describing what this asserts — passed to the LLM as intent.';
+    inp.oninput = function(){ node.label = inp.value; renderPreview(); };
+    return inp;
+}
+
+function renderPreview() {
+    var el = document.getElementById('spec-preview');
+    if (!el) return;
+    var spec = TREE.checks.length ? toStorage(TREE) : null;
+    el.textContent = spec ? JSON.stringify(spec, null, 2) : '(no checks yet)';
+}
+
+// ---------- save / delete ----------
+function saveTemplate() {
+    var msg = document.getElementById('save-msg');
+    var spec = TREE.checks.length ? toStorage(TREE) : null;
+    if (!spec) { msg.textContent = 'nothing to save — add at least one check'; return; }
+    msg.textContent = 'saving…';
+    fetch('/annotate/api/macro_template/' + SELECTED, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({template: spec})
+    }).then(function(r){return r.json();}).then(function(d){
+        if (d.error) { msg.textContent = 'error: ' + d.error; return; }
+        msg.textContent = 'saved ✓';
+        markTemplated(SELECTED, true);
+    });
+}
+function deleteTemplate() {
+    var msg = document.getElementById('save-msg');
+    fetch('/annotate/api/macro_template/' + SELECTED, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({template: null})
+    }).then(function(r){return r.json();}).then(function(){
+        TREE = {kind:'group', op:'AND', checks:[]};
+        renderTree(); msg.textContent = 'deleted';
+        markTemplated(SELECTED, false);
+    });
+}
+function markTemplated(macro, has) {
+    var card = document.querySelector('.macro-card[data-macro="'+macro+'"] [data-tmpl-badge]');
+    if (card) { card.textContent = has ? '✓' : '—'; card.className = 'badge ' + (has ? 'badge-tmpl' : 'badge-none'); }
+    updateTemplateCount();
+}
+function updateTemplateCount() {
+    var n = document.querySelectorAll('[data-tmpl-badge]');
+    var done = 0, ai = 0;
+    n.forEach(function(b){ var t=b.textContent.trim(); if (t==='✓') done++; else if (t==='AI') ai++; });
+    document.getElementById('tmpl-count').textContent =
+        done + ' confirmed' + (ai ? ' · ' + ai + ' AI-suggested' : '') + ' / ' + n.length;
+}
+
+// ---------- bulk suggest the rest ----------
+function suggestAll() {
+    var btn = document.getElementById('suggest-all-btn');
+    if (!confirm('Regenerate AI-suggested templates for every macro without a CONFIRMED one, using your confirmed templates as the examples? Existing AI drafts are refreshed; your confirmed templates are left untouched.')) return;
+    btn.disabled = true;
+    var done = [];   // exclude cursor so the batch loop terminates
+    function loop() {
+        btn.textContent = 'Generating…';
+        fetch('/annotate/api/suggest_templates_batch', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({limit: 8, exclude: done})
+        }).then(function(r){ return r.json(); }).then(function(d){
+            if (d.error) { btn.disabled=false; btn.textContent='Suggest rest with AI'; alert(d.error); return; }
+            (d.results || []).forEach(function(r){ done.push(r.macro); });
+            btn.textContent = 'Generating… (' + d.remaining + ' left)';
+            if (d.remaining > 0) { loop(); }
+            else { btn.textContent = 'Done — reloading'; setTimeout(function(){ location.reload(); }, 600); }
+        }).catch(function(e){ btn.disabled=false; btn.textContent='Suggest rest with AI'; alert('Error: '+e.message); });
+    }
+    loop();
+}
+
+// init
+updateTemplateCount();
+if (SELECTED) loadMacro(SELECTED);
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlights - {{ match.home_team.abbreviation }} vs {{ match.away_team.abbreviation }} - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = '' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('sports-esports.index') }}">Home</a> /
+            <a href="{{ url_for('sports-esports.match_detail', match_id=match.id) }}">Match #{{ match.id }}</a> /
+            Highlights
+        </div>
+
+        <div class="page-title">{{ match.home_team.name }} vs {{ match.away_team.name }} - Highlights</div>
+
+        {% if match.status == 'scheduled' %}
+        <div class="empty-state">This match has not started yet. Highlights will be available after the match.</div>
+        {% else %}
+        <div data-mini-player
+             data-badge="Highlights"
+             data-accent="#00d4aa"
+             data-title="{{ match.home_team.name }} vs {{ match.away_team.name }}"
+             data-subtitle="{% if match.league %}{{ match.league.name }} &middot; {% endif %}Final {{ match.home_score }}&ndash;{{ match.away_score }}"
+             data-duration="3540"
+             data-captions="true"
+             style="margin-bottom:1.5rem;"></div>
+
+        <div class="highlight-list">
+            <div class="highlight-item" data-time="0:12">
+                <span class="hl-time">00:12</span>
+                <span class="hl-desc">Opening play</span>
+            </div>
+            <div class="highlight-item" data-time="15:34">
+                <span class="hl-time">15:34</span>
+                <span class="hl-desc">Key scoring moment</span>
+            </div>
+            <div class="highlight-item" data-time="42:10">
+                <span class="hl-time">42:10</span>
+                <span class="hl-desc">Turning point</span>
+            </div>
+            <div class="highlight-item" data-time="58:00">
+                <span class="hl-time">58:00</span>
+                <span class="hl-desc">Final moments</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

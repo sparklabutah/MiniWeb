@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compose — TumblrVibe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1a1a2e; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        a { color: #7c83ff; text-decoration: none; }
+        .top-bar { background: #16213e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #7c83ff; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .85rem; margin-left: 1rem; }
+
+        .compose-wrap { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+        .compose-wrap h1 { font-size: 1.3rem; color: #7c83ff; margin-bottom: 1rem; }
+        .field { margin-bottom: 1rem; }
+        .field label { display: block; font-size: .85rem; color: #888; margin-bottom: .3rem; }
+        .field input, .field textarea, .field select { width: 100%; padding: .7rem 1rem; background: #16213e; border: 1px solid #0f3460; border-radius: .4rem; color: #e0e0e0; font-size: .9rem; font-family: inherit; }
+        .field input:focus, .field textarea:focus, .field select:focus { border-color: #7c83ff; outline: none; }
+        .field textarea { min-height: 200px; resize: vertical; line-height: 1.6; }
+        .submit-btn { padding: .7rem 2rem; background: #7c83ff; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        .submit-btn:hover { background: #6b72e8; }
+        .result { margin-top: 1rem; padding: .8rem; border-radius: .4rem; display: none; }
+        .result.success { background: #0f3460; color: #7c83ff; display: block; }
+        .result.error { background: #3d1a2e; color: #e94560; display: block; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('blogs.index') }}" class="logo">TumblrVibe</a>
+        <div class="nav-links">
+            <a href="{{ url_for('blogs.index') }}">Feed</a>
+            {% if user %}
+            <a href="{{ url_for('blogs.dashboard') }}">Dashboard</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="compose-wrap">
+        <h1>Compose New Post</h1>
+        <form method="post" action="{{ url_for('blogs.form_create_post') }}">
+            <div class="field">
+                <label>Title</label>
+                <input type="text" name="title" id="title" placeholder="Your post title..." required>
+            </div>
+            <div class="field">
+                <label>Body</label>
+                <textarea name="body" id="body" placeholder="Write your post..." required></textarea>
+            </div>
+            <div class="field">
+                <label>Category</label>
+                <select name="category" id="category">
+                    {% for c in categories %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>Tags (comma-separated)</label>
+                <input type="text" name="tags" id="tags" placeholder="e.g. python, tutorial, webdev">
+            </div>
+            <div class="field">
+                <label>Image URL (optional)</label>
+                <input type="text" name="image_url" id="image_url" placeholder="https://...">
+            </div>
+            <div class="field">
+                <label>Author Username</label>
+                <input type="text" name="author_username" id="author_username" value="{{ user.username if user else '' }}" required>
+            </div>
+            <button type="submit" class="submit-btn">Publish Post</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,603 @@
+{% extends "brokerage/base.html" %}
+{% block title %}{{ ticker.symbol }} - {{ ticker.name }} | TradeVista{% endblock %}
+{% block content %}
+<div class="rh-main">
+    <div class="rh-content">
+        <!-- Price Hero -->
+        <div style="margin-bottom:8px;">
+            <div style="font-size:14px;color:#6F7782;margin-bottom:4px;">{{ ticker.name }}</div>
+            <div class="rh-price-hero" id="hero-price" data-live-price="{{ ticker.symbol }}">
+                ${{ "%.2f"|format(ticker.current_price) if ticker.current_price >= 1 else "%.4f"|format(ticker.current_price) }}
+            </div>
+            <div class="rh-change" id="hero-change">
+                <span class="{% if ticker.change >= 0 %}rh-green{% else %}rh-red{% endif %}" id="hero-change-text" data-live-change="{{ ticker.symbol }}">
+                    {{ "+" if ticker.change >= 0 }}${{ "%.2f"|format(ticker.change|abs) }}
+                    ({{ "+" if ticker.change_pct >= 0 }}{{ "%.2f"|format(ticker.change_pct) }}%)
+                </span>
+                <span class="rh-label" style="margin-left:8px;">Today</span>
+            </div>
+        </div>
+
+        <!-- Interactive SVG Chart -->
+        <div style="position:relative;margin-bottom:24px;" id="chart-wrapper">
+            {% if history.daily %}
+            {% set daily = history.daily %}
+            {% set all_prices = [] %}
+            {% for d in daily %}
+                {% if all_prices.append(d.close) %}{% endif %}
+                {% if all_prices.append(d.open) %}{% endif %}
+            {% endfor %}
+            {% set chart_min = daily|map(attribute='low')|min %}
+            {% set chart_max = daily|map(attribute='high')|max %}
+            {% set chart_range = chart_max - chart_min if chart_max != chart_min else 1 %}
+            {% set chart_w = 800 %}
+            {% set chart_h = 300 %}
+            {% set chart_pad = 10 %}
+            {% set n_points = daily|length if daily|length > 1 else 2 %}
+
+            <div id="chart-container" style="position:relative;width:100%;overflow:hidden;">
+                <svg id="price-chart" viewBox="0 0 {{ chart_w }} {{ chart_h }}" preserveAspectRatio="none"
+                     style="width:100%;height:300px;display:block;cursor:crosshair;">
+                    <!-- Gradient fill -->
+                    <defs>
+                        <linearGradient id="chart-grad-up" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#00C805" stop-opacity="0.15"/>
+                            <stop offset="100%" stop-color="#00C805" stop-opacity="0.01"/>
+                        </linearGradient>
+                        <linearGradient id="chart-grad-down" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#FF5000" stop-opacity="0.15"/>
+                            <stop offset="100%" stop-color="#FF5000" stop-opacity="0.01"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Fill area -->
+                    <polygon id="chart-fill"
+                        fill="url(#chart-grad-{% if ticker.change >= 0 %}up{% else %}down{% endif %})"
+                        points="{% for d in daily %}{{ (loop.index0 / (n_points - 1) * (chart_w - 2 * chart_pad) + chart_pad)|round(1) }},{{ (chart_h - chart_pad - (d.close - chart_min) / chart_range * (chart_h - 2 * chart_pad))|round(1) }} {% endfor %}{{ chart_w - chart_pad }},{{ chart_h - chart_pad }} {{ chart_pad }},{{ chart_h - chart_pad }}"
+                    />
+
+                    <!-- Price line -->
+                    <polyline id="chart-line"
+                        fill="none"
+                        stroke="{% if ticker.change >= 0 %}#00C805{% else %}#FF5000{% endif %}"
+                        stroke-width="2"
+                        stroke-linejoin="round"
+                        points="{% for d in daily %}{{ (loop.index0 / (n_points - 1) * (chart_w - 2 * chart_pad) + chart_pad)|round(1) }},{{ (chart_h - chart_pad - (d.close - chart_min) / chart_range * (chart_h - 2 * chart_pad))|round(1) }} {% endfor %}"
+                    />
+
+                    <!-- Hover line (hidden by default) -->
+                    <line id="chart-hover-line" x1="0" y1="0" x2="0" y2="{{ chart_h }}"
+                          stroke="#6F7782" stroke-width="1" stroke-dasharray="3,3" style="display:none;"/>
+
+                    <!-- Hover dot -->
+                    <circle id="chart-hover-dot" cx="0" cy="0" r="5"
+                            fill="{% if ticker.change >= 0 %}#00C805{% else %}#FF5000{% endif %}"
+                            stroke="#1E2124" stroke-width="2" style="display:none;"/>
+                </svg>
+
+                <!-- Tooltip -->
+                <div id="chart-tooltip" class="chart-tooltip" style="display:none;"></div>
+            </div>
+
+            <!-- Period Selectors -->
+            <div class="period-selector" id="period-selector">
+                <button class="period-btn" data-period="1D" onclick="selectPeriod('1D')">1D</button>
+                <button class="period-btn" data-period="1W" onclick="selectPeriod('1W')">1W</button>
+                <button class="period-btn" data-period="1M" onclick="selectPeriod('1M')">1M</button>
+                <button class="period-btn" data-period="3M" onclick="selectPeriod('3M')">3M</button>
+                <button class="period-btn active" data-period="1Y" onclick="selectPeriod('1Y')">1Y</button>
+            </div>
+            {% else %}
+            <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#6F7782;">
+                No price history available
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Key Statistics -->
+        <div class="rh-card" style="margin-bottom:24px;">
+            <div class="rh-card-header">
+                <h2>Key Statistics</h2>
+            </div>
+            <div class="rh-card-body">
+                <div class="stats-grid">
+                    {% if ticker.market_cap_b %}
+                    <div class="stat-row">
+                        <span class="stat-key">Market Cap</span>
+                        <span class="stat-val">${{ ticker.market_cap_b }}B</span>
+                    </div>
+                    {% endif %}
+                    {% if ticker.day_high is not none %}
+                    <div class="stat-row">
+                        <span class="stat-key">Day's Range</span>
+                        <span class="stat-val">${{ "%.2f"|format(ticker.day_low) }} - ${{ "%.2f"|format(ticker.day_high) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if ticker.volume %}
+                    <div class="stat-row">
+                        <span class="stat-key">Volume</span>
+                        <span class="stat-val">{{ "{:,}".format(ticker.volume) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if history.daily and history.daily|length > 1 %}
+                    <div class="stat-row">
+                        <span class="stat-key">52W High</span>
+                        <span class="stat-val">${{ "%.2f"|format(history.daily|map(attribute='high')|max) }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">52W Low</span>
+                        <span class="stat-val">${{ "%.2f"|format(history.daily|map(attribute='low')|min) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if ticker.day_open is not none %}
+                    <div class="stat-row">
+                        <span class="stat-key">Open</span>
+                        <span class="stat-val">${{ "%.2f"|format(ticker.day_open) }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="stat-row">
+                        <span class="stat-key">Exchange</span>
+                        <span class="stat-val">{{ ticker.exchange }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Sector</span>
+                        <span class="stat-val">{{ ticker.sector }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Type</span>
+                        <span class="stat-val"><span class="rh-tag rh-tag-{{ ticker.type }}">{{ ticker.type }}</span></span>
+                    </div>
+                    {% if ticker.contract_size %}
+                    <div class="stat-row">
+                        <span class="stat-key">Contract Size</span>
+                        <span class="stat-val">{{ ticker.contract_size }}</span>
+                    </div>
+                    {% endif %}
+                    {% if ticker.expiry %}
+                    <div class="stat-row">
+                        <span class="stat-key">Expiry</span>
+                        <span class="stat-val">{{ ticker.expiry }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Options Chain -->
+        {% if options %}
+        <div class="rh-card" style="margin-bottom:24px;">
+            <div class="rh-card-header">
+                <h2>Options</h2>
+            </div>
+            <div class="rh-card-body" style="padding:0 0 8px;">
+                <!-- Options Tabs -->
+                <div class="options-tabs" style="padding:0 20px;">
+                    <div class="options-tab active" data-opt-type="call" onclick="showOptionsTab('call')">Calls</div>
+                    <div class="options-tab" data-opt-type="put" onclick="showOptionsTab('put')">Puts</div>
+                </div>
+
+                <!-- Calls Table -->
+                <div id="options-calls" style="overflow-x:auto;">
+                    <table class="rh-table">
+                        <thead>
+                            <tr>
+                                <th>Strike</th>
+                                <th class="right">Bid</th>
+                                <th class="right">Ask</th>
+                                <th class="right">Last</th>
+                                <th class="right">Volume</th>
+                                <th class="right">OI</th>
+                                <th class="right">IV</th>
+                                <th>Expiry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in options if o.type == 'call' %}
+                            {% set is_itm = ticker.current_price >= o.strike %}
+                            <tr class="{% if is_itm %}itm-row{% endif %}" data-opt-id="{{ o.id }}" data-opt-delta="{{ o.delta }}" data-opt-strike="{{ o.strike }}">
+                                <td style="font-weight:700;">
+                                    ${{ "%.2f"|format(o.strike) }}
+                                    {% if is_itm %}<span style="font-size:10px;color:#00C805;margin-left:4px;">ITM</span>{% endif %}
+                                </td>
+                                <td class="right" data-opt-bid="{{ o.id }}">${{ "%.2f"|format(o.premium * 0.95) }}</td>
+                                <td class="right" data-opt-ask="{{ o.id }}">${{ "%.2f"|format(o.premium * 1.05) }}</td>
+                                <td class="right" data-opt-last="{{ o.id }}">${{ "%.2f"|format(o.premium) }}</td>
+                                <td class="right">{{ "{:,}".format(o.volume) }}</td>
+                                <td class="right">{{ "{:,}".format(o.open_interest) }}</td>
+                                <td class="right">{{ "%.0f"|format(o.iv * 100) }}%</td>
+                                <td>{{ o.expiry }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Puts Table -->
+                <div id="options-puts" style="overflow-x:auto;display:none;">
+                    <table class="rh-table">
+                        <thead>
+                            <tr>
+                                <th>Strike</th>
+                                <th class="right">Bid</th>
+                                <th class="right">Ask</th>
+                                <th class="right">Last</th>
+                                <th class="right">Volume</th>
+                                <th class="right">OI</th>
+                                <th class="right">IV</th>
+                                <th>Expiry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in options if o.type == 'put' %}
+                            {% set is_itm = ticker.current_price <= o.strike %}
+                            <tr class="{% if is_itm %}itm-row{% endif %}" data-opt-id="{{ o.id }}" data-opt-delta="{{ o.delta }}" data-opt-strike="{{ o.strike }}">
+                                <td style="font-weight:700;">
+                                    ${{ "%.2f"|format(o.strike) }}
+                                    {% if is_itm %}<span style="font-size:10px;color:#FF5000;margin-left:4px;">ITM</span>{% endif %}
+                                </td>
+                                <td class="right" data-opt-bid="{{ o.id }}">${{ "%.2f"|format(o.premium * 0.95) }}</td>
+                                <td class="right" data-opt-ask="{{ o.id }}">${{ "%.2f"|format(o.premium * 1.05) }}</td>
+                                <td class="right" data-opt-last="{{ o.id }}">${{ "%.2f"|format(o.premium) }}</td>
+                                <td class="right">{{ "{:,}".format(o.volume) }}</td>
+                                <td class="right">{{ "{:,}".format(o.open_interest) }}</td>
+                                <td class="right">{{ "%.0f"|format(o.iv * 100) }}%</td>
+                                <td>{{ o.expiry }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Related Stocks -->
+        {% if related_tickers %}
+        <div class="rh-card">
+            <div class="rh-card-header">
+                <h2>People Also Bought</h2>
+            </div>
+            <div class="rh-card-body" style="padding:0;">
+                {% for rt in related_tickers %}
+                <a href="{{ url_for('brokerage.ticker_detail', symbol=rt.symbol) }}" class="wl-item" style="text-decoration:none;">
+                    <div>
+                        <div class="wl-sym">{{ rt.symbol }}</div>
+                        <div class="wl-name">{{ rt.name }}</div>
+                    </div>
+                    {% if rt.sparkline_prices and rt.sparkline_prices|length > 1 %}
+                    <div class="wl-sparkline">
+                        {% set sp_min = rt.sparkline_prices|min %}
+                        {% set sp_max = rt.sparkline_prices|max %}
+                        {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                        <svg class="sparkline-svg" width="48" height="20" viewBox="0 0 48 20">
+                            <polyline fill="none" stroke="{% if rt.change >= 0 %}#00C805{% else %}#FF5000{% endif %}" stroke-width="1.5"
+                                points="{% for sp in rt.sparkline_prices %}{{ (loop.index0 / (rt.sparkline_prices|length - 1) * 46 + 1)|round(1) }},{{ (19 - (sp - sp_min) / sp_range * 18)|round(1) }} {% endfor %}"/>
+                        </svg>
+                    </div>
+                    {% endif %}
+                    <div class="wl-right">
+                        <div class="wl-price">${{ "%.2f"|format(rt.current_price) if rt.current_price >= 1 else "%.4f"|format(rt.current_price) }}</div>
+                        <div class="wl-change {% if rt.change >= 0 %}rh-green{% else %}rh-red{% endif %}">
+                            {{ "+" if rt.change_pct >= 0 }}{{ "%.2f"|format(rt.change_pct) }}%
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- About -->
+        <div class="rh-card" style="margin-top:24px;">
+            <div class="rh-card-header">
+                <h2>About {{ ticker.name }}</h2>
+            </div>
+            <div class="rh-card-body">
+                <div class="rh-label" style="line-height:1.6;">
+                    {{ ticker.name }} ({{ ticker.exchange }}: {{ ticker.symbol }}) is a {{ ticker.type }} in the {{ ticker.sector }} sector.
+                    {% if ticker.market_cap_b %}It has a market capitalization of approximately ${{ ticker.market_cap_b }} billion.{% endif %}
+                    {% if ticker.market_open %}The market is currently open for trading.{% else %}The market is currently closed.{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: Trade Panel -->
+    <div class="rh-sidebar">
+        <div class="trade-panel">
+            <div class="trade-panel-header">
+                <div class="trade-toggle">
+                    <button class="trade-toggle-btn active-buy" id="buy-toggle" onclick="setTradeSide('buy')">Buy</button>
+                    <button class="trade-toggle-btn" id="sell-toggle" onclick="setTradeSide('sell')">Sell</button>
+                </div>
+            </div>
+            <form id="trade-form" method="post" action="{{ url_for('brokerage.trade_submit') }}">
+                <input type="hidden" name="symbol" value="{{ ticker.symbol }}">
+                <input type="hidden" name="side" value="buy" id="trade-side-input">
+
+                <div class="trade-input-group">
+                    <label>Order Type</label>
+                    <select name="order_type" id="order-type-select" onchange="toggleLimitPrice()">
+                        <option value="market">Market Order</option>
+                        <option value="limit">Limit Order</option>
+                        <option value="stop_loss">Stop Loss</option>
+                    </select>
+                </div>
+
+                <div class="trade-input-group">
+                    <label>Shares</label>
+                    <input type="number" name="quantity" id="trade-qty" value="1" min="1" step="1" oninput="updateTradeEstimate()">
+                </div>
+
+                <div class="trade-input-group" id="limit-price-row" style="display:none;">
+                    <label>Price</label>
+                    <input type="number" name="price" id="trade-limit-price" step="0.01" placeholder="{{ "%.2f"|format(ticker.current_price) }}">
+                </div>
+
+                <div class="trade-input-group">
+                    <label>Market Price</label>
+                    <span style="font-weight:600;" id="trade-live-price">${{ "%.2f"|format(ticker.current_price) if ticker.current_price >= 1 else "%.4f"|format(ticker.current_price) }}</span>
+                </div>
+
+                {% if user %}
+                <div class="trade-input-group">
+                    <label>Pay With</label>
+                    <select name="account_type">
+                        <option value="checking">Checking</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="trade-estimate">
+                    <div class="trade-estimate-row">
+                        <span class="rh-label">Estimated Cost</span>
+                        <span style="font-weight:700;font-size:16px;" id="trade-est-total">${{ "%.2f"|format(ticker.current_price) }}</span>
+                    </div>
+                    {% if user %}
+                    <div class="trade-estimate-row" style="margin-top:4px;">
+                        <span class="rh-label">Buying Power</span>
+                        <span style="font-size:13px;">${{ "{:,.2f}".format(user.buying_power) }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div style="padding:16px 20px;">
+                    {% if user %}
+                    <button type="submit" class="rh-btn rh-btn-primary" id="trade-submit-btn" style="width:100%;">Buy {{ ticker.symbol }}</button>
+                    {% else %}
+                    <a href="{{ url_for('brokerage.login_page') }}" class="rh-btn rh-btn-primary" style="width:100%;text-align:center;">Log In to Trade</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        {% if user %}
+        <div style="margin-top:16px;">
+            <form method="post" action="{{ url_for('brokerage.form_watchlist_toggle') }}">
+                <input type="hidden" name="symbol" value="{{ ticker.symbol }}">
+                <button type="submit" class="rh-btn rh-btn-outline" style="width:100%;">
+                    {% if ticker.symbol in watchlist_symbols %}Remove from List{% else %}Add to List{% endif %}
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var sym = "{{ ticker.symbol }}";
+    var currentPrice = {{ ticker.current_price }};
+    var basePrice = {{ ticker.current_price }};
+
+    // ---- Chart data ----
+    var dailyData = {{ history.daily|tojson }};
+    var intradayData = {{ history.intraday|tojson }};
+    // Convert intraday to daily-like format for the chart
+    var intradayAsDaily = intradayData.map(function(p) {
+        return { date: p.date || '', time: p.time, close: p.price, open: p.price, high: p.price * 1.002, low: p.price * 0.998, volume: p.volume || 0 };
+    });
+    var fullDaily = dailyData.slice();
+    var chartColor = '{{ "#00C805" if ticker.change >= 0 else "#FF5000" }}';
+
+    // ---- Chart hover interaction ----
+    var chartSvg = document.getElementById('price-chart');
+    var hoverLine = document.getElementById('chart-hover-line');
+    var hoverDot = document.getElementById('chart-hover-dot');
+    var tooltip = document.getElementById('chart-tooltip');
+    var heroPrice = document.getElementById('hero-price');
+    var heroChange = document.getElementById('hero-change-text');
+
+    if (chartSvg && dailyData.length > 0) {
+        var chartW = 800, chartH = 300, pad = 10;
+
+        function getChartBounds(data) {
+            var mn = Infinity, mx = -Infinity;
+            for (var i = 0; i < data.length; i++) {
+                if (data[i].low < mn) mn = data[i].low;
+                if (data[i].high > mx) mx = data[i].high;
+            }
+            return { min: mn, max: mx, range: mx - mn || 1 };
+        }
+
+        function getPointCoords(data) {
+            var b = getChartBounds(data);
+            var pts = [];
+            for (var i = 0; i < data.length; i++) {
+                var x = i / (data.length - 1) * (chartW - 2 * pad) + pad;
+                var y = chartH - pad - (data[i].close - b.min) / b.range * (chartH - 2 * pad);
+                pts.push({ x: x, y: y, price: data[i].close, date: data[i].date, time: data[i].time || '', vol: data[i].volume });
+            }
+            return pts;
+        }
+
+        function redrawChart(data) {
+            var b = getChartBounds(data);
+            var pts = getPointCoords(data);
+            var first = data[0], last = data[data.length - 1];
+            var isUp = last.close >= first.open;
+            var color = isUp ? '#00C805' : '#FF5000';
+
+            var lineStr = pts.map(function(p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
+            var fillStr = lineStr + ' ' + (chartW - pad) + ',' + (chartH - pad) + ' ' + pad + ',' + (chartH - pad);
+
+            var line = document.getElementById('chart-line');
+            var fill = document.getElementById('chart-fill');
+            var dot = document.getElementById('chart-hover-dot');
+            if (line) { line.setAttribute('points', lineStr); line.setAttribute('stroke', color); }
+            if (fill) { fill.setAttribute('points', fillStr); fill.setAttribute('fill', 'url(#chart-grad-' + (isUp ? 'up' : 'down') + ')'); }
+            if (dot) { dot.setAttribute('fill', color); }
+
+            chartColor = color;
+            dailyData = data;
+        }
+
+        chartSvg.addEventListener('mousemove', function(e) {
+            var rect = chartSvg.getBoundingClientRect();
+            var xPct = (e.clientX - rect.left) / rect.width;
+            var pts = getPointCoords(dailyData);
+            var idx = Math.round(xPct * (pts.length - 1));
+            idx = Math.max(0, Math.min(pts.length - 1, idx));
+            var p = pts[idx];
+
+            hoverLine.setAttribute('x1', p.x); hoverLine.setAttribute('x2', p.x);
+            hoverLine.style.display = '';
+            hoverDot.setAttribute('cx', p.x); hoverDot.setAttribute('cy', p.y);
+            hoverDot.style.display = '';
+
+            var label = p.time ? p.time : p.date;
+            tooltip.textContent = '$' + p.price.toFixed(2) + '  |  ' + label;
+            tooltip.style.display = 'block';
+            var ttLeft = (p.x / chartW) * rect.width;
+            tooltip.style.left = ttLeft + 'px';
+            tooltip.style.top = '-30px';
+
+            // Temporarily update hero price to hovered price
+            heroPrice.textContent = '$' + p.price.toFixed(2);
+            var first = dailyData[0];
+            var chg = p.price - first.open;
+            var chgPct = (chg / first.open * 100);
+            var sign = chg >= 0 ? '+' : '';
+            heroChange.textContent = sign + '$' + Math.abs(chg).toFixed(2) + ' (' + sign + chgPct.toFixed(2) + '%)';
+            heroChange.className = chg >= 0 ? 'rh-green' : 'rh-red';
+        });
+
+        chartSvg.addEventListener('mouseleave', function() {
+            hoverLine.style.display = 'none';
+            hoverDot.style.display = 'none';
+            tooltip.style.display = 'none';
+            // Restore current price
+            heroPrice.textContent = currentPrice >= 1 ? '$' + currentPrice.toFixed(2) : '$' + currentPrice.toFixed(4);
+        });
+    }
+
+    // ---- Period selection ----
+    window.selectPeriod = function(period) {
+        document.querySelectorAll('.period-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelector('[data-period="' + period + '"]').classList.add('active');
+
+        var n = fullDaily.length;
+        var slice;
+        switch(period) {
+            case '1D': slice = intradayAsDaily.length > 1 ? intradayAsDaily : fullDaily.slice(-1); break;
+            case '1W': slice = fullDaily.slice(Math.max(0, n - 5)); break;
+            case '1M': slice = fullDaily.slice(Math.max(0, n - 22)); break;
+            case '3M': slice = fullDaily.slice(Math.max(0, n - 66)); break;
+            case '1Y': default: slice = fullDaily; break;
+        }
+        if (slice.length < 2) slice = fullDaily.slice(-2);
+        redrawChart(slice);
+    };
+
+    // ---- Options tabs ----
+    window.showOptionsTab = function(type) {
+        document.querySelectorAll('.options-tab').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelector('[data-opt-type="' + type + '"]').classList.add('active');
+        document.getElementById('options-calls').style.display = type === 'call' ? '' : 'none';
+        document.getElementById('options-puts').style.display = type === 'put' ? '' : 'none';
+    };
+
+    // ---- Trade panel ----
+    window.setTradeSide = function(side) {
+        document.getElementById('trade-side-input').value = side;
+        var buyBtn = document.getElementById('buy-toggle');
+        var sellBtn = document.getElementById('sell-toggle');
+        var submitBtn = document.getElementById('trade-submit-btn');
+        if (side === 'buy') {
+            buyBtn.className = 'trade-toggle-btn active-buy';
+            sellBtn.className = 'trade-toggle-btn';
+            if (submitBtn) { submitBtn.className = 'rh-btn rh-btn-primary'; submitBtn.textContent = 'Buy ' + sym; }
+        } else {
+            buyBtn.className = 'trade-toggle-btn';
+            sellBtn.className = 'trade-toggle-btn active-sell';
+            if (submitBtn) { submitBtn.className = 'rh-btn rh-btn-sell'; submitBtn.textContent = 'Sell ' + sym; }
+        }
+    };
+
+    window.toggleLimitPrice = function() {
+        var sel = document.getElementById('order-type-select');
+        document.getElementById('limit-price-row').style.display = sel.value === 'market' ? 'none' : '';
+    };
+
+    window.updateTradeEstimate = function() {
+        var qty = parseFloat(document.getElementById('trade-qty').value) || 0;
+        var total = qty * currentPrice;
+        document.getElementById('trade-est-total').textContent = '$' + total.toFixed(2);
+    };
+
+    // ---- Live price polling ----
+    var prevPrice = currentPrice;
+
+    function updatePriceUI(data) {
+        var d = data[sym];
+        if (!d) return;
+
+        currentPrice = d.price;
+
+        // Update hero price (only if not hovering chart)
+        if (tooltip && tooltip.style.display === 'none') {
+            heroPrice.textContent = d.price >= 1 ? '$' + d.price.toFixed(2) : '$' + d.price.toFixed(4);
+            var sign = d.change >= 0 ? '+' : '';
+            heroChange.textContent = sign + '$' + Math.abs(d.change).toFixed(2) + ' (' + sign + d.change_pct.toFixed(2) + '%)';
+            heroChange.className = d.change >= 0 ? 'rh-green' : 'rh-red';
+        }
+
+        // Flash
+        if (d.price > prevPrice) {
+            heroPrice.classList.remove('tick-up','tick-down'); void heroPrice.offsetWidth; heroPrice.classList.add('tick-up');
+        } else if (d.price < prevPrice) {
+            heroPrice.classList.remove('tick-up','tick-down'); void heroPrice.offsetWidth; heroPrice.classList.add('tick-down');
+        }
+
+        // Update trade panel
+        var tlp = document.getElementById('trade-live-price');
+        if (tlp) tlp.textContent = d.price >= 1 ? '$' + d.price.toFixed(2) : '$' + d.price.toFixed(4);
+        updateTradeEstimate();
+
+        // Update options prices based on underlying price change
+        var priceChange = d.price - prevPrice;
+        if (Math.abs(priceChange) > 0.001) {
+            document.querySelectorAll('[data-opt-delta]').forEach(function(row) {
+                var delta = parseFloat(row.getAttribute('data-opt-delta')) || 0;
+                var optChange = delta * priceChange;
+                ['bid','ask','last'].forEach(function(col) {
+                    var el = row.querySelector('[data-opt-' + col + ']');
+                    if (el) {
+                        var cur = parseFloat(el.textContent.replace('$','')) || 0;
+                        var nw = Math.max(0.01, cur + optChange);
+                        el.textContent = '$' + nw.toFixed(2);
+                    }
+                });
+            });
+        }
+
+        prevPrice = d.price;
+    }
+
+    RH.startPolling([sym], updatePriceUI, 2000);
+})();
+</script>
+{% endblock %}

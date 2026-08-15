@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team - {{ project.short_title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafbfc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #1e3a5f, #2d5a87); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #7dd3fc; }
+        .header-right a { color: #cbd5e1; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1e3a5f; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        .page-title { font-size: 1.4rem; color: #1e3a5f; margin-bottom: .3rem; }
+        .page-sub { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1.5rem; }
+        .member-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .6rem; padding: 1.5rem; display: flex; gap: 1.2rem; align-items: flex-start; }
+        .avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #1e3a5f, #3b82f6); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.4rem; font-weight: 700; flex-shrink: 0; }
+        .member-info { flex: 1; }
+        .member-info h3 { font-size: 1.1rem; color: #1e3a5f; margin-bottom: .2rem; }
+        .badge-corresponding { display: inline-block; background: #fef3c7; color: #92400e; font-size: .7rem; font-weight: 600; padding: .1rem .4rem; border-radius: .2rem; margin-left: .3rem; vertical-align: middle; }
+        .member-info .role { font-size: .85rem; color: #059669; font-weight: 600; text-transform: capitalize; margin-bottom: .4rem; }
+        .member-detail { font-size: .85rem; color: #475569; margin-bottom: .15rem; }
+        .member-detail a { color: #2563eb; text-decoration: none; }
+        .member-detail a:hover { text-decoration: underline; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('project-homepages.index') }}"><span>Flow</span>Net</a></h1>
+        <div class="header-right">
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('project-homepages.index') }}">Home</a>
+        <a href="{{ url_for('project-homepages.paper_page') }}">Paper</a>
+        <a href="{{ url_for('project-homepages.team_page') }}" class="active">Team</a>
+        <a href="{{ url_for('project-homepages.resources_page') }}">Resources</a>
+        <a href="{{ url_for('project-homepages.updates_page') }}">Updates</a>
+        <a href="{{ url_for('project-homepages.stats_page') }}">Stats</a>
+        <div class="nav-dropdown" style="position:relative;display:inline-block;">
+            <select id="section-nav" onchange="if(this.value)window.location=this.value" style="padding:.3rem .5rem;font-size:.85rem;border:1px solid #cbd5e1;border-radius:.3rem;background:#fff;color:#1e3a5f;cursor:pointer;">
+                <option value="">Go to section...</option>
+                {% for sec in sections_list %}
+                <option value="{{ url_for('project-homepages.section_page', section_key=sec.key) }}">{{ sec.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a href="{{ url_for('project-homepages.login_page') }}">{% if user %}{{ user.username }}{% else %}Sign In{% endif %}</a>
+    </nav>
+
+    <div class="container">
+        <h2 class="page-title">Team</h2>
+        <p class="page-sub">{{ project.short_title }} project team at {{ project.authors[0].affiliation }}</p>
+
+        <div class="team-grid">
+            {% for member in team %}
+            <div class="member-card">
+                <div class="avatar">{{ member.full_name.split()[0][0] }}{{ member.full_name.split()[-1][0] }}</div>
+                <div class="member-info">
+                    <h3>
+                        {{ member.full_name }}
+                        {% if member.corresponding %}<span class="badge-corresponding">Corresponding Author</span>{% endif %}
+                    </h3>
+                    <div class="role">{{ member.role }}</div>
+                    <div class="member-detail">{{ member.department }}, {{ member.affiliation }}</div>
+                    <div class="member-detail"><a href="mailto:{{ member.email }}">{{ member.email }}</a></div>
+                    {% if member.orcid %}
+                    <div class="member-detail">ORCID: <a href="https://orcid.org/{{ member.orcid }}" target="_blank">{{ member.orcid }}</a></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">
+        &copy; {{ project.year }} {{ project.authors[0].affiliation }} &middot; {{ project.short_title }} Project
+    </div>
+</body>
+</html>

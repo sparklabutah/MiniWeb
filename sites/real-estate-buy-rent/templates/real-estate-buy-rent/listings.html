@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listings - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover, .nav-bar a.active { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+        .filter-bar { background: #fff; border-radius: .5rem; padding: 1rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .filter-row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+        .filter-row input[type="text"] { flex: 1; min-width: 200px; padding: .5rem .8rem; border: 2px solid #e0e0e0; border-radius: .3rem; font-size: .9rem; }
+        .filter-row input[type="text"]:focus { border-color: #1565c0; outline: none; }
+        .filter-row select, .filter-row input[type="number"] { padding: .45rem .5rem; border: 1px solid #ccc; border-radius: .25rem; font-size: .82rem; }
+        .filter-row input[type="number"] { width: 100px; }
+        .filter-row label { font-size: .82rem; color: #666; }
+        .filter-row button { padding: .5rem 1.2rem; background: #0d47a1; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .9rem; }
+        .filter-row button:hover { background: #1565c0; }
+        .result-info { font-size: .85rem; color: #888; margin-bottom: .8rem; }
+        .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .listing-card { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: box-shadow .15s; }
+        .listing-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+        .card-img { width: 100%; height: 180px; background: #e3f2fd; display: flex; align-items: center; justify-content: center; color: #90caf9; font-size: .85rem; position: relative; }
+        .card-badge { position: absolute; top: .5rem; left: .5rem; padding: .2rem .6rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; color: #fff; }
+        .badge-sale { background: #2e7d32; }
+        .badge-rent { background: #1565c0; }
+        .badge-sold { background: #757575; }
+        .badge-rented { background: #757575; }
+        .card-body { padding: .8rem; }
+        .card-price { font-size: 1.15rem; font-weight: 700; color: #0d47a1; margin-bottom: .2rem; }
+        .card-title { font-size: .92rem; margin-bottom: .3rem; }
+        .card-title a { color: #333; text-decoration: none; }
+        .card-title a:hover { color: #0d47a1; }
+        .card-meta { font-size: .78rem; color: #999; display: flex; gap: .6rem; flex-wrap: wrap; }
+        .type-tag { background: #e3f2fd; color: #1565c0; padding: .1rem .4rem; border-radius: .2rem; text-transform: capitalize; font-size: .75rem; }
+        .no-results { text-align: center; color: #999; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.tours_page') }}">Tours</a>
+            <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}">Inquiries</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}" class="active">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}">Buy</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}">Rent</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+
+    <div class="container">
+        <div class="filter-bar">
+            <form class="filter-row" method="get" action="{{ url_for('real-estate-buy-rent.listings_page') }}">
+                <input type="text" name="q" placeholder="Search listings..." value="{{ q }}" autocomplete="off">
+                <label>Type:
+                    <select name="type">
+                        <option value="">All Types</option>
+                        {% for t in property_types %}
+                        <option value="{{ t }}" {{ 'selected' if prop_type == t }}>{{ t | capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Status:
+                    <select name="status">
+                        <option value="">All</option>
+                        {% for s in statuses %}
+                        <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s | replace('_', ' ') | title }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Beds:
+                    <select name="beds">
+                        <option value="">Any</option>
+                        <option value="1" {{ 'selected' if beds_min == 1 }}>1+</option>
+                        <option value="2" {{ 'selected' if beds_min == 2 }}>2+</option>
+                        <option value="3" {{ 'selected' if beds_min == 3 }}>3+</option>
+                        <option value="4" {{ 'selected' if beds_min == 4 }}>4+</option>
+                    </select>
+                </label>
+                <label>Baths:
+                    <select name="baths">
+                        <option value="">Any</option>
+                        <option value="1" {{ 'selected' if baths_min == 1 }}>1+</option>
+                        <option value="2" {{ 'selected' if baths_min == 2 }}>2+</option>
+                        <option value="3" {{ 'selected' if baths_min == 3 }}>3+</option>
+                    </select>
+                </label>
+                <label>Min $:
+                    <input type="number" name="price_min" value="{{ price_min if price_min else '' }}" min="0" placeholder="0">
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;">Max $: <span id="price-max-val">{{ "${:,}".format(price_max) if price_max else 'Any' }}</span>
+                    <input type="range" name="price_max" min="0" max="25000000" step="100000" value="{{ price_max if price_max else 25000000 }}" oninput="document.getElementById('price-max-val').textContent=this.value=='25000000'?'Any':'$'+parseInt(this.value).toLocaleString()" style="width:120px;">
+                </label>
+                <label>Min Sqft:
+                    <input type="number" name="sqft_min" value="{{ sqft_min if sqft_min else '' }}" min="0" placeholder="0">
+                </label>
+                <div style="display:flex;gap:.6rem;align-items:center;">
+                    <span style="font-size:.82rem;color:#666;">Features:</span>
+                    {% for feat in ['garage', 'pool', 'basement', 'fireplace'] %}
+                    <label style="font-size:.82rem;display:flex;align-items:center;gap:.2rem;cursor:pointer;">
+                        <input type="checkbox" name="features" value="{{ feat }}" {% if feat in request.args.getlist('features') %}checked{% endif %} style="accent-color:#0d47a1;">
+                        {{ feat|capitalize }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <label>Sort:
+                    <select name="sort">
+                        <option value="date" {{ 'selected' if sort == 'date' }}>Newest</option>
+                        <option value="price_low" {{ 'selected' if sort == 'price_low' }}>Price: Low to High</option>
+                        <option value="price_high" {{ 'selected' if sort == 'price_high' }}>Price: High to Low</option>
+                        <option value="sqft" {{ 'selected' if sort == 'sqft' }}>Largest</option>
+                        <option value="beds" {{ 'selected' if sort == 'beds' }}>Most Bedrooms</option>
+                    </select>
+                </label>
+                <button type="submit">Filter</button>
+            </form>
+        </div>
+
+        <div class="result-info">{{ total }} listing{{ 's' if total != 1 }} found{% if total > listings|length %} (showing first {{ listings|length }}){% endif %}</div>
+
+        {% if listings %}
+        <div class="listing-grid">
+            {% for listing in listings %}
+            <div class="listing-card" data-id="{{ listing.id }}">
+                <div class="card-img">
+                    {% if listing.status == 'for_sale' %}
+                    <span class="card-badge badge-sale">FOR SALE</span>
+                    {% elif listing.status == 'for_rent' %}
+                    <span class="card-badge badge-rent">FOR RENT</span>
+                    {% elif listing.status == 'sold' %}
+                    <span class="card-badge badge-sold">SOLD</span>
+                    {% elif listing.status == 'rented' %}
+                    <span class="card-badge badge-rented">RENTED</span>
+                    {% endif %}
+                    {{ listing.photos_count }} photos
+                </div>
+                <div class="card-body">
+                    {% if listing.price %}
+                    <div class="card-price">${{ "{:,.0f}".format(listing.price) }}</div>
+                    {% elif listing.rent_monthly %}
+                    <div class="card-price">${{ "{:,.0f}".format(listing.rent_monthly) }}/mo</div>
+                    {% endif %}
+                    <div class="card-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=listing.id) }}">{{ listing.title }}</a></div>
+                    <div class="card-meta">
+                        <span>{{ listing.bedrooms }} bd</span>
+                        <span>{{ listing.bathrooms }} ba</span>
+                        <span>{{ "{:,.0f}".format(listing.sqft) }} sqft</span>
+                        <span class="type-tag">{{ listing.type }}</span>
+                    </div>
+                    <div class="card-meta" style="margin-top:.3rem">
+                        <span>{{ listing.address }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-results">No listings match your search criteria.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

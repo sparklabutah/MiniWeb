@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FundSpark - Start a Project</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fafafa; color: #282828; line-height: 1.5; }
+        a { text-decoration: none; color: inherit; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e6e6e6; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+        .navbar-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #282828; }
+        .navbar-brand em { font-style: normal; color: #2bde73; }
+        .navbar-links { display: flex; align-items: center; gap: 1.5rem; }
+        .navbar-links a { font-size: .875rem; font-weight: 500; color: #656969; transition: color .15s; }
+        .navbar-links a:hover { color: #282828; }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+        .page-title { font-size: 1.5rem; font-weight: 800; margin-bottom: .3rem; }
+        .page-sub { font-size: .85rem; color: #999; margin-bottom: 1.5rem; }
+
+        .form-card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); border: 1px solid #eee; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .8rem; color: #555; margin-bottom: .3rem; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .7rem .9rem; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: .9rem; font-family: inherit; outline: none; transition: border-color .15s; }
+        .form-group textarea { min-height: 110px; resize: vertical; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #2bde73; }
+        .form-hint { font-size: .72rem; color: #bbb; margin-top: .2rem; }
+
+        .btn-launch { width: 100%; padding: .85rem; background: #2bde73; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: .5rem; transition: background .15s; }
+        .btn-launch:hover { background: #25c766; }
+
+        /* ---------- Reward tiers ---------- */
+        .section-head { font-size: 1.05rem; font-weight: 800; margin: 2rem 0 .3rem; }
+        .section-sub { font-size: .78rem; color: #999; margin-bottom: 1rem; }
+        .tier-row { border: 1.5px solid #e0e0e0; border-radius: 10px; padding: 1.1rem 1.1rem .4rem; margin-bottom: 1rem; position: relative; background: #fcfcfc; }
+        .tier-row .tier-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .8rem; }
+        .tier-row .tier-idx { font-size: .78rem; font-weight: 700; color: #2bde73; text-transform: uppercase; letter-spacing: .04em; }
+        .tier-remove { background: none; border: none; color: #c0392b; font-size: .78rem; font-weight: 600; cursor: pointer; padding: .2rem .4rem; }
+        .tier-remove:hover { text-decoration: underline; }
+        .tier-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+        .tier-grid .full { grid-column: 1 / -1; }
+        .btn-add-tier { width: 100%; padding: .7rem; background: #fff; color: #2bde73; border: 1.5px dashed #2bde73; border-radius: 8px; font-size: .9rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+        .btn-add-tier:hover { background: #f0fdf5; }
+        .no-tiers-hint { font-size: .75rem; color: #bbb; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{{ url_for('crowdfunding-donations.index') }}" class="navbar-brand"><em>Fund</em>Spark</a>
+    <div class="navbar-links">
+        <a href="{{ url_for('crowdfunding-donations.index') }}">Explore</a>
+        <a href="{{ url_for('crowdfunding-donations.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('crowdfunding-donations.logout') }}">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <h1 class="page-title">Start a project</h1>
+    <p class="page-sub">Share your idea with the world and get funded.</p>
+
+    <div class="form-card">
+        <form method="POST" action="{{ url_for('crowdfunding-donations.form_create_campaign') }}">
+            <div class="form-group">
+                <label for="title">Project Title</label>
+                <input type="text" id="title" name="title" placeholder="Give your project a catchy title" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Short Description</label>
+                <textarea id="description" name="description" placeholder="A one or two sentence summary of your project..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="story">Full Story <span style="color:#bbb;font-weight:400">(optional)</span></label>
+                <textarea id="story" name="story" placeholder="Tell backers the full story: why it matters, what you'll do with the funds, and your timeline..."></textarea>
+                <div class="form-hint">Added to the "About this project" section on your campaign page.</div>
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category" required>
+                    <option value="">Select a category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="goal_amount">Funding Goal ($)</label>
+                <input type="number" id="goal_amount" name="goal_amount" placeholder="10,000" min="1" required>
+                <div class="form-hint">Set a realistic goal that covers your project needs.</div>
+            </div>
+            <div class="form-group">
+                <label for="funding_model">Funding Model</label>
+                <select id="funding_model" name="funding_model">
+                    <option value="all-or-nothing">All or Nothing</option>
+                    <option value="flexible">Flexible</option>
+                </select>
+                <div class="form-hint">All or Nothing: funds are only collected if the goal is reached.</div>
+            </div>
+            <div class="form-group">
+                <label for="end_date">End Date</label>
+                <input type="date" id="end_date" name="end_date" required>
+            </div>
+
+            <!-- ---------- Reward tiers ---------- -->
+            <div class="section-head">Reward Tiers</div>
+            <div class="section-sub">Offer backers something in return for their pledge. Add one tier per reward level.</div>
+
+            <div id="tiers"></div>
+            <p class="no-tiers-hint" id="no-tiers-hint">No reward tiers yet. Backers will still be able to pledge a custom amount.</p>
+
+            <button type="button" class="btn-add-tier" id="add-tier" style="margin-bottom:1rem">+ Add reward tier</button>
+
+            <button type="submit" class="btn-launch">Launch Project</button>
+        </form>
+    </div>
+</div>
+
+<!-- Reward-tier row template -->
+<template id="tier-template">
+    <div class="tier-row">
+        <div class="tier-head">
+            <span class="tier-idx">Reward Tier</span>
+            <button type="button" class="tier-remove">Remove</button>
+        </div>
+        <div class="tier-grid">
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Reward Title</label>
+                <input type="text" name="tier_name" placeholder="e.g. Early Bird Special">
+            </div>
+            <div class="form-group" style="margin-bottom:.8rem">
+                <label>Pledge Amount ($)</label>
+                <input type="number" name="tier_amount" placeholder="25" min="1" step="1">
+            </div>
+            <div class="form-group" style="margin-bottom:.8rem">
+                <label>Limit <span style="color:#bbb;font-weight:400">(optional)</span></label>
+                <input type="number" name="tier_limit" placeholder="Unlimited" min="1" step="1">
+            </div>
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Description</label>
+                <textarea name="tier_description" placeholder="What does a backer get at this level?" style="min-height:70px"></textarea>
+            </div>
+            <div class="form-group full" style="margin-bottom:.8rem">
+                <label>Fulfillment</label>
+                <select name="tier_fulfillment">
+                    <option value="physical">Physical (requires shipping)</option>
+                    <option value="digital">Digital (no shipping)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+(function () {
+    var tiers = document.getElementById('tiers');
+    var tpl = document.getElementById('tier-template');
+    var addBtn = document.getElementById('add-tier');
+    var hint = document.getElementById('no-tiers-hint');
+
+    function renumber() {
+        var rows = tiers.querySelectorAll('.tier-row');
+        rows.forEach(function (row, i) {
+            row.querySelector('.tier-idx').textContent = 'Reward Tier ' + (i + 1);
+        });
+        hint.style.display = rows.length ? 'none' : 'block';
+    }
+
+    function addTier() {
+        var frag = tpl.content.cloneNode(true);
+        frag.querySelector('.tier-remove').addEventListener('click', function (e) {
+            e.target.closest('.tier-row').remove();
+            renumber();
+        });
+        tiers.appendChild(frag);
+        renumber();
+    }
+
+    addBtn.addEventListener('click', addTier);
+    renumber();
+})();
+</script>
+
+</body>
+</html>

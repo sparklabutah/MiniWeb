@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickChat</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; color: #e9edef; height: 100vh; overflow: hidden; }
+        .header { background: #202c33; padding: .6rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3942; }
+        .header h1 { font-size: 1.1rem; font-weight: 600; }
+        .header h1 a { color: #e9edef; text-decoration: none; }
+        .header h1 a span { color: #00a884; }
+        nav { background: #202c33; padding: .4rem 1.2rem; display: flex; gap: 1rem; border-bottom: 1px solid #2a3942; }
+        nav a { color: #8696a0; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .6rem; border-radius: .3rem; transition: all .15s; }
+        nav a:hover { color: #e9edef; background: #2a3942; }
+        nav a.active { color: #00a884; border-bottom: 2px solid #00a884; }
+        .app-container { display: flex; height: calc(100vh - 90px); }
+        .sidebar { width: 380px; min-width: 320px; background: #111b21; border-right: 1px solid #2a3942; display: flex; flex-direction: column; }
+        .sidebar-header { padding: .8rem 1rem; display: flex; flex-direction: column; align-items: stretch; gap: .5rem; }
+        .search-box { flex: 1; position: relative; }
+        .search-box input { width: 100%; padding: .55rem .9rem; background: #202c33; border: none; border-radius: .5rem; color: #e9edef; font-size: .85rem; outline: none; }
+        .search-box input::placeholder { color: #8696a0; }
+        .conversation-list { flex: 1; overflow-y: auto; }
+        .conversation-list::-webkit-scrollbar { width: 6px; }
+        .conversation-list::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+        .conv-item { display: flex; align-items: center; padding: .7rem 1rem; cursor: pointer; border-bottom: 1px solid #222d34; transition: background .15s; text-decoration: none; color: inherit; }
+        .conv-item:hover { background: #202c33; }
+        .conv-item.active { background: #2a3942; }
+        .conv-avatar { width: 48px; height: 48px; border-radius: 50%; background: #2a3942; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 600; color: #aebac1; flex-shrink: 0; position: relative; }
+        .conv-avatar.online::after { content: ''; position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #00a884; border-radius: 50%; border: 2px solid #111b21; }
+        .conv-info { flex: 1; margin-left: .8rem; min-width: 0; }
+        .conv-top { display: flex; justify-content: space-between; align-items: baseline; }
+        .conv-name { font-size: .95rem; font-weight: 500; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .conv-item.unread .conv-name { font-weight: 700; color: #fff; }
+        .conv-time { font-size: .7rem; color: #8696a0; white-space: nowrap; margin-left: .5rem; }
+        .conv-item.unread .conv-time { color: #00a884; font-weight: 600; }
+        .conv-preview { font-size: .82rem; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .15rem; }
+        .conv-item.unread .conv-preview { color: #d1d7db; font-weight: 600; }
+        .conv-badge { display: flex; align-items: center; gap: .3rem; }
+        .badge-group { background: #2a3942; color: #8696a0; font-size: .65rem; padding: .1rem .4rem; border-radius: .6rem; }
+        .unread-badge { background: #00a884; color: #111b21; font-size: .7rem; font-weight: 700; min-width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0; }
+        .main-panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #222e35; }
+        .welcome { text-align: center; max-width: 500px; padding: 2rem; }
+        .welcome-icon { font-size: 4rem; margin-bottom: 1rem; opacity: .6; }
+        .welcome h2 { color: #e9edef; font-size: 1.8rem; font-weight: 300; margin-bottom: .8rem; }
+        .welcome p { color: #8696a0; font-size: .9rem; line-height: 1.5; }
+        .pin-toggle { background: none; border: none; cursor: pointer; font-size: .85rem; margin-left: .4rem; padding: .15rem; border-radius: .3rem; filter: grayscale(1); opacity: .45; transition: all .15s; }
+        .pin-toggle:hover { background: #2a3942; opacity: .8; }
+        .pin-toggle.pinned { filter: none; opacity: 1; }
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; }
+            .main-panel { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('instant-messaging.index') }}">Quick<span>Chat</span></a></h1>
+        <span style="color:#8696a0;font-size:.8rem;">{{ users_map[current_user_id].display_name }}</span>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('instant-messaging.index') }}" class="active">Chats</a>
+        <a href="{{ url_for('instant-messaging.contacts_page') }}">Contacts</a>
+        <span style="flex:1;"></span>
+        <select id="sortSelect" onchange="applyView()" style="padding:.3rem .5rem;background:#202c33;border:1px solid #2a3942;border-radius:.3rem;color:#e9edef;font-size:.82rem;">
+            <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Sort: Recent</option>
+            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort: Name</option>
+            <option value="unread" {% if sort_by == 'unread' %}selected{% endif %}>Sort: Unread</option>
+        </select> </nav>
+
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search or start new chat" oninput="filterConversations()">
+                </div>
+                <div style="display:flex;gap:4px;padding:4px 8px;align-items:center;">
+                    <label style="font-size:.72rem;color:#8696a0;">From:</label>
+                    <input type="date" id="dateFrom" value="{{ date_from }}" onchange="applyView()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    <label style="font-size:.72rem;color:#8696a0;">To:</label>
+                    <input type="date" id="dateTo" value="{{ date_to }}" onchange="applyView()" style="padding:2px 4px;border:1px solid #2a3942;border-radius:4px;font-size:.72rem;background:#202c33;color:#e9edef;width:100px;">
+                    {% if date_from or date_to %}<a href="{{ url_for('instant-messaging.index', sort=sort_by) }}" style="font-size:.72rem;color:#00a884;text-decoration:none;margin-left:2px;">Clear</a>{% endif %}
+                </div>
+            </div>
+            <div class="conversation-list" id="conversationList">
+                {% for conv in conversations %}
+                <a href="{{ url_for('instant-messaging.conversation_page', conv_id=conv.id) }}" class="conv-item {% if conv.unread_count > 0 %}unread{% endif %}" data-name="{{ conv.display_name|lower }}">
+                    <div class="conv-avatar {% if conv.status == 'online' %}online{% endif %}">
+                        {{ conv.display_name[0] }}
+                    </div>
+                    <div class="conv-info">
+                        <div class="conv-top">
+                            <span class="conv-name">{{ conv.display_name }}</span>
+                            <span class="conv-time">{{ conv.last_time }}</span>
+                        </div>
+                        <div class="conv-preview">
+                            {% if conv.type == 'group' %}<span class="badge-group">GROUP</span> {% endif %}
+                            {{ conv.last_text }}
+                        </div>
+                    </div>
+                    {% if conv.unread_count > 0 %}
+                    <span class="unread-badge">{{ conv.unread_count }}</span>
+                    {% endif %}
+                    <button class="pin-toggle {% if conv.pinned_count > 0 %}pinned{% endif %}" data-url="{{ url_for('instant-messaging.api_pin_conversation', conv_id=conv.id) }}" title="{% if conv.pinned_count > 0 %}Unpin conversation{% else %}Pin conversation{% endif %}">&#128204;</button>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="main-panel">
+            <div class="welcome">
+                <div class="welcome-icon">&#128172;</div>
+                <h2>QuickChat Web</h2>
+                <p>Send and receive messages. Select a conversation from the sidebar to get started.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Reload with the chosen sort + date range so the server re-orders and
+        // re-filters the conversation list (SQL-level date filter).
+        function applyView() {
+            const params = new URLSearchParams();
+            const sort = document.getElementById('sortSelect').value;
+            const from = document.getElementById('dateFrom').value;
+            const to = document.getElementById('dateTo').value;
+            if (sort && sort !== 'recent') params.set('sort', sort);
+            if (from) params.set('from', from);
+            if (to) params.set('to', to);
+            const qs = params.toString();
+            location.href = qs ? '?' + qs : location.pathname;
+        }
+
+        function filterConversations() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('.conv-item').forEach(item => {
+                const name = item.getAttribute('data-name') || '';
+                const preview = (item.querySelector('.conv-preview') || {}).textContent || '';
+                item.style.display = (name.includes(q) || preview.toLowerCase().includes(q)) ? '' : 'none';
+            });
+            fetch('{{ url_for("instant-messaging.api_conversations_list") }}' + (q ? '?q=' + encodeURIComponent(q) : ''));
+        }
+
+        // follow_by_toggle: pin/unpin a conversation
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.pin-toggle');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var pinned = d.pinned_count > 0;
+                    btn.classList.toggle('pinned', pinned);
+                    btn.title = pinned ? 'Unpin conversation' : 'Pin conversation';
+                });
+        });
+    </script>
+</body>
+</html>

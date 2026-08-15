@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Apps - AppVault</title>
+    <style>
+        :root {
+            --gp-green: #01875f; --gp-green-light: #e6f4ea;
+            --gp-blue: #1a73e8; --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa; --gp-surface: #fff;
+            --gp-text: #202124; --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0; --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+        .topbar { background: var(--gp-surface); border-bottom: 1px solid var(--gp-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .6rem 1.5rem; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
+        .logo-icon { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
+        .nav-links { display: flex; gap: .25rem; align-items: center; margin-left: auto; }
+        .nav-links a { padding: .45rem .85rem; border-radius: 20px; text-decoration: none; font-size: .85rem; font-weight: 500; color: var(--gp-text-secondary); transition: background .15s; white-space: nowrap; }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+        .nav-links .login-btn { background: var(--gp-blue); color: #fff; }
+        .nav-links .login-btn:hover { background: #1557b0; color: #fff; }
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: 1.5rem; }
+        .compare-form { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin-bottom: 2rem; }
+        .compare-form form { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+        .compare-form label { font-size: .88rem; font-weight: 600; color: #475569; display: block; margin-bottom: .3rem; }
+        .compare-form select { padding: .5rem .75rem; border: 1px solid #cbd5e1; border-radius: .4rem; font-size: .9rem; outline: none; min-width: 200px; }
+        .compare-form select:focus { border-color: #3b82f6; }
+        .btn { padding: .55rem 1.25rem; background: #2563eb; color: #fff; border: none; border-radius: .4rem; font-size: .9rem; cursor: pointer; }
+        .btn:hover { background: #1d4ed8; }
+        .compare-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; overflow: hidden; }
+        .compare-table th { background: #f1f5f9; padding: .75rem 1rem; text-align: left; font-size: .85rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; }
+        .compare-table td { padding: .75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .95rem; vertical-align: top; }
+        .compare-table tr:last-child td { border-bottom: none; }
+        .compare-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; width: 160px; }
+        .stars { color: #f59e0b; letter-spacing: 1px; }
+        .no-compare { text-align: center; padding: 3rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+            <div class="logo-icon">A</div>
+            AppVault
+        </a>
+        <div class="nav-links">
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+            {% if user %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+                <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+                <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="login-btn">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+</div>
+    <div class="container">
+        <h2 class="page-title">Compare Apps</h2>
+
+        <div class="compare-form">
+            <form method="get" action="{{ url_for('software-marketplace.compare_page') }}">
+                <div>
+                    <label for="app1">App 1</label>
+                    <select name="app1" id="app1">
+                        <option value="">Select an app</option>
+                        {% for a in all_apps %}
+                        <option value="{{ a.id }}" {% if apps|length > 0 and apps[0].id == a.id %}selected{% endif %}>{{ a.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="app2">App 2</label>
+                    <select name="app2" id="app2">
+                        <option value="">Select an app</option>
+                        {% for a in all_apps %}
+                        <option value="{{ a.id }}" {% if apps|length > 1 and apps[1].id == a.id %}selected{% endif %}>{{ a.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn" onclick="
+                    var a1 = document.getElementById('app1').value;
+                    var a2 = document.getElementById('app2').value;
+                    var ids = [a1, a2].filter(function(v){return v;}).join(',');
+                    if (ids) {
+                        window.location.href = '{{ url_for('software-marketplace.compare_page') }}?ids=' + ids;
+                        return false;
+                    }
+                ">Compare</button>
+            </form>
+        </div>
+
+        {% if apps and apps|length >= 2 %}
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Attribute</th>
+                    {% for app in apps %}
+                    <th><a href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}" style="color: #1e40af; text-decoration: none;">{{ app.name }}</a></th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Category</td>
+                    {% for app in apps %}<td>{{ app.category|replace('_', ' ')|title }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Genre</td>
+                    {% for app in apps %}<td>{{ app.genre }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Rating</td>
+                    {% for app in apps %}
+                    <td>
+                        <span class="stars">{% for i in range(app.rating|int) %}&#9733;{% endfor %}{% for i in range(5 - app.rating|int) %}&#9734;{% endfor %}</span>
+                        {{ app.rating }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td>Reviews</td>
+                    {% for app in apps %}<td>{{ app.reviews_count }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>User Avg Rating</td>
+                    {% for app in apps %}<td>{{ app.avg_user_rating }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Price</td>
+                    {% for app in apps %}
+                    <td>{% if app.price == 0 %}Free{% else %}${{ "%.2f"|format(app.price) }}{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td>Installs</td>
+                    {% for app in apps %}<td>{{ app.installs }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Size</td>
+                    {% for app in apps %}<td>{{ app.size }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Content Rating</td>
+                    {% for app in apps %}<td>{{ app.content_rating }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Developer</td>
+                    {% for app in apps %}<td>{{ app.developer }}</td>{% endfor %}
+                </tr>
+                <tr>
+                    <td>Last Updated</td>
+                    {% for app in apps %}<td>{{ app.last_updated }}</td>{% endfor %}
+                </tr>
+            </tbody>
+        </table>
+        {% elif apps and apps|length == 1 %}
+        <div class="no-compare">Select a second app to compare.</div>
+        {% else %}
+        <div class="no-compare">Select two apps above to compare them side by side.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

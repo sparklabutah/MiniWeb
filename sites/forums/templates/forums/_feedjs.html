@@ -1,0 +1,45 @@
+<script>
+    const BASE = '{{ url_for("forums.index") }}';
+    function vote(postId, direction, btn) {
+        fetch(`${BASE}api/posts/${postId}/vote`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({direction: direction})
+        }).then(r => r.json()).then(data => {
+            if (data.score !== undefined) {
+                const pill = btn.closest('.vote-pill');
+                if (pill) {
+                    pill.querySelector('.score').textContent = data.score;
+                    const up = pill.querySelector('.up'), dn = pill.querySelector('.down');
+                    if (up) up.classList.toggle('active', data.user_vote === 'up');
+                    if (dn) dn.classList.toggle('active', data.user_vote === 'down');
+                }
+            }
+        }).catch(()=>{});
+    }
+    function savePost(postId, btn) {
+        fetch(`${BASE}api/posts/${postId}/save`, {method: 'POST'})
+            .then(r => r.json()).then(data => {
+                const l = btn.querySelector('.lbl');
+                if (l) l.textContent = data.action === 'saved' ? 'Saved' : 'Save';
+                btn.style.color = data.action === 'saved' ? 'var(--orange)' : '';
+            }).catch(()=>{});
+    }
+    function sharePost(postId, btn) {
+        fetch(`${BASE}api/posts/${postId}/share`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({method: 'copy_link'})
+        }).then(r => r.json()).then(data => {
+            const l = btn.querySelector('.lbl');
+            if (data.share_url) { navigator.clipboard.writeText(window.location.origin + data.share_url).catch(()=>{}); }
+            if (l) { l.textContent = 'Copied!'; setTimeout(() => l.textContent = 'Share', 1500); }
+        }).catch(()=>{});
+    }
+    function joinSub(name, btn) {
+        fetch(`${BASE}api/subreddits/${encodeURIComponent(name)}/join`, {method: 'POST'})
+            .then(r => r.json()).then(data => {
+                const joined = data.action === 'joined';
+                btn.textContent = joined ? 'Joined' : 'Join';
+                btn.classList.toggle('joined', joined);
+            }).catch(()=>{});
+    }
+</script>

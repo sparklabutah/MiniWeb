@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ meeting.title }} - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #1976d2; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .detail-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; margin-bottom: 1.5rem; }
+        .detail-header { padding: 1.5rem; border-bottom: 1px solid #f0f0f0; }
+        .detail-header h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+        .detail-header .tag { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; font-size: .78rem; font-weight: 600; margin-right: .5rem; }
+        .tag.scheduled { background: #e3f2fd; color: #1565c0; }
+        .tag.completed { background: #e8f5e9; color: #2e7d32; }
+        .tag.cancelled { background: #fce4ec; color: #c62828; }
+        .tag.work { background: #e3f2fd; color: #1565c0; }
+        .tag.personal { background: #fce4ec; color: #c62828; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+        @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+        .detail-field { padding: 1rem 1.5rem; border-bottom: 1px solid #f5f5f5; }
+        .detail-field:nth-child(odd) { border-right: 1px solid #f5f5f5; }
+        .detail-field .label { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: .3rem; }
+        .detail-field .value { font-size: .95rem; color: #1a1a2e; }
+        .participants-section { padding: 1.2rem 1.5rem; }
+        .participants-section h3 { font-size: .95rem; color: #1a1a2e; margin-bottom: .8rem; }
+        .participant { display: flex; align-items: center; gap: .6rem; padding: .4rem 0; }
+        .participant .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e3f2fd; color: #1565c0; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; }
+        .participant .name { font-size: .88rem; }
+        .participant .role { font-size: .75rem; color: #64748b; margin-left: .3rem; }
+        .recording-section { background: #fff8e1; border: 1px solid #ffe082; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: 1.5rem; }
+        .recording-section h3 { font-size: .95rem; color: #e65100; margin-bottom: .5rem; }
+        .recording-section a { color: #e65100; text-decoration: none; font-weight: 500; }
+        .recording-section a:hover { text-decoration: underline; }
+        .recording-meta { font-size: .85rem; color: #64748b; margin-top: .3rem; }
+        .actions { display: flex; gap: .8rem; margin-top: 1rem; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-danger { background: #c62828; color: #fff; }
+        .btn-danger:hover { background: #b71c1c; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-join-call { background: #2e7d32; color: #fff; }
+        .btn-join-call:hover { background: #1b5e20; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}" class="active">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a> &raquo; {{ meeting.title }}
+        </div>
+
+        <div class="detail-card">
+            <div class="detail-header">
+                <h2>{{ meeting.title }}</h2>
+                <span class="tag {{ meeting.status }}">{{ meeting.status|capitalize }}</span>
+                <span class="tag {{ meeting.type }}">{{ meeting.type|capitalize }}</span>
+            </div>
+
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="label">Date &amp; Time</div>
+                    <div class="value">{{ parse_dt(meeting.date).strftime('%A, %B %d, %Y at %I:%M %p') if parse_dt(meeting.date) else meeting.date }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Duration</div>
+                    <div class="value">{{ format_duration_minutes(meeting.duration_minutes) }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Host</div>
+                    <div class="value">{{ host.display_name if host else 'Unknown' }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Meeting ID</div>
+                    <div class="value" style="font-family: monospace;">{{ meeting.id }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Passcode</div>
+                    <div class="value" style="font-family: monospace;">
+                        {% if passcode %}<strong style="letter-spacing:1px;">{{ passcode }}</strong> <span style="color:#64748b;font-family:inherit;">&middot; required to join</span>{% else %}<span style="color:#64748b;">Not required</span>{% endif %}
+                    </div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Recording Available</div>
+                    <div class="value">{{ 'Yes' if meeting.recording_available else 'No' }}</div>
+                </div>
+                <div class="detail-field">
+                    <div class="label">Participants</div>
+                    <div class="value">{{ participants|length }} people</div>
+                </div>
+                {% if meeting.attachment and meeting.attachment.filename %}
+                <div class="detail-field">
+                    <div class="label">Attachment</div>
+                    <div class="value">&#128206; {{ meeting.attachment.filename }}{% if meeting.attachment.size_bytes is not none %} <span style="color:#64748b;">({{ meeting.attachment.size_bytes }} bytes)</span>{% endif %}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="participants-section">
+                <h3>Participants</h3>
+                {% for p in participants %}
+                <div class="participant">
+                    <div class="avatar">{{ p.display_name[0] }}</div>
+                    <span class="name">{{ p.display_name }}</span>
+                    {% if p.id == meeting.host_id %}<span class="role">(Host)</span>{% endif %}
+                </div>
+                {% endfor %}
+
+                <form method="POST" action="{{ url_for('remote-calls.form_invite_to_meeting', meeting_id=meeting.id) }}" style="display:flex;gap:.5rem;margin-top:1rem;align-items:center;">
+                    <input type="email" name="email" placeholder="Invite by email" required style="flex:1;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;">
+                    <button type="submit" class="btn btn-primary">Invite</button>
+                </form>
+            </div>
+        </div>
+
+        {% if recording %}
+        <div class="recording-section">
+            <h3>&#127909; Recording Available</h3>
+            <a href="{{ url_for('remote-calls.recording_detail', recording_id=recording.id) }}">{{ recording.title }}</a>
+            <div class="recording-meta">
+                {{ format_duration_minutes(recording.duration_minutes) }}
+                &middot; {{ recording.file_size_mb }} MB
+                &middot; {{ recording.format|upper }}
+                {% if recording.transcript_available %} &middot; Transcript available{% endif %}
+                &middot; {{ recording.views }} views
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="actions">
+            {% if meeting.status != 'cancelled' %}
+            <a href="{{ url_for('remote-calls.call_room', meeting_id=meeting.id) }}" class="btn btn-join-call">&#128249; Join Call{% if passcode %} &#128274;{% endif %}</a>
+            {% endif %}
+            <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Back to Meetings</a>
+            <button class="btn btn-primary" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Link Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
+            {% if meeting.status == 'scheduled' %}
+            <button class="btn btn-danger" onclick="cancelMeeting('{{ meeting.id }}')">Cancel Meeting</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function cancelMeeting(meetingId) {
+        if (!confirm('Are you sure you want to cancel this meeting?')) return;
+        fetch('{{ url_for("remote-calls.index") }}api/meetings/' + meetingId, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); }
+            else { location.reload(); }
+        })
+        .catch(err => alert('Error: ' + err));
+    }
+    </script>
+</body>
+</html>

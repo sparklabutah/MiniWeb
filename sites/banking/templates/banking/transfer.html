@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Funds - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #4da6ff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        .main { max-width: 600px; margin: 2rem auto; padding: 0 2rem; }
+        .form-card { background: #fff; padding: 2rem; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .form-card h2 { color: #0a2463; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .3rem; }
+        .form-group select, .form-group input { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; }
+        .form-group input:focus, .form-group select:focus { border-color: #4da6ff; outline: none; }
+        .btn-submit { width: 100%; padding: .8rem; background: #0a2463; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { background: #1e3a6e; }
+        .alert { padding: .8rem 1rem; border-radius: .4rem; margin-bottom: 1rem; font-size: .9rem; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    {% set nav_active = 'transfer' %}
+    {% include 'banking/_nav.html' %}
+
+    <div class="main">
+        <div class="form-card">
+            <h2>Transfer Funds</h2>
+
+            {% if result == 'success' %}
+            <div class="alert alert-success">Transfer completed successfully!</div>
+            {% elif result and result.startswith('error') %}
+            <div class="alert alert-error">Transfer failed. Please check the details and try again.</div>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('banking.transfer_submit') }}">
+                <div class="form-group">
+                    <label for="from_account">From Account</label>
+                    <select name="from_account" id="from_account" required>
+                        <option value="">Select source account</option>
+                        {% for acct in accounts %}
+                        <option value="{{ acct.id }}">{{ acct.type|capitalize }} - {{ acct.account_number }} (${{ "%.2f"|format(acct.balance) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="to_account">To Account</label>
+                    <select name="to_account" id="to_account" required>
+                        <option value="">Select destination account</option>
+                        {% for acct in accounts %}
+                        <option value="{{ acct.id }}">{{ acct.type|capitalize }} - {{ acct.account_number }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="amount">Transfer Amount ($)</label>
+                    <input type="number" name="amount" id="amount" min="0.01" step="0.01" placeholder="Enter amount" required oninput="syncSlider(this.value)">
+                </div>
+                <div class="form-group">
+                    <label for="amount_slider">Or use slider</label>
+                    <input type="range" id="amount_slider" min="1" max="10000" value="100" step="1" oninput="syncAmount(this.value)">
+                    <div id="slider-display" style="text-align:center;font-size:1rem;font-weight:600;color:#0a2463;margin-top:.3rem">$100.00</div>
+                </div>
+                <div class="form-group">
+                    <label for="memo">Memo (optional)</label>
+                    <input type="text" name="memo" id="memo" placeholder="e.g. Rent payment">
+                </div>
+                <button type="submit" class="btn-submit">Transfer Funds</button>
+            </form>
+        </div>
+    </div>
+    <script>
+    function syncAmount(val) {
+        document.getElementById('amount').value = val;
+        document.getElementById('slider-display').textContent = '$' + parseFloat(val).toFixed(2);
+    }
+    function syncSlider(val) {
+        var v = parseFloat(val) || 0;
+        if (v >= 1 && v <= 10000) {
+            document.getElementById('amount_slider').value = v;
+        }
+        document.getElementById('slider-display').textContent = '$' + v.toFixed(2);
+    }
+    </script>
+</body>
+</html>

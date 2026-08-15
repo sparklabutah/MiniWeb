@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Filings - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'filings' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h2>Tax Filings</h2>
+            <a href="{{ url_for('tax-filing-dmv-permits.file_1040_page') }}" class="submit-btn" style="text-decoration:none;padding:8px 16px">File a Form 1040</a>
+        </div>
+        <form class="filters" method="get">
+            <div>
+                <label for="q">Search</label>
+                <input type="text" name="q" id="q" value="{{ search_q or '' }}" placeholder="Search filings...">
+            </div>
+            <div>
+                <label for="tax_year">Tax Year</label>
+                <select name="tax_year" id="tax_year">
+                    <option value="">All Years</option>
+                    {% for y in tax_years %}
+                    <option value="{{ y }}" {% if selected_year == y|string %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="type">Type</label>
+                <select name="type" id="type">
+                    <option value="">All Types</option>
+                    {% for t in filing_types %}
+                    <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t|replace("_"," ")|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="status">Status</label>
+                <select name="status" id="status">
+                    <option value="">All</option>
+                    <option value="filed" {% if selected_status == 'filed' %}selected{% endif %}>Filed</option>
+                    <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="overdue" {% if selected_status == 'overdue' %}selected{% endif %}>Overdue</option>
+                </select>
+            </div>
+            <button type="submit">Filter</button>
+        </form>
+        <table>
+            <thead>
+                <tr><th>Filing ID</th><th>Type</th><th>Tax Year</th><th>Tax Owed</th><th>Tax Paid</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for f in filings %}
+                <tr>
+                    <td><a href="{{ url_for('tax-filing-dmv-permits.tax_filing_detail', filing_id=f.id) }}">{{ f.filing_id }}</a></td>
+                    <td>{{ f.type|replace("_"," ")|title }}</td>
+                    <td>{{ f.tax_year }}</td>
+                    <td>${{ "%.2f"|format(f.tax_owed) }}</td>
+                    <td>${{ "%.2f"|format(f.tax_paid) }}</td>
+                    <td><span class="badge badge-{{ f.status }}">{{ f.status|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

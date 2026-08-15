@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>u/{{ profile_user.username }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+    <style>
+        /* profile-specific bits layered on the shared design system */
+        .pf-banner{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;}
+        .pf-banner h1{font-size:1.35rem;font-weight:700;line-height:1.2;}
+        .pf-banner .sub{font-size:.82rem;color:var(--muted);margin-top:4px;}
+        .pf-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+        .pf-actions button{padding:6px 16px;border-radius:18px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;cursor:pointer;font-size:.8rem;}
+        .pf-actions button:hover{background:var(--hover);}
+        .pf-tabs{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;margin-bottom:16px;}
+        .pf-tabs button{padding:8px 18px;border:none;background:none;border-radius:16px;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--muted);}
+        .pf-tabs button.active{background:var(--chip);color:var(--ink);}
+        .tab-content{display:none;}
+        .tab-content.active{display:block;}
+        .cmt-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px;}
+        .cmt-item .meta{font-size:.78rem;color:var(--muted);margin-bottom:6px;}
+        .cmt-item .body{font-size:.9rem;color:#333;line-height:1.5;}
+    </style>
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <div class="pf-banner">
+                <span class="av lg" style="width:56px;height:56px;font-size:1.4rem;background:{{ avatar_color(profile_user.username) }};">{{ profile_user.username[0]|upper }}</span>
+                <div>
+                    <h1>u/{{ profile_user.username }}</h1>
+                    <div class="sub">{{ post_karma + comment_karma }} karma · Cake day {{ profile_user.cake_day }}</div>
+                </div>
+                {% if current_user and current_user.username != profile_user.username %}
+                <div class="pf-actions">
+                    <button onclick="followUser('{{ profile_user.username }}')">{% if profile_user.username in current_user.get('followed_users', []) %}Following{% else %}Follow{% endif %}</button>
+                    <button onclick="blockUser('{{ profile_user.username }}')" {% if profile_user.username in current_user.get('blocked_users', []) %}style="background:#fee2e2"{% endif %}>{% if profile_user.username in current_user.get('blocked_users', []) %}Blocked{% else %}Block{% endif %}</button>
+                    <button onclick="messageUser('{{ profile_user.username }}')">Message</button>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="pf-tabs">
+                <button class="active" onclick="showTab('posts')">Posts ({{ user_posts | length }})</button>
+                <button onclick="showTab('comments')">Comments ({{ user_comments | length }})</button>
+            </div>
+
+            <div class="tab-content active" id="tab-posts">
+                {% for post in user_posts %}
+                {% include "forums/_postcard.html" %}
+                {% else %}
+                <div class="rd-empty">No posts yet.</div>
+                {% endfor %}
+            </div>
+
+            <div class="tab-content" id="tab-comments">
+                {% for c in user_comments %}
+                <div class="cmt-item">
+                    <div class="meta">
+                        u/{{ profile_user.username }} commented on
+                        <a href="{{ url_for('forums.post_detail', post_id=c.post_id) }}" style="color:var(--blue);font-weight:600;">{{ c._post_title }}</a>
+                        {% if c._post_subreddit %}in r/{{ c._post_subreddit }}{% endif %} · {{ c.score }} points
+                    </div>
+                    <div class="body">{{ c.body[:200] }}{% if c.body|length > 200 %}...{% endif %}</div>
+                </div>
+                {% else %}
+                <div class="rd-empty">No comments yet.</div>
+                {% endfor %}
+            </div>
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">About</div>
+                <div class="widget-pad">
+                    <div class="about-stat"><span>Post Karma</span><b>{{ post_karma }}</b></div>
+                    <div class="about-stat"><span>Comment Karma</span><b>{{ comment_karma }}</b></div>
+                    <div class="about-stat"><span>Cake Day</span><b>{{ profile_user.cake_day }}</b></div>
+                    <div class="about-stat"><span>Communities</span><b>{{ profile_user.subscribed_subreddits | length }}</b></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "forums/_feedjs.html" %}
+    <script>
+        // BASE is declared in _feedjs.html (included above)
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.pf-tabs button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+        function followUser(username) {
+            var btn = event.target;
+            fetch(`${BASE}api/users/${username}/follow`, {method: 'POST'})
+                .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
+                    btn.textContent = d.action === 'followed' ? 'Following' : 'Follow';
+                    btn.style.background = d.action === 'followed' ? '#dbeafe' : '';
+                }).catch(() => { btn.textContent = 'Error'; });
+        }
+        function blockUser(username) {
+            var btn = event.target;
+            fetch(`${BASE}api/users/${username}/block`, {method: 'POST'})
+                .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
+                    btn.textContent = d.action === 'blocked' ? 'Blocked' : 'Block';
+                    btn.style.background = d.action === 'blocked' ? '#fee2e2' : '';
+                }).catch(() => { btn.textContent = 'Error'; });
+        }
+        function messageUser(username) {
+            const subject = prompt('Subject:') || '';
+            const body = prompt('Message:');
+            if (!body) return;
+            fetch(`${BASE}api/messages`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({to: username, subject: subject, body: body})
+            }).then(r => r.json()).then(d => alert(d.id ? 'Message sent!' : d.error));
+        }
+    </script>
+</body>
+</html>

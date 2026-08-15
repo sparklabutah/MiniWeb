@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>r/{{ subreddit }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <!-- community banner -->
+            <div class="postcard" style="display:flex;align-items:center;gap:14px;">
+                <span class="av lg" style="width:56px;height:56px;font-size:1.4rem;background:{{ community.color }};">{{ subreddit[0]|upper }}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:1.3rem;font-weight:800;">r/{{ subreddit }}</div>
+                    <div style="font-size:.8rem;color:var(--muted);">{{ "{:,}".format(community.post_count) }} posts</div>
+                </div>
+                <button class="btn-join" style="padding:8px 22px;" onclick="joinSub('{{ subreddit }}', this)">Join</button>
+            </div>
+
+            <div class="rd-sortbar">
+                <a class="{{ 'active' if sort == 'hot' }}" href="?sort=hot">🔥 Hot</a>
+                <a class="{{ 'active' if sort == 'new' }}" href="?sort=new">✦ New</a>
+                <a class="{{ 'active' if sort == 'top' }}" href="?sort=top">↑ Top</a>
+                <span class="sp"></span>
+            </div>
+
+            {% for post in posts %}
+            {% include "forums/_postcard.html" %}
+            {% else %}
+            <div class="rd-empty">No posts in this community yet.</div>
+            {% endfor %}
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">About Community</div>
+                <div class="widget-pad">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                        <span class="av md" style="background:{{ community.color }};">{{ subreddit[0]|upper }}</span>
+                        <b>r/{{ subreddit }}</b>
+                    </div>
+                    {% if community.description %}<p style="margin-bottom:10px;">{{ community.description }}</p>{% endif %}
+                    <div class="about-stat"><span>Posts</span><b>{{ "{:,}".format(community.post_count) }}</b></div>
+                    <div style="margin-top:12px;"><a class="rd-btn" href="{{ url_for('forums.submit_page') }}?subreddit={{ subreddit }}" style="display:block;text-align:center;">Create Post</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "forums/_feedjs.html" %}
+</body>
+</html>

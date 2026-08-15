@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Projects - DesignFlow</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+        .header { background: #fff; border-bottom: 1px solid #e8e8ef; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; color: #7c3aed; font-weight: 800; letter-spacing: -.5px; }
+        .header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; align-items: center; gap: 1rem; }
+        .header-nav a { font-size: .9rem; color: #64748b; text-decoration: none; padding: .3rem .6rem; border-radius: .3rem; transition: background .15s; }
+        .header-nav a:hover { background: #f1f0ff; color: #7c3aed; }
+        .header-nav .active { color: #7c3aed; font-weight: 600; }
+
+        .page-header { max-width: 1200px; margin: 2rem auto 0; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        .page-header h2 { font-size: 1.5rem; }
+        .page-header .create-btn { background: #7c3aed; color: #fff; padding: .55rem 1.2rem; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; }
+        .page-header .create-btn:hover { background: #6d28d9; }
+
+        .controls { max-width: 1200px; margin: 1rem auto; padding: 0 2rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+        .status-tabs { display: flex; gap: .3rem; }
+        .status-tab { padding: .35rem .8rem; border-radius: 2rem; font-size: .8rem; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #475569; text-decoration: none; transition: all .15s; }
+        .status-tab:hover, .status-tab.active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+        .controls label { font-size: .85rem; color: #64748b; margin-left: auto; }
+        .controls select { padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .85rem; background: #fff; }
+
+        .main { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem 3rem; }
+        .result-count { font-size: .85rem; color: #94a3b8; margin-bottom: 1rem; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.2rem; }
+        .card { background: #fff; border-radius: .6rem; overflow: hidden; border: 1px solid #e8e8ef; transition: box-shadow .2s, transform .15s; }
+        .card:hover { box-shadow: 0 8px 25px rgba(124,58,237,.12); transform: translateY(-2px); }
+        .card-thumb { height: 170px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        .card-thumb .dims { position: absolute; top: .5rem; right: .5rem; background: rgba(0,0,0,.6); color: #fff; padding: .15rem .5rem; border-radius: .2rem; font-size: .7rem; }
+        .card-thumb a { display: block; width: 100%; height: 100%; }
+        .card-body { padding: .8rem 1rem; }
+        .card-body h3 { font-size: .95rem; margin-bottom: .35rem; }
+        .card-body h3 a { color: #1a1a2e; text-decoration: none; }
+        .card-body h3 a:hover { color: #7c3aed; }
+        .card-meta { font-size: .8rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+        .status-badge { font-size: .72rem; padding: .15rem .5rem; border-radius: .2rem; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+
+        .placeholder-thumb { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: rgba(255,255,255,.7); font-weight: 700; }
+        .thumb-1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .thumb-2 { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+        .thumb-3 { background: linear-gradient(135deg, #f97316, #ef4444); }
+        .thumb-4 { background: linear-gradient(135deg, #10b981, #059669); }
+        .thumb-5 { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+        .thumb-6 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .thumb-7 { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+
+        .card-actions { padding: .5rem 1rem .8rem; display: flex; gap: .5rem; }
+        .card-actions a, .card-actions button { font-size: .78rem; padding: .3rem .6rem; border-radius: .3rem; text-decoration: none; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #475569; transition: all .15s; }
+        .card-actions a:hover, .card-actions button:hover { border-color: #7c3aed; color: #7c3aed; }
+
+        .no-projects { text-align: center; color: #94a3b8; padding: 4rem 2rem; }
+        .no-projects h3 { font-size: 1.2rem; margin-bottom: .5rem; color: #64748b; }
+        .no-projects a { color: #7c3aed; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('design-creative.index') }}">DesignFlow</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('design-creative.index') }}">Templates</a>
+            <a href="{{ url_for('design-creative.assets_page') }}">Assets</a>
+            <a href="{{ url_for('design-creative.projects_page') }}" class="active">My Projects</a>
+            <a href="{{ url_for('design-creative.logout') }}">Logout ({{ user.name }})</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <h2>My Projects</h2>
+        <form method="post" action="{{ url_for('design-creative.form_create_project') }}" style="display:flex;gap:.5rem;align-items:center;">
+            <input type="text" name="title" placeholder="Design name" autocomplete="off"
+                   style="padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:.4rem;font-size:.9rem;">
+            <button type="submit" class="create-btn">+ Create New Design</button>
+        </form>
+    </div>
+
+    <div class="controls">
+        <div class="status-tabs">
+            <a class="status-tab {{ 'active' if not status }}" href="{{ url_for('design-creative.projects_page', sort=sort) }}">All</a>
+            <a class="status-tab {{ 'active' if status == 'draft' }}" href="{{ url_for('design-creative.projects_page', status='draft', sort=sort) }}">Drafts</a>
+            <a class="status-tab {{ 'active' if status == 'completed' }}" href="{{ url_for('design-creative.projects_page', status='completed', sort=sort) }}">Completed</a>
+        </div>
+        <label>Sort:
+            <select id="sort-select" onchange="applySort()">
+                <option value="modified" {{ 'selected' if sort == 'modified' }}>Last Modified</option>
+                <option value="created" {{ 'selected' if sort == 'created' }}>Date Created</option>
+                <option value="name" {{ 'selected' if sort == 'name' }}>Name A-Z</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="main">
+        <div class="result-count">{{ projects|length }} project{{ 's' if projects|length != 1 }}</div>
+
+        {% if projects %}
+        <div class="grid">
+            {% for proj in projects %}
+            <div class="card" data-id="{{ proj.id }}">
+                <div class="card-thumb">
+                    <div class="placeholder-thumb thumb-{{ (proj.id % 7) + 1 }}">
+                        {{ proj.title[:1] }}
+                    </div>
+                    <span class="dims">{{ proj.dimensions }}</span>
+                </div>
+                <div class="card-body">
+                    <h3><a href="{{ url_for('design-creative.project_detail', project_id=proj.id) }}">{{ proj.title }}</a></h3>
+                    <div class="card-meta">
+                        <span class="status-badge status-{{ proj.status }}">{{ proj.status }}</span>
+                        <span>Modified {{ proj.modified_date }}</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <a href="{{ url_for('design-creative.editor', project_id=proj.id) }}">Edit</a>
+                    <form method="post" action="{{ url_for('design-creative.form_duplicate_project', project_id=proj.id) }}" style="display:inline">
+                        <button type="submit">Duplicate</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-projects">
+            <h3>No projects yet</h3>
+            <p>Start from a <a href="{{ url_for('design-creative.index') }}">template</a> or create a blank design.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function applySort() {
+        const params = new URLSearchParams(window.location.search);
+        params.set('sort', document.getElementById('sort-select').value);
+        window.location.href = '{{ url_for("design-creative.projects_page") }}?' + params.toString();
+    }
+    </script>
+</body>
+</html>

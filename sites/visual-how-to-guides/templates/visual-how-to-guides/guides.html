@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Guides - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+        .navbar .search-box { display: flex; margin-right: 16px; }
+        .navbar .search-box input { border: 1px solid #ddd; border-radius: 4px 0 0 4px; padding: 6px 12px; font-size: 14px; width: 200px; outline: none; }
+        .navbar .search-box input:focus { border-color: #4CAF50; }
+        .navbar .search-box button { background: #4CAF50; color: #fff; border: none; padding: 6px 14px; border-radius: 0 4px 4px 0; cursor: pointer; font-size: 14px; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .page-header { padding: 28px 0 20px; border-bottom: 1px solid #e0e0e0; margin-bottom: 24px; }
+        .page-header h1 { font-size: 28px; color: #333; }
+
+        .layout { display: flex; gap: 24px; padding: 24px 0; }
+        .sidebar { width: 260px; flex-shrink: 0; }
+        .main-content { flex: 1; min-width: 0; }
+
+        .filter-section { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .filter-section h3 { font-size: 15px; color: #4CAF50; margin-bottom: 14px; border-bottom: 2px solid #4CAF50; padding-bottom: 8px; }
+        .filter-group { margin-bottom: 16px; }
+        .filter-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+        .filter-group select,
+        .filter-group input[type="range"],
+        .filter-group input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
+        .filter-group select:focus,
+        .filter-group input:focus { outline: none; border-color: #4CAF50; }
+        .filter-group input[type="range"] { padding: 0; cursor: pointer; accent-color: #4CAF50; }
+        .difficulty-labels { display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 4px; }
+        .filter-btn { width: 100%; padding: 10px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+        .filter-btn:hover { background: #45a049; }
+        .reset-link { display: block; text-align: center; margin-top: 10px; font-size: 13px; }
+
+        .results-info { font-size: 14px; color: #777; margin-bottom: 16px; }
+
+        .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .guide-card { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; background: #fff; }
+        .guide-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .guide-card .thumb { width: 100%; height: 160px; background: #e8f5e9; display: flex; align-items: center; justify-content: center; color: #4CAF50; font-size: 14px; }
+        .guide-card .card-body { padding: 16px; }
+        .guide-card .card-body h3 { font-size: 16px; margin-bottom: 8px; }
+        .guide-card .card-body h3 a { color: #333; }
+        .guide-card .card-body h3 a:hover { color: #4CAF50; }
+        .guide-card .card-body p { font-size: 13px; color: #666; margin-bottom: 10px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .guide-card .meta { font-size: 13px; color: #777; display: flex; gap: 12px; flex-wrap: wrap; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state h3 { margin-bottom: 10px; font-size: 18px; color: #666; }
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.authors_directory') }}">Authors</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <form class="search-box" action="{{ url_for('visual-how-to-guides.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search guides..." value="{{ q }}">
+            <button type="submit">Search</button>
+        </form>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Browse Guides</h1>
+        </div>
+
+        <div class="layout">
+            <aside class="sidebar">
+                <form class="filter-section" method="get" action="{{ url_for('visual-how-to-guides.guides_list') }}">
+                    <h3>Filters</h3>
+
+                    <div class="filter-group">
+                        <label for="category">Category</label>
+                        <select name="category" id="category">
+                            <option value="">All Categories</option>
+                            {% for c in categories %}
+                            <option value="{{ c.name }}" {% if cat == c.name %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="difficulty">Difficulty</label>
+                        <select name="difficulty" id="difficulty">
+                            <option value="">Any Difficulty</option>
+                            <option value="Beginner" {% if diff == 'Beginner' %}selected{% endif %}>Beginner</option>
+                            <option value="Intermediate" {% if diff == 'Intermediate' %}selected{% endif %}>Intermediate</option>
+                            <option value="Advanced" {% if diff == 'Advanced' %}selected{% endif %}>Advanced</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="difficulty_slider">Difficulty Level (1-3)</label>
+                        <input type="range" name="difficulty_max" id="difficulty_slider" min="1" max="3" value="3" step="1">
+                        <div class="difficulty-labels">
+                            <span>Easy</span>
+                            <span>Medium</span>
+                            <span>Hard</span>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sort">Sort By</label>
+                        <select name="sort" id="sort">
+                            <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest First</option>
+                            <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+                            <option value="rating" {% if sort == 'rating' %}selected{% endif %}>Highest Rated</option>
+                            <option value="popular" {% if sort == 'popular' %}selected{% endif %}>Most Popular</option>
+                            <option value="duration_asc" {% if sort == 'duration_asc' %}selected{% endif %}>Shortest First</option>
+                            <option value="duration_desc" {% if sort == 'duration_desc' %}selected{% endif %}>Longest First</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="search-q">Search</label>
+                        <input type="text" name="q" id="search-q" value="{{ q }}" placeholder="Keywords...">
+                    </div>
+
+                    <button type="submit" class="filter-btn">Apply Filters</button>
+                    <a href="{{ url_for('visual-how-to-guides.guides_list') }}" class="reset-link">Reset Filters</a>
+                </form>
+            </aside>
+
+            <div class="main-content">
+                <div class="results-info">
+                    {{ guides|length }} guide{{ 's' if guides|length != 1 else '' }} found
+                    {% if q %} for "{{ q }}"{% endif %}
+                    {% if cat %} in {{ cat }}{% endif %}
+                    {% if diff %} ({{ diff }}){% endif %}
+                </div>
+
+                {% if guides %}
+                <div class="guide-grid">
+                    {% for guide in guides %}
+                    <div class="guide-card">
+                        <div class="thumb">{% if guide.cover_image %}<img src="{{ guide.cover_image }}" alt="" style="width:100%;height:100%;object-fit:cover">{% else %}{{ guide.title[:30] }}{% endif %}</div>
+                        <div class="card-body">
+                            <h3><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=guide.id) }}">{{ guide.title }}</a></h3>
+                            {% if guide.author %}<div style="font-size:13px;color:#777;margin-bottom:6px;">by <a href="{{ url_for('visual-how-to-guides.author_page', name=guide.author) }}" style="color:#4CAF50;">{{ guide.author }}</a></div>{% endif %}
+                            <p>{{ guide.description }}</p>
+                            <div class="meta">
+                                <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                                <span>{{ guide.time_estimate }}</span>
+                                <span>{{ guide.rating }}/5</span>
+                                <span>{{ guide.steps|length }} steps</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <h3>No guides found</h3>
+                    <p>Try adjusting your filters or <a href="{{ url_for('visual-how-to-guides.guides_list') }}">browse all guides</a>.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+</body>
+</html>

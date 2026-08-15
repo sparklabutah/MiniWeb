@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - ShopHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #eaeded; color: #0f1111; }
+        .header { background: #131921; padding: .6rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .header .logo { color: #fff; font-size: 1.4rem; font-weight: 700; text-decoration: none; }
+        .header .logo span { color: #febd69; }
+        .header-nav { margin-left: auto; display: flex; gap: 1rem; }
+        .header-nav a { color: #fff; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #febd69; }
+        .container { max-width: 1000px; margin: 1rem auto; padding: 0 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+        .checkout-main { flex: 1; min-width: 320px; }
+        .panel { background: #fff; border-radius: .4rem; padding: 1.2rem; margin-bottom: 1rem; }
+        .panel h2 { font-size: 1.1rem; margin-bottom: .8rem; padding-bottom: .5rem; border-bottom: 1px solid #e3e6e6; }
+        .form-row { margin-bottom: .7rem; }
+        .form-row label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: .25rem; }
+        .form-row input, .form-row select { width: 100%; padding: .45rem .6rem; border: 1px solid #a6a6a6; border-radius: .3rem; font-size: .9rem; }
+        .form-row input:focus, .form-row select:focus { outline: none; border-color: #e77600; box-shadow: 0 0 3px rgba(228,121,17,.5); }
+        .form-grid { display: flex; gap: .7rem; }
+        .form-grid .form-row { flex: 1; }
+        .ship-option { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem; border: 1px solid #d5d9d9; border-radius: .3rem; margin-bottom: .5rem; cursor: pointer; font-size: .88rem; }
+        .ship-option:hover { background: #f7fafa; }
+        .ship-option input { accent-color: #e77600; }
+        .ship-option .ship-price { margin-left: auto; font-weight: 700; }
+        .ship-option .ship-eta { color: #565959; font-size: .8rem; }
+        .summary-box { width: 280px; flex-shrink: 0; background: #fff; border-radius: .4rem; padding: 1.2rem; position: sticky; top: 1rem; }
+        .summary-box h3 { font-size: 1rem; margin-bottom: .8rem; }
+        .summary-line { display: flex; justify-content: space-between; font-size: .88rem; margin-bottom: .4rem; }
+        .summary-line.total { font-size: 1.05rem; font-weight: 700; color: #b12704; border-top: 1px solid #e3e6e6; padding-top: .5rem; margin-top: .5rem; }
+        .item-line { display: flex; justify-content: space-between; gap: .5rem; font-size: .8rem; color: #565959; margin-bottom: .3rem; }
+        .btn-place-order { display: block; width: 100%; padding: .6rem; background: #ffd814; border: none; border-radius: 1.2rem; font-size: .95rem; font-weight: 600; cursor: pointer; text-align: center; margin-top: .8rem; }
+        .btn-place-order:hover { background: #f7ca00; }
+        .error-msg { background: #fff5f5; border: 1px solid #d00; color: #d00; border-radius: .3rem; padding: .6rem .8rem; font-size: .85rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('e-commerce.index') }}" class="logo">Shop<span>Hub</span></a>
+        <div class="header-nav">
+            <a href="{{ url_for('e-commerce.cart_page') }}">Cart</a>
+            <a href="{{ url_for('e-commerce.orders_page') }}">Orders</a>
+            <a href="{{ url_for('e-commerce.logout') }}">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="checkout-main">
+            <form method="POST" action="{{ url_for('e-commerce.form_checkout') }}" id="checkout-form">
+                {% if error %}
+                <div class="error-msg">{{ error }}</div>
+                {% endif %}
+
+                <div class="panel">
+                    <h2>1. Shipping Address</h2>
+                    <div class="form-row">
+                        <label for="full_name">Full name</label>
+                        <input type="text" id="full_name" name="full_name" value="{{ form.full_name or user.name or '' }}" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="street">Street address</label>
+                        <input type="text" id="street" name="street" value="{{ form.street or '' }}" placeholder="123 Main St, Apt 4" required>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label for="city">City</label>
+                            <input type="text" id="city" name="city" value="{{ form.city or '' }}" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="state">State</label>
+                            <input type="text" id="state" name="state" value="{{ form.state or '' }}" placeholder="UT">
+                        </div>
+                        <div class="form-row">
+                            <label for="zip_code">ZIP code</label>
+                            <input type="text" id="zip_code" name="zip_code" value="{{ form.zip_code or '' }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>2. Shipping Method</h2>
+                    {% for m in shipping_methods %}
+                    <label class="ship-option">
+                        <input type="radio" name="shipping_method" value="{{ m.id }}"
+                               {{ 'checked' if (form.shipping_method or 'standard') == m.id }}>
+                        <span>{{ m.label }} <span class="ship-eta">({{ m.eta }})</span></span>
+                        <span class="ship-price">{{ 'FREE' if m.cost == 0 else '$%.2f'|format(m.cost) }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="panel">
+                    <h2>3. Payment Method</h2>
+                    <div class="form-row">
+                        <label for="account_type">Pay with</label>
+                        <select id="account_type" name="account_type">
+                            <option value="checking" {{ 'selected' if form.account_type == 'checking' }}>Checking Account</option>
+                            <option value="credit" {{ 'selected' if form.account_type == 'credit' }}>Credit Card</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="summary-box">
+            <h3>Order Summary</h3>
+            {% for item in cart_items %}
+            <div class="item-line">
+                <span>{{ item.product.name[:40] }}{{ '…' if item.product.name|length > 40 }} × {{ item.quantity }}</span>
+                <span>${{ "%.2f"|format(item.subtotal) }}</span>
+            </div>
+            {% endfor %}
+            <div class="summary-line" style="margin-top:.6rem;">
+                <span>Subtotal</span><span>${{ "%.2f"|format(total) }}</span>
+            </div>
+            <div class="summary-line">
+                <span>Shipping</span><span id="shipping-cost">$0.00</span>
+            </div>
+            <div class="summary-line total">
+                <span>Order total</span><span id="order-total">${{ "%.2f"|format(total) }}</span>
+            </div>
+            <button type="submit" form="checkout-form" class="btn-place-order">Place Your Order</button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var subtotal = {{ total | tojson }};
+        var costs = { {% for m in shipping_methods %}{{ m.id | tojson }}: {{ m.cost | tojson }}{{ ',' if not loop.last }}{% endfor %} };
+        function updateTotals() {
+            var sel = document.querySelector('input[name="shipping_method"]:checked');
+            var cost = sel ? (costs[sel.value] || 0) : 0;
+            document.getElementById('shipping-cost').textContent = cost === 0 ? 'FREE' : '$' + cost.toFixed(2);
+            document.getElementById('order-total').textContent = '$' + (subtotal + cost).toFixed(2);
+        }
+        document.querySelectorAll('input[name="shipping_method"]').forEach(function(r) {
+            r.addEventListener('change', updateTotals);
+        });
+        updateTotals();
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+    <style>
+        .post-body-full { font-size:.95rem; line-height:1.6; white-space:pre-wrap; color:#222; margin:8px 0 12px; }
+        .post-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
+        .pd-act { background:var(--bg); border:none; border-radius:18px; padding:7px 12px; font-size:.8rem; font-weight:600; color:var(--muted); }
+        .pd-act:hover { background:var(--hover); color:var(--ink); }
+        .share-dropdown { position:relative; }
+        .share-menu { display:none; position:absolute; left:0; top:110%; background:#fff; border:1px solid var(--line); border-radius:8px; min-width:170px; z-index:60; box-shadow:0 4px 16px rgba(0,0,0,.12); overflow:hidden; }
+        .share-menu.open { display:block; }
+        .share-menu button { display:block; width:100%; text-align:left; padding:9px 12px; border:none; background:none; font-size:.85rem; color:var(--ink); }
+        .share-menu button:hover { background:var(--hover); }
+        .edit-form textarea { width:100%; min-height:64px; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:.9rem; }
+        .edit-form button { margin-top:6px; padding:6px 14px; border:none; border-radius:16px; font-weight:700; font-size:.8rem; cursor:pointer; }
+        .edit-form .save-btn { background:var(--blue); color:#fff; } .edit-form .cancel-btn { background:var(--chip); color:var(--ink); margin-left:4px; }
+        .comment-form textarea { width:100%; min-height:88px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-family:inherit; font-size:.9rem; outline:none; }
+        .comment-form textarea:focus { border-color:var(--blue); }
+        .comments-h { font-size:.85rem; font-weight:700; color:var(--muted); margin:16px 4px 8px; }
+        .comment { padding:8px 0 4px 0; }
+        .comment-meta { font-size:.76rem; color:var(--muted); margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+        .comment-meta .cav { width:20px; height:20px; }
+        .comment-meta b { color:var(--ink); }
+        .comment-body { font-size:.9rem; line-height:1.5; color:#222; margin-bottom:6px; }
+        .comment-actions { display:flex; align-items:center; gap:2px; }
+        .comment-actions button { font-size:.75rem; color:var(--muted); background:none; border:none; font-weight:700; padding:4px 8px; border-radius:14px; }
+        .comment-actions button:hover { background:var(--hover); color:var(--ink); }
+        .children { margin-left:16px; padding-left:12px; border-left:2px solid var(--line2); }
+        .mod-banner { border-radius:8px; padding:8px 12px; font-size:.82rem; font-weight:700; margin-bottom:10px; }
+        .mod-banner.removed { background:#fde2dd; color:#a4260a; }
+        .mod-banner.locked { background:#fdeecd; color:#8a5a00; }
+        .mod-banner.sticky { background:#dff0e0; color:#2a7d3a; }
+        .mod-bar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line2); }
+        .mod-bar .lbl { font-size:.72rem; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+        .mod-bar button { border:none; border-radius:16px; padding:6px 13px; font-size:.78rem; font-weight:700; cursor:pointer; }
+        .mb-remove { background:#fde2dd; color:#a4260a; }
+        .mb-lock { background:#fdeecd; color:#8a5a00; }
+        .mb-pin { background:#dff0e0; color:#2a7d3a; }
+    </style>
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <article class="postcard">
+                {% if is_removed %}<div class="mod-banner removed">🚫 Removed by moderators — hidden from the community and feeds.</div>{% endif %}
+                {% if is_locked %}<div class="mod-banner locked">🔒 Locked — new comments are disabled.</div>{% endif %}
+                {% if is_sticky %}<div class="mod-banner sticky">📌 Pinned to the top of r/{{ post.subreddit }}.</div>{% endif %}
+                <div class="pc-head">
+                    <a href="{{ url_for('forums.subreddit_view', subreddit_name=post.subreddit) }}"><span class="av sm" style="background:{{ post._av }};">{{ post.subreddit[0]|upper }}</span></a>
+                    <a class="sub" href="{{ url_for('forums.subreddit_view', subreddit_name=post.subreddit) }}">r/{{ post.subreddit }}</a>
+                    <span class="dot">•</span>
+                    <span>Posted by <a href="{{ url_for('forums.user_profile', username=post.author) }}" style="color:inherit;">u/{{ post.author }}</a> · {{ format_time_ago(post.created_utc) }}</span>
+                    {% if post.flair %}<span class="flair">{{ post.flair }}</span>{% endif %}
+                </div>
+
+                <h1 class="pc-title" style="font-size:1.35rem;">{{ post.title }}</h1>
+
+                {% if post._media.kind == 'image' %}
+                <div class="pc-media"><img src="{{ post._media.url }}" alt=""></div>
+                {% elif post._media.kind == 'link' %}
+                <a class="pc-link" href="{{ post._media.url }}" target="_blank" rel="noopener"><span class="lk-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span><span class="lk-url">{{ post._media.url }}</span></a>
+                {% endif %}
+                {% if post.body %}<div class="post-body-full">{{ post.body }}</div>{% endif %}
+
+                <div class="post-actions">
+                    <div class="vote-pill">
+                        <button class="up" onclick="votePost('up')" title="Upvote"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l8 9h-5v7h-6v-7H4z"/></svg></button>
+                        <span class="score" id="post-score">{{ post.score }}</span>
+                        <button class="down" onclick="votePost('down')" title="Downvote"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20l-8-9h5V4h6v7h5z"/></svg></button>
+                    </div>
+                    <span class="pd-act" style="background:none;">💬 {{ post._comment_count }} Comments</span>
+                    <div class="share-dropdown">
+                        <button class="pd-act" onclick="toggleShareMenu()">↗ Share</button>
+                        <div class="share-menu" id="share-menu">
+                            <button onclick="sharePost('copy_link')">Copy Link</button>
+                            <button onclick="sharePost('crosspost')">Crosspost</button>
+                            <button onclick="sharePost('dm')">Send as Message</button>
+                        </div>
+                    </div>
+                    <button class="pd-act" onclick="savePost()">Save</button>
+                    {% if current_user and current_user.root_user_id == post.author_root_user_id %}
+                    <button class="pd-act" onclick="showEditPost()">Edit</button>
+                    <button class="pd-act" onclick="deletePost()">Delete</button>
+                    {% endif %}
+                    <button class="pd-act" onclick="showReport()">Report</button>
+                </div>
+                {% if is_moderator %}
+                <div class="mod-bar">
+                    <span class="lbl">Mod</span>
+                    <button class="mb-remove" onclick="modRemove({{ 'true' if is_removed else 'false' }})">{{ 'Restore' if is_removed else 'Remove' }}</button>
+                    <button class="mb-lock" onclick="modLock({{ 'true' if is_locked else 'false' }})">{{ 'Unlock' if is_locked else 'Lock' }}</button>
+                    <button class="mb-pin" onclick="modPin({{ 'true' if is_sticky else 'false' }})">{{ 'Unpin' if is_sticky else 'Pin' }}</button>
+                    <a class="pd-act" href="{{ url_for('forums.mod_queue', subreddit_name=post.subreddit) }}" style="text-decoration:none;">Queue</a>
+                </div>
+                {% endif %}
+                <div id="edit-post-form" style="display:none;" class="edit-form" style="margin-top:10px;">
+                    <textarea id="edit-post-body">{{ post.body }}</textarea>
+                    <button class="save-btn" onclick="saveEditPost()">Save</button>
+                    <button class="cancel-btn" onclick="document.getElementById('edit-post-form').style.display='none'">Cancel</button>
+                </div>
+            </article>
+
+            {% if is_locked or is_removed %}
+            <div class="postcard rd-empty" style="padding:16px;">
+                {% if is_removed %}This post was removed by moderators. Commenting is disabled.{% else %}🔒 This post is locked. New comments are disabled.{% endif %}
+            </div>
+            {% else %}
+            <div class="postcard comment-form">
+                <textarea id="comment-body" placeholder="What are your thoughts?"></textarea>
+                <button class="rd-btn blue" style="margin-top:8px;" onclick="addComment()">Comment</button>
+            </div>
+            {% endif %}
+
+            <div class="postcard">
+                <div class="comments-h">{{ post._comment_count }} Comments</div>
+                {% macro render_comments(nodes) %}
+                {% for c in nodes %}
+                <div class="comment" data-comment-id="{{ c.id }}">
+                    <div class="comment-meta">
+                        <span class="av cav" style="background:{{ avatar_color(c.author) }};">{{ c.author[0]|upper }}</span>
+                        <a href="{{ url_for('forums.user_profile', username=c.author) }}"><b>u/{{ c.author }}</b></a>
+                        · {{ c.score }} points · {{ format_time_ago(c.created_utc) }}
+                    </div>
+                    <div class="comment-body">{{ c.body }}</div>
+                    <div class="comment-actions">
+                        <button onclick="voteComment('{{ c.id }}', 'up')" title="Upvote">▲</button>
+                        <button onclick="voteComment('{{ c.id }}', 'down')" title="Downvote">▼</button>
+                        <button onclick="showReply('{{ c.id }}')">Reply</button>
+                        {% if current_user and current_user.root_user_id == c.author_root_user_id %}
+                        <button onclick="deleteComment('{{ c.id }}')">Delete</button>
+                        {% endif %}
+                    </div>
+                    <div id="reply-{{ c.id }}" style="display:none;" class="edit-form">
+                        <textarea id="reply-body-{{ c.id }}" placeholder="Write a reply..."></textarea>
+                        <button class="save-btn" onclick="submitReply('{{ c.id }}')">Reply</button>
+                        <button class="cancel-btn" onclick="document.getElementById('reply-{{ c.id }}').style.display='none'">Cancel</button>
+                    </div>
+                    {% if c.children %}<div class="children">{{ render_comments(c.children) }}</div>{% endif %}
+                </div>
+                {% endfor %}
+                {% endmacro %}
+                {{ render_comments(comment_tree) }}
+                {% if not comment_tree %}<div class="rd-empty" style="padding:20px;">No comments yet. Be the first to share what you think!</div>{% endif %}
+            </div>
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">Community</div>
+                <div class="widget-pad">
+                    <a href="{{ url_for('forums.subreddit_view', subreddit_name=post.subreddit) }}" style="display:flex;align-items:center;gap:10px;">
+                        <span class="av md" style="background:{{ post._av }};">{{ post.subreddit[0]|upper }}</span>
+                        <b>r/{{ post.subreddit }}</b>
+                    </a>
+                    <div style="margin-top:12px;"><a class="rd-btn" href="{{ url_for('forums.submit_page') }}?subreddit={{ post.subreddit }}" style="display:block;text-align:center;">Create Post</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE = '{{ url_for("forums.index") }}';
+        const POST_ID = '{{ post.id }}';
+
+        // In-page confirmation. Native confirm()/alert()/prompt() are suppressed
+        // inside the sandboxed portal iframe (no allow-modals), so they silently
+        // return false — which used to make Delete do nothing. This modal works
+        // regardless of the iframe sandbox.
+        function uiConfirm(message, confirmLabel) {
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
+                var box = document.createElement('div');
+                box.style.cssText = 'background:#fff;color:#1a1a1b;border-radius:10px;max-width:340px;width:90%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.3);font-family:inherit;';
+                box.innerHTML = '<div style="font-size:15px;margin-bottom:16px;line-height:1.4;">' + message + '</div>' +
+                    '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+                    '<button data-act="cancel" style="padding:7px 16px;border:1px solid #ccc;background:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Cancel</button>' +
+                    '<button data-act="ok" style="padding:7px 16px;border:none;background:#d93a00;color:#fff;border-radius:18px;font-weight:600;cursor:pointer;">' + (confirmLabel || 'Confirm') + '</button>' +
+                    '</div>';
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                function done(val) { if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(val); }
+                box.querySelector('[data-act="cancel"]').onclick = function () { done(false); };
+                box.querySelector('[data-act="ok"]').onclick = function () { done(true); };
+                ov.onclick = function (e) { if (e.target === ov) done(false); };
+            });
+        }
+
+        function votePost(dir) {
+            fetch(`${BASE}api/posts/${POST_ID}/vote`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).then(r => r.json()).then(d => {
+                if(d.score !== undefined) document.getElementById('post-score').textContent = d.score;
+                var pill = document.getElementById('post-score').closest('.vote-pill');
+                if(pill){
+                    var up = pill.querySelector('.up'), dn = pill.querySelector('.down');
+                    if(up) up.classList.toggle('active', d.user_vote === 'up');
+                    if(dn) dn.classList.toggle('active', d.user_vote === 'down');
+                }
+            });
+        }
+        function voteComment(cid, dir) {
+            fetch(`${BASE}api/comments/${cid}/vote`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function addComment() {
+            const body = document.getElementById('comment-body').value.trim();
+            if (!body) return;
+            fetch(`${BASE}api/posts/${POST_ID}/comments`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function showReply(cid) { document.getElementById('reply-' + cid).style.display = 'block'; }
+        function submitReply(parentId) {
+            const body = document.getElementById('reply-body-' + parentId).value.trim();
+            if (!body) return;
+            fetch(`${BASE}api/posts/${POST_ID}/comments`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body, parent_comment_id: parentId})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function deleteComment(cid) {
+            uiConfirm('Delete this comment?', 'Delete').then(function (ok) {
+                if (!ok) return;
+                fetch(`${BASE}api/comments/${cid}`, {method: 'DELETE'}).then(() => location.reload());
+            });
+        }
+        function savePost() {
+            var btn = document.querySelector('.post-actions button[onclick="savePost()"]');
+            fetch(`${BASE}api/posts/${POST_ID}/save`, {method: 'POST'})
+                .then(r => r.json()).then(d => {
+                    if (btn) { btn.textContent = d.action === 'saved' ? 'Saved' : 'Save'; btn.style.color = d.action === 'saved' ? 'var(--orange)' : ''; }
+                });
+        }
+        function toggleShareMenu() { document.getElementById('share-menu').classList.toggle('open'); }
+        function sharePost(method) {
+            document.getElementById('share-menu').classList.remove('open');
+            fetch(`${BASE}api/posts/${POST_ID}/share`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({method: method})
+            }).then(r => r.json()).then(d => {
+                if (method === 'copy_link' && d.share_url) {
+                    navigator.clipboard.writeText(window.location.origin + d.share_url)
+                        .then(() => alert('Link copied to clipboard!'))
+                        .catch(() => alert('Share link: ' + d.share_url));
+                } else { alert('Shared via ' + method); }
+            });
+        }
+        function deletePost() {
+            uiConfirm('Delete this post? This cannot be undone.', 'Delete').then(function (ok) {
+                if (!ok) return;
+                fetch(`${BASE}api/posts/${POST_ID}`, {method: 'DELETE'})
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d && d.status === 'deleted') {
+                            window.location.href = '{{ url_for("forums.index") }}';
+                        } else {
+                            uiConfirm((d && d.error) || 'Could not delete this post.', 'OK');
+                        }
+                    })
+                    .catch(() => uiConfirm('Could not delete this post.', 'OK'));
+            });
+        }
+        function showEditPost() { document.getElementById('edit-post-form').style.display = 'block'; }
+        function saveEditPost() {
+            const body = document.getElementById('edit-post-body').value.trim();
+            fetch(`${BASE}api/posts/${POST_ID}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body})
+            }).then(() => location.reload());
+        }
+        // In-page report modal — native prompt()/alert() are suppressed in the
+        // sandboxed portal iframe, so the old prompt-based flow silently no-oped.
+        function showReport() {
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
+            var box = document.createElement('div');
+            box.style.cssText = 'background:#fff;color:#1a1a1b;border-radius:10px;max-width:380px;width:90%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.3);font-family:inherit;';
+            box.innerHTML =
+                '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">Report post</div>' +
+                '<label style="font-size:13px;color:#555;">Reason</label>' +
+                '<select id="rep-reason" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;">' +
+                '<option value="spam">Spam</option><option value="harassment">Harassment</option>' +
+                '<option value="misinformation">Misinformation</option><option value="other">Other</option></select>' +
+                '<label style="font-size:13px;color:#555;">Additional details (optional)</label>' +
+                '<textarea id="rep-desc" rows="3" style="width:100%;padding:8px;margin:4px 0 14px;border:1px solid #ccc;border-radius:6px;resize:vertical;font-family:inherit;"></textarea>' +
+                '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+                '<button data-act="cancel" style="padding:7px 16px;border:1px solid #ccc;background:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Cancel</button>' +
+                '<button data-act="ok" style="padding:7px 16px;border:none;background:#d93a00;color:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Submit report</button>' +
+                '</div>';
+            ov.appendChild(box); document.body.appendChild(ov);
+            function close() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+            box.querySelector('[data-act="cancel"]').onclick = close;
+            ov.onclick = function (e) { if (e.target === ov) close(); };
+            box.querySelector('[data-act="ok"]').onclick = function () {
+                var reason = document.getElementById('rep-reason').value;
+                var desc = document.getElementById('rep-desc').value.trim();
+                fetch(`${BASE}api/report`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({target_type: 'post', target_id: POST_ID, reason: reason, description: desc})
+                }).then(r => r.json()).then(d => {
+                    close();
+                    uiConfirm(d.id ? 'Report submitted. Thanks for helping keep the community safe.' : (d.error || 'Could not submit report.'), 'OK');
+                }).catch(() => { close(); uiConfirm('Could not submit report.', 'OK'); });
+            };
+        }
+        function modRemove(isOn) {
+            fetch(`${BASE}api/mod/posts/${POST_ID}/remove`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: isOn ? 'restore' : 'remove'})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function modLock(isOn) {
+            fetch(`${BASE}api/mod/posts/${POST_ID}/lock`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({locked: !isOn})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        function modPin(isOn) {
+            fetch(`${BASE}api/mod/posts/${POST_ID}/pin`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({sticky: !isOn})
+            }).then(r => r.json()).then(() => location.reload());
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.share-dropdown')) { var m=document.getElementById('share-menu'); if(m) m.classList.remove('open'); }
+        });
+    </script>
+</body>
+</html>

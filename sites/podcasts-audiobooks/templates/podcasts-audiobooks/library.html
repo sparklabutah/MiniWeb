@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Library - SoundShelf</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f1a; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; }
+        a { color: #8b5cf6; text-decoration: none; }
+        a:hover { color: #a78bfa; }
+
+        .top-bar { background: #1a1a2e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #2d2d44; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #8b5cf6; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+        .top-bar .nav-links .active { color: #8b5cf6; font-weight: 600; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+        .user-header { background: #1a1a2e; border-radius: .6rem; padding: 1.5rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem; }
+        .user-header .avatar { width: 60px; height: 60px; border-radius: 50%; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fff; font-weight: 700; }
+        .user-header .user-info h2 { font-size: 1.2rem; color: #f0f0f0; }
+        .user-header .user-info .bio { font-size: .85rem; color: #888; }
+        .user-header .user-info .speed { font-size: .8rem; color: #666; margin-top: .2rem; }
+
+        .section-title { font-size: 1.2rem; color: #f0f0f0; margin: 1.5rem 0 .8rem; border-bottom: 1px solid #2d2d44; padding-bottom: .4rem; }
+
+        .sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+        .sub-card { background: #1a1a2e; border-radius: .5rem; padding: .8rem; display: flex; gap: .8rem; align-items: center; border: 1px solid transparent; transition: border-color .2s; }
+        .sub-card:hover { border-color: #8b5cf6; }
+        .sub-card .mini-cover { width: 50px; height: 50px; border-radius: .4rem; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff; font-weight: 800; flex-shrink: 0; }
+        .sub-card .sub-info h4 { font-size: .85rem; color: #f0f0f0; }
+        .sub-card .sub-info .host { font-size: .7rem; color: #888; }
+
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+        .book-card { background: #1a1a2e; border-radius: .5rem; overflow: hidden; border: 1px solid transparent; transition: border-color .2s; }
+        .book-card:hover { border-color: #8b5cf6; }
+        .book-card .cover { height: 100px; display: flex; align-items: center; justify-content: center; font-size: .8rem; color: #fff; padding: .5rem; text-align: center; background: #2d2d44; }
+        .book-card .info { padding: .6rem; }
+        .book-card .info h4 { font-size: .8rem; color: #f0f0f0; margin-bottom: .1rem; }
+        .book-card .info .author { font-size: .7rem; color: #888; }
+
+        .episode-list { display: flex; flex-direction: column; gap: .5rem; }
+        .episode-item { background: #1a1a2e; border-radius: .5rem; padding: .7rem 1rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; transition: border-color .2s; }
+        .episode-item:hover { border-color: #8b5cf6; }
+        .episode-item .ep-info h4 { font-size: .85rem; color: #f0f0f0; }
+        .episode-item .ep-info .ep-sub { font-size: .75rem; color: #888; }
+        .episode-item .ep-duration { font-size: .8rem; color: #888; }
+
+        .history-list { display: flex; flex-direction: column; gap: .5rem; }
+        .history-item { background: #1a1a2e; border-radius: .5rem; padding: .7rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .history-item .h-info h4 { font-size: .85rem; color: #f0f0f0; }
+        .history-item .h-info .h-sub { font-size: .75rem; color: #888; }
+        .history-item .h-right { text-align: right; }
+        .history-item .h-right .progress { font-size: .8rem; color: #8b5cf6; }
+        .history-item .h-right .date { font-size: .7rem; color: #666; }
+        .progress-bar { height: 4px; background: #2d2d44; border-radius: 2px; margin-top: .3rem; width: 120px; }
+        .progress-bar .fill { height: 100%; border-radius: 2px; background: #8b5cf6; }
+
+        .empty { color: #666; font-size: .85rem; padding: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('podcasts-audiobooks.index') }}" class="logo">SoundShelf</a>
+        <div class="nav-links">
+            <a href="{{ url_for('podcasts-audiobooks.index') }}">Discover</a>
+            <a href="{{ url_for('podcasts-audiobooks.podcasts_list') }}">Podcasts</a>
+            <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}">Audiobooks</a>
+            <a href="{{ url_for('podcasts-audiobooks.library_page') }}" class="active">Library</a>
+            <a href="{{ url_for('podcasts-audiobooks.logout') }}">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="user-header">
+            <div class="avatar">{{ user.display_name[0] }}</div>
+            <div class="user-info">
+                <h2>{{ user.display_name }}</h2>
+                <div class="bio">{{ user.bio }}</div>
+                <div class="speed">Playback speed: {{ playback_speed }}x</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Subscribed Podcasts ({{ subscribed_podcasts|length }})</h2>
+        {% if subscribed_podcasts %}
+        <div class="sub-grid">
+            {% for p in subscribed_podcasts %}
+            <a href="{{ url_for('podcasts-audiobooks.podcast_detail', podcast_id=p.id) }}" class="sub-card" style="text-decoration:none;color:inherit;">
+                <div class="mini-cover" style="background: {{ p.cover_color }};">{{ p.title[0] }}</div>
+                <div class="sub-info">
+                    <h4>{{ p.title }}</h4>
+                    <div class="host">{{ p.host }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No podcast subscriptions yet. <a href="{{ url_for('podcasts-audiobooks.podcasts_list') }}">Browse podcasts</a></div>
+        {% endif %}
+
+        <h2 class="section-title">Followed Podcasts ({{ followed_podcasts|length }})</h2>
+        {% if followed_podcasts %}
+        <div class="sub-grid">
+            {% for p in followed_podcasts %}
+            <a href="{{ url_for('podcasts-audiobooks.podcast_detail', podcast_id=p.id) }}" class="sub-card" style="text-decoration:none;color:inherit;">
+                <div class="mini-cover" style="background: {{ p.cover_color }};">{{ p.title[0] }}</div>
+                <div class="sub-info">
+                    <h4>{{ p.title }}</h4>
+                    <div class="host">{{ p.host }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No followed podcasts yet.</div>
+        {% endif %}
+
+        <h2 class="section-title">Purchased Audiobooks ({{ purchased_audiobooks|length }})</h2>
+        {% if purchased_audiobooks %}
+        <div class="book-grid">
+            {% for a in purchased_audiobooks %}
+            <a href="{{ url_for('podcasts-audiobooks.audiobook_detail', audiobook_id=a.id) }}" class="book-card" style="text-decoration:none;color:inherit;">
+                <div class="cover">{{ a.title }}</div>
+                <div class="info">
+                    <h4>{{ a.title }}</h4>
+                    <div class="author">{{ a.author }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No audiobooks purchased yet. <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}">Browse audiobooks</a></div>
+        {% endif %}
+
+        <h2 class="section-title">Saved Episodes ({{ saved_episodes|length }})</h2>
+        {% if saved_episodes %}
+        <div class="episode-list">
+            {% for e in saved_episodes %}
+            <a href="{{ url_for('podcasts-audiobooks.episode_detail', episode_id=e.id) }}" class="episode-item" style="text-decoration:none;color:inherit;">
+                <div class="ep-info">
+                    <h4>{{ e.title }}</h4>
+                    <div class="ep-sub">{{ e._podcast.title if e._podcast else '' }} &middot; {{ e.publish_date }}</div>
+                </div>
+                <div class="ep-duration">{{ e.duration_minutes }} min</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No saved episodes yet.</div>
+        {% endif %}
+
+        <h2 class="section-title">Listen History</h2>
+        {% if listen_history %}
+        <div class="history-list">
+            {% for h in listen_history %}
+            <div class="history-item">
+                <div class="h-info">
+                    <h4>{{ h._title if h._title else 'Item ' ~ h.item_id }}</h4>
+                    <div class="h-sub">
+                        {% if h.item_type == 'episode' %}
+                        Episode &middot; {{ h._podcast if h._podcast else '' }}
+                        {% else %}
+                        Audiobook{% if h._author %} &middot; {{ h._author }}{% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="h-right">
+                    <div class="progress">{{ h.progress_percent }}%</div>
+                    <div class="date">{{ h.last_played }}</div>
+                    <div class="progress-bar"><div class="fill" style="width: {{ h.progress_percent }}%;"></div></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No listening history yet.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

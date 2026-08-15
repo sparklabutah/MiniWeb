@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ doc.title }} - MeridianFlow Docs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f9fc; color: #3c4257; line-height: 1.6; }
+        .topnav { background: #0a2540; color: #fff; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topnav-brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: .5rem; }
+        .topnav-brand span { color: #80e9ff; }
+        .topnav-links { display: flex; align-items: center; gap: 1.2rem; }
+        .topnav-links a { color: #adbdcc; text-decoration: none; font-size: .875rem; }
+        .topnav-links a:hover { color: #fff; }
+        .layout { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: #1a1f36; color: #a3acb9; padding: 1.5rem 0; overflow-y: auto; position: sticky; top: 56px; height: calc(100vh - 56px); flex-shrink: 0; }
+        .sidebar-section { margin-bottom: 1.2rem; }
+        .sidebar-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #697386; padding: .4rem 1.5rem; }
+        .sidebar-link { display: block; padding: .35rem 1.5rem; font-size: .85rem; color: #a3acb9; text-decoration: none; transition: all .15s; border-left: 3px solid transparent; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+        .sidebar-link.active { color: #80e9ff; border-left-color: #80e9ff; background: rgba(128,233,255,.06); }
+
+        .content { flex: 1; max-width: 800px; padding: 2.5rem 3rem; }
+        .breadcrumb { font-size: .8rem; color: #8898aa; margin-bottom: 1rem; }
+        .breadcrumb a { color: #635bff; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .5rem; }
+        .page-header h1 { font-size: 1.8rem; color: #0a2540; }
+        .bookmark-btn { background: none; border: 1px solid #e3e8ee; border-radius: 6px; padding: .4rem .8rem; font-size: .8rem; cursor: pointer; color: #697386; transition: all .15s; }
+        .bookmark-btn:hover { border-color: #635bff; color: #635bff; }
+        .page-meta { font-size: .8rem; color: #8898aa; margin-bottom: 1.5rem; }
+        .page-meta .tag { background: #f0f0ff; color: #635bff; padding: .1rem .4rem; border-radius: 3px; margin-right: .3rem; font-size: .75rem; }
+
+        /* Content styling */
+        .doc-content { line-height: 1.75; }
+        .doc-content h2 { font-size: 1.3rem; color: #0a2540; margin: 2rem 0 .75rem; padding-top: 1rem; border-top: 1px solid #e3e8ee; }
+        .doc-content h3 { font-size: 1.05rem; color: #0a2540; margin: 1.5rem 0 .5rem; }
+        .doc-content p { margin-bottom: 1rem; }
+        .doc-content pre { background: #1a1f36; color: #e3e8ee; padding: 1rem 1.2rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: .85rem; line-height: 1.5; position: relative; }
+        .doc-content pre .copy-code { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,.15); border: none; color: #adbdcc; padding: .25rem .5rem; border-radius: 4px; cursor: pointer; font-size: .72rem; }
+        .doc-content pre .copy-code:hover { background: rgba(255,255,255,.3); color: #fff; }
+        .doc-content code { font-family: 'SFMono-Regular', Menlo, Monaco, monospace; font-size: .85em; }
+        .doc-content p code, .doc-content li code { background: #f0f0ff; color: #635bff; padding: .1rem .35rem; border-radius: 3px; }
+        .doc-content pre code { background: none; color: inherit; padding: 0; }
+        .doc-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .88rem; }
+        .doc-content th { background: #f6f9fc; text-align: left; padding: .6rem .8rem; border-bottom: 2px solid #e3e8ee; color: #0a2540; font-weight: 600; }
+        .doc-content td { padding: .6rem .8rem; border-bottom: 1px solid #e3e8ee; }
+        .doc-content ul, .doc-content ol { margin: .5rem 0 1rem 1.5rem; }
+        .doc-content li { margin-bottom: .3rem; }
+        .doc-content strong { color: #0a2540; }
+
+        /* Method badges */
+        .method-badge { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15rem .4rem; border-radius: 3px; font-family: monospace; letter-spacing: .03em; }
+        .method-get { background: #d4f4e2; color: #0d7a3e; }
+        .method-post { background: #d4e4ff; color: #1a56db; }
+        .method-put { background: #fff3cd; color: #856404; }
+        .method-delete { background: #fdd; color: #c0392b; }
+        .method-patch { background: #e8daef; color: #6c3483; }
+
+        /* Nav buttons */
+        .page-nav { display: flex; justify-content: space-between; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e3e8ee; }
+        .page-nav a { display: flex; flex-direction: column; text-decoration: none; padding: .75rem 1rem; border: 1px solid #e3e8ee; border-radius: 8px; max-width: 45%; transition: border-color .15s; }
+        .page-nav a:hover { border-color: #635bff; }
+        .page-nav .nav-label { font-size: .75rem; color: #8898aa; }
+        .page-nav .nav-title { font-size: .9rem; color: #635bff; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="{{ url_for('documentation-api-docs.index') }}" class="topnav-brand">MeridianFlow <span>Docs</span></a>
+        <div class="topnav-links">
+            <a href="{{ url_for('documentation-api-docs.index') }}">Home</a>
+            <a href="{{ url_for('documentation-api-docs.api_reference') }}">API Reference</a>
+            <a href="{{ url_for('documentation-api-docs.changelog') }}">Changelog</a>
+            <a href="{{ url_for('documentation-api-docs.search_page') }}">Search</a>
+            {% if user %}
+            <a href="{{ url_for('documentation-api-docs.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('documentation-api-docs.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('documentation-api-docs.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside class="sidebar">
+            {% for section_name, section_docs in ordered_sections %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">{{ section_name }}</div>
+                {% for d in section_docs %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=d.slug) }}" class="sidebar-link {{ 'active' if d.id == doc.id }}">{{ d.title }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </aside>
+
+        <main class="content">
+            <div class="breadcrumb">
+                <a href="{{ url_for('documentation-api-docs.index') }}">Docs</a> / <a href="{{ url_for('documentation-api-docs.index') }}">{{ doc.section }}</a> / {{ doc.title }}
+            </div>
+
+            <div class="page-header">
+                <h1>{{ doc.title }}</h1>
+                {% if user %}
+                <form method="post" action="{{ url_for('documentation-api-docs.form_bookmark_page', slug=doc.slug) }}">
+                    <button type="submit" class="bookmark-btn">
+                        {% if doc.id in user.get('bookmarked_pages', []) %}
+                        &#9733; Bookmarked
+                        {% else %}
+                        &#9734; Bookmark
+                        {% endif %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+
+            <div class="page-meta">
+                Updated {{ doc.updated_at }}
+                {% for tag in doc.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="doc-content" id="doc-content">
+                {{ doc.content | safe }}
+            </div>
+
+            <div class="page-nav">
+                {% if prev_doc %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=prev_doc.slug) }}">
+                    <span class="nav-label">&larr; Previous</span>
+                    <span class="nav-title">{{ prev_doc.title }}</span>
+                </a>
+                {% else %}
+                <span></span>
+                {% endif %}
+                {% if next_doc %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=next_doc.slug) }}" style="text-align:right;margin-left:auto">
+                    <span class="nav-label">Next &rarr;</span>
+                    <span class="nav-title">{{ next_doc.title }}</span>
+                </a>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // Simple Markdown-like rendering for code blocks and tables
+    (function() {
+        const el = document.getElementById('doc-content');
+        let html = el.innerHTML;
+
+        // Convert ```lang\n...\n``` code blocks
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+            // Detect method badges
+            let badge = '';
+            const methodMatch = code.match(/^(GET|POST|PUT|DELETE|PATCH)\s/m);
+            if (methodMatch) {
+                const m = methodMatch[1].toLowerCase();
+                badge = '<span class="method-badge method-' + m + '">' + methodMatch[1] + '</span> ';
+            }
+            return badge + '<pre><code class="language-' + lang + '">' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code></pre>';
+        });
+
+        // Convert inline `code`
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Convert ## headings
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+
+        // Convert **bold**
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+        // Convert tables
+        html = html.replace(/\n\|(.+)\|\n\|[-| ]+\|\n((?:\|.+\|\n?)+)/g, function(_, header, body) {
+            let th = header.split('|').map(h => '<th>' + h.trim() + '</th>').join('');
+            let rows = body.trim().split('\n').map(row => {
+                let cells = row.replace(/^\||\|$/g, '').split('|').map(c => '<td>' + c.trim() + '</td>').join('');
+                return '<tr>' + cells + '</tr>';
+            }).join('');
+            return '<table><thead><tr>' + th + '</tr></thead><tbody>' + rows + '</tbody></table>';
+        });
+
+        // Convert - list items
+        html = html.replace(/\n((?:- .+\n?)+)/g, function(_, items) {
+            let lis = items.trim().split('\n').map(l => '<li>' + l.replace(/^- /, '') + '</li>').join('');
+            return '<ul>' + lis + '</ul>';
+        });
+
+        // Convert numbered list items
+        html = html.replace(/\n((?:\d+\. .+\n?)+)/g, function(_, items) {
+            let lis = items.trim().split('\n').map(l => '<li>' + l.replace(/^\d+\. /, '') + '</li>').join('');
+            return '<ol>' + lis + '</ol>';
+        });
+
+        // Wrap remaining bare text in paragraphs
+        html = html.replace(/\n\n/g, '</p><p>');
+
+        el.innerHTML = html;
+
+        // Add copy buttons to all code blocks
+        el.querySelectorAll('pre').forEach(function(pre) {
+            var btn = document.createElement('button');
+            btn.className = 'copy-code';
+            btn.textContent = 'Copy';
+            btn.addEventListener('click', function() {
+                var code = pre.querySelector('code');
+                var text = code ? code.textContent : pre.textContent;
+                navigator.clipboard.writeText(text).then(function() {
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                });
+                fetch('/sites/documentation-api-docs/api/track/copy_code', {method: 'POST'}).catch(function(){});
+            });
+            pre.appendChild(btn);
+        });
+    })();
+    </script>
+</body>
+</html>

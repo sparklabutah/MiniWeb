@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if mode == 'register' %}Register{% else %}Sign In{% endif %} - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .login-box { max-width: 420px; margin: 3rem auto; background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .login-box h2 { font-size: 1.4rem; margin-bottom: .5rem; color: #0d47a1; }
+        .login-box p.sub { color: #888; font-size: .85rem; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; color: #555; }
+        .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #ddd; border-radius: .3rem; font-size: .9rem; }
+        .form-group input:focus { border-color: #0d47a1; outline: none; }
+        .btn-submit { width: 100%; padding: .7rem; background: #0d47a1; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        .btn-submit:hover { background: #1565c0; }
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .6rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-size: .85rem; }
+        .switch { text-align: center; margin-top: 1rem; font-size: .85rem; color: #888; }
+        .switch a { color: #0d47a1; text-decoration: none; }
+        .switch a:hover { text-decoration: underline; }
+        .user-hint { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .user-hint h4 { font-size: .8rem; color: #999; text-transform: uppercase; margin-bottom: .5rem; }
+        .user-hint ul { list-style: none; padding: 0; }
+        .user-hint li { font-size: .85rem; color: #555; padding: .2rem 0; }
+        .user-hint code { background: #f0f4f8; padding: .1rem .3rem; border-radius: .2rem; font-size: .82rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="login-box">
+        {% if mode == 'register' %}
+        <h2>Create Account</h2>
+        <p class="sub">Join Lakeport Real Estate to save listings and contact agents.</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('real-estate-buy-rent.register_submit') }}">
+            <div class="form-group"><label>Full Name</label><input type="text" name="name" required></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email" required></div>
+            <div class="form-group"><label>Phone</label><input type="tel" name="phone"></div>
+            <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
+            <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
+            <button type="submit" class="btn-submit">Register</button>
+        </form>
+        <div class="switch">Already have an account? <a href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign in</a></div>
+        {% else %}
+        <h2>Sign In</h2>
+        <p class="sub">Sign in to your Lakeport Real Estate account.</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('real-estate-buy-rent.login_submit') }}">
+            <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
+            <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
+            <button type="submit" class="btn-submit">Sign In</button>
+        </form>
+        <div class="switch">New user? <a href="{{ url_for('real-estate-buy-rent.register_page') }}">Create account</a></div>
+        <div class="user-hint">
+            <h4>Demo Accounts</h4>
+            <ul>
+                <li><code>alex_buyer</code> / <code>pass123</code> - Homebuyer</li>
+                <li><code>carlos_landlord</code> / <code>pass123</code> - Landlord</li>
+                <li><code>jenny_home</code> / <code>pass123</code> - First-time buyer</li>
+                <li><code>mike_investor</code> / <code>pass123</code> - Investor</li>
+                <li><code>sara_renter</code> / <code>pass123</code> - Renter</li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

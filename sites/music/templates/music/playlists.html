@@ -1,0 +1,68 @@
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}Playlists — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<h1 class="page-h">Playlists</h1>
+<p style="color:#b3b3b3;margin-bottom:22px;font-size:.95rem;">Browse playlists or create your own.</p>
+
+{% if user %}
+<div class="form-card" id="create-form" style="max-width:520px;margin:0 0 30px;">
+    <h3 style="color:#fff;margin-bottom:16px;font-size:1.1rem;">Create New Playlist</h3>
+    <div class="fg">
+        <label for="pl-name">Name</label>
+        <input type="text" id="pl-name" placeholder="My awesome playlist">
+    </div>
+    <div class="fg">
+        <label for="pl-desc">Description</label>
+        <textarea id="pl-desc" placeholder="What is this playlist about?"></textarea>
+    </div>
+    <div class="fg" style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="pl-public" checked style="width:auto;">
+        <label for="pl-public" style="margin:0;color:#e0e0e0;">Public</label>
+    </div>
+    <button class="btn-green" onclick="createPlaylist()">Create Playlist</button>
+    <div id="form-msg" style="margin-top:10px;font-size:.85rem;"></div>
+</div>
+{% endif %}
+
+<div class="grid">
+    {% for pl in playlists %}
+    <a href="{{ url_for('music.playlist_detail', playlist_id=pl.id) }}" class="card">
+        <div class="art" style="background:linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+        <div class="nm">{{ pl.name }}</div>
+        <div class="mt">{{ pl.description }}</div>
+        <div class="mt" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <span>{{ pl.owner_name }}</span>
+            <span>{{ pl.total_tracks }} tracks</span>
+            <span style="font-size:.7rem;padding:1px 6px;border-radius:3px;text-transform:uppercase;font-weight:600;{% if pl.is_public %}background:#1db954;color:#000;{% else %}background:#555;color:#ddd;{% endif %}">
+                {% if pl.is_public %}Public{% else %}Private{% endif %}
+            </span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function createPlaylist() {
+    const name = document.getElementById("pl-name").value.trim();
+    const desc = document.getElementById("pl-desc").value.trim();
+    const isPublic = document.getElementById("pl-public").checked;
+    const msg = document.getElementById("form-msg");
+
+    if (!name) { msg.textContent = "Name is required"; msg.style.color = "#e74c3c"; return; }
+
+    fetch("{{ url_for('music.api_create_playlist') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name: name, description: desc, is_public: isPublic})
+    }).then(r => r.json()).then(data => {
+        if (data.error) { msg.textContent = data.error; msg.style.color = "#e74c3c"; }
+        else { msg.textContent = "Playlist created!"; msg.style.color = "#1db954"; setTimeout(() => location.reload(), 500); }
+    });
+}
+</script>
+{% endblock %}

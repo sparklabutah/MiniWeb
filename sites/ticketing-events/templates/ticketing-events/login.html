@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Lakeport Events</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .header-actions a { color: #fff; text-decoration: none; font-size: .9rem; margin-left: 1rem; padding: .4rem .8rem; border-radius: .3rem; }
+        .header-actions a:hover { background: rgba(255,255,255,.15); }
+        nav { max-width: 1200px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #333; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #fff5f5; color: #d63031; }
+        nav a.active { font-weight: 700; background: #fff0f0; color: #d63031; }
+
+        .login-container { max-width: 420px; margin: 4rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .login-container h2 { color: #d63031; margin-bottom: .5rem; font-size: 1.5rem; }
+        .login-container .subtitle { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .form-group input:focus { border-color: #d63031; outline: none; box-shadow: 0 0 0 3px rgba(214,48,49,.15); }
+        .btn-login { width: 100%; padding: .8rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-login:hover { background: #c0392b; }
+        .error { background: #fef2f2; color: #dc2626; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #fee2e2; }
+        .secure-badge { text-align: center; margin-top: 1.5rem; font-size: .8rem; color: #94a3b8; }
+        .user-list { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+        .user-list h4 { font-size: .85rem; color: #999; margin-bottom: .6rem; }
+        .user-list .user-hint { display: flex; justify-content: space-between; padding: .3rem 0; font-size: .82rem; color: #555; cursor: pointer; border-radius: .2rem; padding: .3rem .5rem; }
+        .user-list .user-hint:hover { background: #fff5f5; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+        <div class="header-actions">
+            <a href="{{ url_for('ticketing-events.index') }}">Browse Events</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('ticketing-events.index') }}">All Events</a>
+        <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+        <a href="{{ url_for('ticketing-events.login_page') }}" class="active">Sign In</a>
+    </nav>
+
+    <form class="login-container" method="post" action="{{ url_for('ticketing-events.login_submit') }}">
+        <h2>Sign In</h2>
+        <p class="subtitle">Access your tickets and order history</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" placeholder="Enter your password">
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
+        <div class="secure-badge">Secure sign-in to Lakeport Events</div>
+
+        <div class="user-list">
+            <h4>Available accounts:</h4>
+            <div class="user-hint" onclick="document.getElementById('username').value='alex_rivera'">
+                <span>alex_rivera</span><span>Alex Rivera</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='marcus_chen'">
+                <span>marcus_chen</span><span>Marcus Chen</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='sophie_lin'">
+                <span>sophie_lin</span><span>Sophie Lin</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='daniel_okonkwo'">
+                <span>daniel_okonkwo</span><span>Daniel Okonkwo</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='mia_torres'">
+                <span>mia_torres</span><span>Mia Torres</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='elena_vasquez'">
+                <span>elena_vasquez</span><span>Elena Vasquez</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='nathan_brooks'">
+                <span>nathan_brooks</span><span>Nathan Brooks</span>
+            </div>
+            <div class="user-hint" onclick="document.getElementById('username').value='tom_bradley'">
+                <span>tom_bradley</span><span>Tom Bradley</span>
+            </div>
+        </div>
+    </form>
+</body>
+</html>

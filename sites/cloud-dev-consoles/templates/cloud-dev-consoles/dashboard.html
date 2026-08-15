@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}.top-bar{background:#232f3e;color:#fff;padding:0 1.5rem;height:48px;display:flex;align-items:center;justify-content:space-between}.top-bar .logo{font-size:1.1rem;font-weight:700;color:#ff9900;text-decoration:none}.top-bar .logo span{color:#fff;font-weight:400;margin-left:.3rem}.nav-bar{background:#37475a;padding:0 1.5rem;display:flex;overflow-x:auto}.nav-bar a{color:#d5dbdb;text-decoration:none;padding:.6rem 1rem;font-size:.85rem;border-bottom:2px solid transparent}.nav-bar a:hover,.nav-bar a.active{color:#fff;border-bottom-color:#ff9900}.top-bar-right a{color:#d5dbdb;text-decoration:none;font-size:.85rem;margin-left:1rem}.container{max-width:1000px;margin:0 auto;padding:1.5rem}.page-title{font-size:1.4rem;margin-bottom:1rem}.card{background:#fff;border-radius:8px;padding:1.5rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.card h2{font-size:1.1rem;margin-bottom:.8rem;color:#232f3e}.detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.8rem}.detail-label{font-size:.8rem;color:#64748b;text-transform:uppercase}.detail-value{font-size:.95rem;font-weight:500}.tag{display:inline-block;padding:.15rem .5rem;background:#e8ecef;border-radius:3px;font-size:.8rem;color:#475569;margin:.2rem}
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a>
+        <div class="top-bar-right">
+            <a href="{{ url_for('cloud-dev-consoles.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('cloud-dev-consoles.logout') }}">Sign Out</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a><a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a><a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a><a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a><a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a><a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a><a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a><a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a><a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a><a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a><a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a><a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">User Dashboard</h1>
+        <div class="card">
+            <h2>Profile</h2>
+            <div class="detail-grid">
+                <div><div class="detail-label">Name</div><div class="detail-value">{{ user.name }}</div></div>
+                <div><div class="detail-label">Username</div><div class="detail-value">{{ user.username }}</div></div>
+                <div><div class="detail-label">Email</div><div class="detail-value">{{ user.email }}</div></div>
+                <div><div class="detail-label">Role</div><div class="detail-value">{{ user.role }}</div></div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Preferences</h2>
+            <div class="detail-grid">
+                {% for k, v in user.get('preferences', {}).items() %}
+                <div><div class="detail-label">{{ k }}</div><div class="detail-value">{{ v }}</div></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card">
+            <h2>Recently Viewed Services</h2>
+            {% if recent_services %}
+            {% for sid in recent_services %}<span class="tag">{{ sid }}</span>{% endfor %}
+            {% else %}
+            <p style="color:#94a3b8;font-size:.9rem;">No recently viewed services.</p>
+            {% endif %}
+        </div>
+        <div class="card">
+            <h2>Saved Queries</h2>
+            {% if saved_queries %}
+            {% for q in saved_queries %}<span class="tag">{{ q }}</span>{% endfor %}
+            {% else %}
+            <p style="color:#94a3b8;font-size:.9rem;">No saved queries.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

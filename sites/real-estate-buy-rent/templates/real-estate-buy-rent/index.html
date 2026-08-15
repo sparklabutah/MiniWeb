@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lakeport Real Estate - Buy & Rent Homes</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover, .nav-bar a.active { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem; }
+        .hero { background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); color: #fff; padding: 2.5rem 2rem; border-radius: .5rem; margin-bottom: 2rem; text-align: center; }
+        .hero h2 { font-size: 1.8rem; margin-bottom: .5rem; }
+        .hero p { font-size: 1rem; color: #bbdefb; margin-bottom: 1.5rem; }
+        .hero-search { display: flex; gap: .5rem; max-width: 600px; margin: 0 auto; }
+        .hero-search input { flex: 1; padding: .7rem 1rem; border: none; border-radius: .3rem; font-size: 1rem; }
+        .hero-search select { padding: .7rem .8rem; border: none; border-radius: .3rem; font-size: .9rem; background: #fff; }
+        .hero-search button { padding: .7rem 1.5rem; background: #ff6f00; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: 1rem; font-weight: 600; }
+        .hero-search button:hover { background: #e65100; }
+        .stats-row { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .stat-card { flex: 1; min-width: 150px; background: #fff; border-radius: .5rem; padding: 1.2rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .stat-card .stat-number { font-size: 1.6rem; font-weight: 700; color: #0d47a1; }
+        .stat-card .stat-label { font-size: .82rem; color: #888; margin-top: .2rem; }
+        .section-title { font-size: 1.2rem; color: #333; margin-bottom: 1rem; border-bottom: 2px solid #0d47a1; padding-bottom: .4rem; display: inline-block; }
+        .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .listing-card { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: box-shadow .15s; }
+        .listing-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+        .card-img { width: 100%; height: 180px; background: #e3f2fd; display: flex; align-items: center; justify-content: center; color: #90caf9; font-size: .85rem; position: relative; }
+        .card-badge { position: absolute; top: .5rem; left: .5rem; padding: .2rem .6rem; border-radius: .2rem; font-size: .72rem; font-weight: 600; color: #fff; }
+        .badge-sale { background: #2e7d32; }
+        .badge-rent { background: #1565c0; }
+        .badge-sold { background: #757575; }
+        .card-body { padding: .8rem; }
+        .card-price { font-size: 1.15rem; font-weight: 700; color: #0d47a1; margin-bottom: .2rem; }
+        .card-title { font-size: .92rem; margin-bottom: .3rem; }
+        .card-title a { color: #333; text-decoration: none; }
+        .card-title a:hover { color: #0d47a1; }
+        .card-meta { font-size: .78rem; color: #999; display: flex; gap: .6rem; flex-wrap: wrap; }
+        .card-meta span { white-space: nowrap; }
+        .type-tag { background: #e3f2fd; color: #1565c0; padding: .1rem .4rem; border-radius: .2rem; text-transform: capitalize; font-size: .75rem; }
+        .view-all { display: inline-block; margin-top: .5rem; color: #0d47a1; text-decoration: none; font-size: .9rem; font-weight: 500; }
+        .view-all:hover { text-decoration: underline; }
+        .footer { text-align: center; padding: 2rem; color: #999; font-size: .82rem; border-top: 1px solid #eee; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.tours_page') }}">Tours</a>
+            <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}">Inquiries</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('real-estate-buy-rent.login_page') }}">Sign In</a>
+            <a href="{{ url_for('real-estate-buy-rent.register_page') }}">Register</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}" class="active">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}">Buy</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}">Rent</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+
+    <div class="container">
+        <div class="hero">
+            <h2>Find Your Next Home in Lakeport, WA</h2>
+            <p>Browse {{ for_sale_count }} homes for sale and {{ for_rent_count }} rentals</p>
+            <form class="hero-search" method="get" action="{{ url_for('real-estate-buy-rent.listings_page') }}">
+                <input type="text" name="q" placeholder="Search by address, feature, or keyword..." autocomplete="off">
+                <select name="status">
+                    <option value="">Buy or Rent</option>
+                    <option value="for_sale">Buy</option>
+                    <option value="for_rent">Rent</option>
+                </select>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-number">{{ for_sale_count }}</div>
+                <div class="stat-label">Homes For Sale</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ for_rent_count }}</div>
+                <div class="stat-label">Rentals Available</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${{ "{:,.0f}".format(avg_sale) }}</div>
+                <div class="stat-label">Avg. Sale Price</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${{ "{:,.0f}".format(avg_rent) }}/mo</div>
+                <div class="stat-label">Avg. Rent</div>
+            </div>
+        </div>
+
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='real-estate-buy-rent-ad2') %}
+        {% include "ads/_product_ads.html" %}
+
+        <h2 class="section-title">Featured Homes For Sale</h2>
+        <div class="listing-grid">
+            {% for listing in featured_sale %}
+            <div class="listing-card">
+                <div class="card-img">
+                    <span class="card-badge badge-sale">FOR SALE</span>
+                    {{ listing.photos_count }} photos
+                </div>
+                <div class="card-body">
+                    <div class="card-price">${{ "{:,.0f}".format(listing.price) }}</div>
+                    <div class="card-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=listing.id) }}">{{ listing.title }}</a></div>
+                    <div class="card-meta">
+                        <span>{{ listing.bedrooms }} bd</span>
+                        <span>{{ listing.bathrooms }} ba</span>
+                        <span>{{ "{:,.0f}".format(listing.sqft) }} sqft</span>
+                        <span class="type-tag">{{ listing.type }}</span>
+                    </div>
+                    <div class="card-meta" style="margin-top:.3rem">
+                        <span>{{ listing.address }}, {{ listing.city }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}" class="view-all">View all homes for sale &rarr;</a>
+
+        <h2 class="section-title" style="margin-top:2rem">Featured Rentals</h2>
+        <div class="listing-grid">
+            {% for listing in featured_rent %}
+            <div class="listing-card">
+                <div class="card-img">
+                    <span class="card-badge badge-rent">FOR RENT</span>
+                    {{ listing.photos_count }} photos
+                </div>
+                <div class="card-body">
+                    <div class="card-price">${{ "{:,.0f}".format(listing.rent_monthly) }}/mo</div>
+                    <div class="card-title"><a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=listing.id) }}">{{ listing.title }}</a></div>
+                    <div class="card-meta">
+                        <span>{{ listing.bedrooms }} bd</span>
+                        <span>{{ listing.bathrooms }} ba</span>
+                        <span>{{ "{:,.0f}".format(listing.sqft) }} sqft</span>
+                        <span class="type-tag">{{ listing.type }}</span>
+                    </div>
+                    <div class="card-meta" style="margin-top:.3rem">
+                        <span>{{ listing.address }}, {{ listing.city }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}" class="view-all">View all rentals &rarr;</a>
+
+        {% set ad_format = 'grid' %}
+        {% set ads = product_ads(4, seed='real-estate-buy-rent-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <div class="footer">
+        Lakeport Real Estate &mdash; Lakeport, WA 98401
+    </div>
+</body>
+</html>

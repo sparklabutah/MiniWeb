@@ -1,0 +1,1193 @@
+"""Documents -- collaborative document editing platform (Google Docs style).
+
+Reads JSON data files for documents, users, folders, and revisions.
+Supports full CRUD, sharing/permissions, starring, trash, and folder organization.
+"""
+import pathlib
+from datetime import datetime
+
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
+from app import db
+from app.events import emit
+
+SITE = "documents"
+SITE_DIR = pathlib.Path(__file__).resolve().parent
+
+blueprint = Blueprint(
+    "documents",
+    __name__,
+    template_folder=str(SITE_DIR / "templates"),
+    static_folder=str(SITE_DIR / "static"),
+    static_url_path="/static",
+)
+
+# ---------------------------------------------------------------------------
+# Data loading helpers
+# ---------------------------------------------------------------------------
+
+def _load_documents():
+    return db.query(SITE, "documents")
+
+
+def _save_documents(docs):
+    db.save_collection(SITE, "documents", docs)
+
+
+def _load_users():
+    return db.query(SITE, "users")
+
+
+
+
+def _load_folders():
+    return db.query(SITE, "folders")
+
+
+def _save_folders(folders):
+    db.save_collection(SITE, "folders", folders)
+
+
+def _load_revisions():
+    return db.query(SITE, "revisions")
+
+
+def _save_revisions(revisions):
+    db.save_collection(SITE, "revisions", revisions)
+
+
+def _append_revision(revisions, *, document_id, user_id, timestamp, summary, doc):
+    """Append a new revision that captures a full content snapshot of ``doc``.
+
+    Storing the title + content on every revision is what makes the version
+    history restorable (Google-Docs style "see / restore a previous version"),
+    not just a log line. Revisions persist as full JSON blobs in the session
+    overlay, so these extra keys survive without a DB rebuild.
+    """
+    rev_id = max((r["id"] for r in revisions), default=0) + 1
+    revisions.append({
+        "id": rev_id,
+        "document_id": document_id,
+        "user_id": user_id,
+        "timestamp": timestamp,
+        "summary": summary,
+        "title": doc.get("title", ""),
+        "content": doc.get("content", ""),
+    })
+    return rev_id
+
+
+# ---------------------------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------------------------
+
+def _get_user(user_id):
+    return db.get_item(SITE, "users", user_id)
+
+
+def _current_user():
+    if "user_id" in session:
+        return _get_user(session["user_id"])
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Permission helpers
+# ---------------------------------------------------------------------------
+
+def _user_can_access(doc, user_id):
+    """Check if a user can at least view a document."""
+    if doc["owner_id"] == user_id:
+        return True
+    for c in doc.get("collaborators", []):
+        if c["user_id"] == user_id:
+            return True
+    return False
+
+
+def _user_permission(doc, user_id):
+    """Return the permission level for a user on a document: 'owner', 'edit', 'comment', 'view', or None."""
+    if doc["owner_id"] == user_id:
+        return "owner"
+    for c in doc.get("collaborators", []):
+        if c["user_id"] == user_id:
+            return c["permission"]
+    return None
+
+
+def _user_can_edit(doc, user_id):
+    perm = _user_permission(doc, user_id)
+    return perm in ("owner", "edit")
+
+
+def _accessible_where(uid):
+    """SQL WHERE fragment (and params) limiting rows to docs a user may access.
+
+    Access = the user owns the doc OR is listed in the collaborators JSON.
+    Returns (sql_fragment, params). If uid is None nothing is accessible.
+    """
+    if uid is None:
+        return "0", []
+    frag = ("(owner_id = ? OR EXISTS (SELECT 1 FROM json_each(collaborators) je "
+            "WHERE json_extract(je.value, '$.user_id') = ?))")
+    return frag, [uid, uid]
+
+
+# ---------------------------------------------------------------------------
+# Search helper
+# ---------------------------------------------------------------------------
+
+def _search_documents(docs, query):
+    if not query:
+        return docs
+    q = query.lower().strip()
+    results = []
+    for d in docs:
+        text = (d["title"] + " " + d["content"]).lower()
+        if q in text:
+            results.append(d)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# HTML routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/")
+def index():
+    """Dashboard / document list showing all non-trashed documents."""
+    user = _current_user()
+    folders = _load_folders()
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    q = request.args.get("q", "").strip()
+    sort = request.args.get("sort", "updated").strip()
+    folder_filter = request.args.get("folder_id", "", type=str).strip()
+    owner_filter = request.args.get("owner_id", "", type=str).strip()
+
+    uid = user["id"] if user else None
+
+    # Only documents the current user owns or has been shared with are listed.
+    access_frag, params = _accessible_where(uid)
+    where = ["is_trashed = 0", access_frag]
+
+    if q:
+        where.append("(LOWER(title) LIKE ? OR LOWER(content) LIKE ?)")
+        like = f"%{q.lower()}%"
+        params += [like, like]
+
+    fid = oid = None
+    if folder_filter:
+        try:
+            fid = int(folder_filter)
+            where.append("folder_id = ?")
+            params.append(fid)
+        except ValueError:
+            pass
+    if owner_filter:
+        try:
+            oid = int(owner_filter)
+            where.append("owner_id = ?")
+            params.append(oid)
+        except ValueError:
+            pass
+
+    # Sorting (last-modified DESC by default so recently edited docs float up).
+    order_sql, order_key = {
+        "title": ("LOWER(title) ASC", "title"),
+        "name_asc": ("LOWER(title) ASC", "title"),
+        "name_desc": ("LOWER(title) DESC", "-title"),
+        "created": ("created_at DESC", "-created_at"),
+    }.get(sort, ("updated_at DESC", "-updated_at"))
+
+    sql = (f"SELECT * FROM documents_documents WHERE {' AND '.join(where)} "
+           f"ORDER BY {order_sql} LIMIT 500")
+    base_rows = db.execute(sql, tuple(params))
+
+    # Merge this session's overlay edits, mirroring the SQL WHERE so a doc the
+    # user just renamed/edited re-sorts correctly (floats to the top).
+    ql = q.lower()
+
+    def _match(d):
+        if d.get("is_trashed"):
+            return False
+        if uid is None or not _user_can_access(d, uid):
+            return False
+        if q:
+            title = str(d.get("title", "")).lower()
+            content = str(d.get("content", "")).lower()
+            if ql not in title and ql not in content:
+                return False
+        if fid is not None and d.get("folder_id") != fid:
+            return False
+        if oid is not None and d.get("owner_id") != oid:
+            return False
+        return True
+
+    visible = db.merge_overlay(SITE, "documents", base_rows,
+                               match=_match, sort=order_key, limit=500)
+
+    return render_template("documents/index.html",
+                           documents=visible, folders=folders, user=user,
+                           user_map=user_map, users=users, q=q, sort=sort,
+                           folder_filter=folder_filter, owner_filter=owner_filter)
+
+
+@blueprint.route("/editor/<int:doc_id>")
+def editor(doc_id):
+    """Document editor page."""
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    folders = _load_folders()
+    revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
+    revisions.sort(key=lambda r: r["timestamp"], reverse=True)
+    can_edit = user and _user_can_edit(doc, user["id"])
+    permission = _user_permission(doc, user["id"]) if user else None
+    return render_template("documents/editor.html", doc=doc, user=user,
+                           user_map=user_map, users=users, revisions=revisions,
+                           folders=folders, can_edit=can_edit, permission=permission)
+
+
+@blueprint.route("/view/<int:doc_id>")
+def view_doc(doc_id):
+    """Read-only document view."""
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    revisions = [r for r in _load_revisions() if r["document_id"] == doc_id]
+    revisions.sort(key=lambda r: r["timestamp"], reverse=True)
+    permission = _user_permission(doc, user["id"]) if user else None
+    return render_template("documents/view.html", doc=doc, user=user,
+                           user_map=user_map, revisions=revisions,
+                           permission=permission)
+
+
+@blueprint.route("/folder/<int:folder_id>")
+def folder_view(folder_id):
+    """Show documents in a specific folder."""
+    folders = _load_folders()
+    folder = next((f for f in folders if f["id"] == folder_id), None)
+    if folder is None:
+        abort(404)
+    user = _current_user()
+    uid = user["id"] if user else None
+    access_frag, params = _accessible_where(uid)
+    base_rows = db.execute(
+        f"SELECT * FROM documents_documents WHERE is_trashed = 0 AND folder_id = ? "
+        f"AND {access_frag} ORDER BY updated_at DESC LIMIT 500",
+        tuple([folder_id] + params))
+
+    def _match(d):
+        return (not d.get("is_trashed")
+                and d.get("folder_id") == folder_id
+                and uid is not None and _user_can_access(d, uid))
+
+    folder_docs = db.merge_overlay(SITE, "documents", base_rows,
+                                   match=_match, sort="-updated_at", limit=500)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+
+    return render_template("documents/folder.html", folder=folder,
+                           documents=folder_docs, user=user,
+                           user_map=user_map, folders=_load_folders())
+
+
+@blueprint.route("/starred")
+def starred():
+    """Show starred documents (no login required for viewing)."""
+    user = _current_user()
+    docs = _load_documents()
+    starred_docs = [d for d in docs if d.get("is_starred", False)
+                    and not d.get("is_trashed", False)]
+    starred_docs.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    return render_template("documents/starred.html", documents=starred_docs,
+                           user=user, user_map=user_map)
+
+
+@blueprint.route("/trash")
+def trash():
+    """Show trashed documents (no login required for viewing)."""
+    user = _current_user()
+    docs = _load_documents()
+    trashed = [d for d in docs if d.get("is_trashed", False)]
+    trashed.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    return render_template("documents/trash.html", documents=trashed,
+                           user=user, user_map=user_map)
+
+
+@blueprint.route("/new")
+def new_doc_page():
+    """Form to create a new document."""
+    user = _current_user()
+    folders = _load_folders()
+    users = _load_users()
+    return render_template("documents/new.html", user=user, folders=folders, users=users)
+
+
+@blueprint.route("/login", methods=["GET"])
+def login_page():
+    return render_template("documents/login.html", error=None)
+
+
+@blueprint.route("/login", methods=["POST"])
+def login_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user or user.get("password") != password:
+        return render_template("documents/login.html",
+                               error="Invalid username or password")
+    session["user_id"] = user["id"]
+    emit("signup", user_id=user["id"], site_name="documents", username=request.form.get("username", ""), password=request.form.get("password", ""), email="")
+    next_url = request.form.get("next") or request.args.get("next")
+    if next_url:
+        return redirect(next_url)
+    return redirect(url_for("documents.index"))
+
+
+@blueprint.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return redirect(url_for("documents.login_page"))
+
+
+# ---------------------------------------------------------------------------
+# Form-based mutation routes (browser automation compatible)
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/document/<int:doc_id>/star", methods=["POST"])
+def form_star_document(doc_id):
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    doc["is_starred"] = not doc.get("is_starred", False)
+    _save_documents(docs)
+    redirect_to = request.form.get("redirect_to")
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for("documents.index"))
+
+
+@blueprint.route("/document/<int:doc_id>/trash", methods=["POST"])
+def form_trash_document(doc_id):
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if doc["owner_id"] != user["id"]:
+        abort(403)
+    doc["is_trashed"] = True
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
+    return redirect(url_for("documents.index"))
+
+
+@blueprint.route("/document/<int:doc_id>/restore", methods=["POST"])
+def form_restore_document(doc_id):
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if doc["owner_id"] != user["id"]:
+        abort(403)
+    doc["is_trashed"] = False
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
+    return redirect(url_for("documents.trash"))
+
+
+@blueprint.route("/document/<int:doc_id>/delete", methods=["POST"])
+def form_delete_document(doc_id):
+    """Permanently delete a trashed document."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if doc["owner_id"] != user["id"]:
+        abort(403)
+    docs = [d for d in docs if d["id"] != doc_id]
+    _save_documents(docs)
+    # Also remove revisions for this document
+    revisions = _load_revisions()
+    revisions = [r for r in revisions if r["document_id"] != doc_id]
+    _save_revisions(revisions)
+    return redirect(url_for("documents.trash"))
+
+
+@blueprint.route("/document/<int:doc_id>/share", methods=["POST"])
+def form_share_document(doc_id):
+    """Add a collaborator to a document via form submission."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+
+    user_id = request.form.get("user_id", type=int)
+    permission = request.form.get("permission", "view")
+    if not user_id:
+        return redirect(url_for("documents.editor", doc_id=doc_id))
+    if permission not in ("view", "comment", "edit"):
+        permission = "view"
+
+    collaborators = doc.setdefault("collaborators", [])
+    existing = next((c for c in collaborators if c["user_id"] == user_id), None)
+    if existing:
+        existing["permission"] = permission
+    else:
+        collaborators.append({"user_id": user_id, "permission": permission})
+
+    _save_documents(docs)
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/document/<int:doc_id>/update", methods=["POST"])
+def form_update_document(doc_id):
+    """Update a document title/content via form submission."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+
+    title = request.form.get("title", "").strip()
+    content = request.form.get("content", "")
+
+    changed = False
+    if title and title != doc["title"]:
+        doc["title"] = title
+        changed = True
+    if content != doc["content"]:
+        doc["content"] = content
+        doc["word_count"] = len(content.split()) if content.strip() else 0
+        changed = True
+
+    if changed:
+        now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        doc["updated_at"] = now
+        _save_documents(docs)
+
+        revisions = _load_revisions()
+        _append_revision(revisions, document_id=doc_id, user_id=user["id"],
+                         timestamp=now, summary="Updated via form", doc=doc)
+        _save_revisions(revisions)
+
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/document/<int:doc_id>/version/<int:rev_id>")
+def version_view(doc_id, rev_id):
+    """Show the historical content captured in a specific revision.
+
+    This is the Google-Docs "see this previous version" view: it renders the
+    title/content snapshot stored on the revision, not the document's current
+    body. Older seed revisions predate snapshots and carry no content -- those
+    are shown with a notice instead.
+    """
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    rev = next((r for r in _load_revisions()
+                if r["id"] == rev_id and r["document_id"] == doc_id), None)
+    if rev is None:
+        abort(404)
+    users = _load_users()
+    user_map = {u["id"]: u for u in users}
+    has_snapshot = "content" in rev
+    can_edit = _user_can_edit(doc, user["id"])
+    return render_template("documents/version.html", doc=doc, rev=rev,
+                           user=user, user_map=user_map,
+                           has_snapshot=has_snapshot, can_edit=can_edit)
+
+
+@blueprint.route("/document/<int:doc_id>/version/<int:rev_id>/restore", methods=["POST"])
+def form_restore_version(doc_id, rev_id):
+    """Restore a previous version: overwrite the document with the revision's
+    snapshot and record a NEW revision capturing the restored content."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+    rev = next((r for r in _load_revisions()
+                if r["id"] == rev_id and r["document_id"] == doc_id), None)
+    if rev is None or "content" not in rev:
+        abort(404)
+
+    old_content = rev["content"]
+    doc["content"] = old_content
+    if rev.get("title"):
+        doc["title"] = rev["title"]
+    doc["word_count"] = len(old_content.split()) if old_content.strip() else 0
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    doc["updated_at"] = now
+    _save_documents(docs)
+
+    revisions = _load_revisions()
+    _append_revision(revisions, document_id=doc_id, user_id=user["id"],
+                     timestamp=now,
+                     summary=f"Restored version from {rev['timestamp'][:10]}",
+                     doc=doc)
+    _save_revisions(revisions)
+
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+@blueprint.route("/document/<int:doc_id>/move", methods=["POST"])
+def form_move_document(doc_id):
+    """Move a document to a different folder from the editor UI."""
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+    folder_id = request.form.get("folder_id", type=int)  # blank -> None (no folder)
+    doc["folder_id"] = folder_id
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
+    return redirect(url_for("documents.editor", doc_id=doc_id))
+
+
+# ---------------------------------------------------------------------------
+# Inline-editable data grid (edit_by_cell)
+#
+# A document can carry a structured data table (a project / line-item tracker)
+# that is edited directly in grid cells. The grid lives in a purely
+# overlay-backed "doc_tables" collection keyed by document id, mirroring the
+# university-academic gradebook pattern: get_item is overlay-first so saved
+# edits are honoured, and a deterministic default is served when nothing has
+# been saved yet. Mutations go ONLY to the session overlay -- base tables are
+# never touched.
+# ---------------------------------------------------------------------------
+
+_TABLE_HEADER = ["Line Item", "Owner", "Status", "Budget", "Spent"]
+_TABLE_DEFAULT_ROWS = [
+    ["Compute (EC2)", "Priya", "On track", "12000", "9800"],
+    ["Managed DB (RDS)", "Alex", "On track", "6000", "5400"],
+    ["Object storage (S3)", "Sam", "Over budget", "1500", "2100"],
+    ["Observability", "Jordan", "At risk", "3000", "2750"],
+]
+
+
+def _default_doc_table():
+    """Grid with header row 0 followed by the default line-item rows."""
+    return [list(_TABLE_HEADER)] + [list(r) for r in _TABLE_DEFAULT_ROWS]
+
+
+def _load_doc_table(doc_id):
+    """Return the data-table grid for a document.
+
+    Reads the session overlay first (get_item is overlay-first, so saved edits
+    are honoured); falls back to the deterministic default grid.
+    """
+    tbl = db.get_item(SITE, "doc_tables", doc_id)
+    if tbl and tbl.get("data"):
+        return tbl["data"]
+    return _default_doc_table()
+
+
+@blueprint.route("/document/<int:doc_id>/table", methods=["GET"])
+def table_view(doc_id):
+    """Inline-editable data-grid for a document (edit_by_cell)."""
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not user or not _user_can_access(doc, user["id"]):
+        abort(403)
+    can_edit = _user_can_edit(doc, user["id"])
+    grid = _load_doc_table(doc_id)
+    return render_template("documents/table.html", doc=doc, grid=grid,
+                           user=user, can_edit=can_edit)
+
+
+@blueprint.route("/document/<int:doc_id>/table", methods=["POST"])
+def table_submit(doc_id):
+    """Persist inline cell edits from the document data-grid (edit_by_cell).
+
+    Form fields: cell_<row>_<col>=value (e.g. cell_1_3=15000). The grid
+    auto-expands so "+ Add row" rows appended client-side are saved. Persists to
+    the session overlay via db.save_item -- base tables are never written. This
+    is a normal /sites/documents/... route so its POST body is captured by
+    /_admin/log and a verifier can assert the entered values.
+    """
+    if "user_id" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        abort(404)
+    user = _current_user()
+    if not _user_can_edit(doc, user["id"]):
+        abort(403)
+
+    grid = _load_doc_table(doc_id)
+    width = len(grid[0]) if grid else len(_TABLE_HEADER)
+
+    for key, value in request.form.items():
+        if not key.startswith("cell_"):
+            continue
+        parts = key.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            r, c = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        while len(grid) <= r:
+            grid.append([""] * width)
+        while len(grid[r]) <= c:
+            grid[r].append("")
+        grid[r][c] = value.strip()
+
+    db.save_item(SITE, "doc_tables", doc_id, {
+        "id": doc_id,
+        "document_id": doc_id,
+        "data": grid,
+    })
+
+    return redirect(url_for("documents.table_view", doc_id=doc_id))
+
+
+@blueprint.route("/upload", methods=["POST"])
+def form_upload_document():
+    """Upload a file as a new document."""
+    user = _current_user()
+    if not user:
+        return redirect(url_for("documents.login_page"))
+    f = request.files.get("file")
+    title = f.filename if f and f.filename else "Uploaded Document"
+    content = f"[Uploaded file: {title}]"
+    docs = _load_documents()
+    new_id = max((d["id"] for d in docs), default=0) + 1
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_doc = {
+        "id": new_id, "title": title, "content": content,
+        "owner_id": user["id"], "folder_id": None,
+        "collaborators": [], "word_count": len(content.split()),
+        "is_starred": False, "is_trashed": False,
+        "created_at": now, "updated_at": now,
+    }
+    docs.append(new_doc)
+    _save_documents(docs)
+    emit("file_created", user_id=user["id"], filename=title, file_type="document", source_site="documents", source_id=new_id)
+    return redirect(url_for("documents.editor", doc_id=new_id))
+
+
+@blueprint.route("/document/create", methods=["POST"])
+def form_create_document():
+    """Create a new document via form submission."""
+    title = request.form.get("title", "Untitled Document").strip()
+    content = request.form.get("content", "").strip()
+    owner_id = request.form.get("owner_id", type=int)
+    folder_id = request.form.get("folder_id", type=int)
+
+    if not owner_id:
+        user = _current_user()
+        if user:
+            owner_id = user["id"]
+        else:
+            return redirect(url_for("documents.login_page"))
+
+    docs = _load_documents()
+    new_id = max((d["id"] for d in docs), default=0) + 1
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    word_count = len(content.split()) if content else 0
+
+    new_doc = {
+        "id": new_id,
+        "title": title,
+        "content": content,
+        "owner_id": owner_id,
+        "folder_id": folder_id,
+        "collaborators": [],
+        "word_count": word_count,
+        "is_starred": False,
+        "is_trashed": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+    docs.append(new_doc)
+    _save_documents(docs)
+
+    revisions = _load_revisions()
+    _append_revision(revisions, document_id=new_id, user_id=owner_id,
+                     timestamp=now, summary="Created document", doc=new_doc)
+    _save_revisions(revisions)
+
+    emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
+
+    return redirect(url_for("documents.editor", doc_id=new_id))
+
+
+# ---------------------------------------------------------------------------
+# API routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/documents")
+def api_documents():
+    """List documents. Supports query params: q, sort, folder_id, owner_id, starred, trashed."""
+    docs = _load_documents()
+    q = request.args.get("q", "").strip()
+    sort = request.args.get("sort", "updated").strip()
+    folder_id = request.args.get("folder_id", type=int)
+    owner_id = request.args.get("owner_id", type=int)
+    starred = request.args.get("starred", "").strip().lower()
+    trashed = request.args.get("trashed", "").strip().lower()
+
+    results = list(docs)
+
+    # Filter trashed (default: exclude trashed)
+    if trashed == "true" or trashed == "only":
+        results = [d for d in results if d.get("is_trashed", False)]
+    else:
+        results = [d for d in results if not d.get("is_trashed", False)]
+
+    if q:
+        results = _search_documents(results, q)
+    if folder_id is not None:
+        results = [d for d in results if d.get("folder_id") == folder_id]
+    if owner_id is not None:
+        results = [d for d in results if d["owner_id"] == owner_id]
+    if starred == "true":
+        results = [d for d in results if d.get("is_starred", False)]
+
+    # Sort
+    if sort == "title":
+        results.sort(key=lambda d: d["title"].lower())
+    elif sort == "created":
+        results.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+    elif sort == "word_count":
+        results.sort(key=lambda d: d.get("word_count", 0), reverse=True)
+    else:
+        results.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+
+    return jsonify(results)
+
+
+@blueprint.route("/api/documents/<int:doc_id>")
+def api_document(doc_id):
+    """Get a single document by ID."""
+    doc = db.get_item(SITE, "documents", doc_id)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+    return jsonify(doc)
+
+
+@blueprint.route("/api/documents", methods=["POST"])
+def api_create_document():
+    """Create a new document."""
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "Untitled Document").strip()
+    content = data.get("content", "").strip()
+    owner_id = data.get("owner_id")
+    folder_id = data.get("folder_id")
+
+    if not owner_id:
+        return jsonify({"error": "owner_id required"}), 400
+
+    docs = _load_documents()
+    new_id = max((d["id"] for d in docs), default=0) + 1
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    word_count = len(content.split()) if content else 0
+
+    new_doc = {
+        "id": new_id,
+        "title": title,
+        "content": content,
+        "owner_id": owner_id,
+        "folder_id": folder_id,
+        "collaborators": [],
+        "word_count": word_count,
+        "is_starred": False,
+        "is_trashed": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+    docs.append(new_doc)
+    _save_documents(docs)
+
+    # Create initial revision
+    revisions = _load_revisions()
+    _append_revision(revisions, document_id=new_id, user_id=owner_id,
+                     timestamp=now, summary="Created document", doc=new_doc)
+    _save_revisions(revisions)
+
+    emit("file_created", user_id=owner_id, filename=title, file_type="document", source_site="documents", source_id=new_id)
+
+    return jsonify(new_doc), 201
+
+
+@blueprint.route("/api/documents/<int:doc_id>", methods=["PUT"])
+def api_update_document(doc_id):
+    """Update a document's title and/or content."""
+    data = request.get_json(silent=True) or {}
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    changed = False
+    if "title" in data:
+        doc["title"] = data["title"].strip()
+        changed = True
+    if "content" in data:
+        doc["content"] = data["content"]
+        doc["word_count"] = len(data["content"].split()) if data["content"] else 0
+        changed = True
+
+    if changed:
+        now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        doc["updated_at"] = now
+        _save_documents(docs)
+
+        # Create revision
+        user_id = data.get("user_id", doc["owner_id"])
+        summary = data.get("summary", "Updated document")
+        revisions = _load_revisions()
+        _append_revision(revisions, document_id=doc_id, user_id=user_id,
+                         timestamp=now, summary=summary, doc=doc)
+        _save_revisions(revisions)
+
+    return jsonify(doc)
+
+
+@blueprint.route("/api/documents/<int:doc_id>", methods=["PATCH"])
+def api_patch_document(doc_id):
+    """Partial update a document (same as PUT)."""
+    return api_update_document(doc_id)
+
+
+@blueprint.route("/api/documents/<int:doc_id>/star", methods=["POST"])
+def api_star_document(doc_id):
+    """Toggle star on a document."""
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+    doc["is_starred"] = not doc.get("is_starred", False)
+    _save_documents(docs)
+    return jsonify({"id": doc_id, "is_starred": doc["is_starred"]})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/trash", methods=["POST"])
+def api_trash_document(doc_id):
+    """Move a document to trash or restore it."""
+    data = request.get_json(silent=True) or {}
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    action = data.get("action", "trash")
+    if action == "restore":
+        doc["is_trashed"] = False
+    else:
+        doc["is_trashed"] = True
+
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
+    return jsonify({"id": doc_id, "is_trashed": doc["is_trashed"], "action": action})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/share", methods=["POST"])
+def api_share_document(doc_id):
+    """Add or update a collaborator on a document."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    permission = data.get("permission", "view")
+
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    if permission not in ("view", "comment", "edit"):
+        return jsonify({"error": "permission must be view, comment, or edit"}), 400
+
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    collaborators = doc.setdefault("collaborators", [])
+    existing = next((c for c in collaborators if c["user_id"] == user_id), None)
+    if existing:
+        existing["permission"] = permission
+        action = "updated"
+    else:
+        collaborators.append({"user_id": user_id, "permission": permission})
+        action = "added"
+
+    _save_documents(docs)
+    return jsonify({"action": action, "user_id": user_id, "permission": permission,
+                    "total_collaborators": len(collaborators)})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/unshare", methods=["POST"])
+def api_unshare_document(doc_id):
+    """Remove a collaborator from a document."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    collaborators = doc.get("collaborators", [])
+    before = len(collaborators)
+    doc["collaborators"] = [c for c in collaborators if c["user_id"] != user_id]
+    after = len(doc["collaborators"])
+
+    _save_documents(docs)
+    return jsonify({"action": "removed" if after < before else "not_found",
+                    "user_id": user_id,
+                    "total_collaborators": after})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/move", methods=["POST"])
+def api_move_document(doc_id):
+    """Move a document to a different folder."""
+    data = request.get_json(silent=True) or {}
+    folder_id = data.get("folder_id")
+
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    doc["folder_id"] = folder_id
+    doc["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _save_documents(docs)
+    return jsonify({"id": doc_id, "folder_id": folder_id})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/delete", methods=["POST", "DELETE"])
+def api_delete_document(doc_id):
+    """Permanently delete a document."""
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+
+    docs = [d for d in docs if d["id"] != doc_id]
+    _save_documents(docs)
+
+    revisions = _load_revisions()
+    revisions = [r for r in revisions if r["document_id"] != doc_id]
+    _save_revisions(revisions)
+
+    return jsonify({"action": "deleted", "id": doc_id})
+
+
+@blueprint.route("/api/documents/<int:doc_id>/revisions")
+def api_document_revisions(doc_id):
+    """Get revision history for a document."""
+    docs = _load_documents()
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+    revisions = db.query(SITE, "revisions", where={"document_id": doc_id}, sort="-timestamp")
+    return jsonify(revisions)
+
+
+# ---------------------------------------------------------------------------
+# Folder API routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/folders")
+def api_folders():
+    """List all folders."""
+    folders = _load_folders()
+    owner_id = request.args.get("owner_id", type=int)
+    if owner_id is not None:
+        folders = [f for f in folders if f["owner_id"] == owner_id]
+    return jsonify(folders)
+
+
+@blueprint.route("/api/folders/<int:folder_id>")
+def api_folder(folder_id):
+    """Get a single folder with its documents."""
+    folders = _load_folders()
+    folder = next((f for f in folders if f["id"] == folder_id), None)
+    if folder is None:
+        return jsonify({"error": "Folder not found"}), 404
+    docs = _load_documents()
+    folder_docs = [d for d in docs if d.get("folder_id") == folder_id
+                   and not d.get("is_trashed", False)]
+    result = dict(folder)
+    result["documents"] = folder_docs
+    return jsonify(result)
+
+
+@blueprint.route("/api/folders", methods=["POST"])
+def api_create_folder():
+    """Create a new folder."""
+    data = request.get_json(silent=True) or {}
+    name = data.get("name", "New Folder").strip()
+    owner_id = data.get("owner_id")
+    color = data.get("color", "#4A90D9")
+
+    if not owner_id:
+        return jsonify({"error": "owner_id required"}), 400
+
+    folders = _load_folders()
+    new_id = max((f["id"] for f in folders), default=0) + 1
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    new_folder = {
+        "id": new_id,
+        "name": name,
+        "owner_id": owner_id,
+        "color": color,
+        "created_at": now,
+    }
+    folders.append(new_folder)
+    _save_folders(folders)
+    return jsonify(new_folder), 201
+
+
+# ---------------------------------------------------------------------------
+# User API routes
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    users = _load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user or user.get("password") != password:
+        return jsonify({"error": "Invalid credentials"}), 401
+    session["user_id"] = user["id"]
+    return jsonify({"user_id": user["id"], "username": user["username"]})
+
+
+@blueprint.route("/api/users")
+def api_users():
+    """List all users (passwords excluded)."""
+    users = _load_users()
+    return jsonify([{k: v for k, v in u.items() if k != "password"} for u in users])
+
+
+@blueprint.route("/api/users/<int:user_id>")
+def api_user(user_id):
+    user = _get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({k: v for k, v in user.items() if k != "password"})
+
+
+# ---------------------------------------------------------------------------
+# Stats / search API
+# ---------------------------------------------------------------------------
+
+@blueprint.route("/api/stats")
+def api_stats():
+    """Aggregate statistics about documents."""
+    docs = _load_documents()
+    active = [d for d in docs if not d.get("is_trashed", False)]
+    trashed = [d for d in docs if d.get("is_trashed", False)]
+    starred = [d for d in active if d.get("is_starred", False)]
+    total_words = sum(d.get("word_count", 0) for d in active)
+    folders = _load_folders()
+    revisions = _load_revisions()
+
+    owner_ids = set(d["owner_id"] for d in active)
+
+    return jsonify({
+        "total_documents": len(active),
+        "trashed_documents": len(trashed),
+        "starred_documents": len(starred),
+        "total_word_count": total_words,
+        "total_folders": len(folders),
+        "total_revisions": len(revisions),
+        "unique_owners": len(owner_ids),
+        "avg_word_count": round(total_words / len(active), 1) if active else 0,
+    })
+
+@blueprint.route("/api/search")
+def api_search():
+    """Search documents by content/title."""
+    q = request.args.get("q", "").strip()
+    docs = _load_documents()
+    active = [d for d in docs if not d.get("is_trashed", False)]
+    results = _search_documents(active, q)
+    return jsonify(results)
+
+
+@blueprint.route("/api/export")
+def api_export():
+    """Export documents as JSON or CSV."""
+    fmt = request.args.get("format", "json").lower()
+    folder_id = request.args.get("folder_id", type=int)
+    owner_id = request.args.get("owner_id", type=int)
+
+    docs = _load_documents()
+    active = [d for d in docs if not d.get("is_trashed", False)]
+
+    if folder_id is not None:
+        active = [d for d in active if d.get("folder_id") == folder_id]
+    if owner_id is not None:
+        active = [d for d in active if d["owner_id"] == owner_id]
+
+    if fmt == "csv":
+        lines = ["id,title,owner_id,folder_id,word_count,is_starred,created_at,updated_at"]
+        for d in active:
+            title = d["title"].replace('"', '""')
+            fid = d.get("folder_id") or ""
+            wc = d.get("word_count", 0)
+            star = d.get("is_starred", False)
+            cat = d.get("created_at", "")
+            uat = d.get("updated_at", "")
+            lines.append(f'{d["id"]},"{title}",{d["owner_id"]},{fid},{wc},{star},"{cat}","{uat}"')
+        return Response("\n".join(lines), mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=documents.csv"})
+    return jsonify(active)

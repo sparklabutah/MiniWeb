@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Messages</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .top-nav .nav-links a:hover { color: #0095f6; }
+        .container { max-width: 720px; margin: 24px auto; padding: 0 20px; }
+        .dm-card { background: #fff; border: 1px solid #dbdbdb; border-radius: 8px; overflow: hidden; }
+        .dm-header { padding: 16px 20px; border-bottom: 1px solid #dbdbdb; font-size: 18px; font-weight: 600; }
+        .convo { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #efefef; }
+        .convo:hover { background: #fafafa; }
+        .convo .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+        .convo .meta { flex: 1; min-width: 0; }
+        .convo .name { font-weight: 600; font-size: 14px; }
+        .convo .preview { font-size: 13px; color: #8e8e8e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .convo .time { font-size: 11px; color: #c7c7c7; }
+        .empty { padding: 40px 20px; text-align: center; color: #8e8e8e; }
+        .new-dm { padding: 16px 20px; border-top: 1px solid #dbdbdb; }
+        .new-dm label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+        .new-dm select { width: 100%; padding: 10px 12px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; }
+        .new-dm button { margin-top: 10px; padding: 9px 20px; background: #0095f6; color: #fff; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}" style="color:#0095f6;font-weight:600;">Messages</a>
+            <a href="{{ url_for('multimedia-posting.settings_page') }}">Settings</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="dm-card">
+            <div class="dm-header">Messages</div>
+            {% if conversations %}
+                {% for c in conversations %}
+                <a href="{{ url_for('multimedia-posting.messages_thread', other_id=c.other.id) }}" class="convo" style="color:#262626;">
+                    <div class="avatar" style="background: hsl({{ (c.other.id | replace('mp-u-', '') | int * 40) if c.other.id and 'mp-u-' in c.other.id else 200 }}, 50%, 50%);">
+                        {{ c.other.display_name[0] if c.other.display_name else '?' }}
+                    </div>
+                    <div class="meta">
+                        <div class="name">{{ c.other.username }}</div>
+                        <div class="preview">{{ c.last.text }}</div>
+                    </div>
+                    <div class="time">{{ c.last.created_at[:10] }}</div>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="empty">No conversations yet. Start one below.</div>
+            {% endif %}
+
+            <div class="new-dm">
+                <label for="dm-user">New message</label>
+                <select id="dm-user">
+                    <option value="">Select a user…</option>
+                    {% for u in directory %}
+                    <option value="{{ u.id }}">{{ u.username }} — {{ u.display_name }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="openConversation()">Message</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const baseUrl = "{{ url_for('multimedia-posting.index') }}";
+    function openConversation() {
+        const uid = document.getElementById('dm-user').value;
+        if (!uid) return;
+        window.location.href = `${baseUrl}messages/${uid}`;
+    }
+    </script>
+</body>
+</html>

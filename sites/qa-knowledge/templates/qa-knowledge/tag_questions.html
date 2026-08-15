@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questions tagged [{{ tag }}] - KnowledgeHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; } a:hover { color: #0a95ff; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .user-area { color: #fff; font-size: 13px; margin-left: auto; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+        .tag-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .tag-header h2 { font-size: 20px; }
+        .tag-badge { display: inline-block; background: #e1ecf4; color: #39739d; padding: 4px 10px; border-radius: 3px; font-size: 16px; font-weight: 600; }
+        .sort-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .sort-bar a, .sort-bar span { padding: 4px 10px; border: 1px solid #d6d9dc; border-radius: 3px; font-size: 13px; }
+        .sort-bar a.active, .sort-bar span.active { background: #e3e6e8; font-weight: 600; }
+        .q-list-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e3e6e8; }
+        .q-stats { text-align: center; min-width: 60px; }
+        .q-stats .num { font-size: 17px; font-weight: 600; } .q-stats .lbl { font-size: 11px; color: #6a737c; }
+        .q-content h3 { font-size: 15px; margin-bottom: 4px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .meta { font-size: 12px; color: #6a737c; margin-top: 4px; }
+        .btn { display: inline-block; padding: 6px 14px; background: #0a95ff; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .btn-outline { background: #fff; color: #0074cc; border: 1px solid #0074cc; }
+    </style>
+</head>
+<body>
+    {% include "qa-knowledge/_header.html" %}
+
+    <div class="container">
+        <div class="tag-header">
+            <div>
+                <h2>Questions tagged <span class="tag-badge">{{ tag }}</span></h2>
+                <p style="font-size:13px; color:#6a737c; margin-top:4px;">{{ total }} question{{ 's' if total != 1 }}{% if total_pages > 1 %} &middot; page {{ page }} of {{ total_pages }}{% endif %}</p>
+            </div>
+            <!-- follow_by_toggle -->
+            {% if current_user %}
+            <form method="post" action="{{ url_for('qa-knowledge.form_follow_tag', tag=tag) }}">
+                <button type="submit" class="btn btn-outline">Follow Tag</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="sort-bar">
+            <span>Sort by:</span>
+            {% for s in ['newest', 'votes', 'active'] %}
+            <a href="{{ url_for('qa-knowledge.tag_questions', tag=tag, sort=s) }}"
+               class="{% if sort == s %}active{% endif %}">{{ s|capitalize }}</a>
+            {% endfor %}
+        </div>
+
+        {% for q in questions %}
+        <div class="q-list-item">
+            <div class="q-stats">
+                <div class="num">{{ q.score }}</div><div class="lbl">votes</div>
+            </div>
+            <div class="q-stats">
+                <div class="num">{{ q.answer_count }}</div><div class="lbl">answers</div>
+            </div>
+            <div class="q-content">
+                <h3><a href="{{ url_for('qa-knowledge.question_detail', qid=q.id) }}">{{ q.title }}</a></h3>
+                <div class="tags">
+                    {% for t in q.tags %}
+                    <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
+                    {% endfor %}
+                </div>
+                <div class="meta">asked {{ q.creation_date }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% if total_pages > 1 %}
+        <div style="display:flex;gap:.5rem;justify-content:center;padding:16px 0;">
+            {% if page > 1 %}<a href="{{ url_for('qa-knowledge.tag_questions', tag=tag, sort=sort, page=page-1) }}" style="padding:6px 12px;border:1px solid #d6d9dc;border-radius:4px;">&larr; Prev</a>{% endif %}
+            <span style="padding:6px 12px;color:#6a737c;">page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}<a href="{{ url_for('qa-knowledge.tag_questions', tag=tag, sort=sort, page=page+1) }}" style="padding:6px 12px;border:1px solid #d6d9dc;border-radius:4px;">Next &rarr;</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

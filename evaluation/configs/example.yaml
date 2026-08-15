@@ -1,0 +1,17 @@
+# run_agent_verify config: a matrix of agents × tasks.
+#   python evaluation/run_agent_verify.py --config evaluation/configs/example.yaml
+agents:
+  - {model: gemini-3.1-pro-preview, obs: visual}
+  - {model: claude-sonnet-5, harness: computer-use}   # native computer-use tool
+  - {model: computer-use-preview, harness: computer-use, label: openai-cua}
+  - {model: gpt-5, obs: axtree}
+  - {model: ollama/llama3.3, label: llama-local}
+tasks:
+  - Minh/job-sites_3c5414
+  - Minh/software-marketplace_dc52a3
+  - "site:banking"            # expands to every annotated banking task
+# run-wide defaults (any agent can override obs/grade/native_llm)
+grade: verifier              # verifier | judge | both
+max_steps: 50
+timeout: 300
+headless: true

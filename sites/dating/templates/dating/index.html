@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeartLink - Discover</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; min-height: 100vh; }
+        .navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+        .navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+        .navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+        .navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+        .navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+        .navbar .nav-links a.active { background: #f0ebff; color: #667eea; }
+
+        .discover-container { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+        .filter-bar { background: #fff; border-radius: 0.8rem; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .filter-bar h3 { font-size: 0.85rem; color: #888; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+        .filter-row label { font-size: 0.82rem; color: #666; }
+        .filter-row select, .filter-row input[type="number"] { padding: 0.35rem 0.5rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; background: #f5f0ff; }
+        .filter-row input[type="number"] { width: 65px; }
+        .filter-row input[type="text"] { flex: 1; padding: 0.35rem 0.5rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; }
+        .filter-btn { padding: 0.35rem 0.8rem; background: #667eea; color: #fff; border: none; border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; }
+
+        .profile-card { background: #fff; border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; }
+        .card-photo { width: 100%; height: 400px; background: linear-gradient(135deg, #e8eaf6, #f3e5f5); display: flex; align-items: center; justify-content: center; position: relative; }
+        .card-photo .initials { font-size: 5rem; color: #667eea; font-weight: 700; opacity: 0.5; }
+        .card-photo .verified-badge { position: absolute; top: 1rem; right: 1rem; background: #4caf50; color: #fff; padding: 0.25rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
+        .card-info { padding: 1.2rem 1.5rem; }
+        .card-name { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; }
+        .card-name .age { font-weight: 400; color: #666; }
+        .card-location { font-size: 0.9rem; color: #888; margin-top: 0.2rem; }
+        .card-looking { display: inline-block; background: #fff3e0; color: #e65100; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.78rem; font-weight: 500; margin-top: 0.5rem; }
+        .card-bio { font-size: 0.95rem; color: #444; line-height: 1.5; margin-top: 0.8rem; }
+        .card-interests { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
+        .card-interests .tag { background: #f0ebff; color: #667eea; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.78rem; }
+        .card-interests .tag.shared { background: #e8f5e9; color: #2e7d32; }
+
+        .card-actions { display: flex; justify-content: center; gap: 1.5rem; padding: 1.2rem 1.5rem; }
+        .btn-action { width: 60px; height: 60px; border-radius: 50%; border: none; font-size: 1.5rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-action:hover { transform: scale(1.1); }
+        .btn-pass { background: #fff; color: #667eea; box-shadow: 0 2px 10px rgba(102,126,234,0.2); border: 2px solid #f0ebff; }
+        .btn-like { background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; box-shadow: 0 4px 15px rgba(102,126,234,0.3); }
+        .btn-profile-link { background: #fff; color: #667eea; box-shadow: 0 2px 10px rgba(102,126,234,0.2); border: 2px solid #e8eaf6; font-size: 1.2rem; }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
+        .empty-state h2 { font-size: 1.5rem; color: #666; margin-bottom: 0.5rem; }
+        .profile-count { text-align: center; font-size: 0.85rem; color: #999; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+        <div class="nav-links">
+            <a href="{{ url_for('dating.index') }}" class="active">Discover</a>
+            <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+            <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
+            <a href="{{ url_for('dating.matches_page') }}">Matches</a>
+            <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+            <a href="{{ url_for('dating.logout') }}">Logout</a>
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </nav>
+
+    <div class="discover-container">
+        <form class="filter-bar" id="filter-form" method="get" action="{{ url_for('dating.index') }}">
+            <h3>Discovery Filters</h3>
+            <div class="filter-row">
+                <label>Age:</label>
+                <input type="number" name="min_age" id="min_age" placeholder="Min" min="18" max="99" value="{{ request.args.get('min_age', '') }}">
+                <span style="color:#999">-</span>
+                <input type="number" name="max_age" id="max_age" placeholder="Max" min="18" max="99" value="{{ request.args.get('max_age', '') }}">
+                <label>Looking for:</label>
+                <select name="looking_for" id="looking_for">
+                    <option value="">All</option>
+                    <option value="relationship" {{ 'selected' if request.args.get('looking_for') == 'relationship' }}>Relationship</option>
+                    <option value="casual" {{ 'selected' if request.args.get('looking_for') == 'casual' }}>Casual</option>
+                    <option value="friendship" {{ 'selected' if request.args.get('looking_for') == 'friendship' }}>Friendship</option>
+                </select>
+                <button type="submit" class="filter-btn">Filter</button>
+            </div>
+            <div class="filter-row" style="margin-top:0.5rem">
+                <label>Interest:</label>
+                <input type="text" name="interest" placeholder="e.g. hiking" value="{{ request.args.get('interest', '') }}">
+                <label>Joined From:</label>
+                <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" style="padding:0.35rem 0.5rem;border:1px solid #ddd;border-radius:0.4rem;font-size:0.85rem;">
+                <label>To:</label>
+                <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" style="padding:0.35rem 0.5rem;border:1px solid #ddd;border-radius:0.4rem;font-size:0.85rem;">
+            </div>
+        </form>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div class="profile-count" style="margin-bottom:0;">{{ profiles|length }} profile{{ 's' if profiles|length != 1 }} to discover</div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <select name="sort" form="filter-form" onchange="document.getElementById('filter-form').requestSubmit ? document.getElementById('filter-form').requestSubmit() : document.getElementById('filter-form').submit()" style="padding:.3rem .5rem;border:1px solid #ddd;border-radius:.4rem;font-size:.82rem;background:#fff;">
+                    <option value="">Sort by</option>
+                    <option value="age_asc" {{ 'selected' if request.args.get('sort') == 'age_asc' }}>Age (Low-High)</option>
+                    <option value="age_desc" {{ 'selected' if request.args.get('sort') == 'age_desc' }}>Age (High-Low)</option>
+                    <option value="name" {{ 'selected' if request.args.get('sort') == 'name' }}>Name A-Z</option>
+                    <option value="newest" {{ 'selected' if request.args.get('sort') == 'newest' }}>Newest</option>
+                </select> </div>
+        </div>
+
+        {% set ad_format = 'native' %}
+        {% set ads = product_ads(4, seed='dating-ad2') %}
+        {% include "ads/_product_ads.html" %}
+
+        {% if current_profile %}
+        <div class="profile-card" data-profile-id="{{ current_profile.id }}">
+            <div class="card-photo">
+                <span class="initials">{{ current_profile.name.split()[0][0] }}{{ current_profile.name.split()[-1][0] }}</span>
+                {% if current_profile.verified %}
+                <span class="verified-badge">Verified</span>
+                {% endif %}
+            </div>
+            <div class="card-info">
+                <div class="card-name">{{ current_profile.name }} <span class="age">{{ current_profile.age }}</span></div>
+                <div class="card-location">{{ current_profile.location }}</div>
+                <span class="card-looking">{{ current_profile.looking_for }}</span>
+                <div class="card-bio">{{ current_profile.bio }}</div>
+                <div class="card-interests">
+                    {% for interest in current_profile.interests %}
+                    <span class="tag {% if interest in user.interests %}shared{% endif %}">{{ interest }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="card-actions">
+                <form method="post" action="{{ url_for('dating.form_pass', profile_id=current_profile.id) }}" style="display:inline">
+                    <button type="submit" class="btn-action btn-pass" title="Pass">&#x2715;</button>
+                </form>
+                <a href="{{ url_for('dating.profile_detail', profile_id=current_profile.id) }}" class="btn-action btn-profile-link" title="View Profile">&#x1f464;</a>
+                <form method="post" action="{{ url_for('dating.form_like', profile_id=current_profile.id) }}" style="display:inline">
+                    <button type="submit" class="btn-action btn-like" title="Like">&#x2764;</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h2>No more profiles</h2>
+            <p>You have seen everyone matching your preferences. Check back later or adjust your filters!</p>
+        </div>
+        {% endif %}
+
+        {% set ad_format = 'rail' %}
+        {% set ads = product_ads(3, seed='dating-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+</body>
+</html>

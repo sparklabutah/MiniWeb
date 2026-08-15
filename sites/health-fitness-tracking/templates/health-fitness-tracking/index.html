@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitTrack — Overview</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+</head>
+<body>
+    {% set active_page = 'overview' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
+
+    <div class="ft-shell">
+        <div class="ft-datebar">
+            <div>
+                <h1>Daily Overview</h1>
+                <div class="sub">Your training, nutrition &amp; recovery at a glance</div>
+            </div>
+            <div class="ft-datenav">
+                <a href="?date={{ prev_date }}">&#8249;</a>
+                <span class="d">{{ view_date }}</span>
+                <a href="?date={{ next_date }}">&#8250;</a>
+            </div>
+        </div>
+
+        <!-- KPI strip -->
+        <div class="kpis">
+            <div class="kpi"><div class="k-lbl">Steps Today</div><div class="k-val">{{ "{:,}".format(an.kpis.steps) }}</div><div class="k-delta flat">7-day avg {{ "{:,}".format(an.kpis.avg_steps) }}</div></div>
+            <div class="kpi"><div class="k-lbl">Active Min</div><div class="k-val">{{ an.kpis.active_min }}<span class="u"> min</span></div><div class="k-delta flat">move goal 30</div></div>
+            <div class="kpi"><div class="k-lbl">Weight</div><div class="k-val">{{ an.kpis.weight }}<span class="u"> kg</span></div><div class="k-delta {{ 'down' if an.kpis.weight_delta < 0 else 'up' if an.kpis.weight_delta > 0 else 'flat' }}">{{ '%+.1f'|format(an.kpis.weight_delta) }} kg / 30d</div></div>
+            <div class="kpi"><div class="k-lbl">Sleep</div><div class="k-val">{{ an.kpis.sleep }}<span class="u"> h</span></div><div class="k-delta flat">last night</div></div>
+            <div class="kpi"><div class="k-lbl">Workouts</div><div class="k-val">{{ an.kpis.workouts_week }}</div><div class="k-delta flat">this week</div></div>
+            <div class="kpi"><div class="k-lbl">Distance</div><div class="k-val">{{ an.kpis.distance_week }}<span class="u"> km</span></div><div class="k-delta flat">7-day total</div></div>
+            <div class="kpi"><div class="k-lbl">Active Streak</div><div class="k-val">{{ an.kpis.streak }}<span class="u"> d</span></div><div class="k-delta down">🔥 keep it going</div></div>
+        </div>
+
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='health-fitness-tracking-index') %}
+        {% include "ads/_product_ads.html" %}
+
+        <div class="ft-grid">
+            <!-- ===== main column ===== -->
+            <div class="col">
+                <!-- Weight trend -->
+                <div class="panel">
+                    <div class="panel-h">
+                        <h3>Weight Trend</h3>
+                        {% if an.weight %}<span class="meta">{{ an.weight.start_date }} → {{ an.weight.end_date }} · <b style="color:{{ '#16a34a' if an.weight.delta < 0 else '#dc2626' }}">{{ '%+.1f'|format(an.weight.delta) }} kg</b></span>{% endif %}
+                    </div>
+                    <div class="panel-b">
+                        {% if an.weight %}
+                        <svg class="chart" viewBox="0 0 {{ an.weight.W }} {{ an.weight.H }}">
+                            {% for gy in [0.25, 0.5, 0.75] %}<line class="grid-line" x1="12" y1="{{ (an.weight.H * gy)|round(1) }}" x2="{{ an.weight.W - 12 }}" y2="{{ (an.weight.H * gy)|round(1) }}"/>{% endfor %}
+                            <polygon class="wt-area" points="{{ an.weight.area }}"/>
+                            <polyline class="wt-line" points="{{ an.weight.poly }}"/>
+                            <circle class="wt-dot" cx="{{ an.weight.poly.split(' ')[-1].split(',')[0] }}" cy="{{ an.weight.poly.split(' ')[-1].split(',')[1] }}" r="3.5"/>
+                        </svg>
+                        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:4px;">
+                            <span>{{ an.weight.max }} kg</span><span>range</span><span>{{ an.weight.min }} kg</span>
+                        </div>
+                        {% else %}<div style="color:var(--faint);text-align:center;padding:20px;">Not enough weight data.</div>{% endif %}
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Steps — Last 14 Days</h3><span class="meta">goal {{ "{:,}".format(an.steps.goal) }}/day</span></div>
+                    <div class="panel-b">
+                        <svg class="chart" viewBox="0 0 {{ an.steps.W }} {{ an.steps.H }}">
+                            <line class="goal-line" x1="12" y1="{{ an.steps.goal_y }}" x2="{{ an.steps.W - 12 }}" y2="{{ an.steps.goal_y }}"/>
+                            {% for b in an.steps.bars %}
+                            <rect class="bar {{ 'over' if b.over }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"><title>{{ b.date }}: {{ "{:,}".format(b.steps) }} steps</title></rect>
+                            <text class="bar-lbl" x="{{ (b.x + b.w/2)|round(1) }}" y="{{ an.steps.H - 2 }}">{{ b.dow }}</text>
+                            {% endfor %}
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Recent activity table -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Recent Activity</h3><a href="{{ url_for('health-fitness-tracking.workouts_page') }}">View all →</a></div>
+                    <table class="dt">
+                        <tr><th>Date</th><th>Activity</th><th>Duration</th><th>Distance</th><th>Calories</th><th>Avg HR</th></tr>
+                        {% for w in recent_workouts %}
+                        <tr>
+                            <td>{{ w.date }}</td>
+                            <td><a href="{{ url_for('health-fitness-tracking.workout_detail', workout_id=w.id) }}"><span class="type-tag tt-{{ w.type }}">{{ w.type|replace('_',' ') }}</span></a></td>
+                            <td>{{ w.duration_minutes }} min</td>
+                            <td>{{ (w.distance_km ~ ' km') if w.distance_km else '—' }}</td>
+                            <td>{{ w.calories_burned }}</td>
+                            <td>{{ (w.heart_rate_avg ~ ' bpm') if w.heart_rate_avg else '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- ===== side column ===== -->
+            <div class="col">
+                <!-- Calorie budget -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Calorie Budget</h3><a href="{{ url_for('health-fitness-tracking.nutrition_page') }}">Food log →</a></div>
+                    <div class="panel-b">
+                        <div class="ring-wrap">
+                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                <circle class="ring-bg" cx="70" cy="70" r="{{ cal_ring.r }}"/>
+                                <circle class="ring-fg" cx="70" cy="70" r="{{ cal_ring.r }}" stroke-dasharray="{{ cal_ring.dash }} {{ cal_ring.c }}" transform="rotate(-90 70 70)"/>
+                            </svg>
+                            <div class="ring-center">
+                                <div class="big">{{ cal_ring.remaining }}</div>
+                                <div class="lbl">kcal left</div>
+                            </div>
+                        </div>
+                        <div class="cal-row">
+                            <div><div class="n">{{ cal_ring.goal }}</div><div class="l">Goal</div></div>
+                            <div><div class="n">{{ cal_ring.consumed }}</div><div class="l">Food</div></div>
+                            <div><div class="n">{{ cal_ring.burned }}</div><div class="l">Exercise</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Macros -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Macronutrients</h3></div>
+                    <div class="panel-b">
+                        {% for key, m in [('protein', macros.protein), ('carbs', macros.carbs), ('fat', macros.fat), ('fiber', macros.fiber)] %}
+                        <div class="macro">
+                            <div class="m-top"><span class="m-name" style="text-transform:capitalize;">{{ key }}</span><span class="m-val">{{ m.cur }} / {{ m.goal }} g</span></div>
+                            <div class="m-track"><div class="m-fill {{ key }}" style="width:{{ m.pct }}%;"></div></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- This week's training -->
+                <div class="panel">
+                    <div class="panel-h"><h3>This Week</h3><span class="meta">{{ an.week.count }} workouts</span></div>
+                    <div class="panel-b">
+                        <div class="week-dots">
+                            {% for d in an.week.days %}
+                            <div class="wd {{ 'on' if d.has }}"><div class="dot" title="{{ d.date }}{{ ' · ' ~ d.type|replace('_',' ') if d.type }}">{{ '✓' if d.has else '' }}</div><div class="lbl">{{ d.dow[0] }}</div></div>
+                            {% endfor %}
+                        </div>
+                        <div class="week-stats">
+                            <div><div class="n">{{ an.week.minutes }}</div><div class="l">Minutes</div></div>
+                            <div><div class="n">{{ an.week.distance }}</div><div class="l">Km</div></div>
+                            <div><div class="n">{{ "{:,}".format(an.week.calories) }}</div><div class="l">Kcal</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity heatmap -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Activity — 12 Weeks</h3></div>
+                    <div class="panel-b">
+                        <svg class="heat chart" viewBox="0 0 {{ an.heat.W }} {{ an.heat.H }}" style="max-width:230px;">
+                            {% for c in an.heat.cells %}
+                            <rect class="h{{ c.level }}" x="{{ c.x }}" y="{{ c.y }}" width="{{ c.s }}" height="{{ c.s }}" rx="2"><title>{{ c.date }}: {{ c.mins }} active min</title></rect>
+                            {% endfor %}
+                        </svg>
+                        <div class="heat-legend">Less <i style="background:#eceff3;"></i><i style="background:#c6e6cf;"></i><i style="background:#7fce97;"></i><i style="background:#39a860;"></i><i style="background:#16803c;"></i> More</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% set ad_format = 'grid' %}
+        {% set ads = product_ads(4, seed='health-fitness-tracking-ad2') %}
+        {% include "ads/_product_ads.html" %}
+
+    </div>
+
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard · Data shown for {{ view_date }}</div>
+</body>
+</html>

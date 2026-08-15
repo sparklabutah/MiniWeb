@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .filters { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; }
+        .filters .field { margin-bottom: 0; }
+        .ip-addr { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: .78rem; color: var(--faint); }
+        .details-text { font-size: .8rem; color: var(--muted); max-width: 320px; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'audit' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'audit' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <h2>Access Audit Log</h2>
+                <a href="/" class="back-link">&larr; Back to MiniWeb</a>
+            </div>
+
+            <div class="card card-pad">
+                <form class="filters" method="get" action="{{ url_for('password-managers.audit_log_page') }}">
+                    <div class="field">
+                        <label class="form-label">Action</label>
+                        <select name="action">
+                            <option value="">All Actions</option>
+                            {% for action in actions %}
+                            <option value="{{ action }}" {% if filter_action == action %}selected{% endif %}>{{ action|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="form-label">Vault</label>
+                        <select name="vault">
+                            <option value="">All Vaults</option>
+                            {% for v in vaults %}
+                            <option value="{{ v.id }}" {% if filter_vault == v.id %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                    <a href="{{ url_for('password-managers.audit_log_page') }}" class="btn btn-outline">Clear</a>
+                </form>
+            </div>
+
+            <div>
+                <div class="section-title">{{ audit_log|length }} event{{ 's' if audit_log|length != 1 }}</div>
+                <div class="card">
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Entry</th>
+                                <th>Device / IP</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in audit_log %}
+                            <tr>
+                                <td>{{ event.timestamp[:16]|replace('T', ' ') }}</td>
+                                <td>{{ user_map.get(event.user_id, 'User ' ~ event.user_id) }}</td>
+                                <td>
+                                    {% if event.action in ('login_failed', 'share_vault') %}
+                                    <span class="chip bad">{{ event.action|replace('_', ' ') }}</span>
+                                    {% elif event.action in ('edit_entry',) %}
+                                    <span class="chip warn">{{ event.action|replace('_', ' ') }}</span>
+                                    {% elif event.action in ('autofill', 'login_success') %}
+                                    <span class="chip good">{{ event.action|replace('_', ' ') }}</span>
+                                    {% else %}
+                                    <span class="chip">{{ event.action|replace('_', ' ') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if event.entry_id %}
+                                    <a href="{{ url_for('password-managers.entry_detail', entry_id=event.entry_id) }}">{{ event.entry_title }}</a>
+                                    {% else %}
+                                    <span class="muted">&mdash;</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>{{ event.device }}</div>
+                                    <div class="ip-addr">{{ event.ip_address }}</div>
+                                </td>
+                                <td><div class="details-text">{{ event.details }}</div></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

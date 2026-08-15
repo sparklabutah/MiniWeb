@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ guide.title }} - StepVista</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; }
+        a { text-decoration: none; color: #4CAF50; }
+        a:hover { text-decoration: underline; }
+
+        .navbar { background: #fff; border-bottom: 3px solid #4CAF50; padding: 0 24px; display: flex; align-items: center; height: 60px; }
+        .navbar .logo { font-size: 24px; font-weight: 700; color: #4CAF50; margin-right: 32px; }
+        .navbar nav a { margin-right: 20px; color: #555; font-size: 15px; font-weight: 500; }
+        .navbar nav a:hover { color: #4CAF50; text-decoration: none; }
+        .navbar .spacer { flex: 1; }
+        .navbar .user-area a { margin-left: 12px; font-size: 14px; }
+        .navbar .search-box { display: flex; margin-right: 16px; }
+        .navbar .search-box input { border: 1px solid #ddd; border-radius: 4px 0 0 4px; padding: 6px 12px; font-size: 14px; width: 200px; outline: none; }
+        .navbar .search-box input:focus { border-color: #4CAF50; }
+        .navbar .search-box button { background: #4CAF50; color: #fff; border: none; padding: 6px 14px; border-radius: 0 4px 4px 0; cursor: pointer; font-size: 14px; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+        .breadcrumb { padding: 16px 0; font-size: 14px; color: #999; }
+        .breadcrumb a { color: #4CAF50; }
+
+        .guide-header { padding: 24px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 32px; }
+        .guide-header h1 { font-size: 32px; margin-bottom: 12px; color: #222; }
+        .guide-header .guide-meta { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 16px; }
+        .guide-header .guide-meta span { font-size: 14px; color: #666; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+        .badge-easy { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff3e0; color: #e65100; }
+        .badge-hard { background: #ffebee; color: #c62828; }
+        .guide-header .description { font-size: 16px; color: #555; line-height: 1.6; margin-bottom: 16px; }
+        .guide-header .actions { display: flex; gap: 12px; align-items: center; }
+        .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; text-align: center; }
+        .btn-primary { background: #4CAF50; color: #fff; }
+        .btn-primary:hover { background: #45a049; text-decoration: none; }
+        .btn-outline { background: #fff; color: #4CAF50; border: 2px solid #4CAF50; }
+        .btn-outline:hover { background: #e8f5e9; text-decoration: none; }
+        .btn-bookmarked { background: #4CAF50; color: #fff; border: 2px solid #4CAF50; }
+
+        .author-info { display: flex; align-items: center; gap: 12px; padding: 16px 0; }
+        .author-avatar { width: 40px; height: 40px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; color: #4CAF50; font-weight: 700; font-size: 16px; }
+        .author-info .author-name { font-weight: 600; color: #333; }
+        .author-info .author-name a { color: #333; }
+        .author-info .author-name a:hover { color: #4CAF50; }
+
+        .steps-section { padding: 20px 0; }
+        .steps-section h2 { font-size: 22px; margin-bottom: 24px; color: #333; }
+
+        .step-card { display: flex; gap: 20px; margin-bottom: 32px; padding: 24px; border: 1px solid #e0e0e0; border-radius: 10px; background: #fafafa; }
+        .step-number { flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; background: #4CAF50; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; }
+        .step-content { flex: 1; min-width: 0; }
+        .step-content h3 { font-size: 18px; margin-bottom: 8px; color: #333; }
+        .step-content p { font-size: 15px; color: #555; line-height: 1.6; margin-bottom: 0; }
+
+        .playback-link { display: inline-block; margin: 16px 0 32px; padding: 10px 24px; background: #4CAF50; color: #fff; border-radius: 6px; font-weight: 600; }
+        .playback-link:hover { background: #45a049; text-decoration: none; }
+
+        .rating-section { padding: 24px 0; border-top: 1px solid #e0e0e0; margin-top: 16px; }
+        .rating-section h3 { font-size: 18px; margin-bottom: 16px; }
+        .rating-display { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 16px; }
+        .stars { color: #FFC107; font-size: 20px; }
+        .rating-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .rating-form label { font-size: 14px; color: #555; }
+        .rating-form input[type="range"] { width: 200px; accent-color: #4CAF50; }
+        .rating-form .score-display { font-weight: 700; color: #4CAF50; min-width: 30px; }
+        .rating-form button { padding: 8px 16px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+
+        .comments-section { padding: 24px 0; border-top: 1px solid #e0e0e0; }
+        .comments-section h3 { font-size: 18px; margin-bottom: 20px; }
+        .comment-form { margin-bottom: 24px; }
+        .comment-form textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; }
+        .comment-form textarea:focus { outline: none; border-color: #4CAF50; }
+        .comment-form button { margin-top: 8px; padding: 8px 20px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .comment { padding: 16px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 12px; background: #fafafa; }
+        .comment .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .comment .comment-author { font-weight: 600; font-size: 14px; color: #333; }
+        .comment .comment-date { font-size: 12px; color: #999; }
+        .comment .comment-text { font-size: 14px; line-height: 1.5; color: #555; margin-bottom: 8px; }
+        .comment .comment-actions { display: flex; gap: 8px; }
+        .comment .comment-actions form { display: inline; }
+        .comment .comment-actions button { background: none; border: 1px solid #ddd; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; color: #666; }
+        .comment .comment-actions button:hover { border-color: #4CAF50; color: #4CAF50; }
+        .helpful-count { font-size: 12px; color: #4CAF50; margin-left: 8px; }
+
+        .related-section { padding: 24px 0; border-top: 1px solid #e0e0e0; }
+        .related-section h3 { font-size: 18px; margin-bottom: 16px; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+        .related-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+        .related-card h4 { font-size: 14px; margin-bottom: 6px; }
+        .related-card h4 a { color: #333; }
+        .related-card h4 a:hover { color: #4CAF50; }
+        .related-card .meta { font-size: 12px; color: #777; }
+
+        .footer { border-top: 1px solid #e0e0e0; padding: 24px; text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('visual-how-to-guides.index') }}" class="logo">StepVista</a>
+        <nav>
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Browse</a>
+            <a href="{{ url_for('visual-how-to-guides.authors_directory') }}">Authors</a>
+            <a href="{{ url_for('visual-how-to-guides.compare_page') }}">Compare</a>
+            <a href="{{ url_for('visual-how-to-guides.create_page') }}">Create</a>
+        </nav>
+        <div class="spacer"></div>
+        <form class="search-box" action="{{ url_for('visual-how-to-guides.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search guides...">
+            <button type="submit">Search</button>
+        </form>
+        <div class="user-area">
+            {% if user %}
+                <a href="{{ url_for('visual-how-to-guides.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('visual-how-to-guides.bookmarks_page') }}">Bookmarks</a>
+                <a href="{{ url_for('visual-how-to-guides.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('visual-how-to-guides.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('visual-how-to-guides.index') }}">Home</a> /
+            <a href="{{ url_for('visual-how-to-guides.guides_list') }}">Guides</a> /
+            {{ guide.title }}
+        </div>
+
+        <div class="guide-header">
+            <h1>{{ guide.title }}</h1>
+            <div class="guide-meta">
+                <span class="badge badge-{{ guide.difficulty }}">{{ guide.difficulty }}</span>
+                <span>{{ guide.time_estimate }}</span>
+                <span>{{ guide.steps|length }} steps</span>
+                <span>{{ guide.views }} views</span>
+                <span>Rating: {{ guide.rating }}/5</span>
+                <span>Published: {{ guide.date_published }}</span>
+            </div>
+            <p class="description">{{ guide.description }}</p>
+            <div class="actions">
+                {% if user %}
+                <form action="{{ url_for('visual-how-to-guides.form_bookmark', guide_id=guide.id) }}" method="post" style="display:inline;">
+                    <button type="submit" class="btn {% if is_bookmarked %}btn-bookmarked{% else %}btn-outline{% endif %}">
+                        {% if is_bookmarked %}Bookmarked{% else %}Bookmark{% endif %}
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('visual-how-to-guides.guide_step', guide_id=guide.id, step_num=1) }}" class="btn btn-primary">Start Playback</a>
+            </div>
+        </div>
+
+        {% if author %}
+        <div class="author-info">
+            <div class="author-avatar">{{ author[0] }}</div>
+            <div>
+                <div class="author-name"><a href="{{ url_for('visual-how-to-guides.author_page', name=author) }}">{{ author }}</a></div>
+                <div style="font-size: 13px; color: #999;">Author</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="steps-section">
+            <h2>Steps</h2>
+            {% for step in guide.steps %}
+            <div class="step-card" id="step-{{ step.number }}">
+                <div class="step-number">{{ step.number }}</div>
+                <div class="step-content">
+                    <h3>{{ step.title }}</h3>
+                    {% if step.image %}<img src="{{ step.image }}" alt="Step {{ step.number }}" style="max-width:100%;border-radius:8px;margin:12px 0">{% endif %}
+                    <p>{{ step.description }}</p>
+                </div>
+            </div>
+            {% endfor %}
+
+            <a href="{{ url_for('visual-how-to-guides.guide_step', guide_id=guide.id, step_num=1) }}" class="playback-link">View as Slideshow</a>
+        </div>
+
+        <div class="rating-section">
+            <h3>Rate This Guide</h3>
+            <div class="rating-display">
+                <span class="stars">
+                    {% for i in range(1, 6) %}
+                        {% if i <= guide.rating|round(0, 'floor')|int %}&#9733;{% else %}&#9734;{% endif %}
+                    {% endfor %}
+                </span>
+                <span>{{ guide.rating }}/5</span>
+            </div>
+            {% if user %}
+            <form class="rating-form" action="{{ url_for('visual-how-to-guides.form_rate', guide_id=guide.id) }}" method="post">
+                <label for="rating-slider">Your rating:</label>
+                <input type="range" name="score" id="rating-slider" min="1" max="5" step="0.5" value="{{ user_rating or 3 }}" oninput="document.getElementById('score-val').textContent = this.value">
+                <span class="score-display" id="score-val">{{ user_rating or 3 }}</span>
+                <button type="submit">Submit Rating</button>
+                {% if user_rating %}
+                <span style="font-size: 13px; color: #999;">(Your current rating: {{ user_rating }})</span>
+                {% endif %}
+            </form>
+            {% else %}
+            <p style="font-size: 14px; color: #999;"><a href="{{ url_for('visual-how-to-guides.login_page') }}">Log in</a> to rate this guide.</p>
+            {% endif %}
+        </div>
+
+        <div class="comments-section">
+            <h3>Comments ({{ comments|length }})</h3>
+            {% if user %}
+            <form class="comment-form" action="{{ url_for('visual-how-to-guides.form_comment', guide_id=guide.id) }}" method="post">
+                <textarea name="text" placeholder="Share your thoughts or ask a question..." required></textarea>
+                <button type="submit">Post Comment</button>
+            </form>
+            {% else %}
+            <p style="font-size: 14px; color: #999; margin-bottom: 16px;"><a href="{{ url_for('visual-how-to-guides.login_page') }}">Log in</a> to leave a comment.</p>
+            {% endif %}
+
+            {% for comment in comments %}
+            <div class="comment">
+                <div class="comment-header">
+                    <span class="comment-author">
+                        {% set commenter = users|selectattr('id', 'equalto', comment.user_id)|first %}
+                        {% if commenter %}{{ commenter.display_name }}{% else %}User {{ comment.user_id }}{% endif %}
+                    </span>
+                    <span class="comment-date">{{ comment.date }}</span>
+                </div>
+                <div class="comment-text">{{ comment.text }}</div>
+                <div class="comment-actions">
+                    {% if user %}
+                    <form action="{{ url_for('visual-how-to-guides.form_react', comment_id=comment.id) }}" method="post">
+                        <input type="hidden" name="reaction" value="helpful">
+                        <button type="submit">Helpful</button>
+                    </form>
+                    <form action="{{ url_for('visual-how-to-guides.form_react', comment_id=comment.id) }}" method="post">
+                        <input type="hidden" name="reaction" value="unhelpful">
+                        <button type="submit">Not Helpful</button>
+                    </form>
+                    {% endif %}
+                    <span class="helpful-count">{{ comment.helpful_count }} found helpful</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if not comments %}
+            <p style="color: #999; font-size: 14px;">No comments yet. Be the first to share your thoughts!</p>
+            {% endif %}
+        </div>
+
+        {% if related %}
+        <div class="related-section">
+            <h3>Related Guides</h3>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-card">
+                    <h4><a href="{{ url_for('visual-how-to-guides.guide_detail', guide_id=r.id) }}">{{ r.title }}</a></h4>
+                    <div class="meta">
+                        <span class="badge badge-{{ r.difficulty }}">{{ r.difficulty }}</span>
+                        {{ r.time_estimate }} | {{ r.rating }}/5
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">StepVista - Learn How to Do Anything</div>
+</body>
+</html>

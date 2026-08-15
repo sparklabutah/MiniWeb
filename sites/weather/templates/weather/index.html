@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lakeport Weather</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1565c0, #0d47a1); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #81d4fa; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .header-right a { color: #b3d9f7; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1060px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e0e7ef; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1565c0; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .35rem .6rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; }
+        .content { max-width: 1060px; margin: 1.5rem auto; padding: 0 2rem; }
+
+        /* Alert banner */
+        .alert-banner { background: #fff3e0; border: 1px solid #ffcc80; border-radius: .4rem; padding: .8rem 1.2rem; margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: .6rem; }
+        .alert-banner .alert-icon { font-size: 1.2rem; }
+        .alert-banner .alert-text { font-size: .85rem; color: #e65100; }
+        .alert-banner .alert-text a { color: #bf360c; font-weight: 600; }
+
+        /* Current conditions */
+        .current-card { background: linear-gradient(135deg, #1976d2, #1565c0); border-radius: .6rem; padding: 2rem; color: #fff; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .current-main { display: flex; align-items: center; gap: 1.5rem; }
+        .current-icon { font-size: 3.5rem; }
+        .current-temp { font-size: 3.5rem; font-weight: 300; line-height: 1; }
+        .current-temp small { font-size: 1rem; font-weight: 400; opacity: .8; display: block; margin-top: .3rem; }
+        .current-details { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .8rem; }
+        .current-details .detail { font-size: .85rem; opacity: .9; }
+        .current-details .detail strong { opacity: 1; }
+        .current-location { font-size: 1rem; margin-bottom: .3rem; font-weight: 600; }
+        .current-conditions { font-size: 1.1rem; opacity: .9; }
+        .current-updated { font-size: .75rem; opacity: .6; margin-top: .5rem; }
+
+        /* Forecast grid */
+        .section-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: #1565c0; }
+        .forecast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .8rem; margin-bottom: 2rem; }
+        .forecast-day { background: #fff; border-radius: .5rem; padding: 1rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .forecast-day .day-name { font-weight: 600; font-size: .9rem; color: #1565c0; }
+        .forecast-day .day-date { font-size: .75rem; color: #64748b; margin-bottom: .5rem; }
+        .forecast-day .day-icon { font-size: 1.8rem; margin: .3rem 0; }
+        .forecast-day .day-temps { font-size: .95rem; font-weight: 500; }
+        .forecast-day .day-temps .low { color: #64748b; font-weight: 400; }
+        .forecast-day .day-cond { font-size: .75rem; color: #64748b; margin-top: .3rem; }
+        .forecast-day .day-precip { font-size: .75rem; color: #42a5f5; margin-top: .2rem; }
+
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e0e7ef; margin-top: 2rem; background: #fff; }
+
+        /* Location search (navigate_by_query) */
+        .loc-search-bar { display: flex; gap: .6rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+        .loc-search-bar input[type="text"] { flex: 1; min-width: 220px; padding: .55rem .8rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .9rem; }
+        .loc-search-bar input[type="text"]:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .loc-search-wrap { position: relative; flex: 1; min-width: 220px; }
+        .loc-search-wrap input[type="text"] { width: 100%; }
+        .loc-suggest { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: .35rem; box-shadow: 0 8px 24px rgba(0,0,0,.13); max-height: 280px; overflow-y: auto; z-index: 60; }
+        .loc-suggest .item { padding: .5rem .85rem; cursor: pointer; font-size: .88rem; color: #1f2937; border-bottom: 1px solid #f1f5f9; }
+        .loc-suggest .item:last-child { border-bottom: none; }
+        .loc-suggest .item:hover, .loc-suggest .item.active { background: #e3f2fd; color: #1565c0; }
+        .loc-suggest .empty { padding: .55rem .85rem; color: #9ca3af; font-size: .85rem; }
+        .btn-blue { background: #1565c0; color: #fff; border: none; padding: .55rem 1.2rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
+        .btn-blue:hover { background: #0d47a1; }
+        .loc-error { background: #fce4ec; color: #c62828; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
+
+        /* Browse all locations (public, clickable) */
+        .browse-locs { margin-bottom: 1.5rem; }
+        .browse-locs .browse-label { font-size: .8rem; color: #64748b; font-weight: 600; margin-bottom: .5rem; }
+        .browse-locs .browse-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .browse-locs .browse-list a { background: #e3f2fd; color: #1565c0; font-size: .82rem; padding: .35rem .75rem; border-radius: .3rem; text-decoration: none; border: 1px solid transparent; }
+        .browse-locs .browse-list a:hover { background: #bbdefb; }
+        .browse-locs .browse-list a.active { background: #1565c0; color: #fff; font-weight: 600; }
+
+        /* Unit toggle switch (filter_by_toggle) */
+        .unit-toggle { display: flex; align-items: center; gap: .5rem; font-size: .85rem; font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; cursor: pointer; inset: 0; background: rgba(255,255,255,.35); border-radius: 22px; transition: .2s; }
+        .switch .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .slider { background: #81d4fa; }
+        .switch input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Compare / lookup panels */
+        .tool-card { background: #fff; border-radius: .5rem; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 2rem; }
+        .tool-form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: .8rem; }
+        .tool-form .form-group { min-width: 160px; }
+        .tool-form label { display: block; font-size: .78rem; color: #475569; font-weight: 600; margin-bottom: .3rem; }
+        .tool-form input { width: 100%; padding: .5rem .7rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .85rem; }
+        .tool-form input:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .tool-table { width: 100%; border-collapse: collapse; }
+        .tool-table th { background: #e3f2fd; color: #1565c0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: .6rem .8rem; text-align: left; }
+        .tool-table td { padding: .5rem .8rem; border-top: 1px solid #f0f4f8; font-size: .85rem; }
+        .tool-msg { font-size: .85rem; color: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('weather.index') }}">Lakeport<span>Weather</span></a></h1>
+        <div class="header-right">
+            {% if user %}
+                <a href="{{ url_for('weather.locations_page') }}">My Locations</a>
+                <a href="{{ url_for('weather.logout') }}">Sign Out ({{ user.username }})</a>
+            {% else %}
+                <a href="{{ url_for('weather.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('weather.index') }}" class="active">Current</a>
+        <a href="{{ url_for('weather.forecast_page') }}{% if request.args.get('location') %}?location={{ request.args.get('location')|urlencode }}{% endif %}">7-Day Forecast</a>
+        <a href="{{ url_for('weather.hourly_page') }}">Hourly</a>
+        <a href="{{ url_for('weather.history_page') }}">History</a>
+        <a href="{{ url_for('weather.alerts_page') }}">Alerts{% if alerts %} ({{ alerts|length }}){% endif %}</a>
+        <a href="{{ url_for('weather.locations_page') }}">Locations</a>
+    </nav>
+
+    <div class="content">
+        {% if alerts %}
+        <div class="alert-banner">
+            <span class="alert-icon">&#9888;&#65039;</span>
+            <div class="alert-text">
+                <strong>{{ alerts|length }} active alert{{ 's' if alerts|length > 1 else '' }}:</strong>
+                {{ alerts[0].title }}
+                {% if alerts|length > 1 %} and {{ alerts|length - 1 }} more{% endif %}
+                &mdash; <a href="{{ url_for('weather.alerts_page') }}">View all alerts</a>
+            </div>
+        </div>
+        {% endif %}
+
+        <form class="loc-search-bar" method="get" action="{{ url_for('weather.index') }}" autocomplete="off">
+            <div class="loc-search-wrap">
+                <input type="text" id="loc-search-input" name="location" placeholder="Search a location (e.g., Seattle)" value="{{ request.args.get('location', '') }}"
+                       autocomplete="off" oninput="filterLocSuggest(this.value)" onfocus="filterLocSuggest(this.value)" onkeydown="locSuggestKey(event)">
+                <div id="loc-suggest" class="loc-suggest" style="display:none"></div>
+            </div>
+            <button type="submit" class="btn-blue">Go</button>
+        </form>
+        {% if location_error %}
+        <div class="loc-error">{{ location_error }}</div>
+        {% endif %}
+
+        {% if all_locations %}
+        <div class="browse-locs">
+            <div class="browse-label">Browse {{ all_locations|length }} locations</div>
+            <div class="browse-list">
+                {% for loc in all_locations %}
+                <a href="{{ url_for('weather.index') }}?location={{ loc.name|urlencode }}"{% if loc.id == selected_loc_id %} class="active"{% endif %}>{{ loc.name }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="current-card">
+            <div>
+                <div class="current-location">{{ current.location }}</div>
+                <div class="current-main">
+                    <div class="current-icon">{{ icon_for(current.conditions) }}</div>
+                    <div>
+                        <div class="current-temp">
+                            <span id="cur-temp">{{ current.temp_f }}</span>&deg;<span id="cur-temp-unit">F</span>
+                            <small><span id="cur-alt-temp">{{ current.temp_c }}</span>&deg;<span id="cur-alt-unit">C</span> &middot; Feels like <span id="cur-feels">{{ current.feels_like_f }}</span>&deg;<span id="cur-feels-unit">F</span></small>
+                        </div>
+                    </div>
+                </div>
+                <div class="current-conditions">{{ current.conditions }}</div>
+                <div class="current-updated">Updated {{ current.updated }}</div>
+            </div>
+            <div>
+                <div class="unit-toggle" style="margin-bottom: .8rem; justify-content: flex-end;">
+                    <span>&deg;F</span>
+                    <label class="switch">
+                        <input type="checkbox" id="unit-switch" onchange="toggleUnits(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                    <span>&deg;C</span>
+                </div>
+                <div class="current-details">
+                    <div class="detail"><strong>Humidity:</strong> {{ current.humidity }}%</div>
+                    <div class="detail"><strong>Wind:</strong> <span id="cur-wind">{{ current.wind_mph }}</span> <span id="cur-wind-unit">mph</span> {{ current.wind_dir }}</div>
+                    <div class="detail"><strong>UV Index:</strong> {{ current.uv_index }}</div>
+                    <div class="detail"><strong>Visibility:</strong> <span id="cur-vis">{{ current.visibility_mi }}</span> <span id="cur-vis-unit">mi</span></div>
+                    <div class="detail"><strong>Pressure:</strong> <span id="cur-pres">{{ current.pressure_inhg }}</span> <span id="cur-pres-unit">inHg</span></div>
+                    <div class="detail"><strong>Air Quality:</strong> {{ current.air_quality }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='weather-index') %}
+        {% include "ads/_product_ads.html" %}
+
+        <h2 class="section-title">7-Day Forecast</h2>
+        <div class="forecast-grid">
+            {% for day in forecast %}
+            <div class="forecast-day">
+                <div class="day-name">{{ day.day }}</div>
+                <div class="day-date">{{ day.date }}</div>
+                <div class="day-icon">{{ icon_for(day.conditions) }}</div>
+                <div class="day-temps">{{ day.high_f }}&deg; <span class="low">{{ day.low_f }}&deg;</span></div>
+                <div class="day-cond">{{ day.conditions }}</div>
+                <div class="day-precip">&#128167; {{ day.precip_pct }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <h2 class="section-title">Compare Locations</h2>
+        <div class="tool-card">
+            <form class="tool-form" onsubmit="compareLocations(event)">
+                <div class="form-group">
+                    <label for="cmp-loc1">First location</label>
+                    <input type="text" id="cmp-loc1" placeholder="e.g., Seattle, WA" required>
+                </div>
+                <div class="form-group">
+                    <label for="cmp-loc2">Second location</label>
+                    <input type="text" id="cmp-loc2" placeholder="e.g., Portland, OR" required>
+                </div>
+                <button type="submit" class="btn-blue">Compare</button>
+            </form>
+            <div id="compare-results"></div>
+        </div>
+
+        <h2 class="section-title">Past Weather Lookup</h2>
+        <div class="tool-card">
+            <form class="tool-form" onsubmit="lookupHistory(event)">
+                <div class="form-group">
+                    <label for="hist-from">From date</label>
+                    <input type="date" id="hist-from" required>
+                </div>
+                <div class="form-group">
+                    <label for="hist-to">To date</label>
+                    <input type="date" id="hist-to" required>
+                </div>
+                <button type="submit" class="btn-blue">Get Data</button>
+            </form>
+            <div id="history-results"></div>
+        </div>
+
+        {% set ad_format = 'native' %}
+        {% set ads = product_ads(4, seed='weather-ad2') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <div class="footer">
+        Lakeport Weather &middot; Data for Lakeport, WA &middot; <a href="/">MiniWeb</a>
+    </div>
+
+    <script>
+        // --- Location search autocomplete ---
+        const WEATHER_LOCS = {{ all_locations | map(attribute='name') | list | tojson }};
+        let _locActive = -1;
+        function _locItems() { return Array.from(document.querySelectorAll('#loc-suggest .item')); }
+        function filterLocSuggest(q) {
+            const box = document.getElementById('loc-suggest');
+            if (!box) return;
+            _locActive = -1;
+            q = (q || '').trim().toLowerCase();
+            let matches = WEATHER_LOCS;
+            if (q) matches = WEATHER_LOCS.filter(n => n.toLowerCase().includes(q));
+            if (!matches.length) {
+                box.innerHTML = '<div class="empty">No matching location</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = matches.slice(0, 12).map(n =>
+                `<div class="item" data-name="${encodeURIComponent(n)}" onmousedown="pickLoc(this.getAttribute('data-name'))">${n}</div>`
+            ).join('');
+            box.style.display = 'block';
+        }
+        function pickLoc(encName) {
+            window.location.href = "{{ url_for('weather.index') }}?location=" + encName;
+        }
+        function locSuggestKey(e) {
+            const box = document.getElementById('loc-suggest');
+            if (!box || box.style.display === 'none') return;
+            const items = _locItems();
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); _locActive = (_locActive + 1) % items.length; }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); _locActive = (_locActive - 1 + items.length) % items.length; }
+            else if (e.key === 'Enter' && _locActive >= 0) { e.preventDefault(); pickLoc(items[_locActive].getAttribute('data-name')); return; }
+            else { return; }
+            items.forEach((it, i) => it.classList.toggle('active', i === _locActive));
+            if (items[_locActive]) items[_locActive].scrollIntoView({ block: 'nearest' });
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.loc-search-wrap')) {
+                const b = document.getElementById('loc-suggest');
+                if (b) b.style.display = 'none';
+            }
+        });
+
+        function toggleUnits(metric) {
+            fetch("{{ url_for('weather.api_current_units') }}?units=" + (metric ? "metric" : "imperial"))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var isMetric = d.display_units === "metric";
+                    document.getElementById("cur-temp").textContent = d.temp_display;
+                    document.getElementById("cur-temp-unit").textContent = isMetric ? "C" : "F";
+                    document.getElementById("cur-alt-temp").textContent = isMetric ? d.temp_f : d.temp_c;
+                    document.getElementById("cur-alt-unit").textContent = isMetric ? "F" : "C";
+                    document.getElementById("cur-feels").textContent = d.feels_like_display;
+                    document.getElementById("cur-feels-unit").textContent = isMetric ? "C" : "F";
+                    document.getElementById("cur-wind").textContent = d.wind_display;
+                    document.getElementById("cur-wind-unit").textContent = d.wind_unit;
+                    document.getElementById("cur-vis").textContent = d.visibility_display;
+                    document.getElementById("cur-vis-unit").textContent = d.visibility_unit;
+                    document.getElementById("cur-pres").textContent = d.pressure_display;
+                    document.getElementById("cur-pres-unit").textContent = d.pressure_unit;
+                });
+        }
+
+        function esc(s) {
+            var div = document.createElement("div");
+            div.textContent = String(s);
+            return div.innerHTML;
+        }
+
+        function compareLocations(e) {
+            e.preventDefault();
+            var loc1 = document.getElementById("cmp-loc1").value.trim();
+            var loc2 = document.getElementById("cmp-loc2").value.trim();
+            var out = document.getElementById("compare-results");
+            fetch("{{ url_for('weather.api_compare') }}?location1=" + encodeURIComponent(loc1) +
+                  "&location2=" + encodeURIComponent(loc2))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.error) { out.innerHTML = '<p class="tool-msg">' + esc(d.error) + '</p>'; return; }
+                    var html = '<table class="tool-table"><thead><tr><th>Location</th><th>Temp</th><th>Humidity</th><th>Wind</th><th>Conditions</th></tr></thead><tbody>';
+                    d.comparison.forEach(function(c) {
+                        if (c.error) {
+                            html += '<tr><td>' + esc(c.name) + '</td><td colspan="4" class="tool-msg">' + esc(c.error) + '</td></tr>';
+                        } else {
+                            html += '<tr><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.temp_f) + '&deg;F / ' + esc(c.temp_c) + '&deg;C</td><td>' +
+                                    esc(c.humidity) + '%</td><td>' + esc(c.wind_mph) + ' mph</td><td>' + esc(c.conditions) + '</td></tr>';
+                        }
+                    });
+                    out.innerHTML = html + '</tbody></table>';
+                })
+                .catch(function() { out.innerHTML = '<p class="tool-msg">Network error</p>'; });
+        }
+
+        function lookupHistory(e) {
+            e.preventDefault();
+            var from = document.getElementById("hist-from").value;
+            var to = document.getElementById("hist-to").value;
+            var out = document.getElementById("history-results");
+            fetch("{{ url_for('weather.api_historical') }}?date_from=" + encodeURIComponent(from) +
+                  "&date_to=" + encodeURIComponent(to))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var rows = d.historical || [];
+                    if (!rows.length) { out.innerHTML = '<p class="tool-msg">No historical data in that range.</p>'; return; }
+                    var html = '<table class="tool-table"><thead><tr><th>Date</th><th>High</th><th>Low</th><th>Precip</th><th>Conditions</th></tr></thead><tbody>';
+                    rows.forEach(function(day) {
+                        html += '<tr><td><strong>' + esc(day.date) + '</strong></td><td>' + esc(day.high_f) + '&deg;F</td><td>' +
+                                esc(day.low_f) + '&deg;F</td><td>' + esc(day.precip_in) + '"</td><td>' + esc(day.conditions) + '</td></tr>';
+                    });
+                    out.innerHTML = html + '</tbody></table>';
+                })
+                .catch(function() { out.innerHTML = '<p class="tool-msg">Network error</p>'; });
+        }
+    </script>
+</body>
+</html>

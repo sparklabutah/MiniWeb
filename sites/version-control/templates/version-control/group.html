@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }} - MeridianGit</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+        .group-header { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid #21262d; margin-bottom: 20px; }
+        .group-avatar { width: 64px; height: 64px; border-radius: 12px; background: #21262d; border: 1px solid #30363d; display: flex; align-items: center; justify-content: center; }
+        .group-avatar svg { fill: #8b949e; }
+        .group-name { font-size: 24px; font-weight: 600; color: #f0f6fc; }
+        .group-meta { font-size: 13px; color: #8b949e; margin-top: 2px; }
+        .group-badge { font-size: 11px; font-weight: 600; color: #8b949e; border: 1px solid #30363d; border-radius: 12px; padding: 1px 8px; margin-left: 8px; vertical-align: middle; }
+        .repo-list { display: flex; flex-direction: column; }
+        .repo-item { padding: 16px 0; border-bottom: 1px solid #21262d; }
+        .repo-item .rn { font-size: 18px; font-weight: 600; }
+        .repo-item .rv { font-size: 11px; font-weight: 500; color: #8b949e; border: 1px solid #30363d; border-radius: 12px; padding: 0 7px; margin-left: 8px; }
+        .repo-item .rd { font-size: 13px; color: #8b949e; margin-top: 4px; max-width: 70ch; }
+        .repo-item .rmeta { font-size: 12px; color: #8b949e; margin-top: 8px; display: flex; gap: 16px; }
+        .empty { color: #8b949e; padding: 40px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('version-control.index') }}" class="nav-logo">MeridianGit</a>
+        <div class="nav-links">
+            <a href="{{ url_for('version-control.index') }}">Dashboard</a>
+            <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+            <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+            <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+            <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+        </div>
+        <div class="nav-user">
+            {% if session.vc_user_id %}
+            <a class="user-name" href="{{ url_for('version-control.user_profile', user_id=session.vc_user_id) }}" style="color:#f0f6fc;text-decoration:none;">{{ session.vc_name }}</a>
+            <a href="{{ url_for('version-control.logout') }}" style="color:#8b949e;">Sign out</a>
+            {% else %}
+            <a href="{{ url_for('version-control.login_page') }}" style="color:#f0f6fc;">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+    <div class="container">
+        <div class="group-header">
+            <div class="group-avatar">
+                <svg width="34" height="34" viewBox="0 0 16 16"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zM4.5 6.5a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM3 11.5c0-1.1 1.8-1.8 3-1.8s3 .7 3 1.8V12H3v-.5zm6.2-1.6c1 .1 2.3.7 2.3 1.6V12H9.9v-.5c0-.7-.3-1.2-.7-1.6z"/></svg>
+            </div>
+            <div>
+                <div class="group-name">{{ name }}<span class="group-badge">group</span></div>
+                <div class="group-meta">{{ repo_count }} repositor{{ 'y' if repo_count == 1 else 'ies' }} · ★ {{ total_stars }}</div>
+            </div>
+        </div>
+
+        {% if repos %}
+        <div class="repo-list">
+            {% for r in repos %}
+            <div class="repo-item">
+                <span class="rn"><a href="{{ url_for('version-control.repo_detail', repo_id=r.id) }}">{{ name }} / {{ r.name }}</a></span>
+                <span class="rv">{{ r.visibility }}</span>
+                {% if r.description %}<div class="rd">{{ r.description }}</div>{% endif %}
+                <div class="rmeta">
+                    <span>★ {{ r.stars }}</span>
+                    {% if r.last_activity %}<span>Updated {{ r.last_activity[:10] }}</span>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">This group has no repositories.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

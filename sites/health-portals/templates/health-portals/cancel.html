@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancel Appointment - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'appointments' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <a href="{{ url_for('health-portals.appointments_page') }}" class="back">&larr; Back to Appointments</a>
+        <div class="card">
+            {% if success %}
+            <div class="success">Appointment has been cancelled successfully.</div>
+            {% else %}
+            <h2>Cancel Appointment</h2>
+            <div class="appt-info">
+                <div><strong>Type:</strong> {{ appointment.category }}</div>
+                <div><strong>Date:</strong> {{ appointment.date }} at {{ appointment.time }}</div>
+                <div><strong>Provider:</strong> {{ appointment.provider_name }}</div>
+            </div>
+            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+            <form method="POST" action="{{ url_for('health-portals.cancel_appointment_submit', appt_id=appointment.id) }}">
+                <div class="form-group">
+                    <label for="reason">Reason for cancellation (optional)</label>
+                    <textarea id="reason" name="reason" placeholder="Why are you cancelling?"></textarea>
+                </div>
+                <button type="submit" class="btn">Confirm Cancellation</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Meridian Tracker{% endblock %}</title>
+    <link rel="stylesheet" href="/static/pmtracker.css">
+</head>
+<body>
+<div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <a href="{{ url_for('project-mgmt-issue-tracking.index') }}" class="sb-brand">
+            <span class="mark">M</span> Meridian
+        </a>
+        <a href="{{ url_for('project-mgmt-issue-tracking.create_issue_page') }}" class="sb-new">&#43; New Issue</a>
+        <nav class="sb-nav">
+            <a href="{{ url_for('project-mgmt-issue-tracking.index') }}" class="{{ 'active' if active == 'dashboard' }}"><span class="ic">&#9632;</span> Dashboard</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.sprints_page') }}" class="{{ 'active' if active == 'sprints' }}"><span class="ic">&#8635;</span> Sprints</a>
+            <a href="{{ url_for('project-mgmt-issue-tracking.backlog') }}" class="{{ 'active' if active == 'backlog' }}"><span class="ic">&#9776;</span> Backlog</a>
+        </nav>
+        {% if sidebar_projects %}
+        <div class="sb-label">Projects</div>
+        {% for p in sidebar_projects %}
+        <a href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=p.id) }}" class="sb-proj {{ 'active' if active_project_id == p.id }}">
+            <span class="key">{{ p.key | default(p.name[:2]|upper) }}</span> {{ p.name }}
+        </a>
+        {% endfor %}
+        {% endif %}
+        <div class="sb-foot">
+            {% if chrome_user %}Signed in as <b>{{ chrome_user.name }}</b>{% else %}<a href="{{ url_for('project-mgmt-issue-tracking.login_page') }}">Sign in</a>{% endif %}
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="topbar">
+            {% block topbar %}<h1>{% block heading %}Dashboard{% endblock %}</h1>{% endblock %}
+            <div class="spacer"></div>
+            {% if chrome_user %}
+            <span class="avatar tb-avatar" style="background:{{ chrome_user.avatar_color | default('#4f46e5') }}" title="{{ chrome_user.name }}">{{ chrome_user.name[0] }}</span>
+            {% else %}
+            <a href="{{ url_for('project-mgmt-issue-tracking.login_page') }}" class="btn btn-primary">Sign in</a>
+            {% endif %}
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

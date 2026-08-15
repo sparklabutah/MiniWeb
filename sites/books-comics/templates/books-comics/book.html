@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ book.title }} -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .detail { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .back-link { font-size: .9rem; display: inline-block; margin-bottom: 1rem; color: #8b4513; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .book-header { display: flex; gap: 2rem; margin-bottom: 2rem; }
+        .cover-large { width: 200px; height: 280px; border-radius: .5rem; display: flex; align-items: center; justify-content: center; font-size: 4rem; font-weight: bold; color: #fff; flex-shrink: 0; overflow: hidden; }
+        .cover-large img { width: 100%; height: 100%; object-fit: cover; }
+        .book-details h2 { font-size: 1.5rem; color: #2d2d2d; margin: 0 0 .5rem; line-height: 1.3; }
+        .authors { font-size: 1rem; color: #6b5b4f; margin-bottom: .5rem; }
+        .authors a { color: #8b4513; text-decoration: none; }
+        .authors a:hover { text-decoration: underline; }
+        .meta-row { display: flex; flex-wrap: wrap; gap: .8rem; font-size: .85rem; color: #8b7b6f; margin-bottom: .5rem; align-items: center; }
+        .cat-link { background: #f5efe6; padding: .2rem .6rem; border-radius: .25rem; color: #6b5b4f; text-decoration: none; }
+        .cat-link:hover { background: #e8dfd3; }
+        .rating-display { color: #d4a574; font-size: 1rem; margin-bottom: .5rem; }
+        .price-display { font-size: 1.3rem; font-weight: 600; color: #8b4513; margin-bottom: 1rem; }
+        .price-display.free { color: #2e7d32; }
+        .actions { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
+        .btn { padding: .5rem 1rem; border: 1px solid #d4c5b0; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: #6b5b4f; }
+        .btn:hover { background: #f5efe6; }
+        .btn-primary { background: #8b4513; color: #fff; border-color: #8b4513; }
+        .btn-primary:hover { background: #a0522d; }
+        .btn-green { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+        .btn-green:hover { background: #388e3c; }
+        .msg { display: none; font-size: .85rem; color: #2e7d32; margin: .5rem 0; }
+        .section { margin: 1.5rem 0; }
+        .section h3 { font-size: 1rem; color: #2d2d2d; margin: 0 0 .5rem; border-bottom: 1px solid #e8dfd3; padding-bottom: .3rem; }
+        .description-text { font-size: .95rem; line-height: 1.7; color: #4a4a4a; }
+        .info-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+        .info-table th { text-align: left; color: #8b7b6f; padding: .5rem .8rem; background: #f5efe6; width: 150px; }
+        .info-table td { padding: .5rem .8rem; color: #4a4a4a; }
+        .info-table tr { border-bottom: 1px solid #f5efe6; }
+        .chapters-list { list-style: none; padding: 0; }
+        .chapters-list li { padding: .4rem 0; border-bottom: 1px solid #f5efe6; }
+        .chapters-list li a { color: #8b4513; text-decoration: none; font-size: .9rem; }
+        .chapters-list li a:hover { text-decoration: underline; }
+        .related { margin-top: 2rem; }
+        .related-item { border-left: 3px solid #e8dfd3; padding: .5rem .8rem; margin-bottom: .5rem; }
+        .related-item a { font-size: .9rem; color: #8b4513; text-decoration: none; }
+        .related-item a:hover { text-decoration: underline; }
+        .related-meta { font-size: .8rem; color: #a09080; }
+        .review-section { margin-top: 2rem; }
+        .review { border-bottom: 1px solid #f5efe6; padding: .8rem 0; }
+        .review-text { font-size: .9rem; color: #4a4a4a; }
+        .review-meta { font-size: .8rem; color: #a09080; }
+        .review-form textarea { width: 100%; padding: .5rem; border: 1px solid #d4c5b0; border-radius: .3rem; font-size: .9rem; min-height: 80px; }
+        .rating-input { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+        .rating-input input[type="range"] { width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div style="display:flex;gap:.8rem;align-items:center">
+            <a href="{{ url_for('books-comics.index') }}" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">Browse</a>
+            {% if user %}
+            <a href="{{ url_for('books-comics.dashboard') }}" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">My Library</a>
+            <a href="{{ url_for('books-comics.cart_page') }}" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">Cart</a>
+            <a href="{{ url_for('books-comics.logout') }}" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">Logout</a>
+            {% else %}
+            <a href="{{ url_for('books-comics.login_page') }}" style="font-size:.95rem;font-weight:bold;color:#fff;background:#8b4513;padding:.5rem 1.2rem;border-radius:.3rem;text-decoration:none">Login</a>
+            {% endif %}
+            <a href="/" style="font-size:.85rem;color:#6b5b4f;text-decoration:none">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="detail">
+        <a href="{{ url_for('books-comics.index') }}" class="back-link">&larr; Back to browse</a>
+
+        <div class="book-header">
+            {% set colors = ['#8b4513','#2e5090','#6b4c6e','#2e7d32','#c44536','#4a6fa5','#7b5e3b','#5c6b4f'] %}
+            <div class="cover-large" style="background: {{ colors[book.id % 8] }}">
+                <img src="{{ book.cover_url }}" alt="{{ book.title }}">
+            </div>
+            <div class="book-details">
+                <h2>{{ book.title }}</h2>
+                <div class="authors">
+                    {% for a in book.authors %}
+                    <a href="{{ url_for('books-comics.index', q=a) }}">{{ a }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="meta-row">
+                    <span>{{ book.year }}</span>
+                    <a class="cat-link" href="{{ url_for('books-comics.category_page', slug=book.category) }}">{{ book.category }}</a>
+                    <span>{{ book.num_chapters }} chapters</span>
+                    <span>{{ book.word_count }} words</span>
+                </div>
+                <div class="rating-display">
+                    {{ '* ' * (book.rating|int) }} {{ book.rating }} ({{ book.rating_count }} ratings)
+                </div>
+                <div class="price-display {{ 'free' if book.price == 0 }}">{{ book.price_str }}</div>
+
+                <div class="actions" style="display:flex;gap:.6rem;flex-wrap:wrap;margin:1rem 0">
+                    <a class="btn btn-green" href="{{ url_for('books-comics.read_book', book_id=book.id) }}" style="font-size:1rem;padding:.6rem 1.5rem;font-weight:bold" id="read-button">Read This Book</a>
+                    {% if user %}
+                    <form method="post" action="{{ url_for('books-comics.form_save_book', book_id=book.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-primary" id="save-button">Save to Library</button>
+                    </form>
+                    <form method="post" action="{{ url_for('books-comics.form_cart_add', book_id=book.id) }}" style="display:inline">
+                        <button type="submit" class="btn" id="cart-button" style="border:2px solid #8b4513;font-weight:600">Add to Cart</button>
+                    </form>
+                    {% if book.authors %}
+                    <form method="post" action="{{ url_for('books-comics.form_follow_author', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="author" value="{{ book.authors[0] }}">
+                        <button type="submit" class="btn" id="follow-button">Follow Author</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('books-comics.form_subscribe_category', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="category" value="{{ book.category }}">
+                        <button type="submit" class="btn" id="subscribe-button">Subscribe to {{ book.category }}</button>
+                    </form>
+                    {% else %}
+                    <a class="btn btn-primary" href="{{ url_for('books-comics.login_page') }}" style="font-weight:bold">Login to Save/Follow/Subscribe</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>About This Book</h3>
+            <p class="description-text">{{ book.description }}</p>
+        </div>
+
+        <table class="info-table">
+            <tr><th>Category</th><td>{{ book.category }}</td></tr>
+            <tr><th>Subject</th><td>{{ book.subject or 'N/A' }}</td></tr>
+            <tr><th>Year</th><td>{{ book.year }}</td></tr>
+            <tr><th>Authors</th><td>{{ book.authors | join(', ') }}</td></tr>
+            <tr><th>Chapters</th><td>{{ book.num_chapters }}</td></tr>
+            <tr><th>Word Count</th><td>{{ book.word_count }}</td></tr>
+            <tr><th>Price</th><td>{{ book.price_str }}</td></tr>
+            {% if book.institution %}<tr><th>Institution</th><td>{{ book.institution }}</td></tr>{% endif %}
+            {% if book.license %}<tr><th>License</th><td>{{ book.license }}</td></tr>{% endif %}
+        </table>
+
+        <div class="section">
+            <h3>Chapters</h3>
+            <ul class="chapters-list">
+                {% for ch in book.chapters %}
+                <li>
+                    <a href="{{ url_for('books-comics.read_book', book_id=book.id, chapter=ch.chapter) }}">{{ ch.title }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if user %}
+        <div class="section">
+            <h3>Rate This Book</h3>
+            <form method="post" action="{{ url_for('books-comics.form_rate_book', book_id=book.id) }}">
+                <div class="rating-input">
+                    <input type="range" id="rate-slider" name="rating" min="1" max="5" step="0.5" value="4">
+                    <span id="rate-value">4.0</span>
+                    <button type="submit" class="btn btn-primary">Submit Rating</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="review-section">
+            <h3>Reviews ({{ reviews|length }})</h3>
+            {% if user %}
+            <div style="margin-bottom:1rem">
+                <form method="post" action="{{ url_for('books-comics.form_post_review', book_id=book.id) }}">
+                    <textarea id="review-text" name="text" placeholder="Write your review..."></textarea>
+                    <button type="submit" class="btn btn-primary" style="margin-top:.3rem">Post Review</button>
+                </form>
+            </div>
+            {% endif %}
+            {% for r in reviews %}
+            <div class="review" id="review-{{ r.id }}">
+                <div class="review-text">{{ r.text }}</div>
+                <div class="review-meta">
+                    {% if r.rating %}Rating: {{ r.rating }}{% endif %}
+                    <form method="post" action="{{ url_for('books-comics.form_react_review', book_id=book.id) }}" style="display:inline">
+                        <input type="hidden" name="review_id" value="{{ r.id }}">
+                        <input type="hidden" name="reaction" value="like">
+                        <button type="submit" class="btn" style="padding:.1rem .5rem;font-size:.75rem">Like ({{ r.reactions.like if r.reactions and r.reactions.like else 0 }})</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Books ({{ book.category }})</h3>
+            {% for r in related %}
+            <div class="related-item">
+                <a href="{{ url_for('books-comics.book_detail', book_id=r.id) }}">{{ r.title }}</a>
+                <div class="related-meta">{{ r.authors_str }} -- {{ r.year }} -- {{ r.rating }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    const rateSlider = document.getElementById('rate-slider');
+    const rateValue = document.getElementById('rate-value');
+    if (rateSlider) {
+        rateSlider.addEventListener('input', () => {
+            rateValue.textContent = parseFloat(rateSlider.value).toFixed(1);
+        });
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Databases - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}.top-bar{background:#232f3e;color:#fff;padding:0 1.5rem;height:48px;display:flex;align-items:center;justify-content:space-between}.top-bar .logo{font-size:1.1rem;font-weight:700;color:#ff9900;text-decoration:none}.top-bar .logo span{color:#fff;font-weight:400;margin-left:.3rem}.nav-bar{background:#37475a;padding:0 1.5rem;display:flex;overflow-x:auto}.nav-bar a{color:#d5dbdb;text-decoration:none;padding:.6rem 1rem;font-size:.85rem;border-bottom:2px solid transparent}.nav-bar a:hover,.nav-bar a.active{color:#fff;border-bottom-color:#ff9900}.top-bar-right a{color:#d5dbdb;text-decoration:none;font-size:.85rem}.container{max-width:1200px;margin:0 auto;padding:1.5rem}.page-title{font-size:1.4rem;margin-bottom:1rem}.filters{display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:1rem;align-items:center;background:#fff;padding:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}.filters label{font-size:.8rem;color:#64748b}.filters select,.filters input{padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.85rem}.filters button{padding:.4rem 1rem;background:#232f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85rem}table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}th{background:#f8f9fa;text-align:left;padding:.7rem 1rem;font-size:.8rem;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0}td{padding:.7rem 1rem;font-size:.88rem;border-bottom:1px solid #f0f2f5}tr:hover{background:#f8f9fa}.status-badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600}.status-available{background:#d4edda;color:#155724}.status-stopped{background:#f8d7da;color:#721c24}a.link{color:#0073bb;text-decoration:none}.result-count{font-size:.85rem;color:#64748b;margin-bottom:.8rem}
+    </style>
+</head>
+<body>
+    <div class="top-bar"><a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a></div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a><a href="{{ url_for('cloud-dev-consoles.services_page') }}">Services</a><a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a><a href="{{ url_for('cloud-dev-consoles.databases_page') }}" class="active">Databases</a><a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a><a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a><a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a><a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a><a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a><a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a><a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a><a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">Databases</h1>
+        <form class="filters" method="GET">
+            <label>Search</label><input type="text" name="q" value="{{ q }}" placeholder="Search databases...">
+            <label>Engine</label>
+            <select name="engine" id="engine-filter">
+                <option value="">All Engines</option>
+                {% for e_val, e_label in engines %}<option value="{{ e_val }}" {% if engine == e_val %}selected{% endif %}>{{ e_label }}</option>{% endfor %}
+            </select>
+            <label>Status</label>
+            <select name="status"><option value="">All</option><option value="available" {% if status == 'available' %}selected{% endif %}>Available</option><option value="stopped" {% if status == 'stopped' %}selected{% endif %}>Stopped</option></select>
+            <label>Sort</label>
+            <select name="sort"><option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option><option value="cost" {% if sort == 'cost' %}selected{% endif %}>Cost</option><option value="storage" {% if sort == 'storage' %}selected{% endif %}>Storage Used</option><option value="connections" {% if sort == 'connections' %}selected{% endif %}>Connections</option></select>
+            <button type="submit">Apply</button>
+        </form>
+        <!-- Provision database (create_by_form) -->
+        <form class="filters" method="POST" action="{{ url_for('cloud-dev-consoles.form_create_database') }}" id="create-database-form">
+            <strong style="font-size:.85rem;">Create database</strong>
+            <label>Name</label><input type="text" name="name" placeholder="my-new-database" required>
+            <label>Engine</label>
+            <select name="engine">
+                <option value="PostgreSQL">PostgreSQL</option>
+                <option value="MySQL">MySQL</option>
+                <option value="MongoDB">MongoDB</option>
+                <option value="Redis">Redis</option>
+            </select>
+            <label>Version</label><input type="text" name="version" placeholder="16.2" style="width:90px;">
+            <label>Class</label>
+            <select name="instance_class">
+                <option value="db.t3.medium">db.t3.medium</option>
+                <option value="db.r6g.large">db.r6g.large</option>
+                <option value="db.r6g.2xlarge">db.r6g.2xlarge</option>
+                <option value="db.m5.large">db.m5.large</option>
+            </select>
+            <label>Storage (GB)</label><input type="number" name="storage_gb" value="100" min="1" max="65536" style="width:90px;">
+            <label>Region</label>
+            <select name="region">{% for r in regions %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select>
+            <label><input type="checkbox" name="multi_az"> Multi-AZ</label>
+            <label><input type="checkbox" name="encrypted" checked> Encrypted</label>
+            <button type="submit" style="background:#ff9900;color:#232f3e;font-weight:600;">Create database</button>
+        </form>
+        <div class="result-count">{{ databases|length }} databases</div>
+        <table id="databases-table">
+            <thead><tr><th>Name</th><th>Engine</th><th>Version</th><th>Class</th><th>Storage</th><th>Connections</th><th>Status</th><th>Multi-AZ</th><th>Cost/mo</th></tr></thead>
+            <tbody>
+            {% for db in databases %}
+            <tr>
+                <td><a class="link" href="{{ url_for('cloud-dev-consoles.api_database', db_id=db.id) }}">{{ db.name }}</a></td>
+                <td>{{ db.engine }}</td><td>{{ db.version }}</td><td>{{ db.instance_class }}</td>
+                <td>{{ db.storage_used_gb }}/{{ db.storage_gb }} GB</td>
+                <td>{{ db.connections_active }}/{{ db.connections_max }}</td>
+                <td><span class="status-badge status-{{ db.status }}">{{ db.status }}</span></td>
+                <td>{% if db.multi_az %}Yes{% else %}No{% endif %}</td>
+                <td>${{ "%.2f"|format(db.monthly_cost) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

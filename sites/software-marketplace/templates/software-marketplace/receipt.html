@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt {{ purchase.receipt_id }} - AppVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --gp-green: #01875f; --gp-green-light: #e6f4ea;
+            --gp-blue: #1a73e8; --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa; --gp-surface: #fff;
+            --gp-text: #202124; --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0; --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+        .topbar { background: var(--gp-surface); border-bottom: 1px solid var(--gp-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .6rem 1.5rem; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
+        .logo-icon { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
+        .nav-links { display: flex; gap: .25rem; align-items: center; margin-left: auto; }
+        .nav-links a { padding: .45rem .85rem; border-radius: 20px; text-decoration: none; font-size: .85rem; font-weight: 500; color: var(--gp-text-secondary); transition: background .15s; white-space: nowrap; }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+        .nav-links .login-btn { background: var(--gp-blue); color: #fff; }
+        .nav-links .login-btn:hover { background: #1557b0; color: #fff; }
+        .container { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .crumb { font-size: .85rem; margin-bottom: 1rem; }
+        .crumb a { color: #3b82f6; text-decoration: none; }
+        .crumb a:hover { text-decoration: underline; }
+        .receipt { background: #fff; border: 1px solid #e2e8f0; border-radius: .9rem; padding: 1.75rem; box-shadow: var(--gp-shadow); }
+        .receipt-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1rem; }
+        .receipt-head h1 { font-size: 1.25rem; }
+        .receipt-no { font-family: monospace; color: #475569; font-size: .9rem; margin-top: .25rem; }
+        .badge { display: inline-block; padding: .25rem .7rem; border-radius: 20px; font-size: .78rem; font-weight: 600; }
+        .badge-completed { background: #ecfdf5; color: #059669; }
+        .badge-refunded { background: #fef2f2; color: #dc2626; }
+        .line { display: flex; align-items: center; gap: 1rem; padding: .75rem 0; }
+        .app-icon { width: 52px; height: 52px; background: #dbeafe; border-radius: .6rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+        .line-info { flex: 1; }
+        .line-info h3 { font-size: 1rem; }
+        .line-info h3 a { text-decoration: none; color: inherit; }
+        .line-info h3 a:hover { color: #2563eb; }
+        .line-info .meta { color: #64748b; font-size: .82rem; }
+        .line-price { font-weight: 700; }
+        .totals { border-top: 1px solid #e2e8f0; margin-top: 1rem; padding-top: 1rem; }
+        .totals .row { display: flex; justify-content: space-between; padding: .3rem 0; font-size: .92rem; color: #475569; }
+        .totals .row.grand { font-size: 1.1rem; font-weight: 700; color: #202124; border-top: 1px dashed #cbd5e1; margin-top: .5rem; padding-top: .75rem; }
+        .meta-grid { margin-top: 1.25rem; display: grid; grid-template-columns: auto 1fr; gap: .4rem 1.25rem; font-size: .88rem; }
+        .meta-grid dt { color: #64748b; }
+        .meta-grid dd { color: #202124; }
+        .refund-box { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e2e8f0; }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .45rem; font-size: .9rem; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .refunded-note { color: #dc2626; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+            <div class="logo-icon">A</div>
+            AppVault
+        </a>
+        <div class="nav-links">
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+            {% if user %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.purchases_page') }}">Purchases</a>
+                <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+                <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+                <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="login-btn">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+</div>
+    <div class="container">
+        <div class="crumb"><a href="{{ url_for('software-marketplace.purchases_page') }}">&larr; Back to Purchases</a></div>
+        <div class="receipt">
+            <div class="receipt-head">
+                <div>
+                    <h1>Receipt</h1>
+                    <div class="receipt-no">{{ purchase.receipt_id }}</div>
+                </div>
+                {% if purchase.status == 'refunded' %}
+                    <span class="badge badge-refunded">Refunded</span>
+                {% else %}
+                    <span class="badge badge-completed">Completed</span>
+                {% endif %}
+            </div>
+
+            <div class="line">
+                <div class="app-icon">{{ purchase.app_name[0] if purchase.app_name else '?' }}</div>
+                <div class="line-info">
+                    <h3>
+                        {% if app %}
+                        <a href="{{ url_for('software-marketplace.app_detail', app_id=app.id) }}">{{ purchase.app_name }}</a>
+                        {% else %}{{ purchase.app_name }}{% endif %}
+                    </h3>
+                    <div class="meta">{% if app %}{{ app.developer }} &middot; {{ app.category }}{% else %}App{% endif %}</div>
+                </div>
+                <div class="line-price">${{ "%.2f"|format(purchase.price or 0) }}</div>
+            </div>
+
+            <div class="totals">
+                <div class="row"><span>Subtotal</span><span>${{ "%.2f"|format(purchase.price or 0) }}</span></div>
+                {% if purchase.discount and purchase.discount > 0 %}
+                <div class="row"><span>Discount{% if purchase.promo_code %} ({{ purchase.promo_code }}){% endif %}</span><span>-${{ "%.2f"|format(purchase.discount) }}</span></div>
+                {% endif %}
+                <div class="row grand"><span>Total paid</span><span>${{ "%.2f"|format(net_paid) }}</span></div>
+            </div>
+
+            <dl class="meta-grid">
+                <dt>Order / Receipt ID</dt><dd class="receipt-no">{{ purchase.receipt_id }}</dd>
+                <dt>Purchase date</dt><dd>{{ purchase.date }}</dd>
+                <dt>Status</dt><dd>{{ purchase.status|capitalize }}</dd>
+                {% if purchase.status == 'refunded' and purchase.refund_date %}
+                <dt>Refunded on</dt><dd>{{ purchase.refund_date }}</dd>
+                {% endif %}
+            </dl>
+
+            <div class="refund-box">
+                {% if purchase.status == 'refunded' %}
+                    <p class="refunded-note">This purchase was refunded on {{ purchase.refund_date or purchase.date }}.</p>
+                {% else %}
+                    <form method="post" action="{{ url_for('software-marketplace.form_refund_purchase', purchase_id=purchase.id) }}">
+                        <input type="hidden" name="redirect_to" value="{{ url_for('software-marketplace.purchase_detail', purchase_id=purchase.id) }}">
+                        <button type="submit" class="btn btn-danger">Request refund</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

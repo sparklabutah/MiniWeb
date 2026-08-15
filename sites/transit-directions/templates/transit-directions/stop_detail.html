@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stop.name }} - Lakeport Transit Authority</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .breadcrumb { font-size: 13px; color: #666; margin-bottom: 16px; }
+        .breadcrumb a { color: #1a237e; text-decoration: none; }
+        .stop-header { margin-bottom: 24px; }
+        .stop-header h2 { font-size: 24px; margin-bottom: 4px; }
+        .stop-header .code { font-size: 14px; color: #888; }
+        .stop-header .address { font-size: 14px; color: #666; margin-top: 4px; }
+        .zone-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #fff3e0; color: #e65100; margin-left: 8px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .info-item { background: white; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .info-item .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-item .value { font-size: 16px; font-weight: 600; margin-top: 4px; }
+        .section { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .section h3 { font-size: 18px; color: #1a237e; margin-bottom: 14px; }
+        .arrival-list { display: flex; flex-direction: column; gap: 8px; }
+        .arrival-row { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 8px; background: #f8f9fa; }
+        .arrival-badge { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+        .arrival-info { flex: 1; }
+        .arrival-info .route-name { font-size: 14px; font-weight: 600; }
+        .arrival-info .direction { font-size: 12px; color: #666; }
+        .arrival-time { font-size: 16px; font-weight: 600; color: #1a237e; }
+        .arrival-minutes { font-size: 12px; color: #888; }
+        .routes-served { display: flex; gap: 8px; flex-wrap: wrap; }
+        .route-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; background: #e8eaf6; color: #283593; font-weight: 600; font-size: 14px; text-decoration: none; }
+        .route-chip:hover { background: #c5cae9; }
+        .amenity-list { display: flex; gap: 8px; flex-wrap: wrap; }
+        .amenity-tag { padding: 4px 10px; border-radius: 4px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Public Transit for Lakeport and the Region</div>
+    </div>
+    <div class="nav">
+        <a href="{{ url_for('transit-directions.index') }}">Home</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}">Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}" class="active">Stops</a>
+        <a href="{{ url_for('transit-directions.trip_planner') }}">Trip Planner</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}">Fares</a>
+        <a href="{{ url_for('transit-directions.login') }}">Sign In</a>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('transit-directions.index') }}">Home</a> &rsaquo; <a href="{{ url_for('transit-directions.stops_list') }}">Stops</a> &rsaquo; {{ stop.name }}
+        </div>
+
+        <div class="stop-header">
+            <h2>{{ stop.name }} <span class="zone-badge">Zone {{ stop.zone }}</span></h2>
+            <div class="code">Stop {{ stop.stop_code }}</div>
+            <div class="address">{{ stop.address }}</div>
+            <div style="margin-top:6px;">
+                <a href="/sites/map-services/directions?to={{ stop.name|urlencode }}" style="color:#1a73e8;font-size:.85rem;text-decoration:none;">Get Directions to this stop &rarr;</a>
+                &middot;
+                <a href="/sites/map-services/?q={{ stop.name|urlencode }}" style="color:#1a73e8;font-size:.85rem;text-decoration:none;">View on Map</a>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">Zone</div>
+                <div class="value">{{ stop.zone }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Routes Served</div>
+                <div class="value">{{ stop.routes_served | length }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Accessible</div>
+                <div class="value">{% if stop.wheelchair_accessible %}Yes{% else %}No{% endif %}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Amenities</div>
+                <div class="value">{{ stop.amenities | length }}</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Routes at this Stop</h3>
+            <div class="routes-served">
+                {% for route in served_routes %}
+                <a href="{{ url_for('transit-directions.route_detail', route_id=route.id) }}" class="route-chip" style="border-left: 4px solid {{ route.color }}">
+                    Rt {{ route.route_number }} - {{ route.name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Upcoming Arrivals</h3>
+            {% if arrivals %}
+            <div class="arrival-list">
+                {% for arr in arrivals %}
+                <div class="arrival-row">
+                    <div class="arrival-badge" style="background-color: {{ arr.route_color }}">{{ arr.route_number }}</div>
+                    <div class="arrival-info">
+                        <div class="route-name">{{ arr.route_name }}</div>
+                        <div class="direction">{{ arr.direction }}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="arrival-time">{{ arr.time }}</div>
+                        <div class="arrival-minutes">{{ arr.minutes_away }} min</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="font-size: 14px; color: #888;">No upcoming arrivals at this time.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Amenities</h3>
+            <div class="amenity-list">
+                {% for amenity in stop.amenities %}
+                <span class="amenity-tag">{{ amenity | replace('_', ' ') | title }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

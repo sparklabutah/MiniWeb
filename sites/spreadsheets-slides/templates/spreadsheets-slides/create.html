@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New - SheetDeck</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .header a { color: #0f9d58; text-decoration: none; font-size: 1.2rem; font-weight: 500; }
+        .header h1 { font-size: 1rem; font-weight: 400; color: #5f6368; }
+        .container { max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { font-size: 1rem; font-weight: 500; color: #202124; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .card h2 svg { width: 24px; height: 24px; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.85rem; color: #5f6368; margin-bottom: 0.3rem; }
+        input[type="text"] { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.95rem; }
+        input:focus { outline: none; border-color: #0f9d58; }
+        .btn { padding: 0.5rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .btn-spreadsheet { background: #0f9d58; color: #fff; }
+        .btn-spreadsheet:hover { background: #0b8043; }
+        .btn-presentation { background: #f9ab00; color: #202124; }
+        .btn-presentation:hover { background: #f29900; }
+        .templates-section { margin-top: 2rem; }
+        .templates-section h3 { font-size: 0.95rem; color: #5f6368; margin-bottom: 0.8rem; }
+        .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.8rem; }
+        .template-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: box-shadow 0.15s; }
+        .template-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .template-name { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.3rem; }
+        .template-cat { font-size: 0.75rem; color: #80868b; }
+        .template-type { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; display: inline-block; margin-top: 0.3rem; }
+        .template-type.spreadsheet { background: #e6f4ea; color: #0f9d58; }
+        .template-type.presentation { background: #fef7e0; color: #f9ab00; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('spreadsheets-slides.index') }}">SheetDeck</a>
+        <h1>Create New File</h1>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>
+                <svg viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6z"/></svg>
+                New Spreadsheet
+            </h2>
+            <form method="post" action="{{ url_for('spreadsheets-slides.form_create_spreadsheet') }}">
+                <div class="form-group">
+                    <label for="ss-title">Title</label>
+                    <input type="text" id="ss-title" name="title" placeholder="Untitled Spreadsheet" autocomplete="off">
+                </div>
+                {% if user %}
+                <input type="hidden" name="owner_id" value="{{ user.id }}">
+                {% endif %}
+                <button type="submit" class="btn btn-spreadsheet">Create Spreadsheet</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>
+                <svg viewBox="0 0 24 24" fill="#f9ab00"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM6 6h12v2H6zm0 4h12v6H6z"/></svg>
+                New Presentation
+            </h2>
+            <form method="post" action="{{ url_for('spreadsheets-slides.form_create_presentation') }}">
+                <div class="form-group">
+                    <label for="pres-title">Title</label>
+                    <input type="text" id="pres-title" name="title" placeholder="Untitled Presentation" autocomplete="off">
+                </div>
+                {% if user %}
+                <input type="hidden" name="owner_id" value="{{ user.id }}">
+                {% endif %}
+                <button type="submit" class="btn btn-presentation">Create Presentation</button>
+            </form>
+        </div>
+
+        {% if templates %}
+        <div class="templates-section">
+            <h3>Or start from a template</h3>
+            <div class="template-grid">
+                {% for t in templates %}
+                <div class="template-card use-tpl" data-name="{{ t.name }}" data-type="{{ t.type }}" data-id="{{ t.id }}">
+                    <div class="template-name">{{ t.name }}</div>
+                    <div class="template-cat">{{ t.category }}</div>
+                    <span class="template-type {{ t.type }}">{{ t.type|capitalize }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+<script>
+document.addEventListener('click', function(e) {
+    var card = e.target.closest('.use-tpl');
+    if (!card) return;
+    card.style.opacity = '0.5';
+    card.style.pointerEvents = 'none';
+    var endpoint = card.dataset.type === 'presentation'
+        ? '/sites/spreadsheets-slides/api/presentations'
+        : '/sites/spreadsheets-slides/api/spreadsheets';
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: card.dataset.name + ' (copy)', owner_id: 1})
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.id) {
+            var path = card.dataset.type === 'presentation'
+                ? '/sites/spreadsheets-slides/presentation/' + d.id
+                : '/sites/spreadsheets-slides/spreadsheet/' + d.id;
+            window.location.href = path;
+        } else {
+            window.location.href = '/sites/spreadsheets-slides/';
+        }
+    })
+    .catch(function() { card.style.opacity = '1'; card.style.pointerEvents = ''; });
+});
+</script>
+</body>
+</html>

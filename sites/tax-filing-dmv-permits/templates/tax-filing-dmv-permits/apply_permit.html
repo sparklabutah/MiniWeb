@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply for Permit - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'permits' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div class="form-card">
+            <h2>Apply for a Permit</h2>
+            <div id="success-msg" class="success-msg">Permit application submitted successfully!</div>
+            <form id="permit-form" onsubmit="return submitPermit(event)">
+                <div class="form-group"><label for="type">Permit Type</label>
+                    <select name="type" id="type">
+                        <option value="Building">Building</option>
+                        <option value="Renovation">Renovation</option>
+                        <option value="Electrical">Electrical</option>
+                        <option value="Plumbing">Plumbing</option>
+                        <option value="Parking Permit">Parking Permit</option>
+                        <option value="Event Permit">Event Permit</option>
+                        <option value="Fence">Fence</option>
+                    </select>
+                </div>
+                <div class="form-group"><label for="applicant_name">Applicant Name</label><input type="text" name="applicant_name" id="applicant_name" value="{{ user.display_name }}" required></div>
+                <div class="form-group"><label for="address">Property Address</label><input type="text" name="address" id="address" required placeholder="e.g., 123 Main St, Lakeport, WA 98401"></div>
+                <div class="form-group"><label for="description">Description</label><textarea name="description" id="description" required placeholder="Describe the work to be performed..."></textarea></div>
+                <div class="upload-area">
+                    <p>Upload Supporting Documents (optional)</p>
+                    <input type="file" id="doc-upload" name="file">
+                </div>
+                <button type="submit" class="submit-btn">Submit Application</button>
+            </form>
+        </div>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+
+    <script>
+    function submitPermit(e) {
+        e.preventDefault();
+        var data = {
+            type: document.getElementById('type').value,
+            applicant_name: document.getElementById('applicant_name').value,
+            address: document.getElementById('address').value,
+            description: document.getElementById('description').value,
+            user_id: {{ user.id }},
+        };
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/permits', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            document.getElementById('success-msg').style.display = 'block';
+            document.getElementById('success-msg').textContent = 'Permit application ' + d.permit_id + ' submitted successfully!';
+            var fileInput = document.getElementById('doc-upload');
+            if (fileInput.files.length > 0) {
+                var fd = new FormData(); fd.append('file', fileInput.files[0]);
+                fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/upload', {method:'POST', body: fd});
+            }
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

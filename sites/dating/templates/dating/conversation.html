@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat with {{ other.name }} - HeartLink</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; }
+.navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+.navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+.navbar .nav-links { display: flex; gap: 1rem; align-items: center; }
+.navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+.navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+.chat-container { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 52px); }
+.chat-header { padding: 0.8rem 1.5rem; background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; gap: 0.8rem; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #f093fb); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 0.85rem; }
+.chat-name { font-weight: 600; font-size: 1rem; color: #1a1a2e; }
+.chat-name a { color: #1a1a2e; text-decoration: none; }
+.chat-name a:hover { color: #667eea; }
+.messages { flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+.bubble-row { display: flex; margin-bottom: 0.5rem; }
+.bubble-row.mine { justify-content: flex-end; }
+.bubble-row.theirs { justify-content: flex-start; }
+.bubble { max-width: 75%; padding: 0.6rem 1rem; border-radius: 1.2rem; font-size: 0.9rem; line-height: 1.4; }
+.bubble-row.mine .bubble { background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; border-bottom-right-radius: 0.3rem; }
+.bubble-row.theirs .bubble { background: #fff; color: #333; border-bottom-left-radius: 0.3rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.bubble .time { font-size: 0.65rem; opacity: 0.6; margin-top: 0.2rem; display: block; }
+.bubble-row.mine .bubble .time { text-align: right; }
+.compose { padding: 0.8rem 1.5rem; background: #fff; border-top: 1px solid #e8e8e8; display: flex; gap: 0.5rem; }
+.compose input[type="text"] { flex: 1; padding: 0.6rem 1rem; border: 2px solid #e8e8e8; border-radius: 2rem; font-size: 0.9rem; outline: none; }
+.compose input[type="text"]:focus { border-color: #667eea; }
+.compose button { padding: 0.6rem 1.2rem; border-radius: 2rem; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+.no-messages { text-align: center; color: #aaa; padding: 3rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+    <div class="nav-links">
+        <a href="{{ url_for('dating.index') }}">Discover</a>
+        <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
+        <a href="{{ url_for('dating.matches_page') }}" class="active">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
+    </div>
+</nav>
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="avatar">{{ other.name[0] if other else '?' }}</div>
+        <div>
+            <div class="chat-name"><a href="{{ url_for('dating.profile_detail', profile_id=other.id) }}">{{ other.name }}</a></div>
+        </div>
+    </div>
+
+    <div class="messages">
+        {% if messages %}
+        {% for msg in messages %}
+        <div class="bubble-row {{ 'mine' if msg.sender_id == user.id else 'theirs' }}">
+            <div class="bubble">
+                {{ msg.content }}
+                {% if msg.attachment_src %}
+                <div style="margin-top:.4rem;"><img src="{{ msg.attachment_src }}" alt="{{ msg.attachment or 'photo' }}" style="max-width:180px;border-radius:.7rem;display:block;"></div>
+                {% elif msg.attachment %}
+                <div style="margin-top:.3rem;font-size:.8rem;opacity:.85;">&#128206; {{ msg.attachment }}</div>
+                {% endif %}
+                <span class="time">{{ msg.timestamp }}</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-messages">No messages yet. Say hi!</div>
+        {% endif %}
+    </div>
+
+    <div style="text-align:center; padding:.4rem 1.5rem; background:#f0ebff; font-size:.82rem; color:#555;">
+        Need more features? <a href="/sites/instant-messaging/" style="color:#667eea; font-weight:600;">Continue conversation on Messenger &rarr;</a>
+    </div>
+    <form class="compose" id="compose-form" method="post" enctype="multipart/form-data" action="{{ url_for('dating.form_send_message', match_id=match.id) }}">
+        <label for="photo-upload" style="cursor:pointer;font-size:1.2rem;padding:0.4rem;" title="Attach a photo">📎</label>
+        <input type="file" id="photo-upload" name="file" accept="image/*" style="display:none;">
+        {% set my_photo = (user.photos[0] if user.photos else user.photo_url) %}
+        {% if my_photo %}
+        <button type="button" id="send-my-photo" style="padding:.4rem .7rem;border-radius:2rem;background:#f0ebff;color:#667eea;border:1px solid #d7cbf5;cursor:pointer;font-size:.78rem;font-weight:600;white-space:nowrap;" title="Send your profile picture">📸 My photo</button>
+        {% endif %}
+        <input type="hidden" name="attachment_src" id="attachment_src">
+        <input type="hidden" name="attachment_name" id="attachment_name">
+        <span id="attach-name" style="font-size:.75rem;color:#667eea;align-self:center;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <input type="text" name="content" placeholder="Type a message..." autocomplete="off">
+        <button type="submit">Send</button>
+    </form>
+    <script>
+    // Open the conversation scrolled to the newest message (bottom), not the oldest.
+    (function () {
+      var m = document.querySelector('.messages');
+      if (m) m.scrollTop = m.scrollHeight;
+    })();
+    (function () {
+      var MY_PHOTO = {{ my_photo | default('', true) | tojson }};
+      var srcInput = document.getElementById('attachment_src');
+      var nameInput = document.getElementById('attachment_name');
+      var label = document.getElementById('attach-name');
+      function setAttach(name, src) { nameInput.value = name || ''; srcInput.value = src || ''; label.textContent = name || ''; }
+      // Photo chosen through the simulated file explorer (sets the file input).
+      document.getElementById('photo-upload').addEventListener('change', function () {
+        if (!this.files || !this.files.length) return;
+        var f = this.files[0];
+        var reader = new FileReader();
+        reader.onload = function () { setAttach(f.name, reader.result); };
+        reader.readAsDataURL(f);
+      });
+      var btn = document.getElementById('send-my-photo');
+      if (btn) btn.addEventListener('click', function () {
+        setAttach('profile.jpg', MY_PHOTO);
+        label.textContent = 'profile.jpg';
+      });
+    })();
+    </script>
+</div>
+</body></html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit Profile - HeartLink</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; }
+.navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+.navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+.navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+.navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+.navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+.navbar .nav-links a.active { background: #667eea; color: #fff; }
+.main { max-width: 500px; margin: 2rem auto; padding: 0 1.5rem; }
+h2 { margin-bottom: 1rem; color: #1a1a2e; }
+.form-card { background: #fff; border-radius: 1rem; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+label { display: block; font-size: 0.85rem; margin: 1rem 0 0.3rem; color: #555; font-weight: 500; }
+label:first-child { margin-top: 0; }
+input, textarea, select { width: 100%; padding: 0.65rem 0.8rem; border: 2px solid #e8e8e8; border-radius: 0.5rem; font-size: 0.9rem; }
+input:focus, textarea:focus, select:focus { border-color: #667eea; outline: none; }
+textarea { min-height: 80px; resize: vertical; }
+button { margin-top: 1.5rem; padding: 0.75rem 2rem; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; border: none; border-radius: 2rem; cursor: pointer; font-size: 1rem; font-weight: 600; width: 100%; }
+button:hover { opacity: 0.9; }
+
+/* Tinder-style photo grid */
+.photos-card { background: #fff; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+.photos-card h3 { font-size: 1rem; color: #1a1a2e; margin-bottom: .3rem; }
+.photos-card .hint { font-size: .78rem; color: #999; margin-bottom: 1rem; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+.photo-tile { position: relative; aspect-ratio: 3/4; border-radius: .7rem; overflow: hidden; background: #f0ebff; border: 2px solid #eee; cursor: grab; }
+.photo-tile.dragging { opacity: .4; }
+.photo-tile.over { border-color: #667eea; }
+.photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.photo-tile .primary-badge { position: absolute; top: 6px; left: 6px; background: linear-gradient(135deg,#667eea,#f093fb); color: #fff; font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 1rem; letter-spacing: .03em; }
+.photo-tile .remove { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; border: none; cursor: pointer; font-size: .9rem; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }
+.photo-tile .remove:hover { background: #e5484d; }
+.photo-add { aspect-ratio: 3/4; border: 2px dashed #cdbff0; border-radius: .7rem; background: #faf7ff; color: #a186e0; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: .82rem; gap: .3rem; }
+.photo-add:hover { background: #f2ecff; border-color: #667eea; color: #667eea; }
+.photo-add .plus { font-size: 1.8rem; line-height: 1; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+    <div class="nav-links">
+        <a href="{{ url_for('dating.index') }}">Discover</a>
+        <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
+        <a href="{{ url_for('dating.matches_page') }}">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}" class="active">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
+    </div>
+</nav>
+<div class="main">
+<h2>Edit Profile</h2>
+
+<div class="photos-card">
+<h3>Photos</h3>
+<div class="hint">Drag to reorder &middot; the first photo is your main picture &middot; up to 6</div>
+<div class="photo-grid" id="photo-grid"></div>
+</div>
+
+<div class="form-card">
+<form method="post" action="{{ url_for('dating.form_update_profile') }}">
+<label for="bio">Bio</label>
+<textarea name="bio" id="bio">{{ user.bio }}</textarea>
+
+<label for="location">Location</label>
+<input type="text" name="location" id="location" value="{{ user.location }}">
+
+<label for="interests">Interests (comma-separated)</label>
+<input type="text" name="interests" id="interests" value="{{ user.interests|join(', ') }}">
+
+<label for="looking_for">Looking for</label>
+<select name="looking_for" id="looking_for">
+<option value="relationship" {{ 'selected' if user.looking_for == 'relationship' }}>Relationship</option>
+<option value="casual" {{ 'selected' if user.looking_for == 'casual' }}>Casual</option>
+<option value="friendship" {{ 'selected' if user.looking_for == 'friendship' }}>Friendship</option>
+</select>
+
+<label for="gender_pref">Gender Preference</label>
+<select name="gender_pref" id="gender_pref">
+<option value="any" {{ 'selected' if prefs.gender_pref == 'any' }}>Any</option>
+<option value="male" {{ 'selected' if prefs.gender_pref == 'male' }}>Male</option>
+<option value="female" {{ 'selected' if prefs.gender_pref == 'female' }}>Female</option>
+</select>
+
+<label for="min_age_pref">Min Age Preference</label>
+<input type="number" name="min_age_pref" id="min_age_pref" value="{{ prefs.min_age }}">
+
+<label for="max_age_pref">Max Age Preference</label>
+<input type="number" name="max_age_pref" id="max_age_pref" value="{{ prefs.max_age }}">
+
+<label for="max_distance_pref">Max Distance (miles)</label>
+<input type="number" name="max_distance_pref" id="max_distance_pref" value="{{ prefs.max_distance_miles or '' }}" placeholder="No limit">
+
+<button type="submit">Save Changes</button>
+</form>
+</div>
+</div>
+
+<script>
+(function () {
+  var photos = {{ user.photos | default([], true) | tojson }};
+  var grid = document.getElementById('photo-grid');
+  // Pointer-based drag (mousedown/move/up + touch) — works with synthetic mouse
+  // gestures, so a browser agent that can draw on a canvas can also reorder here.
+  var drag = null;  // { src }
+
+  function toSrc(f) {
+    var c = (f.content || '').trim();
+    if (!c) return '/_fs/download?path=' + encodeURIComponent(f.path);
+    if (c.indexOf('data:') === 0 || c.indexOf('http') === 0 || c.indexOf('/') === 0) return c;
+    if (c.indexOf('<svg') === 0) return 'data:image/svg+xml;utf8,' + encodeURIComponent(c);
+    return '/_fs/download?path=' + encodeURIComponent(f.path);
+  }
+
+  function persist() {
+    fetch('{{ url_for("dating.form_update_photos") }}', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photos: photos })
+    });
+  }
+
+  function ptFrom(e) {
+    var t = e.touches && e.touches[0];
+    return { x: t ? t.clientX : e.clientX, y: t ? t.clientY : e.clientY };
+  }
+  function onMove(e) {
+    if (!drag) return;
+    if (e.cancelable) e.preventDefault();
+    var p = ptFrom(e);
+    var el = document.elementFromPoint(p.x, p.y);
+    var tile = el && el.closest ? el.closest('.photo-tile') : null;
+    if (!tile || !grid.contains(tile) || tile.dataset.i === undefined) return;
+    var to = parseInt(tile.dataset.i, 10);
+    var from = photos.indexOf(drag.src);
+    if (to !== from && to >= 0 && from >= 0) {
+      var moved = photos.splice(from, 1)[0];
+      photos.splice(to, 0, moved);
+      render();
+      var nt = grid.children[to];
+      if (nt) nt.classList.add('dragging');
+    }
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    if (drag) { drag = null; persist(); render(); }
+  }
+  function startDrag(e, src) {
+    if (e.target.closest('.remove')) return;
+    if (e.cancelable) e.preventDefault();
+    drag = { src: src };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  }
+
+  function render() {
+    grid.innerHTML = '';
+    photos.forEach(function (src, i) {
+      var t = document.createElement('div');
+      t.className = 'photo-tile'; t.dataset.i = i;
+      t.innerHTML = (i === 0 ? '<span class="primary-badge">MAIN</span>' : '') +
+        '<button class="remove" title="Remove">×</button>' +
+        '<img src="' + src + '" alt="photo ' + (i + 1) + '" draggable="false">';
+      t.querySelector('.remove').addEventListener('click', function (e) {
+        e.stopPropagation(); photos.splice(i, 1); persist(); render();
+      });
+      t.addEventListener('mousedown', function (e) { startDrag(e, src); });
+      t.addEventListener('touchstart', function (e) { startDrag(e, src); }, { passive: false });
+      grid.appendChild(t);
+    });
+    if (photos.length < 6) {
+      var add = document.createElement('div');
+      add.className = 'photo-add';
+      add.innerHTML = '<span class="plus">+</span><span>Add photo</span>';
+      add.addEventListener('click', function () {
+        if (!window.MiniWebFS) { return; }
+        window.MiniWebFS.open({
+          accept: 'image/*', startPath: '/Pictures',
+          onPick: function (f) { photos.push(toSrc(f)); persist(); render(); }
+        });
+      });
+      grid.appendChild(add);
+    }
+  }
+  render();
+})();
+</script>
+</body></html>

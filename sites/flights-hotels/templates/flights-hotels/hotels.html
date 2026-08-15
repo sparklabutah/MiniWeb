@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotels - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .page-title { font-size: 1.4rem; color: #1a365d; margin-bottom: .3rem; }
+        .result-count { color: #718096; font-size: .9rem; margin-bottom: 1.5rem; }
+        .filters { background: #fff; border-radius: .5rem; padding: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .filters form { display: flex; gap: .8rem; flex-wrap: wrap; align-items: flex-end; }
+        .filters .form-group { flex: 1; min-width: 130px; }
+        .filters label { display: block; font-size: .78rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        .filters select, .filters input { width: 100%; padding: .45rem .6rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .88rem; }
+        .filters select:focus, .filters input:focus { outline: none; border-color: #4299e1; }
+        .filter-btn { background: #2b6cb0; color: #fff; border: none; padding: .5rem 1.2rem; border-radius: .3rem; cursor: pointer; font-size: .88rem; font-weight: 600; white-space: nowrap; }
+        .filter-btn:hover { background: #1a365d; }
+        .clear-link { font-size: .82rem; color: #e53e3e; text-decoration: none; white-space: nowrap; }
+        .hotel-card { background: #fff; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: .8rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; gap: 1.2rem; text-decoration: none; color: inherit; transition: box-shadow .15s, border-color .15s; border: 1px solid transparent; }
+        .hotel-card:hover { border-color: #4299e1; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        .hotel-info { flex: 1; }
+        .hotel-name { font-size: 1.1rem; font-weight: 700; color: #1a365d; margin-bottom: .2rem; }
+        .hotel-city { font-size: .85rem; color: #718096; margin-bottom: .4rem; }
+        .hotel-stars { color: #d69e2e; font-size: .9rem; margin-bottom: .3rem; }
+        .hotel-amenities { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem; }
+        .amenity-tag { background: #edf2f7; color: #4a5568; font-size: .72rem; padding: .15rem .5rem; border-radius: .2rem; }
+        .hotel-meta { text-align: right; min-width: 120px; display: flex; flex-direction: column; justify-content: center; }
+        .hotel-price { font-size: 1.4rem; font-weight: 700; color: #2b6cb0; }
+        .hotel-price-label { font-size: .75rem; color: #a0aec0; }
+        .hotel-rating { font-size: .9rem; color: #4a5568; margin-top: .3rem; }
+        .hotel-rating strong { color: #2d3748; }
+        .hotel-rooms { font-size: .78rem; color: #718096; margin-top: .2rem; }
+        .no-results { text-align: center; color: #a0aec0; padding: 3rem; background: #fff; border-radius: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}" class="active">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h2 class="page-title">Hotel Results</h2>
+        <p class="result-count">{{ total }} hotel{{ 's' if total != 1 else '' }} found</p>
+
+        <div class="filters">
+            <form method="get" action="{{ url_for('flights-hotels.hotels_page') }}">
+                <div class="form-group">
+                    <label>City</label>
+                    <select name="city">
+                        <option value="">Any</option>
+                        {% for c in cities %}
+                        <option value="{{ c }}" {{ 'selected' if city == c else '' }}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Min Stars</label>
+                    <select name="min_stars">
+                        <option value="">Any</option>
+                        <option value="2" {{ 'selected' if min_stars == '2' else '' }}>2+</option>
+                        <option value="3" {{ 'selected' if min_stars == '3' else '' }}>3+</option>
+                        <option value="4" {{ 'selected' if min_stars == '4' else '' }}>4+</option>
+                        <option value="5" {{ 'selected' if min_stars == '5' else '' }}>5</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Min Rating</label>
+                    <select name="min_rating">
+                        <option value="">Any</option>
+                        <option value="3.5" {{ 'selected' if min_rating == '3.5' else '' }}>3.5+</option>
+                        <option value="4.0" {{ 'selected' if min_rating == '4.0' else '' }}>4.0+</option>
+                        <option value="4.5" {{ 'selected' if min_rating == '4.5' else '' }}>4.5+</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Max Price / Night</label>
+                    <input type="number" name="max_price" value="{{ max_price }}" placeholder="$">
+                </div>
+                <div class="form-group">
+                    <label>Amenity</label>
+                    <select name="amenity">
+                        <option value="">Any</option>
+                        {% for a in all_amenities %}
+                        <option value="{{ a }}" {{ 'selected' if amenity == a else '' }}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Sort</label>
+                    <select name="sort">
+                        <option value="price" {{ 'selected' if sort == 'price' else '' }}>Price (Low)</option>
+                        <option value="price_desc" {{ 'selected' if sort == 'price_desc' else '' }}>Price (High)</option>
+                        <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>Rating</option>
+                        <option value="stars" {{ 'selected' if sort == 'stars' else '' }}>Stars</option>
+                        <option value="name" {{ 'selected' if sort == 'name' else '' }}>Name</option>
+                    </select>
+                </div>
+                <button type="submit" class="filter-btn">Filter</button>
+                <a href="{{ url_for('flights-hotels.hotels_page') }}" class="clear-link">Clear</a>
+            </form>
+        </div>
+
+        {% if hotels %}
+        {% for h in hotels %}
+        <a class="hotel-card" href="{{ url_for('flights-hotels.hotel_detail', hotel_id=h.id) }}">
+            <div class="hotel-info">
+                <div class="hotel-name">{{ h.eff_name or h.name or h.hotelname or 'Hotel' }}</div>
+                <div class="hotel-city">{{ h.eff_city or h.city or '' }}</div>
+                <div class="hotel-stars">
+                    {% set star_count = h.eff_stars or h.stars or 3 %}
+                    {% for _ in range(star_count) %}&#9733;{% endfor %}{% for _ in range(5 - star_count) %}&#9734;{% endfor %}
+                </div>
+                <div class="hotel-amenities">
+                    {% set amen = h.amenities if h.amenities is iterable and h.amenities is not string else [] %}
+                    {% if amen %}
+                        {% for a in amen[:5] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
+                        {% if amen|length > 5 %}<span class="amenity-tag">+{{ amen|length - 5 }} more</span>{% endif %}
+                    {% elif h.hotelfacilities %}
+                        <span class="amenity-tag">{{ h.hotelfacilities[:60] }}...</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="hotel-meta">
+                <div class="hotel-price">${{ "%.0f"|format(h.eff_price or h.price_per_night or 0) }}</div>
+                <div class="hotel-price-label">per night</div>
+                {% if h.rating %}<div class="hotel-rating">Rating: <strong>{{ h.rating }}</strong>/5</div>{% endif %}
+                {% if h.rooms_available %}<div class="hotel-rooms">{{ h.rooms_available }} rooms left</div>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="no-results">No hotels match your search criteria. Try adjusting the filters.</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmarks - Lakeport Tribune</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f4f4f4; color: #222; font-family: Georgia, 'Times New Roman', serif; line-height: 1.6; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { color: #0d3b5e; text-decoration: underline; }
+        .site-header { background: #1a1a2e; color: #fff; }
+        .header-brand { text-align: center; padding: 1rem 1rem .6rem; border-bottom: 3px double #444; }
+        .header-brand h1 { font-size: 2rem; letter-spacing: 2px; color: #fff; }
+        .header-brand h1 a { color: #fff; text-decoration: none; }
+        .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+        h2 { font-size: 1.4rem; color: #1a1a2e; margin-bottom: 1rem; }
+        .bookmark-item { background: #fff; border-radius: .4rem; padding: 1.2rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .bookmark-item h3 { font-size: 1.05rem; margin-bottom: .3rem; }
+        .bookmark-item h3 a { color: #1a1a2e; }
+        .bookmark-item h3 a:hover { color: #e74c3c; text-decoration: none; }
+        .bookmark-item .meta { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .75rem; color: #888; }
+        .bookmark-item .note { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #666; font-style: italic; margin-top: .3rem; }
+        .no-results { background: #fff; border-radius: .4rem; padding: 2rem; text-align: center; color: #888; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .site-footer { background: #1a1a2e; color: #888; padding: 2rem 1.5rem; margin-top: 2rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-brand">
+            <h1><a href="{{ url_for('news.index') }}">Lakeport Tribune</a></h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Your Bookmarks ({{ bookmarks|length }})</h2>
+        {% if bookmarks %}
+            {% for bm in bookmarks %}
+            <div class="bookmark-item">
+                <h3><a href="{{ url_for('news.article_detail', article_id=bm.article_id) }}">{{ bm.article_title }}</a></h3>
+                <div class="meta">Saved {{ bm.bookmarked_at }}</div>
+                {% if bm.note %}
+                <div class="note">"{{ bm.note }}"</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-results">
+                <p>No bookmarks yet. Save articles to read later.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <footer class="site-footer">
+        <p>&copy; Lakeport Tribune</p>
+    </footer>
+</body>
+</html>

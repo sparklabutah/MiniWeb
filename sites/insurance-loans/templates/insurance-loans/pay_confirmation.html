@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Confirmed - Cascadia Insurance &amp; Lending</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #1a3c5e, #2b5f8a); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #5db8fe; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a3c5e; text-decoration: none; font-size: .88rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef4fb; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        nav .btn-logout { color: #dc2626; margin-left: auto; }
+        nav .btn-login { background: #1a3c5e; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        .container { max-width: 620px; margin: 1.5rem auto; padding: 0 1.5rem 2.5rem; }
+        .card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .check-circle { width: 60px; height: 60px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+        .card h2 { text-align: center; color: #166534; font-size: 1.3rem; margin-bottom: .3rem; }
+        .card .sub { text-align: center; font-size: .9rem; color: #64748b; margin-bottom: 1.5rem; }
+        .detail-row { display: flex; justify-content: space-between; padding: .55rem 0; font-size: .9rem; border-bottom: 1px solid #f1f5f9; }
+        .detail-row .label { color: #64748b; font-weight: 500; }
+        .detail-row .value { color: #1e293b; font-weight: 600; text-align: right; }
+        .balance-box { background: #f0fdf4; padding: 1.2rem; border-radius: .5rem; text-align: center; margin: 1.3rem 0; }
+        .balance-box .amount { font-size: 1.8rem; font-weight: 700; color: #059669; }
+        .balance-box .lbl { font-size: .82rem; color: #64748b; }
+        .actions { display: flex; gap: .7rem; margin-top: 1.5rem; flex-wrap: wrap; }
+        .btn { flex: 1; text-align: center; padding: .6rem 1rem; border-radius: .35rem; text-decoration: none; font-size: .9rem; font-weight: 600; }
+        .btn-primary { background: #1a3c5e; color: #fff; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('insurance-loans.index') }}">Cascadia <span>Insurance &amp; Lending</span></a></h1>
+    </div>
+    <nav>
+        <a href="{{ url_for('insurance-loans.index') }}">Dashboard</a>
+        <a href="{{ url_for('insurance-loans.policies_page') }}">Policies</a>
+        <a href="{{ url_for('insurance-loans.claims_page') }}">Claims</a>
+        <a href="{{ url_for('insurance-loans.loans_page') }}">Loans</a>
+        <a href="{{ url_for('insurance-loans.payments_page') }}" class="active">Payments</a>
+        {% if logged_in %}
+        <a href="{{ url_for('insurance-loans.logout') }}" class="btn-logout">Sign Out</a>
+        {% else %}
+        <a href="{{ url_for('insurance-loans.login_page') }}" class="btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="check-circle">&#10003;</div>
+            <h2>Payment Confirmed</h2>
+            <div class="sub">Your payment has been processed and recorded.</div>
+
+            <div class="detail-row"><span class="label">Amount Paid</span><span class="value">${{ "%.2f"|format(payment.amount) }}</span></div>
+            <div class="detail-row"><span class="label">Paid Toward</span><span class="value">{{ payment.related_loan or payment.related_policy or '--' }}</span></div>
+            <div class="detail-row"><span class="label">Method</span><span class="value">{{ payment.method|replace('_', ' ')|title }}</span></div>
+            <div class="detail-row"><span class="label">Date</span><span class="value">{{ payment.payment_date }}</span></div>
+            <div class="detail-row"><span class="label">Confirmation #</span><span class="value">{{ payment.confirmation_number }}</span></div>
+
+            {% if loan %}
+            <div class="balance-box">
+                <div class="amount">${{ "%.2f"|format(loan.current_balance) }}</div>
+                <div class="lbl">New Balance on {{ loan.loan_number }}{% if loan.status == 'paid_off' %} &mdash; Paid Off!{% endif %}</div>
+            </div>
+            <a href="{{ url_for('insurance-loans.loan_detail', loan_id=loan.id) }}" class="btn btn-secondary" style="display:block;margin-bottom:.3rem;">View Loan</a>
+            {% elif policy %}
+            <div class="balance-box">
+                <div class="amount">{{ policy.paid_through_date or policy.renewal_date or '--' }}</div>
+                <div class="lbl">Policy {{ policy.policy_number }} paid through</div>
+            </div>
+            <a href="{{ url_for('insurance-loans.policy_detail', policy_id=policy.id) }}" class="btn btn-secondary" style="display:block;margin-bottom:.3rem;">View Policy</a>
+            {% endif %}
+
+            <div class="actions">
+                <a href="{{ url_for('insurance-loans.payments_page') }}" class="btn btn-secondary">Payment History</a>
+                <a href="{{ url_for('insurance-loans.make_payment_page') }}" class="btn btn-primary">Make Another Payment</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">Cascadia Insurance &amp; Lending</div>
+</body>
+</html>

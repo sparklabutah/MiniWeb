@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteCanvas</title>
+    <style>
+        :root {
+            --amber: #f59e0b;
+            --amber-dark: #d97706;
+            --amber-light: #fef3c7;
+            --amber-50: #fffbeb;
+            --text-primary: #1c1917;
+            --text-secondary: #57534e;
+            --text-muted: #a8a29e;
+            --bg-page: #fafaf9;
+            --bg-card: #ffffff;
+            --bg-sidebar: #ffffff;
+            --border: #e7e5e4;
+            --border-light: #f5f5f4;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,.07);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,.1);
+            --radius: .5rem;
+            --radius-lg: .75rem;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-page); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; line-height: 1.5; }
+        a { color: var(--amber-dark); text-decoration: none; }
+        a:hover { color: var(--amber); }
+
+        /* ---- Top bar ---- */
+        .top-bar {
+            background: var(--bg-card);
+            padding: .6rem 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 200;
+            backdrop-filter: blur(12px);
+        }
+        .logo { font-size: 1.25rem; font-weight: 800; color: var(--text-primary); letter-spacing: -.02em; display: flex; align-items: center; gap: .5rem; }
+        .logo .logo-icon { width: 26px; height: 26px; background: var(--amber); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .logo .logo-icon svg { width: 16px; height: 16px; fill: #fff; }
+        .nav-links { display: flex; gap: .6rem; align-items: center; }
+        .nav-links a { color: var(--text-secondary); font-size: .85rem; font-weight: 500; padding: .35rem .65rem; border-radius: var(--radius); transition: background .15s; }
+        .nav-links a:hover { background: var(--border-light); color: var(--text-primary); }
+        .btn-new { background: var(--amber) !important; color: #fff !important; font-weight: 600 !important; padding: .4rem .9rem !important; border-radius: var(--radius) !important; transition: background .15s !important; }
+        .btn-new:hover { background: var(--amber-dark) !important; }
+        .user-badge { font-size: .8rem; color: var(--text-muted); font-weight: 500; }
+
+        /* ---- Layout: sidebar + main ---- */
+        .layout { display: flex; min-height: calc(100vh - 49px); }
+
+        .sidebar {
+            width: 260px; min-width: 260px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            padding: 1rem 0;
+            overflow-y: auto;
+            display: flex; flex-direction: column;
+        }
+        .sidebar-section { padding: 0 .75rem; margin-bottom: 1.2rem; }
+        .sidebar-title { font-size: .7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .5rem; padding: 0 .5rem; }
+
+        .sidebar .search-box { position: relative; margin-bottom: .25rem; }
+        .sidebar .search-box input {
+            width: 100%; padding: .5rem .7rem .5rem 2rem;
+            border: 1px solid var(--border); border-radius: var(--radius);
+            background: var(--bg-page); font-size: .85rem; color: var(--text-primary);
+            transition: border-color .15s;
+        }
+        .sidebar .search-box input:focus { border-color: var(--amber); outline: none; }
+        .sidebar .search-box .search-icon {
+            position: absolute; left: .6rem; top: 50%; transform: translateY(-50%);
+            width: 14px; height: 14px; color: var(--text-muted);
+        }
+
+        .note-list { flex: 1; overflow-y: auto; }
+        .note-list-item {
+            display: block; padding: .55rem .75rem;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer; transition: background .12s;
+            text-decoration: none; color: inherit;
+        }
+        .note-list-item:hover { background: var(--amber-50); }
+        .note-list-item.active { background: var(--amber-light); border-left: 3px solid var(--amber); }
+        .note-list-item .nli-title { font-size: .85rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: .35rem; }
+        .note-list-item .nli-title .pin-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+        .note-list-item .nli-preview { font-size: .75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .1rem; }
+        .note-list-item .nli-date { font-size: .65rem; color: var(--text-muted); margin-top: .15rem; }
+
+        .tag-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .tag-chip {
+            display: inline-block; padding: .15rem .5rem;
+            background: var(--border-light); border-radius: 99px;
+            font-size: .72rem; color: var(--text-secondary);
+            cursor: pointer; transition: all .12s; text-decoration: none;
+            border: 1px solid transparent;
+        }
+        .tag-chip:hover { background: var(--amber-light); color: var(--amber-dark); border-color: var(--amber); }
+        .tag-chip.active { background: var(--amber); color: #fff; }
+        .tag-chip .tag-count { font-size: .65rem; opacity: .7; margin-left: .2rem; }
+
+        /* ---- Main content area ---- */
+        .main-content { flex: 1; padding: 1.5rem 2rem; overflow-y: auto; }
+
+        .main-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: .75rem; }
+        .main-header h1 { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); letter-spacing: -.02em; }
+
+        .sort-controls { display: flex; gap: .3rem; align-items: center; }
+        .sort-controls .sort-label { font-size: .75rem; color: var(--text-muted); margin-right: .3rem; }
+        .sort-btn { padding: .3rem .6rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); font-size: .78rem; color: var(--text-secondary); cursor: pointer; transition: all .12s; text-decoration: none; }
+        .sort-btn:hover { border-color: var(--amber); color: var(--amber-dark); }
+        .sort-btn.active { background: var(--amber); color: #fff; border-color: var(--amber); }
+
+        /* ---- Notes grid ---- */
+        .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+
+        .note-card {
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.15rem;
+            min-height: 150px;
+            display: flex; flex-direction: column;
+            border: 1px solid var(--border);
+            transition: box-shadow .2s, transform .12s;
+            cursor: pointer; position: relative;
+            background: var(--bg-card);
+        }
+        .note-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+        .note-card .card-color-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+
+        .note-card .pin-badge {
+            position: absolute; top: .6rem; right: .6rem;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: var(--amber); display: flex; align-items: center; justify-content: center;
+        }
+        .note-card .pin-badge svg { width: 11px; height: 11px; fill: #fff; }
+
+        .note-card .card-title { font-size: .92rem; font-weight: 700; color: var(--text-primary); margin-bottom: .3rem; margin-top: .35rem; line-height: 1.3; }
+        .note-card .card-title a { color: inherit; }
+
+        .note-card .card-preview {
+            font-size: .8rem; color: var(--text-secondary); flex: 1;
+            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical; white-space: pre-line; line-height: 1.5;
+        }
+
+        .note-card .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: .6rem; }
+        .note-card .card-tags { display: flex; gap: .25rem; flex-wrap: wrap; }
+        .note-card .card-tags span { background: var(--border-light); padding: .1rem .35rem; border-radius: 99px; font-size: .65rem; color: var(--text-muted); }
+        .note-card .card-date { font-size: .7rem; color: var(--text-muted); white-space: nowrap; }
+
+        .note-card .card-drawing-indicator {
+            position: absolute; bottom: .6rem; right: .6rem;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(245, 158, 11, .12); display: flex; align-items: center; justify-content: center;
+        }
+        .note-card .card-drawing-indicator svg { width: 12px; height: 12px; fill: var(--amber); }
+        .note-card .card-drawing-thumb { margin: .5rem 0 .2rem; border: 1px solid var(--border-light); border-radius: .4rem; overflow: hidden; background: #fff; }
+        .note-card .card-drawing-thumb img { display: block; width: 100%; max-height: 130px; object-fit: contain; }
+
+        /* ---- Section dividers ---- */
+        .section-label { font-size: .72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .6rem; margin-top: .5rem; display: flex; align-items: center; gap: .5rem; }
+        .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+        /* ---- Empty state ---- */
+        .empty-state { text-align: center; padding: 4rem 1rem; }
+        .empty-state .empty-icon { width: 64px; height: 64px; margin: 0 auto 1rem; background: var(--amber-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .empty-state .empty-icon svg { width: 32px; height: 32px; fill: var(--amber); }
+        .empty-state p { font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem; }
+        .empty-state .btn-create { display: inline-block; background: var(--amber); color: #fff; padding: .55rem 1.4rem; border-radius: var(--radius); font-weight: 600; font-size: .9rem; transition: background .15s; }
+        .empty-state .btn-create:hover { background: var(--amber-dark); }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { padding: 1rem; }
+            .notes-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .notes-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ---- Upload image widget ---- */
+        .upload-widget { margin-top: .5rem; }
+        .upload-dropzone {
+            display: flex; flex-direction: column; align-items: center; gap: .3rem;
+            padding: .7rem .5rem;
+            border: 1.5px dashed var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-page);
+            cursor: pointer; text-align: center;
+            transition: border-color .15s, background .15s;
+        }
+        .upload-dropzone:hover, .upload-dropzone.dragover { border-color: var(--amber); background: var(--amber-50); }
+        .upload-dropzone svg { width: 20px; height: 20px; color: var(--text-muted); }
+        .upload-dropzone .up-label { font-size: .75rem; font-weight: 600; color: var(--text-secondary); }
+        .upload-dropzone .up-hint { font-size: .65rem; color: var(--text-muted); }
+        .upload-widget input[type=file] { display: none; }
+        .upload-filename {
+            font-size: .72rem; color: var(--text-primary); font-weight: 500;
+            margin-top: .35rem; word-break: break-all; display: none;
+        }
+        .upload-preview { display: none; margin-top: .4rem; }
+        .upload-preview img {
+            max-width: 100%; max-height: 120px; border-radius: var(--radius);
+            border: 1px solid var(--border); display: block;
+        }
+        .upload-msg {
+            font-size: .7rem; margin-top: .35rem; display: none;
+            padding: .35rem .5rem; border-radius: var(--radius);
+        }
+        .upload-msg.error { display: block; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
+        .btn-upload {
+            width: 100%; margin-top: .4rem; padding: .4rem;
+            font-size: .8rem; font-weight: 600;
+            background: var(--amber); color: #fff;
+            border: none; border-radius: var(--radius);
+            cursor: pointer; transition: background .15s;
+        }
+        .btn-upload:hover:not(:disabled) { background: var(--amber-dark); }
+        .btn-upload:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('handwritten-notes-whiteboards.index') }}" class="logo">
+            <span class="logo-icon">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </span>
+            NoteCanvas
+        </a>
+        <div class="nav-links">
+            <a href="{{ url_for('handwritten-notes-whiteboards.whiteboards_page') }}">Whiteboards</a>
+            {% if user %}
+            <a href="{{ url_for('handwritten-notes-whiteboards.note_new_page') }}" class="btn-new">+ New Note</a>
+            <span class="user-badge">{{ user.display_name }}</span>
+            <a href="{{ url_for('handwritten-notes-whiteboards.logout') }}">Sign Out</a>
+            {% else %}
+            <a href="{{ url_for('handwritten-notes-whiteboards.login_page') }}" class="btn-new">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <form method="get" action="{{ url_for('handwritten-notes-whiteboards.index') }}">
+                    <div class="search-box">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" name="q" placeholder="Search notes..." value="{{ q }}" autocomplete="off">
+                        {% if tag_filter %}<input type="hidden" name="tag" value="{{ tag_filter }}">{% endif %}
+                        {% if sort_by != 'recent' %}<input type="hidden" name="sort" value="{{ sort_by }}">{% endif %}
+                    </div>
+                </form>
+            </div>
+
+            {% if user %}
+            <div class="sidebar-section" style="padding: 0 .75rem .5rem;">
+                <a href="{{ url_for('handwritten-notes-whiteboards.note_new_page') }}" class="btn-new" style="display:block;text-align:center;padding:.5rem;font-size:.85rem;">+ New Note</a>
+                <form method="POST" enctype="multipart/form-data" action="{{ url_for('handwritten-notes-whiteboards.form_upload_image') }}" class="upload-widget" id="upload-form">
+                    <label class="upload-dropzone" id="upload-dropzone" for="upload-file-input">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+                        <span class="up-label">Choose an image</span>
+                        <span class="up-hint">or drag &amp; drop &middot; PNG, JPG</span>
+                    </label>
+                    <input type="file" name="file" id="upload-file-input" accept="image/*">
+                    <div class="upload-filename" id="upload-filename"></div>
+                    <div class="upload-preview" id="upload-preview"><img id="upload-preview-img" alt="Preview"></div>
+                    <div class="upload-msg {{ 'error' if upload_error }}" id="upload-msg">
+                        {% if upload_error == '2' %}That file is not an image. Please choose a PNG or JPG.
+                        {% elif upload_error %}Please choose an image file before uploading.
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn-upload" id="upload-btn" disabled>Upload Image</button>
+                </form>
+                <script>
+                (function () {
+                    var form = document.getElementById('upload-form');
+                    if (!form) return;
+                    var input = document.getElementById('upload-file-input');
+                    var dropzone = document.getElementById('upload-dropzone');
+                    var btn = document.getElementById('upload-btn');
+                    var nameEl = document.getElementById('upload-filename');
+                    var previewEl = document.getElementById('upload-preview');
+                    var previewImg = document.getElementById('upload-preview-img');
+                    var msgEl = document.getElementById('upload-msg');
+
+                    function showError(text) {
+                        msgEl.textContent = text;
+                        msgEl.classList.add('error');
+                    }
+                    function clearError() {
+                        msgEl.textContent = '';
+                        msgEl.classList.remove('error');
+                    }
+
+                    function update() {
+                        var file = input.files && input.files[0];
+                        if (file) {
+                            clearError();
+                            nameEl.textContent = file.name;
+                            nameEl.style.display = 'block';
+                            btn.disabled = false;
+                            if (file.type && file.type.indexOf('image/') === 0) {
+                                var reader = new FileReader();
+                                reader.onload = function (e) {
+                                    previewImg.src = e.target.result;
+                                    previewEl.style.display = 'block';
+                                };
+                                reader.readAsDataURL(file);
+                            } else {
+                                previewEl.style.display = 'none';
+                            }
+                        } else {
+                            nameEl.style.display = 'none';
+                            previewEl.style.display = 'none';
+                            btn.disabled = true;
+                        }
+                    }
+
+                    input.addEventListener('change', update);
+
+                    // Drag & drop support
+                    ['dragover', 'dragenter'].forEach(function (evt) {
+                        dropzone.addEventListener(evt, function (e) {
+                            e.preventDefault();
+                            dropzone.classList.add('dragover');
+                        });
+                    });
+                    ['dragleave', 'drop'].forEach(function (evt) {
+                        dropzone.addEventListener(evt, function (e) {
+                            e.preventDefault();
+                            dropzone.classList.remove('dragover');
+                        });
+                    });
+                    dropzone.addEventListener('drop', function (e) {
+                        if (e.dataTransfer && e.dataTransfer.files.length) {
+                            input.files = e.dataTransfer.files;
+                            update();
+                        }
+                    });
+
+                    // Block submit if no file is selected.
+                    form.addEventListener('submit', function (e) {
+                        if (!input.files || !input.files.length) {
+                            e.preventDefault();
+                            btn.disabled = true;
+                            showError('Please choose an image file before uploading.');
+                        }
+                    });
+
+                    update();
+                })();
+                </script>
+            </div>
+            {% endif %}
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">All Notes</div>
+                <div class="note-list">
+                    {% for note in pinned_notes %}
+                    <a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}" class="note-list-item">
+                        <div class="nli-title"><span class="pin-dot"></span> {{ note.title }}</div>
+                        <div class="nli-preview">{{ note.content[:60] }}</div>
+                        <div class="nli-date">{{ note.updated_at[:10] }}</div>
+                    </a>
+                    {% endfor %}
+                    {% for note in notes %}
+                    <a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}" class="note-list-item">
+                        <div class="nli-title">{{ note.title }}</div>
+                        <div class="nli-preview">{{ note.content[:60] }}</div>
+                        <div class="nli-date">{{ note.updated_at[:10] }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if tags %}
+            <div class="sidebar-section">
+                <div class="sidebar-title">Tags</div>
+                <div class="tag-list">
+                    {% if tag_filter %}
+                    <a href="{{ url_for('handwritten-notes-whiteboards.index', q=q, sort=sort_by) }}" class="tag-chip active">{{ tag_filter }} &times;</a>
+                    {% endif %}
+                    {% for tag_name, tag_count in tags %}
+                    {% if tag_name != tag_filter %}
+                    <a href="{{ url_for('handwritten-notes-whiteboards.index', tag=tag_name, q=q, sort=sort_by) }}" class="tag-chip">{{ tag_name }}<span class="tag-count">{{ tag_count }}</span></a>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <div class="main-header">
+                <h1>
+                    {% if q %}Search: "{{ q }}"
+                    {% elif tag_filter %}Tag: {{ tag_filter }}
+                    {% else %}All Notes
+                    {% endif %}
+                </h1>
+                <div class="sort-controls">
+                    <span class="sort-label">Sort:</span>
+                    <a href="{{ url_for('handwritten-notes-whiteboards.index', sort='recent', q=q, tag=tag_filter) }}" class="sort-btn {{ 'active' if sort_by == 'recent' }}">Recent</a>
+                    <a href="{{ url_for('handwritten-notes-whiteboards.index', sort='title', q=q, tag=tag_filter) }}" class="sort-btn {{ 'active' if sort_by == 'title' }}">Title</a>
+                    <a href="{{ url_for('handwritten-notes-whiteboards.index', sort='created', q=q, tag=tag_filter) }}" class="sort-btn {{ 'active' if sort_by == 'created' }}">Created</a>
+                </div>
+            </div>
+
+            {% if pinned_notes %}
+            <div class="section-label">Pinned</div>
+            <div class="notes-grid" style="margin-bottom: 1.5rem;">
+                {% for note in pinned_notes %}
+                <div class="note-card" onclick="location.href='{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}'">
+                    <div class="card-color-bar" style="background: {{ note.color }};"></div>
+                    <div class="pin-badge">
+                        <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                    </div>
+                    <div class="card-title"><a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}">{{ note.title }}</a></div>
+                    <div class="card-preview">{{ note.content[:180] }}</div>
+                    {% if note.image %}
+                    <div class="card-drawing-thumb"><img src="{{ note.image }}" alt="{{ note.title }} image" loading="lazy"></div>
+                    {% endif %}
+                    {% if note.drawing_data %}
+                    <div class="card-drawing-thumb"><img src="{{ note.drawing_data }}" alt="Saved drawing" loading="lazy"></div>
+                    {% endif %}
+                    <div class="card-footer">
+                        <div class="card-tags">
+                            {% for t in note.tags[:3] %}
+                            <span>{{ t }}</span>
+                            {% endfor %}
+                        </div>
+                        <span class="card-date">{{ note.updated_at[:10] }}</span>
+                    </div>
+                    {% if note.drawing_data %}
+                    <div class="card-drawing-indicator" title="This note has a drawing">
+                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if notes %}
+            {% if pinned_notes %}
+            <div class="section-label">Notes</div>
+            {% endif %}
+            <div class="notes-grid">
+                {% for note in notes %}
+                <div class="note-card" onclick="location.href='{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}'">
+                    <div class="card-color-bar" style="background: {{ note.color }};"></div>
+                    <div class="card-title"><a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}">{{ note.title }}</a></div>
+                    <div class="card-preview">{{ note.content[:180] }}</div>
+                    {% if note.image %}
+                    <div class="card-drawing-thumb"><img src="{{ note.image }}" alt="{{ note.title }} image" loading="lazy"></div>
+                    {% endif %}
+                    {% if note.drawing_data %}
+                    <div class="card-drawing-thumb"><img src="{{ note.drawing_data }}" alt="Saved drawing" loading="lazy"></div>
+                    {% endif %}
+                    <div class="card-footer">
+                        <div class="card-tags">
+                            {% for t in note.tags[:3] %}
+                            <span>{{ t }}</span>
+                            {% endfor %}
+                        </div>
+                        <span class="card-date">{{ note.updated_at[:10] }}</span>
+                    </div>
+                    {% if note.drawing_data %}
+                    <div class="card-drawing-indicator" title="This note has a drawing">
+                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not notes and not pinned_notes %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </div>
+                {% if q %}
+                <p>No notes matching "{{ q }}"</p>
+                <a href="{{ url_for('handwritten-notes-whiteboards.index') }}" class="btn-create">Clear Search</a>
+                {% elif tag_filter %}
+                <p>No notes tagged "{{ tag_filter }}"</p>
+                <a href="{{ url_for('handwritten-notes-whiteboards.index') }}" class="btn-create">View All Notes</a>
+                {% else %}
+                <p>No notes yet. Create your first note to get started.</p>
+                {% if user %}
+                <a href="{{ url_for('handwritten-notes-whiteboards.note_new_page') }}" class="btn-create">+ New Note</a>
+                {% else %}
+                <a href="{{ url_for('handwritten-notes-whiteboards.login_page') }}" class="btn-create">Sign In to Create Notes</a>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

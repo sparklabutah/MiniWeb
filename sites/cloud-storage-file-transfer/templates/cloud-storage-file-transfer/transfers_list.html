@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfers - MeridianCloud</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', 'Segoe UI', Roboto, -apple-system, sans-serif; background: #f8f9fa; color: #202124; font-size: 14px; }
+        a { text-decoration: none; color: inherit; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #1a73e8; }
+        .header-right { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: #5f6368; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.8rem; font-weight: 600; }
+        .content { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem; }
+        h1 { font-size: 1.4rem; font-weight: 500; }
+        .btn { padding: 0.5rem 1.2rem; border: none; border-radius: 20px; cursor: pointer; font-size: 0.88rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #dadce0; border-radius: 12px; overflow: hidden; }
+        th { text-align: left; padding: 0.7rem 1rem; font-size: 0.78rem; color: #5f6368; font-weight: 500; border-bottom: 1px solid #e0e0e0; }
+        td { padding: 0.7rem 1rem; font-size: 0.85rem; border-bottom: 1px solid #f1f3f4; color: #3c4043; }
+        tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #f8f9fa; }
+        .recipient { font-weight: 500; color: #202124; }
+        .files-sub { color: #80868b; font-size: 0.78rem; }
+        .status-badge { font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 10px; font-weight: 500; }
+        .status-badge.active { background: #e8f5e9; color: #2e7d32; }
+        .status-badge.completed { background: #e3f2fd; color: #1565c0; }
+        .status-badge.expired { background: #fce4ec; color: #c62828; }
+        .link-cell a { color: #1a73e8; font-weight: 500; }
+        .link-cell a:hover { text-decoration: underline; }
+        .empty { text-align: center; padding: 4rem 1rem; color: #5f6368; background: #fff; border: 1px solid #dadce0; border-radius: 12px; }
+        .empty .big { font-size: 3rem; opacity: 0.4; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="logo">&#9729; MeridianCloud</a>
+        <div class="header-right">
+            {% if user %}
+            <span>{{ user.name }}</span>
+            <div class="avatar" style="background:{{ user.avatar_color }};">{{ user.name[0] }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="topbar">
+            <h1>&#9993; My transfers</h1>
+            <a href="{{ url_for('cloud-storage-file-transfer.transfers_new') }}" class="btn btn-primary">+ Send files</a>
+        </div>
+
+        {% if rows %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Files</th>
+                    <th>Recipient</th>
+                    <th>Sent</th>
+                    <th>Expires</th>
+                    <th>Downloads</th>
+                    <th>Status</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <div class="recipient">{{ row.primary_name }}</div>
+                        {% if row.file_count > 1 %}<div class="files-sub">+{{ row.file_count - 1 }} more file{{ 's' if row.file_count - 1 != 1 else '' }}</div>{% endif %}
+                    </td>
+                    <td>{{ row.transfer.recipient_email }}</td>
+                    <td>{{ row.transfer.created_at[:10] }}</td>
+                    <td>{{ row.transfer.expires_at[:10] }}</td>
+                    <td>{{ row.transfer.download_count }}</td>
+                    <td><span class="status-badge {{ row.transfer.status }}">{{ row.transfer.status }}</span></td>
+                    <td class="link-cell">
+                        {% if row.share_path %}
+                        <a href="{{ row.share_path }}">Open link &#8599;</a>
+                        {% else %}
+                        <span style="color:#bdc1c6;">&mdash;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">
+            <div class="big">&#9993;</div>
+            <h3 style="margin:0.6rem 0;font-weight:500;color:#202124;">No transfers yet</h3>
+            <p>Use <b>Send files</b> to share files with anyone via a download link.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

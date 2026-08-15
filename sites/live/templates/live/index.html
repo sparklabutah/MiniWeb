@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseLive — Browse</title>
+    <link rel="stylesheet" href="/static/twitch.css">
+    <style>
+        /* hero animated equalizer bars behind the poster */
+        .hero-eq { position: absolute; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; opacity: .18; z-index: 1; }
+        .hero-eq span { flex: 1; background: #9147ff; border-radius: 2px 2px 0 0; animation: eq 1.8s ease-in-out infinite; }
+        @keyframes eq { 0%,100%{ height: 10%; } 50%{ height: 80%; } }
+
+        /* The featured hero puts the player (aspect-ratio 16:9) and the chat in
+           a flex row. The chat has no fixed height, so as messages piled up it
+           grew the row and — via align-items:stretch — stretched the video
+           player taller and taller. Keep the player at its own 16:9 height
+           (flex-start) and give the chat a bounded height so it scrolls
+           internally instead. Desktop only; the mobile layout (<=860px) stacks
+           the columns and sets its own chat height. */
+        @media (min-width: 861px) {
+            .tw-hero { align-items: flex-start; }
+            .tw-hero-chat { height: min(56vh, 480px); }
+        }
+        .tw-hero-chat .tw-chat-msgs { min-height: 0; }
+    </style>
+</head>
+<body>
+    {% set active_nav = 'browse' %}
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <main class="tw-main">
+            <div class="tw-content">
+
+                {% if featured_stream %}
+                <section class="tw-hero">
+                    <div class="tw-hero-player" style="background: {{ featured_stream.thumb_css }};">
+                        <div class="hero-eq">
+                            {% for i in range(48) %}<span style="animation-delay: {{ (i * 0.06)|round(2) }}s;"></span>{% endfor %}
+                        </div>
+                        <span class="live-tag"><span class="dot"></span> LIVE</span>
+                        <div class="tw-hero-overlay">
+                            <div class="h-title">{{ featured_stream.title }}</div>
+                            <div class="h-row">
+                                <span class="tw-avatar" style="width:34px;height:34px;font-size:.85rem;background: {{ featured_streamer.avatar_color if featured_streamer else '#9147ff' }};">{{ featured_streamer.display_name[0]|upper if featured_streamer else '?' }}</span>
+                                <a class="h-chan" href="{{ url_for('live.channel_page', user_id=featured_stream.channel_id) }}">{{ featured_streamer.display_name if featured_streamer else 'Unknown' }}</a>
+                                <span class="h-view"><span class="tw-dot"></span> <span id="viewer-count">{{ featured_stream.average_viewers }}</span> watching</span>
+                                {% if featured_uptime is not none %}<span class="h-view" title="Stream uptime">&#9201; <span id="hero-uptime">0:00:00</span></span>{% endif %}
+                                <span class="tw-pill">{{ featured_stream.category }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tw-hero-chat tw-chat">
+                        <div class="tw-chat-head">Stream Chat <span class="live-badge">LIVE</span></div>
+                        <div class="tw-chat-msgs" id="chat-messages"></div>
+                        <div class="tw-chat-input">
+                            <div class="box">
+                                <input type="text" id="chat-input" placeholder="Send a message" autocomplete="off">
+                                <button class="tw-btn tw-btn-sm" id="chat-send" type="button">Chat</button>
+                            </div>
+                            <div class="bottom">
+                                <span class="hint">{% if logged_in %}Chatting as {{ user.display_name }}{% else %}<a href="{{ url_for('live.login_page') }}">Log in</a> to chat{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {% endif %}
+
+                {% if ad %}
+                <a class="tw-ad" href="/sites/{{ ad.site }}/">
+                    <div class="l"><span><span class="label">Ad</span><span class="brand">{{ ad.brand }}</span></span><span class="tag">{{ ad.tagline }}</span></div>
+                    <span class="tw-btn tw-btn-sm">Visit {{ ad.domain }} &rarr;</span>
+                </a>
+                {% endif %}
+
+                <div class="tw-page-head">
+                    <h1>Browse</h1>
+                </div>
+
+                {% set ad_format = 'banner' %}
+                {% set ads = product_ads(4, seed='live-ad2') %}
+                {% include "ads/_product_ads.html" %}
+
+                <div class="tw-tabs">
+                    <a href="{{ url_for('live.index') }}" class="{{ 'active' if not selected_status }}">All</a>
+                    <a href="{{ url_for('live.index', status='live') }}" class="{{ 'active' if selected_status == 'live' }}">Live channels</a>
+                    <a href="{{ url_for('live.index', status='completed') }}" class="{{ 'active' if selected_status == 'completed' }}">Past streams</a>
+                </div>
+
+                <form class="tw-filters" method="get" action="{{ url_for('live.index') }}" style="margin-bottom:1.3rem;">
+                    <div class="tw-fg">
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ q }}" placeholder="Search streams...">
+                    </div>
+                    <div class="tw-fg">
+                        <label>Category</label>
+                        <select name="category">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {{ 'selected' if selected_category == cat }}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="">All</option>
+                            <option value="live" {{ 'selected' if selected_status == 'live' }}>Live</option>
+                            <option value="completed" {{ 'selected' if selected_status == 'completed' }}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Streamer</label>
+                        <select name="streamer">
+                            <option value="">All Streamers</option>
+                            {% for s in streamers %}
+                            <option value="{{ s.id }}" {{ 'selected' if selected_streamer == s.id }}>{{ s.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="tw-fg">
+                        <label>Sort By</label>
+                        <select name="sort">
+                            <option value="default" {{ 'selected' if selected_sort == 'default' }}>Recommended</option>
+                            <option value="viewers" {{ 'selected' if selected_sort == 'viewers' }}>Most Viewed</option>
+                            <option value="newest" {{ 'selected' if selected_sort == 'newest' }}>Newest</option>
+                            <option value="oldest" {{ 'selected' if selected_sort == 'oldest' }}>Oldest</option>
+                            <option value="duration" {{ 'selected' if selected_sort == 'duration' }}>Longest</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="tw-btn">Filter</button>
+                    {% if selected_category or selected_status or selected_streamer or q %}
+                    <a href="{{ url_for('live.index') }}" class="tw-btn-2">Clear</a>
+                    {% endif %}
+                </form>
+
+                {% if streams %}
+                <div class="tw-grid">
+                    {% for stream in streams %}
+                    {% set streamer = user_map.get(stream.channel_id) %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.stream_detail', stream_id=stream.id) }}" style="background: {{ stream.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                {% if stream.status == 'live' %}
+                                <span class="tw-live-pill">Live</span>
+                                <span class="tw-viewers"><span class="tw-dot"></span> {{ fmt_count(stream.average_viewers) }}</span>
+                                {% else %}
+                                <span class="tw-vod-pill">VOD</span>
+                                <span class="tw-viewers">{{ fmt_count(stream.total_views) }} views</span>
+                                {% endif %}
+                                {% if stream.duration_minutes %}<span class="tw-dur">{{ stream.duration_minutes }}m</span>{% endif %}
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ streamer.avatar_color if streamer else '#9147ff' }};">{{ streamer.display_name[0]|upper if streamer else '?' }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.stream_detail', stream_id=stream.id) }}" title="{{ stream.title }}">{{ stream.title }}</a>
+                                <a class="tw-card-chan" href="{{ url_for('live.channel_page', user_id=stream.channel_id) }}">{{ streamer.display_name if streamer else 'Unknown' }}</a>
+                                <a class="tw-card-cat" href="{{ url_for('live.index', category=stream.category) }}">{{ stream.category }}</a>
+                                {% if stream.tags %}
+                                <div class="tw-pills">
+                                    {% for tag in stream.tags[:3] %}<span class="tw-pill">{{ tag }}</span>{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>No streams found matching your filters.</p></div>
+                {% endif %}
+
+                {% set ad_format = 'grid' %}
+                {% set ads = product_ads(4, seed='live-index') %}
+                {% include "ads/_product_ads.html" %}
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Login-required modal -->
+    <div class="tw-modal-bg" id="loginModal">
+        <div class="tw-modal">
+            <h3>Log in to chat</h3>
+            <p>You need to be logged in to send messages in Stream Chat.</p>
+            <div class="acts">
+                <button type="button" class="tw-btn-2" onclick="document.getElementById('loginModal').classList.remove('show')">Not now</button>
+                <a class="tw-btn" href="{{ url_for('live.login_page') }}">Log In</a>
+            </div>
+        </div>
+    </div>
+
+    {% if featured_stream %}
+    <script>
+    (function() {
+        var chatBox   = document.getElementById('chat-messages');
+        var viewerEl  = document.getElementById('viewer-count');
+        var chatInput = document.getElementById('chat-input');
+        var sendBtn   = document.getElementById('chat-send');
+        var streamId  = {{ featured_stream.id | tojson }};
+        var baseViewers = {{ featured_stream.average_viewers }};
+        var loggedIn  = {{ logged_in | tojson }};
+        var nextOffset = 0;
+        var batchSize  = 2;
+
+        function userColor(name) {
+            var h = 0;
+            for (var i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+            return 'hsl(' + (Math.abs(h) % 360) + ',70%,66%)';
+        }
+        function escapeHtml(t) { var d = document.createElement('div'); d.appendChild(document.createTextNode(t)); return d.innerHTML; }
+
+        function appendMsg(msg) {
+            var div = document.createElement('div');
+            div.className = 'tw-msg' + (msg.tip_amount ? ' cheer' : '');
+            var badges = '';
+            var bl = msg.badges;
+            if (typeof bl === 'string') { try { bl = JSON.parse(bl); } catch(e) { bl = []; } }
+            if (bl && bl.length) { for (var i = 0; i < bl.length; i++) { badges += '<span class="badge ' + bl[i] + '">' + bl[i].substring(0,3) + '</span>'; } }
+            div.innerHTML = badges +
+                '<span class="u" style="color:' + userColor(msg.username) + '">' + escapeHtml(msg.username) + '</span>: ' +
+                '<span class="t">' + escapeHtml(msg.message) + '</span>';
+            chatBox.appendChild(div);
+            while (chatBox.children.length > 80) chatBox.removeChild(chatBox.firstChild);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        /* Chat pace scales with viewer count: busier => faster + bigger bursts. */
+        function chatPace(viewers) {
+            var v = Math.max(1, viewers);
+            var perSec = Math.min(6, 0.25 + Math.sqrt(v) / 22);
+            var delay  = (1000 / perSec) * (0.4 + Math.random() * 1.9);
+            delay = Math.max(250, Math.min(6000, delay));
+            var batch = 1, r = Math.random();
+            if (v > 5000 && r > 0.45) batch = 3;
+            else if (v > 1000 && r > 0.55) batch = 2;
+            else if (v > 200 && r > 0.75) batch = 2;
+            return { delay: delay, batch: batch };
+        }
+
+        function fetchChat() {
+            var pace = chatPace(baseViewers);
+            batchSize = pace.batch;
+            var url = '{{ url_for("live.api_chat_live") }}';
+            {% if featured_chat_count > 0 %}
+            url += '?stream_id=' + encodeURIComponent(streamId) + '&offset=' + nextOffset + '&limit=' + batchSize;
+            {% else %}
+            url += '?offset=' + nextOffset + '&limit=' + batchSize;
+            {% endif %}
+            fetch(url).then(function(r){ return r.json(); }).then(function(data){
+                if (data.messages && data.messages.length) {
+                    for (var i = 0; i < data.messages.length; i++) appendMsg(data.messages[i]);
+                    nextOffset = data.next_offset;
+                }
+            }).catch(function(){}).finally(function(){ setTimeout(fetchChat, pace.delay); });
+        }
+
+        function tickViewers() {
+            var delta = Math.floor(Math.random() * 11) - 5;
+            baseViewers = Math.max(1, baseViewers + delta);
+            viewerEl.textContent = baseViewers.toLocaleString();
+            setTimeout(tickViewers, 2000 + Math.random() * 3000);
+        }
+
+        /* Live uptime clock for the featured stream (ticks up every second) */
+        var heroUptime = {{ featured_uptime | tojson }};
+        if (heroUptime !== null) {
+            var huEl = document.getElementById('hero-uptime');
+            function fmtUptime(s) { var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h + ':' + (m<10?'0':'') + m + ':' + (sec<10?'0':'') + sec; }
+            (function tickUptime() { if (huEl) huEl.textContent = fmtUptime(heroUptime); heroUptime++; setTimeout(tickUptime, 1000); })();
+        }
+
+        function trySend() {
+            var text = chatInput.value.trim();
+            if (!text) return;
+            if (!loggedIn) { document.getElementById('loginModal').classList.add('show'); return; }
+            chatInput.value = '';
+            fetch('{{ url_for("live.api_stream_chat_post", stream_id=featured_stream.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: text})
+            }).then(function(r){ return r.json(); }).then(function(msg){ if (msg.id) appendMsg(msg); }).catch(function(){});
+        }
+        if (sendBtn) sendBtn.addEventListener('click', trySend);
+        if (chatInput) chatInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); trySend(); } });
+
+        fetchChat();
+        tickViewers();
+    })();
+    </script>
+    {% endif %}
+</body>
+</html>

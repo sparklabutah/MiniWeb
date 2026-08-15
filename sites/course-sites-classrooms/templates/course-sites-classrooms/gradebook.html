@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gradebook - {{ course.code }} - EduPortal LMS</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1e293b; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; }
+        .header-nav a { color: #cbd5e1; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.5rem 3rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #3b82f6; text-decoration: none; }
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
+        .tab { padding: .6rem 1.2rem; font-size: .9rem; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab:hover { color: #1e293b; }
+        .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 500; }
+        .section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1rem; overflow-x: auto; }
+        .section h3 { font-size: 1rem; margin-bottom: .8rem; }
+        .weights { display: flex; gap: 1.5rem; margin-bottom: 1rem; font-size: .85rem; color: #64748b; }
+        .weights span { padding: .2rem .6rem; background: #f8fafc; border-radius: .2rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .8rem; min-width: 700px; }
+        th { text-align: left; padding: .5rem .6rem; background: #f8fafc; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        td { padding: .5rem .6rem; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        .grade-A { color: #16a34a; font-weight: 700; }
+        .grade-B { color: #3b82f6; font-weight: 600; }
+        .grade-C { color: #d97706; font-weight: 600; }
+        .grade-D { color: #ea580c; font-weight: 600; }
+        .grade-F { color: #dc2626; font-weight: 700; }
+        .score-cell { text-align: center; }
+        .score-good { color: #16a34a; }
+        .score-mid { color: #d97706; }
+        .score-low { color: #dc2626; }
+        .avg-col { font-weight: 600; background: #fafbfd; }
+        .export-link { font-size: .85rem; float: right; color: #3b82f6; text-decoration: none; }
+        .export-link:hover { text-decoration: underline; }
+        .cell-input { width: 3.4rem; padding: .25rem; text-align: center; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .8rem; color: #1e293b; background: #fff; }
+        .cell-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+        .name-input { width: 100%; padding: .25rem; border: 1px solid #e2e8f0; border-radius: .2rem; font-size: .8rem; }
+        .grade-actions { margin-top: 1rem; display: flex; gap: .6rem; }
+        .btn { padding: .45rem 1rem; font-size: .85rem; border: none; border-radius: .3rem; cursor: pointer; }
+        .btn-add { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }
+        .btn-add:hover { background: #e2e8f0; }
+        .btn-save { background: #3b82f6; color: #fff; }
+        .btn-save:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('course-sites-classrooms.index') }}" style="color:inherit;text-decoration:none">EduPortal LMS</a></h1>
+        <div class="header-nav">
+            {% if user %}
+            <span style="font-size:.85rem;color:#cbd5e1;">{{ user.name }}</span>
+            <a href="{{ url_for('course-sites-classrooms.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('course-sites-classrooms.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('course-sites-classrooms.index') }}">Courses</a> &raquo;
+            <a href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">{{ course.code }}</a> &raquo;
+            Gradebook
+        </div>
+
+        <div class="tabs">
+            <a class="tab" href="{{ url_for('course-sites-classrooms.course_detail', course_id=course.id) }}">Overview</a>
+            <a class="tab active" href="{{ url_for('course-sites-classrooms.gradebook', course_id=course.id) }}">Gradebook</a>
+            <a class="tab" href="{{ url_for('course-sites-classrooms.discussions_page', course_id=course.id) }}">Discussions</a>
+        </div>
+
+        <div class="section">
+            <h3>{{ course.code }} Gradebook
+                <a class="export-link" href="{{ url_for('course-sites-classrooms.api_export_gradebook', course_id=course.id) }}" >Export CSV</a>
+            </h3>
+            <div class="weights">
+                {% for cat, weight in course.grade_weights.items() %}
+                <span>{{ cat|capitalize }}: {{ (weight * 100)|int }}%</span>
+                {% endfor %}
+            </div>
+
+            {% if request.args.get('saved') is not none %}
+            <div style="background:#e8f5e9;border:1px solid #66bb6a;color:#1b5e20;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:.9rem;font-weight:600;">
+                &#10003; Changes saved{% if request.args.get('saved')|int > 0 %} &mdash; {{ request.args.get('saved') }} grade{{ 's' if request.args.get('saved')|int != 1 else '' }} updated{% endif %}.
+            </div>
+            {% endif %}
+            <form method="post" action="{{ url_for('course-sites-classrooms.form_save_gradebook', course_id=course.id) }}">
+            <table id="gradebook-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        {% for a in assignments %}
+                        <th class="score-cell" title="{{ a.title }} ({{ a.points_possible }} pts)">{{ a.title[:20] }}{% if a.title|length > 20 %}...{% endif %}<br><small>{{ a.category }} / {{ a.points_possible }}pts</small></th>
+                        {% endfor %}
+                        <th class="avg-col">Weighted Avg</th>
+                        <th class="avg-col">Grade</th>
+                    </tr>
+                </thead>
+                <tbody id="gradebook-body">
+                    {% for row in gradebook %}
+                    <tr>
+                        <td><strong>{{ row.student.name }}</strong></td>
+                        {% for a in assignments %}
+                        <td class="score-cell">
+                            {% set sub = row.scores.get(a.id) %}
+                            <input class="cell-input" type="number" step="any" min="0"
+                                   name="cell_{{ row.student.id }}_{{ a.id }}"
+                                   value="{{ sub.score if sub and sub.score is not none else '' }}"
+                                   placeholder="--" title="out of {{ a.points_possible }}">
+                        </td>
+                        {% endfor %}
+                        <td class="avg-col">{{ row.weighted_avg if row.weighted_avg is not none else '--' }}%</td>
+                        <td class="avg-col grade-{{ row.letter[0] if row.letter != 'N/A' else '' }}">{{ row.letter }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="grade-actions">
+                <button type="button" class="btn btn-add" id="add-row-btn">+ Add row</button>
+                <button type="submit" class="btn btn-save">Save Changes</button>
+            </div>
+            </form>
+        </div>
+
+        <script>
+            (function () {
+                var assignmentIds = [{% for a in assignments %}{{ a.id }}{% if not loop.last %}, {% endif %}{% endfor %}];
+                var newRowCount = 0;
+                var body = document.getElementById('gradebook-body');
+                var btn = document.getElementById('add-row-btn');
+                if (btn) {
+                    btn.addEventListener('click', function () {
+                        var n = newRowCount++;
+                        var tr = document.createElement('tr');
+                        var nameTd = document.createElement('td');
+                        var nameInput = document.createElement('input');
+                        nameInput.className = 'name-input';
+                        nameInput.name = 'newrow_' + n + '_name';
+                        nameInput.placeholder = 'New student name';
+                        nameTd.appendChild(nameInput);
+                        tr.appendChild(nameTd);
+                        assignmentIds.forEach(function (aid) {
+                            var td = document.createElement('td');
+                            td.className = 'score-cell';
+                            var input = document.createElement('input');
+                            input.className = 'cell-input';
+                            input.type = 'number';
+                            input.step = 'any';
+                            input.min = '0';
+                            input.name = 'newrow_' + n + '_cell_' + aid;
+                            input.placeholder = '--';
+                            td.appendChild(input);
+                            tr.appendChild(td);
+                        });
+                        tr.appendChild(document.createElement('td'));
+                        tr.appendChild(document.createElement('td'));
+                        body.appendChild(tr);
+                        nameInput.focus();
+                    });
+                }
+            })();
+        </script>
+    </div>
+</body>
+</html>

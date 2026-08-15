@@ -1,0 +1,30 @@
+{# Shared site header: brand + nav + search + user area.
+   Included by every content page so the search bar is consistent site-wide. #}
+<style>
+    .header .search-form { flex: 1; display: flex; }
+    .header .search-form input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; }
+    .header .search-form button { padding: 6px 12px; background: #e3701a; color: #fff; border: none; border-radius: 3px; cursor: pointer; margin-left: 4px; }
+    .header .user-area { color: #fff; font-size: 13px; margin-left: auto; white-space: nowrap; }
+    .header .user-area a { color: #fff; }
+</style>
+<div class="header">
+    <a href="{{ url_for('qa-knowledge.index') }}" class="logo">KnowledgeHub</a>
+    <nav>
+        <a href="{{ url_for('qa-knowledge.index') }}">Questions</a>
+        <a href="{{ url_for('qa-knowledge.tags_page') }}">Tags</a>
+        <a href="{{ url_for('qa-knowledge.users_page') }}">Users</a>
+    </nav>
+    <form class="search-form" action="{{ url_for('qa-knowledge.search_page') }}" method="get">
+        <input type="text" name="q" placeholder="Search questions..." value="{{ query|default('') }}">
+        <button type="submit">Search</button>
+    </form>
+    <div class="user-area">
+        {% if current_user %}
+            <a href="{{ url_for('qa-knowledge.dashboard') }}">{{ current_user.se_display_name }}</a> |
+            <a href="{{ url_for('qa-knowledge.logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('qa-knowledge.login_page') }}">Log in</a> |
+            <a href="{{ url_for('qa-knowledge.register_page') }}">Sign up</a>
+        {% endif %}
+    </div>
+</div>

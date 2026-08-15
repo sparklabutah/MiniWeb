@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ channel_user.display_name }} - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
+    <style>
+        .ch-banner { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; background: var(--surface); border-radius: .6rem; padding: 1.6rem 1.8rem; margin-bottom: 1.6rem; }
+        .ch-av { width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .ch-info { flex: 1; min-width: 200px; }
+        .ch-info h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: .3rem; }
+        .ch-info .bio { color: var(--text-alt); font-size: .88rem; margin-bottom: .6rem; }
+        .ch-stats { display: flex; gap: 1.5rem; font-size: .85rem; color: var(--text-dim); }
+        .ch-stats strong { color: var(--text); }
+        .ch-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .rewards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .reward { background: var(--surface); border-radius: .5rem; padding: 1rem 1.1rem; }
+        .reward h4 { font-size: .9rem; margin-bottom: .3rem; }
+        .reward .desc { font-size: .8rem; color: var(--text-alt); margin-bottom: .5rem; }
+        .reward .cost { font-size: .85rem; color: var(--purple-2); font-weight: 700; }
+        .sec-title { font-size: 1.15rem; font-weight: 800; margin: 1.6rem 0 1rem; }
+    </style>
+</head>
+<body>
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <main class="tw-main">
+            <div class="tw-content">
+                <div class="ch-banner">
+                    <div class="ch-av" style="background: {{ channel_user.avatar_color }};">{{ channel_user.display_name[0]|upper }}</div>
+                    <div class="ch-info">
+                        <h2>
+                            {{ channel_user.display_name }}
+                            {% if channel_user.is_partner %}<span style="color:var(--purple-2);font-size:.8rem;" title="Partner">&#10003;</span>
+                            {% elif channel_user.is_affiliate %}<span style="color:var(--text-alt);font-size:.8rem;" title="Affiliate">&#10003;</span>{% endif %}
+                        </h2>
+                        {% if channel_user.bio %}<p class="bio">{{ channel_user.bio }}</p>{% endif %}
+                        <div class="ch-stats">
+                            <span><strong>{{ fmt_count(follower_count) }}</strong> followers</span>
+                            <span><strong>{{ fmt_count(sub_count) }}</strong> subscribers</span>
+                            <span><strong>{{ "{:,}".format(channel_user.total_views) }}</strong> total views</span>
+                        </div>
+                    </div>
+                    <div class="ch-actions">
+                        {% if logged_in and user.id != channel_user.id %}
+                        <button class="tw-btn" id="followBtn" onclick="toggleFollow()">
+                            <span>{{ '&#10003;'|safe if is_following else '&#9829;'|safe }}</span>
+                            <span id="followTxt">{{ 'Following' if is_following else 'Follow' }}</span>
+                        </button>
+                        <button class="{{ 'tw-btn-2' if is_subscribed else 'tw-btn' }}" id="subBtn" onclick="toggleSubscribe()"
+                                style="{{ 'background:var(--purple);' if not is_subscribed }}">
+                            {{ 'Subscribed' if is_subscribed else 'Subscribe' }}
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <h3 class="sec-title">Streams <span style="color:var(--text-dim);font-weight:500;font-size:.9rem;">({{ streams|length }})</span></h3>
+                {% if streams %}
+                <div class="tw-grid">
+                    {% for s in streams %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.stream_detail', stream_id=s.id) }}" style="background: {{ s.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                {% if s.status == 'live' %}<span class="tw-live-pill">Live</span><span class="tw-viewers"><span class="tw-dot"></span> {{ fmt_count(s.average_viewers) }}</span>
+                                {% else %}<span class="tw-vod-pill">VOD</span><span class="tw-viewers">{{ fmt_count(s.total_views) }} views</span>{% endif %}
+                                {% if s.duration_minutes %}<span class="tw-dur">{{ s.duration_minutes }}m</span>{% endif %}
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ channel_user.avatar_color }};">{{ channel_user.display_name[0]|upper }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.stream_detail', stream_id=s.id) }}" title="{{ s.title }}">{{ s.title }}</a>
+                                <a class="tw-card-cat" href="{{ url_for('live.index', category=s.category) }}">{{ s.category }}</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>No streams yet.</p></div>
+                {% endif %}
+
+                {% if clips %}
+                <h3 class="sec-title">Top Clips <span style="color:var(--text-dim);font-weight:500;font-size:.9rem;">({{ clips|length }})</span></h3>
+                <div class="tw-grid">
+                    {% for c in clips %}
+                    <div class="tw-card">
+                        <div class="tw-thumb-wrap">
+                            <a class="tw-thumb" href="{{ url_for('live.clip_detail', clip_id=c.id) }}" style="background: {{ c.thumb_css }};">
+                                <span class="play-glyph">&#9654;</span>
+                                <span class="tw-viewers">{{ fmt_count(c.views) }} views</span>
+                                <span class="tw-dur">{{ c.duration_seconds }}s</span>
+                            </a>
+                        </div>
+                        <div class="tw-card-body">
+                            <span class="tw-card-av" style="background: {{ channel_user.avatar_color }};">{{ channel_user.display_name[0]|upper }}</span>
+                            <div class="tw-card-info">
+                                <a class="tw-card-title" href="{{ url_for('live.clip_detail', clip_id=c.id) }}" title="{{ c.title }}">{{ c.title }}</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if channel_rewards %}
+                <h3 class="sec-title">Channel Point Rewards</h3>
+                <div class="rewards">
+                    {% for r in channel_rewards %}
+                    <div class="reward">
+                        <h4>{{ r.name }}</h4>
+                        <p class="desc">{{ r.description }}</p>
+                        <span class="cost">{{ "{:,}".format(r.cost) }} points</span>
+                        {% if logged_in %}
+                        <button class="tw-btn tw-btn-sm" style="margin-top:.7rem;display:block;" onclick="redeemReward({{ r.id | tojson }}, this)">Redeem</button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="redeemFeedback" style="font-size:.8rem;margin-top:.6rem;min-height:1em;"></div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    {% if logged_in %}
+    <script>
+        function redeemReward(rewardId, btn) {
+            fetch('{{ url_for("live.api_channel_redeem", user_id=channel_user.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reward_id: String(rewardId)})
+            }).then(r => r.json().then(d => ({ok: r.ok, data: d}))).then(res => {
+                const fb = document.getElementById('redeemFeedback');
+                if (res.ok) {
+                    btn.textContent = 'Redeemed!'; btn.disabled = true;
+                    fb.style.color = 'var(--purple-2)';
+                    var rd = res.data.redemption || {};
+                    fb.textContent = 'Redeemed "' + rd.reward_name + '" — balance: ' + rd.remaining_balance + ' points';
+                } else { fb.style.color = 'var(--red)'; fb.textContent = res.data.error || 'Could not redeem reward.'; }
+            });
+        }
+    </script>
+    {% endif %}
+    {% if logged_in and user.id != channel_user.id %}
+    <script>
+        function toggleFollow() {
+            fetch('{{ url_for("live.api_channel_follow", user_id=channel_user.id) }}', { method: 'POST', headers: {'Content-Type': 'application/json'} })
+                .then(r => r.json()).then(data => {
+                    const following = data.status === 'followed';
+                    document.getElementById('followTxt').textContent = following ? 'Following' : 'Follow';
+                    document.querySelector('#followBtn span:first-child').innerHTML = following ? '&#10003;' : '&#9829;';
+                });
+        }
+        function toggleSubscribe() {
+            fetch('{{ url_for("live.api_channel_subscribe", user_id=channel_user.id) }}', { method: 'POST', headers: {'Content-Type': 'application/json'} })
+                .then(r => r.json()).then(data => {
+                    const btn = document.getElementById('subBtn');
+                    if (data.status === 'subscribed') { btn.textContent = 'Subscribed'; btn.className = 'tw-btn-2'; btn.style.background = ''; }
+                    else { btn.textContent = 'Subscribe'; btn.className = 'tw-btn'; btn.style.background = 'var(--purple)'; }
+                });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>

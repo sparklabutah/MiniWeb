@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ route.name }} - CascadiaMaps</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202124; font-size: 14px; }
+
+        .app { display: flex; height: 100vh; flex-direction: column; }
+        .top-bar { background:#fff;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e8eaed;flex-shrink:0; }
+        .top-bar .brand { font-size:16px;font-weight:500;color:#5f6368;text-decoration:none; }
+        .top-bar .brand b { color:#4285f4; }
+        .top-bar .nav-link { font-size:12px;color:#5f6368;text-decoration:none;padding:4px 8px;border-radius:16px; }
+        .top-bar .nav-link:hover { background:#f1f3f4; }
+        .top-bar .spacer { flex:1; }
+
+        .content { flex: 1; overflow-y: auto; background: #f8f9fa; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px 16px; }
+
+        .breadcrumb { font-size: 12px; color: #5f6368; margin-bottom: 12px; }
+        .breadcrumb a { color: #1a73e8; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .route-card { background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+        .route-card h2 { font-size: 18px; margin-bottom: 8px; font-weight: 500; }
+        .route-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+        .route-meta div { font-size: 13px; }
+        .route-meta .label { color: #5f6368; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: .03em; }
+        .route-meta .value { font-weight: 500; }
+        .mode-badge { display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+        .mode-badge.cycling { background: #e8f5e9; color: #2d9249; }
+        .mode-badge.walking { background: #fff3e0; color: #e65100; }
+        .mode-badge.transit { background: #f3e5f5; color: #7b1fa2; }
+
+        .steps-card { background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 20px; }
+        .steps-card h3 { font-size: 14px; margin-bottom: 12px; font-weight: 500; }
+        .steps-list { list-style: none; }
+        .step { padding: 8px 0; border-bottom: 1px solid #f1f3f4; display: flex; gap: 12px; align-items: flex-start; }
+        .step:last-child { border-bottom: none; }
+        .step-num { width: 26px; height: 26px; border-radius: 50%; background: #4285f4; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .step-info { flex: 1; }
+        .step-info .instruction { font-size: 13px; margin-bottom: 2px; }
+        .step-info .detail { font-size: 12px; color: #5f6368; }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="top-bar">
+        <a href="{{ url_for('map-services.index') }}" class="brand"><b>Cascadia</b>Maps</a>
+        <a href="{{ url_for('map-services.directions') }}" class="nav-link">Directions</a>
+        <a href="{{ url_for('map-services.saved_places') }}" class="nav-link">Saved</a>
+        <span class="spacer"></span>
+        <a href="/" class="nav-link">MiniWeb</a>
+    </div>
+    <div class="content">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="{{ url_for('map-services.directions') }}">Directions</a> &rsaquo; {{ route.name }}
+            </div>
+            <div class="route-card">
+                <h2>{{ route.name }}</h2>
+                <div class="route-meta">
+                    <div>
+                        <div class="label">From</div>
+                        <div class="value">{{ route.origin }}</div>
+                    </div>
+                    <div>
+                        <div class="label">To</div>
+                        <div class="value">{{ route.destination }}</div>
+                    </div>
+                    <div>
+                        <div class="label">Distance</div>
+                        <div class="value">{{ route.distance_km }} km</div>
+                    </div>
+                    <div>
+                        <div class="label">Duration</div>
+                        <div class="value">{{ route.duration_minutes }} min</div>
+                    </div>
+                    <div>
+                        <div class="label">Mode</div>
+                        <div><span class="mode-badge {{ route.mode }}">{{ route.mode }}</span></div>
+                    </div>
+                </div>
+            </div>
+            {% if route.steps %}
+            <div class="steps-card">
+                <h3>Turn-by-Turn Directions</h3>
+                <ol class="steps-list">
+                    {% for step in route.steps %}
+                    <li class="step">
+                        <div class="step-num">{{ loop.index }}</div>
+                        <div class="step-info">
+                            <div class="instruction">{{ step.instruction }}</div>
+                            <div class="detail">{{ step.distance_km }} km &middot; {{ step.duration_minutes }} min</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

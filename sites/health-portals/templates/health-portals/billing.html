@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'billing' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <h2>Billing & Payments</h2>
+        <div class="total-due">Total Outstanding: <span>${{ "%.2f"|format(total_due) }}</span></div>
+        <form class="export-bar" id="billing-export-form" action="{{ url_for('health-portals.api_export') }}" method="get">
+            <input type="hidden" name="data_type" value="billing">
+            <label for="export-format">Export billing records:</label>
+            <select id="export-format" name="format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit">Export</button>
+        </form>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Provider</th>
+                    <th>Billed</th>
+                    <th>Your Cost</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bills %}
+                <tr>
+                    <td>{{ b.date_of_service }}</td>
+                    <td>{{ b.description }}</td>
+                    <td>{{ b.provider_name }}</td>
+                    <td>${{ "%.2f"|format(b.billed_amount or 0) }}</td>
+                    <td>${{ "%.2f"|format(b.patient_responsibility or b.patient_copay or 0) }}</td>
+                    <td><span class="badge badge-{{ b.payment_status }}">{{ b.payment_status | replace('_', ' ') }}</span></td>
+                    <td>
+                        {% if b.payment_status == 'pending' %}
+                        <a href="{{ url_for('health-portals.pay_bill_page', bill_id=b.id) }}" class="pay-link">Pay Now</a>
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

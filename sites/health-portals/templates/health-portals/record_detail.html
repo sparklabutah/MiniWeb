@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record Details - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'records' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('health-portals.records_page') }}">Records</a> &rsaquo; Record #{{ record.id }}
+        </div>
+
+        <div class="card">
+            <h2>{{ record.record_type|replace('_', ' ')|title }}
+                <span class="badge">{{ record.record_type|replace('_', ' ')|title }}</span>
+            </h2>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="label">Date</div>
+                    <div class="value">{{ record.date }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Provider</div>
+                    <div class="value">{{ record.provider_name }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Patient</div>
+                    <div class="value">{{ record.patient_name }}</div>
+                </div>
+                {% if record.diagnosis %}
+                <div class="detail-item">
+                    <div class="label">Diagnosis</div>
+                    <div class="value">{{ record.diagnosis }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Summary</h3>
+            <div class="summary-text">{{ record.summary }}</div>
+        </div>
+
+        {% if record.vitals and record.vitals|length > 0 %}
+        <div class="card">
+            <h3>Vitals</h3>
+            <div class="vitals-grid">
+                {% if record.vitals.blood_pressure_systolic %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.blood_pressure_systolic }}/{{ record.vitals.blood_pressure_diastolic }}</div>
+                    <div class="vital-label">Blood Pressure (mmHg)</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.heart_rate_bpm %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.heart_rate_bpm }}</div>
+                    <div class="vital-label">Heart Rate (bpm)</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.temperature_f %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.temperature_f }}</div>
+                    <div class="vital-label">Temperature (F)</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.oxygen_saturation_pct %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.oxygen_saturation_pct }}%</div>
+                    <div class="vital-label">O2 Saturation</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.weight_lbs %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.weight_lbs }}</div>
+                    <div class="vital-label">Weight (lbs)</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.height_in %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.height_in }}"</div>
+                    <div class="vital-label">Height (in)</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.bmi %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.bmi }}</div>
+                    <div class="vital-label">BMI</div>
+                </div>
+                {% endif %}
+                {% if record.vitals.respiratory_rate %}
+                <div class="vital-item">
+                    <div class="vital-value">{{ record.vitals.respiratory_rate }}</div>
+                    <div class="vital-label">Resp. Rate</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if record.lab_results and record.lab_results|length > 0 %}
+        <div class="card">
+            <h3>Lab Results</h3>
+            <table class="lab-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Result</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lab in record.lab_results %}
+                    <tr>
+                        <td>{{ lab.test }}</td>
+                        <td>
+                            {% if 'normal' in lab.result|lower %}
+                                <span class="lab-result-normal">{{ lab.result }}</span>
+                            {% elif 'elevated' in lab.result|lower %}
+                                <span class="lab-result-elevated">{{ lab.result }}</span>
+                            {% else %}
+                                {{ lab.result }}
+                            {% endif %}
+                        </td>
+                        <td style="font-size: .8rem; color: #64748b;">{{ lab.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if record.pt_assessment %}
+        <div class="card">
+            <h3>Physical Therapy Assessment</h3>
+            <div class="pt-section">
+                {% if record.pt_assessment.pain_scale %}
+                <div class="pt-item"><div class="pt-label">Pain Scale:</div><div class="pt-value">{{ record.pt_assessment.pain_scale }}</div></div>
+                {% endif %}
+                {% if record.pt_assessment.range_of_motion %}
+                <div class="pt-item"><div class="pt-label">Range of Motion:</div><div class="pt-value">{{ record.pt_assessment.range_of_motion }}</div></div>
+                {% endif %}
+                {% if record.pt_assessment.strength %}
+                <div class="pt-item"><div class="pt-label">Strength:</div><div class="pt-value">{{ record.pt_assessment.strength }}</div></div>
+                {% endif %}
+                {% if record.pt_assessment.special_tests %}
+                <div class="pt-item"><div class="pt-label">Special Tests:</div><div class="pt-value">{{ record.pt_assessment.special_tests }}</div></div>
+                {% endif %}
+                {% if record.pt_assessment.gait %}
+                <div class="pt-item"><div class="pt-label">Gait:</div><div class="pt-value">{{ record.pt_assessment.gait }}</div></div>
+                {% endif %}
+                {% if record.pt_assessment.functional_progress %}
+                <div class="pt-item"><div class="pt-label">Progress:</div><div class="pt-value">{{ record.pt_assessment.functional_progress }}</div></div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if record.treatment_plan %}
+        <div class="card">
+            <h3>Treatment Plan</h3>
+            <div class="summary-text">{{ record.treatment_plan }}</div>
+        </div>
+        {% endif %}
+
+        {% if record.vaccination_record and record.vaccination_record|length > 0 %}
+        <div class="card">
+            <h3>Vaccination Record</h3>
+            {% for vax in record.vaccination_record %}
+            <div class="vacc-card">
+                <div class="vacc-name">{{ vax.vaccine }}</div>
+                <div class="vacc-meta">
+                    Date: {{ vax.date_administered }}
+                    {% if vax.site %} | Site: {{ vax.site }}{% endif %}
+                    {% if vax.lot_number %} | Lot: {{ vax.lot_number }}{% endif %}
+                    {% if vax.next_due %} | Next Due: {{ vax.next_due }}{% endif %}
+                </div>
+                {% if vax.notes %}<div class="vacc-meta" style="margin-top: .2rem;">{{ vax.notes }}</div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if record.referral_details %}
+        <div class="card">
+            <h3>Referral Details</h3>
+            <div class="referral-box">
+                <div class="ref-item"><strong>Referred To:</strong> {{ record.referral_details.referred_to }}</div>
+                <div class="ref-item"><strong>Department:</strong> {{ record.referral_details.department }}</div>
+                <div class="ref-item"><strong>Reason:</strong> {{ record.referral_details.reason }}</div>
+                <div class="ref-item"><strong>Urgency:</strong> {{ record.referral_details.urgency|capitalize }}</div>
+                <div class="ref-item"><strong>Authorization:</strong> {{ record.referral_details.authorization_number }}</div>
+                <div class="ref-item"><strong>Sessions Authorized:</strong> {{ record.referral_details.sessions_authorized }}</div>
+                <div class="ref-item"><strong>Valid Through:</strong> {{ record.referral_details.valid_through }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if record.follow_up %}
+        <div class="card">
+            <h3>Follow-up</h3>
+            <div class="summary-text">{{ record.follow_up }}</div>
+        </div>
+        {% endif %}
+
+        <a href="{{ url_for('health-portals.records_page') }}" class="back-link">&larr; Back to Records</a>
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saved Places - CascadiaMaps</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202124; font-size: 14px; }
+
+        .app { display: flex; height: 100vh; flex-direction: column; }
+        .top-bar { background:#fff;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e8eaed;flex-shrink:0; }
+        .top-bar .brand { font-size:16px;font-weight:500;color:#5f6368;text-decoration:none; }
+        .top-bar .brand b { color:#4285f4; }
+        .top-bar .nav-link { font-size:12px;color:#5f6368;text-decoration:none;padding:4px 8px;border-radius:16px; }
+        .top-bar .nav-link:hover { background:#f1f3f4; }
+        .top-bar .spacer { flex:1; }
+
+        .content { flex: 1; overflow-y: auto; background: #f8f9fa; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px 16px; }
+
+        h2 { font-size: 16px; margin-bottom: 12px; font-weight: 500; }
+        .place-list { list-style: none; display: grid; gap: 6px; }
+        .place-card { background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow .15s; }
+        .place-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+        .place-icon { width: 40px; height: 40px; border-radius: 50%; background: #e8f0fe; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #1967d2; font-weight: 700; flex-shrink: 0; }
+        .place-info { flex: 1; }
+        .place-info h3 { font-size: 14px; margin-bottom: 2px; font-weight: 500; }
+        .place-info p { font-size: 12px; color: #5f6368; }
+        .place-label { display: inline-block; background: #e8f0fe; color: #1967d2; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: capitalize; }
+        .empty { text-align: center; padding: 40px 16px; color: #5f6368; font-size: 13px; }
+        .empty a { color: #1a73e8; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="top-bar">
+        <a href="{{ url_for('map-services.index') }}" class="brand"><b>Cascadia</b>Maps</a>
+        <a href="{{ url_for('map-services.directions') }}" class="nav-link">Directions</a>
+        <a href="{{ url_for('map-services.saved_places') }}" class="nav-link" style="color:#1967d2;font-weight:500;">Saved</a>
+        <a href="{{ url_for('map-services.settings_page') }}" class="nav-link">Settings</a>
+        <span class="spacer"></span>
+        <a href="/" class="nav-link">MiniWeb</a>
+    </div>
+    <div class="content">
+        <div class="container">
+            <h2>Your Saved Places ({{ places|length }})</h2>
+            {% if places %}
+            <ul class="place-list" id="saved-places-list">
+                {% for p in places %}
+                <li class="place-card" data-place-id="{{ p.id }}">
+                    <div class="place-icon">{{ p.icon[:1]|upper if p.icon else 'P' }}</div>
+                    <div class="place-info">
+                        <h3>{{ p.name }}</h3>
+                        <p>{{ p.address }}</p>
+                        <span class="place-label">{{ p.label }}</span>
+                        {% if p.visit_count %}<span style="font-size:11px;color:#5f6368;margin-left:6px;">{{ p.visit_count }} visits</span>{% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty">
+                {% if user %}
+                    <p>You have no saved places yet. Explore the map and save places you visit often.</p>
+                {% else %}
+                    <p><a href="{{ url_for('map-services.login_page') }}">Sign in</a> to see your saved places.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

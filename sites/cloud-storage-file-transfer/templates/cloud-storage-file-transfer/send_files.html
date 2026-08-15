@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send files - MeridianCloud</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', 'Segoe UI', Roboto, -apple-system, sans-serif; background: #f8f9fa; color: #202124; font-size: 14px; }
+        a { text-decoration: none; color: inherit; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #1a73e8; }
+        .header-right { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: #5f6368; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.8rem; font-weight: 600; }
+        .content { max-width: 720px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        h1 { font-size: 1.4rem; font-weight: 500; margin-bottom: 0.3rem; }
+        .subtitle { color: #5f6368; margin-bottom: 1.2rem; }
+        .card { background: #fff; border: 1px solid #dadce0; border-radius: 12px; padding: 1.4rem; margin-bottom: 1.2rem; }
+        .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.8rem; }
+        label.field-label { display: block; font-size: 0.82rem; color: #5f6368; margin-bottom: 0.3rem; }
+        input[type=email], input[type=number], textarea { width: 100%; border: 1px solid #dadce0; border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.9rem; font-family: inherit; outline: none; }
+        input:focus, textarea:focus { border-color: #1a73e8; }
+        .field { margin-bottom: 1rem; }
+        .file-picker { max-height: 340px; overflow-y: auto; border: 1px solid #eceff1; border-radius: 8px; }
+        .file-row { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0.8rem; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+        .file-row:last-child { border-bottom: none; }
+        .file-row:hover { background: #f8f9fa; }
+        .file-row .fname { flex: 1; font-weight: 500; color: #3c4043; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-row .fmeta { color: #80868b; font-size: 0.78rem; white-space: nowrap; }
+        .btn { padding: 0.55rem 1.4rem; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-outline { background: #fff; border: 1px solid #dadce0; color: #5f6368; }
+        .actions { display: flex; align-items: center; gap: 0.7rem; }
+        .selcount { color: #5f6368; font-size: 0.85rem; }
+        .error { background: #fce8e6; color: #c5221f; border-radius: 8px; padding: 0.7rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; }
+        .two-col { display: flex; gap: 1rem; }
+        .two-col > div { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="logo">&#9729; MeridianCloud</a>
+        <div class="header-right">
+            {% if user %}
+            <span>{{ user.name }}</span>
+            <div class="avatar" style="background:{{ user.avatar_color }};">{{ user.name[0] }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>&#9993; Send files</h1>
+        <p class="subtitle">Pick files, add a recipient, and we'll generate a share link they can download from.</p>
+
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+        <form method="post" action="{{ url_for('cloud-storage-file-transfer.transfers_create_form') }}">
+            <div class="card">
+                <h3>1. Choose files <span class="selcount" id="selCount">(0 selected)</span></h3>
+                {% if files %}
+                <div class="file-picker">
+                    {% for file in files %}
+                    <label class="file-row">
+                        <input type="checkbox" class="tf-file" name="file_ids" value="{{ file.id }}"
+                               {% if preselect and preselect == file.id %}checked{% endif %}>
+                        <span class="fname" title="{{ file.name }}">{{ file.name }}</span>
+                        <span class="fmeta">{{ format_size(file.size_bytes) }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color:#80868b;">You have no files to send yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>2. Where to send it</h3>
+                <div class="field">
+                    <label class="field-label" for="recipient_email">Recipient email</label>
+                    <input type="email" id="recipient_email" name="recipient_email" placeholder="name@example.com" required>
+                </div>
+                <div class="two-col">
+                    <div class="field">
+                        <label class="field-label" for="message">Message (optional)</label>
+                        <textarea id="message" name="message" rows="2" placeholder="Here are the files you asked for."></textarea>
+                    </div>
+                    <div class="field" style="max-width:160px;">
+                        <label class="field-label" for="expires_days">Link expires (days)</label>
+                        <input type="number" id="expires_days" name="expires_days" value="7" min="1" max="90">
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Create transfer link</button>
+                <a href="{{ url_for('cloud-storage-file-transfer.index') }}" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        (function () {
+            var boxes = Array.prototype.slice.call(document.querySelectorAll('.tf-file'));
+            var countEl = document.getElementById('selCount');
+            function refresh() {
+                var n = boxes.filter(function (b) { return b.checked; }).length;
+                countEl.textContent = '(' + n + ' selected)';
+            }
+            boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+            refresh();
+        })();
+    </script>
+</body>
+</html>
