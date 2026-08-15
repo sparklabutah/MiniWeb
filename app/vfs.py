@@ -41,7 +41,8 @@ _MIME = {
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".gif": "image/gif", ".svg": "image/svg+xml", ".mp4": "video/mp4",
-    ".mp3": "audio/mpeg", ".zip": "application/zip",
+    ".webm": "video/webm", ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg", ".wav": "audio/wav", ".zip": "application/zip",
 }
 
 # Favorites sidebar order + icon keys (the client maps these to glyphs).
