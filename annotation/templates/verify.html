@@ -145,22 +145,15 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                     &#128465; Delete
                 </button>
             </div>
-            <label>Original instruction</label>
-            <div style="font-size:.85rem;line-height:1.4;margin-bottom:.4rem">{{ task.instruction }}</div>
-
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
-                <label style="margin:0">Instruction (refined, natural, realistic) <span style="font-weight:400;text-transform:none;color:#94a3b8">— same task, phrased like a real request</span></label>
-                <button onclick="generateAmbiguous()" id="ambig-btn"
-                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
-                    Suggest with AI
-                </button>
-                <span id="ambig-status" style="font-size:.65rem;color:#94a3b8"></span>
+                <label style="margin:0">Instruction <span style="font-weight:400;text-transform:none;color:#94a3b8">— edit inline; saves automatically</span></label>
+                <span id="instr-status" style="font-size:.65rem;color:#94a3b8"></span>
             </div>
-            <textarea id="instruction-ambiguous" rows="4"
-                style="width:100%;font-size:.85rem;padding:.4rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;margin-bottom:.5rem;font-family:inherit"
-                placeholder="Rephrase the instruction as a natural request..."
-                onchange="saveAmbiguous('{{ task.task_id }}', '{{ task.annotator|default('anonymous') }}', this.value)"
-            >{{ task.instruction_ambiguous or '' }}</textarea>
+            <textarea id="instruction-original" rows="4"
+                style="width:100%;font-size:.85rem;line-height:1.4;padding:.4rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;margin-bottom:.5rem;font-family:inherit"
+                oninput="document.getElementById('instr-status').textContent=''"
+                onchange="saveInstruction('{{ task.task_id }}', '{{ task.annotator|default('anonymous') }}', this.value)"
+            >{{ task.instruction }}</textarea>
 
             <div style="display:flex;gap:1rem;flex-wrap:wrap">
                 <div>
@@ -646,40 +639,6 @@ function deleteTask() {
         .catch(e => alert('Delete failed: ' + e));
 }
 
-function generateAmbiguous() {
-    var original = {{ (task.instruction if task else "") | tojson }};
-    if (!original) return;
-    var btn = document.getElementById('ambig-btn');
-    var status = document.getElementById('ambig-status');
-    var textarea = document.getElementById('instruction-ambiguous');
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
-    status.textContent = '';
-    fetch('/annotate/api/make_ambiguous', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({instruction: original})
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        btn.disabled = false;
-        btn.textContent = 'Suggest with AI';
-        if (d.ambiguous) {
-            textarea.value = d.ambiguous;
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
-            textarea.style.borderColor = '#86efac';
-            status.textContent = 'AI suggestion loaded — edit and save';
-            setTimeout(function() { textarea.style.borderColor = '#cbd5e1'; }, 2000);
-            // Auto-save
-            saveAmbiguous('{{ task.task_id if task else '' }}', '{{ task.annotator|default('anonymous') if task else '' }}', d.ambiguous);
-        } else {
-            status.textContent = d.error || 'Failed';
-        }
-    }).catch(function(e) {
-        btn.disabled = false;
-        btn.textContent = 'Suggest with AI';
-        status.textContent = 'Error: ' + e.message;
-    });
-}
 
 function suggestTags() {
     var taskId = {{ (task.task_id if task else "") | tojson }};
@@ -750,18 +709,19 @@ function applyTagSuggestion(macro, span) {
     });
 }
 
-function saveAmbiguous(taskId, annotator, value) {
+function saveInstruction(taskId, annotator, value) {
+    var el = document.getElementById('instruction-original');
+    var st = document.getElementById('instr-status');
     fetch('/annotate/api/update_task_field', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'instruction_ambiguous', value: value})
+        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'instruction', value: value})
     }).then(r => r.json()).then(d => {
         if (d.status === 'ok') {
-            var el = document.getElementById('instruction-ambiguous');
-            if (el) el.style.borderColor = '#86efac';
-            setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500);
-        }
-    });
+            if (el) { el.style.borderColor = '#86efac'; setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500); }
+            if (st) { st.textContent = '✓ saved'; st.style.color = '#16a34a'; setTimeout(function() { if (st) st.textContent = ''; }, 2000); }
+        } else if (st) { st.textContent = 'save failed'; st.style.color = '#dc2626'; }
+    }).catch(function() { if (st) { st.textContent = 'save failed'; st.style.color = '#dc2626'; } });
 }
 
 // ── Verification Walk ──────────────────────────────────────────────────────
