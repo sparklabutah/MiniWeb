@@ -840,6 +840,11 @@ def api_video_create():
         users = _users()
         channel_id = users[0]["id"] if users else 1
 
+    try:                                         # form values arrive as strings
+        duration = int(float(data.get("duration_seconds") or 0))
+    except (TypeError, ValueError):
+        duration = 0
+
     videos = _videos()
     new_video = {
         "id": _next_id(videos),
@@ -847,7 +852,7 @@ def api_video_create():
         "channel_id": channel_id,
         "user_id": data.get("user_id", channel_id),
         "description": data.get("description", ""),
-        "duration_seconds": data.get("duration_seconds", 0),
+        "duration_seconds": duration,
         "views": 0,
         "likes": 0,
         "dislikes": 0,

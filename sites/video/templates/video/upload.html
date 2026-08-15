@@ -165,6 +165,7 @@
             </div>
 
             <input type="hidden" id="video_url" name="video_url">
+            <input type="hidden" id="duration_seconds" name="duration_seconds">
 
             <div class="submit-section">
                 <a href="{{ url_for('video.index') }}" class="cancel-btn" style="background:transparent; color:#fff; border:1px solid #303030; padding:10px 24px; border-radius:20px; font-size:14px;">Cancel</a>
@@ -179,23 +180,41 @@
         var form = document.querySelector('.upload-form');
         var dropText = document.querySelector('.drop-text');
         var vurl = document.getElementById('video_url');
+        var dur = document.getElementById('duration_seconds');
+        var durReady = Promise.resolve();
         if (fi) fi.addEventListener('change', function () {
             if (!fi.files || !fi.files.length) return;
             var f = fi.files[0];
             if (dropText) dropText.textContent = '✓ ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB) ready to publish';
             if (vurl) vurl.value = 'uploaded://' + f.name;
+            // Read the real duration from the chosen clip so it isn't 0:00.
+            durReady = new Promise(function (resolve) {
+                try {
+                    var v = document.createElement('video');
+                    v.preload = 'metadata';
+                    v.onloadedmetadata = function () {
+                        if (dur && isFinite(v.duration) && v.duration > 0) dur.value = Math.max(1, Math.round(v.duration));
+                        URL.revokeObjectURL(v.src); resolve();
+                    };
+                    v.onerror = function () { resolve(); };
+                    v.src = URL.createObjectURL(f);
+                    setTimeout(resolve, 2000);   // don't hang the publish
+                } catch (e) { resolve(); }
+            });
         });
         if (form) form.addEventListener('submit', function (e) {
             e.preventDefault();
             var title = (document.getElementById('title') || {}).value || '';
             if (!title.trim()) { alert('Please add a title.'); return; }
-            // Send as multipart so the chosen video file rides along (real upload),
-            // then redirect to the new video like a real publish flow.
-            var fd = new FormData(form);
-            if (fi && fi.files && fi.files.length) fd.append('file', fi.files[0]);
             var btn = form.querySelector('.publish-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
-            fetch(form.getAttribute('action'), { method: 'POST', body: fd })
+            // Wait for the duration read so the published video isn't 0:00, then
+            // send as multipart so the chosen video file rides along.
+            durReady.then(function () {
+                var fd = new FormData(form);
+                if (fi && fi.files && fi.files.length) fd.append('file', fi.files[0]);
+                return fetch(form.getAttribute('action'), { method: 'POST', body: fd });
+            })
                 .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
                 .then(function (res) {
                     if (res.ok && res.d && res.d.id) {
