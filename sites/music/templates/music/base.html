@@ -79,8 +79,12 @@
             </div>
         </div>
         <div class="pb-right">
-            <span>&#128266;</span>
-            <div class="pb-vol"><div class="pb-fill"></div></div>
+            <button class="pb-mute" id="pb-mute" title="Mute" onclick="MusicPlayer.toggleMute()"
+                    style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;padding:0;line-height:1;">{{ ('&#128263;' if player_muted|default(false) else '&#128266;') | safe }}</button>
+            <div class="pb-vol" id="pb-vol" title="Volume"
+                 data-volume="{{ player_volume|default(70) }}" data-muted="{{ 'true' if player_muted|default(false) else 'false' }}">
+                <div class="pb-fill" id="pb-vol-fill" style="width: {{ 0 if player_muted|default(false) else player_volume|default(70) }}%"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -108,7 +112,28 @@ document.addEventListener('keydown', function(e){ if(e.key==='Enter' && document
 var MusicPlayer = (function () {
     var NOTE = '{{ note_svg | replace("\n","") }}';
     var playing = false, timer = null, pos = 0, dur = 210;
+    var volume = 70, muted = false;
+    var volEl = null, volFillEl = null, muteEl = null;
     function mmss(s){ s=Math.max(0,Math.floor(s)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+    function renderVolume(){
+        if(volFillEl) volFillEl.style.width = (muted ? 0 : volume) + '%';
+        if(muteEl) muteEl.innerHTML = (muted || volume === 0) ? '&#128263;' : '&#128266;';
+        var audio = document.getElementById('pb-audio');
+        if(audio) audio.volume = muted ? 0 : volume/100;
+    }
+    function persistVolume(){
+        fetch('{{ url_for("music.index") }}api/playback/volume', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({volume: volume, muted: muted})
+        }).catch(function(){});
+    }
+    function setVolume(pct, persist){
+        volume = Math.max(0, Math.min(100, Math.round(pct)));
+        if(volume > 0) muted = false;
+        renderVolume();
+        if(persist !== false) persistVolume();
+    }
+    function toggleMute(){ muted = !muted; renderVolume(); persistVolume(); }
     function tick(){ pos += 1; if(pos>dur){ pos=dur; stop(); } render(); }
     function render(){
         document.getElementById('pb-fill').style.width = (dur? (pos/dur*100):0)+'%';
@@ -134,14 +159,32 @@ var MusicPlayer = (function () {
         }).catch(function(){});
     }
     function toggle(){ if(!timer && pos===0) return; if(playing) stop(); else start(); }
-    // Seek by clicking the bar
+    // Seek by clicking the bar + wire volume slider/mute
     document.addEventListener('DOMContentLoaded', function(){
         var bar = document.getElementById('pb-bar');
         if(bar) bar.addEventListener('click', function(e){
             var r = bar.getBoundingClientRect(); pos = Math.round((e.clientX-r.left)/r.width*dur); render();
         });
+        volEl = document.getElementById('pb-vol');
+        volFillEl = document.getElementById('pb-vol-fill');
+        muteEl = document.getElementById('pb-mute');
+        if(volEl){
+            var v = parseInt(volEl.getAttribute('data-volume'), 10);
+            if(!isNaN(v)) volume = v;
+            muted = volEl.getAttribute('data-muted') === 'true';
+            renderVolume();
+            var dragging = false;
+            function volFromEvent(e){
+                var r = volEl.getBoundingClientRect();
+                var cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+                setVolume((cx - r.left) / r.width * 100);
+            }
+            volEl.addEventListener('mousedown', function(e){ dragging = true; volFromEvent(e); e.preventDefault(); });
+            document.addEventListener('mousemove', function(e){ if(dragging) volFromEvent(e); });
+            document.addEventListener('mouseup', function(){ dragging = false; });
+        }
     });
-    return { play: play, toggle: toggle };
+    return { play: play, toggle: toggle, setVolume: setVolume, toggleMute: toggleMute };
 })();
 </script>
 {% block scripts %}{% endblock %}

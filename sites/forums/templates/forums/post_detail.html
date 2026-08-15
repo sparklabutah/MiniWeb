@@ -281,14 +281,40 @@
                 body: JSON.stringify({body: body})
             }).then(() => location.reload());
         }
+        // In-page report modal — native prompt()/alert() are suppressed in the
+        // sandboxed portal iframe, so the old prompt-based flow silently no-oped.
         function showReport() {
-            const reason = prompt('Reason for report (spam, harassment, misinformation, other):');
-            if (!reason) return;
-            const desc = prompt('Additional details (optional):') || '';
-            fetch(`${BASE}api/report`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({target_type: 'post', target_id: POST_ID, reason: reason, description: desc})
-            }).then(r => r.json()).then(d => alert(d.id ? 'Report submitted' : d.error));
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;';
+            var box = document.createElement('div');
+            box.style.cssText = 'background:#fff;color:#1a1a1b;border-radius:10px;max-width:380px;width:90%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.3);font-family:inherit;';
+            box.innerHTML =
+                '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">Report post</div>' +
+                '<label style="font-size:13px;color:#555;">Reason</label>' +
+                '<select id="rep-reason" style="width:100%;padding:8px;margin:4px 0 12px;border:1px solid #ccc;border-radius:6px;">' +
+                '<option value="spam">Spam</option><option value="harassment">Harassment</option>' +
+                '<option value="misinformation">Misinformation</option><option value="other">Other</option></select>' +
+                '<label style="font-size:13px;color:#555;">Additional details (optional)</label>' +
+                '<textarea id="rep-desc" rows="3" style="width:100%;padding:8px;margin:4px 0 14px;border:1px solid #ccc;border-radius:6px;resize:vertical;font-family:inherit;"></textarea>' +
+                '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+                '<button data-act="cancel" style="padding:7px 16px;border:1px solid #ccc;background:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Cancel</button>' +
+                '<button data-act="ok" style="padding:7px 16px;border:none;background:#d93a00;color:#fff;border-radius:18px;font-weight:600;cursor:pointer;">Submit report</button>' +
+                '</div>';
+            ov.appendChild(box); document.body.appendChild(ov);
+            function close() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+            box.querySelector('[data-act="cancel"]').onclick = close;
+            ov.onclick = function (e) { if (e.target === ov) close(); };
+            box.querySelector('[data-act="ok"]').onclick = function () {
+                var reason = document.getElementById('rep-reason').value;
+                var desc = document.getElementById('rep-desc').value.trim();
+                fetch(`${BASE}api/report`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({target_type: 'post', target_id: POST_ID, reason: reason, description: desc})
+                }).then(r => r.json()).then(d => {
+                    close();
+                    uiConfirm(d.id ? 'Report submitted. Thanks for helping keep the community safe.' : (d.error || 'Could not submit report.'), 'OK');
+                }).catch(() => { close(); uiConfirm('Could not submit report.', 'OK'); });
+            };
         }
         function modRemove(isOn) {
             fetch(`${BASE}api/mod/posts/${POST_ID}/remove`, {

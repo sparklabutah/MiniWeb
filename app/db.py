@@ -592,7 +592,9 @@ def next_id(site: str, collection: str) -> int:
     base = 0
     if table:
         try:
-            base = conn.execute(f"SELECT MAX([{pk}]) FROM [{table}]").fetchone()[0] or 0
+            # CAST so a TEXT pk with non-numeric ids (e.g. 'user_5') yields 0 in SQLite
+            # instead of returning a string that then crashes int() below.
+            base = conn.execute(f"SELECT MAX(CAST([{pk}] AS INTEGER)) FROM [{table}]").fetchone()[0] or 0
         except sqlite3.OperationalError:
             base = 0
     over = conn.execute(

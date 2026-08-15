@@ -57,6 +57,13 @@
         .loc-search-bar { display: flex; gap: .6rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
         .loc-search-bar input[type="text"] { flex: 1; min-width: 220px; padding: .55rem .8rem; border: 1.5px solid #d1d5db; border-radius: .3rem; font-size: .9rem; }
         .loc-search-bar input[type="text"]:focus { border-color: #42a5f5; outline: none; box-shadow: 0 0 0 3px rgba(66,165,245,.15); }
+        .loc-search-wrap { position: relative; flex: 1; min-width: 220px; }
+        .loc-search-wrap input[type="text"] { width: 100%; }
+        .loc-suggest { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: .35rem; box-shadow: 0 8px 24px rgba(0,0,0,.13); max-height: 280px; overflow-y: auto; z-index: 60; }
+        .loc-suggest .item { padding: .5rem .85rem; cursor: pointer; font-size: .88rem; color: #1f2937; border-bottom: 1px solid #f1f5f9; }
+        .loc-suggest .item:last-child { border-bottom: none; }
+        .loc-suggest .item:hover, .loc-suggest .item.active { background: #e3f2fd; color: #1565c0; }
+        .loc-suggest .empty { padding: .55rem .85rem; color: #9ca3af; font-size: .85rem; }
         .btn-blue { background: #1565c0; color: #fff; border: none; padding: .55rem 1.2rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
         .btn-blue:hover { background: #0d47a1; }
         .loc-error { background: #fce4ec; color: #c62828; padding: .6rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
@@ -127,8 +134,12 @@
         </div>
         {% endif %}
 
-        <form class="loc-search-bar" method="get" action="{{ url_for('weather.index') }}">
-            <input type="text" name="location" placeholder="View weather for a location (e.g., Seattle, WA)" value="{{ request.args.get('location', '') }}">
+        <form class="loc-search-bar" method="get" action="{{ url_for('weather.index') }}" autocomplete="off">
+            <div class="loc-search-wrap">
+                <input type="text" id="loc-search-input" name="location" placeholder="Search a location (e.g., Seattle)" value="{{ request.args.get('location', '') }}"
+                       autocomplete="off" oninput="filterLocSuggest(this.value)" onfocus="filterLocSuggest(this.value)" onkeydown="locSuggestKey(event)">
+                <div id="loc-suggest" class="loc-suggest" style="display:none"></div>
+            </div>
             <button type="submit" class="btn-blue">Go</button>
         </form>
         {% if location_error %}
@@ -241,6 +252,49 @@
     </div>
 
     <script>
+        // --- Location search autocomplete ---
+        const WEATHER_LOCS = {{ all_locations | map(attribute='name') | list | tojson }};
+        let _locActive = -1;
+        function _locItems() { return Array.from(document.querySelectorAll('#loc-suggest .item')); }
+        function filterLocSuggest(q) {
+            const box = document.getElementById('loc-suggest');
+            if (!box) return;
+            _locActive = -1;
+            q = (q || '').trim().toLowerCase();
+            let matches = WEATHER_LOCS;
+            if (q) matches = WEATHER_LOCS.filter(n => n.toLowerCase().includes(q));
+            if (!matches.length) {
+                box.innerHTML = '<div class="empty">No matching location</div>';
+                box.style.display = 'block';
+                return;
+            }
+            box.innerHTML = matches.slice(0, 12).map(n =>
+                `<div class="item" data-name="${encodeURIComponent(n)}" onmousedown="pickLoc(this.getAttribute('data-name'))">${n}</div>`
+            ).join('');
+            box.style.display = 'block';
+        }
+        function pickLoc(encName) {
+            window.location.href = "{{ url_for('weather.index') }}?location=" + encName;
+        }
+        function locSuggestKey(e) {
+            const box = document.getElementById('loc-suggest');
+            if (!box || box.style.display === 'none') return;
+            const items = _locItems();
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); _locActive = (_locActive + 1) % items.length; }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); _locActive = (_locActive - 1 + items.length) % items.length; }
+            else if (e.key === 'Enter' && _locActive >= 0) { e.preventDefault(); pickLoc(items[_locActive].getAttribute('data-name')); return; }
+            else { return; }
+            items.forEach((it, i) => it.classList.toggle('active', i === _locActive));
+            if (items[_locActive]) items[_locActive].scrollIntoView({ block: 'nearest' });
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.loc-search-wrap')) {
+                const b = document.getElementById('loc-suggest');
+                if (b) b.style.display = 'none';
+            }
+        });
+
         function toggleUnits(metric) {
             fetch("{{ url_for('weather.api_current_units') }}?units=" + (metric ? "metric" : "imperial"))
                 .then(function(r) { return r.json(); })

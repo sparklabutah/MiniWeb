@@ -222,8 +222,45 @@ def _interpret_entry(raw, idx):
 
 _TABLE = "dictionaries_language_tools_entries"
 
+# Case-insensitive prefix index on the headword column. The table has 448k
+# entries and `word` is only a BINARY PRIMARY-KEY autoindex, so every search
+# used to fall back to a full table SCAN (made worse by wrapping the column in
+# LOWER(word), which defeats any index). This NOCASE index lets SQLite serve
+# both exact (`word = ? COLLATE NOCASE`) and prefix (`word LIKE 'q%'`) lookups
+# as index range SEARCHes instead of scanning all rows.
+_WORD_INDEX = "idx_dictionaries_language_tools_entries_word_nocase"
+_index_ready = False
+
+
+def _ensure_search_index():
+    """Idempotently create the headword search index (runs once per process)."""
+    global _index_ready
+    if _index_ready:
+        return
+    try:
+        db.execute(
+            f"CREATE INDEX IF NOT EXISTS [{_WORD_INDEX}] "
+            f"ON [{_TABLE}] (word COLLATE NOCASE)"
+        )
+    except Exception:
+        # Never let index maintenance break a request; queries still work
+        # (just slower) if the DDL fails for any reason.
+        pass
+    _index_ready = True
+
+
+def _like_prefix(q):
+    """Build a safe LIKE prefix pattern for `word LIKE ? ESCAPE '\\'`.
+
+    Escapes LIKE wildcards so a query containing % or _ is treated literally
+    and the pattern stays a true literal prefix (keeps the index range scan).
+    """
+    q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return q + "%"
+
 
 def _db_conn():
+    _ensure_search_index()
     return db.get_conn()
 
 def _db_search_words(query, pos=None, letter=None, limit=50, offset=0):
@@ -234,8 +271,10 @@ def _db_search_words(query, pos=None, letter=None, limit=50, offset=0):
     params = []
 
     if q:
-        clauses.append("LOWER(word) LIKE ?")
-        params.append(f"%{q}%")
+        # Indexed prefix match (uses idx..._word_nocase range scan), never a
+        # full-table `%q%` scan.
+        clauses.append("word LIKE ? ESCAPE '\\'")
+        params.append(_like_prefix(q))
     if pos:
         clauses.append("pos = ?")
         params.append(pos)
@@ -244,7 +283,10 @@ def _db_search_words(query, pos=None, letter=None, limit=50, offset=0):
         params.append(letter.upper())
 
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    sql = f"SELECT rowid, * FROM [{_TABLE}]{where} LIMIT ? OFFSET ?"
+    sql = (
+        f"SELECT rowid, * FROM [{_TABLE}]{where} "
+        f"ORDER BY word COLLATE NOCASE LIMIT ? OFFSET ?"
+    )
     params.extend([limit, offset])
 
     rows = conn.execute(sql, params).fetchall()
@@ -261,8 +303,11 @@ def _db_search_words_scored(query, limit=50, offset=0):
     results = []
     seen = set()
 
-    # 1. Exact match (score 100)
-    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) = ? LIMIT ?", (q, limit)).fetchall():
+    # 1. Exact match (score 100) -- indexed SEARCH via word NOCASE index.
+    for r in conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] WHERE word = ? COLLATE NOCASE LIMIT ?",
+        (q, limit),
+    ).fetchall():
         key = r["rowid"]
         if key not in seen:
             seen.add(key)
@@ -272,24 +317,18 @@ def _db_search_words_scored(query, limit=50, offset=0):
     if remaining <= 0:
         return [e for e, _ in results]
 
-    # 2. Prefix match (score 50)
-    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? AND LOWER(word) != ? LIMIT ?", (f"{q}%", q, remaining)).fetchall():
+    # 2. Prefix match (score 50) -- indexed range SEARCH (`word LIKE 'q%'`),
+    #    never a full-table `%q%` scan.
+    for r in conn.execute(
+        f"SELECT rowid, * FROM [{_TABLE}] "
+        f"WHERE word LIKE ? ESCAPE '\\' AND word <> ? COLLATE NOCASE "
+        f"ORDER BY word COLLATE NOCASE LIMIT ?",
+        (_like_prefix(q), q, remaining),
+    ).fetchall():
         key = r["rowid"]
         if key not in seen:
             seen.add(key)
             results.append((_interpret_entry(_deserialize_row(r), len(results) + 1), 50))
-
-    remaining = limit - len(results)
-    if remaining <= 0:
-        results.sort(key=lambda x: (-x[1], x[0]["word_lower"]))
-        return [e for e, _ in results]
-
-    # 3. Contains match (score 20)
-    for r in conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? AND LOWER(word) NOT LIKE ? LIMIT ?", (f"%{q}%", f"{q}%", remaining)).fetchall():
-        key = r["rowid"]
-        if key not in seen:
-            seen.add(key)
-            results.append((_interpret_entry(_deserialize_row(r), len(results) + 1), 20))
 
     results.sort(key=lambda x: (-x[1], x[0]["word_lower"]))
     return [e for e, _ in results]
@@ -301,8 +340,10 @@ def _db_count_search(query="", pos=None, letter=None):
     clauses = []
     params = []
     if query:
-        clauses.append("LOWER(word) LIKE ?")
-        params.append(f"%{query.lower().strip()}%")
+        # Prefix count served by the covering NOCASE index (was a full
+        # `%q%` scan on every search -- the main perf sink).
+        clauses.append("word LIKE ? ESCAPE '\\'")
+        params.append(_like_prefix(query.strip()))
     if pos:
         clauses.append("pos = ?")
         params.append(pos)
@@ -316,9 +357,9 @@ def _db_count_search(query="", pos=None, letter=None):
 def _db_get_word(word_text):
     """Look up entries for a word (case-insensitive)."""
     conn = _db_conn()
-    rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) = ?", (word_text.lower(),)).fetchall()
+    rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE word = ? COLLATE NOCASE", (word_text,)).fetchall()
     if not rows:
-        rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE LOWER(word) LIKE ? LIMIT 10", (f"{word_text.lower()}%",)).fetchall()
+        rows = conn.execute(f"SELECT rowid, * FROM [{_TABLE}] WHERE word LIKE ? ESCAPE '\\' ORDER BY word COLLATE NOCASE LIMIT 10", (_like_prefix(word_text),)).fetchall()
     return [_interpret_entry(_deserialize_row(r), i + 1) for i, r in enumerate(rows)]
 
 
@@ -457,11 +498,14 @@ def _db_compute_stats():
 def _db_check_word_exists(word_text):
     """Check if a word exists in DB."""
     conn = _db_conn()
+    # Indexed existence check. word_detail calls this once per linked
+    # synonym/related term, so an un-indexed LOWER(word) scan meant dozens of
+    # full-table scans per page.
     row = conn.execute(
-        f"SELECT COUNT(*) FROM [{_TABLE}] WHERE LOWER(word) = ?",
-        (word_text.lower(),),
+        f"SELECT 1 FROM [{_TABLE}] WHERE word = ? COLLATE NOCASE LIMIT 1",
+        (word_text,),
     ).fetchone()
-    return row[0] > 0
+    return row is not None
 
 
 

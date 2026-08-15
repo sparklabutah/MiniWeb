@@ -96,11 +96,38 @@ def _init_raw_data():
 # Data access helpers
 # ---------------------------------------------------------------------------
 
+# Collections with no base table in the built DB. They are written per-session via
+# save_collection (overlay), but db.query() returns [] for a collection with no
+# registered table — so reads never saw the writes. Register empty base tables on
+# first use (forums_messages convention) to give the overlay a home.
+_MUSIC_TABLELESS = {"playback": "music_playback", "subscriptions": "music_subscriptions",
+                    "shares": "music_shares"}
+_music_tables_ready = False
+
+
+def _ensure_music_tables():
+    global _music_tables_ready
+    if _music_tables_ready and db.get_table_name(SITE, "playback"):
+        return
+    conn = db._get_conn()
+    for coll, table in _MUSIC_TABLELESS.items():
+        conn.execute(
+            f"CREATE TABLE IF NOT EXISTS [{table}] (id TEXT PRIMARY KEY, user_id INTEGER, data TEXT)"
+        )
+        db.register_table(SITE, coll, table, "id")
+    conn.commit()
+    _music_tables_ready = True
+
+
 def _load(name):
+    if name in _MUSIC_TABLELESS:
+        _ensure_music_tables()
     return db.query(SITE, name)
 
 
 def _save(name, data):
+    if name in _MUSIC_TABLELESS:
+        _ensure_music_tables()
     db.save_collection(SITE, name, data)
 
 
@@ -377,9 +404,15 @@ def _inject_shell():
         uid = session.get("user_id")
         user = _get_user(uid) if uid else None
         pls = [p for p in _load_playlists() if p.get("user_id") == uid] if uid else []
-        return {"music_user": user, "sidebar_playlists": pls[:40]}
+        # Player volume/mute state so the playbar reflects it on every reload.
+        # Persisted on the (overlay-backed) user record, like other player state.
+        volume = user.get("player_volume", 70) if user else 70
+        muted = user.get("player_muted", False) if user else False
+        return {"music_user": user, "sidebar_playlists": pls[:40],
+                "player_volume": volume, "player_muted": muted}
     except Exception:
-        return {"music_user": None, "sidebar_playlists": []}
+        return {"music_user": None, "sidebar_playlists": [],
+                "player_volume": 70, "player_muted": False}
 
 
 @blueprint.route("/")
@@ -1329,6 +1362,56 @@ def api_playback_control():
         "status": state["status"],
         "current_index": state["current_index"],
         "now_playing": now_playing,
+    })
+
+
+@blueprint.route("/api/playback/volume", methods=["GET"])
+def api_playback_volume_get():
+    """Return the current player volume / mute level for the logged-in user."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"volume": 70, "muted": False})
+    user = _get_user(user_id) or {}
+    return jsonify({
+        "volume": user.get("player_volume", 70),
+        "muted": user.get("player_muted", False),
+    })
+
+
+@blueprint.route("/api/playback/volume", methods=["POST"])
+def api_playback_volume():
+    """Persist the player's volume / mute level so it survives reload.
+
+    Volume/mute are stored on the (overlay-backed) user record — the same
+    per-user player state other preferences live on — so the level the user
+    picked is remembered regardless of what is (or isn't) playing.
+
+    Expects JSON: {volume: 0-100, muted: bool} (either field optional).
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Login required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    user = _get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user = dict(user)
+
+    if "volume" in data:
+        try:
+            vol = int(round(float(data["volume"])))
+        except (TypeError, ValueError):
+            return jsonify({"error": "volume must be a number 0-100"}), 400
+        user["player_volume"] = max(0, min(100, vol))
+    if "muted" in data:
+        user["player_muted"] = bool(data["muted"])
+
+    db.save_item(SITE, "users", user_id, user)
+
+    return jsonify({
+        "volume": user.get("player_volume", 70),
+        "muted": user.get("player_muted", False),
     })
 
 
