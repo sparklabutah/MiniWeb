@@ -687,7 +687,7 @@ def form_share_conversation(conv_id):
                 shared_list.append(conv_id)
             _save_users(users)
 
-    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id))
+    return redirect(url_for("ai-chatbots.chat_page", conv_id=conv_id, shared=1))
 
 
 def _last_user_message(messages):
