@@ -58,7 +58,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="bubble-row {{ 'mine' if msg.sender_id == user.id else 'theirs' }}">
             <div class="bubble">
                 {{ msg.content }}
-                {% if msg.attachment %}<div style="margin-top:.3rem;font-size:.8rem;opacity:.85;">&#128206; {{ msg.attachment }}</div>{% endif %}
+                {% if msg.attachment_src %}
+                <div style="margin-top:.4rem;"><img src="{{ msg.attachment_src }}" alt="{{ msg.attachment or 'photo' }}" style="max-width:180px;border-radius:.7rem;display:block;"></div>
+                {% elif msg.attachment %}
+                <div style="margin-top:.3rem;font-size:.8rem;opacity:.85;">&#128206; {{ msg.attachment }}</div>
+                {% endif %}
                 <span class="time">{{ msg.timestamp }}</span>
             </div>
         </div>
@@ -71,13 +75,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div style="text-align:center; padding:.4rem 1.5rem; background:#f0ebff; font-size:.82rem; color:#555;">
         Need more features? <a href="/sites/instant-messaging/" style="color:#667eea; font-weight:600;">Continue conversation on Messenger &rarr;</a>
     </div>
-    <form class="compose" method="post" enctype="multipart/form-data" action="{{ url_for('dating.form_send_message', match_id=match.id) }}">
-        <label for="photo-upload" style="cursor:pointer;font-size:1.2rem;padding:0.4rem;" title="Attach photo">📎</label>
-        <input type="file" id="photo-upload" name="file" accept="image/*" style="display:none;"
-               onchange="document.getElementById('attach-name').textContent = this.files.length ? this.files[0].name : ''">
+    <form class="compose" id="compose-form" method="post" enctype="multipart/form-data" action="{{ url_for('dating.form_send_message', match_id=match.id) }}">
+        <label for="photo-upload" style="cursor:pointer;font-size:1.2rem;padding:0.4rem;" title="Attach a photo">📎</label>
+        <input type="file" id="photo-upload" name="file" accept="image/*" style="display:none;">
+        {% set my_photo = (user.photos[0] if user.photos else user.photo_url) %}
+        {% if my_photo %}
+        <button type="button" id="send-my-photo" style="padding:.4rem .7rem;border-radius:2rem;background:#f0ebff;color:#667eea;border:1px solid #d7cbf5;cursor:pointer;font-size:.78rem;font-weight:600;white-space:nowrap;" title="Send your profile picture">📸 My photo</button>
+        {% endif %}
+        <input type="hidden" name="attachment_src" id="attachment_src">
+        <input type="hidden" name="attachment_name" id="attachment_name">
         <span id="attach-name" style="font-size:.75rem;color:#667eea;align-self:center;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
         <input type="text" name="content" placeholder="Type a message..." autocomplete="off">
         <button type="submit">Send</button>
     </form>
+    <script>
+    (function () {
+      var MY_PHOTO = {{ my_photo | default('', true) | tojson }};
+      var srcInput = document.getElementById('attachment_src');
+      var nameInput = document.getElementById('attachment_name');
+      var label = document.getElementById('attach-name');
+      function setAttach(name, src) { nameInput.value = name || ''; srcInput.value = src || ''; label.textContent = name || ''; }
+      // Photo chosen through the simulated file explorer (sets the file input).
+      document.getElementById('photo-upload').addEventListener('change', function () {
+        if (!this.files || !this.files.length) return;
+        var f = this.files[0];
+        var reader = new FileReader();
+        reader.onload = function () { setAttach(f.name, reader.result); };
+        reader.readAsDataURL(f);
+      });
+      var btn = document.getElementById('send-my-photo');
+      if (btn) btn.addEventListener('click', function () {
+        setAttach('profile.jpg', MY_PHOTO);
+        label.textContent = 'profile.jpg';
+      });
+    })();
+    </script>
 </div>
 </body></html>

@@ -37,6 +37,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .report-form input { padding: 0.55rem 1rem; border: 1px solid #e8deff; border-radius: 2rem; font-size: 0.85rem; outline: none; color: #555; }
 .report-form button { padding: 0.55rem 1.5rem; border: none; border-radius: 2rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; background: #f1f1f1; color: #dc2626; }
 .reported-badge { display: inline-block; background: #fef2f2; color: #dc2626; padding: 0.4rem 1rem; border-radius: 1rem; font-weight: 600; font-size: 0.85rem; }
+/* Tinder-style photo gallery */
+.profile-header { min-height: 440px; }
+.gal-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0; transition: opacity .18s ease; }
+.gal-img.active { opacity: 1; }
+.gal-bars { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 3; display: flex; gap: 4px; }
+.gal-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.4); }
+.gal-bar.on { background: #fff; }
+.gal-tap { position: absolute; top: 0; bottom: 0; width: 45%; z-index: 2; cursor: pointer; }
+.gal-tap.left { left: 0; } .gal-tap.right { right: 0; }
+.gal-count { position: absolute; top: 20px; right: 14px; z-index: 3; background: rgba(0,0,0,.35); color: #fff; font-size: .72rem; padding: 2px 8px; border-radius: 1rem; }
 </style>
 </head>
 <body>
@@ -57,8 +67,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </nav>
 <div class="main">
 <div class="profile-card">
-<div class="profile-header">
-    {% if profile.photos %}<img src="{{ profile.photos[0] }}" alt="{{ profile.name }}">{% endif %}
+<div class="profile-header" id="gallery">
+    {% if profile.photos %}
+    <div class="gal-bars">
+        {% for p in profile.photos %}<div class="gal-bar {% if loop.first %}on{% endif %}"></div>{% endfor %}
+    </div>
+    {% for p in profile.photos %}
+    <img class="gal-img {% if loop.first %}active{% endif %}" src="{{ p }}" alt="{{ profile.name }} photo {{ loop.index }}">
+    {% endfor %}
+    {% if profile.photos|length > 1 %}
+    <span class="gal-count" id="gal-count">1 / {{ profile.photos|length }}</span>
+    <div class="gal-tap left" onclick="galMove(-1)"></div>
+    <div class="gal-tap right" onclick="galMove(1)"></div>
+    {% endif %}
+    {% endif %}
     <div class="overlay">
         <h2>{{ profile.name }}</h2>
         <div class="age">{{ profile.age }} -- {{ profile.location }}</div>
@@ -111,4 +133,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </div>
 </div>
 </div>
+<script>
+(function () {
+  var imgs = [].slice.call(document.querySelectorAll('#gallery .gal-img'));
+  var bars = [].slice.call(document.querySelectorAll('#gallery .gal-bar'));
+  var count = document.getElementById('gal-count');
+  var cur = 0;
+  window.galMove = function (d) {
+    if (imgs.length < 2) return;
+    imgs[cur].classList.remove('active'); if (bars[cur]) bars[cur].classList.remove('on');
+    cur = (cur + d + imgs.length) % imgs.length;
+    imgs[cur].classList.add('active'); if (bars[cur]) bars[cur].classList.add('on');
+    if (count) count.textContent = (cur + 1) + ' / ' + imgs.length;
+  };
+})();
+</script>
 </body></html>

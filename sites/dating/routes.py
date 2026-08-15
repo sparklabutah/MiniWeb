@@ -628,7 +628,12 @@ def form_send_message(match_id):
     content = request.form.get("content", "").strip()
     attachment = request.files.get("file")
     attachment_name = attachment.filename if attachment and attachment.filename else ""
-    if not content and not attachment_name:
+    # An image can also be sent via the simulated file explorer, which stashes a
+    # renderable data-URL / src in `attachment_src` (so it renders inline in chat).
+    attachment_src = request.form.get("attachment_src", "").strip()
+    if attachment_src and not attachment_name:
+        attachment_name = request.form.get("attachment_name", "").strip() or "photo.jpg"
+    if not content and not attachment_name and not attachment_src:
         return redirect(url_for("dating.conversation", match_id=match_id))
 
     other_id = match["user2_id"] if match["user1_id"] == user["id"] else match["user1_id"]
@@ -647,6 +652,8 @@ def form_send_message(match_id):
     }
     if attachment_name:
         msg["attachment"] = attachment_name
+    if attachment_src:
+        msg["attachment_src"] = attachment_src
     db.save_item(SITE, "messages", new_id, msg)
     _add_email(other_id, "noreply@dating.lakeport.local",
                "You have a new message",
@@ -707,6 +714,42 @@ def form_update_profile():
 
     db.save_item(SITE, "users", u["id"], u)
     return redirect(url_for("dating.edit_profile"))
+
+
+@blueprint.route("/update-photos", methods=["POST"])
+def form_update_photos():
+    """Persist the user's profile-photo gallery (Tinder-style: add / reorder /
+    remove). Body: JSON {photos: [src, ...]}. The first photo is the primary."""
+    user = _get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "not logged in"}), 401
+    u = _get_user(user["id"])
+    if not u:
+        return jsonify({"ok": False, "error": "no user"}), 404
+    body = request.get_json(silent=True) or {}
+    photos = body.get("photos")
+    if not isinstance(photos, list):
+        return jsonify({"ok": False, "error": "photos must be a list"}), 400
+    # Cap length + size so a runaway data-URL can't bloat the overlay.
+    clean = [str(p) for p in photos if isinstance(p, str) and p.strip()][:6]
+    u["photos"] = clean
+    if clean:
+        u["photo_url"] = clean[0]  # primary drives the avatar/cards
+    db.save_item(SITE, "users", u["id"], u)
+    return jsonify({"ok": True, "photos": clean, "count": len(clean)})
+
+
+@blueprint.route("/photo/<int:user_id>/<int:idx>.svg")
+def profile_photo(user_id, idx):
+    """Deterministic synthetic gallery photo (selfie / outdoors / hobby) for a
+    profile. Generated on the fly — see photos.py — so no image files are stored."""
+    from .photos import render_photo
+    u = _get_user(user_id)
+    svg = render_photo(user_id, idx, (u or {}).get("name", ""),
+                       (u or {}).get("interests"))
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
 # ---------------------------------------------------------------------------
