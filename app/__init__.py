@@ -663,6 +663,10 @@ def create_app():
 
     _register_recovery_routes(app)
 
+    # Universal simulated filesystem (Finder/Explorer-style) — /_fs/*
+    from app.vfs import register_fs_routes
+    register_fs_routes(app)
+
     @app.teardown_appcontext
     def _close_db(exc):
         db.close()
@@ -1160,7 +1164,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
 })()</script>"""
 
     _RECORDER_SCRIPT = b'<script src="/static/recorder.js"></script>'
-    _FILE_PICKER_SCRIPT = b'<script src="/static/file-picker.js"></script>'
+    _FILE_EXPLORER_SCRIPT = b'<script src="/static/file-explorer.js"></script>'
     _EXPORT_FEEDBACK_SCRIPT = b'<script src="/static/export-feedback.js"></script>'
     _SHARE_SCRIPT = b'<script src="/static/miniweb-share.js"></script>'
     # Shared video player — enhances any [data-mini-player] container across all sites.
@@ -1207,7 +1211,7 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
             parts = request.path.split("/", 3)  # ['', 'sites', '<id>', ...]
             site_id = parts[2] if len(parts) > 2 else ""
             logo_css = (_BRAND_FONTS_CSS + _logo_font_style(site_id)) if site_id else b""
-            inject = (_BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_PICKER_SCRIPT
+            inject = (_BROKEN_IMG_SCRIPT + b"\n" + _RECORDER_SCRIPT + b"\n" + _FILE_EXPLORER_SCRIPT
                       + b"\n" + _EXPORT_FEEDBACK_SCRIPT + b"\n" + _PLAYER_ASSETS
                       + b"\n" + _SHARE_SCRIPT + b"\n" + logo_css)
             idx = data.rfind(b"</body>")
