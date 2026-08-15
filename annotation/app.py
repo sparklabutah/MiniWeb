@@ -429,8 +429,10 @@ def _generate_prompt(sites, coverage, force_single=False):
     # --- 2. Pick chain length using ratio 3:2:3:2 for lengths 1:2:3:4 ---
     # Weight toward lengths the site still needs
     chain_counts = site_chain_counts.get(seed["id"], {})
-    # Target ratio: 3:2:3:2 = lengths 1,2,3,4
-    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2}
+    # Target ratio for lengths 1..6. Still favors shorter chains, but includes the
+    # longer 5- and 6-macro chains (weighted by scarcity: each length's target is
+    # divided by its current count below, so under-filled lengths get priority).
+    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2, 5: 1, 6: 1}
     chain_weights = []
     chain_options = []
     for length, target_w in target_ratio.items():
@@ -454,12 +456,19 @@ def _generate_prompt(sites, coverage, force_single=False):
         n_sites = 1
         n_macros = min(n_macros, 3)
     else:
-        n_sites = 1  # default, may expand for cross-site below
+        # Longer chains often span sites, so make them progressively more likely to
+        # be multi-site (single-site stays the majority). The longest chains may
+        # reach 3 sites; shorter ones cap at 2.
+        n_sites = 1
+        if n_macros >= 3:
+            p_cross = min(0.6, 0.2 + 0.08 * (n_macros - 3))  # 3→.20 … 6→.44
+            if rng.random() < p_cross:
+                n_sites = 2
+                if n_macros >= 5 and rng.random() < 0.35:
+                    n_sites = 3
 
-    if not force_single and n_macros >= 2 and rng.random() < 0.2:
-        # 20% chance of cross-site task when chain >= 2
-        n_sites = 2
-        # Expand along graph edges from seed
+    if not force_single and n_sites >= 2:
+        # Cross-site task — expand along graph edges from the seed to n_sites sites.
         candidates = []
 
         # Direct outgoing
@@ -678,8 +687,8 @@ def _generate_site_prompt(site, rng=None):
 
     uncovered = [m for m in all_macros if m not in covered]
 
-    # 1. Pick chain length: ratio 3:2:3:2 for lengths 1:2:3:4
-    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2}
+    # 1. Pick chain length: ratio for lengths 1..6 (favors shorter, includes 5/6)
+    target_ratio = {1: 3, 2: 2, 3: 3, 4: 2, 5: 1, 6: 1}
     chain_options = []
     chain_weights = []
     for length, target_w in target_ratio.items():
@@ -719,13 +728,12 @@ def _generate_site_prompt(site, rng=None):
             has_qa = True
         remaining = [m for m in remaining if m != pick]
 
-    # Compute how many tasks still needed per chain length
-    # Target ratio 3:2:3:2 — scale to cover all macros
+    # Compute how many tasks still needed per chain length (lengths 1..6)
     total_macros = len(all_macros)
-    # One "batch" = 3×1 + 2×2 + 3×3 + 2×4 = 24 macro slots in 10 tasks
     import math
     batches = max(1, math.ceil(total_macros / 24))
-    targets = {1: 3 * batches, 2: 2 * batches, 3: 3 * batches, 4: 2 * batches}
+    targets = {1: 3 * batches, 2: 2 * batches, 3: 3 * batches,
+               4: 2 * batches, 5: 1 * batches, 6: 1 * batches}
     chain_remaining = {k: max(0, targets[k] - chain_counts.get(k, 0)) for k in targets}
 
     return {
@@ -795,10 +803,14 @@ def index():
     macros = _load_macros()
     coverage = _get_macro_coverage()
     cell_counts = _get_cell_counts()
+    # per-macro task counts, least-covered first — surfaced on the dashboard so
+    # annotators see gaps at a glance (replaces the standalone Coverage page)
+    macro_counts = sorted(((m, coverage.get(m, 0)) for m in macros),
+                          key=lambda x: (x[1], x[0]))
     return render_template("index.html",
                            sites=sites, task_count=ann_stats["total_tasks"],
                            macros=macros, coverage=coverage,
-                           cell_counts=cell_counts)
+                           cell_counts=cell_counts, macro_counts=macro_counts)
 
 
 @annotation_bp.route("/task")
@@ -834,6 +846,9 @@ def annotate():
                        "type": site_map.get(sid, {}).get("type", "")}
                       for sid in task_site_ids],
             "macros": task.get("macros", []),
+            # instance ids for duplicate-macro tasks; absent/empty for the common
+            # case (the client then derives ids 1:1 from the base names)
+            "macro_instances": task.get("macro_instances", []),
             "num_sites": len(task_site_ids),
             "num_macros": len(task.get("macros", [])),
             "edges": [],
@@ -1454,12 +1469,17 @@ def api_create_task():
         return jsonify({"error": "instruction and sites required"}), 400
 
     # Multi-macro tasks must ship a dependency graph that touches every macro
-    # (mirrors the client-side check in annotate.html so the API can't bypass it)
+    # (mirrors the client-side check in annotate.html so the API can't bypass it).
+    # `macros` is a list of BASE names (duplicates allowed); when duplicates are
+    # present the client also sends `macro_instances` (per-occurrence ids) and the
+    # edges/subtasks are keyed by those ids, so validate against the instance list.
     macros = data.get("macros") or []
-    if len(macros) >= 2:
+    macro_instances = data.get("macro_instances") or []
+    connectivity_keys = macro_instances if macro_instances else macros
+    if len(connectivity_keys) >= 2:
         edges = data.get("macro_edges") or []
         linked = {e.get("from") for e in edges} | {e.get("to") for e in edges}
-        orphans = [m for m in macros if m not in linked]
+        orphans = [m for m in connectivity_keys if m not in linked]
         if orphans:
             return jsonify({"error": "macro dependencies incomplete",
                             "unconnected_macros": orphans}), 400
@@ -1490,6 +1510,8 @@ def api_create_task():
         "instruction": data["instruction"],
         "macros": data.get("macros", []),
         "num_sites": len(sites_list),
+        # NOTE: `macro_instances` is added below ONLY for duplicate-macro tasks, so
+        # tasks without duplicates serialize identically to the pre-duplicate schema.
         "num_macros": len(data.get("macros", [])),
         "expected_answer": data.get("expected_answer"),
         "answer_type": data.get("answer_type", "string"),
@@ -1511,6 +1533,18 @@ def api_create_task():
         "agent_result": data.get("agent_result"),
         "annotator": data.get("annotator", "anonymous"),
     }
+
+    # Duplicate-macro tasks: persist the per-occurrence instance ids so reload can
+    # reconstruct the distinct nodes (their subtasks/ops/edges are keyed by these
+    # ids). Only stored when the macro list actually repeats a name — a task with
+    # no duplicates omits the field entirely and stays byte-compatible with the
+    # existing (gold) tasks. GRADING NOTE: for duplicate tasks the QA leaf/terminal
+    # detection in macro_templates.leaf_macros compares BASE `macros` against the
+    # instance-id edge endpoints, so per-occurrence leaf grading isn't resolved for
+    # duplicates; non-duplicate tasks (all gold) are unaffected.
+    if macro_instances and len(macro_instances) == len(task["macros"]) \
+            and any(i != b for i, b in zip(macro_instances, task["macros"])):
+        task["macro_instances"] = macro_instances
 
     # Re-record: replace an existing task in place. The new recording keeps
     # the original task_id and annotator dir (external references stay
@@ -1794,96 +1828,6 @@ def api_prompt():
     single = request.args.get("single") == "1"
     prompt = _generate_prompt(sites, coverage, force_single=single)
     return jsonify(prompt)
-
-
-@annotation_bp.route("/coverage")
-def coverage_page():
-    """Per-site macro coverage matrix — which macros already have tasks."""
-    return render_template("coverage.html")
-
-
-@annotation_bp.route("/api/coverage_matrix")
-def api_coverage_matrix():
-    """Per-site coverage: macros covered, chain breakdown, tasks remaining."""
-    import math
-    from annotation.storage import list_tasks
-
-    all_tasks = list_tasks()
-
-    # Per-site analysis
-    sites = {}
-    for s in _load_sites():
-        sid = s["id"]
-        all_macros = sorted(set(_load_site_macros(sid)))
-        total_macros = len(all_macros)
-
-        # Tasks for this site
-        site_tasks = [t for t in all_tasks
-                      if sid in [x["id"] if isinstance(x, dict) else x
-                                 for x in t.get("sites", [])]]
-
-        # Covered macros — canonicalize task macros so retired alias names
-        # (pre-consolidation) count toward the canonical macro, matching
-        # _get_macro_coverage and the sampled pool
-        covered = set()
-        chain_counts = {}
-        for t in site_tasks:
-            cms = {_canon(m) for m in t.get("macros", [])}
-            covered.update(cms)
-            cl = len(cms)
-            chain_counts[cl] = chain_counts.get(cl, 0) + 1
-
-        uncovered = [m for m in all_macros if m not in covered]
-
-        # Target: 3:2:3:2 ratio, scaled by batches needed
-        batches = max(1, math.ceil(total_macros / 24))
-        targets = {1: 3 * batches, 2: 2 * batches, 3: 3 * batches, 4: 2 * batches}
-        remaining = {k: max(0, targets[k] - chain_counts.get(k, 0)) for k in targets}
-        total_remaining = sum(remaining.values())
-        total_target = sum(targets.values())
-        total_done = sum(chain_counts.get(k, 0) for k in targets)
-
-        # Per-macro coverage detail (canonical names on both sides)
-        macro_detail = {}
-        for m in all_macros:
-            count = sum(1 for t in site_tasks
-                        if m in {_canon(x) for x in t.get("macros", [])})
-            macro_detail[m] = {"count": count, "covered": m in covered}
-
-        sites[sid] = {
-            "name": s.get("name", sid),
-            "total_macros": total_macros,
-            "covered_macros": total_macros - len(uncovered),
-            "uncovered": uncovered,
-            "chain_counts": chain_counts,
-            "chain_targets": targets,
-            "chain_remaining": remaining,
-            "tasks_done": len(site_tasks),
-            "tasks_target": total_target,
-            "tasks_remaining": total_remaining,
-            "macros": macro_detail,
-        }
-
-    # Global summary
-    total_tasks_done = len(all_tasks)
-    total_tasks_remaining = sum(s["tasks_remaining"] for s in sites.values())
-    total_sites_complete = sum(1 for s in sites.values() if s["tasks_remaining"] == 0)
-    all_possible_macros = set()
-    for site_macros in MACRO_LOCATIONS.values():
-        all_possible_macros.update(_canon(m) for m in site_macros.keys())
-    # Intersect with the pool so stray macro names in old task files can't
-    # push "covered" above what the denominator counts
-    total_macros_covered = len({_canon(m) for t in all_tasks
-                                for m in t.get("macros", [])} & all_possible_macros)
-    return jsonify({
-        "sites": sites,
-        "total_tasks_done": total_tasks_done,
-        "total_tasks_remaining": total_tasks_remaining,
-        "total_sites": len(sites),
-        "sites_complete": total_sites_complete,
-        "macros_covered": total_macros_covered,
-        "macros_total": len(all_possible_macros),
-    })
 
 
 @annotation_bp.route("/api/floor_k", methods=["GET", "POST"])

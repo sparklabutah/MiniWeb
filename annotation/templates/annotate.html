@@ -287,7 +287,6 @@ textarea#instruction:focus {
     <span style="flex:1"></span>
     <button class="btn btn-secondary btn-sm" onclick="resetSession()" title="Reset all site data to pristine state">Reset Session</button>
     <a href="{{ url_for('annotation.index') }}">Home</a>
-    <a href="{{ url_for('annotation.coverage_page') }}" title="Which macros are already covered per site">Coverage</a>
     <a href="{{ url_for('annotation.verify') }}">Verifiers</a>
 </div>
 
@@ -577,7 +576,48 @@ function _covBadge(key) {
 const rerecordTask = {{ rerecord | tojson }};   // set when replacing an existing task
 let currentPrompt = {{ prompt | tojson }};
 let currentStep = 1;
-let selectedMacros = currentPrompt ? currentPrompt.macros.slice() : [];
+
+// --- Macro INSTANCE ids (duplicate-macro support) -------------------------
+// selectedMacros holds *instance ids*: the first occurrence of a macro is its
+// plain name ("create_by_form"); a 2nd+ occurrence is suffixed with a delimiter
+// unlikely to collide with any macro name ("create_by_form#2", "#3", ...). All
+// per-node state (subtasks/ops/positions/spans/skip/NA/QA/edges) is keyed by
+// instance id; anything about the macro ITSELF (description, ops, warnings, QA,
+// span guidance, coverage, locations) is looked up via baseOf(id).
+const MACRO_INST_DELIM = '#';
+function baseOf(id) {
+    id = String(id);
+    const i = id.indexOf(MACRO_INST_DELIM);
+    return i < 0 ? id : id.slice(0, i);
+}
+// Derive instance ids for a plain list of base names (first = name, repeats suffixed)
+function makeInstanceIds(bases) {
+    const seen = {}, out = [];
+    for (const raw of (bases || [])) {
+        const b = baseOf(raw);
+        seen[b] = (seen[b] || 0) + 1;
+        out.push(seen[b] === 1 ? b : b + MACRO_INST_DELIM + seen[b]);
+    }
+    return out;
+}
+// Next free instance id for a base, given what's already on the task
+function nextInstanceId(base) {
+    base = baseOf(base);
+    if (!selectedMacros.includes(base)) return base;
+    let n = 2;
+    while (selectedMacros.includes(base + MACRO_INST_DELIM + n)) n++;
+    return base + MACRO_INST_DELIM + n;
+}
+// Whether the current task uses any duplicate macro (needs macro_instances on save)
+function _hasDupMacros() { return selectedMacros.some(id => id !== baseOf(id)); }
+
+// Prefer explicit instance ids (dup-aware saved tasks); else derive from base names.
+function _initInstances(p) {
+    if (!p) return [];
+    if (p.macro_instances && p.macro_instances.length) return p.macro_instances.slice();
+    return makeInstanceIds(p.macros || []);
+}
+let selectedMacros = _initInstances(currentPrompt);
 let trajectory = [];
 let recording = false;
 let recordInterval = null;
@@ -629,7 +669,7 @@ function _getLocationsForMacro(macroName) {
     for (const site of currentPrompt.sites) {
         const siteId = typeof site === 'string' ? site : site.id;
         const siteName = typeof site === 'string' ? site : (site.name || site.id);
-        const siteLocs = (macroLocations[siteId] || {})[macroName];
+        const siteLocs = (macroLocations[siteId] || {})[baseOf(macroName)];
         if (siteLocs && siteLocs.length) {
             for (const loc of siteLocs) {
                 locs.push({site: siteName, loc});
@@ -953,6 +993,16 @@ function renderMacroList() {
     const container = document.getElementById('macro-nodes');
     const graphEl = document.getElementById('macro-graph');
     if (!container) return;
+
+    // Alias the description registry for every duplicate INSTANCE id so the many
+    // `macroDescriptions[id]` read sites (name, warning, span guidance, labels)
+    // resolve without threading baseOf() through each one.
+    selectedMacros.forEach(id => {
+        const b = baseOf(id);
+        if (id !== b && !macroDescriptions[id] && macroDescriptions[b]) {
+            macroDescriptions[id] = macroDescriptions[b];
+        }
+    });
 
     // Initialize positions if not set — auto-layout in a grid
     const gw = (graphEl && graphEl.offsetWidth > 50) ? graphEl.offsetWidth - 20 : 300;
@@ -1337,10 +1387,13 @@ function showMacroSearch(q) {
     if (!q || q.length < 2) { results.style.display = 'none'; return; }
     q = q.toLowerCase();
 
-    // Search all macros from macroDescriptions
+    // Search all macros from macroDescriptions. Duplicates are allowed, so we do
+    // NOT skip already-added macros — you can add the same macro again. We DO skip
+    // the instance-id alias entries (e.g. "create_by_form#2") that renderMacroList
+    // stamps into macroDescriptions, so each base macro appears once.
     const matches = [];
     for (const [key, desc] of Object.entries(macroDescriptions)) {
-        if (selectedMacros.includes(key)) continue;  // already added
+        if (baseOf(key) !== key) continue;  // alias for a duplicate instance — skip
         const text = (desc.description || '') + ' ' + key;
         if (text.toLowerCase().includes(q)) {
             matches.push({key, desc: desc.description || key});
@@ -1349,7 +1402,7 @@ function showMacroSearch(q) {
 
     if (!matches.length) {
         results.innerHTML = '<div style="padding:.4rem .5rem;color:#94a3b8">No matching macros</div>';
-        results.style.display = 'block';
+        _positionMacroResults();
         return;
     }
 
@@ -1365,22 +1418,33 @@ function showMacroSearch(q) {
             <div style="font-size:.65rem;color:#94a3b8">${m.key}</div>
         </div>`
     ).join('');
-    // Position fixed dropdown below the input
-    const input = document.getElementById('macro-search');
-    const rect = input.getBoundingClientRect();
-    results.style.left = rect.left + 'px';
-    results.style.top = (rect.bottom + 4) + 'px';
-    results.style.bottom = 'auto';
-    results.style.display = 'block';
+    _positionMacroResults();
 }
 
 function addMacroFromSearch(macroKey) {
-    if (!selectedMacros.includes(macroKey)) {
-        selectedMacros.push(macroKey);
-        renderMacroList();
+    // Always add a NEW instance (duplicates allowed). First occurrence keeps the
+    // plain name; repeats get a "#N" suffix.
+    selectedMacros.push(nextInstanceId(macroKey));
+    renderMacroList();
+    // Keep the search panel usable: DON'T clear/hide it. Re-focus the input and
+    // re-run the search so you can add several macros in a row without re-clicking.
+    // Adding a node can grow the graph and shift the input, so re-show also
+    // repositions the fixed dropdown under the (possibly moved) input.
+    // Keep focus where the user is adding from: the browse panel's filter if it's
+    // open (so you can keep filtering + adding several), else the top search box.
+    const panel = document.getElementById('macro-add-panel');
+    if (panel && panel.style.display === 'block') {
+        const f = document.getElementById('macro-add-filter');
+        if (f) f.focus();
+        _positionAddMacroPanel();
+        return;
     }
-    document.getElementById('macro-search').value = '';
-    document.getElementById('macro-search-results').style.display = 'none';
+    const input = document.getElementById('macro-search');
+    if (input) {
+        const q = input.value;
+        input.focus();
+        showMacroSearch(q);
+    }
 }
 
 // How-to-work-with-macros help strip (collapsed state persisted).
@@ -1441,18 +1505,54 @@ window.addEventListener('resize', _positionAddMacroPanel);
 window.addEventListener('scroll', _positionAddMacroPanel, true);
 function renderAddMacroPanel(filter) {
     const p = document.getElementById('macro-add-panel');
-    filter = (filter || '').toLowerCase();
-    // group registry macros by family, excluding ones already on the task
+    filter = filter || '';
+    // Build the panel SHELL once: a filter input that is NEVER recreated (so it
+    // keeps focus + cursor as you type) and a FIXED-HEIGHT results area (so the
+    // panel never resizes as the match count changes — that resizing is what made
+    // the search bar jump and become un-clickable). Only the chip list re-renders
+    // on each keystroke, via filterAddMacroList(); the input and the propose-a-
+    // macro form (whose typed values would otherwise be wiped) stay put.
+    const inS = "width:100%;font-size:.7rem;padding:.22rem .35rem;border:1px solid #c4b5fd;border-radius:.25rem;margin-top:.15rem";
+    p.innerHTML = `
+      <div style="padding:.3rem .5rem;border-bottom:1px solid #e2e8f0;display:flex;gap:.3rem;align-items:center">
+        <input id="macro-add-filter" placeholder="filter…" autocomplete="off" oninput="filterAddMacroList(this.value)"
+            style="flex:1;font-size:.7rem;padding:.2rem .35rem;border:1px solid #cbd5e1;border-radius:.25rem">
+        <span style="font-size:.6rem;color:#94a3b8">${ALL_MACROS.length} macros</span>
+      </div>
+      <div id="macro-add-results" style="height:42vh;overflow-y:auto"></div>
+      <div style="padding:.45rem .55rem;border-top:1px solid #e2e8f0;background:#f8fafc">
+        <div style="font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;color:#8b5cf6;font-weight:700">Propose a new macro <span style="color:#ef4444">*all fields required</span></div>
+        <input id="macro-new-name" placeholder="new_macro_name (snake_case)" style="${inS};font-family:ui-monospace,monospace">
+        <textarea id="macro-new-desc" rows="2" placeholder="Natural-language description — what the interaction is" style="${inS};resize:vertical;font-family:inherit"></textarea>
+        <div style="display:flex;gap:.3rem">
+            <input id="macro-new-spanstart" placeholder="span start (when it begins)" style="${inS}">
+            <input id="macro-new-spanend" placeholder="span end (when it ends)" style="${inS}">
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.3rem">
+            <button class="btn btn-sm" onclick="proposeNewMacro()" style="font-size:.65rem;background:#8b5cf6;color:#fff;border:none">Add to task</button>
+            <span id="macro-new-err" style="font-size:.6rem;color:#ef4444"></span>
+        </div>
+      </div>`;
+    const inp = document.getElementById('macro-add-filter');
+    inp.value = filter;
+    filterAddMacroList(filter);
+    _positionAddMacroPanel();     // clamp once on open; the panel height is now constant
+    inp.focus();
+}
+
+// Re-render ONLY the grouped macro chips into the fixed-height results area. The
+// filter input and the propose-a-macro form are left untouched, so focus/cursor
+// are never lost and the panel keeps a constant size however many macros match.
+function filterAddMacroList(filter) {
+    const box = document.getElementById('macro-add-results');
+    if (!box) return;
+    const f = (filter || '').toLowerCase();
     const groups = {};
     ALL_MACROS.forEach(m => {
-        if (selectedMacros.includes(m.key)) return;
-        if (filter && !(m.key + ' ' + (m.description||'')).toLowerCase().includes(filter)) return;
+        if (f && !(m.key + ' ' + (m.description||'')).toLowerCase().includes(f)) return;
         (groups[m.group] = groups[m.group] || []).push(m);
     });
-    let html = `<div style="padding:.3rem .5rem;border-bottom:1px solid #e2e8f0;display:flex;gap:.3rem;align-items:center">
-        <input id="macro-add-filter" placeholder="filter…" oninput="renderAddMacroPanel(this.value)" value="${escHtml(filter)}"
-            style="flex:1;font-size:.7rem;padding:.2rem .35rem;border:1px solid #cbd5e1;border-radius:.25rem">
-        <span style="font-size:.6rem;color:#94a3b8">${ALL_MACROS.length} macros</span></div>`;
+    let html = '';
     Object.keys(groups).forEach(g => {
         html += `<div style="padding:.25rem .55rem 0;font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;font-weight:700">${g}</div>
             <div style="display:flex;flex-wrap:wrap;gap:.25rem;padding:.2rem .5rem .35rem">`;
@@ -1466,24 +1566,8 @@ function renderAddMacroPanel(filter) {
         }).join('');
         html += `</div>`;
     });
-    // propose-new-macro form — ALL fields required (a proposed macro must be a
-    // complete registry entry: name + description + span start + span end).
-    const inS = "width:100%;font-size:.7rem;padding:.22rem .35rem;border:1px solid #c4b5fd;border-radius:.25rem;margin-top:.15rem";
-    html += `<div style="padding:.45rem .55rem;border-top:1px solid #e2e8f0;background:#f8fafc">
-        <div style="font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;color:#8b5cf6;font-weight:700">Propose a new macro <span style="color:#ef4444">*all fields required</span></div>
-        <input id="macro-new-name" placeholder="new_macro_name (snake_case)" style="${inS};font-family:ui-monospace,monospace">
-        <textarea id="macro-new-desc" rows="2" placeholder="Natural-language description — what the interaction is" style="${inS};resize:vertical;font-family:inherit"></textarea>
-        <div style="display:flex;gap:.3rem">
-            <input id="macro-new-spanstart" placeholder="span start (when it begins)" style="${inS}">
-            <input id="macro-new-spanend" placeholder="span end (when it ends)" style="${inS}">
-        </div>
-        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.3rem">
-            <button class="btn btn-sm" onclick="proposeNewMacro()" style="font-size:.65rem;background:#8b5cf6;color:#fff;border:none">Add to task</button>
-            <span id="macro-new-err" style="font-size:.6rem;color:#ef4444"></span>
-        </div>
-    </div>`;
-    p.innerHTML = html;
-    _positionAddMacroPanel();   // re-clamp: filtering changes the panel height
+    if (!html) html = '<div style="padding:.6rem .7rem;color:#94a3b8">No matching macros</div>';
+    box.innerHTML = html;
 }
 function proposeNewMacro() {
     const err = document.getElementById('macro-new-err');
@@ -1500,7 +1584,7 @@ function proposeNewMacro() {
     if (ALL_MACROS.some(m => m.key === name) || selectedMacros.includes(name)) {
         if (err) err.textContent = '“' + name + '” already exists'; return;
     }
-    selectedMacros.push(name);
+    selectedMacros.push(nextInstanceId(name));
     proposedMacros[name] = true;
     proposedMacroDefs[name] = {description: desc, span_start: s0, span_end: s1};
     macroDescriptions[name] = {description: desc, span_start: s0, span_end: s1};  // so the node renders
@@ -1516,14 +1600,25 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Position the results dropdown under the search input.
+// Position the results dropdown under the search input, clamped to the viewport
+// so it can never overflow off-screen (it already caps height at 220px + scroll).
 function _positionMacroResults() {
     const results = document.getElementById('macro-search-results');
     const rect = document.getElementById('macro-search').getBoundingClientRect();
-    results.style.left = rect.left + 'px';
-    results.style.top = (rect.bottom + 4) + 'px';
     results.style.bottom = 'auto';
     results.style.display = 'block';
+    const margin = 8;
+    const pw = results.offsetWidth || rect.width;
+    const ph = results.offsetHeight || 220;
+    let left = Math.min(rect.left, window.innerWidth - pw - margin);
+    left = Math.max(margin, left);
+    let top = rect.bottom + 4;
+    if (top + ph > window.innerHeight - margin) {
+        const above = rect.top - ph - 4;
+        top = above >= margin ? above : Math.max(margin, window.innerHeight - ph - margin);
+    }
+    results.style.left = left + 'px';
+    results.style.top = top + 'px';
 }
 
 // Enter = semantic (meaning-based) search via the LLM-backed endpoint.
@@ -1603,7 +1698,9 @@ document.addEventListener('click', function(e) {
 // data, so the annotator EDITS a concrete draft instead of writing from scratch.
 function draftTask() {
     if (!currentPrompt || !currentPrompt.sites || !currentPrompt.macros) return;
-    const macros = getEnabledMacros().map(m => macroOps[m] ? m + '.' + macroOps[m] : m);
+    // Backend drafts by BASE macro name — send base names (+ op suffix per instance).
+    const enabledIds = getEnabledMacros();
+    const macros = enabledIds.map(m => macroOps[m] ? baseOf(m) + '.' + macroOps[m] : baseOf(m));
     if (!macros.length) { alert('No macros to draft from.'); return; }
     const status = document.getElementById('draft-status');
     const btn = document.getElementById('draft-task-btn');
@@ -1617,10 +1714,13 @@ function draftTask() {
             status.textContent = '⚠ ' + (d.error || 'draft unavailable (restart server if creds stale)');
             return;
         }
-        // prefill each macro's subtask (marker maps base macro -> concrete step)
+        // prefill each macro's subtask — response keys are BASE names; map each to
+        // the first still-empty INSTANCE of that base so duplicates each get filled.
         let filled = 0;
         for (const [mac, text] of Object.entries(d.subtasks || {})) {
-            if (getEnabledMacros().includes(mac) && text) { macroSubtasks[mac] = text; filled++; }
+            if (!text) continue;
+            const target = getEnabledMacros().find(id => baseOf(id) === baseOf(mac) && !(macroSubtasks[id] || '').trim());
+            if (target) { macroSubtasks[target] = text; filled++; }
         }
         if (d.instruction) document.getElementById('instruction').value = d.instruction;
         renderMacroList();           // re-render nodes so the prefilled subtasks show
@@ -1873,7 +1973,7 @@ function reshufflePrompt() {
                 return;
             }
             currentPrompt = prompt;
-            selectedMacros = prompt.macros.slice();
+            selectedMacros = _initInstances(prompt);
             _spatialWarned = '';   // new prompt — re-show spatial design warnings if sampled
             macrosNotApplicable = {};
             macrosSkipped = {};
@@ -1903,10 +2003,9 @@ function reshufflePrompt() {
             if (prompt.chosen_site && prompt.chain_remaining) {
                 const cr = prompt.chain_remaining;
                 const parts = [];
-                if (cr['1'] > 0) parts.push(cr['1'] + '\u00d7 len-1');
-                if (cr['2'] > 0) parts.push(cr['2'] + '\u00d7 len-2');
-                if (cr['3'] > 0) parts.push(cr['3'] + '\u00d7 len-3');
-                if (cr['4'] > 0) parts.push(cr['4'] + '\u00d7 len-4');
+                for (let L = 1; L <= 6; L++) {
+                    if (cr[String(L)] > 0) parts.push(cr[String(L)] + '\u00d7 len-' + L);
+                }
                 const uncov = prompt.uncovered_macros || 0;
                 const total = prompt.total_macros || 0;
                 let status = '';
@@ -3440,8 +3539,8 @@ async function submitTask() {
 
     // Every proposed (not-yet-registered) macro must carry a complete definition:
     // natural-language description + span start + span end.
-    const badProposed = enabledMacros.filter(m => proposedMacros[m]).filter(m => {
-        const d = proposedMacroDefs[m] || {};
+    const badProposed = enabledMacros.filter(m => proposedMacros[baseOf(m)]).filter(m => {
+        const d = proposedMacroDefs[baseOf(m)] || {};
         return !(d.description && d.description.trim()) || !(d.span_start && d.span_start.trim()) || !(d.span_end && d.span_end.trim());
     });
     if (badProposed.length) {
@@ -3509,7 +3608,12 @@ async function submitTask() {
                 site: currentPrompt.sites[0].id,
                 instruction,
                 expected_answer: document.getElementById('final-answer').value,
-                macros: enabledMacros,
+                // Backend `macros` stays a LIST of BASE names (duplicates allowed);
+                // per-instance state below is keyed by instance id. macro_instances
+                // is sent ONLY when duplicates exist, so non-duplicate tasks are
+                // byte-identical to the pre-duplicate schema.
+                macros: enabledMacros.map(baseOf),
+                macro_instances: _hasDupMacros() ? enabledMacros : undefined,
                 macro_spans: macroSpans,
                 macro_operations: macroOps,
                 macro_edges: macroEdges,

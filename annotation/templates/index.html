@@ -46,7 +46,6 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
     <div>
         <a href="{{ url_for('annotation.verify') }}">Verifier Builder</a>
         <a href="{{ url_for('annotation.macro_templates_page') }}">Macro Templates</a>
-        <a href="{{ url_for('annotation.coverage_page') }}">Coverage</a>
         <a href="{{ url_for('annotation.accounts_page') }}">Accounts</a>
         <a href="/" target="_blank">MiniWeb Portal</a>
     </div>
@@ -89,7 +88,7 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
                 <h3 style="font-size:.85rem;color:#475569;margin-bottom:.4rem">Sites × Macros</h3>
                 {% set max_macros = [] %}
                 {% for key in cell_counts %}{% if key[1] not in max_macros %}{% if max_macros.append(key[1]) %}{% endif %}{% endif %}{% endfor %}
-                {% set macro_cols = [1, 2, 3, 4] %}
+                {% set macro_cols = [1, 2, 3, 4, 5, 6] %}
                 <div class="cell-grid" style="grid-template-columns: auto repeat({{ macro_cols|length }}, 1fr);">
                     <div class="header-cell"></div>
                     {% for m in macro_cols %}
@@ -115,6 +114,21 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
                     {% set covered = [] %}
                     {% for m in macros %}{% if coverage.get(m, 0) > 0 %}{% if covered.append(m) %}{% endif %}{% endif %}{% endfor %}
                     <div><strong>{{ covered|length }}</strong>/{{ macros|length }} macros covered</div>
+                </div>
+            </div>
+
+            <!-- Tasks per macro (folded in from the old Coverage page) -->
+            <div style="flex:1;min-width:300px">
+                <h3 style="font-size:.85rem;color:#475569;margin-bottom:.4rem">Tasks per macro <span style="font-weight:400;color:#94a3b8">— least covered first</span></h3>
+                <div style="max-height:340px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.4rem;padding:.35rem">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.2rem">
+                    {% for m, c in macro_counts %}
+                        <div title="{{ m }} — {{ c }} task(s)" style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;padding:.15rem .45rem;border-radius:.3rem;background:{{ '#fef2f2' if c == 0 else ('#fffbeb' if c <= 3 else '#f0fdf4') }}">
+                            <span style="font-size:.72rem;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m }}</span>
+                            <span style="font-size:.72rem;font-weight:700;font-variant-numeric:tabular-nums;color:{{ '#991b1b' if c == 0 else ('#92400e' if c <= 3 else '#166534') }}">{{ c }}</span>
+                        </div>
+                    {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
