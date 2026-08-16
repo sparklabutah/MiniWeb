@@ -12,7 +12,7 @@ Pipeline:
   3. run the browser-use agent from the task's starting_url
   4. pull the recorder stream (/_admin/record) + request log (/_admin/log)
      -> assemble a trajectory in the human trajectory.json schema
-  5. verify_task(verifier, synthesize_network_events(trajectory), agent_answer)
+  5. verify_task(verifier, trajectory, agent_answer)
   6. print PASS/FAIL + per-macro + failed-check reasons; write result.json
 
 Usage:
@@ -46,7 +46,7 @@ try:
 except Exception:
     pass
 
-from evaluation.trajectory import synthesize_network_events
+from evaluation.trajectory import merge_server_log
 from evaluation.verifiers import verify_task
 from annotation.storage import ANNOTATIONS_DIR
 
@@ -157,19 +157,8 @@ def build_trajectory(base):
     if not any(e.get("type") == "action" for e in traj):
         for b in beacons:
             traj.append({"type": "action", **b})
-    for e in log:
-        url = e.get("path", "")
-        query = e.get("query") or {}
-        if query:
-            url = url + "?" + urlencode(query)
-        traj.append({
-            "type": "network",
-            "method": e.get("method"),
-            "url": url,
-            "status": e.get("status"),
-            "requestBody": e.get("body"),
-        })
-    return synthesize_network_events(traj), recorded, log, beacons
+    traj = merge_server_log(traj, log)
+    return traj, recorded, log, beacons
 
 
 # ── agent factory (shared build_agent — one factory for every runner) ─────────

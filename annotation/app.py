@@ -1237,8 +1237,10 @@ def api_suggest_task_verifier():
                       "label": s.get("label", ""), "context": s.get("group_labels", [])}
                      for s in draft["slots"]]
 
-    from evaluation.trajectory import synthesize_network_events
-    reduced = mt.reduce_trajectory_for_llm(synthesize_network_events(traj))
+    from pathlib import Path as _P
+    from evaluation.trajectory import merge_server_log
+    reduced = mt.reduce_trajectory_for_llm(
+        merge_server_log(traj, _P(str(_dir)) / "server_log.json"))
 
     system_prompt = (
         "You fill in the OPEN variables of pre-written verifier templates for a web task.\n"
@@ -1312,10 +1314,12 @@ def api_suggest_task_verifier():
 def _load_test_trajectory(annotator, task_id, which):
     """Return (trajectory, answer, note) for the requested test source.
 
-    Network events the recorder missed (GET navigations; POSTs dropped by the
-    old walk collector) are reconstructed from the actions before verifying."""
+    Network events come from RECORDED evidence only: the trajectory's own
+    (client-captured) network events, unioned with the session's server-side
+    request log when one was saved next to the recording. Nothing is synthesized
+    from actions — a request either has a witness or it doesn't count."""
     from annotation.storage import ANNOTATIONS_DIR
-    from evaluation.trajectory import synthesize_network_events
+    from evaluation.trajectory import merge_server_log
     tdir = ANNOTATIONS_DIR / annotator / task_id
 
     if which == "walk":
@@ -1323,7 +1327,7 @@ def _load_test_trajectory(annotator, task_id, which):
         if not wf.exists():
             return None, "", "no verification walk recorded for this task"
         d = json.loads(wf.read_text())
-        return synthesize_network_events(d.get("trajectory", [])), d.get("answer", ""), "verification walk"
+        return d.get("trajectory", []), d.get("answer", ""), "verification walk"
     if which == "agent":
         from pathlib import Path
         from evaluation.trajectory import extract_final_reasoning
@@ -1331,7 +1335,8 @@ def _load_test_trajectory(annotator, task_id, which):
         ar = rd / "trajectory.json"
         if not ar.exists():
             return None, "", "no agent run recorded for this task"
-        traj = synthesize_network_events(json.loads(ar.read_text()))
+        traj = json.loads(ar.read_text())
+        traj = merge_server_log(traj, rd / "server_log.json")   # no-op if absent
         reasoning = extract_final_reasoning(rd)
         if reasoning:
             traj = traj + [{"type": "reasoning", "text": reasoning}]
@@ -1341,13 +1346,14 @@ def _load_test_trajectory(annotator, task_id, which):
         if rp.exists():
             answer = (json.loads(rp.read_text()) or {}).get("final_result", "") or ""
         return traj, answer, "agent attempt"
-    # default: gold human trajectory
+    # default: gold human trajectory + the recording session's server log
     tf = tdir / "trajectory.json"
     task = json.loads((tdir / "task.json").read_text()) if (tdir / "task.json").exists() else {}
     traj = json.loads(tf.read_text()) if tf.exists() else []
+    traj = merge_server_log(traj, tdir / "server_log.json")     # no-op if absent
     # the human's reported answer IS the expected answer (perfect-trace assumption)
     answer = task.get("answer") or task.get("expected_answer") or ""
-    return synthesize_network_events(traj), answer, "gold (human)"
+    return traj, answer, "gold (human)"
 
 
 @annotation_bp.route("/api/run_task_verifier", methods=["POST"])
