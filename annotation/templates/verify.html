@@ -1099,13 +1099,25 @@ function pinQuery(idx, key) {
 }
 function pinBody(idx, key) {
     var m = tvTargetMacro(); if (!m) return;
-    var r = tvEvidence()[idx], g = tvGate(m, true);
+    var r = tvEvidence()[idx], g = tvGate(m, true); g.advisory = false;
     g.method = r.method; if (typeof g.url !== 'string') g.url = r.path;
-    var v = r.body[key], vs = typeof v === 'object' ? JSON.stringify(v) : String(v);
-    var mode = (!isNaN(parseFloat(vs)) && isFinite(vs)) ? 'numeric' : (vs.length > 30 ? 'contains' : 'equals');
+    var v = r.body[key];   // keep the gold value's REAL type (list stays list, number stays number)
+    var mode = 'equals';
+    if (typeof v === 'number' || (typeof v === 'string' && v !== '' && !isNaN(parseFloat(v)) && isFinite(v))) mode = 'numeric';
+    else if (typeof v === 'string' && v.length > 30) mode = 'contains';
     g.body_fields = g.body_fields && !g.body_fields.open ? g.body_fields : {};
-    g.body_fields[key] = {value: (typeof v === 'object' ? vs : v), mode: mode};
+    g.body_fields[key] = {value: v, mode: mode};
     tvChanged();
+}
+// Value inputs are typed: text that parses as JSON ([], {}, 42, true, null, "...")
+// becomes that value; everything else is a plain string — no ""-wrapping needed.
+function tvParseVal(s) {
+    var t = String(s == null ? '' : s).trim();
+    if (t === '') return '';
+    if (/^(\[|\{|-?\d|true$|false$|null$|")/.test(t)) {
+        try { return JSON.parse(t); } catch (e) { /* fall through: plain string */ }
+    }
+    return s;
 }
 // Structured gate editor rendered inside each macro card.
 function gateEditorHTML(macro) {
@@ -1167,8 +1179,9 @@ function gateEditorHTML(macro) {
         var mode = (v && typeof v === 'object' && v.mode) ? v.mode : 'auto';
         var modeOpts = ['auto','equals','contains','numeric','fuzzy'].map(function(o){
             return '<option'+(o===mode?' selected':'')+'>'+o+'</option>'; }).join('');
+        var disp = (typeof val === 'string') ? val : JSON.stringify(val);
         rowsHtml += '<tr><td>body.<input class="f" value="'+tvEsc(k)+'" onchange="gateRenameField(\''+macro+'\',\''+tvEsc(k)+'\',this.value)"></td>'
-            + '<td><input class="v" value="'+tvEsc(typeof val==='object'?JSON.stringify(val):val)+'" onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',this.value,null)"></td>'
+            + '<td><input class="v" title="plain text = string · [] {} 42 true parse as JSON" value="'+tvEsc(disp)+'" onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',this.value,null)"></td>'
             + '<td><select onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',null,this.value)">'+modeOpts+'</select></td>'
             + '<td><button class="tv-pin" onclick="gateDelField(\''+macro+'\',\''+tvEsc(k)+'\')">✕</button></td></tr>';
     });
@@ -1216,7 +1229,7 @@ function gateSetField(macro, key, val, mode) {
     g.body_fields = (g.body_fields && !g.body_fields.open) ? g.body_fields : {};
     var cur = g.body_fields[key];
     var obj = (cur && typeof cur === 'object' && 'value' in cur) ? cur : {value: cur, mode: 'auto'};
-    if (val !== null) obj.value = val;
+    if (val !== null) obj.value = tvParseVal(val);   // [] {} 42 true parse as JSON; else string
     if (mode !== null) obj.mode = mode;
     g.body_fields[key] = obj;
     tvChanged();
@@ -1301,7 +1314,7 @@ function suggestTaskVerifier() {
 }
 
 // --- readable check-tree rendering (same as the Verifier Review page) ---
-function tvEsc(s){ return String(s==null?'':s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function tvEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function tvHas(v){ return !(v==null || (typeof v==='object' && v.open===true)); }
 function tvFmt(v){
     if (v && typeof v==='object' && v.open===true) return '<span class="tv-any">any</span>';
