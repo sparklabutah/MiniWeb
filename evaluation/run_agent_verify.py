@@ -73,7 +73,15 @@ def locate_task(task_id: str):
     vf = tdir / "verifier.json"
     if not vf.exists():
         raise ValueError(f"no verifier.json in {tdir} — build one first")
-    return tdir, task, json.loads(vf.read_text())
+    verifier = json.loads(vf.read_text())
+    # a re-recorded task may carry a NEW expected answer; verifier.json froze the
+    # old one at build time — sync answer-type leaves before grading
+    try:
+        from annotation.macro_templates import refresh_expected
+        refresh_expected(verifier.get("macros") or {}, task)
+    except Exception:
+        pass
+    return tdir, task, verifier
 
 
 # ── trajectory assembly from the running server's logs ────────────────────────
@@ -213,8 +221,15 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
         stop_server(proc)
         raise RuntimeError(f"server did not start on port {port}")
     base = f"http://localhost:{port}"
-    rec_url = None if start_from == "starting_url" else recorded_start_url(tdir)
-    start_url = resolve_start_url(base, rec_url or task.get("starting_url"), site_id)
+    task_sites = [s["id"] if isinstance(s, dict) else s for s in (task.get("sites") or [])]
+    if len(task_sites) > 1:
+        # Cross-site tasks start at the platform homepage: choosing which app to
+        # open is part of the task, and the recorded start URL (one of the two
+        # sites) would pre-solve that step.
+        start_url = base + "/"
+    else:
+        rec_url = None if start_from == "starting_url" else recorded_start_url(tdir)
+        start_url = resolve_start_url(base, rec_url or task.get("starting_url"), site_id)
 
     tok0 = LLMClient.GLOBAL.as_dict()
     agent = make_agent(model, headless=headless, max_steps=max_steps, timeout=timeout,
@@ -349,6 +364,8 @@ async def run_config(args):
     agents = cfg.get("agents") or [{"model": cfg.get("model", "gemini-flash")}]
     tasks = _expand_tasks(cfg.get("tasks"))
     d = lambda k, dv: cfg.get(k, dv)  # run-wide defaults
+    exclude = set(cfg.get("exclude") or [])   # task_ids to skip entirely (e.g. poison tasks)
+    resume = cfg.get("resume", True)          # skip tasks whose result.json already exists
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = Path(cfg.get("out") or (ROOT / "evaluation" / "results" / f"config_{ts}"))
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -360,6 +377,13 @@ async def run_config(args):
         model = a["model"]; label = a.get("label", model)
         for ti, task_id in enumerate(tasks):
             tag = f"{DIM}[{label} · {task_id}]{RESET}"
+            out_dir = run_dir / f"{label.replace('/','-')}__{task_id.replace('/','-')}"
+            if task_id in exclude:
+                print(f"  {tag} {DIM}SKIP (excluded){RESET}")
+                continue
+            if resume and (out_dir / "result.json").exists():
+                print(f"  {tag} {DIM}SKIP (done){RESET}")
+                continue
             try:
                 res = await run_and_grade(
                     task_id=task_id, model=model,
@@ -369,7 +393,7 @@ async def run_config(args):
                     harness=a.get("harness", d("harness", "browser-use")),
                     max_steps=d("max_steps", 50), timeout=d("timeout", 300),
                     headless=d("headless", True), start_from=d("start_from", "recorded"),
-                    port=args.port, out=run_dir / f"{label.replace('/','-')}__{task_id.replace('/','-')}",
+                    port=args.port, out=out_dir,
                     verbose=False)
                 res["agent_label"] = label
                 mk = f"{GREEN}PASS{RESET}" if res["passed"] else f"{RED}FAIL{RESET}"

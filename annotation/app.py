@@ -1385,7 +1385,9 @@ def api_run_task_verifier():
     from annotation import macro_templates as mt
     tjson = ANNOTATIONS_DIR / annotator / task_id / "task.json"
     if tjson.exists():
-        mt.inject_qa_leaf(macros, json.loads(tjson.read_text()))
+        tdata = json.loads(tjson.read_text())
+        mt.inject_qa_leaf(macros, tdata)
+        mt.refresh_expected(macros, tdata)   # never grade against a stale expected
 
     report = verify_task({"task_id": task_id, "macros": macros}, traj, answer)
     report["which"] = which
@@ -1401,7 +1403,17 @@ def api_task_verifier(annotator, task_id):
     vf = ANNOTATIONS_DIR / annotator / task_id / "verifier.json"
     if request.method == "GET":
         if vf.exists():
-            return jsonify(json.loads(vf.read_text()))
+            spec = json.loads(vf.read_text())
+            # a re-recorded task may have a NEW expected answer — never serve the
+            # builder a stale one frozen in verifier.json
+            tjson = vf.parent / "task.json"
+            if tjson.exists():
+                from annotation.macro_templates import refresh_expected
+                refreshed = refresh_expected(spec.get("macros") or {},
+                                             json.loads(tjson.read_text()))
+                if refreshed:
+                    spec["expected_refreshed"] = refreshed
+            return jsonify(spec)
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
     # Merge-save: only overwrite keys present in the payload, so fields written

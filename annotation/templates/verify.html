@@ -176,9 +176,109 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
             {% endif %}
         </div>
 
+        <!-- Verifier builder -->
+        <div class="section">
+            <style>
+            .tv-ev{border:1px solid #e2e8f0;border-radius:.4rem;background:#fafcff;margin-bottom:.6rem}
+            .tv-ev-head{display:flex;gap:.5rem;align-items:center;padding:.35rem .5rem;border-bottom:1px solid #eef2f7;flex-wrap:wrap}
+            .tv-ev-rows{max-height:260px;overflow-y:auto}
+            .tv-ev-row{display:flex;gap:.4rem;align-items:baseline;padding:.25rem .5rem;border-bottom:1px solid #f4f7fb;font-size:.72rem;flex-wrap:wrap}
+            .tv-ev-row:hover{background:#f1f5f9}
+            .tv-m{font-weight:800;font-size:.62rem;padding:.05rem .35rem;border-radius:.25rem}
+            .tv-m.mut{background:#fee2e2;color:#b91c1c}.tv-m.get{background:#e2e8f0;color:#475569}
+            .tv-chip{cursor:pointer;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:.7rem;padding:.02rem .45rem;font-size:.66rem;white-space:nowrap}
+            .tv-chip:hover{background:#e0e7ff}
+            .tv-chip.star{background:#fef9c3;border-color:#fde047;color:#a16207;font-weight:700}
+            .tv-pin{cursor:pointer;font-size:.62rem;border:1px solid #cbd5e1;background:#fff;border-radius:.25rem;padding:.02rem .4rem;color:#334155}
+            .tv-pin:hover{background:#f1f5f9}
+            .tv-gate{border:1px solid #dbeafe;background:#f8fbff;border-radius:.35rem;padding:.4rem .55rem;margin:.3rem 0}
+            .tv-gate table{border-collapse:collapse;width:100%}
+            .tv-gate td{padding:.12rem .3rem;font-size:.72rem}
+            .tv-gate input,.tv-gate select{font-size:.72rem;padding:.12rem .3rem;border:1px solid #cbd5e1;border-radius:.25rem}
+            .tv-gate input.f{width:120px}.tv-gate input.v{width:220px}
+            .tv-gate .url{width:min(480px,90%)}
+            .tv-live{font-size:.62rem;font-weight:800;padding:.05rem .4rem;border-radius:.3rem;margin-left:.3rem}
+            .tv-live.p{background:#dcfce7;color:#166534}.tv-live.f{background:#fee2e2;color:#b91c1c}.tv-live.w{background:#f1f5f9;color:#94a3b8}
+            .tv-adv-toggle{font-size:.66rem;color:#64748b;display:inline-flex;align-items:center;gap:.25rem;cursor:pointer}
+            </style>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <h3 style="margin:0">Verifier Builder</h3>
+                <button onclick="suggestTaskVerifier()" id="tv-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest with AI
+                </button>
+                <button onclick="saveTaskVerifier()" id="tv-save" class="btn btn-primary" style="padding:.2rem .6rem;font-size:.72rem;display:none">Save</button>
+                <span id="tv-gold-live" class="tv-live w" title="live check of this spec against the GOLD trajectory">gold: —</span>
+                <span id="tv-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            <p class="hint">Design rule: the backend gate pins <b>instruction-named values</b> (⭐ chips), grounded in the gold requests below — everything else stays open. Make the FE affordance <b>non-advisory</b> when the macro <i>is</i> the mechanism (search bar, slider, dropdown).</p>
+            <div id="tv-missing" style="font-size:.72rem;color:#b45309;margin-bottom:.4rem"></div>
+
+            <!-- Gold request evidence: click a row to set a macro's gate, click a chip to pin a field -->
+            <div class="tv-ev">
+                <div class="tv-ev-head">
+                    <b style="font-size:.72rem">Gold requests</b>
+                    <span style="font-size:.64rem;color:#94a3b8">pin into →</span>
+                    <select id="tv-target" style="font-size:.7rem;padding:.1rem .25rem;border:1px solid #cbd5e1;border-radius:.25rem"></select>
+                    <label style="font-size:.64rem;color:#64748b;margin-left:auto"><input type="checkbox" id="tv-ev-all" checked onchange="renderEvidence()"> include plain GETs</label>
+                    <span style="font-size:.62rem;color:#a16207">⭐ = value appears in the instruction/expected answer</span>
+                </div>
+                <div class="tv-ev-rows" id="tv-evidence"></div>
+            </div>
+            <div id="tv-result"></div>
+
+            <!-- Sandbox -->
+            <div id="tv-sandbox" style="display:none;margin-top:.6rem;padding-top:.6rem;border-top:1px dashed #e2e8f0">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                    <label style="margin:0">Test against</label>
+                    <select id="tv-which" class="param-input" style="width:auto;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.76rem">
+                        <option value="gold">Gold (human)</option>
+                        <option value="walk">Verification walk</option>
+                        <option value="agent">Agent attempt</option>
+                    </select>
+                    <button onclick="runTaskVerifier()" id="tv-run" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run</button>
+                    <button onclick="runBoth()" id="tv-runboth" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run Gold + Walk</button>
+                    <span id="tv-run-msg" style="font-size:.7rem;color:#94a3b8"></span>
+                </div>
+                <div id="tv-run-result" style="margin-top:.5rem"></div>
+            </div>
+        </div>
+
         <!-- Trajectory Playback -->
         <div class="section">
             <h3>Trajectory Playback</h3>
+            <details open style="margin-bottom:.6rem;border:1px solid #e2e8f0;border-radius:.4rem;background:#fcfcfd;padding:.35rem .55rem">
+            <summary style="cursor:pointer;font-size:.8rem;font-weight:600;color:#334155">Macros ({{ task.macros|length }}) — spans highlighted in the action list below</summary>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <button onclick="suggestTags()" id="suggest-tags-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest Tags with AI
+                </button>
+                <span id="suggest-tags-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            {% for m in task.macros %}
+            <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
+                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}
+                    {% if task.macro_operations and task.macro_operations.get(m) %}
+                    <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase;vertical-align:middle">op: {{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
+                {% if task.macro_spans and task.macro_spans.get(m) %}
+                <div style="font-size:.68rem;color:#2563eb;margin-top:.1rem">Tagged actions: {{ task.macro_spans[m]|join(' → ') }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if task.macro_edges %}
+            <label>Macro Dependencies</label>
+            <div style="font-size:.75rem;color:#475569">
+                {% for edge in task.macro_edges %}
+                <div>{{ macro_descriptions.get(edge.get('from',''), {}).get('description', edge.get('from','')) }} → {{ macro_descriptions.get(edge.get('to',''), {}).get('description', edge.get('to','')) }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            </details>
             <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
                 <button onclick="playbackStep(-1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&larr; Prev</button>
                 <span id="playback-counter" style="font-size:.8rem;color:#64748b;min-width:80px;text-align:center">0 / 0</span>
@@ -279,71 +379,6 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         </div>
         {% endif %}
 
-        <!-- Macros for this task -->
-        <div class="section">
-            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
-                <h3 style="margin:0">Macros ({{ task.macros|length }})</h3>
-                <button onclick="suggestTags()" id="suggest-tags-btn"
-                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
-                    Suggest Tags with AI
-                </button>
-                <span id="suggest-tags-status" style="font-size:.65rem;color:#94a3b8"></span>
-            </div>
-            {% for m in task.macros %}
-            <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
-                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}
-                    {% if task.macro_operations and task.macro_operations.get(m) %}
-                    <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase;vertical-align:middle">op: {{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}</span>
-                    {% endif %}
-                </div>
-                <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
-                {% if task.macro_spans and task.macro_spans.get(m) %}
-                <div style="font-size:.68rem;color:#2563eb;margin-top:.1rem">Tagged actions: {{ task.macro_spans[m]|join(' → ') }}</div>
-                {% endif %}
-            </div>
-            {% endfor %}
-
-            {% if task.macro_edges %}
-            <label>Macro Dependencies</label>
-            <div style="font-size:.75rem;color:#475569">
-                {% for edge in task.macro_edges %}
-                <div>{{ macro_descriptions.get(edge.get('from',''), {}).get('description', edge.get('from','')) }} → {{ macro_descriptions.get(edge.get('to',''), {}).get('description', edge.get('to','')) }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Verifier builder -->
-        <div class="section">
-            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
-                <h3 style="margin:0">Verifier Builder</h3>
-                <button onclick="suggestTaskVerifier()" id="tv-btn"
-                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
-                    Suggest with AI
-                </button>
-                <button onclick="saveTaskVerifier()" id="tv-save" class="btn btn-primary" style="padding:.2rem .6rem;font-size:.72rem;display:none">Save</button>
-                <span id="tv-status" style="font-size:.65rem;color:#94a3b8"></span>
-            </div>
-            <p class="hint">Fills each macro's <a href="/annotate/macro-templates" style="color:#2563eb">template</a> open fields from this trajectory (gemini-3.5-flash). Edit before saving.</p>
-            <div id="tv-missing" style="font-size:.72rem;color:#b45309;margin-bottom:.4rem"></div>
-            <div id="tv-result"></div>
-
-            <!-- Sandbox -->
-            <div id="tv-sandbox" style="display:none;margin-top:.6rem;padding-top:.6rem;border-top:1px dashed #e2e8f0">
-                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-                    <label style="margin:0">Test against</label>
-                    <select id="tv-which" class="param-input" style="width:auto;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.76rem">
-                        <option value="gold">Gold (human)</option>
-                        <option value="walk">Verification walk</option>
-                        <option value="agent">Agent attempt</option>
-                    </select>
-                    <button onclick="runTaskVerifier()" id="tv-run" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run</button>
-                    <button onclick="runBoth()" id="tv-runboth" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run Gold + Walk</button>
-                    <span id="tv-run-msg" style="font-size:.7rem;color:#94a3b8"></span>
-                </div>
-                <div id="tv-run-result" style="margin-top:.5rem"></div>
-            </div>
-        </div>
         {% endif %}
     </div>
 </div>
@@ -858,6 +893,9 @@ var TV_TASK = {{ (task.task_id if task else "") | tojson }};
 var TV_ANN  = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
 var TV_MACROS = {};   // macro -> filled tree (editable model)
 var TV_FEEDBACK = {}; // macro -> NL feedback for the later coding-agent fix pass
+var TV_INSTR = {{ (task.instruction if task else "") | tojson }};
+var TV_EXPECTED = {{ (task.expected_answer if task and task.expected_answer else "") | tojson }};
+var TV_LIVE = {};     // macro -> last gold-run passed bool
 var TV_OPS = {{ task.macro_operations | tojson if task and task.macro_operations else '{}' }};  // macro -> reasoning op (stored key)
 var OP_LABELS = {{ op_labels | tojson }};  // op key -> display label (e.g. read -> read/memorize)
 function opLabel(op){ return OP_LABELS[op] || op; }
@@ -888,6 +926,350 @@ var TASK_SPANS = {{ task.macro_spans | tojson if task and task.macro_spans else 
     });
 })();
 
+// ===================== Evidence panel + structured gate editor =====================
+// Parse the gold trajectory's network events into pin-able evidence rows.
+function tvEvidence() {
+    var out = [];
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'network') continue;
+        var url = e.url || '', method = (e.method || 'GET').toUpperCase();
+        var path = url.split('?')[0], qs = url.indexOf('?') >= 0 ? url.split('?').slice(1).join('?') : '';
+        var query = {};
+        if (qs) qs.split('&').forEach(function(p){
+            var kv = p.split('='); if (kv[0]) query[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1]||'').replace(/\+/g,' '));
+        });
+        var body = e.requestBody;
+        if (typeof body === 'string') { try { body = JSON.parse(body); } catch(err) { body = body ? {_raw: body} : null; } }
+        out.push({method: method, url: url, path: path, query: query, body: (body && typeof body === 'object') ? body : null});
+    }
+    return out;
+}
+function tvStar(val) {  // does this value appear in the instruction / expected answer?
+    var s = String(val == null ? '' : val).trim().toLowerCase();
+    if (s.length < 2) return false;
+    var hay = (TV_INSTR + ' ' + TV_EXPECTED).toLowerCase();
+    return hay.indexOf(s) >= 0;
+}
+function renderEvidence() {
+    var el = document.getElementById('tv-evidence');
+    if (!el) return;
+    var all = document.getElementById('tv-ev-all').checked;
+    var rows = tvEvidence(), html = '', shown = 0;
+    rows.forEach(function(r, idx) {
+        var interesting = r.method !== 'GET' || Object.keys(r.query).length || r.body;
+        if (!all && !interesting) return;
+        shown++;
+        var chips = '';
+        Object.keys(r.query).forEach(function(k){
+            var star = tvStar(r.query[k]);
+            chips += '<span class="tv-chip'+(star?' star':'')+'" title="pin url constraint '+tvEsc(k)+'='+tvEsc(r.query[k])+'" '
+                   + 'onclick="pinQuery('+idx+',\''+tvEsc(k).replace(/'/g,"\\'")+'\')">'+(star?'⭐':'')+tvEsc(k)+'='+tvEsc(String(r.query[k]).slice(0,40))+'</span> ';
+        });
+        Object.keys(r.body || {}).forEach(function(k){
+            var v = r.body[k], vs = typeof v === 'object' ? JSON.stringify(v) : String(v);
+            var star = tvStar(vs);
+            chips += '<span class="tv-chip'+(star?' star':'')+'" title="pin body field '+tvEsc(k)+'" '
+                   + 'onclick="pinBody('+idx+',\''+tvEsc(k).replace(/'/g,"\\'")+'\')">'+(star?'⭐':'')+'body.'+tvEsc(k)+'='+tvEsc(vs.slice(0,40))+'</span> ';
+        });
+        html += '<div class="tv-ev-row"><span class="tv-m '+(r.method==='GET'?'get':'mut')+'">'+r.method+'</span>'
+              + '<span style="color:#334155;word-break:break-all">'+tvEsc(r.path)+'</span>'
+              + '<button class="tv-pin" onclick="pinGate('+idx+')" title="use this request as the target macro\'s backend gate">→ gate</button>'
+              + chips + '</div>';
+    });
+    el.innerHTML = html || '<div style="padding:.5rem;font-size:.7rem;color:#94a3b8">no '+(all?'':'mutation/query ')+'requests recorded in the gold trajectory</div>';
+}
+function populateTarget() {
+    var sel = document.getElementById('tv-target');
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = Object.keys(TV_MACROS).map(function(m){ return '<option'+(m===cur?' selected':'')+'>'+tvEsc(m)+'</option>'; }).join('');
+}
+// Walk a macro tree collecting leaf refs by type.
+function tvLeaves(node, type, out) {
+    out = out || [];
+    if (!node || typeof node !== 'object') return out;
+    if (node.op) { (node.checks||[]).forEach(function(c){ tvLeaves(c, type, out); }); return out; }
+    if (!type || node.type === type) out.push(node);
+    return out;
+}
+function tvGate(macro, create) {  // the macro's first request_made leaf (its backend gate)
+    var tree = TV_MACROS[macro];
+    if (!tree) return null;
+    var leaves = tvLeaves(tree, 'request_made');
+    if (leaves.length) return leaves[0];
+    if (!create) return null;
+    var leaf = {type: 'request_made', label: 'backend gate', method: {open:true}, url: {open:true}};
+    if (tree.op) { (tree.checks = tree.checks || []).push(leaf); }
+    else { TV_MACROS[macro] = {op: 'AND', checks: [tree, leaf]}; }
+    return leaf;
+}
+// Every macro carries the 3 canonical components: page_visited + action (FE
+// affordance) + request_made (backend gate). Missing ones are added OPEN
+// ({open:true} = not asserted, passes until pinned) so they're editable here.
+// Per-component on/off: toggling ON inserts that component's check into the
+// macro tree; toggling OFF removes it. Nothing is added automatically — a
+// verifier only changes when YOU flip a toggle (and then Save).
+function tvCompLeaf(type) {
+    if (type === 'page_visited')
+        return {type:'page_visited', label:'page visited', url:{open:true}};
+    if (type === 'action_included')
+        return {type:'action_included', label:'FE affordance', action:{open:true}, target:{open:true}, value:{open:true}, advisory:true};
+    return {type:'request_made', label:'backend gate', method:{open:true}, url:{open:true}};
+}
+function compToggle(macro, type, on) {
+    var tree = TV_MACROS[macro];
+    if (on) {
+        var leaf = tvCompLeaf(type);
+        if (tree && tree.op) (tree.checks = tree.checks || []).push(leaf);
+        else if (tree) TV_MACROS[macro] = {op:'AND', checks:[tree, leaf]};
+        else TV_MACROS[macro] = leaf;
+    } else {
+        var ls = tvLeaves(tree, type);
+        if (!ls.length) return;
+        var t = tree;
+        for (var i = 0; i < ls.length; i++) {
+            var r = tvRemoveNode(t, ls[i]);
+            if (r === null) {
+                alert('This is the only check left in the macro — removing it would leave a vacuous verifier. Turn another component on first.');
+                renderTaskVerifier();
+                return;
+            }
+            t = r;
+        }
+        TV_MACROS[macro] = t;
+    }
+    tvChanged();
+}
+function tvPage(macro) { return tvLeaves(TV_MACROS[macro], 'page_visited')[0] || null; }
+function tvVisitedPages() {
+    // distinct pages actually visited in the gold trajectory, in first-seen order
+    var seen = {}, out = [];
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'observation' || !e.url) continue;
+        if (!seen[e.url]) { seen[e.url] = 1; out.push(e.url); }
+    }
+    return out;
+}
+function pageSetUrl(macro, url) {
+    var p = tvPage(macro); if (!p) return;
+    p.url = url || {open:true};
+    if (url) p.advisory = false;   // pinning a page url = it should gate
+    tvChanged();
+}
+function pageSelect(macro, sel) {
+    if (sel.value === '__custom__') {
+        var cur = tvPage(macro);
+        var v = prompt('url substring or re:pattern the visited page must match:',
+                       (cur && typeof cur.url === 'string') ? cur.url : '');
+        if (v === null) { renderTaskVerifier(); return; }  // cancelled — restore select
+        pageSetUrl(macro, v.trim());
+        return;
+    }
+    pageSetUrl(macro, sel.value);
+}
+function gateAdvisory(macro, on) {
+    var g = tvGate(macro); if (g) { g.advisory = on ? true : false; tvChanged(); }
+}
+function pageAdvisory(macro, on) {
+    var p = tvPage(macro); if (p) { p.advisory = on ? true : false; tvChanged(); }
+}
+function tvTargetMacro() {
+    var sel = document.getElementById('tv-target');
+    return sel && sel.value ? sel.value : Object.keys(TV_MACROS)[0];
+}
+function pinGate(idx) {
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true); g.advisory = false; g.advisory = false; g.advisory = false;
+    g.method = r.method;
+    g.url = r.path;
+    tvChanged();
+}
+function escRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function pinQuery(idx, key) {
+    // GET-param constraint lives in the url (query params are part of the URL):
+    // re:<path>\?.*key=value — order-insensitive enough; edit as text if needed.
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true);
+    g.method = r.method;
+    var base = (typeof g.url === 'string' && g.url.indexOf('re:') === 0) ? g.url : 're:' + escRe(r.path) + '\\?';
+    g.url = base + (base.endsWith('\\?') ? '' : '.*') + '.*' + escRe(key) + '=' + escRe(encodeURIComponent(String(r.query[key])).replace(/%20/g,'+'));
+    tvChanged();
+}
+function pinBody(idx, key) {
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true);
+    g.method = r.method; if (typeof g.url !== 'string') g.url = r.path;
+    var v = r.body[key], vs = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    var mode = (!isNaN(parseFloat(vs)) && isFinite(vs)) ? 'numeric' : (vs.length > 30 ? 'contains' : 'equals');
+    g.body_fields = g.body_fields && !g.body_fields.open ? g.body_fields : {};
+    g.body_fields[key] = {value: (typeof v === 'object' ? vs : v), mode: mode};
+    tvChanged();
+}
+// Structured gate editor rendered inside each macro card.
+function gateEditorHTML(macro) {
+    var g = tvGate(macro);
+    var live = TV_LIVE[macro];
+    var badge = live === undefined ? '' : '<span class="tv-live '+(live?'p':'f')+'">gold '+(live?'✓':'✗')+'</span>';
+    // component on/off strip — checked = the component exists in this macro's tree
+    var comps = [['request_made','request'], ['action_included','action'], ['page_visited','page visited']];
+    var strip = '<div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">'
+        + '<b style="font-size:.7rem;color:#1d4ed8">components</b>' + badge
+        + comps.map(function(cp){
+            var on = tvLeaves(TV_MACROS[macro], cp[0]).length > 0;
+            return '<label class="tv-adv-toggle"><input type="checkbox" '+(on?'checked':'')
+                 + ' onchange="compToggle(\''+macro+'\',\''+cp[0]+'\',this.checked)"><b>'+cp[1]+'</b></label>';
+          }).join('')
+        + '</div>';
+    // page_visited component editor — dropdown of pages actually visited in gold
+    // (built BEFORE the no-gate early return: macros like report_information have
+    // no request gate but still need their page/action editors)
+    var pv = tvPage(macro);
+    var pvHtml = '';
+    if (pv) {
+        var pvUrl = typeof pv.url === 'string' ? pv.url : '';
+        var pages = tvVisitedPages();
+        var inList = pvUrl === '' || pages.indexOf(pvUrl) >= 0;
+        var pvOpts = '<option value=""'+(pvUrl===''?' selected':'')+'>(any page)</option>'
+            + pages.map(function(u){
+                return '<option value="'+tvEsc(u)+'"'+(u===pvUrl?' selected':'')+'>'+tvEsc(u)+'</option>';
+              }).join('')
+            + (!inList ? '<option value="'+tvEsc(pvUrl)+'" selected>'+tvEsc(pvUrl)+' (custom)</option>' : '')
+            + '<option value="__custom__">custom…</option>';
+        pvHtml = '<div style="display:flex;gap:.4rem;align-items:center;margin-top:.25rem;flex-wrap:wrap">'
+            + '<b style="font-size:.7rem;color:#0e7490">page visited</b>'
+            + '<select style="max-width:min(480px,80%)" onchange="pageSelect(\''+macro+'\',this)">'+pvOpts+'</select>'
+            + '<label class="tv-adv-toggle" title="advisory = does not gate pass/fail"><input type="checkbox" '+(pv.advisory===true?'checked':'')+' onchange="pageAdvisory(\''+macro+'\',this.checked)">advisory</label>'
+            + '</div>';
+    }
+    // FE affordance advisory toggles
+    var fe = tvLeaves(TV_MACROS[macro], 'action_included');
+    var feHtml = fe.length ? '<div style="margin-top:.3rem;font-size:.68rem;color:#64748b">FE affordance: '
+        + fe.map(function(l, i){
+            var on = l.advisory !== false;
+            return '<label class="tv-adv-toggle"><input type="checkbox" '+(on?'checked':'')
+                 + ' onchange="feAdvisory(\''+macro+'\','+i+',this.checked)">'
+                 + tvEsc(l.action || 'action')+' advisory</label>';
+          }).join(' · ')
+        + ' <span style="color:#a16207">(uncheck = the UI mechanism is REQUIRED)</span></div>' : '';
+    if (!g) return '<div class="tv-gate">' + strip
+        + '<div style="font-size:.68rem;color:#94a3b8;margin-top:.2rem">no request gate — toggle "request" on, or click "→ gate" on a gold request above</div>'
+        + pvHtml + feHtml + '</div>';
+    var method = typeof g.method === 'string' ? g.method : '';
+    var url = typeof g.url === 'string' ? g.url : '';
+    var opts = ['','GET','POST','PUT','PATCH','DELETE'].map(function(o){
+        return '<option value="'+o+'"'+(o===method?' selected':'')+'>'+(o||'ANY')+'</option>'; }).join('');
+    var rowsHtml = '';
+    var bf = (g.body_fields && !g.body_fields.open) ? g.body_fields : {};
+    Object.keys(bf).forEach(function(k){
+        var v = bf[k], val = (v && typeof v === 'object' && 'value' in v) ? v.value : v;
+        var mode = (v && typeof v === 'object' && v.mode) ? v.mode : 'auto';
+        var modeOpts = ['auto','equals','contains','numeric','fuzzy'].map(function(o){
+            return '<option'+(o===mode?' selected':'')+'>'+o+'</option>'; }).join('');
+        rowsHtml += '<tr><td>body.<input class="f" value="'+tvEsc(k)+'" onchange="gateRenameField(\''+macro+'\',\''+tvEsc(k)+'\',this.value)"></td>'
+            + '<td><input class="v" value="'+tvEsc(typeof val==='object'?JSON.stringify(val):val)+'" onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',this.value,null)"></td>'
+            + '<td><select onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',null,this.value)">'+modeOpts+'</select></td>'
+            + '<td><button class="tv-pin" onclick="gateDelField(\''+macro+'\',\''+tvEsc(k)+'\')">✕</button></td></tr>';
+    });
+    return '<div class="tv-gate">' + strip
+        + '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.25rem">'
+        + '<b style="font-size:.7rem;color:#1d4ed8">request</b>'
+        + '<select onchange="gateSetMU(\''+macro+'\',this.value,null)">'+opts+'</select>'
+        + '<input class="url" placeholder="url substring or re:pattern" value="'+tvEsc(url)+'" onchange="gateSetMU(\''+macro+'\',null,this.value)">'
+        + '<label class="tv-adv-toggle" title="advisory = does not gate pass/fail"><input type="checkbox" '+(g.advisory===true?'checked':'')+' onchange="gateAdvisory(\''+macro+'\',this.checked)">advisory</label>'
+        + '</div>'
+        + (rowsHtml ? '<table>'+rowsHtml+'</table>' : '<div style="font-size:.66rem;color:#94a3b8;margin-top:.2rem">no field constraints — click a ⭐ chip above to pin an instruction-named value</div>')
+        + '<button class="tv-pin" style="margin-top:.2rem" onclick="gateAddField(\''+macro+'\')">+ field constraint</button>'
+        + pvHtml + feHtml + '</div>';
+}
+function tvRemoveNode(node, target) {
+    // Remove `target` (by reference) from the tree; prune empty groups. Returns
+    // the (possibly new) node, or null if this whole subtree vanished.
+    if (node === target) return null;
+    if (!node || !node.op) return node;
+    node.checks = (node.checks || [])
+        .map(function(c){ return tvRemoveNode(c, target); })
+        .filter(function(c){ return c !== null; });
+    if (!node.checks.length) return null;
+    if (node.checks.length === 1) return node.checks[0];  // collapse single-child group
+    return node;
+}
+function gateRemove(macro) {
+    var g = tvGate(macro); if (!g) return;
+    var remaining = tvRemoveNode(TV_MACROS[macro], g);
+    if (remaining === null) {
+        alert('The request gate is the only check in this macro — removing it would leave a vacuous verifier that passes on anything. Edit it, or add another check first.');
+        return;
+    }
+    TV_MACROS[macro] = remaining;
+    tvChanged();
+}
+function gateSetMU(macro, method, url) {
+    var g = tvGate(macro, true);
+    if (method !== null) g.method = method || {open:true};
+    if (url !== null) g.url = url || {open:true};
+    tvChanged();
+}
+function gateSetField(macro, key, val, mode) {
+    var g = tvGate(macro, true);
+    g.body_fields = (g.body_fields && !g.body_fields.open) ? g.body_fields : {};
+    var cur = g.body_fields[key];
+    var obj = (cur && typeof cur === 'object' && 'value' in cur) ? cur : {value: cur, mode: 'auto'};
+    if (val !== null) obj.value = val;
+    if (mode !== null) obj.mode = mode;
+    g.body_fields[key] = obj;
+    tvChanged();
+}
+function gateRenameField(macro, oldK, newK) {
+    var g = tvGate(macro); if (!g || !g.body_fields || oldK === newK) return;
+    g.body_fields[newK] = g.body_fields[oldK]; delete g.body_fields[oldK];
+    tvChanged();
+}
+function gateDelField(macro, key) {
+    var g = tvGate(macro); if (!g || !g.body_fields) return;
+    delete g.body_fields[key];
+    if (!Object.keys(g.body_fields).length) delete g.body_fields;
+    tvChanged();
+}
+function gateAddField(macro) {
+    var k = prompt('field name (as it appears in the request body):'); if (!k) return;
+    gateSetField(macro, k, '', 'auto');
+}
+function feAdvisory(macro, i, on) {
+    var fe = tvLeaves(TV_MACROS[macro], 'action_included');
+    if (fe[i]) fe[i].advisory = on ? true : false;
+    tvChanged();
+}
+// Any structured edit: re-render + debounce a live gold validation run.
+var _tvValTimer = null;
+function tvChanged() {
+    renderTaskVerifier();
+    document.getElementById('tv-save').style.display = Object.keys(TV_MACROS).length ? '' : 'none';
+    tvValidateSoon();
+}
+function tvValidateSoon() {
+    if (_tvValTimer) clearTimeout(_tvValTimer);
+    _tvValTimer = setTimeout(tvValidateGold, 600);
+}
+function tvValidateGold() {
+    if (!Object.keys(TV_MACROS).length) return;
+    var el = document.getElementById('tv-gold-live');
+    el.className = 'tv-live w'; el.textContent = 'gold: …';
+    fetch('/annotate/api/run_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN, which: 'gold', macros: TV_MACROS})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.error) { el.className='tv-live w'; el.textContent = 'gold: ?'; el.title = d.error; return; }
+        TV_LIVE = {};
+        Object.keys(d.macros||{}).forEach(function(m){ TV_LIVE[m] = !!d.macros[m].passed; });
+        el.className = 'tv-live ' + (d.passed ? 'p' : 'f');
+        el.textContent = 'gold: ' + (d.passed ? 'PASS' : 'FAIL');
+        renderTaskVerifier();   // repaint per-macro badges without revalidating
+    }).catch(function(){ el.className='tv-live w'; el.textContent='gold: ?'; });
+}
+// ===================== end evidence/gate editor =====================
+
 function suggestTaskVerifier() {
     var btn = document.getElementById('tv-btn');
     var status = document.getElementById('tv-status');
@@ -909,6 +1291,7 @@ function suggestTaskVerifier() {
             : '';
         TV_MACROS = d.templates || {};
         renderTaskVerifier();
+        tvValidateSoon();
         document.getElementById('tv-save').style.display =
             Object.keys(TV_MACROS).length ? '' : 'none';
     }).catch(function(e){
@@ -954,9 +1337,12 @@ function renderTaskVerifier() {
         var opBadge = TV_OPS[macro]
             ? ' <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase">op: '+tvEsc(opLabel(TV_OPS[macro]))+'</span>'
             : '';
+        var liveBadge = TV_LIVE[macro] === undefined ? ''
+            : ' <span class="tv-live '+(TV_LIVE[macro]?'p':'f')+'">gold '+(TV_LIVE[macro]?'✓':'✗')+'</span>';
         box.innerHTML =
-            '<div class="mhead"><span class="mname">'+tvEsc(macro)+'</span>'+opBadge+'</div>'
-          + '<div class="mbody"><div class="tv-body-tree">' + tvNode(TV_MACROS[macro])
+            '<div class="mhead"><span class="mname">'+tvEsc(macro)+'</span>'+opBadge+liveBadge+'</div>'
+          + '<div class="mbody">' + gateEditorHTML(macro)
+          + '<div class="tv-body-tree">' + tvNode(TV_MACROS[macro])
           + '<details class="tv-raw"><summary>edit raw JSON</summary></details></div>'
           + '<div class="tv-fb"><label>Feedback</label>'
           + '<div class="fbrow"><button class="btn btn-primary fbsave" style="padding:.15rem .5rem;font-size:.68rem">Save</button>'
@@ -986,6 +1372,8 @@ function renderTaskVerifier() {
     });
     document.getElementById('tv-sandbox').style.display =
         Object.keys(TV_MACROS).length ? '' : 'none';
+    populateTarget();
+    renderEvidence();
 }
 
 function saveTaskVerifier() {
@@ -1074,7 +1462,12 @@ if (TV_TASK) {
             if (d.macros && Object.keys(d.macros).length) {
                 TV_MACROS = d.macros; renderTaskVerifier();
                 document.getElementById('tv-save').style.display = '';
-                document.getElementById('tv-status').textContent = 'loaded saved verifier';
+                document.getElementById('tv-status').textContent = (d.expected_refreshed && d.expected_refreshed.length)
+                    ? '⚠ expected answer refreshed from task.json (' + d.expected_refreshed.join(', ') + ') — Save to persist'
+                    : 'loaded saved verifier';
+                tvValidateSoon();   // live gold badge on load
+            } else {
+                renderEvidence();   // evidence panel is useful even before a spec exists
             }
         });
 }
