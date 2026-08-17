@@ -1475,8 +1475,17 @@ if (TV_TASK) {
             if (d.macros && Object.keys(d.macros).length) {
                 TV_MACROS = d.macros; renderTaskVerifier();
                 document.getElementById('tv-save').style.display = '';
-                document.getElementById('tv-status').textContent = (d.expected_refreshed && d.expected_refreshed.length)
-                    ? '⚠ expected answer refreshed from task.json (' + d.expected_refreshed.join(', ') + ') — Save to persist'
+                var notes = [];
+                if (d.expected_refreshed && d.expected_refreshed.length)
+                    notes.push('expected answer refreshed (' + d.expected_refreshed.join(', ') + ')');
+                if (d.macros_removed && d.macros_removed.length)
+                    notes.push('untagged macros dropped: ' + d.macros_removed.join(', '));
+                if (d.macros_added && d.macros_added.length)
+                    notes.push('new tags scaffolded from template: ' + d.macros_added.join(', '));
+                if (d.macros_no_template && d.macros_no_template.length)
+                    notes.push('new tags with NO template (author one): ' + d.macros_no_template.join(', '));
+                document.getElementById('tv-status').textContent = notes.length
+                    ? '⚠ synced with task.json — ' + notes.join(' · ') + ' — Save to persist'
                     : 'loaded saved verifier';
                 tvValidateSoon();   // live gold badge on load
             } else {

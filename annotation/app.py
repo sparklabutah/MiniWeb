@@ -1410,15 +1410,42 @@ def api_task_verifier(annotator, task_id):
     if request.method == "GET":
         if vf.exists():
             spec = json.loads(vf.read_text())
-            # a re-recorded task may have a NEW expected answer — never serve the
-            # builder a stale one frozen in verifier.json
+            # verifier.json freezes state at build time; never serve the builder
+            # stale data when task.json has since changed (re-record / retag):
             tjson = vf.parent / "task.json"
             if tjson.exists():
-                from annotation.macro_templates import refresh_expected
-                refreshed = refresh_expected(spec.get("macros") or {},
-                                             json.loads(tjson.read_text()))
+                from annotation.macro_templates import (refresh_expected,
+                                                        build_task_draft, _canon)
+                tdata = json.loads(tjson.read_text())
+                #  1. expected answer may have changed
+                refreshed = refresh_expected(spec.get("macros") or {}, tdata)
                 if refreshed:
                     spec["expected_refreshed"] = refreshed
+                #  2. the macro TAGS may have changed — reconcile the macro set
+                want = list(dict.fromkeys(_canon(m) for m in (tdata.get("macros") or [])))
+                have = spec.get("macros") or {}
+                removed = [m for m in have if m not in want]
+                for m in removed:
+                    have.pop(m)
+                missing = [m for m in want if m not in have]
+                added, no_template = [], []
+                if missing:
+                    draft = build_task_draft(missing)
+                    for m in missing:
+                        tree = (draft.get("templates") or {}).get(m)
+                        if tree:
+                            have[m] = tree
+                            added.append(m)
+                        else:
+                            no_template.append(m)
+                # keep the builder's card order = the task's tag order
+                spec["macros"] = {m: have[m] for m in want if m in have}
+                if removed:
+                    spec["macros_removed"] = removed
+                if added:
+                    spec["macros_added"] = added
+                if no_template:
+                    spec["macros_no_template"] = no_template
             return jsonify(spec)
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
