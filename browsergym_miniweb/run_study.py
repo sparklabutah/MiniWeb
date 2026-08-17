@@ -15,7 +15,6 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-os.environ["AGENTLAB_EXP_ROOT"] = "/scratch/general/vast/u1653932/agentlab_results"
 
 def main():
     ap = argparse.ArgumentParser(
