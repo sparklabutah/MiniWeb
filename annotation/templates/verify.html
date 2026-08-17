@@ -928,11 +928,31 @@ var TASK_SPANS = {{ task.macro_spans | tojson if task and task.macro_spans else 
 
 // ===================== Evidence panel + structured gate editor =====================
 // Parse the gold trajectory's network events into pin-able evidence rows.
+var TV_EV_HIDDEN = 0;   // network events outside the recording window (session noise)
+function tvWindow() {
+    // recording time span from action/observation timestamps
+    var lo = null, hi = null;
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'action' && e.type !== 'observation') continue;
+        var t = e.timestamp ? Date.parse(e.timestamp) : NaN;
+        if (isNaN(t)) continue;
+        if (lo === null || t < lo) lo = t;
+        if (hi === null || t > hi) hi = t;
+    }
+    return [lo, hi];
+}
 function tvEvidence() {
     var out = [];
+    var w = tvWindow(), MARGIN = 90 * 1000;
+    TV_EV_HIDDEN = 0;
     for (var i = 0; i < _trajData.length; i++) {
         var e = _trajData[i];
         if (e.type !== 'network') continue;
+        if (w[0] !== null && e.timestamp) {
+            var t = Date.parse(e.timestamp);
+            if (!isNaN(t) && (t < w[0] - MARGIN || t > w[1] + MARGIN)) { TV_EV_HIDDEN++; continue; }
+        }
         var url = e.url || '', method = (e.method || 'GET').toUpperCase();
         var path = url.split('?')[0], qs = url.indexOf('?') >= 0 ? url.split('?').slice(1).join('?') : '';
         var query = {};
@@ -977,6 +997,9 @@ function renderEvidence() {
               + '<button class="tv-pin" onclick="pinGate('+idx+')" title="use this request as the target macro\'s backend gate">→ gate</button>'
               + chips + '</div>';
     });
+    if (TV_EV_HIDDEN > 0)
+        html += '<div style="padding:.3rem .5rem;font-size:.66rem;color:#a16207;background:#fffbeb">'
+              + TV_EV_HIDDEN + ' request(s) outside the recording window hidden (session noise from other pages)</div>';
     el.innerHTML = html || '<div style="padding:.5rem;font-size:.7rem;color:#94a3b8">no '+(all?'':'mutation/query ')+'requests recorded in the gold trajectory</div>';
 }
 function populateTarget() {

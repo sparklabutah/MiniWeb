@@ -25,19 +25,59 @@ import json
 import os
 
 
+def _parse_ts(ts):
+    import datetime as _dt
+    try:
+        return _dt.datetime.fromisoformat(str(ts).replace("Z", "+00:00")).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return None
+
+
+def trajectory_window(traj: list):
+    """(start, end) datetimes of the recording, from the trajectory's own
+    event timestamps. (None, None) when the trajectory carries no timestamps."""
+    times = [_parse_ts(e.get("timestamp")) for e in (traj or [])]
+    times = [t for t in times if t]
+    return (min(times), max(times)) if times else (None, None)
+
+
+def filter_log_to_window(traj: list, server_log: list, margin_s: int = 90) -> list:
+    """Drop server-log entries recorded OUTSIDE the trajectory's time window.
+
+    The request log is per browser session, and an annotator's session sees far
+    more than one recording — other tasks, free browsing, the annotate UI's own
+    playback iframes. Anything outside [first, last trajectory timestamp]
+    (± margin) is that other activity, not this recording's evidence.
+    Entries without timestamps are kept (can't be placed, so don't judge them).
+    """
+    import datetime as _dt
+    t0, t1 = trajectory_window(traj)
+    if not t0:
+        return list(server_log or [])
+    lo, hi = t0 - _dt.timedelta(seconds=margin_s), t1 + _dt.timedelta(seconds=margin_s)
+    out = []
+    for e in server_log or []:
+        ts = _parse_ts(e.get("timestamp"))
+        if ts is None or lo <= ts <= hi:
+            out.append(e)
+    return out
+
+
 def merge_server_log(traj: list, server_log) -> list:
     """Return traj + a `network` event per server-log entry (union of witnesses).
 
     `server_log` is a list of entries as written by the app's request logger
     ({method, path, query, status, body?}) or a path to such a JSON file.
     Entries are appended after the recorded events; existing (client-recorded)
-    network events are kept.
+    network events are kept. Log entries outside the trajectory's own time
+    window are dropped (session logs accumulate unrelated activity).
     """
     if isinstance(server_log, (str, os.PathLike)):
         try:
             server_log = json.load(open(server_log))
         except (OSError, ValueError):
             server_log = []
+    server_log = filter_log_to_window(traj, server_log)
     if not server_log:
         return list(traj or [])
 
