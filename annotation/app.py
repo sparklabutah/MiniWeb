@@ -1461,6 +1461,11 @@ def api_task_verifier(annotator, task_id):
     for key in ("macros", "model", "feedback", "feedback_at"):
         if key in data:
             spec[key] = data[key]
+    if "macros" in data:
+        # a human saving through the builder IS the redesign event — stamp it
+        from datetime import datetime as _dt
+        spec["built_by"] = "human-builder-v2"
+        spec["saved_at"] = _dt.now().isoformat()
     vf.parent.mkdir(parents=True, exist_ok=True)
     vf.write_text(json.dumps(spec, indent=2, default=str))
     return jsonify({"status": "ok"})
