@@ -91,8 +91,9 @@ class BrowserUseAgent:
         self.max_steps = max_steps
         self.timeout = timeout
         self.headless = headless
-        # real files the agent may attach to <input type=file> — mirrors the
-        # fake in-page file picker's catalog (see evaluation/generate_fixtures.py)
+        # real files the agent may attach to <input type=file> — the actual files
+        # from the simulated file system / VFS (see evaluation/generate_fixtures.py),
+        # the same tree the in-page file explorer serves.
         self.available_file_paths = available_file_paths or []
         self._session = None
         self._server_url: str | None = None

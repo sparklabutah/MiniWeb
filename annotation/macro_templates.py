@@ -415,6 +415,35 @@ def inject_qa_leaf(macros_spec: dict, task: dict) -> dict:
     return macros_spec
 
 
+def refresh_expected(macros_spec: dict, task: dict) -> list:
+    """Sync answer-type leaves' `expected` to the task's CURRENT answers.
+
+    verifier.json freezes `expected` at build time; when a task is re-recorded
+    and its expected_answer / qa_answers change, the saved verifier silently
+    keeps grading against the old value. Call this wherever a verifier spec is
+    loaded next to its task (builder load, sandbox run, eval grading).
+
+    Returns the list of macros whose expected value was updated.
+    """
+    import json as _json
+    qa = task.get("qa_answers") or {}
+    changed = []
+    for macro, tree in (macros_spec or {}).items():
+        want = qa.get(macro) if isinstance(qa, dict) and qa.get(macro) else (task.get("expected_answer") or "")
+        if not isinstance(want, str):
+            want = _json.dumps(want)
+        if not want:
+            continue
+        for leaf in _all_leaves(tree):
+            if leaf.get("type") in ("qa_answer", "answer_matches", "reasoning_contains"):
+                cur = leaf.get("expected")
+                if isinstance(cur, str) and cur and cur != want:
+                    leaf["expected"] = want
+                    if macro not in changed:
+                        changed.append(macro)
+    return changed
+
+
 def build_task_draft(macros: list) -> dict:
     """Assemble the per-task verifier draft from the macros' templates.
 

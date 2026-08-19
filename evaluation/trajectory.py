@@ -1,39 +1,102 @@
-"""Trajectory normalization — reconstruct network events the recorder missed.
+"""Trajectory collation helpers.
 
-recorder.js only logs a `network` event for fetch/XMLHttpRequest. Two gaps
-follow:
+Two jobs, both pure collation of RECORDED evidence (no synthesis):
 
-  * full-page GET navigations (page loads, ?query= filters) are never network
-    events — they surface only as `navigate` actions / observation URLs;
-  * the verification-walk collector used to drop `network` messages entirely,
-    so walks recorded before that fix have no network events at all.
+  * merge_server_log — union the server-side request log into a trajectory as
+    `network` events. The server (`/_admin/log`, Flask after_request) is the
+    authoritative witness for requests: client-side recorder.js structurally
+    cannot see full-page navigations or native form POSTs (the page unloads
+    mid-flight). Client-recorded fetch/XHR network events are KEPT — old server
+    logs may lack request bodies that the client did capture — so the result is
+    the union of both witnesses. Duplicates are harmless: request_made scans
+    for existence.
 
-But the information isn't lost: a `submit` action carries {url, method,
-formData}, and every page an agent GETs shows up as an observation URL (stored
-`navigate` actions are filtered out during processing, so observations are the
-reliable GET source). This module derives the corresponding `network` events, so
-`request_made` checks work uniformly. Synthesized events are flagged
-`_synthesized` for provenance and are only added when no real network event
-already covers them (idempotent).
+  * extract_final_reasoning — the agent's final reasoning + answer from the
+    harness's own record (history.json / result.json).
+
+The old `synthesize_network_events` (inferring network events from submit /
+observation actions) is GONE: a DOM submit event fires even when the submission
+is blocked client-side, so synthesized POSTs asserted requests no witness ever
+saw. Network events now come only from the server log or the in-page recorder.
 """
 from __future__ import annotations
 
-from urllib.parse import urlsplit
+import json
+import os
 
 
-def _path(url: str) -> str:
-    """Strip scheme+host, keep path (+query) — matches how real network events
-    and page URLs are stored (e.g. '/sites/books-comics/book/1/rate')."""
-    if not url:
-        return ""
-    s = urlsplit(str(url))
-    if s.scheme or s.netloc:
-        return s.path + (("?" + s.query) if s.query else "")
-    return str(url)
+def _parse_ts(ts):
+    import datetime as _dt
+    try:
+        return _dt.datetime.fromisoformat(str(ts).replace("Z", "+00:00")).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return None
 
 
-def _path_only(url: str) -> str:
-    return _path(url).split("?", 1)[0]
+def trajectory_window(traj: list):
+    """(start, end) datetimes of the recording, from the trajectory's own
+    event timestamps. (None, None) when the trajectory carries no timestamps."""
+    times = [_parse_ts(e.get("timestamp")) for e in (traj or [])]
+    times = [t for t in times if t]
+    return (min(times), max(times)) if times else (None, None)
+
+
+def filter_log_to_window(traj: list, server_log: list, margin_s: int = 90) -> list:
+    """Drop server-log entries recorded OUTSIDE the trajectory's time window.
+
+    The request log is per browser session, and an annotator's session sees far
+    more than one recording — other tasks, free browsing, the annotate UI's own
+    playback iframes. Anything outside [first, last trajectory timestamp]
+    (± margin) is that other activity, not this recording's evidence.
+    Entries without timestamps are kept (can't be placed, so don't judge them).
+    """
+    import datetime as _dt
+    t0, t1 = trajectory_window(traj)
+    if not t0:
+        return list(server_log or [])
+    lo, hi = t0 - _dt.timedelta(seconds=margin_s), t1 + _dt.timedelta(seconds=margin_s)
+    out = []
+    for e in server_log or []:
+        ts = _parse_ts(e.get("timestamp"))
+        if ts is None or lo <= ts <= hi:
+            out.append(e)
+    return out
+
+
+def merge_server_log(traj: list, server_log) -> list:
+    """Return traj + a `network` event per server-log entry (union of witnesses).
+
+    `server_log` is a list of entries as written by the app's request logger
+    ({method, path, query, status, body?}) or a path to such a JSON file.
+    Entries are appended after the recorded events; existing (client-recorded)
+    network events are kept. Log entries outside the trajectory's own time
+    window are dropped (session logs accumulate unrelated activity).
+    """
+    if isinstance(server_log, (str, os.PathLike)):
+        try:
+            server_log = json.load(open(server_log))
+        except (OSError, ValueError):
+            server_log = []
+    server_log = filter_log_to_window(traj, server_log)
+    if not server_log:
+        return list(traj or [])
+
+    from urllib.parse import urlencode
+    out = list(traj or [])
+    for e in server_log:
+        url = e.get("path", "") or ""
+        query = e.get("query") or {}
+        if query:
+            url = url + "?" + urlencode(query)
+        out.append({
+            "type": "network",
+            "method": e.get("method"),
+            "url": url,
+            "status": e.get("status"),
+            "requestBody": e.get("body"),
+            "_source": "server_log",
+        })
+    return out
 
 
 def extract_final_reasoning(result_dir) -> str:
@@ -43,8 +106,6 @@ def extract_final_reasoning(result_dir) -> str:
     (final_result), NOT in trajectory.json. Returns a single text blob to attach
     to the trajectory as a {type:"reasoning"} event for the reasoning check.
     """
-    import json
-    import os
     bits = []
     rp = os.path.join(str(result_dir), "result.json")
     if os.path.exists(rp):
@@ -66,56 +127,3 @@ def extract_final_reasoning(result_dir) -> str:
         except (ValueError, OSError):
             pass
     return "\n".join(bits)
-
-
-def synthesize_network_events(traj: list, include_get: bool = True) -> list:
-    """Return a copy of `traj` with `network` events reconstructed from `submit`
-    (POST) and, if include_get, `navigate` (GET) actions. Idempotent."""
-    if not traj:
-        return traj
-
-    # what real network events already cover, keyed by (method, path-no-query)
-    covered = set()
-    for e in traj:
-        if e.get("type") == "network":
-            covered.add(((e.get("method") or "GET").upper(), _path_only(e.get("url"))))
-
-    out = []
-    events = list(traj)
-    for i, e in enumerate(events):
-        out.append(e)
-        t = e.get("type")
-
-        if t == "action" and e.get("action") == "submit" and e.get("url"):
-            method = (e.get("method") or "POST").upper()
-            path = _path(e.get("url"))
-            key = (method, _path_only(path))
-            if key in covered:
-                continue
-            covered.add(key)
-            # next observation on a different page => redirect-after-POST (302)
-            status = 200
-            for nxt in events[i + 1:]:
-                if nxt.get("type") == "observation":
-                    if _path_only(nxt.get("url")) != _path_only(e.get("url")):
-                        status = 302
-                    break
-            out.append({
-                "type": "network", "method": method, "url": path,
-                "status": status, "requestBody": e.get("formData"),
-                "_synthesized": "submit",
-            })
-
-        elif include_get and t == "observation" and e.get("url"):
-            # each distinct page the agent loaded is a GET to that URL
-            path = _path(e.get("url"))
-            key = ("GET", _path_only(path))
-            if key in covered:
-                continue
-            covered.add(key)
-            out.append({
-                "type": "network", "method": "GET", "url": path,
-                "status": 200, "_synthesized": "observation",
-            })
-
-    return out

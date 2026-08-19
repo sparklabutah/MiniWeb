@@ -148,11 +148,15 @@ def _expected_number(expected):
 def _field_match(want, got) -> bool:
     """Match one expected body-field value against the observed one, robustly.
 
-    - explicit form {"value": v, "mode": "equals|contains|numeric"} honors the mode
+    - explicit form {"value": v, "mode": "equals|contains|numeric|fuzzy"} honors the mode
     - both sides numeric        → numeric-tolerant (rounding-safe)
     - multi-word text           → CONTAINS (compact substring) — so a review that
                                   embeds a mandated sentence, or a message body, passes
     - single token / id / date  → compact-equal (ids stay strict, formatting-tolerant)
+    - mode "fuzzy"              → LLM judge (same mechanism as report_information's
+                                  answer check): does the submitted text satisfy the
+                                  expected content? For free-text form fields (messages,
+                                  reviews, bios) where substring matching is too brittle.
     An OPEN value ({open:true}) always matches (not asserted).
     """
     mode = "auto"
@@ -160,6 +164,13 @@ def _field_match(want, got) -> bool:
         mode, want = want.get("mode", "auto"), want["value"]
     if isinstance(want, dict) and want.get("open") is True:
         return True
+    if mode == "fuzzy":
+        # cheap paths first: exact/containment short-circuit the LLM call
+        nw0, ng0 = _compact(want), _compact(got)
+        if nw0 and (nw0 == ng0 or nw0 in ng0):
+            return True
+        ok, _why = _judge_alignment(str(got), str(want), "submitted form field")
+        return ok
     wn, gn = _numeric_value(want), _numeric_value(got)
     if mode == "numeric" or (mode == "auto" and wn is not None and gn is not None):
         return wn is not None and gn is not None and _num_close(wn, gn)
