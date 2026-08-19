@@ -452,6 +452,18 @@ def index():
     battery_min = request.args.get("battery_min", type=float)
     features = [f for f in request.args.getlist("feature") if f in FEATURE_FILTERS]
 
+    # The range sliders always submit with the form, so their "Any" resting
+    # positions (price_max=2000/slider-max, battery_min=0/slider-min,
+    # price_min=0) arrive as concrete values. Treat those sentinels as
+    # no-filter — otherwise every submit silently drops phones with an unknown
+    # price/battery (most older phones), e.g. "zte nova" -> 0 results.
+    if price_min is not None and price_min <= 0:
+        price_min = None
+    if price_max is not None and price_max >= 2000:
+        price_max = None
+    if battery_min is not None and battery_min <= 0:
+        battery_min = None
+
     results = _db_query_phones(
         q=q, brand=brand or None, os_family=os_fam or None,
         sort=sort, price_min=price_min, price_max=price_max,

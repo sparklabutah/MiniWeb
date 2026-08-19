@@ -65,8 +65,16 @@ def save_task(annotator: str, task_id: str, task_data: dict, trajectory: list):
     with open(d / "trajectory.json", "w") as f:
         json.dump(trajectory, f, indent=2, default=str)
 
-    # Save server-side logs
+    # Save server-side logs — trimmed to THIS recording's time window. The
+    # session request log accumulates everything the annotator's browser did
+    # (other tasks, free browsing, playback iframes); only entries inside the
+    # trajectory's own timestamp span are this recording's evidence.
     if server_log:
+        try:
+            from evaluation.trajectory import filter_log_to_window
+            server_log = filter_log_to_window(trajectory, server_log)
+        except Exception:
+            pass
         with open(d / "server_log.json", "w") as f:
             json.dump(server_log, f, indent=2, default=str)
     if beacon_log:

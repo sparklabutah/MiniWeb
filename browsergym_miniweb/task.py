@@ -16,7 +16,7 @@ import pathlib
 from browsergym.core.task import AbstractBrowserTask
 
 from evaluation.verifiers import verify_task
-from evaluation.trajectory import synthesize_network_events
+from evaluation.trajectory import merge_server_log
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ANN = ROOT / "data" / "annotations"
@@ -51,17 +51,15 @@ def _start_url(base, tdir, task):
 
 
 def _assemble(recorded, log, beacons):
-    """Same assembly as run_agent_verify.build_trajectory, but from session-scoped feeds."""
-    traj = list(recorded)
+    """Same assembly as run_agent_verify.build_trajectory, but from session-scoped feeds.
+
+    Network events come from the server request log (union with any client-recorded
+    ones) — queries intact, nothing synthesized from actions."""
+    traj = [e for e in recorded if e.get("type") != "network"]
     if not any(e.get("type") == "action" for e in traj):
         for b in beacons:
             traj.append({"type": "action", **b})
-    if not any(e.get("type") == "network" for e in traj):
-        for e in log:
-            traj.append({"type": "network", "method": e.get("method"),
-                         "url": e.get("path"), "status": e.get("status"),
-                         "requestBody": e.get("body")})
-    return synthesize_network_events(traj)
+    return merge_server_log(traj, log)
 
 
 def fetch_session_trajectory(page, base):

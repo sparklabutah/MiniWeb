@@ -1237,8 +1237,10 @@ def api_suggest_task_verifier():
                       "label": s.get("label", ""), "context": s.get("group_labels", [])}
                      for s in draft["slots"]]
 
-    from evaluation.trajectory import synthesize_network_events
-    reduced = mt.reduce_trajectory_for_llm(synthesize_network_events(traj))
+    from pathlib import Path as _P
+    from evaluation.trajectory import merge_server_log
+    reduced = mt.reduce_trajectory_for_llm(
+        merge_server_log(traj, _P(str(_dir)) / "server_log.json"))
 
     system_prompt = (
         "You fill in the OPEN variables of pre-written verifier templates for a web task.\n"
@@ -1312,10 +1314,12 @@ def api_suggest_task_verifier():
 def _load_test_trajectory(annotator, task_id, which):
     """Return (trajectory, answer, note) for the requested test source.
 
-    Network events the recorder missed (GET navigations; POSTs dropped by the
-    old walk collector) are reconstructed from the actions before verifying."""
+    Network events come from RECORDED evidence only: the trajectory's own
+    (client-captured) network events, unioned with the session's server-side
+    request log when one was saved next to the recording. Nothing is synthesized
+    from actions — a request either has a witness or it doesn't count."""
     from annotation.storage import ANNOTATIONS_DIR
-    from evaluation.trajectory import synthesize_network_events
+    from evaluation.trajectory import merge_server_log
     tdir = ANNOTATIONS_DIR / annotator / task_id
 
     if which == "walk":
@@ -1323,7 +1327,7 @@ def _load_test_trajectory(annotator, task_id, which):
         if not wf.exists():
             return None, "", "no verification walk recorded for this task"
         d = json.loads(wf.read_text())
-        return synthesize_network_events(d.get("trajectory", [])), d.get("answer", ""), "verification walk"
+        return d.get("trajectory", []), d.get("answer", ""), "verification walk"
     if which == "agent":
         from pathlib import Path
         from evaluation.trajectory import extract_final_reasoning
@@ -1331,7 +1335,8 @@ def _load_test_trajectory(annotator, task_id, which):
         ar = rd / "trajectory.json"
         if not ar.exists():
             return None, "", "no agent run recorded for this task"
-        traj = synthesize_network_events(json.loads(ar.read_text()))
+        traj = json.loads(ar.read_text())
+        traj = merge_server_log(traj, rd / "server_log.json")   # no-op if absent
         reasoning = extract_final_reasoning(rd)
         if reasoning:
             traj = traj + [{"type": "reasoning", "text": reasoning}]
@@ -1341,13 +1346,14 @@ def _load_test_trajectory(annotator, task_id, which):
         if rp.exists():
             answer = (json.loads(rp.read_text()) or {}).get("final_result", "") or ""
         return traj, answer, "agent attempt"
-    # default: gold human trajectory
+    # default: gold human trajectory + the recording session's server log
     tf = tdir / "trajectory.json"
     task = json.loads((tdir / "task.json").read_text()) if (tdir / "task.json").exists() else {}
     traj = json.loads(tf.read_text()) if tf.exists() else []
+    traj = merge_server_log(traj, tdir / "server_log.json")     # no-op if absent
     # the human's reported answer IS the expected answer (perfect-trace assumption)
     answer = task.get("answer") or task.get("expected_answer") or ""
-    return synthesize_network_events(traj), answer, "gold (human)"
+    return traj, answer, "gold (human)"
 
 
 @annotation_bp.route("/api/run_task_verifier", methods=["POST"])
@@ -1385,7 +1391,9 @@ def api_run_task_verifier():
     from annotation import macro_templates as mt
     tjson = ANNOTATIONS_DIR / annotator / task_id / "task.json"
     if tjson.exists():
-        mt.inject_qa_leaf(macros, json.loads(tjson.read_text()))
+        tdata = json.loads(tjson.read_text())
+        mt.inject_qa_leaf(macros, tdata)
+        mt.refresh_expected(macros, tdata)   # never grade against a stale expected
 
     report = verify_task({"task_id": task_id, "macros": macros}, traj, answer)
     report["which"] = which
@@ -1401,7 +1409,44 @@ def api_task_verifier(annotator, task_id):
     vf = ANNOTATIONS_DIR / annotator / task_id / "verifier.json"
     if request.method == "GET":
         if vf.exists():
-            return jsonify(json.loads(vf.read_text()))
+            spec = json.loads(vf.read_text())
+            # verifier.json freezes state at build time; never serve the builder
+            # stale data when task.json has since changed (re-record / retag):
+            tjson = vf.parent / "task.json"
+            if tjson.exists():
+                from annotation.macro_templates import (refresh_expected,
+                                                        build_task_draft, _canon)
+                tdata = json.loads(tjson.read_text())
+                #  1. expected answer may have changed
+                refreshed = refresh_expected(spec.get("macros") or {}, tdata)
+                if refreshed:
+                    spec["expected_refreshed"] = refreshed
+                #  2. the macro TAGS may have changed — reconcile the macro set
+                want = list(dict.fromkeys(_canon(m) for m in (tdata.get("macros") or [])))
+                have = spec.get("macros") or {}
+                removed = [m for m in have if m not in want]
+                for m in removed:
+                    have.pop(m)
+                missing = [m for m in want if m not in have]
+                added, no_template = [], []
+                if missing:
+                    draft = build_task_draft(missing)
+                    for m in missing:
+                        tree = (draft.get("templates") or {}).get(m)
+                        if tree:
+                            have[m] = tree
+                            added.append(m)
+                        else:
+                            no_template.append(m)
+                # keep the builder's card order = the task's tag order
+                spec["macros"] = {m: have[m] for m in want if m in have}
+                if removed:
+                    spec["macros_removed"] = removed
+                if added:
+                    spec["macros_added"] = added
+                if no_template:
+                    spec["macros_no_template"] = no_template
+            return jsonify(spec)
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
     # Merge-save: only overwrite keys present in the payload, so fields written
@@ -1416,6 +1461,11 @@ def api_task_verifier(annotator, task_id):
     for key in ("macros", "model", "feedback", "feedback_at"):
         if key in data:
             spec[key] = data[key]
+    if "macros" in data:
+        # a human saving through the builder IS the redesign event — stamp it
+        from datetime import datetime as _dt
+        spec["built_by"] = "human-builder-v2"
+        spec["saved_at"] = _dt.now().isoformat()
     vf.parent.mkdir(parents=True, exist_ok=True)
     vf.write_text(json.dumps(spec, indent=2, default=str))
     return jsonify({"status": "ok"})
