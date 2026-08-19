@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 """Run a browser-use agent against an annotated task and grade it with the
 task's macro verifier (verifier.json + evaluation/verifiers.py::verify_task).
-
-This grades the agent's *trajectory* against the per-task macro verifier — the
-same spec the annotate UI builds and the gold self-check uses (as opposed to an
-LLM-as-judge on expected_outcome).
-
+.
 Pipeline:
   1. locate the task dir + its verifier.json under data/annotations/*/<task_id>/
   2. start the MiniWeb server (fresh -> logs start empty)
@@ -50,8 +46,7 @@ from evaluation.trajectory import merge_server_log
 from evaluation.verifiers import verify_task
 from annotation.storage import ANNOTATIONS_DIR
 
-BOLD, DIM, RESET = "\033[1m", "\033[2m", "\033[0m"
-GREEN, RED, YELLOW, CYAN = "\033[32m", "\033[31m", "\033[33m", "\033[36m"
+from helpers.term import BOLD, DIM, RESET, GREEN, RED, YELLOW, CYAN
 
 
 # ── task + verifier resolution ────────────────────────────────────────────────
@@ -163,21 +158,19 @@ def build_trajectory(base):
 
 # ── agent factory (shared build_agent — one factory for every runner) ─────────
 
-def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=False,
-               harness="browser-use"):
+def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=False):
     from agents import build_agent
     from generate_fixtures import ensure_fixtures
-    return build_agent(model, native_llm=native_llm, harness=harness, use_vision=use_vision,
+    return build_agent(model, native_llm=native_llm, use_vision=use_vision,
                        max_steps=max_steps, timeout=timeout, headless=headless,
                        available_file_paths=ensure_fixtures())
 
 
 # ── run + grade (one agent on one task) ───────────────────────────────────────
 
-async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
-                        judge_model="auto", native_llm=False, harness="browser-use",
+async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
                         max_steps=50, timeout=300, headless=True, start_from="recorded",
-                        port=8099, out=None, verbose=True):
+                        port=8099, out=None, verbose=True, agent=None):
     """Run one agent on one task and grade it. Returns a result dict."""
     from server import start_server, stop_server, wait_for_server
     from helpers.llm import LLMClient
@@ -221,8 +214,9 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
         start_url = resolve_start_url(base, rec_url or task.get("starting_url"), site_id)
 
     tok0 = LLMClient.GLOBAL.as_dict()
-    agent = make_agent(model, headless=headless, max_steps=max_steps, timeout=timeout,
-                       use_vision=use_vision, native_llm=native_llm, harness=harness)
+    if agent is None:
+        agent = make_agent(model, headless=headless, max_steps=max_steps, timeout=timeout,
+                           use_vision=use_vision, native_llm=native_llm)
     result = None
     t0 = datetime.now()
     try:
@@ -242,15 +236,6 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
     agent_answer = (getattr(result, "final_result", "") or "") if result else ""
     report = verify_task(verifier, traj, agent_answer, question=instruction)
 
-    judge = None
-    if grade in ("judge", "both"):
-        from judge import judge_task
-        judge = judge_task(
-            instruction=instruction,
-            trajectory=[e for e in recorded if e.get("type") == "action"],
-            expected_answer=expected,
-            rubric=task.get("expected_outcome") or "The agent completed the task correctly.",
-            agent_answer=agent_answer, model=judge_model)
 
     g = LLMClient.GLOBAL.as_dict()
     tokens = {k: g[k] - tok0.get(k, 0) for k in g}
@@ -258,11 +243,11 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
     res = {
         "task_id": tdir.name, "annotator": tdir.parent.name, "site": site_id,
         "instruction": instruction, "expected_answer": expected,
-        "agent_answer": agent_answer, "model": model, "obs": obs, "grade": grade,
+        "agent_answer": agent_answer, "model": model, "obs": obs,
         "elapsed_s": round(elapsed, 1), "steps": getattr(result, "steps", -1),
         "is_done": getattr(result, "is_done", False),
         "passed": report["passed"], "by_macro": report["by_macro"],
-        "judge": judge, "llm_tokens": tokens, "artifacts": str(out),
+        "llm_tokens": tokens, "artifacts": str(out),
     }
     (out / "trajectory.json").write_text(json.dumps(traj, indent=1, default=str))
     (out / "server_log.json").write_text(json.dumps(log, indent=1))
@@ -283,9 +268,6 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
             if not passed:
                 for leaf in _failed_leaves(report["macros"].get(macro, {})):
                     print(f"       {DIM}- {leaf['type']}: {leaf.get('reason','')[:80]}{RESET}")
-        if judge is not None:
-            jb = f"{GREEN}PASS{RESET}" if judge.get("pass") else f"{RED}FAIL{RESET}"
-            print(f"{BOLD}llm judge{RESET}    : {jb} ({judge.get('score')}) {DIM}{(judge.get('reasoning') or '')[:70]}{RESET}")
         print(f"{BOLD}llm tokens{RESET}   : {tokens['total']} ({tokens['prompt']}p+{tokens['completion']}c, {tokens['calls']} calls)")
         print(f"artifacts     : {out}\n" + "=" * 64)
     return res
@@ -293,36 +275,21 @@ async def run_and_grade(*, task_id, model, obs="axtree", grade="verifier",
 
 async def main_async(args):
     res = await run_and_grade(
-        task_id=args.task_id, model=args.model, obs=args.obs, grade=args.grade,
-        judge_model=args.judge_model, native_llm=args.native_llm, harness=args.harness,
+        task_id=args.task_id, model=args.model, obs=args.obs,
+        native_llm=args.native_llm,
         max_steps=args.max_steps, timeout=args.timeout, headless=not args.no_headless,
         start_from=args.start_from, port=args.port, out=args.out, verbose=True)
     return 0 if res["passed"] else 1
 
 
-# ── config mode: a matrix of agents × tasks ───────────────────────────────────
 
-def _load_config(path):
-    """Config (YAML or JSON):
-        agents: [{model: gemini-3.1-pro-preview, obs: visual}, {model: mock}]
-        tasks:  [Minh/job-sites_3c5414, software-marketplace_dc52a3, "site:banking"]
-        tasks:  all       # or the single token "all" -> every current task w/ a verifier
-        grade: verifier   # + max_steps/timeout/headless/start_from/native_llm defaults
-    """
-    text = Path(path).read_text()
-    try:
-        import yaml; cfg = yaml.safe_load(text)
-    except Exception:
-        cfg = json.loads(text)
-    return cfg
-
+# ── task-set expansion (used by run_study) ─────────────────────────────────────
 
 def _all_task_ids():
     """Every current annotated task that has a verifier (excludes .trash)."""
     return [f"{p.parent.parent.name}/{p.parent.name}"
             for p in sorted(ANNOTATIONS_DIR.glob("*/*/task.json"))
             if (p.parent / "verifier.json").exists() and "/.trash/" not in p.as_posix()]
-
 
 def _expand_tasks(entries):
     """Task ids, expanding "all" into every current annotated task and "site:<id>"
@@ -348,79 +315,6 @@ def _expand_tasks(entries):
     return list(dict.fromkeys(out))
 
 
-async def run_config(args):
-    cfg = _load_config(args.config)
-    agents = cfg.get("agents") or [{"model": cfg.get("model", "gemini-flash")}]
-    tasks = _expand_tasks(cfg.get("tasks"))
-    d = lambda k, dv: cfg.get(k, dv)  # run-wide defaults
-    exclude = set(cfg.get("exclude") or [])   # task_ids to skip entirely (e.g. poison tasks)
-    resume = cfg.get("resume", True)          # skip tasks whose result.json already exists
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(cfg.get("out") or (ROOT / "evaluation" / "results" / f"config_{ts}"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"{BOLD}{CYAN}config run{RESET}: {len(agents)} agent(s) × {len(tasks)} task(s) = "
-          f"{len(agents)*len(tasks)} runs  →  {run_dir}\n")
-    results = []
-    for ai, a in enumerate(agents):
-        model = a["model"]; label = a.get("label", model)
-        for ti, task_id in enumerate(tasks):
-            tag = f"{DIM}[{label} · {task_id}]{RESET}"
-            out_dir = run_dir / f"{label.replace('/','-')}__{task_id.replace('/','-')}"
-            if task_id in exclude:
-                print(f"  {tag} {DIM}SKIP (excluded){RESET}")
-                continue
-            if resume and (out_dir / "result.json").exists():
-                print(f"  {tag} {DIM}SKIP (done){RESET}")
-                continue
-            try:
-                res = await run_and_grade(
-                    task_id=task_id, model=model,
-                    obs=a.get("obs", d("obs", "axtree")), grade=a.get("grade", d("grade", "verifier")),
-                    judge_model=a.get("judge_model", d("judge_model", "auto")),
-                    native_llm=a.get("native_llm", d("native_llm", False)),
-                    harness=a.get("harness", d("harness", "browser-use")),
-                    max_steps=d("max_steps", 50), timeout=d("timeout", 300),
-                    headless=d("headless", True), start_from=d("start_from", "recorded"),
-                    port=args.port, out=out_dir,
-                    verbose=False)
-                res["agent_label"] = label
-                mk = f"{GREEN}PASS{RESET}" if res["passed"] else f"{RED}FAIL{RESET}"
-                print(f"  {tag} {mk}  {DIM}{res['elapsed_s']:.0f}s  {res['llm_tokens']['total']}tok{RESET}"
-                      + ("" if res["judge"] is None else f"  judge={'P' if res['judge'].get('pass') else 'F'}"))
-                results.append(res)
-            except Exception as exc:
-                print(f"  {tag} {RED}ERROR{RESET} {exc}")
-                results.append({"agent_label": label, "model": model, "task_id": task_id,
-                                "passed": False, "error": str(exc)})
-
-    (run_dir / "results.json").write_text(json.dumps(results, indent=1, default=str))
-    _print_matrix(agents, tasks, results, run_dir)
-    return 0
-
-
-def _print_matrix(agents, tasks, results, run_dir):
-    by = {(r.get("agent_label", r.get("model")), r["task_id"]): r for r in results}
-    labels = [a.get("label", a["model"]) for a in agents]
-    tids = list(dict.fromkeys(r["task_id"] for r in results))
-    w = max([len(t) for t in tids] + [10])
-    print(f"\n{BOLD}results matrix{RESET}  (✓ pass / ✗ fail)")
-    print(f"  {'task':<{w}}  " + "  ".join(f"{l[:14]:>14}" for l in labels))
-    for t in tids:
-        cells = []
-        for l in labels:
-            r = by.get((l, t))
-            cells.append(f"{GREEN}✓{RESET}" if r and r.get("passed") else f"{RED}✗{RESET}")
-        print(f"  {t:<{w}}  " + "  ".join(f"{c:>{14+len(GREEN)+len(RESET)}}" for c in cells))
-    print(f"\n{BOLD}pass rate{RESET}:")
-    for l in labels:
-        rs = [r for r in results if r.get("agent_label", r.get("model")) == l]
-        p = sum(1 for r in rs if r.get("passed")); tot = len(rs)
-        tok = sum((r.get("llm_tokens") or {}).get("total", 0) for r in rs)
-        print(f"  {l:<22} {p}/{tot} ({100*p//max(tot,1)}%)   {DIM}{tok} tokens{RESET}")
-    print(f"\nresults → {run_dir/'results.json'}")
-
-
 def _failed_leaves(node, out=None):
     if out is None:
         out = []
@@ -435,28 +329,14 @@ def _failed_leaves(node, out=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task-id", help="'<task_id>' or '<annotator>/<task_id>' (single run)")
-    ap.add_argument("--config", help="YAML/JSON config for a matrix of agents × tasks "
-                    "(agents: [{model, obs?, grade?}], tasks: [ids or 'site:<id>'], + defaults). "
-                    "Overrides --task-id.")
+    ap.add_argument("--task-id", required=True,
+                    help="'<task_id>' or '<annotator>/<task_id>' (studies: use run_study.py)")
     ap.add_argument("--model", default="gemini-flash",
                     help="agent model passed to ChatLLM (e.g. gemini-flash, gpt-4o), or 'mock'")
     ap.add_argument("--obs", choices=["visual", "axtree", "html"], default="axtree",
                     help="agent observation mode: 'visual' feeds screenshots (use_vision=True); "
                          "'axtree'/'html' feed browser-use's text DOM serialization "
                          "(use_vision=False). Default: axtree.")
-    ap.add_argument("--grade", choices=["verifier", "judge", "both"], default="verifier",
-                    help="how to grade: the macro verifier (default), an LLM judge on "
-                         "expected_outcome, or both.")
-    ap.add_argument("--judge-model", default="auto",
-                    help="model for the LLM judge when --grade includes judge (default: the "
-                         "configured default model).")
-    ap.add_argument("--harness", choices=["browser-use", "computer-use", "auto"],
-                    default="browser-use",
-                    help="agent harness: 'browser-use' (DOM/text loop, all providers, default); "
-                         "'computer-use' = the provider's NATIVE computer-use tool (screenshots + "
-                         "click/type) for commercial models (gemini/openai/anthropic); "
-                         "'auto' = computer-use for commercial providers, browser-use otherwise.")
     ap.add_argument("--native-llm", action="store_true",
                     help="drive the agent with browser-use's provider-native LLM (needs that "
                          "provider's API key in env; enables true vision). Default: the unified "
@@ -471,10 +351,6 @@ def main():
     ap.add_argument("--no-headless", action="store_true", help="show the browser")
     ap.add_argument("--out", default=None, help="artifacts dir (default: evaluation/results/agentverify_*)")
     args = ap.parse_args()
-    if args.config:
-        raise SystemExit(asyncio.run(run_config(args)))
-    if not args.task_id:
-        ap.error("one of --task-id or --config is required")
     try:
         raise SystemExit(asyncio.run(main_async(args)))
     except ValueError as e:

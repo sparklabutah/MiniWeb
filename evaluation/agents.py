@@ -573,24 +573,13 @@ MODEL_ALIASES = {
 
 
 def build_agent(model: str, *, native_llm: bool = False, harness: str = "browser-use", **opts):
-    """Construct an agent runner for a model name (or a friendly alias, or "mock").
+    """Construct a browser-use agent runner for a model name (or an alias, or "mock").
 
-    harness:
-      "browser-use" (default) — browser-use's DOM/text loop via ChatLLM (all providers).
-      "computer-use"          — the provider's NATIVE computer-use tool (screenshots +
-                                click/type), for commercial models only (gemini/openai/
-                                anthropic). See evaluation/computer_use.py.
-      "auto"                  — computer-use for commercial providers, else browser-use.
     opts: use_vision, max_steps, timeout, headless, available_file_paths.
     """
     if model == "mock":
         return MockAgent(**opts)
     model = MODEL_ALIASES.get(model, model)
-    if harness == "auto":
-        from helpers.llm import resolve_provider
-        harness = "computer-use" if resolve_provider(model) in ("anthropic", "openai", "gemini") \
-            else "browser-use"
-    if harness == "computer-use":
-        from computer_use import ComputerUseAgent
-        return ComputerUseAgent(model, **opts)
+    if harness not in ("browser-use", "auto"):
+        raise ValueError(f"harness {harness!r} is gone — only browser-use is supported")
     return BrowserUseAgent(build_browser_llm(model, native=native_llm), **opts)

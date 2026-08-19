@@ -121,7 +121,6 @@ screenshots per task under `out/`.
 **Multiple local models, one GPU each** (one ollama server + one runner per GPU):
 
 ```bash
-evaluation/run_multi_gpu.sh ollama/llama3.3 ollama/qwen2.5 ollama/mistral
 ```
 
 During eval the agent is **network-isolated to localhost** (a Chromium DNS-block flag) and each
@@ -216,8 +215,8 @@ Full details, interface mapping, and version pins: **`docs/BROWSERGYM_AGENTLAB_M
 app/            Flask app factory, per-site SQLite data layer (session-overlay isolation), admin/eval endpoints
 sites/<id>/     Each mock site: routes.py, templates, site.json (brand + category)
 helpers/        Generic utils — llm (model routing/tokens), geo, security, auth
-evaluation/     run_agent_verify.py (runner), verifiers.py (verify_task), verifier_archetypes.py,
-                trajectory.py, agents.py (browser-use), computer_use.py, server.py, run_multi_gpu.sh
+evaluation/     run_agent_verify.py (single-task runner), run_study.py (model×task studies), verifiers.py,
+                trajectory.py, agents.py (browser-use), server.py, xray.py (results inspector),
 annotation/     Annotation + verifier-building UI, macro registry loaders
 data/           annotations/ (tasks + verifiers), macros.yaml, macro_locations.yaml, backups/
 browsergym_miniweb/   BrowserGym task wrapper + AgentLab wiring (browser-gym branch)
