@@ -49,9 +49,6 @@
         .shared-users { display: flex; gap: 0.3rem; flex-wrap: wrap; }
         .shared-user { font-size: 0.75rem; background: #e8eaed; padding: 0.2rem 0.5rem; border-radius: 12px; color: #5f6368; }
 
-        .api-info { margin: 1rem; padding: 0.8rem; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; font-size: 0.8rem; color: #5f6368; }
-        .api-info summary { cursor: pointer; font-weight: 500; color: #0f9d58; }
-        .api-info code { background: #e8eaed; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
     </style>
 </head>
 <body>
@@ -65,11 +62,14 @@
             <span>Updated: {{ ss.updated_at[:10] if ss.updated_at else '' }}</span>
             <button class="btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)">Share</button>
             {% if can_edit %}
-            <select id="export-format" class="btn" title="Export format">
+            <select id="export-format" class="btn" title="Export format" onchange="ssSyncExport()">
+                <option value="xlsx">Excel (.xlsx)</option>
                 <option value="csv">CSV</option>
                 <option value="json">JSON</option>
             </select>
-            <button class="btn btn-green" onclick="window.location='{{ url_for('spreadsheets-slides.api_spreadsheet_export', sid=ss.id) }}?format='+document.getElementById('export-format').value">Export</button>
+            <a id="export-btn" class="btn btn-green" data-save-as
+               href="{{ url_for('spreadsheets-slides.api_spreadsheet_export', sid=ss.id) }}?format=xlsx"
+               data-download-name="{{ ss.title|replace(' ', '_') }}.xlsx">Export</a>
             {% endif %}
             {% if user %}
             <a href="{{ url_for('spreadsheets-slides.logout') }}" class="btn">Sign Out</a>
@@ -187,6 +187,13 @@
         body.appendChild(tr);
         var first = tr.querySelector('input'); if (first) first.focus();
     }
+    // Keep the Export link's URL + saved filename in sync with the format dropdown.
+    function ssSyncExport() {
+        var fmt = document.getElementById('export-format').value;
+        var a = document.getElementById('export-btn');
+        a.href = a.href.replace(/format=\w+/, 'format=' + fmt);
+        a.dataset.downloadName = a.dataset.downloadName.replace(/\.\w+$/, '.' + fmt);
+    }
     </script>
     {% endif %}
 
@@ -212,23 +219,5 @@
         {% endif %}
     </div>
 
-    <div class="api-info">
-        <details>
-            <summary>API Endpoints for this spreadsheet</summary>
-            <ul style="margin-top:0.5rem;padding-left:1.2rem;line-height:2;">
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}</code> - Full data</li>
-                <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/cell</code> - Update cell</li>
-                <li><code>PUT /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/edit</code> - Edit by ref (A1)</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/ref/A1</code> - Get cell by ref</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/range/A1:C5</code> - Get range</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/compute?column=1&operation=sum</code> - Compute</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/extremum?column=1&direction=max</code> - Extremum</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/filter?column=1&min_value=0</code> - Filter</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/select?column=2&contains=text</code> - Select</li>
-                <li><code>GET /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/export?format=csv</code> - Export CSV</li>
-                <li><code>DELETE /sites/spreadsheets-slides/api/spreadsheets/{{ ss.id }}/row/1</code> - Delete row</li>
-            </ul>
-        </details>
-    </div>
 </body>
 </html>

@@ -3,6 +3,7 @@
 Reads JSON data files for spreadsheets, presentations, templates, and users.
 Supports full CRUD, sharing, cell-level editing, slide management, and templates.
 """
+import json
 import pathlib
 from datetime import datetime
 
@@ -2256,13 +2257,29 @@ def api_spreadsheet_select(sid):
 # Macro-support routes: export_by_dropdown (export spreadsheet as CSV)
 # ---------------------------------------------------------------------------
 
+def _cell_value(cell):
+    """Coerce a stored cell string to int/float where possible, so exported
+    .xlsx cells are real numbers (sortable/summable in a spreadsheet app)."""
+    s = str(cell).strip()
+    if not s:
+        return ""
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        return cell
+
+
 @blueprint.route("/api/spreadsheets/<int:sid>/export")
 def api_spreadsheet_export(sid):
-    """Export a spreadsheet as CSV or JSON.
+    """Export a spreadsheet as XLSX (default, real workbook bytes), CSV or JSON.
 
     Query params:
-    - format: csv (default) or json
-    - sheet (default 0)
+    - format: xlsx (default), csv, or json
+    - sheet (default 0; ignored for xlsx, which exports every sheet)
 
     Supports export_by_dropdown macro.
     """
@@ -2272,11 +2289,29 @@ def api_spreadsheet_export(sid):
         return jsonify({"error": "Spreadsheet not found"}), 404
 
     sheet_idx = request.args.get("sheet", 0, type=int)
-    fmt = request.args.get("format", "csv").lower().strip()
+    fmt = request.args.get("format", "xlsx").lower().strip()
 
     sheets = ss.get("sheets", [])
     if sheet_idx < 0 or sheet_idx >= len(sheets):
         return jsonify({"error": "Invalid sheet index"}), 400
+
+    if fmt == "xlsx":
+        import io
+        from openpyxl import Workbook
+        wb = Workbook()
+        wb.remove(wb.active)
+        for sh in sheets:
+            ws = wb.create_sheet(title=str(sh.get("name", "Sheet"))[:31] or "Sheet")
+            for row in sh.get("data", []):
+                ws.append([_cell_value(c) for c in row])
+        buf = io.BytesIO()
+        wb.save(buf)
+        filename = f"{ss['title'].replace(' ', '_')}.xlsx"
+        return Response(
+            buf.getvalue(),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
     grid = sheets[sheet_idx]["data"]
     sheet_name = sheets[sheet_idx]["name"]
@@ -2313,6 +2348,67 @@ def api_spreadsheet_export(sid):
             if obj:
                 rows.append(obj)
         return jsonify(rows)
+
+
+@blueprint.route("/api/presentations/<int:pid>/export")
+def api_presentation_export(pid):
+    """Export a presentation as PPTX (default, real slide-deck bytes), a
+    plain-text outline, or JSON.
+
+    Query params:
+    - format: pptx (default), txt, or json
+
+    Supports export_by_dropdown macro.
+    """
+    presentations = _load_presentations()
+    pres = next((p for p in presentations if p["id"] == pid), None)
+    if pres is None:
+        return jsonify({"error": "Presentation not found"}), 404
+
+    fmt = request.args.get("format", "pptx").lower().strip()
+    slides = pres.get("slides", [])
+    fname_base = pres["title"].replace(" ", "_")
+
+    if fmt == "pptx":
+        import io
+        from pptx import Presentation as PptxPresentation
+        deck = PptxPresentation()
+        layout = deck.slide_layouts[1]        # Title and Content
+        for s in slides:
+            slide = deck.slides.add_slide(layout)
+            slide.shapes.title.text = str(s.get("title", ""))
+            slide.placeholders[1].text_frame.text = str(s.get("content", ""))
+            if s.get("notes"):
+                slide.notes_slide.notes_text_frame.text = str(s["notes"])
+        buf = io.BytesIO()
+        deck.save(buf)
+        return Response(
+            buf.getvalue(),
+            mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename={fname_base}.pptx"},
+        )
+
+    if fmt == "json":
+        payload = json.dumps({"title": pres["title"], "slides": slides}, indent=2)
+        return Response(
+            payload,
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename={fname_base}.json"},
+        )
+
+    lines = [pres["title"], "=" * len(pres["title"]), ""]
+    for i, s in enumerate(slides, 1):
+        lines.append(f"Slide {i}: {s.get('title', '')}")
+        if s.get("content"):
+            lines.append(s["content"])
+        if s.get("notes"):
+            lines.append(f"[Notes] {s['notes']}")
+        lines.append("")
+    return Response(
+        "\n".join(lines),
+        mimetype="text/plain",
+        headers={"Content-Disposition": f"attachment; filename={fname_base}.txt"},
+    )
 
 
 @blueprint.route("/api/export/all")

@@ -481,6 +481,8 @@ textarea#instruction:focus {
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem;background:#f0fdf4;color:#166534;border-color:#bbf7d0" onclick="draftTask()" id="draft-task-btn" title="Draft a full task (subtasks + instruction) from the sampled macros + real site data — then edit it">✨ Draft task (LLM)</button>
             <span id="draft-status" style="font-size:.6rem;color:#94a3b8"></span>
             <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem" onclick="generateInstruction()">✨ Suggest instruction (LLM)</button>
+            <button class="btn btn-secondary" style="font-size:.65rem;padding:.1rem .4rem;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe" onclick="inferMacros()" id="infer-macros-btn" title="Reverse flow: write the task instruction first (top panel), then let the LLM decompose it into a macro chain (nodes + subtasks + reasoning ops) for you to correct">✨ Infer macros from instruction (LLM)</button>
+            <span id="infer-status" style="font-size:.6rem;color:#94a3b8"></span>
             <button class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem" onclick="macroEdges=[];_drawArrows()">Clear arrows</button>
             <span style="flex:1"></span>
             <button onclick="toggleGraphExpand()" id="graph-expand-btn" class="btn btn-secondary" style="font-size:.6rem;padding:.1rem .3rem">⛶ Fullscreen</button>
@@ -1726,6 +1728,45 @@ function draftTask() {
         renderMacroList();           // re-render nodes so the prefilled subtasks show
         status.textContent = '✓ drafted (' + filled + ' steps) — edit it in your own words';
     }).catch(() => { btn.disabled = false; status.textContent = '⚠ draft request failed'; });
+}
+
+// --- Reverse annotation: instruction -> macro steps ---
+// The annotator writes the task in NL first; the LLM decomposes it into an
+// ordered macro chain (node + reasoning op + subtask per step) that replaces
+// the canvas — a starting point the annotator then corrects.
+function inferMacros() {
+    const text = document.getElementById('instruction').value.trim();
+    if (text.length < 10) { alert('Write the task instruction first (top panel), then infer its macros.'); return; }
+    if (selectedMacros.length && !confirm('Replace the current macro graph with macros inferred from the instruction?')) return;
+    const status = document.getElementById('infer-status');
+    const btn = document.getElementById('infer-macros-btn');
+    status.textContent = 'Inferring…'; btn.disabled = true;
+    fetch('/annotate/api/infer_macros', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({instruction: text,
+                              sites: (currentPrompt && currentPrompt.sites) ? currentPrompt.sites.map(s => s.id || s) : []})
+    }).then(r => r.json()).then(d => {
+        btn.disabled = false;
+        if (d.error || !(d.steps || []).length) {
+            status.textContent = '⚠ ' + (d.error || 'no macros inferred');
+            return;
+        }
+        selectedMacros = []; macroSubtasks = {}; macroOps = {}; macroEdges = [];
+        macroPositions = {}; macroSpans = {};
+        let prev = null;
+        for (const s of d.steps) {
+            const id = nextInstanceId(s.macro);
+            selectedMacros.push(id);
+            if (s.subtask) macroSubtasks[id] = s.subtask;
+            if (s.operation) macroOps[id] = s.operation;
+            if (prev) macroEdges.push({from: prev, to: id});
+            prev = id;
+        }
+        renderMacroList();
+        status.textContent = '✓ inferred ' + d.steps.length + ' step' + (d.steps.length === 1 ? '' : 's') +
+            ' — check macros, ops and arrows' +
+            ((d.unknown || []).length ? ' (no registry match: ' + d.unknown.join(', ') + ')' : '');
+    }).catch(() => { btn.disabled = false; status.textContent = '⚠ infer request failed'; });
 }
 
 function generateInstruction() {

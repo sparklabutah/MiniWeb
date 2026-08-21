@@ -49,9 +49,6 @@
         .empty-state { text-align: center; padding: 4rem 1rem; color: #80868b; }
         .empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #5f6368; }
 
-        .api-info { margin-top: 2rem; padding: 1rem; background: #fff; border: 1px solid #dadce0; border-radius: 8px; font-size: 0.82rem; color: #5f6368; }
-        .api-info summary { cursor: pointer; font-weight: 500; color: #1a73e8; }
-        .api-info code { background: #f1f3f4; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.8rem; }
 
         @media (max-width: 768px) {
             .sidebar { display: none; }
@@ -140,8 +137,8 @@
                     <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" style="padding:3px 6px;border:1px solid #dadce0;border-radius:4px;font-size:.82rem;">
                     <button type="submit" style="padding:3px 10px;background:#1a73e8;color:#fff;border:none;border-radius:4px;font-size:.82rem;cursor:pointer;">Filter</button>
                 </form>
-                <a href="{{ url_for('documents.api_export', format='json') }}" class="btn btn-outline" title="Export all as JSON" >Export JSON</a>
-                <a href="{{ url_for('documents.api_export', format='csv') }}" class="btn btn-outline" title="Export all as CSV" >Export CSV</a>
+                <a href="{{ url_for('documents.api_export', format='json') }}" class="btn btn-outline" data-save-as title="Export all as JSON" >Export JSON</a>
+                <a href="{{ url_for('documents.api_export', format='csv') }}" class="btn btn-outline" data-save-as title="Export all as CSV" >Export CSV</a>
             </div>
         </div>
 
@@ -175,28 +172,6 @@
         </div>
         {% endif %}
 
-        <div class="api-info">
-            <details>
-                <summary>API Endpoints</summary>
-                <ul style="margin-top:0.5rem;padding-left:1.2rem;line-height:2;">
-                    <li><code>GET /sites/documents/api/documents</code> - List documents (?q=, &sort=, &folder_id=, &owner_id=, &starred=true, &trashed=true)</li>
-                    <li><code>GET /sites/documents/api/documents/&lt;id&gt;</code> - Get single document</li>
-                    <li><code>POST /sites/documents/api/documents</code> - Create document (JSON: title, content, owner_id, folder_id)</li>
-                    <li><code>PUT /sites/documents/api/documents/&lt;id&gt;</code> - Update document (JSON: title, content)</li>
-                    <li><code>POST /sites/documents/api/documents/&lt;id&gt;/star</code> - Toggle star</li>
-                    <li><code>POST /sites/documents/api/documents/&lt;id&gt;/share</code> - Share (JSON: user_id, permission)</li>
-                    <li><code>POST /sites/documents/api/documents/&lt;id&gt;/trash</code> - Trash/restore (JSON: action=trash|restore)</li>
-                    <li><code>POST /sites/documents/api/documents/&lt;id&gt;/delete</code> - Permanently delete</li>
-                    <li><code>GET /sites/documents/api/documents/&lt;id&gt;/revisions</code> - Revision history</li>
-                    <li><code>GET /sites/documents/api/folders</code> - List folders</li>
-                    <li><code>GET /sites/documents/api/stats</code> - Document statistics</li>
-                    <li><code>GET /sites/documents/api/search?q=</code> - Search documents</li>
-                    <li><code>GET /sites/documents/api/export?owner_id=&folder_id=&format=json|csv</code> - Export documents</li>
-                    <li><code>POST /sites/documents/api/login</code> - Login (JSON: username, password)</li>
-                    <li><code>GET /sites/documents/api/users</code> - List users</li>
-                </ul>
-            </details>
-        </div>
     </div>
 
     <script>

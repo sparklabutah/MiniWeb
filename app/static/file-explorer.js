@@ -6,8 +6,9 @@
  *
  *  · Intercepts <input type="file"> clicks  → OPEN mode (pick a real seeded file,
  *    fetch its bytes, set input.files).
- *  · Intercepts download / export links     → SAVE-AS mode (choose folder + name,
- *    POST /_fs/save — the gradeable backend gate; the file then appears in the FS).
+ *  · Intercepts download / export links     → saves to /Downloads (browser-style
+ *    chip), or with data-save-as → SAVE-AS dialog (choose folder + name). Both
+ *    POST /_fs/save — the gradeable backend gate; the file then appears in the FS.
  *  · window.MiniWebFS.open({accept, onPick}) / .saveAs({name, content, origin})
  *    let pages (WebMail attach, dating photos) drive it programmatically.
  *  · window.MiniWebFiles kept as a thin back-compat alias.
@@ -223,6 +224,7 @@
     st = {
       mode: opts.mode || 'open', accept: opts.accept || [],
       saveName: opts.saveName || 'untitled', saveContent: opts.saveContent || '',
+      saveContentB64: opts.saveContentB64 || '', saveMime: opts.saveMime || '',
       saveOrigin: opts.saveOrigin || 'download', onPick: opts.onPick || null,
       onSave: opts.onSave || null, path: '/', items: [], selected: null,
     };
@@ -271,7 +273,7 @@
     var folder = st.path;
     fetch(FS + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name, folder: folder, content: st.saveContent,
-        origin: st.saveOrigin }) })
+        content_b64: st.saveContentB64, mime: st.saveMime, origin: st.saveOrigin }) })
       .then(function (r) { return r.json(); })
       .then(function (res) {
         toast('✓ Saved “' + name + '” to ' + (folder.split('/').pop() || 'Macintosh'));
@@ -301,6 +303,7 @@
       o = o || {};
       st = null;
       openDialog({ mode: 'save', saveName: o.name || 'untitled', saveContent: o.content || '',
+        saveContentB64: o.content_b64 || '', saveMime: o.mime || '',
         saveOrigin: o.origin || 'download', onSave: o.onSave, startPath: o.startPath });
     },
   };
@@ -346,19 +349,58 @@
       return /\.[a-z0-9]+$/i.test(last) ? decodeURIComponent(last) : '';
     } catch (e) { return ''; }
   }
+  // The server's Content-Disposition names the file authoritatively; used when
+  // the link itself didn't carry an explicit download / data-download-name.
+  function filenameFromDisposition(r) {
+    var cd = (r.headers && r.headers.get('Content-Disposition')) || '';
+    var m = /filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)/i.exec(cd);
+    if (!m) return '';
+    try { return decodeURIComponent(m[1].trim()); } catch (err) { return m[1].trim(); }
+  }
   document.addEventListener('click', function (e) {
-    var a = e.target.closest('a[download], a[href*="/download"], a[href*="export"][href*="format="], [data-download-name]');
+    var a = e.target.closest('a[download], a[href*="/download"], a[href*="export"][href*="format="], [data-download-name], a[data-save-as]');
     if (!a) return;
     var name = a.getAttribute('download') || a.getAttribute('data-download-name') || '';
+    var explicitName = !!name;
     var href = a.getAttribute('href') || '';
     if (!name) name = filenameFromHref(href);
     if (!name) {
       var fmt = (href.match(/format=([a-z0-9]+)/i) || [])[1];
       if (fmt) name = 'export.' + fmt;
     }
-    if (!name) return;  // not a recognizable file download — let it proceed
+    if (!name) {
+      if (a.hasAttribute('data-save-as')) name = 'untitled';
+      else return;  // not a recognizable file download — let it proceed
+    }
     e.preventDefault(); e.stopPropagation();
     var origin = (location.pathname.split('/')[2] || 'download');
+    var grabName = function (r) {
+      if (!explicitName) { var hn = filenameFromDisposition(r); if (hn) name = hn; }
+      return r.blob();
+    };
+    // Editor exports (data-save-as) behave like a desktop app's Save As: fetch
+    // the bytes, then open the save dialog (choose folder + filename) instead
+    // of silently dropping the file into /Downloads.
+    if (a.hasAttribute('data-save-as')) {
+      var openSave = function (body) {
+        openDialog({ mode: 'save', saveName: name, saveContent: body.content || '',
+          saveContentB64: body.content_b64 || '', saveMime: body.mime || '',
+          saveOrigin: origin, startPath: '/Documents' });
+      };
+      fetch(href, { credentials: 'same-origin' })
+        .then(grabName)
+        .then(function (blob) {
+          var mime = blob.type || '';
+          var textish = (/^text\/|json|csv|xml|svg|javascript|x-www-form/.test(mime) || mime === '');
+          if (textish && blob.size < 500000) {
+            blob.text().then(function (t) { openSave({ content: t, mime: mime }); });
+          } else {
+            blobToB64(blob).then(function (b64) { openSave({ content_b64: b64, mime: mime }); });
+          }
+        })
+        .catch(function () { openSave({ content: '' }); });
+      return;
+    }
     var chip = downloadChip(name);
     // Realistic browser download: fetch the real bytes (binary-safe) and save to
     // Downloads, with a progress chip. Text stays text; binary rides base64.
@@ -372,7 +414,7 @@
     };
     if (href && href.indexOf('javascript:') !== 0) {
       fetch(href, { credentials: 'same-origin' })
-        .then(function (r) { return r.blob(); })
+        .then(grabName)
         .then(function (blob) {
           var mime = blob.type || '';
           var textish = (/^text\/|json|csv|xml|svg|javascript|x-www-form/.test(mime) || mime === '');

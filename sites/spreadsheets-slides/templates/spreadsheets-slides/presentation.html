@@ -67,6 +67,17 @@
         <div class="toolbar-right">
             <span>Owner: {{ user_map.get(pres.owner_id, {}).get('name', 'Unknown') }}</span>
             <span>{{ pres.slides|length }} slides</span>
+            {% if can_edit %}
+            <select id="export-format" class="btn" title="Export format"
+                    onchange="var a=document.getElementById('export-btn');a.href=a.href.replace(/format=\w+/,'format='+this.value);a.dataset.downloadName=a.dataset.downloadName.replace(/\.\w+$/,'.'+this.value);">
+                <option value="pptx">PowerPoint (.pptx)</option>
+                <option value="txt">Text</option>
+                <option value="json">JSON</option>
+            </select>
+            <a id="export-btn" class="btn btn-yellow" data-save-as
+               href="{{ url_for('spreadsheets-slides.api_presentation_export', pid=pres.id) }}?format=pptx"
+               data-download-name="{{ pres.title|replace(' ', '_') }}.pptx">Export</a>
+            {% endif %}
             {% if user %}
             <a href="{{ url_for('spreadsheets-slides.logout') }}" class="btn">Sign Out</a>
             {% else %}

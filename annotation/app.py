@@ -2507,6 +2507,98 @@ def api_draft_task():
         return jsonify({"instruction": raw.strip(), "subtasks": {}})
 
 
+@annotation_bp.route("/api/infer_macros", methods=["POST"])
+def api_infer_macros():
+    """Reverse annotation: the annotator writes the task in natural language
+    FIRST, and the LLM decomposes it into ordered macro steps (base macro +
+    optional reasoning op + a concrete subtask per step) — the inverse of
+    draft_task (macros -> instruction). The UI loads the steps onto the graph
+    canvas as a sequential chain for the annotator to correct.
+
+    Body: {instruction: str, sites?: [site ids]}
+    Returns {mode: "llm", steps: [{macro, operation, subtask}], unknown: [..]}
+    where `unknown` lists model-suggested names not in the registry (dropped).
+    """
+    import json as _json
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    instruction = (data.get("instruction") or "").strip()
+    if len(instruction) < 10:
+        return jsonify({"error": "instruction required (>= 10 chars)"}), 400
+    site_ids = [s["id"] if isinstance(s, dict) else s for s in (data.get("sites") or [])]
+
+    ops = _registry.operations()
+    catalog = "\n".join(f"{name}: {meta.get('description', '')}"
+                        for name, meta in _MACRO_DESCRIPTIONS.items())
+    ops_text = "\n".join(f"{op}: {(info or {}).get('desc', '')}"
+                         for op, info in ops.items())
+
+    # Per-site availability biases the model toward macros that actually exist
+    # on the sampled sites; it may still pick outside — the annotator corrects.
+    site_avail = ""
+    if site_ids:
+        locs = _canonical_macro_locations()
+        parts = [f"{sid}: {', '.join(sorted((locs.get(sid) or {}).keys()))}"
+                 for sid in site_ids if locs.get(sid)]
+        if parts:
+            site_avail = ("\n\nMacros known to exist on the task's sites "
+                          "(prefer these):\n" + "\n".join(parts))
+
+    system = (
+        "You decompose a web task (written in natural language by an annotator) "
+        "into an ORDERED sequence of macro steps.\n"
+        "A step = a base macro (a physical UI interaction from the catalog) plus "
+        "an OPTIONAL reasoning operation, attached only when the step reads or "
+        "derives a value.\n"
+        "Rules:\n"
+        "- Use ONLY macro names from the catalog and ONLY the listed operations.\n"
+        "- One step per distinct interaction, in execution order.\n"
+        "- If the task requires reporting a value/answer back to the human, the "
+        "final step is report_information with the fitting operation.\n"
+        "- Intermediate reasoning is NOT its own step: attach its operation to "
+        "the macro it happens on.\n"
+        "- For each step write a short CONCRETE subtask: what to do on the page, "
+        "with the specific values/entities from the instruction.\n"
+        'Reply ONLY JSON: {"steps": [{"macro": "<catalog name>", '
+        '"operation": "<op or null>", "subtask": "<concrete step>"}]}')
+    user = (f"Task instruction:\n{instruction}\n\nMacro catalog:\n{catalog}"
+            f"\n\nReasoning operations:\n{ops_text}{site_avail}")
+
+    from app.llm import call_llm
+    raw = call_llm(user, system=system, max_tokens=700, temperature=0.2, json_mode=True)
+    if not raw:
+        return jsonify({"error": "LLM unavailable"}), 503
+    try:
+        parsed = _json.loads(raw)
+    except (ValueError, TypeError):
+        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        try:
+            parsed = _json.loads(m.group()) if m else None
+        except (ValueError, TypeError):
+            parsed = None
+    if not isinstance(parsed, dict):
+        return jsonify({"error": "unparseable LLM response"}), 502
+
+    steps, unknown = [], []
+    for s in (parsed.get("steps") or []):
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("macro") or "").strip()
+        if not name:
+            continue
+        if not _registry.is_known(name):
+            unknown.append(name)
+            continue
+        op = str(s.get("operation") or "").strip()
+        if op and not _registry.is_operation(op):
+            op = ""
+        steps.append({"macro": _registry.canon(name), "operation": op,
+                      "subtask": str(s.get("subtask") or "").strip()})
+    if not steps:
+        return jsonify({"error": "no usable steps inferred", "unknown": unknown}), 502
+    return jsonify({"mode": "llm", "steps": steps, "unknown": unknown})
+
+
 @annotation_bp.route("/api/llm_models")
 def api_llm_models():
     """Supported models per provider, with configuration status."""
