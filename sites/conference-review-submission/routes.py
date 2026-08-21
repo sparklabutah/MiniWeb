@@ -405,6 +405,22 @@ def venues_page():
                            venues=venues, user=user, pending_count=pending_count)
 
 
+@blueprint.route("/search")
+def search_page():
+    """Global navbar search (OpenReview-style): FTS over papers + venue-name match."""
+    user = _get_current_user()
+    q = request.args.get("q", "").strip()
+    papers = _db_search_papers(q)[:50] if q else []
+    venues = {v["id"]: v for v in _get_all_venues()}
+    ql = q.lower()
+    matched_venues = [v for v in venues.values()
+                      if q and (ql in v.get("name", "").lower()
+                                or ql in v.get("full_name", "").lower())]
+    return render_template("conference-review-submission/search.html",
+                           user=user, q=q, papers=papers, venues=venues,
+                           matched_venues=matched_venues)
+
+
 @blueprint.route("/venue/<venue_id>")
 def venue_detail(venue_id):
     venue = _get_venue(venue_id)

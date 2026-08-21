@@ -2578,6 +2578,7 @@ function actionDescription(t) {
 function renderTimeline() {
     const timeline = document.getElementById('action-timeline');
     if (!timeline) return;
+    const prevScroll = timeline.scrollTop;
     let html = '';
     let actNum = 0;
     let netCount = 0;
@@ -2674,7 +2675,10 @@ function renderTimeline() {
     document.getElementById('action-count').textContent = actNum + (netCount ? ' + ' + netCount + ' requests' : '');
     const countEl = document.getElementById('rec-count');
     if (countEl) countEl.textContent = actNum + ' actions, ' + netCount + ' requests';
-    if (rewindPoint === null) timeline.scrollTop = timeline.scrollHeight;
+    // Follow the tail only while actively recording (new actions stream in);
+    // during tagging/selection re-renders, keep the annotator's scroll position.
+    if (recording && rewindPoint === null) timeline.scrollTop = timeline.scrollHeight;
+    else timeline.scrollTop = prevScroll;
 }
 
 function rewindTo(actIdx) {

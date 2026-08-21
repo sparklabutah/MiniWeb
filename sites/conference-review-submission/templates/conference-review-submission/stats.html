@@ -4,86 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Statistics | {{ venue.name }} | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
+        .venue-header { padding: 26px 0 0; }
+        .venue-title { font-size: 24px; font-weight: 500; margin-bottom: 2px; }
+        .venue-subtitle { font-size: 13.5px; color: #777; margin-bottom: 10px; }
 
-        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
-        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
-        .topbar a:hover { color: #fff; }
-        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
-        .topbar .right a { margin-right: 0; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { border: 1px solid #ddd; border-radius: 4px; padding: 16px; text-align: center; background: #fff; }
+        .stat-card .val { font-size: 26px; font-weight: 700; color: #333; }
+        .stat-card .lbl { font-size: 12px; color: #8c8c8c; margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+        .stat-card.green .val { color: #5cb85c; }
+        .stat-card.red .val { color: #d9534f; }
 
-        .venue-header { border-bottom: 1px solid #e8e8e8; background: #fafafa; padding: 20px 0; }
-        .venue-inner { max-width: 900px; margin: 0 auto; padding: 0 24px; }
-        .venue-title { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
-        .venue-subtitle { font-size: 13px; color: #777; }
-        .venue-nav { margin-top: 12px; display: flex; gap: 4px; }
-        .venue-nav a { display: inline-block; padding: 6px 14px; font-size: 13px; font-weight: 500; color: #555; text-decoration: none; border-radius: 4px; }
-        .venue-nav a:hover { background: #eee; color: #333; }
-        .venue-nav a.active { background: #1a73e8; color: #fff; }
-
-        .content { max-width: 900px; margin: 0 auto; padding: 24px 24px 64px; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
-        .stat-card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; text-align: center; background: #fff; }
-        .stat-card .val { font-size: 28px; font-weight: 700; color: #1a1a1a; }
-        .stat-card .lbl { font-size: 12px; color: #888; margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
-        .stat-card.green .val { color: #137333; }
-        .stat-card.red .val { color: #c5221f; }
-
-        .section-title { font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 28px 0 14px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+        .section-title { font-size: 16px; font-weight: 700; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #eee; }
 
         .compare-row { display: flex; gap: 12px; }
-        .compare-box { flex: 1; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; text-align: center; background: #fff; }
-        .compare-box h4 { font-size: 12px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-        .compare-box .val { font-size: 24px; font-weight: 700; }
-        .val-green { color: #137333; }
-        .val-red { color: #c5221f; }
+        .compare-box { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 16px; text-align: center; background: #fff; }
+        .compare-box h4 { font-size: 12px; color: #8c8c8c; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+        .compare-box .val { font-size: 22px; font-weight: 700; }
+        .val-green { color: #5cb85c; }
+        .val-red { color: #d9534f; }
 
-        .dist-table { width: 100%; border-collapse: collapse; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
-        .dist-table th { text-align: left; padding: 8px 12px; background: #fafafa; color: #888; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+        .dist-table { width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+        .dist-table th { text-align: left; padding: 8px 12px; background: #f5f5f5; color: #8c8c8c; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
         .dist-table td { padding: 8px 12px; font-size: 13px; color: #444; border-top: 1px solid #f0f0f0; }
         .dist-bar { height: 16px; background: #eee; border-radius: 3px; overflow: hidden; }
         .dist-fill { height: 100%; border-radius: 3px; }
-        .dist-fill.high { background: #137333; }
-        .dist-fill.low { background: #c5221f; }
-        .dist-fill.mid { background: #e37400; }
-
-        .empty-state { text-align: center; color: #999; padding: 48px 16px; font-size: 14px; }
+        .dist-fill.high { background: #5cb85c; }
+        .dist-fill.low { background: #d9534f; }
+        .dist-fill.mid { background: #f0ad4e; }
     </style>
 </head>
 <body>
-    <div class="topbar">
-        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">PeerPortal</a>
-        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
-        <div class="right">
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-container venue-header">
+        <div class="venue-title">{{ venue.name }}</div>
+        <div class="venue-subtitle">{{ venue.full_name }}</div>
+        <div class="nav-tabs">
+            <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">Submissions</a>
+            <a href="{{ url_for('conference-review-submission.stats_page', venue_id=venue.id) }}" class="active">Statistics</a>
             {% if user %}
             <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
-            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
-            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
-            {% else %}
-            <a href="{{ url_for('conference-review-submission.login_page') }}">Login</a>
             {% endif %}
-            <a href="/">MiniWeb</a>
         </div>
     </div>
 
-    <div class="venue-header">
-        <div class="venue-inner">
-            <div class="venue-title">{{ venue.name }}</div>
-            <div class="venue-subtitle">{{ venue.full_name }}</div>
-            <div class="venue-nav">
-                <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">Submissions</a>
-                <a href="{{ url_for('conference-review-submission.stats_page', venue_id=venue.id) }}" class="active">Statistics</a>
-                {% if user %}
-                <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="content">
+    <div class="or-container" style="padding-bottom:64px;">
         {% if total == 0 %}
         <div class="empty-state">No submissions available for this venue to compute statistics.</div>
         {% else %}
@@ -133,5 +101,7 @@
         </table>
         {% endif %}
     </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
 </body>
 </html>

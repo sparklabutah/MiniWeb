@@ -549,14 +549,21 @@ def _find_email(email_id, user_id=None):
 # ---------------------------------------------------------------------------
 
 def _search_emails(emails, query):
+    """Match emails where the full phrase OR every individual word appears.
+
+    Pure phrase-substring matching made multi-word queries useless ("Xfinity
+    statement" missed "Your Xfinity Internet statement..."); AND-of-tokens is
+    what mail clients do and what search tasks assume.
+    """
     if not query:
         return emails
     q = query.lower().strip()
+    tokens = q.split()
     results = []
     for e in emails:
         text = (e.get("subject", "") + " " + e.get("from_addr", "") + " " +
                 e.get("body", "") + " " + " ".join(e.get("to_addrs", []))).lower()
-        if q in text:
+        if q in text or (len(tokens) > 1 and all(t in text for t in tokens)):
             results.append(e)
     return results
 

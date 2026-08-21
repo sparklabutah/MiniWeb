@@ -101,7 +101,13 @@
                 <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>
                 {% endif %}
                 {% if post.image_url %}
-                <img src="{{ post.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                {# media_edits[0] carries the composer's customization (filter + crop) for the lead photo #}
+                {% set e0 = post.media_edits[0] if post.media_edits else none %}
+                {% set lead_css = e0.css if e0 else '' %}
+                {% set ox = e0.offset_x|default(50) if e0 else 50 %}
+                {% set oy = e0.offset_y|default(50) if e0 else 50 %}
+                {% set zm = e0.zoom|default(100) if e0 else 100 %}
+                <img src="{{ post.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover{% if lead_css %};filter:{{ lead_css }}{% endif %}{% if e0 %};object-position:{{ ox }}% {{ oy }}%{% if zm != 100 %};transform:scale({{ zm / 100 }});transform-origin:{{ ox }}% {{ oy }}%{% endif %}{% endif %}">
                 {% else %}
                 <span class="placeholder">&#128247;</span>
                 {% endif %}

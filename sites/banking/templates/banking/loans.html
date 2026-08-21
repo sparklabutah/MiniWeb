@@ -61,16 +61,21 @@
             <div style="font-size:.8rem;color:#64748b;margin-top:.3rem">{{ pct }}% paid off</div>
             <form method="post" action="{{ url_for('banking.pay_loan_submit') }}" style="display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
                 <input type="hidden" name="loan_id" value="{{ loan.id }}">
-                <input type="hidden" name="amount" value="{{ loan.monthly_payment }}">
+                <label style="font-size:.8rem;color:#334155;display:inline-flex;align-items:center;gap:.3rem;">Amount $
+                    <input type="number" name="amount" value="{{ "%.2f"|format(loan.monthly_payment) }}"
+                           min="0.01" max="{{ "%.2f"|format(loan.remaining_balance) }}" step="0.01" required
+                           style="width:110px;padding:.4rem .5rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem;">
+                </label>
                 {% if accounts %}
                 <select name="account_id" style="padding:.4rem .5rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem;">
                     {% for acct in accounts %}
-                    <option value="{{ acct.id }}"{% if acct.type == 'checking' %} selected{% endif %}>{{ acct.account_number }} ({{ acct.type }} - ${{ "%.2f"|format(acct.balance) }})</option>
+                    <option value="{{ acct.id }}"{% if acct.type == 'checking' %} selected{% endif %}>{{ acct.account_number|mask_account }} ({{ acct.type }} - ${{ "%.2f"|format(acct.balance) }})</option>
                     {% endfor %}
                 </select>
                 {% endif %}
-                <button type="submit" class="btn-pay">Make Payment (${{ "%.2f"|format(loan.monthly_payment) }})</button>
+                <button type="submit" class="btn-pay">Make Payment</button>
             </form>
+            <div style="font-size:.72rem;color:#94a3b8;margin-top:.3rem;">Monthly payment is ${{ "%.2f"|format(loan.monthly_payment) }} — enter any amount up to the remaining balance.</div>
         </div>
         {% endfor %}
         {% else %}

@@ -559,6 +559,39 @@ def api_posts_create():
         video_url = last_upload.get("media_url")
     if video_url:
         post["video_url"] = video_url
+
+    # IG-style composer: `media` is an ordered list of selected items with the
+    # per-image edits chosen in the wizard's Edit step. It overrides the legacy
+    # single-image fields, derives the post type, and persists the edits
+    # (preset + adjustment values + computed CSS filter) so verifiers can grade
+    # them and post pages render the customized look.
+    media = data.get("media") or []
+    if media:
+        photos = [m for m in media if (m.get("type") or "photo") != "video"]
+        videos = [m for m in media if m.get("type") == "video"]
+        if photos:
+            post["image_url"] = photos[0].get("url") or post["image_url"]
+        if len(photos) > 1:
+            post["additional_images"] = [p.get("url", "") for p in photos[1:]]
+        if videos:
+            post["video_url"] = videos[0].get("url", "")
+        if not data.get("type"):
+            post["type"] = ("video" if videos and not photos
+                            else "carousel" if len(photos) > 1 else "photo")
+        post["media_edits"] = [{
+            "filename": m.get("filename", ""),
+            "type": m.get("type", "photo"),
+            "preset": (m.get("edits") or {}).get("preset", "normal"),
+            "brightness": (m.get("edits") or {}).get("brightness", 100),
+            "contrast": (m.get("edits") or {}).get("contrast", 100),
+            "saturation": (m.get("edits") or {}).get("saturation", 100),
+            "css": (m.get("edits") or {}).get("css", ""),
+            # crop: aspect preset + zoom% + focal point (object-position %)
+            "aspect": (m.get("edits") or {}).get("aspect", "original"),
+            "zoom": (m.get("edits") or {}).get("zoom", 100),
+            "offset_x": (m.get("edits") or {}).get("offset_x", 50),
+            "offset_y": (m.get("edits") or {}).get("offset_y", 50),
+        } for m in media]
     # Consume the upload so it isn't silently reattached to the next post.
     if last_upload and not data.get("image_url"):
         session.pop("last_upload", None)
@@ -1294,8 +1327,11 @@ def api_upload():
     # session cookie small; the newest upload keeps its media_url for attaching.
     uploads.append({k: v for k, v in result.items() if k != "media_url"})
     session["uploads"] = uploads
+    # Keep the session cookie under the 4KB browser limit: only small data
+    # URIs ride in the session fallback. The composer sends media explicitly
+    # in the create payload, so large uploads lose nothing.
     session["last_upload"] = {
-        "media_url": media_url,
+        "media_url": media_url if len(media_url) < 3000 else "",
         "filename": uploaded.filename,
         "type": result["type"],
     }

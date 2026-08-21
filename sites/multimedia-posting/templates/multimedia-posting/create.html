@@ -12,22 +12,58 @@
         .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
         .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
         .top-nav .nav-links a { color: #262626; font-size: 14px; }
-        .container { max-width: 600px; margin: 40px auto; padding: 20px; }
+        .container { max-width: 680px; margin: 40px auto; padding: 20px; }
         .create-card { background: #fff; border: 1px solid #dbdbdb; border-radius: 8px; padding: 24px; }
-        .create-card h2 { font-size: 20px; margin-bottom: 20px; }
+        .create-card h2 { font-size: 20px; }
+
+        /* step indicator */
+        .steps { display: flex; align-items: center; gap: 8px; margin: 14px 0 22px; font-size: 13px; color: #8e8e8e; }
+        .steps .step { display: flex; align-items: center; gap: 6px; }
+        .steps .dot { width: 22px; height: 22px; border-radius: 50%; background: #efefef; color: #8e8e8e; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+        .steps .step.active { color: #262626; font-weight: 600; }
+        .steps .step.active .dot { background: #0095f6; color: #fff; }
+        .steps .step.done .dot { background: #00a86b; color: #fff; }
+        .steps .bar { flex: 1; height: 1px; background: #dbdbdb; }
+
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
-        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; font-family: inherit; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; font-family: inherit; }
         .form-group textarea { resize: vertical; min-height: 80px; }
-        .form-group select { background: #fff; }
         .upload-area { border: 2px dashed #dbdbdb; border-radius: 8px; padding: 40px; text-align: center; color: #8e8e8e; cursor: pointer; margin-bottom: 16px; }
         .upload-area:hover { border-color: #0095f6; color: #0095f6; }
         .upload-area input[type="file"] { display: none; }
         .btn-primary { display: inline-block; padding: 10px 24px; background: #0095f6; color: #fff; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-primary:hover { background: #0081d6; }
+        .btn-primary:disabled { background: #b2dffc; cursor: not-allowed; }
         .btn-secondary { display: inline-block; padding: 10px 24px; background: #fff; color: #262626; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; cursor: pointer; margin-right: 8px; }
-        .upload-result { margin-top: 8px; font-size: 13px; color: #00a86b; }
         .error-msg { color: #ed4956; font-size: 13px; margin-top: 4px; }
+        .wizard-actions { margin-top: 20px; display: flex; align-items: center; }
+
+        /* selected media strip */
+        .media-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        .media-thumb { position: relative; width: 92px; height: 92px; border-radius: 6px; overflow: hidden; border: 2px solid #dbdbdb; cursor: pointer; background: #f5f5f5; display: flex; align-items: center; justify-content: center; }
+        .media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .media-thumb.active { border-color: #0095f6; }
+        .media-thumb .rm { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; border: none; font-size: 11px; line-height: 1; cursor: pointer; }
+        .media-thumb .vid-badge { position: absolute; bottom: 2px; left: 4px; font-size: 12px; color: #fff; text-shadow: 0 0 3px #000; }
+
+        /* edit step */
+        .edit-layout { display: flex; gap: 18px; flex-wrap: wrap; }
+        .edit-preview { flex: 1 1 300px; min-width: 260px; }
+        .edit-preview .frame { width: 100%; aspect-ratio: 1/1; background: #111; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .edit-preview .frame img { max-width: 100%; max-height: 100%; }
+        /* crop viewport: the visible window into the (zoomed, repositioned) image */
+        .crop-viewport { max-width: 100%; max-height: 100%; overflow: hidden; display: flex; }
+        .crop-viewport img { width: 100%; height: 100%; object-fit: cover; }
+        .edit-controls { flex: 1 1 240px; min-width: 220px; }
+        .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .preset-chip { padding: 6px 12px; border: 1px solid #dbdbdb; border-radius: 999px; background: #fff; font-size: 13px; cursor: pointer; }
+        .preset-chip.active { background: #262626; color: #fff; border-color: #262626; }
+        .slider-group { margin-bottom: 14px; }
+        .slider-group label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .slider-group label .val { font-weight: 400; color: #8e8e8e; }
+        .slider-group input[type="range"] { width: 100%; }
+        .detail-type-badge { display: inline-block; background: #efefef; border-radius: 4px; padding: 3px 10px; font-size: 12px; color: #555; margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -52,84 +88,305 @@
     <div class="container">
         <div class="create-card">
             <h2>Create New Post</h2>
-            <div class="upload-area" onclick="document.getElementById('file-input').click()">
-                <p style="font-size: 36px; margin-bottom: 8px;">&#128247;</p>
-                <p>Click to upload photo or video</p>
-                <input type="file" id="file-input" accept="image/*,video/*" onchange="uploadFile(this)">
+            <div class="steps">
+                <span class="step active" id="step-ind-1"><span class="dot">1</span> Select media</span>
+                <span class="bar"></span>
+                <span class="step" id="step-ind-2"><span class="dot">2</span> Edit</span>
+                <span class="bar"></span>
+                <span class="step" id="step-ind-3"><span class="dot">3</span> Share</span>
             </div>
-            <div id="upload-result" class="upload-result" style="display:none;"></div>
-            <img id="upload-preview" alt="upload preview" style="display:none; max-width:100%; border-radius:8px; margin-bottom:16px;">
+            <div id="error-msg" class="error-msg" style="display:none;"></div>
 
-            <form id="create-form" onsubmit="createPost(event)">
-                <div class="form-group">
-                    <label for="post-type">Type</label>
-                    <select id="post-type" name="type">
-                        <option value="photo">Photo</option>
-                        <option value="video">Video</option>
-                        <option value="carousel">Carousel</option>
-                    </select>
+            <!-- STEP 1: select 1+ photos/videos -->
+            <div id="step-select">
+                <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                    <p style="font-size: 36px; margin-bottom: 8px;">&#128247;</p>
+                    <p id="upload-hint">Click to add photos or videos</p>
+                    <input type="file" id="file-input" accept="image/*,video/*" onchange="uploadFile(this)">
                 </div>
-                <div class="form-group">
-                    <label for="caption">Caption</label>
-                    <textarea id="caption" name="caption" placeholder="Write a caption... Use #hashtags to add tags"></textarea>
+                <div class="media-strip" id="select-strip"></div>
+                <div class="wizard-actions">
+                    <span style="flex:1;font-size:13px;color:#8e8e8e;" id="select-count">No media selected</span>
+                    <button type="button" class="btn-primary" id="to-edit-btn" disabled onclick="gotoStep(2)">Next: Edit</button>
                 </div>
-                <div class="form-group">
-                    <label for="location">Location</label>
-                    <input type="text" id="location" name="location" placeholder="Add location">
+            </div>
+
+            <!-- STEP 2: customize each image before posting -->
+            <div id="step-edit" style="display:none;">
+                <div class="edit-layout">
+                    <div class="edit-preview">
+                        <div class="frame"><div class="crop-viewport" id="crop-viewport"><img id="edit-img" alt="editing preview"></div></div>
+                        <div class="media-strip" id="edit-strip" style="margin-top:10px;"></div>
+                    </div>
+                    <div class="edit-controls" id="edit-controls">
+                        <label style="font-weight:600;font-size:14px;display:block;margin-bottom:8px;">Crop</label>
+                        <div class="preset-row" id="aspect-row"></div>
+                        <div class="slider-group">
+                            <label>Zoom <span class="val" id="zoom-val">100</span></label>
+                            <input type="range" id="zoom" min="100" max="250" value="100" oninput="onSlider('zoom', this.value)">
+                        </div>
+                        <div class="slider-group">
+                            <label>Position &harr; <span class="val" id="offset_x-val">50</span></label>
+                            <input type="range" id="offset_x" min="0" max="100" value="50" oninput="onSlider('offset_x', this.value)">
+                        </div>
+                        <div class="slider-group">
+                            <label>Position &varr; <span class="val" id="offset_y-val">50</span></label>
+                            <input type="range" id="offset_y" min="0" max="100" value="50" oninput="onSlider('offset_y', this.value)">
+                        </div>
+                        <label style="font-weight:600;font-size:14px;display:block;margin:14px 0 8px;">Filter</label>
+                        <div class="preset-row" id="preset-row"></div>
+                        <div class="slider-group">
+                            <label>Brightness <span class="val" id="brightness-val">100</span></label>
+                            <input type="range" id="brightness" min="50" max="150" value="100" oninput="onSlider('brightness', this.value)">
+                        </div>
+                        <div class="slider-group">
+                            <label>Contrast <span class="val" id="contrast-val">100</span></label>
+                            <input type="range" id="contrast" min="50" max="150" value="100" oninput="onSlider('contrast', this.value)">
+                        </div>
+                        <div class="slider-group">
+                            <label>Saturation <span class="val" id="saturation-val">100</span></label>
+                            <input type="range" id="saturation" min="0" max="200" value="100" oninput="onSlider('saturation', this.value)">
+                        </div>
+                        <button type="button" class="btn-secondary" style="font-size:13px;padding:6px 14px;" onclick="resetEdits()">Reset adjustments</button>
+                    </div>
+                    <div class="edit-controls" id="edit-video-note" style="display:none;color:#8e8e8e;font-size:14px;">
+                        Videos post as-is — no adjustments available.
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="tags">Tags (comma-separated, or use #hashtags in caption)</label>
-                    <input type="text" id="tags" name="tags" placeholder="sunset, nature, PNW">
+                <div class="wizard-actions">
+                    <button type="button" class="btn-secondary" onclick="gotoStep(1)">Back</button>
+                    <span style="flex:1"></span>
+                    <button type="button" class="btn-primary" onclick="gotoStep(3)">Next: Share</button>
                 </div>
-                <div id="error-msg" class="error-msg" style="display:none;"></div>
-                <div style="margin-top: 20px;">
-                    <button type="submit" class="btn-primary">Share Post</button>
-                </div>
-            </form>
+            </div>
+
+            <!-- STEP 3: caption + details, submit -->
+            <div id="step-details" style="display:none;">
+                <div class="media-strip" id="details-strip" style="margin-bottom:14px;"></div>
+                <form id="create-form" onsubmit="createPost(event)">
+                    <div class="form-group">
+                        <label for="caption">Caption <span class="detail-type-badge" id="type-badge">photo</span></label>
+                        <textarea id="caption" name="caption" placeholder="Write a caption... Use #hashtags to add tags"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="location">Location</label>
+                        <input type="text" id="location" name="location" placeholder="Add location">
+                    </div>
+                    <div class="form-group">
+                        <label for="tags">Tags (comma-separated, or use #hashtags in caption)</label>
+                        <input type="text" id="tags" name="tags" placeholder="sunset, nature, PNW">
+                    </div>
+                    <div class="wizard-actions">
+                        <button type="button" class="btn-secondary" onclick="gotoStep(2)">Back</button>
+                        <span style="flex:1"></span>
+                        <button type="submit" class="btn-primary">Share Post</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
     <script>
     const baseUrl = "{{ url_for('multimedia-posting.index') }}";
-    let uploadedMediaUrl = null;  // data URI of the last successful upload
+
+    // Instagram-style presets: name -> base CSS filter (adjustment sliders stack on top)
+    const PRESETS = {
+        normal:    '',
+        clarendon: 'contrast(1.2) saturate(1.35)',
+        gingham:   'brightness(1.05) hue-rotate(-10deg)',
+        moon:      'grayscale(1) contrast(1.1) brightness(1.1)',
+        lark:      'contrast(0.9) brightness(1.1) saturate(1.1)',
+        juno:      'contrast(1.15) saturate(1.4) sepia(0.2)',
+    };
+    const defaultEdits = () => ({ preset: 'normal', brightness: 100, contrast: 100, saturation: 100,
+                                  aspect: 'original', zoom: 100, offset_x: 50, offset_y: 50 });
+    // IG-style crop aspect ratios: name -> CSS aspect-ratio (null = keep original)
+    const ASPECTS = { original: null, '1:1': '1 / 1', '4:5': '4 / 5', '16:9': '16 / 9' };
+
+    // media: [{url, filename, type: 'photo'|'video', edits}]
+    let media = [];
+    let editIdx = 0;      // which media item is being edited in step 2
+
+    function showError(msg) {
+        const el = document.getElementById('error-msg');
+        el.style.display = msg ? 'block' : 'none';
+        el.textContent = msg || '';
+    }
+
+    function cssFor(edits) {
+        let css = PRESETS[edits.preset] || '';
+        if (edits.brightness != 100) css += ` brightness(${edits.brightness / 100})`;
+        if (edits.contrast != 100) css += ` contrast(${edits.contrast / 100})`;
+        if (edits.saturation != 100) css += ` saturate(${edits.saturation / 100})`;
+        return css.trim();
+    }
+
+    function thumbHtml(m, i, opts) {
+        const img = (m.type === 'video' || !m.url.startsWith('data:'))
+            ? '<span style="font-size:26px;">' + (m.type === 'video' ? '&#127909;' : '&#128247;') + '</span>'
+            : `<img src="${m.url}" style="filter:${cssFor(m.edits)}" alt="">`;
+        const rm = opts.removable ? `<button class="rm" onclick="event.stopPropagation();removeMedia(${i})" title="Remove">&times;</button>` : '';
+        const badge = m.type === 'video' ? '<span class="vid-badge">&#9654;</span>' : '';
+        const cls = opts.activeIdx === i ? 'media-thumb active' : 'media-thumb';
+        const click = opts.onclick ? ` onclick="${opts.onclick}(${i})"` : '';
+        return `<div class="${cls}" title="${m.filename}"${click}>${img}${rm}${badge}</div>`;
+    }
+
+    function renderStrips() {
+        document.getElementById('select-strip').innerHTML =
+            media.map((m, i) => thumbHtml(m, i, { removable: true })).join('');
+        document.getElementById('select-count').textContent = media.length
+            ? media.length + ' item' + (media.length > 1 ? 's' : '') + ' selected'
+            : 'No media selected';
+        document.getElementById('to-edit-btn').disabled = !media.length;
+        document.getElementById('upload-hint').textContent = media.length
+            ? 'Click to add another photo or video' : 'Click to add photos or videos';
+    }
+
+    function removeMedia(i) {
+        media.splice(i, 1);
+        if (editIdx >= media.length) editIdx = Math.max(0, media.length - 1);
+        renderStrips();
+    }
 
     function uploadFile(input) {
         if (!input.files.length) return;
+        showError('');
         const formData = new FormData();
         formData.append('file', input.files[0]);
         fetch(`${baseUrl}api/upload`, { method: 'POST', body: formData })
             .then(r => r.json())
             .then(data => {
-                if (data.error) {
-                    document.getElementById('error-msg').style.display = 'block';
-                    document.getElementById('error-msg').textContent = data.error;
-                    return;
-                }
-                uploadedMediaUrl = data.media_url || null;
-                if (data.type === 'video') {
-                    document.getElementById('post-type').value = 'video';
-                }
-                const el = document.getElementById('upload-result');
-                el.style.display = 'block';
-                el.textContent = `Uploaded: ${data.filename} (${data.size} bytes)`;
-                if (uploadedMediaUrl && uploadedMediaUrl.startsWith('data:')) {
-                    const prev = document.getElementById('upload-preview');
-                    prev.src = uploadedMediaUrl;
-                    prev.style.display = 'block';
-                }
+                if (data.error) { showError(data.error); return; }
+                media.push({ url: data.media_url || '', filename: data.filename,
+                             type: data.type === 'video' ? 'video' : 'photo', edits: defaultEdits() });
+                input.value = '';
+                renderStrips();
             });
+    }
+
+    // --- step navigation -------------------------------------------------
+    function gotoStep(n) {
+        if (n >= 2 && !media.length) { showError('Select at least one photo or video first.'); return; }
+        showError('');
+        document.getElementById('step-select').style.display = n === 1 ? '' : 'none';
+        document.getElementById('step-edit').style.display = n === 2 ? '' : 'none';
+        document.getElementById('step-details').style.display = n === 3 ? '' : 'none';
+        for (let i = 1; i <= 3; i++) {
+            const el = document.getElementById('step-ind-' + i);
+            el.className = 'step' + (i === n ? ' active' : i < n ? ' done' : '');
+        }
+        if (n === 2) { editIdx = Math.min(editIdx, media.length - 1); renderEditor(); }
+        if (n === 3) renderDetails();
+    }
+
+    // --- step 2: editor --------------------------------------------------
+    function selectEditImage(i) { editIdx = i; renderEditor(); }
+
+    // Size the crop viewport to the chosen aspect (or the image's natural
+    // aspect) and position/zoom the image inside it — a live crop preview.
+    function applyCrop() {
+        const m = media[editIdx];
+        if (!m) return;
+        const vp = document.getElementById('crop-viewport');
+        const img = document.getElementById('edit-img');
+        const e = m.edits;
+        let ar = ASPECTS[e.aspect];
+        if (!ar && img.naturalWidth && img.naturalHeight) {
+            ar = img.naturalWidth + ' / ' + img.naturalHeight;
+        }
+        if (ar) {
+            vp.style.aspectRatio = ar;
+            const parts = ar.split('/').map(Number);
+            if (parts[0] / parts[1] <= 1) { vp.style.height = '100%'; vp.style.width = 'auto'; }
+            else { vp.style.width = '100%'; vp.style.height = 'auto'; }
+        }
+        img.style.objectPosition = e.offset_x + '% ' + e.offset_y + '%';
+        img.style.transformOrigin = e.offset_x + '% ' + e.offset_y + '%';
+        img.style.transform = e.zoom != 100 ? 'scale(' + (e.zoom / 100) + ')' : '';
+    }
+
+    function renderEditor() {
+        const m = media[editIdx];
+        if (!m) return;
+        const isVideo = m.type === 'video';
+        document.getElementById('edit-controls').style.display = isVideo ? 'none' : '';
+        document.getElementById('edit-video-note').style.display = isVideo ? '' : 'none';
+        const img = document.getElementById('edit-img');
+        if (m.url.startsWith('data:') && !isVideo) {
+            img.onload = applyCrop;
+            img.src = m.url; img.style.display = '';
+            img.style.filter = cssFor(m.edits);
+        } else {
+            img.removeAttribute('src'); img.style.display = 'none';
+        }
+        document.getElementById('edit-strip').innerHTML = media.length > 1
+            ? media.map((mm, i) => thumbHtml(mm, i, { activeIdx: editIdx, onclick: 'selectEditImage' })).join('') : '';
+        if (!isVideo) {
+            document.getElementById('aspect-row').innerHTML = Object.keys(ASPECTS).map(a =>
+                `<button type="button" class="preset-chip${m.edits.aspect === a ? ' active' : ''}" onclick="setAspect('${a}')">${a === 'original' ? 'Original' : a}</button>`).join('');
+            document.getElementById('preset-row').innerHTML = Object.keys(PRESETS).map(p =>
+                `<button type="button" class="preset-chip${m.edits.preset === p ? ' active' : ''}" onclick="setPreset('${p}')">${p[0].toUpperCase() + p.slice(1)}</button>`).join('');
+            for (const k of ['brightness', 'contrast', 'saturation', 'zoom', 'offset_x', 'offset_y']) {
+                document.getElementById(k).value = m.edits[k];
+                document.getElementById(k + '-val').textContent = m.edits[k];
+            }
+            applyCrop();
+        }
+    }
+
+    function setPreset(p) {
+        media[editIdx].edits.preset = p;
+        renderEditor();
+    }
+
+    function setAspect(a) {
+        media[editIdx].edits.aspect = a;
+        renderEditor();
+    }
+
+    function onSlider(key, value) {
+        media[editIdx].edits[key] = parseInt(value, 10);
+        document.getElementById(key + '-val').textContent = value;
+        if (key === 'zoom' || key === 'offset_x' || key === 'offset_y') {
+            applyCrop();
+        } else {
+            document.getElementById('edit-img').style.filter = cssFor(media[editIdx].edits);
+        }
+    }
+
+    function resetEdits() {
+        media[editIdx].edits = defaultEdits();
+        renderEditor();
+    }
+
+    // --- step 3: details + submit ---------------------------------------
+    function postType() {
+        const vids = media.filter(m => m.type === 'video').length;
+        const pics = media.length - vids;
+        return vids && !pics ? 'video' : pics > 1 ? 'carousel' : 'photo';
+    }
+
+    function renderDetails() {
+        document.getElementById('details-strip').innerHTML =
+            media.map((m, i) => thumbHtml(m, i, {})).join('');
+        document.getElementById('type-badge').textContent = postType();
     }
 
     function createPost(e) {
         e.preventDefault();
+        if (!media.length) { showError('Select at least one photo or video first.'); return; }
         const caption = document.getElementById('caption').value;
         const location = document.getElementById('location').value;
-        const type = document.getElementById('post-type').value;
         const tagsRaw = document.getElementById('tags').value;
         const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-        const payload = { caption, location, type, tags };
-        if (uploadedMediaUrl) payload.image_url = uploadedMediaUrl;
-
+        const payload = {
+            caption, location, tags,
+            media: media.map(m => ({
+                url: m.url, filename: m.filename, type: m.type,
+                edits: { ...m.edits, css: cssFor(m.edits) },
+            })),
+        };
         fetch(`${baseUrl}api/posts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -137,11 +394,7 @@
         })
         .then(r => r.json())
         .then(data => {
-            if (data.error) {
-                document.getElementById('error-msg').style.display = 'block';
-                document.getElementById('error-msg').textContent = data.error;
-                return;
-            }
+            if (data.error) { showError(data.error); return; }
             window.location.href = `${baseUrl}post/${data.id}`;
         });
     }

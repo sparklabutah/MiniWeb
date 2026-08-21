@@ -210,6 +210,46 @@ def verify_identity_submit():
                            result="failure", logged_in=True)
 
 
+@blueprint.app_template_filter("mask_account")
+def _mask_account_filter(num):
+    """Mask an account number (CHK-847291 -> CHK-••••91) unless this session
+    completed the 2FA reveal (session["identity_verified"])."""
+    s = str(num or "")
+    if session.get("identity_verified"):
+        return s
+    prefix, sep, digits = s.rpartition("-")
+    if sep and len(digits) > 2:
+        return f"{prefix}-{'•' * (len(digits) - 2)}{digits[-2:]}"
+    return ("•" * max(len(s) - 2, 0)) + s[-2:]
+
+
+@blueprint.route("/accounts/reveal", methods=["POST"])
+def accounts_reveal():
+    """Reveal full account numbers, gated behind the shared 2FA flow.
+
+    Sends a code to the user's WebMail inbox and redirects to /verify-payment;
+    on success the account_reveal event handler sets session["identity_verified"]
+    and the user returns to the page they came from, unmasked.
+    """
+    user = _get_current_user()
+    if not user:
+        return render_template("banking/login.html", error="Please log in first")
+    next_url = request.form.get("next") or url_for("banking.accounts_page")
+    if session.get("_disable_2fa"):
+        # Annotation mode: request_2fa's disabled path routes to the payment
+        # bridge, which is wrong for a reveal — set the flag directly instead.
+        session["identity_verified"] = True
+        return redirect(next_url)
+    from app.events import request_2fa
+    verify_url = request_2fa(
+        "account_reveal",
+        return_url=next_url,
+        user_id=user["id"],
+        category="Reveal full account numbers",
+    )
+    return redirect(verify_url)
+
+
 @blueprint.route("/accounts")
 def accounts_page():
     user, logged_in = _get_browsing_user()
@@ -638,6 +678,8 @@ def pay_loan_submit():
 
     if not amount or amount <= 0:
         amount = loan["monthly_payment"]
+    # Never debit more than what's left on the loan.
+    amount = round(min(amount, loan["remaining_balance"]), 2)
 
     # If no account_id provided, find the user's primary checking account
     if not account_id:
@@ -1158,6 +1200,8 @@ def api_pay_loan(loan_id):
 
     if not amount or amount <= 0:
         amount = loan["monthly_payment"]
+    # Never debit more than what's left on the loan.
+    amount = round(min(amount, loan["remaining_balance"]), 2)
 
     # If no account_id provided, find the loan owner's primary checking account
     if not account_id:

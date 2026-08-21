@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search{% if q %}: {{ q }}{% endif %} | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
+    <style>
+        .search-heading { font-size: 22px; font-weight: 600; margin: 26px 0 4px; }
+        .search-sub { font-size: 13px; color: #8c8c8c; margin-bottom: 18px; }
+        .group-heading { font-size: 16px; font-weight: 700; border-bottom: 2px solid #eee; padding-bottom: 6px; margin: 22px 0 8px; }
+    </style>
+</head>
+<body>
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-content" style="max-width:900px;">
+        <div class="search-heading">{% if q %}Search results for &ldquo;{{ q }}&rdquo;{% else %}Search{% endif %}</div>
+        <div class="search-sub">
+            {% if q %}{{ matched_venues|length }} venue{{ 's' if matched_venues|length != 1 }} and {{ papers|length }} paper{{ 's' if papers|length != 1 }} found{% else %}Type a query in the search bar above to find venues and papers.{% endif %}
+        </div>
+
+        {% if matched_venues %}
+        <div class="group-heading">Venues</div>
+        {% for v in matched_venues %}
+        <div class="note">
+            <div class="note-title"><a href="{{ url_for('conference-review-submission.venue_detail', venue_id=v.id) }}">{{ v.name }}</a></div>
+            <div class="note-meta">{{ v.full_name }}{% if v.location %} &middot; {{ v.location }}{% endif %}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if papers %}
+        <div class="group-heading">Papers</div>
+        {% for paper in papers %}
+        <div class="note">
+            <div class="note-title"><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></div>
+            <div class="note-authors">Anonymous</div>
+            {% if paper.abstract %}<div class="note-abstract">{{ paper.abstract }}</div>{% endif %}
+            <div class="note-meta">
+                {% if venues.get(paper.venue_id) %}<span>{{ venues[paper.venue_id].name }}</span><span class="dot">&middot;</span>{% endif %}
+                <span>{{ paper.num_reviews }} review{{ 's' if paper.num_reviews != 1 }}</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if q and not papers and not matched_venues %}
+        <div class="empty-state">No results for &ldquo;{{ q }}&rdquo;.</div>
+        {% endif %}
+    </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+</body>
+</html>

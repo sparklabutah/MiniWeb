@@ -89,3 +89,12 @@ def handle_trade(user_id, symbol, side, quantity, price,
         _add_banking_transaction(
             user_id, f"Buy {quantity} {symbol} @ ${price}",
             total, "Investment", f"TRADE-{symbol}", account_type, account_number)
+
+
+@on("account_reveal")
+def handle_account_reveal(**kwargs):
+    """2FA-gated reveal: mark this session identity-verified so banking pages
+    show full (unmasked) account numbers. Runs when the /verify-payment code
+    is accepted for a banking 'Reveal account numbers' request."""
+    from flask import session
+    session["identity_verified"] = True

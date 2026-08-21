@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account {{ account.account_number }} - SecureBank Online</title>
+    <title>Account {{ account.account_number|mask_account }} - SecureBank Online</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
@@ -38,7 +38,14 @@
     <div class="main">
         <div class="account-header">
             <h2>{{ account.type|capitalize }} Account</h2>
-            <div class="acct-meta"><strong>Account Number:</strong> {{ account.account_number }} | Opened {{ account.opened_date }} | Status: {{ account.status|capitalize }}</div>
+            <div class="acct-meta"><strong>Account Number:</strong> {{ account.account_number|mask_account }}
+                {% if not session.get('identity_verified') %}
+                <form method="post" action="{{ url_for('banking.accounts_reveal') }}" style="display:inline;">
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button type="submit" style="background:none;border:none;color:#2563eb;font-size:.78rem;cursor:pointer;text-decoration:underline;padding:0;" title="Verify your identity to see the full account number">Reveal</button>
+                </form>
+                {% endif %}
+                | Opened {{ account.opened_date }} | Status: {{ account.status|capitalize }}</div>
             <div class="balance-big" style="{% if account.balance < 0 %}color:#dc2626{% endif %}">${{ "%.2f"|format(account.balance|abs) }}{% if account.balance < 0 %} owed{% endif %}</div>
         </div>
 

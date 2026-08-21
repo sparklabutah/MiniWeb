@@ -44,7 +44,7 @@
     <div class="main">
         <h2>Your Accounts</h2>
 
-        <div class="filter-bar">
+        <div class="filter-bar" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
             <label>Filter by type:
                 <select id="acct-type-filter" onchange="filterByType()">
                     <option value="">All Accounts</option>
@@ -53,6 +53,14 @@
                     {% endfor %}
                 </select>
             </label>
+            {% if not session.get('identity_verified') %}
+            <form method="post" action="{{ url_for('banking.accounts_reveal') }}" style="margin-left:auto;">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit" style="background:#fff;border:1px solid #0a2463;color:#0a2463;padding:.35rem .8rem;border-radius:.3rem;font-size:.8rem;cursor:pointer;" title="Verify your identity to see full account numbers">🔒 Reveal account numbers</button>
+            </form>
+            {% else %}
+            <span style="margin-left:auto;font-size:.75rem;color:#059669;">✓ Identity verified — full numbers shown</span>
+            {% endif %}
         </div>
 
         <table id="accounts-table">
@@ -69,7 +77,7 @@
             <tbody>
                 {% for acct in accounts %}
                 <tr>
-                    <td><a href="{{ url_for('banking.account_detail', account_id=acct.id) }}">{{ acct.account_number }}</a></td>
+                    <td><a href="{{ url_for('banking.account_detail', account_id=acct.id) }}">{{ acct.account_number|mask_account }}</a></td>
                     <td><span class="badge badge-{{ acct.type }}">{{ acct.type }}</span></td>
                     <td style="{% if acct.balance < 0 %}color:#dc2626{% endif %}">${{ "%.2f"|format(acct.balance|abs) }}{% if acct.balance < 0 %} owed{% endif %}</td>
                     <td>{{ acct.status }}</td>

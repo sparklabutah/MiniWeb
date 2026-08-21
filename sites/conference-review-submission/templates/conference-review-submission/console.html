@@ -4,144 +4,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Console | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #fff; color: #333; line-height: 1.5; font-size: 14px; }
-
-        .topbar { background: #333; height: 40px; display: flex; align-items: center; padding: 0 24px; }
-        .topbar a { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; margin-right: 20px; }
-        .topbar a:hover { color: #fff; }
-        .topbar .right { margin-left: auto; display: flex; gap: 16px; }
-        .topbar .right a { margin-right: 0; }
-
-        .page-header { border-bottom: 1px solid #e8e8e8; background: #fafafa; padding: 24px 0; }
-        .page-inner { max-width: 900px; margin: 0 auto; padding: 0 24px; }
-        .page-title { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
-        .user-info { font-size: 13px; color: #777; display: flex; align-items: center; gap: 10px; }
-
-        .content { max-width: 900px; margin: 0 auto; padding: 24px 24px 64px; }
-
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
-        .badge-reviewer { background: #e8f0fe; color: #1967d2; }
-        .badge-author { background: #f3e8fd; color: #7b2cbf; }
-        .badge-chair { background: #fef7e0; color: #b06d00; }
-        .badge-accept { background: #e6f4ea; color: #137333; }
-        .badge-reject { background: #fce8e6; color: #c5221f; }
-        .badge-review { background: #e8f0fe; color: #1967d2; }
-        .badge-pending { background: #fff3cd; color: #856404; }
-        .badge-done { background: #e6f4ea; color: #137333; }
-
-        .expertise-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .console-header { padding: 26px 0 0; }
+        .console-title { font-size: 24px; font-weight: 500; margin-bottom: 2px; }
+        .user-info { font-size: 13px; color: #777; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .expertise-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
         .tag { background: #f0f0f0; color: #555; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
-
-        .section { margin-bottom: 32px; }
-        .section-title { font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e8e8e8; display: flex; align-items: center; gap: 8px; }
-        .section-count { background: #1a73e8; color: #fff; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 10px; }
-
-        .task-card { border: 1px solid #e8e8e8; border-radius: 6px; padding: 14px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .task-card:hover { background: #fafafa; }
-        .task-title { font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-        .task-title a { color: #1a73e8; text-decoration: none; }
-        .task-title a:hover { text-decoration: underline; }
-        .task-venue { font-size: 12px; color: #999; }
-        .task-actions { display: flex; align-items: center; gap: 8px; }
-        .btn { display: inline-block; padding: 6px 14px; font-size: 12px; font-weight: 500; border-radius: 4px; text-decoration: none; cursor: pointer; border: none; }
-        .btn-primary { background: #1a73e8; color: #fff; }
-        .btn-primary:hover { background: #1557b0; }
-        .btn-outline { background: #fff; color: #555; border: 1px solid #d0d0d0; }
-        .btn-outline:hover { background: #f5f5f5; }
-
-        .venue-role-card { border: 1px solid #e8e8e8; border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .venue-role-card:hover { background: #fafafa; }
-        .venue-role-name { font-weight: 600; font-size: 14px; }
-        .venue-role-name a { color: #1a73e8; text-decoration: none; }
-        .venue-role-name a:hover { text-decoration: underline; }
-        .venue-role-detail { font-size: 12px; color: #999; }
-
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .count-badge { background: #777; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; margin-left: 4px; }
         .empty-msg { color: #999; font-size: 13px; padding: 16px 0; font-style: italic; }
+        .submit-form { max-width: 640px; display: flex; flex-direction: column; gap: 12px; }
     </style>
 </head>
 <body>
-    <div class="topbar">
-        <a href="{{ url_for('conference-review-submission.index') }}" style="font-weight:600;color:#fff">PeerPortal</a>
-        <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
-        <div class="right">
-            <a href="{{ url_for('conference-review-submission.console') }}" style="color:#fff">Console</a>
-            <a href="{{ url_for('conference-review-submission.console') }}">{{ user.name }}</a>
-            <a href="{{ url_for('conference-review-submission.logout') }}">Logout</a>
-            <a href="/">MiniWeb</a>
-        </div>
-    </div>
+    {% include 'conference-review-submission/_nav.html' %}
 
-    <div class="page-header">
-        <div class="page-inner">
-            <div class="page-title">{{ user.name }}</div>
-            <div class="user-info">
-                <span>{{ user.email }}</span>
-                {% if user.role == 'reviewer' %}
-                <span class="badge badge-reviewer">Reviewer</span>
-                {% elif user.role == 'author' %}
-                <span class="badge badge-author">Author</span>
-                {% elif user.role == 'chair' %}
-                <span class="badge badge-chair">Program Chair</span>
-                {% elif user.role == 'admin' %}
-                <span class="badge badge-chair">Admin</span>
-                {% endif %}
-            </div>
-            {% set expertise = [] %}
-            {% if user.expertise %}
-                {% if user.expertise is string %}
-                    {% set expertise = user.expertise | tojson | fromjson if user.expertise.startswith('[') else [user.expertise] %}
-                {% else %}
-                    {% set expertise = user.expertise %}
-                {% endif %}
-            {% endif %}
-            {% if expertise %}
-            <div class="expertise-tags">
-                {% for tag in expertise %}
-                <span class="tag">{{ tag }}</span>
-                {% endfor %}
-            </div>
+    <div class="or-container console-header">
+        <div class="console-title">{{ user.name }} <span style="font-size:15px;color:#8c8c8c;font-weight:400;">&mdash; Console</span></div>
+        <div class="user-info">
+            <span>{{ user.email }}</span>
+            {% if user.role == 'reviewer' %}
+            <span class="label label-info">Reviewer</span>
+            {% elif user.role == 'author' %}
+            <span class="label label-primary">Author</span>
+            {% elif user.role == 'chair' %}
+            <span class="label label-warning">Program Chair</span>
+            {% elif user.role == 'admin' %}
+            <span class="label label-warning">Admin</span>
             {% endif %}
         </div>
-    </div>
-
-    <div class="content">
-        <!-- Pending Review Tasks -->
-        <div class="section">
-            <div class="section-title">
-                Pending Review Tasks
-                {% if pending_tasks %}<span class="section-count">{{ pending_tasks|length }}</span>{% endif %}
-            </div>
-            {% if pending_tasks %}
-            {% for paper in pending_tasks %}
-            <div class="task-card">
-                <div>
-                    <div class="task-title"><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></div>
-                    <div class="task-venue">{{ paper.conference or paper.venue_id }}</div>
-                </div>
-                <div class="task-actions">
-                    <span class="badge badge-pending">Pending</span>
-                    <a href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}" class="btn btn-primary">Write Review</a>
-                </div>
-            </div>
+        {% set expertise = [] %}
+        {% if user.expertise %}
+            {% if user.expertise is string %}
+                {% set expertise = user.expertise | tojson | fromjson if user.expertise.startswith('[') else [user.expertise] %}
+            {% else %}
+                {% set expertise = user.expertise %}
+            {% endif %}
+        {% endif %}
+        {% if expertise %}
+        <div class="expertise-tags">
+            {% for tag in expertise %}
+            <span class="tag">{{ tag }}</span>
             {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="nav-tabs">
+            <a href="#pending-reviews" class="console-tab active" onclick="return showTab(event, 'pending-reviews')">Pending Reviews{% if pending_tasks %}<span class="count-badge">{{ pending_tasks|length }}</span>{% endif %}</a>
+            <a href="#completed-reviews" class="console-tab" onclick="return showTab(event, 'completed-reviews')">Completed Reviews{% if completed_tasks %}<span class="count-badge">{{ completed_tasks|length }}</span>{% endif %}</a>
+            <a href="#your-submissions" class="console-tab" onclick="return showTab(event, 'your-submissions')">Your Submissions{% if your_submissions %}<span class="count-badge">{{ your_submissions|length }}</span>{% endif %}</a>
+            <a href="#submit-paper" class="console-tab" onclick="return showTab(event, 'submit-paper')">Submit a Paper</a>
+            <a href="#venue-roles" class="console-tab" onclick="return showTab(event, 'venue-roles')">Venues &amp; Roles</a>
+        </div>
+    </div>
+
+    <div class="or-container" style="padding-bottom:64px;">
+        <!-- Pending Review Tasks -->
+        <div class="tab-pane active" id="pane-pending-reviews">
+            {% if pending_tasks %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:110px;">Status</th><th style="width:130px;"></th></tr></thead>
+                <tbody>
+                {% for paper in pending_tasks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td><span class="label label-warning">Pending</span></td>
+                    <td><a href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}" class="btn btn-primary btn-sm">Write Review</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
             {% else %}
             <div class="empty-msg">No pending review tasks.</div>
             {% endif %}
         </div>
 
+        <!-- Completed Reviews -->
+        <div class="tab-pane" id="pane-completed-reviews">
+            {% if completed_tasks %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th>Your Review</th><th style="width:110px;">Status</th><th style="width:80px;"></th></tr></thead>
+                <tbody>
+                {% for paper in completed_tasks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td style="color:#8c8c8c;">
+                        {% if paper.user_review %}Rating: {{ paper.user_review.recommendation }}, Confidence: {{ paper.user_review.confidence }}{% endif %}
+                    </td>
+                    <td><span class="label label-success">Reviewed</span></td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-default btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">No completed reviews.</div>
+            {% endif %}
+        </div>
+
+        <!-- Your Submissions -->
+        <div class="tab-pane" id="pane-your-submissions">
+            {% if your_submissions %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:110px;">Status</th><th style="width:80px;"></th></tr></thead>
+                <tbody>
+                {% for paper in your_submissions %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td>
+                        {% if paper.accepted %}
+                        <span class="label label-success">Accepted</span>
+                        {% else %}
+                        <span class="label label-info">Submitted</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-default btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">No submissions.</div>
+            {% endif %}
+        </div>
+
         <!-- Submit a Paper -->
-        <div class="section">
-            <div class="section-title">Submit a Paper</div>
-            <form method="POST" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.form_upload_paper') }}" style="display:flex;flex-direction:column;gap:10px;max-width:640px;">
+        <div class="tab-pane" id="pane-submit-paper">
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.form_upload_paper') }}" class="submit-form">
                 <div>
-                    <label for="paper-title" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Title</label>
-                    <input type="text" id="paper-title" name="title" placeholder="Paper title" required style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                    <label class="control-label" for="paper-title">Title</label>
+                    <input type="text" class="form-control" id="paper-title" name="title" placeholder="Paper title" required>
                 </div>
                 <div>
-                    <label for="paper-venue" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Venue</label>
-                    <select id="paper-venue" name="venue_id" required style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                    <label class="control-label" for="paper-venue">Venue</label>
+                    <select class="form-control" id="paper-venue" name="venue_id" required>
                         <option value="">Select a venue&hellip;</option>
                         {% for v in submit_venues %}
                         <option value="{{ v.id }}">{{ v.name }}{% if v.status == 'under_review' %} (open){% endif %}</option>
@@ -149,8 +153,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="paper-track" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Track</label>
-                    <select id="paper-track" name="track" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                    <label class="control-label" for="paper-track">Track</label>
+                    <select class="form-control" id="paper-track" name="track">
                         <option value="Main Track">Main Track</option>
                         <option value="Workshop">Workshop</option>
                         <option value="Findings">Findings</option>
@@ -158,15 +162,15 @@
                     </select>
                 </div>
                 <div>
-                    <label for="paper-authors" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Co-authors (comma-separated, optional)</label>
-                    <input type="text" id="paper-authors" name="authors" placeholder="You are added automatically" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;">
+                    <label class="control-label" for="paper-authors">Co-authors (comma-separated, optional)</label>
+                    <input type="text" class="form-control" id="paper-authors" name="authors" placeholder="You are added automatically">
                 </div>
                 <div>
-                    <label for="paper-abstract" style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Abstract</label>
-                    <textarea id="paper-abstract" name="abstract" rows="4" placeholder="Paper abstract" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d0d0d0;border-radius:4px;resize:vertical;"></textarea>
+                    <label class="control-label" for="paper-abstract">Abstract</label>
+                    <textarea class="form-control" id="paper-abstract" name="abstract" rows="4" placeholder="Paper abstract" style="resize:vertical;"></textarea>
                 </div>
                 <div>
-                    <label style="display:block;font-size:12px;color:#555;margin-bottom:3px;">Manuscript</label>
+                    <label class="control-label">Manuscript</label>
                     <input type="file" name="file" accept=".pdf,.doc,.docx,.tex" style="font-size:12px;">
                 </div>
                 <div>
@@ -175,88 +179,51 @@
             </form>
         </div>
 
-        <!-- Your Submissions -->
-        <div class="section">
-            <div class="section-title">
-                Your Submissions
-                {% if your_submissions %}<span class="section-count">{{ your_submissions|length }}</span>{% endif %}
-            </div>
-            {% if your_submissions %}
-            {% for paper in your_submissions %}
-            <div class="task-card">
-                <div>
-                    <div class="task-title"><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></div>
-                    <div class="task-venue">{{ paper.conference or paper.venue_id }}</div>
-                </div>
-                <div class="task-actions">
-                    {% if paper.accepted %}
-                    <span class="badge badge-accept">Accepted</span>
-                    {% else %}
-                    <span class="badge badge-review">Submitted</span>
-                    {% endif %}
-                    <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-outline">View</a>
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="empty-msg">No submissions.</div>
-            {% endif %}
-        </div>
-
-        <!-- Completed Reviews -->
-        <div class="section">
-            <div class="section-title">
-                Completed Reviews
-                {% if completed_tasks %}<span class="section-count">{{ completed_tasks|length }}</span>{% endif %}
-            </div>
-            {% if completed_tasks %}
-            {% for paper in completed_tasks %}
-            <div class="task-card">
-                <div>
-                    <div class="task-title"><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></div>
-                    <div class="task-venue">
-                        {{ paper.conference or paper.venue_id }}
-                        {% if paper.user_review %}
-                        &mdash; Rating: {{ paper.user_review.recommendation }}, Confidence: {{ paper.user_review.confidence }}
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="task-actions">
-                    <span class="badge badge-done">Reviewed</span>
-                    <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-outline">View</a>
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="empty-msg">No completed reviews.</div>
-            {% endif %}
-        </div>
-
         <!-- Venue Participation -->
-        <div class="section">
-            <div class="section-title">Venue Participation</div>
+        <div class="tab-pane" id="pane-venue-roles">
             {% if active_venues %}
-            {% for av in active_venues %}
-            <div class="venue-role-card">
-                <div>
-                    <div class="venue-role-name"><a href="{{ url_for('conference-review-submission.venue_detail', venue_id=av.venue.id) }}">{{ av.venue.name }}</a></div>
-                    <div class="venue-role-detail">{{ av.venue.full_name }}</div>
-                </div>
-                <div>
-                    {% if av.role == 'reviewer' %}
-                    <span class="badge badge-reviewer">Reviewer</span>
-                    {% elif av.role == 'author' %}
-                    <span class="badge badge-author">Author</span>
-                    {% elif av.role == 'chair' %}
-                    <span class="badge badge-chair">Chair</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+            <table class="table table-hover">
+                <thead><tr><th>Venue</th><th></th><th style="width:130px;">Role</th></tr></thead>
+                <tbody>
+                {% for av in active_venues %}
+                <tr>
+                    <td><a href="{{ url_for('conference-review-submission.venue_detail', venue_id=av.venue.id) }}">{{ av.venue.name }}</a></td>
+                    <td style="color:#8c8c8c;">{{ av.venue.full_name }}</td>
+                    <td>
+                        {% if av.role == 'reviewer' %}
+                        <span class="label label-info">Reviewer</span>
+                        {% elif av.role == 'author' %}
+                        <span class="label label-primary">Author</span>
+                        {% elif av.role == 'chair' %}
+                        <span class="label label-warning">Chair</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
             {% else %}
             <div class="empty-msg">Not participating in any venues.</div>
             {% endif %}
         </div>
     </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+
+    <script>
+    function showTab(e, name) {
+        if (e) e.preventDefault();
+        document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
+        document.querySelectorAll('.console-tab').forEach(function (t) { t.classList.remove('active'); });
+        var pane = document.getElementById('pane-' + name);
+        if (pane) pane.classList.add('active');
+        var tab = document.querySelector('.console-tab[href="#' + name + '"]');
+        if (tab) tab.classList.add('active');
+        history.replaceState(null, '', '#' + name);
+        return false;
+    }
+    // Deep-link support: /console#submit-paper opens that tab directly.
+    if (location.hash) showTab(null, location.hash.slice(1));
+    </script>
 </body>
 </html>
