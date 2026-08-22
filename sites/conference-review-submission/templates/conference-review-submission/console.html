@@ -65,13 +65,14 @@
         <div class="tab-pane active" id="pane-pending-reviews">
             {% if pending_tasks %}
             <table class="table table-hover">
-                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:110px;">Status</th><th style="width:130px;"></th></tr></thead>
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:170px;">Review due</th><th style="width:110px;">Status</th><th style="width:130px;"></th></tr></thead>
                 <tbody>
                 {% for paper in pending_tasks %}
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
-                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td style="color:#8c8c8c;">{{ paper.venue_name or paper.conference or paper.venue_id }}</td>
+                    <td><strong>{{ paper.review_deadline or '—' }}</strong>{% if paper.review_deadline %} <span style="color:#8c8c8c;">(AoE)</span>{% endif %}</td>
                     <td><span class="label label-warning">Pending</span></td>
                     <td><a href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}" class="btn btn-primary btn-sm">Write Review</a></td>
                 </tr>

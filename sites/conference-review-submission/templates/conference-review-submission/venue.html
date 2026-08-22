@@ -31,6 +31,13 @@
         <div class="venue-title">{{ venue.name }}</div>
         <div class="venue-subtitle">{{ venue.full_name }}</div>
         <div class="venue-subtitle">{% if venue.location %}{{ venue.location }}{% endif %}{% if venue.dates %}{% if venue.location %} &mdash; {% endif %}{{ venue.dates }}{% endif %}</div>
+        {% if venue.submission_deadline or venue.review_deadline or venue.notification_date %}
+        <div class="venue-counts" style="margin-bottom:0;">
+            {% if venue.submission_deadline %}Submission deadline: <strong>{{ venue.submission_deadline }}</strong> (AoE){% endif %}
+            {% if venue.review_deadline %} &middot; Reviews due: <strong>{{ venue.review_deadline }}</strong>{% endif %}
+            {% if venue.notification_date %} &middot; Notification: <strong>{{ venue.notification_date }}</strong>{% endif %}
+        </div>
+        {% endif %}
         <div class="venue-counts">
             <strong>{{ count_all }}</strong> Submissions
             &middot; <strong>{{ count_accepted }}</strong> Accepted
@@ -97,7 +104,7 @@
                     <div class="note-abstract">{{ paper.abstract }}</div>
                     {% endif %}
                     <div class="note-meta">
-                        {% if venue.status == 'decisions_posted' %}
+                        {% if venue.status != 'under_review' %}
                             {% if paper.accepted %}
                             <span class="label label-success">Accept</span>
                             {% else %}

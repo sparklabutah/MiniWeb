@@ -48,7 +48,10 @@
                 {% for venue in active %}
                 <div class="big-item">
                     <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.full_name or venue.name }}</a>
-                    <div class="sub-line"><span class="clock">&#128337;</span> {% if venue.dates %}Due {{ venue.dates }}{% else %}Accepting submissions{% endif %} &middot; {{ venue.paper_count }} submission{{ 's' if venue.paper_count != 1 }}</div>
+                    <div class="sub-line"><span class="clock">&#128337;</span>
+                        {% if venue.submission_deadline %}Submissions due {{ venue.submission_deadline }} (AoE){% elif venue.dates %}Due {{ venue.dates }}{% else %}Accepting submissions{% endif %}
+                        {% if venue.review_deadline %}&middot; Reviews due {{ venue.review_deadline }}{% endif %}
+                        &middot; {{ venue.paper_count }} submission{{ 's' if venue.paper_count != 1 }}</div>
                 </div>
                 {% else %}
                 <div class="empty-state" style="text-align:left;padding:8px 0;">No venues are currently open for submissions.</div>
@@ -65,7 +68,7 @@
                         {% if venue.status == 'decisions_posted' %}&middot; <span class="label label-success">Decisions Posted</span>
                         {% elif venue.status == 'under_review' %}&middot; <span class="label label-info">Under Review</span>
                         {% elif venue.status == 'archived' %}&middot; <span class="label label-default">Archived</span>{% endif %}
-                        {% if venue.paper_count > 0 and venue.status == 'decisions_posted' %}
+                        {% if venue.paper_count > 0 and venue.status != 'under_review' %}
                         &middot; {{ venue.accepted_count }}/{{ venue.paper_count }} accepted ({{ "%.0f"|format(venue.accepted_count / venue.paper_count * 100) }}%)
                         {% endif %}
                     </div>

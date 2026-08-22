@@ -54,6 +54,7 @@
         '<div class="mp-nowplaying"><div class="mp-np-title">' + esc(d.title || '') + '</div>' +
           '<div class="mp-np-sub">' + esc(d.subtitle || '') + '</div></div>' +
       '</div>' +
+      '<div class="mp-stream" aria-live="polite"></div>' +
       '<div class="mp-cc-overlay">' + esc(d.subtitleText || 'Subtitles on') + '</div>' +
       '<div class="mp-controls">' +
         '<div class="mp-seek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
@@ -87,12 +88,43 @@
     var t = parseFloat(d.mpPos || '0') || 0, playing = false, started = false, chapters = [], lastTs = null, rafOn = false;
     var speed = 1;
 
+    // ---- on-screen info stream (deterministic, time-synced overlay) -------
+    // Each video shows a lower-third describing what's on screen at the current
+    // position; certain facts (codes, numbers, names) appear only inside short
+    // spans, so finding them requires scrubbing the seek bar.
+    var streamEl = q('.mp-stream'), streamSegs = null, streamReq = false;
+    function streamKey() { return d.streamKey || (location.pathname + '|' + (d.title || d.badge || '')); }
+    function fetchStream() {
+      if (streamReq || d.stream === 'off' || duration <= 0) return;
+      streamReq = true;
+      fetch('/_player/timeline?key=' + encodeURIComponent(streamKey()) + '&duration=' + Math.round(duration))
+        .then(function (r) { return r.json(); })
+        .then(function (dd) { streamSegs = (dd && dd.segments) || []; renderStream(); })
+        .catch(function () {});
+    }
+    function renderStream() {
+      if (!streamEl || !streamSegs) return;
+      // only once the viewer has started or scrubbed — a cold player shows no frame
+      if (!started && t <= 0) { streamEl.style.display = 'none'; return; }
+      var seg = null;
+      for (var i = 0; i < streamSegs.length; i++) {
+        if (t >= streamSegs[i].start && t < streamSegs[i].end) { seg = streamSegs[i]; break; }
+      }
+      if (!seg && streamSegs.length && t >= duration) seg = streamSegs[streamSegs.length - 1];
+      if (!seg) { streamEl.style.display = 'none'; return; }
+      streamEl.style.display = 'block';
+      streamEl.textContent = seg.text;
+      streamEl.classList.toggle('mp-stream-fact', seg.kind === 'fact');
+    }
+
     function render() {
       var frac = duration > 0 ? t / duration : 0;
       played.style.width = (frac * 100) + '%'; knob.style.left = (frac * 100) + '%';
       curEl.textContent = fmt(t); seek.setAttribute('aria-valuenow', Math.round(frac * 100));
       // persist position on the root so it survives a reload / trajectory replay
       el.setAttribute('data-mp-pos', Math.round(t));
+      if (!streamSegs) fetchStream();
+      renderStream();
     }
     function loop(ts) {
       if (playing) {

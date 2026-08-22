@@ -63,6 +63,8 @@
         .canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; background: #18181b; overflow: auto; position: relative; }
         .canvas-container { position: relative; background: #ffffff; box-shadow: 0 4px 40px rgba(0,0,0,.4); user-select: none; }
         .canvas-element { position: absolute; display: flex; align-items: center; justify-content: center; cursor: move; overflow: hidden; }
+        .crop-wrap { position: absolute; inset: 0; overflow: hidden; }
+        .crop-wrap img { position: absolute; max-width: none; }
         .canvas-element.el-text { color: #1a1a2e; text-align: left; align-items: flex-start; justify-content: flex-start; padding: 2px 4px; line-height: 1.2; }
         .canvas-element.el-image { background: rgba(14, 165, 233, .12); border: 1px dashed #0ea5e9; color: #0ea5e9; font-size: .7rem; }
         .empty-canvas-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #9ca3af; font-size: .95rem; pointer-events: none; text-align: center; }
@@ -248,6 +250,21 @@
                         <input type="color" class="prop-input" id="prop-stroke" value="#a1a1aa"></div>
                     <div class="prop-row" data-for="stroke"><span class="prop-label">Weight</span>
                         <input type="number" class="prop-input" id="prop-strokew" value="3" min="1" max="80"></div>
+                    <div class="prop-row" data-for="transform"><span class="prop-label">Rotation&deg;</span>
+                        <input type="number" class="prop-input" id="prop-rotation" value="0" min="-360" max="360" step="1"></div>
+                    <div class="prop-row" data-for="transform"><span class="prop-label">Opacity %</span>
+                        <input type="number" class="prop-input" id="prop-opacity" value="100" min="0" max="100" step="1"></div>
+                    <div class="prop-row" data-for="crop" style="margin-top:.4rem;"><span class="prop-label" style="font-weight:600;color:#a1a1aa;">Crop (%)</span></div>
+                    <div class="prop-row" data-for="crop"><span class="prop-label">Left</span>
+                        <input type="number" class="prop-input" id="prop-cropx" value="0" min="0" max="99" step="1"></div>
+                    <div class="prop-row" data-for="crop"><span class="prop-label">Top</span>
+                        <input type="number" class="prop-input" id="prop-cropy" value="0" min="0" max="99" step="1"></div>
+                    <div class="prop-row" data-for="crop"><span class="prop-label">Width</span>
+                        <input type="number" class="prop-input" id="prop-cropw" value="100" min="1" max="100" step="1"></div>
+                    <div class="prop-row" data-for="crop"><span class="prop-label">Height</span>
+                        <input type="number" class="prop-input" id="prop-croph" value="100" min="1" max="100" step="1"></div>
+                    <div class="prop-row" data-for="crop"><span class="prop-label"></span>
+                        <button type="button" class="btn-sm btn-ghost" id="prop-cropreset" style="flex:1;">Reset crop</button></div>
                     <button type="button" class="btn-delete" id="prop-delete">Delete element</button>
                 </div>
             </div>
@@ -301,7 +318,9 @@
                         text: p.text != null ? p.text : 'Text',
                         font: p.font || 'Inter',
                         size: size,
-                        fill: p.color || p.fill || '#1a1a2e'
+                        fill: p.color || p.fill || '#1a1a2e',
+                        rotation: p.rotation || 0,
+                        opacity: p.opacity != null ? p.opacity : 100
                     });
                 } else if (t === 'shape') {
                     var shape = p.shape || 'rectangle';
@@ -311,7 +330,9 @@
                         id: nextId++, type: 'shape', shape: shape,
                         x: p.x || 0, y: p.y || 0,
                         width: w || 120, height: h || 80,
-                        fill: p.fill || p.color || '#ec4899'
+                        fill: p.fill || p.color || '#ec4899',
+                        rotation: p.rotation || 0,
+                        opacity: p.opacity != null ? p.opacity : 100
                     });
                 } else if (t === 'image') {
                     elements.push({
@@ -319,7 +340,11 @@
                         x: p.x || 0, y: p.y || 0,
                         width: p.width || 160, height: p.height || 110,
                         src: p.src || '',
-                        name: p.name, assetId: p.asset_id, assetType: p.asset_type
+                        name: p.name, assetId: p.asset_id, assetType: p.asset_type,
+                        cropX: p.crop_x || 0, cropY: p.crop_y || 0,
+                        cropW: p.crop_w || 100, cropH: p.crop_h || 100,
+                        rotation: p.rotation || 0,
+                        opacity: p.opacity != null ? p.opacity : 100
                     });
                 } else if (t === 'line') {
                     elements.push({
@@ -335,19 +360,26 @@
         }
 
         // ---- Serialize back to saved schema ---------------------------
+        // rotation/opacity/crop are written only when non-default, so untouched
+        // legacy projects round-trip byte-identically.
+        function addTransformProps(e, props) {
+            if (e.rotation) props.rotation = Math.round(e.rotation);
+            if (e.opacity != null && e.opacity !== 100) props.opacity = Math.round(e.opacity);
+            return props;
+        }
         function serialize() {
             return elements.map(function (e) {
                 if (e.type === 'text') {
-                    return { type: 'text', properties: {
+                    return { type: 'text', properties: addTransformProps(e, {
                         text: e.text, x: Math.round(e.x), y: Math.round(e.y),
                         width: Math.round(e.width), height: Math.round(e.height),
-                        font: e.font, size: Math.round(e.size), color: e.fill } };
+                        font: e.font, size: Math.round(e.size), color: e.fill }) };
                 }
                 if (e.type === 'shape') {
                     var props = { shape: e.shape, x: Math.round(e.x), y: Math.round(e.y),
                         width: Math.round(e.width), height: Math.round(e.height), fill: e.fill };
                     if (e.shape === 'circle') { props.radius = Math.round(e.width / 2); }
-                    return { type: 'shape', properties: props };
+                    return { type: 'shape', properties: addTransformProps(e, props) };
                 }
                 if (e.type === 'image') {
                     var iprops = {
@@ -356,7 +388,11 @@
                     if (e.name != null) iprops.name = e.name;
                     if (e.assetId != null) iprops.asset_id = e.assetId;
                     if (e.assetType != null) iprops.asset_type = e.assetType;
-                    return { type: 'image', properties: iprops };
+                    if ((e.cropX || 0) || (e.cropY || 0) || (e.cropW || 100) !== 100 || (e.cropH || 100) !== 100) {
+                        iprops.crop_x = Math.round(e.cropX || 0); iprops.crop_y = Math.round(e.cropY || 0);
+                        iprops.crop_w = Math.round(e.cropW || 100); iprops.crop_h = Math.round(e.cropH || 100);
+                    }
+                    return { type: 'image', properties: addTransformProps(e, iprops) };
                 }
                 return { type: 'line', properties: {
                     x: Math.round(e.x), y: Math.round(e.y),
@@ -393,6 +429,8 @@
             node.style.top    = (e.y * SCALE) + 'px';
             node.style.width  = (e.width * SCALE) + 'px';
             node.style.height = (e.height * SCALE) + 'px';
+            if (e.rotation) { node.style.transform = 'rotate(' + e.rotation + 'deg)'; }
+            if (e.opacity != null && e.opacity !== 100) { node.style.opacity = e.opacity / 100; }
             if (e.type === 'text') {
                 node.style.fontSize = (e.size * SCALE) + 'px';
                 node.style.fontFamily = e.font + ', sans-serif';
@@ -407,13 +445,28 @@
                 if (typeof e.src === 'string' && e.src.indexOf('data:') === 0) {
                     var img = document.createElement('img');
                     img.src = e.src;
-                    img.style.width = '100%';
-                    img.style.height = '100%';
-                    img.style.objectFit = 'contain';
                     img.draggable = false;
+                    var cropped = e.cropX || e.cropY || (e.cropW || 100) !== 100 || (e.cropH || 100) !== 100;
                     node.style.background = 'transparent';
                     node.style.border = 'none';
-                    node.appendChild(img);
+                    if (cropped) {
+                        // Show only the crop window: the image is scaled so the
+                        // crop region exactly fills the element box.
+                        var cw = e.cropW || 100, ch = e.cropH || 100;
+                        var wrap = document.createElement('div');
+                        wrap.className = 'crop-wrap';
+                        img.style.width  = (100 / cw * 100) + '%';
+                        img.style.height = (100 / ch * 100) + '%';
+                        img.style.left   = (-(e.cropX || 0) / cw * 100) + '%';
+                        img.style.top    = (-(e.cropY || 0) / ch * 100) + '%';
+                        wrap.appendChild(img);
+                        node.appendChild(wrap);
+                    } else {
+                        img.style.width = '100%';
+                        img.style.height = '100%';
+                        img.style.objectFit = 'contain';
+                        node.appendChild(img);
+                    }
                 } else {
                     node.textContent = e.src ? ('🖼 ' + shortSrc(e.src)) : 'Image';
                 }
@@ -555,9 +608,13 @@
                 e = { id: nextId++, type: 'shape', shape: 'circle',
                       x: centerX(d), y: centerY(d), width: d, height: d, fill: '#ec4899' };
             } else if (tool === 'image') {
+                // Pick a real image from the simulated file system; falls back to
+                // an empty placeholder frame if the picker is unavailable.
+                if (window.MiniWebFS && MiniWebFS.open) { uploadImageFromPicker(); return; }
                 var iw = Math.round(DESIGN_W*0.3), ih = Math.round(DESIGN_H*0.24);
                 e = { id: nextId++, type: 'image', x: centerX(iw), y: centerY(ih),
-                      width: iw, height: ih, src: '' };
+                      width: iw, height: ih, src: '',
+                      cropX: 0, cropY: 0, cropW: 100, cropH: 100, rotation: 0, opacity: 100 };
             } else if (tool === 'line') {
                 var y = Math.round(DESIGN_H/2);
                 e = { id: nextId++, type: 'line', x: Math.round(DESIGN_W*0.2), y: y,
@@ -566,6 +623,55 @@
             elements.push(e);
             selectedId = e.id;
             render();
+        }
+
+        // ---- Upload image via the simulated file picker ----------------
+        // Fetch the picked file's real bytes, downscale big photos so saved
+        // projects stay reasonably sized, and drop it centered on the canvas
+        // at its natural aspect ratio.
+        function uploadImageFromPicker() {
+            MiniWebFS.open({ accept: 'image/*', startPath: '/Pictures', onPick: function (f) {
+                fetch('/_fs/download?path=' + encodeURIComponent(f.path))
+                    .then(function (r) { return r.blob(); })
+                    .then(function (blob) { return downscaleToDataUri(blob, 1600); })
+                    .then(function (info) {
+                        var maxW = DESIGN_W * 0.6, maxH = DESIGN_H * 0.6;
+                        var s = Math.min(maxW / info.w, maxH / info.h, 1);
+                        var w = Math.max(24, Math.round(info.w * s));
+                        var h = Math.max(24, Math.round(info.h * s));
+                        var e = { id: nextId++, type: 'image',
+                                  x: centerX(w), y: centerY(h), width: w, height: h,
+                                  src: info.dataUri, name: f.name,
+                                  cropX: 0, cropY: 0, cropW: 100, cropH: 100,
+                                  rotation: 0, opacity: 100 };
+                        elements.push(e);
+                        selectedId = e.id;
+                        render();
+                        showToast('Added "' + f.name + '"');
+                    })
+                    .catch(function () { showToast('Could not load image', true); });
+            }});
+        }
+
+        function downscaleToDataUri(blob, maxDim) {
+            return new Promise(function (resolve, reject) {
+                var url = URL.createObjectURL(blob);
+                var im = new Image();
+                im.onload = function () {
+                    var s = Math.min(1, maxDim / Math.max(im.width, im.height));
+                    var w = Math.max(1, Math.round(im.width * s));
+                    var h = Math.max(1, Math.round(im.height * s));
+                    var cv = document.createElement('canvas');
+                    cv.width = w; cv.height = h;
+                    cv.getContext('2d').drawImage(im, 0, 0, w, h);
+                    URL.revokeObjectURL(url);
+                    var isPng = (blob.type || '').indexOf('png') > -1;
+                    resolve({ dataUri: cv.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.9),
+                              w: w, h: h });
+                };
+                im.onerror = function () { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+                im.src = url;
+            });
         }
 
         function deleteSelected() {
@@ -627,14 +733,23 @@
                 setVal('prop-stroke', toHex(e.stroke)); setVal('prop-strokew', Math.round(e.strokeWidth));
                 return;
             }
-            var keys = ['pos','size'];
+            var keys = ['pos','size','transform'];
             if (e.type === 'text') keys.push('text');
-            keys.push('fill');
+            if (e.type !== 'image') keys.push('fill');
+            if (e.type === 'image' && typeof e.src === 'string' && e.src.indexOf('data:') === 0) keys.push('crop');
             showRows(keys);
             document.getElementById('fill-label').textContent = e.type === 'text' ? 'Color' : 'Fill';
             setVal('prop-x', Math.round(e.x)); setVal('prop-y', Math.round(e.y));
             setVal('prop-w', Math.round(e.width)); setVal('prop-h', Math.round(e.height));
             setVal('prop-fill', toHex(e.fill));
+            setVal('prop-rotation', Math.round(e.rotation || 0));
+            setVal('prop-opacity', Math.round(e.opacity != null ? e.opacity : 100));
+            if (e.type === 'image') {
+                setVal('prop-cropx', Math.round(e.cropX || 0));
+                setVal('prop-cropy', Math.round(e.cropY || 0));
+                setVal('prop-cropw', Math.round(e.cropW || 100));
+                setVal('prop-croph', Math.round(e.cropH || 100));
+            }
             if (e.type === 'text') {
                 setVal('prop-text', e.text);
                 setVal('prop-font', e.font);
@@ -671,6 +786,23 @@
         bindProp('prop-fill', function (e,v){ e.fill = v; });
         bindProp('prop-stroke', function (e,v){ e.stroke = v; });
         bindProp('prop-strokew', function (e,v){ e.strokeWidth = Math.max(1, parseFloat(v)||1); });
+        bindProp('prop-rotation', function (e,v){ e.rotation = Math.max(-360, Math.min(360, parseFloat(v)||0)); });
+        bindProp('prop-opacity',  function (e,v){ e.opacity = Math.max(0, Math.min(100, parseFloat(v)||0)); });
+        function clampCrop(e) {
+            e.cropW = Math.max(1, Math.min(100, e.cropW || 100));
+            e.cropH = Math.max(1, Math.min(100, e.cropH || 100));
+            e.cropX = Math.max(0, Math.min(100 - e.cropW, e.cropX || 0));
+            e.cropY = Math.max(0, Math.min(100 - e.cropH, e.cropY || 0));
+        }
+        bindProp('prop-cropx', function (e,v){ e.cropX = parseFloat(v)||0; clampCrop(e); });
+        bindProp('prop-cropy', function (e,v){ e.cropY = parseFloat(v)||0; clampCrop(e); });
+        bindProp('prop-cropw', function (e,v){ e.cropW = parseFloat(v)||100; clampCrop(e); });
+        bindProp('prop-croph', function (e,v){ e.cropH = parseFloat(v)||100; clampCrop(e); });
+        document.getElementById('prop-cropreset').addEventListener('click', function () {
+            var e = elById(selectedId); if (!e) return;
+            e.cropX = 0; e.cropY = 0; e.cropW = 100; e.cropH = 100;
+            render();
+        });
         document.getElementById('prop-delete').addEventListener('click', deleteSelected);
 
         // ---- Toolbar ---------------------------------------------------

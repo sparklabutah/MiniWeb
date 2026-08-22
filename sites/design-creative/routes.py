@@ -225,6 +225,7 @@ def _build_design_svg(project):
         p = el.get("properties", {}) or {}
         x = float(p.get("x", 0) or 0); y = float(p.get("y", 0) or 0)
         ew = float(p.get("width", 120) or 120); eh = float(p.get("height", 40) or 40)
+        before = len(parts)
         if etype == "text":
             size = float(p.get("size", p.get("fontSize", 24)) or 24)
             color = p.get("color", p.get("fill", "#1a1a2e"))
@@ -250,10 +251,27 @@ def _build_design_svg(project):
         elif etype == "image":
             src = p.get("src", "")
             if isinstance(src, str) and src.startswith("data:"):
-                parts.append(
-                    f'<image x="{x}" y="{y}" width="{ew}" height="{eh}" '
-                    f'href="{_xml_escape(src)}" preserveAspectRatio="xMidYMid meet"/>'
-                )
+                cx = float(p.get("crop_x", 0) or 0); cy = float(p.get("crop_y", 0) or 0)
+                cw = float(p.get("crop_w", 100) or 100); ch = float(p.get("crop_h", 100) or 100)
+                if cx or cy or cw != 100 or ch != 100:
+                    # Cropped: scale the full image so the crop window exactly
+                    # fills the element box, clipped to the box (mirrors the
+                    # editor's CSS crop math).
+                    clip_id = f"crop{len(parts)}"
+                    iw = ew * 100 / cw; ih = eh * 100 / ch
+                    ix = x - ew * cx / cw; iy = y - eh * cy / ch
+                    parts.append(
+                        f'<clipPath id="{clip_id}"><rect x="{x}" y="{y}" '
+                        f'width="{ew}" height="{eh}"/></clipPath>'
+                        f'<g clip-path="url(#{clip_id})">'
+                        f'<image x="{ix}" y="{iy}" width="{iw}" height="{ih}" '
+                        f'href="{_xml_escape(src)}" preserveAspectRatio="none"/></g>'
+                    )
+                else:
+                    parts.append(
+                        f'<image x="{x}" y="{y}" width="{ew}" height="{eh}" '
+                        f'href="{_xml_escape(src)}" preserveAspectRatio="xMidYMid meet"/>'
+                    )
             else:
                 parts.append(
                     f'<rect x="{x}" y="{y}" width="{ew}" height="{eh}" '
@@ -271,6 +289,20 @@ def _build_design_svg(project):
                 f'stroke="{_xml_escape(stroke)}" stroke-width="{sw}" '
                 f'stroke-linecap="round"/>'
             )
+        # rotation / opacity (box elements): wrap the emitted markup in a <g>,
+        # rotating about the element center — mirrors the editor's CSS transform
+        if etype in ("text", "shape", "image") and len(parts) > before:
+            rot = float(p.get("rotation", 0) or 0)
+            op_raw = p.get("opacity")
+            opac = float(op_raw) if op_raw is not None else 100.0
+            if rot or opac != 100:
+                attrs = []
+                if rot:
+                    attrs.append(f'transform="rotate({rot} {x + ew / 2} {y + eh / 2})"')
+                if opac != 100:
+                    attrs.append(f'opacity="{opac / 100}"')
+                parts[before] = f'<g {" ".join(attrs)}>' + parts[before]
+                parts[-1] = parts[-1] + "</g>"
     parts.append("</svg>")
     return "\n".join(parts)
 

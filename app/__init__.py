@@ -726,6 +726,10 @@ def create_app():
     from app.vfs import register_fs_routes
     register_fs_routes(app)
 
+    # Deterministic playback info streams for the shared mini-player — /_player/*
+    from app.playback import register_playback_routes
+    register_playback_routes(app)
+
     @app.teardown_appcontext
     def _close_db(exc):
         db.close()

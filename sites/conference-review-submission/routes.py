@@ -349,7 +349,8 @@ def _can_see_reviews(venue, user, paper):
     if role in ("chair", "admin"):
         return True
     if vis == "after_decision":
-        return venue.get("status") == "decisions_posted"
+        # decisions are public once posted AND stay public after archiving
+        return venue.get("status") in ("decisions_posted", "archived")
     if vis == "assigned_only":
         assigned = _parse_json_field(user, "assigned_papers")
         if str(paper["id"]) in [str(a) for a in assigned]:
@@ -397,9 +398,15 @@ def venues_page():
     if user:
         assigned_ids = _parse_json_field(user, "assigned_papers")
         bids = _parse_json_field(user, "bids")
-        pending_count = sum(1 for pid in assigned_ids
-                           if str(pid) not in bids or not isinstance(bids.get(str(pid)), dict)
-                           or not bids[str(pid)].get("recommendation"))
+        venue_status = {v["id"]: v.get("status") for v in venues}
+        for pid in assigned_ids:
+            b = bids.get(str(pid))
+            if isinstance(b, dict) and b.get("recommendation"):
+                continue  # already reviewed
+            p = _db_get_paper(pid)
+            # count only assignments on venues still under review (see console)
+            if p and venue_status.get(p.get("venue_id")) == "under_review":
+                pending_count += 1
 
     return render_template("conference-review-submission/index.html",
                            venues=venues, user=user, pending_count=pending_count)
@@ -608,7 +615,9 @@ def console():
     bids = _parse_json_field(user, "bids")
     venue_roles = _parse_json_field(user, "venue_roles")
 
-    # Fetch assigned papers
+    # Fetch assigned papers. A paper is a PENDING review task only while its
+    # venue is still under review — assignments on venues whose decisions are
+    # long posted (e.g. the 2017 conferences) are dead deadlines, not tasks.
     pending_tasks = []
     completed_tasks = []
     for pid in assigned_ids:
@@ -620,7 +629,11 @@ def console():
             p["user_review"] = bids[pid_str]
             completed_tasks.append(p)
         else:
-            pending_tasks.append(p)
+            p_venue = _get_venue(p.get("venue_id", ""))
+            if p_venue and p_venue.get("status") == "under_review":
+                p["review_deadline"] = p_venue.get("review_deadline", "")
+                p["venue_name"] = p_venue.get("name", p.get("venue_id", ""))
+                pending_tasks.append(p)
 
     # Author submissions: papers where user is an author. Base-table matches via
     # LIKE, plus this session's freshly-submitted papers from the overlay.

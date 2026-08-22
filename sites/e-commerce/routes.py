@@ -558,7 +558,7 @@ def cart_page():
             total += subtotal
 
     promo_code = user.get("promo_code", "")
-    discount = round(total * PROMO_CODES.get(promo_code, 0), 2)
+    discount = round(total * _promo_discount_fraction(promo_code), 2)
     return render_template("e-commerce/cart.html", cart_items=cart_items,
                            total=round(total, 2), user=user,
                            promo_code=promo_code, discount=discount,
@@ -712,6 +712,17 @@ def form_update_cart():
 PROMO_CODES = {"SAVE10": 0.10, "WELCOME5": 0.05, "SHOP20": 0.20}
 
 
+def _promo_discount_fraction(code):
+    """Discount for a static site code OR a checksum-signed playback promo code
+    (the codes shown briefly on-screen inside videos across MiniWeb sites)."""
+    if not code:
+        return 0
+    if code in PROMO_CODES:
+        return PROMO_CODES[code]
+    from app.playback import validate_promo
+    return validate_promo(code) or 0
+
+
 @blueprint.route("/cart/promo", methods=["POST"])
 def form_apply_promo():
     if "user_id" not in session:
@@ -721,7 +732,7 @@ def form_apply_promo():
     user = next((u for u in users if u["id"] == session["user_id"]), None)
     if not user:
         return redirect(url_for("e-commerce.login_page"))
-    if code in PROMO_CODES:
+    if _promo_discount_fraction(code):
         user["promo_code"] = code
         _save_users(users)
         return redirect(url_for("e-commerce.cart_page"))
@@ -878,7 +889,11 @@ def form_checkout():
                 "quantity": item["quantity"],
             })
             total += subtotal
-    total += method["cost"]
+    # Promo (static site codes + playback codes found in videos): discount
+    # applies to merchandise, not shipping.
+    promo_code = user.get("promo_code", "")
+    discount = round(total * _promo_discount_fraction(promo_code), 2)
+    total = total - discount + method["cost"]
 
     now = datetime.datetime.now()
     order_id = f"ORD-{now.strftime('%Y%m%d')}-{len(user.get('orders', [])) + 1:03d}"
@@ -898,6 +913,9 @@ def form_checkout():
         "shipping_method": method["id"],
         "shipping_cost": method["cost"],
     }
+    if discount:
+        order["promo_code"] = promo_code
+        order["discount"] = discount
 
     account_type = form["account_type"] or "checking"
 
