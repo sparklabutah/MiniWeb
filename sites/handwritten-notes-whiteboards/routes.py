@@ -324,40 +324,41 @@ def _persist_uploaded_image(f, note_id):
     return images.save_upload_placeholder(note_id, f.filename)
 
 
-@blueprint.route("/upload-image", methods=["POST"])
-def form_upload_image():
-    """Upload an image and create a new note from it."""
+@blueprint.route("/note/<int:note_id>/image/upload", methods=["POST"])
+def note_image_upload(note_id):
+    """Attach (or replace/remove) an image on an existing note.
+
+    Image upload lives INSIDE the note editor — the old standalone sidebar
+    widget that created a detached image-note is gone.
+    """
     user = _current_user()
     if not user:
         return redirect(url_for("handwritten-notes-whiteboards.login_page"))
+    note = db.get_item(SITE, "notes", note_id)
+    if not note:
+        abort(404)
+
+    if request.form.get("remove"):
+        note["image"] = ""
+        note["updated_at"] = _now_iso()
+        db.save_item(SITE, "notes", note_id, note)
+        return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=note_id))
+
     f = request.files.get("file")
-    # Reject empty uploads: require an actual image file to be selected.
     if not f or not f.filename:
         return redirect(url_for(
-            "handwritten-notes-whiteboards.index", upload_error="1",
-        ))
+            "handwritten-notes-whiteboards.note_detail", note_id=note_id, upload_error="1"))
     if not (f.mimetype or "").startswith("image/"):
         return redirect(url_for(
-            "handwritten-notes-whiteboards.index", upload_error="2",
-        ))
-    title = f.filename
-    now = _now_iso()
-    new_id = db.next_id(SITE, "notes")
-    # Persist the real uploaded bytes (data-URI) so the note shows the actual
-    # image; oversized/unreadable uploads fall back to a placeholder.
-    image_url = _persist_uploaded_image(f, new_id)
-    new_note = {
-        "id": new_id, "title": title,
-        "content": f"[image uploaded: {title}]",
-        "owner_id": user["id"], "created_at": now, "updated_at": now,
-        "tags": "image", "notebook_id": 0, "is_pinned": False,
-        "color": "#FFFACD", "drawing_data": "", "image": image_url,
-    }
-    db.save_item(SITE, "notes", new_id, new_note)
-    emit("file_created", user_id=user["id"], filename=title,
-         file_type="note", source_site="handwritten-notes-whiteboards",
-         source_id=new_id)
-    return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=new_id))
+            "handwritten-notes-whiteboards.note_detail", note_id=note_id, upload_error="2"))
+
+    note["image"] = _persist_uploaded_image(f, note_id)
+    note["updated_at"] = _now_iso()
+    db.save_item(SITE, "notes", note_id, note)
+    emit("file_created", user_id=user["id"], filename=f.filename,
+         file_type="note-image", source_site="handwritten-notes-whiteboards",
+         source_id=note_id)
+    return redirect(url_for("handwritten-notes-whiteboards.note_detail", note_id=note_id))
 
 
 # ---------------------------------------------------------------------------

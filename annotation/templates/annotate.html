@@ -357,9 +357,14 @@ textarea#instruction:focus {
                         <input type="checkbox" id="disable-2fa-toggle" checked onchange="handle2FAToggle(this.checked)" style="accent-color:#f59e0b;width:13px;height:13px;">
                         Skip 2FA
                     </label>
-                    <label style="display:flex;align-items:center;gap:.3rem;margin:0;cursor:pointer;font-size:.7rem;color:#475569;">
-                        <input type="checkbox" id="single-site-toggle" onchange="handleSingleSiteToggle()" style="accent-color:#2563eb;width:13px;height:13px;">
-                        Single site
+                    <label style="display:flex;align-items:center;gap:.3rem;margin:0;font-size:.7rem;color:#475569;">
+                        Sites
+                        <select id="site-count-picker" onchange="handleSiteCountChange()" title="How many sites the sampled task should span" style="font-size:.68rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.3rem;color:#475569;">
+                            <option value="">🎲 Auto</option>
+                            <option value="1">1 site</option>
+                            <option value="2">2 sites</option>
+                            <option value="3">3 sites</option>
+                        </select>
                     </label>
                     <select id="site-picker" onchange="reshufflePrompt()" style="display:none;font-size:.68rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:.3rem;color:#475569;max-width:220px;" title="Choose the site. Status bar shows remaining tasks needed per chain length.">
                         <option value="">🎲 Random site</option>
@@ -801,7 +806,7 @@ function hydrateRerecord() {
         const txt = (b.textContent || '').trim();
         if (txt === '↻ New' || txt === 'Skip') b.style.display = 'none';
     });
-    const sst = document.getElementById('single-site-toggle');
+    const sst = document.getElementById('site-count-picker');
     if (sst && sst.parentElement) sst.parentElement.style.display = 'none';
     const sp = document.getElementById('site-picker');
     if (sp) sp.style.display = 'none';
@@ -1965,12 +1970,13 @@ function getEnabledMacros() {
 // updateChainDisplay defined above as alias to _drawArrows
 
 // --- Reshuffle ---
-function handleSingleSiteToggle() {
-    const checked = document.getElementById('single-site-toggle')?.checked;
+function handleSiteCountChange() {
+    const count = document.getElementById('site-count-picker')?.value;
     const picker = document.getElementById('site-picker');
     if (picker) {
-        picker.style.display = checked ? '' : 'none';
-        if (checked) _populateSitePicker();  // refresh floor counts each time
+        // choosing a specific site only makes sense for single-site tasks
+        picker.style.display = count === '1' ? '' : 'none';
+        if (count === '1') _populateSitePicker();  // refresh floor counts each time
     }
     reshufflePrompt();
 }
@@ -2002,10 +2008,11 @@ async function _populateSitePicker() {
 function reshufflePrompt() {
     if (rerecordTask) return;  // re-record mode is pinned to the saved task
     document.getElementById('status').textContent = 'Loading new prompt...';
-    const singleSite = document.getElementById('single-site-toggle')?.checked ? '1' : '';
-    const chosenSite = singleSite ? (document.getElementById('site-picker')?.value || '') : '';
+    const siteCount = document.getElementById('site-count-picker')?.value || '';
+    const chosenSite = siteCount === '1' ? (document.getElementById('site-picker')?.value || '') : '';
     const params = chosenSite ? '?site=' + encodeURIComponent(chosenSite)
-                              : (singleSite ? '?single=1' : '');
+                 : siteCount === '1' ? '?single=1'
+                 : siteCount ? '?n_sites=' + siteCount : '';
     fetch('/annotate/api/prompt' + params)
         .then(r => r.json())
         .then(prompt => {
@@ -3694,7 +3701,7 @@ async function submitTask() {
         }
         if (d.task_id) {
             // Refresh floor counts in the site picker (a slot was just filled)
-            if (document.getElementById('single-site-toggle')?.checked) _populateSitePicker();
+            if (document.getElementById('site-count-picker')?.value === '1') _populateSitePicker();
             document.getElementById('status').innerHTML = `<span style="color:#16a34a;font-weight:600">Saved: ${d.task_id} \u2014 loading next task...</span>`;
             // Reset and load new prompt
             setTimeout(() => {

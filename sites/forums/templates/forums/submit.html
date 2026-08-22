@@ -14,13 +14,13 @@
             {% if error %}
             <div class="rd-err">{{ error }}</div>
             {% endif %}
-            <form method="POST" action="{{ url_for('forums.submit_post_form') }}">
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('forums.submit_post_form') }}">
                 <div class="rd-field">
                     <label for="subreddit">Community</label>
                     <select name="subreddit" id="subreddit" required>
                         <option value="">Choose a community</option>
                         {% for sub in subreddits %}
-                        <option value="{{ sub }}">r/{{ sub }}</option>
+                        <option value="{{ sub }}"{% if sub == preselect %} selected{% endif %}>r/{{ sub }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -33,11 +33,42 @@
                     <textarea name="body" id="body" placeholder="Text (optional)" style="height:160px;resize:vertical;"></textarea>
                 </div>
                 <div class="rd-field">
+                    <label>Image (optional)</label>
+                    <div id="img-drop" onclick="document.getElementById('post-image').click()"
+                         style="border:2px dashed #d0d0d0;border-radius:8px;padding:18px;text-align:center;color:#878a8c;cursor:pointer;font-size:.85rem;">
+                        <span id="img-hint">&#128247; Click to add an image to your post</span>
+                        <img id="img-preview" alt="" style="display:none;max-width:100%;max-height:260px;border-radius:6px;margin-top:8px;">
+                    </div>
+                    <input type="file" name="image" id="post-image" accept="image/*" style="display:none;" onchange="previewImage(this)">
+                    <button type="button" id="img-remove" onclick="removeImage()" style="display:none;margin-top:6px;background:none;border:1px solid #d0d0d0;border-radius:14px;padding:3px 12px;font-size:.75rem;cursor:pointer;color:#878a8c;">Remove image</button>
+                </div>
+                <div class="rd-field">
                     <label for="flair">Flair (optional)</label>
                     <input type="text" name="flair" id="flair" placeholder="e.g. Discussion, Question, OC">
                 </div>
                 <button type="submit" class="rd-btn">Post</button>
             </form>
+            <script>
+            function previewImage(input) {
+                if (!input.files || !input.files.length) return;
+                var r = new FileReader();
+                r.onload = function () {
+                    document.getElementById('img-preview').src = r.result;
+                    document.getElementById('img-preview').style.display = '';
+                    document.getElementById('img-hint').textContent = input.files[0].name + ' — click to change';
+                    document.getElementById('img-remove').style.display = '';
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+            function removeImage() {
+                var input = document.getElementById('post-image');
+                input.value = '';
+                document.getElementById('img-preview').style.display = 'none';
+                document.getElementById('img-preview').removeAttribute('src');
+                document.getElementById('img-hint').innerHTML = '&#128247; Click to add an image to your post';
+                document.getElementById('img-remove').style.display = 'none';
+            }
+            </script>
         </div>
     </div>
 </body>

@@ -103,7 +103,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                  data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag)|lower }}"
                  onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}&sort={{ sort }}'">
                 <div class="tc-id">{{ t.task_id }}
-                    {% if t_tag == 'verified' %}<span style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; verified</span>
+                    {% if t_tag == 'verified' %}<span class="verified-pill" data-by="{{ t.review_tag.by|default('') }}" data-at="{{ t.review_tag.at|default('') }}" style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; verified</span>
                     {% elif t_tag == 'stale' %}<span style="font-size:.58rem;background:#ffedd5;color:#ea580c;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">stale</span>{% endif %}
                     {% if t.has_feedback %}<span style="font-size:.58rem;background:#ede9fe;color:#7c3aed;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#9998; feedback</span>{% endif %}
                     {% if not t.has_verifier %}<span style="font-size:.58rem;background:#f1f5f9;color:#94a3b8;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">no verifier</span>{% endif %}
@@ -131,6 +131,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                     style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #86efac;{{ 'background:#16a34a;color:#fff' if cur_tag == 'verified' else 'background:#f0fdf4;color:#16a34a' }}">
                     &#10003; Verified
                 </button>
+                <span id="verified-meta" style="font-size:.68rem;color:#16a34a;white-space:nowrap;"></span>
                 <button onclick="setReviewTag('stale')" id="tag-stale-btn" title="Mark as stale: outdated against current site/data"
                     style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #fdba74;{{ 'background:#ea580c;color:#fff' if cur_tag == 'stale' else 'background:#fff7ed;color:#ea580c' }}">
                     &#9888; Stale
@@ -612,6 +613,38 @@ var _reviewAnnotator = {{ ((task.annotator or 'anonymous') if task else "") | to
 
 var _reviewCurTag = {{ ((task.review_tag.tag if task.review_tag else '') if task else "") | tojson }};
 var _reviewerName = {{ session.get('annotator_name', 'anonymous') | tojson }};
+var _reviewTagInfo = {{ (task.review_tag if task and task.review_tag else none) | tojson }};
+
+// "verified by <name> X days ago" — shown next to the Verified button and as a
+// tooltip on the sidebar pills (review_tag stores {tag, by, at}).
+function _agoLabel(atIso) {
+    var ms = Date.now() - new Date(atIso).getTime();
+    if (isNaN(ms)) return '';
+    var days = Math.floor(ms / 86400000);
+    if (days <= 0) {
+        var hours = Math.floor(ms / 3600000);
+        return hours <= 0 ? 'just now' : hours + (hours === 1 ? ' hour ago' : ' hours ago');
+    }
+    return days + (days === 1 ? ' day ago' : ' days ago');
+}
+(function () {
+    var el = document.getElementById('verified-meta');
+    if (el && _reviewTagInfo && _reviewTagInfo.tag === 'verified' && _reviewTagInfo.at) {
+        el.textContent = 'verified by ' + (_reviewTagInfo.by || 'unknown') + ' · ' + _agoLabel(_reviewTagInfo.at);
+    }
+    // Sidebar pills: show "✓ <name> · Nd ago" inline so no task needs opening.
+    document.querySelectorAll('.verified-pill').forEach(function (p) {
+        if (p.dataset.at) {
+            var ms = Date.now() - new Date(p.dataset.at).getTime();
+            var short = isNaN(ms) ? ''
+                : ms < 3600000 ? 'just now'
+                : ms < 86400000 ? Math.floor(ms / 3600000) + 'h ago'
+                : Math.floor(ms / 86400000) + 'd ago';
+            p.textContent = '✓ ' + (p.dataset.by || 'verified') + (short ? ' · ' + short : '');
+            p.title = 'verified by ' + (p.dataset.by || 'unknown') + ' · ' + _agoLabel(p.dataset.at);
+        }
+    });
+})();
 
 function toggleSortOrder() {
     var params = new URLSearchParams(window.location.search);

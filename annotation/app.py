@@ -362,7 +362,7 @@ _EDGE_MACRO_HINTS = {
 }
 
 
-def _generate_prompt(sites, coverage, force_single=False):
+def _generate_prompt(sites, coverage, force_single=False, n_sites_override=None):
     """Site-first prompt sampler.
 
     Strategy:
@@ -454,6 +454,11 @@ def _generate_prompt(sites, coverage, force_single=False):
     if force_single:
         n_sites = 1
         n_macros = min(n_macros, 3)
+    elif n_sites_override:
+        # Annotator explicitly chose the task's site count (1, 2, or 3).
+        n_sites = max(1, min(3, int(n_sites_override)))
+        if n_macros < n_sites:
+            n_macros = n_sites
     else:
         # Longer chains often span sites, so make them progressively more likely to
         # be multi-site (single-site stays the majority). The longest chains may
@@ -516,14 +521,17 @@ def _generate_prompt(sites, coverage, force_single=False):
         # Pick additional sites from candidates
         for _ in range(n_sites - 1):
             if not candidates:
-                # Fallback: random under-covered site
+                # Fallback: random under-covered sites, filling all the way to the
+                # requested count (previously stopped after one, so a forced
+                # 3-site prompt could come back with only 2 sites).
                 remaining = [s for s in site_pool if s["id"] not in sampled_ids]
-                if remaining:
+                while remaining and len(sampled_sites) < n_sites:
                     rw = [1.0 / (s.get("annotated_count", 0) + 1) for s in remaining]
                     t = sum(rw)
-                    pick = rng.choices(remaining, weights=[w/t for w in rw], k=1)[0]
+                    pick = rng.choices(remaining, weights=[w / t for w in rw], k=1)[0]
                     sampled_sites.append(pick)
                     sampled_ids.add(pick["id"])
+                    remaining = [s for s in remaining if s["id"] != pick["id"]]
                 break
 
             cs, ws, etypes, dirs = zip(*candidates)
@@ -553,8 +561,8 @@ def _generate_prompt(sites, coverage, force_single=False):
             required_companions["email"] = "2fa_verification"
 
     for companion_id, reason in required_companions.items():
-        if len(sampled_sites) >= 3:
-            break  # cap at 3 sites max
+        if len(sampled_sites) >= (n_sites_override or 3):
+            break  # honor the annotator-chosen site count (default cap: 3)
         if companion_id not in sampled_ids and companion_id in site_map:
             sampled_sites.append(site_map[companion_id])
             sampled_ids.add(companion_id)
@@ -1864,7 +1872,8 @@ def api_prompt():
     ?site=<id>  — annotator-chosen site: only macros are sampled, with the
                   per-site coverage floor prioritized (single-site task base).
     ?single=1   — random single-site prompt (legacy behavior).
-    (neither)   — graph-aware multi-site sampling.
+    ?n_sites=N  — force the task's site count (1, 2, or 3).
+    (neither)   — graph-aware multi-site sampling (mixed site counts).
     """
     sites = _load_sites()
     site_id = (request.args.get("site") or "").strip()
@@ -1875,7 +1884,9 @@ def api_prompt():
         return jsonify(_generate_site_prompt(site))
     coverage = _get_macro_coverage()
     single = request.args.get("single") == "1"
-    prompt = _generate_prompt(sites, coverage, force_single=single)
+    n_sites = request.args.get("n_sites", type=int)
+    prompt = _generate_prompt(sites, coverage, force_single=single,
+                              n_sites_override=n_sites)
     return jsonify(prompt)
 
 

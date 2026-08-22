@@ -269,10 +269,22 @@
             Save
         </button>
 
+        <form method="POST" enctype="multipart/form-data" id="note-image-form"
+              action="{{ url_for('handwritten-notes-whiteboards.note_image_upload', note_id=note.id) }}" style="display:inline;">
+            <input type="file" name="file" id="note-image-input" accept="image/*" style="display:none;"
+                   onchange="if(this.files.length)document.getElementById('note-image-form').submit();">
+            <button type="button" class="tool-btn" onclick="document.getElementById('note-image-input').click()"
+                    title="{{ 'Replace the image attached to this note' if note.image else 'Attach an image to this note' }}">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2zM8.5 13.5l2.5 3L14.5 12l4.5 6H5l3.5-4.5zM8.5 11A1.5 1.5 0 118.5 8a1.5 1.5 0 010 3z"/></svg>
+                {{ 'Replace image' if note.image else 'Add image' }}
+            </button>
+        </form>
+        {% if note.image %}
         <a class="tool-btn" href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}" title="Edit this note's image (crop, resize, contrast, vibrance)">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2zM8.5 13.5l2.5 3L14.5 12l4.5 6H5l3.5-4.5zM8.5 11A1.5 1.5 0 118.5 8a1.5 1.5 0 010 3z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             Edit image
         </a>
+        {% endif %}
 
         <button class="tool-btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" title="Share note">Share</button>
         <form method="POST" action="{{ url_for('handwritten-notes-whiteboards.form_invite_to_note', note_id=note.id) }}" style="display:inline-flex;gap:.2rem;align-items:center;">
@@ -340,13 +352,26 @@
             {% endif %}
         </div>
 
+        {% if request.args.get('upload_error') %}
+        <div style="margin:.4rem 1.5rem 0;padding:.5rem .8rem;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:.4rem;font-size:.78rem;">
+            {% if request.args.get('upload_error') == '2' %}That file is not an image. Please choose a PNG or JPG.
+            {% else %}Please choose an image file to attach.{% endif %}
+        </div>
+        {% endif %}
+
         {% if note.image %}
         <div class="note-image-bar" style="padding:.4rem 1.5rem 0;">
             <a href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}" title="Edit image" style="display:inline-block;">
                 <img src="{{ note.image }}" alt="{{ note.title }} image" style="max-height:160px;max-width:100%;border:1px solid var(--border);border-radius:.4rem;display:block;">
             </a>
-            <div style="font-size:.72rem;color:var(--text-muted);margin-top:.25rem;">
-                Note image &middot; <a href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}">Edit image</a>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:.25rem;display:flex;gap:.6rem;align-items:center;">
+                Note image
+                &middot; <a href="{{ url_for('handwritten-notes-whiteboards.note_image_edit_page', note_id=note.id) }}">Edit image</a>
+                &middot; <a href="#" onclick="document.getElementById('note-image-input').click();return false;">Replace</a>
+                <form method="POST" action="{{ url_for('handwritten-notes-whiteboards.note_image_upload', note_id=note.id) }}" style="display:inline;margin:0;">
+                    <input type="hidden" name="remove" value="1">
+                    &middot; <button type="submit" style="background:none;border:none;color:#b91c1c;font-size:.72rem;cursor:pointer;padding:0;text-decoration:underline;">Remove</button>
+                </form>
             </div>
         </div>
         {% endif %}

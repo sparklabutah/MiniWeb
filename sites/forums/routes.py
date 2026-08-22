@@ -197,8 +197,10 @@ def _load_reports():
 
 def _truthy(v):
     """A moderation flag column (removed/locked/sticky) counts as set when it
-    holds anything other than the empty/zero/false defaults."""
-    return str(v).strip().lower() not in ("", "0", "none", "false")
+    holds anything other than the empty/zero/false defaults. The seeded corpus
+    stores Postgres-style 'f' / 'false' strings, which must read as UNSET —
+    treating 'f' as set once locked (and stickied) all 50k posts."""
+    return str(v).strip().lower() not in ("", "0", "none", "false", "f", "no", "null")
 
 
 def _is_removed(p):
@@ -318,10 +320,29 @@ def _post_media(url):
     if not url:
         return {"kind": "text"}
     low = url.lower()
+    if low.startswith("data:image/"):        # uploaded image (data URI)
+        return {"kind": "image", "url": url, "domain": "uploaded"}
     domain = low.split("//")[-1].split("/")[0].replace("www.", "")
     if low.endswith(_IMG_EXT) or "i.redd.it" in low:
         return {"kind": "image", "url": url, "domain": domain}
     return {"kind": "link", "url": url, "domain": domain}
+
+
+_MAX_INLINE_IMAGE = 3 * 1024 * 1024  # 3 MB, same cap as PixShare uploads
+
+
+def _uploaded_image_data_uri(file_storage):
+    """Turn an uploaded image file into a data URI (or None if absent/too big)."""
+    if not file_storage or not file_storage.filename:
+        return None
+    content = file_storage.read()
+    if not content or len(content) > _MAX_INLINE_IMAGE:
+        return None
+    mime = file_storage.mimetype or "image/jpeg"
+    if not mime.startswith("image/"):
+        return None
+    import base64
+    return f"data:{mime};base64," + base64.b64encode(content).decode("ascii")
 
 
 def _attach_feed_meta(posts):
@@ -744,7 +765,14 @@ def user_profile(username):
 @blueprint.route("/submit")
 def submit_page():
     subreddits = _get_subreddits()
-    return render_template("forums/submit.html", subreddits=subreddits)
+    # Coming from a community page ("Create Post" in r/<sub>) — preselect it.
+    preselect = (request.args.get("subreddit") or "").strip()
+    if preselect.startswith("r/"):
+        preselect = preselect[2:]
+    if preselect not in subreddits:
+        preselect = ""
+    return render_template("forums/submit.html", subreddits=subreddits,
+                           preselect=preselect)
 
 
 @blueprint.route("/submit", methods=["POST"])
@@ -776,6 +804,11 @@ def submit_post_form():
         "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "flair": flair,
     }
+    # Optional image upload (picked from the simulated filesystem) -> the post
+    # renders as an image post, same pipeline as seeded i.redd.it links.
+    image_uri = _uploaded_image_data_uri(request.files.get("image"))
+    if image_uri:
+        new_post["url"] = image_uri
     db.save_item(SITE, "posts", new_post["id"], new_post)
     return redirect(url_for("forums.post_detail", post_id=new_post["id"]))
 
@@ -1021,6 +1054,12 @@ def api_create_post():
         "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "flair": data.get("flair", ""),
     }
+    # Optional media: a url (link/image post) or an uploaded image file.
+    if (data.get("url") or "").strip():
+        new_post["url"] = data["url"].strip()
+    image_uri = _uploaded_image_data_uri(request.files.get("image"))
+    if image_uri:
+        new_post["url"] = image_uri
     db.save_item(SITE, "posts", new_post["id"], new_post)
     return jsonify(new_post), 201
 
