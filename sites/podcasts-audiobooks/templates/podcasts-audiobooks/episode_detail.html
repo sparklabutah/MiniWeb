@@ -88,6 +88,7 @@
                 </div>
                 <div class="time-display" id="time-display">0:00 / {{ episode.duration_minutes }}:00</div>
             </div>
+            <div id="stream-line" style="display:none;margin-top:.5rem;padding:.45rem .7rem;background:#0f0f1a;border-left:3px solid #52525b;border-radius:.35rem;font-size:.82rem;color:#c4b5fd;"></div>
 
             <div class="speed-control">
                 <label for="speed-select">Playback Speed:</label>
@@ -125,10 +126,36 @@
     // Resume from the last persisted position for this listener.
     let pos = Math.min(totalSec, Math.max(0, {{ resume_position|default(0)|round|int }}));
     function fmtTime(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+
+    // Deterministic listening stream: what the host is saying at this position.
+    // Some facts (codes, names, numbers) are audible only in short spans — find
+    // them by scrubbing the progress bar (search_by_playback).
+    var streamSegs = null;
+    fetch('/_player/timeline?key=' + encodeURIComponent(location.pathname + '|' + {{ episode.title|tojson }}) +
+          '&duration=' + totalSec + '&flavor=audio')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { streamSegs = (d && d.segments) || []; renderPlayer(); })
+        .catch(function () {});
+    function renderStream() {
+        var el = document.getElementById('stream-line');
+        if (!el || !streamSegs || (!playing && pos <= 0)) { if (el) el.style.display = 'none'; return; }
+        var seg = null;
+        for (var i = 0; i < streamSegs.length; i++) {
+            if (pos >= streamSegs[i].start && pos < streamSegs[i].end) { seg = streamSegs[i]; break; }
+        }
+        if (!seg && streamSegs.length && pos >= totalSec) seg = streamSegs[streamSegs.length - 1];
+        if (!seg) { el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.textContent = seg.text;
+        el.style.borderLeftColor = seg.kind === 'fact' ? '#8b5cf6' : '#52525b';
+        el.style.fontWeight = seg.kind === 'fact' ? '600' : '400';
+    }
+
     function renderPlayer() {
         document.getElementById('progress-fill').style.width = (totalSec ? Math.min(100, pos / totalSec * 100) : 0) + '%';
         document.getElementById('time-display').textContent = fmtTime(pos) + ' / ' + fmtTime(totalSec);
         document.getElementById('play-btn').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+        renderStream();
     }
     function saveProgress() {
         fetch(`{{ url_for('podcasts-audiobooks.index') }}api/playback/progress`, {

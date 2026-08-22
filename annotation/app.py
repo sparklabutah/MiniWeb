@@ -2535,15 +2535,15 @@ def _collect_playback_facts():
 
     rows = []
 
-    def add(site, path, title, duration):
+    def add(site, key_path, title, duration, url=None, flavor="video"):
         try:
-            tl = generate_timeline(path + "|" + (title or ""), int(duration))
+            tl = generate_timeline(key_path + "|" + (title or ""), int(duration), flavor)
         except Exception:
             return
         facts = [{"label": s["label"], "value": s["value"],
                   "start": fmt(s["start"]), "end": fmt(s["end"])}
                  for s in tl["segments"] if s.get("kind") == "fact"]
-        rows.append({"site": site, "url": path, "title": title,
+        rows.append({"site": site, "url": url or key_path, "title": title,
                      "duration": fmt(tl["duration"]), "facts": facts})
 
     def _j(v, default):
@@ -2586,6 +2586,21 @@ def _collect_playback_facts():
             dm = r.get("duration_minutes")
             add("project-homepages", f"/sites/project-homepages/resource/{r['id']}",
                 r.get("title", ""), (dm if dm else 15) * 60)
+    except Exception:
+        pass
+    try:  # SoundShelf podcast episodes (audio-flavored stream)
+        for e in db.query("podcasts-audiobooks", "episodes", sort="id", limit=200):
+            add("podcasts-audiobooks", f"/sites/podcasts-audiobooks/episode/{e['id']}",
+                e.get("title", ""), (e.get("duration_minutes") or 0) * 60, flavor="audio")
+    except Exception:
+        pass
+    try:  # SoundWave tracks (playbar key is track-identity, not page path)
+        albums = {a["id"]: a for a in db.query("music", "albums", limit=500)}
+        for t in db.query("music", "tracks", sort="id", limit=200):
+            album = albums.get(t.get("album_id"))
+            url = f"/sites/music/album/{album['id']}" if album else "/sites/music/"
+            add("music", f"/sites/music/track/{t['id']}", t.get("title", ""),
+                t.get("duration_seconds") or 210, url=url, flavor="audio")
     except Exception:
         pass
     try:  # Course lectures (player key = course page path + lecture title)

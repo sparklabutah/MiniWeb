@@ -41,6 +41,30 @@ _FILLER = [
     "Credits and thank-you slide",
 ]
 
+# Audio flavor: same segment structure/values, narration-style wording.
+_FILLER_AUDIO = [
+    "Theme music plays",
+    "Host intro continues",
+    "Interview segment",
+    "Ad read: sponsor message",
+    "Host tells a listener story",
+    "Music bed under discussion",
+    "Caller question on air",
+    "Co-host banter",
+    "Deep-dive into the main topic",
+    "Short musical interlude",
+    "Host recaps the last episode",
+    "Sound clip plays",
+    "Listener mail segment",
+    "Host sets up the next guest",
+    "Discussion gets technical",
+    "Quick news roundup",
+    "Host shares a recommendation",
+    "Outro music begins",
+    "Closing thoughts",
+    "Credits and thank-yous",
+]
+
 _FIRST = ["Maya", "Daniel", "Aisha", "Tom", "Ingrid", "Rafael", "Yuki", "Omar",
           "Petra", "Liam", "Sofia", "Chen"]
 _LAST = ["Torres", "Novak", "Okoye", "Lindqvist", "Ferreira", "Tanaka",
@@ -80,27 +104,41 @@ def validate_promo(code):
     return PROMO_DISCOUNTS[prefix]
 
 
-def _make_facts(rng):
-    """Candidate fact generators — each returns (label, on-screen text, value)."""
+def _make_facts(rng, flavor="video"):
+    """Candidate fact generators — each returns (label, stream text, value).
+
+    The flavor changes ONLY the wording; value generation and rng consumption
+    are identical, so the same key yields the same values in either flavor.
+    """
     promo = make_promo_code(rng)
     ref = f"{rng.randint(10000, 99999)}"
     email = f"{rng.choice(['events', 'support', 'press', 'booking'])}@{rng.choice(_DOMAINS)}"
     count = f"{rng.randint(1200, 48000):,}"
     name = f"{rng.choice(_FIRST)} {rng.choice(_LAST)}"
     amount = f"${rng.randint(90, 4900):,}"
-    pool = [
-        ("promo code", f"On screen: promo code {promo} — redeem at the online store", promo),
-        ("reference number", f"Overlay: reference #{ref}", ref),
-        ("contact email", f"Lower third: contact {email}", email),
-        ("live viewer count", f"Ticker: {count} watching live", count),
-        ("guest name", f"Name card: {name}", name),
-        ("prize amount", f"Banner: prize pool {amount}", amount),
-    ]
+    if flavor == "audio":
+        pool = [
+            ("promo code", f"Host reads out promo code {promo} — redeem at the online store", promo),
+            ("reference number", f"Host gives reference number #{ref}", ref),
+            ("contact email", f"Contact mentioned on air: {email}", email),
+            ("live viewer count", f"Host: {count} listening live right now", count),
+            ("guest name", f"Guest introduced: {name}", name),
+            ("prize amount", f"Prize announced: {amount}", amount),
+        ]
+    else:
+        pool = [
+            ("promo code", f"On screen: promo code {promo} — redeem at the online store", promo),
+            ("reference number", f"Overlay: reference #{ref}", ref),
+            ("contact email", f"Lower third: contact {email}", email),
+            ("live viewer count", f"Ticker: {count} watching live", count),
+            ("guest name", f"Name card: {name}", name),
+            ("prize amount", f"Banner: prize pool {amount}", amount),
+        ]
     rng.shuffle(pool)
     return pool
 
 
-def generate_timeline(key, duration):
+def generate_timeline(key, duration, flavor="video"):
     """[{start, end, text, kind, (label, value)}] covering 0..duration."""
     duration = max(30, min(int(duration or 0), 36000))
     rng = random.Random(zlib.crc32(("miniweb-playback|" + key).encode("utf-8")))
@@ -117,11 +155,11 @@ def generate_timeline(key, duration):
             slots.append(s)
     slots.sort()
 
-    facts = _make_facts(rng)[:len(slots)]
+    facts = _make_facts(rng, flavor)[:len(slots)]
     segments = []
     cursor = 0
     fi = 0
-    filler = _FILLER[:]
+    filler = (_FILLER_AUDIO if flavor == "audio" else _FILLER)[:]
     rng.shuffle(filler)
     fill_i = 0
     while cursor < duration:
@@ -146,9 +184,10 @@ def generate_timeline(key, duration):
 def api_timeline():
     key = (request.args.get("key") or "").strip()
     duration = request.args.get("duration", type=float) or 0
+    flavor = "audio" if request.args.get("flavor") == "audio" else "video"
     if not key:
         return jsonify({"error": "key required"}), 400
-    return jsonify(generate_timeline(key, duration))
+    return jsonify(generate_timeline(key, duration, flavor))
 
 
 def register_playback_routes(app):

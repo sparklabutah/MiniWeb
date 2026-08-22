@@ -67,6 +67,7 @@
             </div>
         </div>
         <div class="pb-center">
+            <div id="pb-stream" style="display:none;font-size:.72rem;color:#a7f3d0;max-width:520px;margin:0 auto .15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;"></div>
             <div class="pb-ctrls">
                 <button title="Previous">&#9198;</button>
                 <button class="pb-play" id="pb-play" onclick="MusicPlayer.toggle()">&#9654;</button>
@@ -135,10 +136,39 @@ var MusicPlayer = (function () {
     }
     function toggleMute(){ muted = !muted; renderVolume(); persistVolume(); }
     function tick(){ pos += 1; if(pos>dur){ pos=dur; stop(); } render(); }
+
+    // Deterministic listening stream per track: some facts (codes, names,
+    // numbers) are audible only in short spans — scrub the bar to find them.
+    var streamSegs = null;
+    function loadStream(trackId, title){
+        streamSegs = null;
+        fetch('/_player/timeline?key=' + encodeURIComponent('/sites/music/track/' + trackId + '|' + (title || '')) +
+              '&duration=' + dur + '&flavor=audio')
+            .then(function(r){ return r.json(); })
+            .then(function(d){ streamSegs = (d && d.segments) || []; render(); })
+            .catch(function(){});
+    }
+    function renderStream(){
+        var el = document.getElementById('pb-stream');
+        if(!el) return;
+        if(!streamSegs || (!playing && pos <= 0)){ el.style.display = 'none'; return; }
+        var seg = null;
+        for(var i = 0; i < streamSegs.length; i++){
+            if(pos >= streamSegs[i].start && pos < streamSegs[i].end){ seg = streamSegs[i]; break; }
+        }
+        if(!seg && streamSegs.length && pos >= dur) seg = streamSegs[streamSegs.length - 1];
+        if(!seg){ el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.textContent = seg.text;
+        el.style.color = seg.kind === 'fact' ? '#6ee7b7' : '#9ca3af';
+        el.style.fontWeight = seg.kind === 'fact' ? '600' : '400';
+    }
+
     function render(){
         document.getElementById('pb-fill').style.width = (dur? (pos/dur*100):0)+'%';
         document.getElementById('pb-cur').textContent = mmss(pos);
         document.getElementById('pb-play').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+        renderStream();
     }
     function start(){ playing=true; if(timer) clearInterval(timer); timer=setInterval(tick,1000); render(); }
     function stop(){ playing=false; if(timer) clearInterval(timer); timer=null; render(); }
@@ -153,8 +183,12 @@ var MusicPlayer = (function () {
             var art = document.getElementById('pb-art');
             art.style.background = t.cover || '#333'; art.innerHTML = NOTE;
             pos = 0;
-            var parts = (t.duration||'').split(':'); dur = parts.length===2 ? (+parts[0]*60 + +parts[1]) : 210;
-            document.getElementById('pb-dur').textContent = t.duration || mmss(dur);
+            // real track length (api sends duration_seconds/duration_formatted;
+            // the old t.duration lookup silently made every track 3:30)
+            if (typeof t.duration_seconds === 'number' && t.duration_seconds > 0) { dur = t.duration_seconds; }
+            else { var parts = (t.duration||'').split(':'); dur = parts.length===2 ? (+parts[0]*60 + +parts[1]) : 210; }
+            document.getElementById('pb-dur').textContent = t.duration_formatted || t.duration || mmss(dur);
+            loadStream(t.id != null ? t.id : id, t.title || '');
             start();
         }).catch(function(){});
     }
