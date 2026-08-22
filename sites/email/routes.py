@@ -11,7 +11,6 @@ from email.utils import parsedate_to_datetime
 
 from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from app import db
-from app.db import _deserialize_row
 from app.events import emit
 
 SITE = "email"
@@ -123,161 +122,65 @@ def _parse_addr_list(raw):
     return [a for a in addrs if a and '@' in a]
 
 
-def _match_user_id(to_addrs, from_addr):
-    """Determine which user this email belongs to.
-    If from_addr is a known user, put it in their sent folder.
-    If any to_addr is a known user, put it in their inbox.
-    Otherwise, distribute round-robin among users.
-    """
-    # Check to addresses first (inbox)
-    for addr in to_addrs:
-        uid = _USER_EMAIL_MAP.get(addr)
-        if uid is not None:
-            return uid, "inbox"
-    # Check from address (sent)
-    uid = _USER_EMAIL_MAP.get(from_addr)
-    if uid is not None:
-        return uid, "inbox"  # Default to inbox for sent items from user
-    return None, "inbox"
-
-
-def _interpret_record(raw, idx):
-    """Convert a raw JSONL record into a normalized email object."""
-    from_addr = (raw.get("from") or raw.get("from_") or "").strip()
-    to_addrs = _parse_addr_list(raw.get("to") or "")
-    cc_addrs = _parse_addr_list(raw.get("cc") or "")
-    subject = (raw.get("subject") or "(no subject)").strip()
-    date_obj = _parse_email_date(raw.get("date") or "")
-    body = raw.get("body") or ""
-    message_id = raw.get("message_id") or ""
-
-    return {
-        "id": idx,
-        "from_addr": from_addr,
-        "to_addrs": to_addrs,
-        "cc_addrs": cc_addrs,
-        "subject": subject,
-        "date": date_obj.isoformat(),
-        "date_display": date_obj.strftime("%b %d, %Y %I:%M %p"),
-        "date_sort": date_obj.timestamp(),
-        "body": body,
-        "body_preview": (body[:120].replace('\n', ' ').replace('\r', ' ').strip() + '...') if len(body) > 120 else body.replace('\n', ' ').replace('\r', ' ').strip(),
-        "message_id": message_id,
-        "folder": "inbox",
-        "is_read": False,
-        "is_starred": False,
-        "labels": [],
-        "user_id": None,
-    }
-
-
-def _assign_emails_to_users(raw_records):
-    """Interpret raw records and assign them to users."""
-    emails = []
-    robin_counter = 0
-    for idx, raw in enumerate(raw_records, 1):
-        email = _interpret_record(raw, idx)
-        from_addr = email["from_addr"]
-        to_addrs = email["to_addrs"]
-
-        # Assign to user
-        uid, folder = _match_user_id(to_addrs, from_addr)
-        if uid is None:
-            # Round-robin among 5 users
-            robin_counter += 1
-            uid = (robin_counter % 5) + 1
-            folder = "inbox"
-
-        # If sender is the user, put in sent
-        user_email = None
-        for addr, u_id in _USER_EMAIL_MAP.items():
-            if u_id == uid:
-                user_email = addr
-                break
-        if from_addr == user_email:
-            folder = "sent"
-
-        email["user_id"] = uid
-        email["folder"] = folder
-        emails.append(email)
-
-    # Sort by date descending
-    emails.sort(key=lambda e: e["date_sort"], reverse=True)
-    # Re-assign IDs after sort
-    for i, e in enumerate(emails, 1):
-        e["id"] = i
-
-    return emails
-
-
 # ---------------------------------------------------------------------------
-# DB-backed data access  (email_emails table)
+# Static (Enron + seeded) emails -- queried straight from email_emails.
+#
+# The derived columns (positional id, user_id, folder, parsed dates, preview)
+# are persisted by scripts/migrate_email_derived_columns.py, so this reads SQL
+# like every other site. No process cache: seeded emails appear without a
+# restart, and nothing holds the 8k-email corpus in RAM.
 # ---------------------------------------------------------------------------
-
 
 def _db_conn():
     return db.get_conn()
 
 
-def _db_load_all_raw():
-    """Load all raw email records from DB."""
-    conn = _db_conn()
-    rows = conn.execute(
-        "SELECT * FROM email_emails ORDER BY date"
-    ).fetchall()
-    results = []
-    for row in rows:
-        raw = _deserialize_row(row)
-        # The per-site table uses 'from_' to avoid SQL keyword;
-        # _interpret_record expects 'from'
-        if "from_" in raw and "from" not in raw:
-            raw["from"] = raw.pop("from_")
-        results.append(raw)
-    return results
+def _row_to_email(r, include_body):
+    return {
+        "id": r["id"],
+        "user_id": r["user_id"],
+        "folder": r["folder"] or "inbox",
+        "from_addr": (r["from_"] or "").strip(),
+        "to_addrs": _parse_addr_list(r["to"] or ""),
+        "cc_addrs": _parse_addr_list(r["cc"] or ""),
+        "subject": (r["subject"] or "(no subject)").strip(),
+        "date": r["date_iso"] or "",
+        "date_display": r["date_display"] or "",
+        "date_sort": r["date_sort"] or 0,
+        "body": (r["body"] if include_body else "") or "",
+        "body_preview": r["body_preview"] or "",
+        "message_id": r["message_id"] or "",
+        "is_read": False,
+        "is_starred": False,
+        "labels": [],
+    }
 
 
-# DB emails cache -- loaded and assigned once
-_db_emails = None
-_db_contacts = None
+_STATIC_COLS = ("id, user_id, folder, from_, [to], cc, subject, "
+                "date_iso, date_display, date_sort, body_preview, message_id")
 
 
-def _db_ensure_loaded():
-    global _db_emails, _db_contacts
-    if _db_emails is None:
-        raw_records = _db_load_all_raw()
-        _db_emails = _assign_emails_to_users(raw_records)
-        # Extract contacts
-        addr_set = set()
-        for e in _db_emails:
-            if e["from_addr"]:
-                addr_set.add(e["from_addr"])
-            for a in e["to_addrs"]:
-                addr_set.add(a)
-            for a in e["cc_addrs"]:
-                addr_set.add(a)
-        _db_contacts = sorted(addr_set)
+def _static_emails(user_id=None, include_body=True):
+    """Date-sorted static emails, optionally scoped to one user."""
+    cols = _STATIC_COLS + (", body" if include_body else "")
+    sql = f"SELECT {cols} FROM email_emails"
+    params = ()
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params = (user_id,)
+    sql += " ORDER BY date_sort DESC"
+    return [_row_to_email(r, include_body) for r in db.execute(sql, params)]
 
 
-def _db_get_emails():
-    _db_ensure_loaded()
-    return _db_emails
-
-
-def _db_get_contacts():
-    _db_ensure_loaded()
-    return _db_contacts
-
-
-# ---------------------------------------------------------------------------
-# Unified accessors -- always use DB
-# ---------------------------------------------------------------------------
-
-def _get_emails():
-    return _db_get_emails()
+def _static_email_by_id(email_id):
+    r = db.execute(f"SELECT {_STATIC_COLS}, body FROM email_emails WHERE id = ?",
+                   (email_id,), fetch="one")
+    return _row_to_email(r, True) if r else None
 
 
 def _get_contacts():
-    return _db_get_contacts()
+    return [r["address"] for r in
+            db.execute("SELECT address FROM email_contacts ORDER BY address", ())]
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +342,7 @@ def _load_overlay_emails():
 # Helper: filter emails for current user
 # ---------------------------------------------------------------------------
 
-def _user_emails(user_id, folder=None):
+def _user_emails(user_id, folder=None, include_body=True):
     """Get emails for a user, optionally filtered by folder.
 
     Priority order:
@@ -460,10 +363,8 @@ def _user_emails(user_id, folder=None):
         if sm_id is not None and sm_id not in overlay_ids and sm.get("user_id") == user_id:
             emails.append(sm)
 
-    # Add Enron background emails
-    for e in _get_emails():
-        if e["user_id"] == user_id:
-            emails.append(e)
+    # Add static (Enron + seeded) emails straight from SQL
+    emails.extend(_static_emails(user_id, include_body=include_body))
 
     # Apply per-session state overrides (delete->trash, move, star, read) BEFORE
     # the folder filter, so a moved/deleted email lands in the right folder.
@@ -477,7 +378,7 @@ def _user_emails(user_id, folder=None):
 
 def _folder_counts(user_id):
     """Get unread count per folder for a user."""
-    all_emails = _user_emails(user_id)
+    all_emails = _user_emails(user_id, include_body=False)
     counts = {}
     for e in all_emails:
         f = e.get("folder", "inbox")
@@ -493,7 +394,7 @@ def _folder_counts(user_id):
 # Delete/move/star/read persist here (session overlay) and are applied on read,
 # so they survive across requests, stay isolated per session, and work for
 # every email source (overlay, Enron/static, composed) — not just 'sent'.
-_STATE_KEYS = ("folder", "is_starred", "is_read")
+_STATE_KEYS = ("folder", "is_starred", "is_read", "labels")
 
 
 def _get_email_states():
@@ -523,24 +424,28 @@ def _apply_states(emails, states=None):
 
 
 def _find_email(email_id, user_id=None):
-    """Find an email by ID across overlay, static, and sent stores."""
+    """Find an email by ID across overlay, static, and sent stores.
+
+    The returned dict has this session's state overrides applied (folder,
+    star, read, labels), so callers see current values — mutations must go
+    through _set_email_state, never by editing the returned dict.
+    """
     # Check overlay emails first
     for e in _load_overlay_emails():
         if e["id"] == email_id:
             if user_id is None or e["user_id"] == user_id:
-                return e, "overlay"
-    # Check static (Enron) emails
-    for e in _get_emails():
-        if e["id"] == email_id:
-            if user_id is None or e["user_id"] == user_id:
-                return e, "static"
+                return _apply_states([e])[0], "overlay"
+    # Check static (Enron + seeded) emails by indexed id
+    e = _static_email_by_id(email_id)
+    if e and (user_id is None or e["user_id"] == user_id):
+        return _apply_states([e])[0], "static"
     # Check runtime-composed sent messages
     sent_msgs = _load_sent()
     overlay_ids = {e["id"] for e in _load_overlay_emails()}
     for e in sent_msgs:
         if e["id"] == email_id and e["id"] not in overlay_ids:
             if user_id is None or e["user_id"] == user_id:
-                return e, "sent"
+                return _apply_states([e])[0], "sent"
     return None, None
 
 
@@ -989,7 +894,7 @@ def api_messages():
         overlay = _load_overlay_emails()
         overlay_ids = {e["id"] for e in overlay}
         emails = list(overlay)
-        emails.extend(_get_emails())
+        emails.extend(_static_emails(None))
         # Add runtime-composed messages not already in overlay
         for sm in _load_sent():
             if sm.get("id") not in overlay_ids:
@@ -1117,6 +1022,7 @@ def api_mark_read(email_id):
     if email is None:
         abort(404)
     email["is_read"] = (mark == "read")
+    _set_email_state(email_id, is_read=email["is_read"])
     if source == "sent":
         sent = _load_sent()
         for s in sent:
@@ -1135,6 +1041,7 @@ def api_star(email_id):
         abort(404)
     new_val = not email.get("is_starred", False)
     email["is_starred"] = new_val
+    _set_email_state(email_id, is_starred=new_val)
     if source == "sent":
         sent = _load_sent()
         for s in sent:
@@ -1154,6 +1061,7 @@ def api_move(email_id):
         abort(404)
     old_folder = email.get("folder")
     email["folder"] = target
+    _set_email_state(email_id, folder=target)
     if source == "sent":
         sent = _load_sent()
         for s in sent:
@@ -1188,6 +1096,7 @@ def api_label(email_id):
     else:
         result = "no_change"
     email["labels"] = labels
+    _set_email_state(email_id, labels=labels)
     if source == "sent":
         sent = _load_sent()
         for s in sent:
@@ -1206,6 +1115,7 @@ def api_delete(email_id):
         abort(404)
     old_folder = email.get("folder")
     email["folder"] = "trash"
+    _set_email_state(email_id, folder="trash")
     if source == "sent":
         sent = _load_sent()
         for s in sent:
@@ -1239,7 +1149,7 @@ def api_folder_count(name):
         # Count across all users
         overlay = _load_overlay_emails()
         overlay_ids = {e["id"] for e in overlay}
-        all_emails = list(overlay) + list(_get_emails())
+        all_emails = list(overlay) + _static_emails(None)
         all_emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
         emails_in_folder = [e for e in all_emails if e.get("folder") == name]
         return jsonify({"folder": name, "total": len(emails_in_folder),
@@ -1270,7 +1180,7 @@ def api_search():
     else:
         overlay = _load_overlay_emails()
         overlay_ids = {e["id"] for e in overlay}
-        emails = list(overlay) + list(_get_emails())
+        emails = list(overlay) + _static_emails(None)
         emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
     results = _search_emails(emails, q)
     return jsonify(results)
@@ -1301,7 +1211,7 @@ def api_login():
 def api_stats():
     overlay = _load_overlay_emails()
     overlay_ids = {e["id"] for e in overlay}
-    emails = list(overlay) + list(_get_emails())
+    emails = list(overlay) + _static_emails(None)
     emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
     user_id = _resolve_user_id(request.args.get("user_id", type=int))
     if user_id:
@@ -1332,7 +1242,7 @@ def api_export():
 
     overlay = _load_overlay_emails()
     overlay_ids = {e["id"] for e in overlay}
-    emails = list(overlay) + list(_get_emails())
+    emails = list(overlay) + _static_emails(None)
     emails.extend(sm for sm in _load_sent() if sm.get("id") not in overlay_ids)
 
     if user_id:

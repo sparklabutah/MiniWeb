@@ -1,6 +1,12 @@
-"""LinguaBridge Translator -- translate text using LLM (same as AI chatbot).
+"""LinguaBridge Translator -- local NLLB translation with a persistent cache.
 
-Inspired by Google Translate. Uses OpenAI gpt-5.4-nano for actual translation.
+Inspired by Google Translate. Novel text is translated once by the local
+NLLB-200 many-to-many model (CTranslate2 int8, all 110 directions, no API
+key; fetch with scripts/fetch_translation_model.py) and cached in the
+translation_cache base table, so repeat requests are deterministic across
+sessions/deploys. Glossaried requests prefer the configured LLM (it honors
+term constraints); the word-by-word dictionaries remain as the last-resort
+offline fallback.
 """
 import csv
 import io
@@ -40,37 +46,189 @@ _LANG_NAMES = {
 }
 
 
-def _get_openai_key():
-    """Load API key from .env file or environment (same as AI chatbot)."""
-    import os
-    env_path = SITE_DIR.parent.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("export "):
-                line = line[7:]
-            if line.startswith("OPENAI_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return os.environ.get("OPENAI_API_KEY", "")
+# ---------------------------------------------------------------------------
+# Persistent shared translation cache.
+#
+# Realism + determinism: the FIRST sighting of a (text, language pair,
+# glossary) triple is translated by the configured LLM (temperature 0) and
+# stored in a BASE table shared across sessions — so annotator recordings,
+# parallel eval agents, and the Railway deploy (the cache travels with the
+# pushed DB) all see the identical string forever after. Without an LLM key
+# the old word-by-word dictionary fallback still answers (never cached, so a
+# later LLM-enabled run can upgrade the output).
+# ---------------------------------------------------------------------------
+
+_CACHE_TABLE = "translation_cache"
+_cache_ready = False
+
+
+def _ensure_cache_table():
+    global _cache_ready
+    if _cache_ready:
+        return
+    conn = db._get_conn()
+    conn.execute(
+        f"""CREATE TABLE IF NOT EXISTS [{_CACHE_TABLE}] (
+            key TEXT PRIMARY KEY, source_lang TEXT, target_lang TEXT,
+            source_text TEXT, translated TEXT, provider TEXT, created_at TEXT)"""
+    )
+    conn.commit()
+    _cache_ready = True
+
+
+def _cache_key(text, source_lang, target_lang, glossary):
+    import hashlib
+    gloss = json.dumps(sorted(glossary.items()), ensure_ascii=False) if glossary else ""
+    raw = f"{source_lang}|{target_lang}|{gloss}|{text}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Local many-to-many NMT model (NLLB-200 distilled 600M via CTranslate2, int8).
+# All 110 directions natively, no API key, ~0.2s/sentence on CPU, deterministic
+# (greedy decoding). Fetched once by scripts/fetch_translation_model.py; when
+# the model dir is absent the site falls back to the LLM, then dictionaries.
+# ---------------------------------------------------------------------------
+
+_NLLB_DIR = pathlib.Path(
+    __import__("os").environ.get("MINIWEB_NLLB_MODEL",
+                                 str(SITE_DIR.parent.parent / "models" / "nllb200-600M-ct2")))
+_FLORES = {
+    "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",
+    "it": "ita_Latn", "pt": "por_Latn", "ja": "jpn_Jpan", "zh": "zho_Hans",
+    "ko": "kor_Hang", "ar": "arb_Arab", "vi": "vie_Latn",
+}
+_nllb = None          # (translator, sentencepiece) once loaded; False = unavailable
+
+
+def _get_nllb():
+    global _nllb
+    if _nllb is None:
+        try:
+            import ctranslate2
+            import sentencepiece as spm
+            if not (_NLLB_DIR / "model.bin").exists():
+                _nllb = False
+            else:
+                sp = spm.SentencePieceProcessor(model_file=str(_NLLB_DIR / "sentencepiece.model"))
+                tr = ctranslate2.Translator(str(_NLLB_DIR), device="cpu", compute_type="int8")
+                _nllb = (tr, sp)
+        except Exception:
+            _nllb = False
+    return _nllb or None
+
+
+def _model_translate(text, source_lang, target_lang, glossary):
+    """Local NLLB translation, line by line (preserves line breaks).
+
+    NLLB can't take glossary constraints, so glossary source terms are
+    substituted with their targets BEFORE translation (glossaried requests
+    prefer the LLM backend anyway; this is the keyless fallback).
+    """
+    nllb = _get_nllb()
+    if not nllb or source_lang not in _FLORES or target_lang not in _FLORES:
+        return None
+    tr, sp = nllb
+    if glossary:
+        for s, t in glossary.items():
+            text = re.sub(rf"(?i)\b{re.escape(s)}\b", t, text)
+    src, tgt = _FLORES[source_lang], _FLORES[target_lang]
+    lines = text.split("\n")
+    batch = [[src] + sp.encode(l, out_type=str) + ["</s>"] for l in lines if l.strip()]
+    if not batch:
+        return None
+    try:
+        results = tr.translate_batch(batch, target_prefix=[[tgt]] * len(batch),
+                                     beam_size=1, max_decoding_length=512)
+    except Exception:
+        return None
+    outs = iter(sp.decode([t for t in r.hypotheses[0] if t != tgt]) for r in results)
+    return "\n".join(next(outs) if l.strip() else l for l in lines)
+
+
+def _llm_translate(text, source_lang, target_lang, glossary):
+    """One-shot LLM translation (temperature 0). Returns None when unavailable."""
+    src = _LANG_NAMES.get(source_lang, source_lang)
+    tgt = _LANG_NAMES.get(target_lang, target_lang)
+    system = (
+        f"You are a translation engine. Translate the user's text from {src} to {tgt}. "
+        "Output ONLY the translated text — no quotes, no notes, no preamble. "
+        "Preserve line breaks, numbers, emails, URLs, and proper names."
+    )
+    if glossary:
+        pairs = "; ".join(f"{s} -> {t}" for s, t in sorted(glossary.items()))
+        system += f" Use these exact term translations wherever the terms appear: {pairs}."
+    try:
+        from app.llm import call_llm
+        out = call_llm(text, system=system, temperature=0,
+                       max_tokens=max(300, min(4000, len(text))))
+    except Exception:
+        return None
+    if not out:
+        return None
+    out = out.strip()
+    # Guard against chatty/runaway model output.
+    if not out or len(out) > max(64, len(text) * 6):
+        return None
+    return out
 
 
 def _translate_text(text, source_lang, target_lang, user_glossary=None):
-    """Deterministic word-by-word translation using built-in dictionaries.
+    """Translate text: LLM once, persistent shared cache forever after.
 
-    Replaces each known word with its target-language equivalent, preserving
-    punctuation and unknown words. User glossary entries take priority.
+    User glossary entries take priority (they constrain the LLM prompt and are
+    part of the cache key). Falls back to the built-in word-by-word
+    dictionaries when no LLM is configured.
     """
     if not text or not text.strip():
         return ""
     if source_lang == target_lang:
         return text
 
-    # User glossary entries take priority over built-in dictionaries.
     glossary = {}
     if user_glossary and user_glossary.get("entries"):
         for entry in user_glossary["entries"]:
             glossary[entry["source"].lower()] = entry["target"]
 
+    _ensure_cache_table()
+    conn = db._get_conn()
+    key = _cache_key(text, source_lang, target_lang, glossary)
+    row = conn.execute(
+        f"SELECT translated FROM [{_CACHE_TABLE}] WHERE key=?", (key,)).fetchone()
+    if row:
+        return row[0]
+
+    # Backend order: glossaried requests prefer the LLM (it honors term
+    # constraints); everything else uses the local NLLB model first.
+    translated, provider = None, None
+    if glossary:
+        translated, provider = _llm_translate(text, source_lang, target_lang, glossary), "llm"
+    if not translated:
+        translated, provider = _model_translate(text, source_lang, target_lang, glossary), "nllb"
+    if not translated:
+        translated, provider = _llm_translate(text, source_lang, target_lang, glossary), "llm"
+    if translated:
+        conn.execute(
+            f"INSERT OR IGNORE INTO [{_CACHE_TABLE}] "
+            f"(key, source_lang, target_lang, source_text, translated, provider, created_at) "
+            f"VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (key, source_lang, target_lang, text, translated, provider,
+             datetime.now().strftime("%Y-%m-%dT%H:%M:%S")))
+        conn.commit()
+        # Race-safe: if a parallel request won the insert, serve its version.
+        row = conn.execute(
+            f"SELECT translated FROM [{_CACHE_TABLE}] WHERE key=?", (key,)).fetchone()
+        return row[0] if row else translated
+
+    return _dictionary_translate(text, source_lang, target_lang, glossary)
+
+
+def _dictionary_translate(text, source_lang, target_lang, glossary):
+    """Fallback: deterministic word-by-word translation from built-in dictionaries.
+
+    Replaces each known word with its target-language equivalent, preserving
+    punctuation and unknown words. Glossary entries take priority.
+    """
     # A direct dictionary for this pair (en->X, or an inverted X->en).
     direct = _DICTIONARIES.get(f"{source_lang}->{target_lang}")
     if direct is None:
