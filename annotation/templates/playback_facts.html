@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playback Facts — MiniWeb Annotation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; }
+        body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; font-size: 14px; }
+        .top { background: #1e293b; color: #fff; padding: .55rem 1rem; display: flex; align-items: center; gap: 1rem; }
+        .top a { color: #94a3b8; text-decoration: none; font-size: .82rem; }
+        .top a:hover { color: #fff; }
+        .top .brand { color: #fff; font-weight: 700; }
+        main { max-width: 1200px; margin: 0 auto; padding: 1.2rem 1rem 4rem; }
+        h1 { font-size: 1.25rem; margin-bottom: .3rem; }
+        .hint { color: #64748b; font-size: .82rem; margin-bottom: 1rem; max-width: 75ch; }
+        .controls { display: flex; gap: .6rem; margin-bottom: .9rem; flex-wrap: wrap; }
+        .controls input, .controls select { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .35rem; font-size: .85rem; }
+        .controls input { width: 320px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; overflow: hidden; }
+        th { text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; background: #f1f5f9; padding: .5rem .7rem; border-bottom: 1px solid #e2e8f0; }
+        td { padding: .45rem .7rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: .84rem; }
+        tr.video-row td { background: #f8fafc; border-top: 2px solid #e2e8f0; }
+        .site-pill { display: inline-block; font-size: .68rem; background: #e0e7ff; color: #3730a3; border-radius: .6rem; padding: .05rem .5rem; white-space: nowrap; }
+        .mono { font-family: ui-monospace, monospace; font-size: .8rem; }
+        .fact-value { font-family: ui-monospace, monospace; font-weight: 700; color: #b45309; }
+        .span { font-family: ui-monospace, monospace; color: #334155; white-space: nowrap; }
+        a.vid { color: #2563eb; text-decoration: none; }
+        a.vid:hover { text-decoration: underline; }
+        .count { color: #64748b; font-size: .8rem; margin-bottom: .5rem; }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <a href="/annotate/" class="brand">MiniWeb Annotation</a>
+        <a href="/annotate/task">Annotate</a>
+        <a href="/annotate/verify">Verifier Builder</a>
+        <a href="/annotate/macro-templates">Macro Templates</a>
+        <a href="/annotate/playback" style="color:#fff;">Playback Facts</a>
+    </div>
+    <main>
+        <h1>Playback Facts</h1>
+        <p class="hint">Every mini-player video across sites and the facts hidden in its on-screen info
+        stream. Each fact is visible <strong>only inside its span</strong> — design
+        <span class="mono">search_by_playback</span> tasks that make the agent scrub to it
+        (e.g. "find the promo code shown in this video and redeem it on the shopping cart").
+        Timelines are deterministic; these values never change unless the video's title or URL changes.</p>
+
+        <div class="controls">
+            <input type="text" id="q" placeholder="Search title / value / fact type..." oninput="applyFilter()">
+            <select id="site-filter" onchange="applyFilter()">
+                <option value="">All sites</option>
+                {% for s in rows|map(attribute='site')|unique|sort %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+            <select id="fact-filter" onchange="applyFilter()">
+                <option value="">All fact types</option>
+                <option>promo code</option><option>reference number</option><option>contact email</option>
+                <option>live viewer count</option><option>guest name</option><option>prize amount</option>
+            </select>
+        </div>
+        <div class="count" id="count"></div>
+
+        <table>
+            <thead><tr><th style="width:130px;">Site</th><th>Video</th><th style="width:70px;">Length</th>
+                <th style="width:130px;">Fact</th><th style="width:200px;">Value</th><th style="width:110px;">Visible span</th></tr></thead>
+            <tbody id="tbody">
+            {% for r in rows %}
+                {% for f in r.facts %}
+                <tr class="fact-row {{ 'video-row' if loop.first }}"
+                    data-search="{{ (r.site ~ ' ' ~ r.title ~ ' ' ~ f.label ~ ' ' ~ f.value)|lower }}"
+                    data-site="{{ r.site }}" data-fact="{{ f.label }}">
+                    <td>{% if loop.first %}<span class="site-pill">{{ r.site }}</span>{% endif %}</td>
+                    <td>{% if loop.first %}<a class="vid" href="{{ r.url }}" target="_blank">{{ r.title or '(untitled)' }}</a>{% endif %}</td>
+                    <td class="span">{% if loop.first %}{{ r.duration }}{% endif %}</td>
+                    <td>{{ f.label }}</td>
+                    <td class="fact-value">{{ f.value }}</td>
+                    <td class="span">{{ f.start }}&ndash;{{ f.end }}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </main>
+    <script>
+    function applyFilter() {
+        var q = document.getElementById('q').value.toLowerCase();
+        var site = document.getElementById('site-filter').value;
+        var fact = document.getElementById('fact-filter').value;
+        var shown = 0;
+        document.querySelectorAll('.fact-row').forEach(function (tr) {
+            var ok = (!q || tr.dataset.search.indexOf(q) >= 0)
+                  && (!site || tr.dataset.site === site)
+                  && (!fact || tr.dataset.fact === fact);
+            tr.style.display = ok ? '' : 'none';
+            if (ok) shown++;
+        });
+        document.getElementById('count').textContent = shown + ' fact rows';
+    }
+    applyFilter();
+    </script>
+</body>
+</html>

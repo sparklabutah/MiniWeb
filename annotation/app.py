@@ -2518,6 +2518,104 @@ def api_draft_task():
         return jsonify({"instruction": raw.strip(), "subtasks": {}})
 
 
+def _collect_playback_facts():
+    """Every mini-player video across sites + the facts hidden in its stream.
+
+    Reproduces each site's player identity key (page path + "|" + data-title)
+    and duration exactly as the templates set them, then reads the deterministic
+    timeline from app.playback — so annotators see WHAT info appears at WHAT
+    span without scrubbing, and can design search_by_playback tasks against it.
+    """
+    import json as _json
+    from app import db
+    from app.playback import generate_timeline
+
+    def fmt(sec):
+        return f"{int(sec) // 60}:{int(sec) % 60:02d}"
+
+    rows = []
+
+    def add(site, path, title, duration):
+        try:
+            tl = generate_timeline(path + "|" + (title or ""), int(duration))
+        except Exception:
+            return
+        facts = [{"label": s["label"], "value": s["value"],
+                  "start": fmt(s["start"]), "end": fmt(s["end"])}
+                 for s in tl["segments"] if s.get("kind") == "fact"]
+        rows.append({"site": site, "url": path, "title": title,
+                     "duration": fmt(tl["duration"]), "facts": facts})
+
+    def _j(v, default):
+        if isinstance(v, str):
+            try:
+                return _json.loads(v)
+            except (ValueError, TypeError):
+                return default
+        return v if v is not None else default
+
+    try:  # StreamHub
+        for v in db.query("video", "videos", sort="id", limit=200):
+            add("video", f"/sites/video/watch/{v['id']}", v.get("title", ""),
+                v.get("duration_seconds") or 0)
+    except Exception:
+        pass
+    try:  # PixShare video posts
+        for p in db.query("multimedia-posting", "posts", where={"type": "video"}, limit=200):
+            add("multimedia-posting", f"/sites/multimedia-posting/post/{p['id']}",
+                (p.get("caption") or "Video post")[:60], p.get("video_duration") or 30)
+    except Exception:
+        pass
+    try:  # Remote-calls recordings
+        for r in db.query("remote-calls", "recordings", limit=200):
+            add("remote-calls", f"/sites/remote-calls/recording/{r['id']}",
+                r.get("title", ""), (r.get("duration_minutes") or 0) * 60)
+    except Exception:
+        pass
+    try:  # Sports highlights (finished matches only — others show no player)
+        teams = {t["id"]: t.get("name", "") for t in db.query("sports-esports", "teams", limit=500)}
+        for m in db.query("sports-esports", "matches", where={"status": "final"}, limit=200):
+            home = teams.get(m.get("home_team_id"), "")
+            away = teams.get(m.get("away_team_id"), "")
+            add("sports-esports", f"/sites/sports-esports/match/{m['id']}/highlights",
+                f"{home} vs {away}", 3540)
+    except Exception:
+        pass
+    try:  # Project homepages video resources
+        for r in db.query("project-homepages", "resources", where={"type": "video"}, limit=200):
+            dm = r.get("duration_minutes")
+            add("project-homepages", f"/sites/project-homepages/resource/{r['id']}",
+                r.get("title", ""), (dm if dm else 15) * 60)
+    except Exception:
+        pass
+    try:  # Course lectures (player key = course page path + lecture title)
+        for course in db.query("course-sites-classrooms", "courses", limit=100):
+            for mod in _j(course.get("modules"), []):
+                for lesson in mod.get("lessons", []):
+                    if lesson.get("type") != "lecture":
+                        continue
+                    mins = lesson.get("duration_min") or 0
+                    if not mins:
+                        mins = 8 + (len(lesson.get("title") or "") % 17)
+                    add("course-sites-classrooms",
+                        f"/sites/course-sites-classrooms/course/{course['id']}",
+                        "Lecture: " + (lesson.get("title") or ""), mins * 60)
+    except Exception:
+        pass
+    return rows
+
+
+@annotation_bp.route("/playback")
+def playback_facts_page():
+    """Lookup table: which video hides what fact at what span."""
+    return render_template("playback_facts.html", rows=_collect_playback_facts())
+
+
+@annotation_bp.route("/api/playback_facts")
+def api_playback_facts():
+    return jsonify(_collect_playback_facts())
+
+
 @annotation_bp.route("/api/infer_macros", methods=["POST"])
 def api_infer_macros():
     """Reverse annotation: the annotator writes the task in natural language
