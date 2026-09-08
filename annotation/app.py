@@ -1005,196 +1005,21 @@ def api_macro_sheet_csv():
                     headers={"Content-Disposition": "attachment; filename=refined_macro_set.csv"})
 
 
-@annotation_bp.route("/macro-templates")
-def macro_templates_page():
-    """Author one verifier template per macro (the reusable skeletons the
-    per-task filler later fills in)."""
-    from annotation import macro_templates as mt
-    macros = mt.list_macros()
-    selected = request.args.get("macro") or (macros[0]["macro"] if macros else "")
-    return render_template("macro_templates.html",
-                           macros=macros,
-                           selected=selected,
-                           check_schema=mt.check_schema())
-
-
-@annotation_bp.route("/api/macro_templates", methods=["GET"])
-def api_list_macro_templates():
-    """Macros that already have a template — for the 'prefill from' dropdown."""
-    from annotation import macro_templates as mt
-    return jsonify({"macros": sorted(mt.load_all().keys())})
-
-
-@annotation_bp.route("/api/macro_template/<macro>", methods=["GET"])
-def api_get_macro_template(macro):
-    from annotation import macro_templates as mt
-    return jsonify({"macro": macro, "template": mt.load_template(macro)})
-
-
-@annotation_bp.route("/api/macro_template/<macro>", methods=["POST"])
-def api_save_macro_template(macro):
-    from annotation import macro_templates as mt
-    data = request.get_json(silent=True) or {}
-    tree = data.get("template")  # None deletes
-    try:
-        mt.save_template(macro, tree)
-    except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": str(exc)}), 400
-    return jsonify({"status": "ok", "macro": macro,
-                    "has_template": tree is not None})
-
-
-@annotation_bp.route("/api/macro_usage/<macro>", methods=["GET"])
-def api_macro_usage(macro):
-    from annotation import macro_templates as mt
-    return jsonify(mt.macro_usage(macro))
-
-
-_TEMPLATE_MODEL = "gemini-3.5-flash"
-
-
-def _schema_lines(schema):
-    lines = []
-    for ctype, meta in schema.items():
-        parts = []
-        for p, ps in meta["params"].items():
-            if ps["kind"] == "enum":
-                parts.append(f"{p}(one of {ps['options']})")
-            else:
-                parts.append(f"{p}({ps['kind']})")
-        lines.append(f"  {ctype}: {meta.get('help','')}  params: {', '.join(parts)}")
-    return "\n".join(lines)
-
-
-def _generate_macro_template(macro, meta, observed, examples_text, schema_text, actions_text):
-    """Ask the LLM for a verifier template for one macro, in the style of the
-    human examples. Returns a tree dict (marked _suggested) or None."""
-    from app.llm import call_llm
-
-    system_prompt = (
-        "You author VERIFIER TEMPLATES for web-task macros. A template is a JSON tree:\n"
-        '  group: {"op":"AND"|"OR", "label":"..."(optional), "checks":[ ... ]}\n'
-        '  leaf : {"type": <check>, "label":"..."(optional), <params>}\n'
-        'Each param is either a FIXED value, or {"open": true} meaning it is filled per\n'
-        "task later. RULES:\n"
-        "- Leave task-specific values OPEN: target, url, expected, body_fields, value.\n"
-        "- FIX the invariants: the action type (for action_included) and the HTTP method\n"
-        "  (for request_made) — choose them from what the macro does.\n"
-        "- Prefer the highest-signal check for the macro's intent: a QA/extract/compute/\n"
-        "  compare/verify macro -> qa_answer (+ answer_grounded); an interaction ->\n"
-        "  action_included; a create/submit/pay/mutation -> request_made (POST) with\n"
-        "  body_fields open.\n"
-        "- Add a short `label` to each check and group saying what it asserts.\n"
-        "- Do NOT assert scroll/navigate. Keep it minimal — one to three checks.\n\n"
-        "Check types and params:\n" + schema_text + "\n\n"
-        "Assertable action types (fix `action` to one of these):\n  " + actions_text + "\n\n"
-        "Match the STYLE of these human-authored examples:\n" + examples_text + "\n\n"
-        "Return ONLY the JSON template tree for the requested macro, nothing else."
-    )
-    user_prompt = json.dumps({
-        "macro": macro, "verb": meta.get("verb", ""), "modality": meta.get("modality", ""),
-        "description": meta.get("description", ""), "observed_actions": observed,
-    }, ensure_ascii=False)
-
-    raw = call_llm(user_prompt, system=system_prompt, max_tokens=1500,
-                   temperature=0.3, json_mode=True, model=_TEMPLATE_MODEL)
-    if not raw:
-        return None
-    try:
-        tree = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(tree, dict):
-        return None
-    if "op" not in tree:                      # a bare leaf -> wrap in an AND group
-        tree = {"op": "AND", "checks": [tree]}
-    tree["_suggested"] = True
-    return tree
-
-
-@annotation_bp.route("/api/suggest_templates_batch", methods=["POST"])
-def api_suggest_templates_batch():
-    """Propose templates for macros that have none, using the confirmed
-    (human-authored) templates as in-context examples. Processes up to `limit`
-    per call so the caller can loop with progress. Suggestions are marked
-    `_suggested` so they read as drafts until you edit + Save.
-    """
-    from annotation import macro_templates as mt
-    data = request.get_json(silent=True) or {}
-    limit = int(data.get("limit", 8))
-    exclude = set(data.get("exclude") or [])   # macros already handled this run
-
-    existing = mt.load_all()
-    confirmed = {m: t for m, t in existing.items() if not mt.is_suggested(t)}
-    if not confirmed:
-        return jsonify({"error": "author at least one template first — it's the example"}), 400
-
-    # targets: site-mapped macros WITHOUT a confirmed template — this regenerates
-    # existing AI drafts with the latest confirmed examples, and never touches a
-    # human-confirmed template. `exclude` carries the ones already done this run
-    # so the batch loop terminates (regenerated drafts stay _suggested).
-    mapped = mt.mapped_macros()
-    targets = sorted(m for m in mapped
-                     if m not in confirmed
-                     and m not in exclude
-                     and (_MACRO_DESCRIPTIONS.get(m) or {}).get("verb") != "navigate")
-    remaining_after = max(0, len(targets) - limit)
-    batch = targets[:limit]
-    if not batch:
-        return jsonify({"processed": 0, "remaining": 0, "results": []})
-
-    # few-shot from confirmed templates (diverse, capped)
-    ex_lines, seen_verbs = [], set()
-    for m, t in confirmed.items():
-        verb = (_MACRO_DESCRIPTIONS.get(m) or {}).get("verb", "")
-        clean = {k: v for k, v in t.items() if k != "_suggested"}
-        desc = (_MACRO_DESCRIPTIONS.get(m) or {}).get("description", "")
-        ex_lines.append(f"{m} ({desc}):\n{json.dumps(clean, ensure_ascii=False)}")
-        seen_verbs.add(verb)
-    examples_text = "\n\n".join(ex_lines[:8])
-
-    schema = mt.check_schema()
-    schema_text = _schema_lines(schema)
-    from evaluation.action_vocabulary import ASSERTABLE_ACTIONS
-    actions_text = ", ".join(ASSERTABLE_ACTIONS)
-    observed_map = mt.observed_actions_all()
-
-    results = []
-    for macro in batch:
-        meta = _MACRO_DESCRIPTIONS.get(macro) or {}
-        tree = _generate_macro_template(
-            macro, meta, observed_map.get(macro, {}),
-            examples_text, schema_text, actions_text)
-        if tree:
-            mt.save_template(macro, tree)
-            results.append({"macro": macro, "ok": True})
-        else:
-            results.append({"macro": macro, "ok": False})
-
-    return jsonify({
-        "processed": len(batch),
-        "succeeded": sum(1 for r in results if r["ok"]),
-        "remaining": remaining_after,
-        "results": results,
-        "model": _TEMPLATE_MODEL,
-    })
-
-
-# task verifier — fill the macros' open template fields from the trajectory
+# task verifier — fill the scaffold's open fields from the trajectory
 _VERIFIER_FILL_MODEL = "gemini-3.5-flash"
 
 
 def _span_actions(task, traj, macro):
     """The concrete recorded actions inside a macro's span — the strongest
     signal for what its open target/value should be."""
-    from annotation import macro_templates as mt
+    from annotation import verifier_scaffold as vs
     acts = [e for e in traj if e.get("type") == "action"]
     out = []
     # `macro` is canonical; aggregate every pre-merge span that maps to it
     for orig, span in (task.get("macro_spans") or {}).items():
         if _canon(orig) != macro:
             continue
-        for idx in mt._span_indices(span, len(acts)):
+        for idx in vs._span_indices(span, len(acts)):
             a = acts[idx]
             out.append({k: a[k] for k in
                         ("action", "target", "value", "text", "option_text", "url", "method")
@@ -1204,13 +1029,15 @@ def _span_actions(task, traj, macro):
 
 @annotation_bp.route("/api/suggest_task_verifier", methods=["POST"])
 def api_suggest_task_verifier():
-    """Fill the OPEN fields of a task's macro templates from its trajectory.
+    """Fill the OPEN fields of a task's universal verifier scaffolds from its
+    trajectory.
 
-    Body: {task_id, annotator?}. Returns the human templates with their open
-    params filled in by the LLM (gemini-3.5-flash), grounded in the whole
+    Body: {task_id, annotator?}. Every macro scaffolds the same 3 canonical
+    components (page_visited + FE affordance + backend gate); the LLM
+    (gemini-3.5-flash) fills their open params, grounded in the whole
     trajectory (observations reduced to axtree only).
     """
-    from annotation import macro_templates as mt
+    from annotation import verifier_scaffold as vs
     from app.llm import call_llm
 
     data = request.get_json(silent=True) or {}
@@ -1224,18 +1051,13 @@ def api_suggest_task_verifier():
         return jsonify({"error": "task not found"}), 404
 
     macros = task.get("macros") or []
-    draft = mt.build_task_draft(macros)
-    if not draft["templates"]:
-        return jsonify({"error": "none of this task's macros have a template yet",
-                        "missing": draft["missing"], "templates": {}}), 200
-    if not draft["slots"]:
-        # nothing open to fill — the templates are already concrete
-        return jsonify({"templates": draft["templates"], "missing": draft["missing"],
-                        "slots": [], "model": None})
+    draft = vs.scaffold_task(macros, task)
+    if not draft["macros"]:
+        return jsonify({"error": "this task has no macros tagged", "macros": {}}), 200
 
     # per-macro context: description + the actions the human took in its span
     macro_ctx = []
-    for macro in draft["templates"]:
+    for macro in draft["macros"]:
         desc = (_MACRO_DESCRIPTIONS.get(macro) or {}).get("description", "")
         macro_ctx.append({"macro": macro, "description": desc,
                           "span_actions": _span_actions(task, traj, macro)})
@@ -1247,19 +1069,21 @@ def api_suggest_task_verifier():
 
     from pathlib import Path as _P
     from evaluation.trajectory import merge_server_log
-    reduced = mt.reduce_trajectory_for_llm(
+    reduced = vs.reduce_trajectory_for_llm(
         merge_server_log(traj, _P(str(_dir)) / "server_log.json"))
 
     system_prompt = (
-        "You fill in the OPEN variables of pre-written verifier templates for a web task.\n"
-        "A human authored one template per macro (the check structure is fixed); your ONLY job\n"
-        "is to supply concrete values for the variables they left open, read off the recorded\n"
-        "trajectory. Do NOT invent checks, change structure, or fill a value the trajectory does\n"
-        "not support.\n\n"
+        "You fill in the OPEN variables of a web task's verifier scaffolds.\n"
+        "Every macro carries the same 3 canonical checks — page_visited, action_included\n"
+        "(the FE affordance) and request_made (the backend gate); the structure is fixed.\n"
+        "Your ONLY job is to supply concrete values for the open variables, read off the\n"
+        "recorded trajectory. Do NOT invent checks, change structure, or fill a value the\n"
+        "trajectory does not support.\n\n"
         "Each slot names its macro, the check type, the param to fill, the FIXED sibling\n"
-        "params, and — when the author wrote them — a `label` (what this check asserts) and\n"
-        "`context` (names of the enclosing logical groups). Use those labels as the intent:\n"
-        "they tell you what value the author meant this slot to capture.\n"
+        "params, and a `label` (what this check asserts). Use those labels as the intent:\n"
+        "they tell you what value the slot is meant to capture. Ground each macro's slots\n"
+        "in ITS tagged span_actions; for request_made prefer the span's mutating call and\n"
+        "use the relative /sites/... path.\n"
         "Guidance by param:\n"
         "  target  -> the human-readable component the action hit (from that macro's span action's `target`)\n"
         "  value   -> the value entered/selected (the span action's value/text/option_text)\n"
@@ -1305,13 +1129,12 @@ def api_suggest_task_verifier():
             {"path": s["path"], "param": s["param"], "value": value})
 
     filled = {}
-    for macro, tree in draft["templates"].items():
-        filled[macro] = mt.fill_open(tree, per_macro_fills.get(macro, []))
-    mt.inject_qa_leaf(filled, task)   # resolve qa_answer's leaf/chained per this task
+    for macro, tree in draft["macros"].items():
+        filled[macro] = vs.fill_open(tree, per_macro_fills.get(macro, []))
+    vs.inject_qa_leaf(filled, task)   # resolve qa_answer's leaf/chained per this task
 
     return jsonify({
-        "templates": filled,
-        "missing": draft["missing"],
+        "macros": filled,
         "slots": draft["slots"],
         "filled_count": len(fills or {}),
         "slot_count": len(draft["slots"]),
@@ -1396,12 +1219,12 @@ def api_run_task_verifier():
 
     # resolve qa_answer leaf/chained from the task graph before running
     from annotation.storage import ANNOTATIONS_DIR
-    from annotation import macro_templates as mt
+    from annotation import verifier_scaffold as vs
     tjson = ANNOTATIONS_DIR / annotator / task_id / "task.json"
     if tjson.exists():
         tdata = json.loads(tjson.read_text())
-        mt.inject_qa_leaf(macros, tdata)
-        mt.refresh_expected(macros, tdata)   # never grade against a stale expected
+        vs.inject_qa_leaf(macros, tdata)
+        vs.refresh_expected(macros, tdata)   # never grade against a stale expected
 
     report = verify_task({"task_id": task_id, "macros": macros}, traj, answer)
     report["which"] = which
@@ -1422,38 +1245,29 @@ def api_task_verifier(annotator, task_id):
             # stale data when task.json has since changed (re-record / retag):
             tjson = vf.parent / "task.json"
             if tjson.exists():
-                from annotation.macro_templates import (refresh_expected,
-                                                        build_task_draft, _canon)
+                from annotation.verifier_scaffold import (default_scaffold,
+                                                          refresh_expected)
                 tdata = json.loads(tjson.read_text())
                 #  1. expected answer may have changed
                 refreshed = refresh_expected(spec.get("macros") or {}, tdata)
                 if refreshed:
                     spec["expected_refreshed"] = refreshed
-                #  2. the macro TAGS may have changed — reconcile the macro set
+                #  2. the macro TAGS may have changed — reconcile the macro set;
+                #     newly-tagged macros get the universal 3-check scaffold
                 want = list(dict.fromkeys(_canon(m) for m in (tdata.get("macros") or [])))
                 have = spec.get("macros") or {}
                 removed = [m for m in have if m not in want]
                 for m in removed:
                     have.pop(m)
-                missing = [m for m in want if m not in have]
-                added, no_template = [], []
-                if missing:
-                    draft = build_task_draft(missing)
-                    for m in missing:
-                        tree = (draft.get("templates") or {}).get(m)
-                        if tree:
-                            have[m] = tree
-                            added.append(m)
-                        else:
-                            no_template.append(m)
+                added = [m for m in want if m not in have]
+                for m in added:
+                    have[m] = default_scaffold(m, tdata)
                 # keep the builder's card order = the task's tag order
                 spec["macros"] = {m: have[m] for m in want if m in have}
                 if removed:
                     spec["macros_removed"] = removed
                 if added:
                     spec["macros_added"] = added
-                if no_template:
-                    spec["macros_no_template"] = no_template
             return jsonify(spec)
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
@@ -1596,7 +1410,7 @@ def api_create_task():
     # ids). Only stored when the macro list actually repeats a name — a task with
     # no duplicates omits the field entirely and stays byte-compatible with the
     # existing (gold) tasks. GRADING NOTE: for duplicate tasks the QA leaf/terminal
-    # detection in macro_templates.leaf_macros compares BASE `macros` against the
+    # detection in verifier_scaffold.leaf_macros compares BASE `macros` against the
     # instance-id edge endpoints, so per-occurrence leaf grading isn't resolved for
     # duplicates; non-duplicate tasks (all gold) are unaffected.
     if macro_instances and len(macro_instances) == len(task["macros"]) \

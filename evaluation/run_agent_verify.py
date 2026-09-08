@@ -72,7 +72,7 @@ def locate_task(task_id: str):
     # a re-recorded task may carry a NEW expected answer; verifier.json froze the
     # old one at build time — sync answer-type leaves before grading
     try:
-        from annotation.macro_templates import refresh_expected
+        from annotation.verifier_scaffold import refresh_expected
         refresh_expected(verifier.get("macros") or {}, task)
     except Exception:
         pass

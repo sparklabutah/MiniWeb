@@ -9,7 +9,6 @@ Runtime data and the dataset. **Most of this directory is gitignored** (`data/*`
 | `trimmed_miniweb.db` | The per-site SQLite dataset every site reads/writes (via `app.db`). Modified post-build — **do not** re-run `build_db.py`. | no |
 | `macros.yaml` | The canonical macro registry (base macros + reasoning ops + aliases). Source of truth loaded by `annotation/macros.py`. | **yes** |
 | `macro_locations.yaml` | Per-site macro→UI-location map (drives coverage/sampling). | **yes** |
-| `macro_templates.yaml` | Per-macro verifier templates (AND/OR check trees). | no |
 | `annotations/` | Recorded tasks: `<annotator>/<task_id>/` with `task.json`, `trajectory.json`, `verifier.json`, screenshots. | no |
 | `annotations-bak/` | Backup snapshot of the annotations. | no |
 | `backups/` | Timestamped tarballs of task/verifier state taken before each migration/relaxation pass. | no |

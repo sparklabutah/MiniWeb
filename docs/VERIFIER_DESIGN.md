@@ -92,33 +92,30 @@ download shipped; the corrected set carries all three.)
 
 ## 5. Generation pipeline (how `verifier.json` is produced)
 
-`verifier.json` is **generated from the macro templates**, then transformed:
+`verifier.json` is built **in-task**, per macro occurrence — there is no per-macro
+template library:
 
-1. **Templates** — `data/macro_templates.yaml`: a human-authored per-macro verifier
-   *skeleton* with `{open: true}` placeholders, already in archetype shape
-   (FE-affordance OR-group AND backend request). Managed by
-   `annotation/macro_templates.py` (load/save; the annotation "Macro Templates" page).
-2. **Assemble + fill** — `annotation/macro_templates.py::build_task_draft(macros)`
-   selects each task macro's template and fills the OPEN params from the task's
-   **grounded values** (the annotator's recorded trajectory + expected answer) and an
-   LLM pass (`built_by: "claude-judgement-fill"` / `"build_verifiers.py (per-occurrence,
-   deterministic grounding)"`).
-3. **Archetype restructure** — `evaluation/verifier_archetypes.py::restructure(tree,
-   macro)` rebuilds the value-grounded tree into the two-part archetype form by the
-   macro→archetype map and stamps `archetype_v2: true`. It does **not** invent
-   values — it reorganizes the grounded tree.
-4. **Correction passes** — applied on top, each snapshotted in `data/backups/` as
-   `verifiers_pre_<pass>_<ts>.tar.gz`: **relax** (relaxed matching), **afford**
-   (advisory front-end), **fuzzy** (`report_info_fuzzy`), **queryfix** (`query_gated`),
-   **extraction**. These set the flags in §4.
+1. **Scaffold** — `annotation/verifier_scaffold.py::scaffold_task(macros, task)`
+   gives every macro the same three canonical checks: `page_visited` +
+   `action_included` (FE affordance, advisory by default) + `request_made` (the
+   backend gate), all params `{open: true}` (= not asserted). `report_information`
+   additionally scaffolds `qa_answer`, pre-seeded from the task's expected answer.
+   A fresh scaffold is a DRAFT — it passes on any trajectory until pinned.
+2. **Pin** — the annotator, in the Verifier Builder (`/annotate/verify`), pins the
+   values that should gate (grounded in the gold requests/actions shown there) and
+   flips per-check **advisory** flags; "Suggest with AI" optionally pre-fills the
+   open params from the recorded trajectory (`api_suggest_task_verifier`).
+   Saving a macro that still asserts nothing warns before persisting.
+3. **Validate** — the spec must PASS its own gold trajectory (live gold badge in
+   the builder; `api_run_task_verifier` sandbox for gold/walk/agent runs).
 
-**Reproducibility caveat:** the historical builder scripts (`build_verifiers.py`,
-`build_new_verifiers.py`) and the one-off correction passes are **not checked into the
-repo** — only their *outputs* (`verifier.json`), the templates, the archetype module,
-and the `pre_*` backup tarballs survive. Regenerating from templates alone reproduces
-stages 1–3 but not the exact stage-4 flags unless the pass logic is reconstructed. This
-is why corrected verifiers are **migrated**, not regenerated, when a download regresses
-them (see §7).
+**History:** the corpus built in Aug 2026 came from a since-retired per-macro
+template library (`macro_templates.yaml` + a "Macro Templates" authoring page)
+plus offline fill/archetype/correction passes — snapshotted in `data/backups/` as
+`verifiers_pre_<pass>_<ts>.tar.gz`, with the retired YAMLs archived in
+`../MiniWeb-archive/macro-templates-retired-2026-09-08/`. Those verifiers are
+standalone trees; they are **migrated**, never regenerated, when a download
+regresses them (see §7).
 
 ## 6. Grading contract (`evaluation/verifiers.py`)
 
@@ -141,8 +138,10 @@ them (see §7).
   + advisory + fuzzy + query-gated; a plain download is the weaker pre-correction form).
 
 ## Files
-- `data/macro_templates.yaml` — per-macro verifier templates (source of truth for shape).
-- `annotation/macro_templates.py` — template load/save + `build_task_draft` (fill).
-- `evaluation/verifier_archetypes.py` — archetype map + `restructure()` (the design).
+- `annotation/verifier_scaffold.py` — universal 3-check scaffold + open-slot fill +
+  task-graph helpers (`inject_qa_leaf`, `refresh_expected`).
+- `annotation/templates/verify.html` — the Verifier Builder (pin values, advisory
+  toggles, gold/walk/agent sandbox).
 - `evaluation/verifiers.py` — the runtime grader (`verify_task`, matching, fuzzy judge).
 - `data/backups/verifiers_pre_*.tar.gz` — snapshots before each correction pass.
+- `../MiniWeb-archive/macro-templates-retired-2026-09-08/` — the retired template YAMLs.

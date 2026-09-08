@@ -6,10 +6,10 @@ trajectories, tag them with macros, and build/review the per-task verifiers.
 
 | File | Role |
 |---|---|
-| `app.py` | The `/annotate` blueprint: the **Annotate**, **Verifier Builder** (`/verify`), **Verifier Review** (`/verifiers`), **Macro Templates**, **Coverage**, and **Graph** pages, plus their JSON APIs (suggest tags, suggest/run task verifier, macro registry CRUD, screenshots). |
+| `app.py` | The `/annotate` blueprint: the **Annotate**, **Verifier Builder** (`/verify`), **Verifier Review** (`/verifiers`), **Coverage**, and **Graph** pages, plus their JSON APIs (suggest tags, suggest/run task verifier, macro registry CRUD, screenshots). |
 | `storage.py` | File-based task storage — `data/annotations/<annotator>/<task_id>/` (`task.json`, `trajectory.json`, `verifier.json`, screenshots). `list_tasks`, `load_task`, `save_task`, trash/delete. |
 | `macros.py` | The canonical macro registry loader (`data/macros.yaml`): base macros + reasoning ops, alias canonicalization (`canon`), descriptions. |
-| `macro_templates.py` | Per-macro verifier **templates** (`data/macro_templates.yaml`) — AND/OR trees of check primitives with OPEN slots; `build_task_draft`, `collect_open_slots`, `fill_open`, `inject_qa_leaf`. |
+| `verifier_scaffold.py` | Universal per-task verifier **scaffolding** — every macro gets the same 3 canonical checks (page_visited + FE affordance + backend gate), all params OPEN, pinned by the annotator in the builder; plus the shared task-graph helpers (`scaffold_task`, `collect_open_slots`, `fill_open`, `inject_qa_leaf`, `refresh_expected`). |
 | `macro_locations.py` | Per-site macro→UI-location data (`data/macro_locations.yaml`) — drives coverage/sampling. |
 | `site_affinities.py` | Cross-site event-flow groups (for multi-site task graphs). |
 | `observations.py` | Save-time **trigger** for the observation-reconstruction pipeline. |

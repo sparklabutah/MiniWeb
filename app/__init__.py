@@ -635,17 +635,15 @@ def _register_recovery_routes(app):
 
     @app.route("/recovery/macros/download", methods=["GET"])
     def _recovery_macros_download():
-        """Stream a tar.gz of the 3 macro YAMLs (macros / locations / templates)."""
+        """Stream a tar.gz of the 2 macro YAMLs (macros / locations)."""
         if not _authed():
             return "not found", 404
         import tarfile
         import tempfile
         from annotation.macros import macro_data_path
-        import annotation.macro_templates as _mt
         yamls = {
             "macros.yaml": macro_data_path("macros.yaml", "MINIWEB_MACROS"),
             "macro_locations.yaml": macro_data_path("macro_locations.yaml", "MINIWEB_MACRO_LOCATIONS"),
-            "macro_templates.yaml": str(_mt.TEMPLATES_PATH),
         }
         tmp = tempfile.NamedTemporaryFile(prefix="macros_dl_", suffix=".tar.gz", delete=False)
         tmp.close()

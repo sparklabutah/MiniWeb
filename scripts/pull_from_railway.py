@@ -28,7 +28,7 @@ import urllib.request
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DATA = REPO / "data"
 ANN = DATA / "annotations"
-MACRO_YAMLS = ["macros.yaml", "macro_locations.yaml", "macro_templates.yaml"]
+MACRO_YAMLS = ["macros.yaml", "macro_locations.yaml"]
 BACKUP_DIR = DATA / "backups"
 DEFAULT_URL = os.environ.get("MINIWEB_RAILWAY_URL",
                              "https://miniweb-production.up.railway.app")
