@@ -115,10 +115,9 @@ def index():
         params = []
 
         if q:
-            # For text search with additional filters, use LIKE fallback
-            like_param = f"%{q}%"
-            clauses.append("([title] LIKE ? OR [body] LIKE ? OR [author_username] LIKE ?)")
-            params.extend([like_param, like_param, like_param])
+            # Use the same token-prefix search as db.search(), including hyphens.
+            clauses.append("[id] IN (SELECT rowid FROM [fts_blogs_posts] WHERE [fts_blogs_posts] MATCH ?)")
+            params.append(" ".join('"' + term.replace('"', '""') + '"*' for term in q.split()))
 
         if cat:
             clauses.append("[category] = ?")
@@ -182,9 +181,8 @@ def index():
         count_clauses = []
         count_params = []
         if q:
-            like_param = f"%{q}%"
-            count_clauses.append("([title] LIKE ? OR [body] LIKE ? OR [author_username] LIKE ?)")
-            count_params.extend([like_param, like_param, like_param])
+            count_clauses.append("[id] IN (SELECT rowid FROM [fts_blogs_posts] WHERE [fts_blogs_posts] MATCH ?)")
+            count_params.append(" ".join('"' + term.replace('"', '""') + '"*' for term in q.split()))
         if cat:
             count_clauses.append("[category] = ?")
             count_params.append(cat)

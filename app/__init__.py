@@ -860,6 +860,13 @@ def create_app():
             "status": response.status_code,
             "timestamp": __import__("datetime").datetime.now().isoformat(),
         }
+        # Creation redirects carry the new resource ID; retain them so verifiers
+        # can bind later edits/shares to that resource rather than a fixture ID.
+        entry["response_headers"] = {
+            k.lower(): response.headers[k]
+            for k in ("Location", "Content-Type", "Content-Disposition")
+            if k in response.headers
+        }
         # Capture request body for mutations
         if request.method in ("POST", "PUT", "DELETE"):
             try:
@@ -872,13 +879,28 @@ def create_app():
                     # single-valued fields to a scalar, keep multi-valued as a list.
                     entry["body"] = {k: (v if len(v) > 1 else v[0])
                                      for k, v in request.form.to_dict(flat=False).items()}
+                if request.files:
+                    import hashlib
+                    files = []
+                    for field, upload in request.files.items(multi=True):
+                        position = upload.stream.tell()
+                        upload.stream.seek(0)
+                        digest, size = hashlib.sha256(), 0
+                        while chunk := upload.stream.read(65536):
+                            digest.update(chunk)
+                            size += len(chunk)
+                        upload.stream.seek(position)
+                        files.append({"field": field, "filename": upload.filename,
+                                      "content_type": upload.content_type,
+                                      "size": size, "sha256": digest.hexdigest()})
+                    entry.setdefault("body", {})["_files"] = files
             except Exception:
                 pass
         # Capture response snippet for API calls
-        if "/api/" in request.path and response.content_type == "application/json":
+        if response.mimetype == "application/json":
             try:
                 resp_text = response.get_data(as_text=True)
-                if len(resp_text) < 500:
+                if len(resp_text) <= 1048576:
                     entry["response"] = json.loads(resp_text)
                 else:
                     entry["response_preview"] = resp_text[:200] + "..."

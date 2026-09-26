@@ -529,12 +529,21 @@ def review_form(paper_id):
 
         # Handle optional file attachment
         attachment_name = None
+        attachment_data = None
         uploaded = request.files.get("file")
         if uploaded and uploaded.filename:
+            import base64
+            import hashlib
+            content = uploaded.read(3 * 1024 * 1024 + 1)
+            uploaded.seek(0)
+            if not content or len(content) > 3 * 1024 * 1024:
+                return "Please attach a nonempty file up to 3 MB.", 400
             attachment_name = uploaded.filename
+            attachment_data = {"filename": attachment_name, "size": len(content),
+                               "sha256": hashlib.sha256(content).hexdigest(),
+                               "content_base64": base64.b64encode(content).decode("ascii")}
 
-        users = _load_users()
-        u = next((u for u in users if u["id"] == user["id"]), None)
+        u = db.get_item(SITE, "users", user["id"])
         if u:
             bids = _parse_json_field(u, "bids")
             bids[str(paper_id)] = {
@@ -544,9 +553,10 @@ def review_form(paper_id):
                 "title": title,
                 "reviewer": user["name"],
                 "attachment": attachment_name,
+                "attachment_data": attachment_data,
             }
             u["bids"] = bids
-            _save_users(users)
+            db.save_item(SITE, "users", u["id"], u)
         _add_email(user["id"], "noreply@conference-review.lakeport.local",
                    "Review submitted",
                    f'Your review for paper "{paper["title"]}" has been submitted successfully.')

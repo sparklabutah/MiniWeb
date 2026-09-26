@@ -72,7 +72,8 @@ def locate_task(task_id: str):
     # a re-recorded task may carry a NEW expected answer; verifier.json froze the
     # old one at build time — sync answer-type leaves before grading
     try:
-        from annotation.verifier_scaffold import refresh_expected
+        from annotation.verifier_scaffold import refresh_expected, inject_qa_leaf
+        inject_qa_leaf(verifier.get("macros") or {}, task)
         refresh_expected(verifier.get("macros") or {}, task)
     except Exception:
         pass

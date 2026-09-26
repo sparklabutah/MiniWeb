@@ -316,6 +316,7 @@ print("Hello, World!"){% endif %}</textarea>
     }
     updateLineCount();
 
+    let lastExecution = null;
     function runCode() {
         const code = codeInput.value;
         const stdinEl = document.getElementById('stdin-input');
@@ -330,6 +331,7 @@ print("Hello, World!"){% endif %}</textarea>
         })
         .then(r => r.json())
         .then(data => {
+            lastExecution = {code: code, stdout: data.stdout || '', returncode: data.returncode};
             let html = '';
             if (data.stdout) html += '<span class="output-stdout">' + escapeHtml(data.stdout) + '</span>';
             if (data.stderr) html += '<span class="output-stderr">' + escapeHtml(data.stderr) + '</span>';
@@ -349,7 +351,11 @@ print("Hello, World!"){% endif %}</textarea>
     }
 
     function shareSnippet(snippetId) {
-        fetch('{{ url_for("code-editor-execution.api_share", snippet_id=0) }}'.replace('/0', '/' + snippetId))
+        const output = lastExecution && lastExecution.code === codeInput.value ? lastExecution.stdout : '';
+        fetch('{{ url_for("code-editor-execution.api_share", snippet_id=0) }}'.replace('/0', '/' + snippetId), {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: codeInput.value, stdout: output})
+        })
         .then(r => r.json())
         .then(data => {
             const url = window.location.origin + data.share_url;

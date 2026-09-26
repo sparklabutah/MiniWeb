@@ -912,9 +912,11 @@ def verify():
     # Always list every annotator's tasks — `annotator` only scopes task loading.
     sort = request.args.get("sort", "newest")
     tasks = list_tasks(newest_first=(sort != "oldest"))
+    from annotation.quality import summary as quality_summary
     for t in tasks:
         vf = ANNOTATIONS_DIR / (t.get("annotator") or "anonymous") / t.get("task_id", "") / "verifier.json"
         t["has_verifier"] = vf.exists()
+        t["quality"] = quality_summary(vf.parent, t)
         t["has_feedback"] = False
         if t["has_verifier"]:
             try:
@@ -936,6 +938,8 @@ def verify():
                 task = load_task(ann, task_id)
                 if task:
                     break
+    if task:
+        task["quality"] = quality_summary(ANNOTATIONS_DIR / (task.get("annotator") or annotator or "anonymous") / task_id, task)
     return render_template("verify.html",
                            tasks=tasks,
                            task=task,
@@ -1017,7 +1021,7 @@ def _span_actions(task, traj, macro):
     out = []
     # `macro` is canonical; aggregate every pre-merge span that maps to it
     for orig, span in (task.get("macro_spans") or {}).items():
-        if _canon(orig) != macro:
+        if _canon(orig.split("#", 1)[0]) != _canon(macro.split("#", 1)[0]):
             continue
         for idx in vs._span_indices(span, len(acts)):
             a = acts[idx]
@@ -1199,6 +1203,9 @@ def api_run_task_verifier():
     task_id = data.get("task_id")
     annotator = data.get("annotator") or "anonymous"
     which = data.get("which") or "gold"
+    from annotation import quality
+    if which not in quality.SOURCES:
+        return jsonify({"error": "unknown test source"}), 400
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
 
@@ -1213,7 +1220,11 @@ def api_run_task_verifier():
     if not macros:
         return jsonify({"error": "no verifier spec — suggest or save one first"}), 400
 
-    traj, answer, note = _load_test_trajectory(annotator, task_id, which)
+    traj, answer, note = _load_test_trajectory(annotator, task_id, "gold" if which in ("empty", "answer_only") else which)
+    if which in ("empty", "answer_only"):
+        traj, note = [], which.replace("_", " ") + " negative check"
+        if which == "empty":
+            answer = ""
     if traj is None:
         return jsonify({"error": note, "which": which}), 404
 
@@ -1221,16 +1232,54 @@ def api_run_task_verifier():
     from annotation.storage import ANNOTATIONS_DIR
     from annotation import verifier_scaffold as vs
     tjson = ANNOTATIONS_DIR / annotator / task_id / "task.json"
+    tdata = {}
     if tjson.exists():
         tdata = json.loads(tjson.read_text())
         vs.inject_qa_leaf(macros, tdata)
         vs.refresh_expected(macros, tdata)   # never grade against a stale expected
 
-    report = verify_task({"task_id": task_id, "macros": macros}, traj, answer)
+    report = verify_task({"task_id": task_id, "macros": macros}, traj, answer,
+                         question=tdata.get("instruction", ""))
     report["which"] = which
     report["source"] = note
     report["action_count"] = sum(1 for e in traj if e.get("type") == "action")
+    saved = quality.read_json(tjson.parent / "verifier.json").get("macros", {})
+    report["evidence_saved"] = bool(saved) and macros == quality.effective_macros(tdata, saved)
+    if report["evidence_saved"]:
+        quality.record_run(tjson.parent, tdata, macros, which, report)
+    report["quality"] = quality.summary(tjson.parent, tdata)
     return jsonify(report)
+
+
+@annotation_bp.route("/api/task_quality/<annotator>/<task_id>", methods=["GET", "POST"])
+def api_task_quality(annotator, task_id):
+    """Persist attributed AI findings without changing human review decisions."""
+    from annotation import quality
+    from annotation.storage import ANNOTATIONS_DIR
+    directory = (ANNOTATIONS_DIR / annotator / task_id).resolve()
+    if directory.parent.parent != ANNOTATIONS_DIR.resolve() or not (directory / "task.json").is_file():
+        return jsonify({"error": "Task not found"}), 404
+    task = json.loads((directory / "task.json").read_text())
+    if request.method == "POST":
+        try:
+            quality.save_ai_review(directory, task, request.get_json(silent=True) or {},
+                                   session.get("annotator_name", "anonymous"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    return jsonify(quality.summary(directory, task))
+
+
+@annotation_bp.route("/api/review_document")
+def api_review_document():
+    from flask import abort, send_file
+    relative = Path(request.args.get("path", ""))
+    root = PROJECT_ROOT / "data"
+    path = (PROJECT_ROOT / relative).resolve()
+    if (not path.is_relative_to(root) or len(path.relative_to(root).parts) < 2
+            or not path.relative_to(root).parts[0].startswith(("task_review_", "task_repairs_", "verifier_audit_", "railway_pulls"))
+            or path.suffix not in (".md", ".json", ".csv") or not path.is_file()):
+        abort(404)
+    return send_file(path, mimetype="text/plain")
 
 
 @annotation_bp.route("/api/task_verifier/<annotator>/<task_id>", methods=["GET", "POST"])
@@ -1286,7 +1335,9 @@ def api_task_verifier(annotator, task_id):
     if "macros" in data:
         # a human saving through the builder IS the redesign event — stamp it
         from datetime import datetime as _dt
-        spec["built_by"] = "human-builder-v2"
+        actor = session.get("annotator_name", "anonymous")
+        spec["built_by"] = "ai-builder-v2" if actor in ("codex-review", "claude-review") else "human-builder-v2"
+        spec["saved_by"] = actor
         spec["saved_at"] = _dt.now().isoformat()
     vf.parent.mkdir(parents=True, exist_ok=True)
     vf.write_text(json.dumps(spec, indent=2, default=str))
@@ -1442,6 +1493,9 @@ def api_create_task():
                               / "task.json").read_text())
             if old.get("instruction_ambiguous"):
                 task["instruction_ambiguous"] = old["instruction_ambiguous"]
+            # Keep the AI findings as history; their hashes mark them outdated.
+            if old.get("ai_review"):
+                task["ai_review"] = old["ai_review"]
             if old.get("review", {}).get("note"):
                 task["review"] = {"status": "pending",
                                   "note": old["review"]["note"],
@@ -2443,6 +2497,27 @@ def playback_facts_page():
 @annotation_bp.route("/api/playback_facts")
 def api_playback_facts():
     return jsonify(_collect_playback_facts())
+
+
+@annotation_bp.route("/macro-browser")
+def macro_browser_page():
+    """Step through every task's sub-trajectory for one macro (or one task's macros)."""
+    return render_template("macro_browser.html")
+
+
+@annotation_bp.route("/api/macro_browser/index")
+def api_macro_browser_index():
+    from annotation import macro_browser
+    return jsonify(macro_browser.index())
+
+
+@annotation_bp.route("/api/macro_browser/task/<annotator>/<task_id>")
+def api_macro_browser_task(annotator, task_id):
+    from annotation import macro_browser
+    detail = macro_browser.task_detail(annotator, task_id)
+    if detail is None:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify(detail)
 
 
 @annotation_bp.route("/api/infer_macros", methods=["POST"])

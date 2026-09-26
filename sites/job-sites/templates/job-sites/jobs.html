@@ -161,7 +161,7 @@
             <div class="results-header">
                 <div>
                     <h2>{% if query %}Results for "{{ query }}"{% else %}All Jobs{% endif %}</h2>
-                    <span class="count">{{ jobs|length }} job{{ 's' if jobs|length != 1 else '' }} found</span>
+                    <span class="count">{{ total }} job{{ 's' if total != 1 else '' }} found</span>
                 </div>
                 <!-- sort_by_ranking -->
                 <div class="sort-bar">
@@ -205,6 +205,11 @@
                 </div>
                 {% endfor %}
             </div>
+            <nav aria-label="Job result pages" style="display:flex;gap:1rem;margin-top:1rem">
+                {% if page > 1 %}<a href="{{ url_for('job-sites.jobs_page', page=page-1, **pagination_args) }}">Previous</a>{% endif %}
+                <span>Page {{ page }} of {{ pages }}</span>
+                {% if page < pages %}<a href="{{ url_for('job-sites.jobs_page', page=page+1, **pagination_args) }}">Next</a>{% endif %}
+            </nav>
             {% else %}
             <div class="no-results">
                 <p>No jobs found matching your search criteria.</p>

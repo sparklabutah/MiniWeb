@@ -414,6 +414,25 @@ def policy_document(policy_id):
     )
 
 
+@blueprint.route("/policy/<int:policy_id>/document.pdf")
+def policy_pdf_download(policy_id):
+    from hashlib import sha256
+    from flask import Response
+    from .pdf import policy_pdf
+    user = _get_current_user()
+    if not user:
+        return redirect(url_for("insurance-loans.login_page"))
+    policy = db.get_item(SITE, "policies", policy_id)
+    if not policy:
+        abort(404)
+    if policy.get("user_id") != user["id"]:
+        abort(403)
+    data = policy_pdf(policy_document(policy_id), policy)
+    return Response(data, mimetype="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="Policy_{policy["policy_number"]}.pdf"',
+        "ETag": '"' + sha256(data).hexdigest() + '"'})
+
+
 @blueprint.route("/policy/<int:policy_id>/save-to-files", methods=["POST"])
 def policy_save_to_files(policy_id):
     """Save the policy document as a real file into the user's files.

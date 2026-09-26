@@ -581,6 +581,14 @@ def form_upload_asset():
     if "user_id" not in session:
         return redirect(url_for("design-creative.login_page"))
     filename = request.form.get("filename", "").strip()
+    uploaded = request.files.get("file")
+    content = None
+    if uploaded and uploaded.filename:
+        filename = uploaded.filename
+        content = uploaded.read(3 * 1024 * 1024 + 1)
+        uploaded.seek(0)
+        if not content or len(content) > 3 * 1024 * 1024:
+            return "Please upload a nonempty file up to 3 MB.", 400
     name = request.form.get("name", "").strip() or filename
     asset_type = request.form.get("type", "").strip() or _asset_type_from_filename(filename)
     if filename:
@@ -600,6 +608,19 @@ def form_upload_asset():
             "filename": filename,
             "uploaded_by": session["user_id"],
         }
+        if content is not None:
+            import base64
+            import hashlib
+            mime = uploaded.mimetype or "application/octet-stream"
+            if content.lstrip().startswith(b"<svg"):
+                mime = "image/svg+xml"
+            asset["src"] = f"data:{mime};base64," + base64.b64encode(content).decode("ascii")
+            asset["sha256"] = hashlib.sha256(content).hexdigest()
+            asset["size"] = len(content)
+            if mime.startswith("image/"):
+                from html import escape
+                asset["svg"] = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">'
+                                '<image width="200" height="200" href="' + escape(asset["src"], quote=True) + '"/></svg>')
         db.save_item(SITE, "assets", asset_id, asset)
         emit("file_created", user_id=session["user_id"], filename=filename,
              file_type=asset_type or "asset", source_site="design-creative",

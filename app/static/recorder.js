@@ -57,6 +57,31 @@
 
     // ── Human-readable element description ─────────────────────────────
 
+    // Record completed clipboard writes, not merely clicks on a Copy button.
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        var nativeWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+        navigator.clipboard.writeText = function (text) {
+            return nativeWriteText(text).then(function (result) {
+                postAction('clipboard_write', document.activeElement, {value: String(text)});
+                return result;
+            });
+        };
+    }
+    if (document.execCommand) {
+        var nativeExecCommand = document.execCommand.bind(document);
+        document.execCommand = function (command) {
+            var el = document.activeElement;
+            var copied = el && typeof el.value === 'string' && typeof el.selectionStart === 'number'
+                ? el.value.slice(el.selectionStart, el.selectionEnd)
+                : String(window.getSelection() || '');
+            var result = nativeExecCommand.apply(document, arguments);
+            if (String(command).toLowerCase() === 'copy' && result) {
+                postAction('clipboard_write', el, {value: copied});
+            }
+            return result;
+        };
+    }
+
     function describe(el) {
         if (!el || el === document.body || el === document.documentElement) return 'page';
         var tag = el.tagName.toLowerCase();

@@ -186,6 +186,7 @@ def editor():
     """Blank code editor page, optionally pre-filled with snippet code."""
     snippet_id = request.args.get("snippet_id", type=int)
     share_token = request.args.get("share", "").strip()
+    share = None
     if not snippet_id and share_token:
         share = db.get_item(SITE, "shares", share_token)
         if share:
@@ -193,6 +194,8 @@ def editor():
     snippet = None
     if snippet_id:
         snippet = _get_snippet(snippet_id)
+    if share and snippet and "code" in share:
+        snippet = {**snippet, "code": share["code"]}
     user = None
     user_settings = {}
     if "user_id" in session:
@@ -203,7 +206,8 @@ def editor():
     tab_size = request.args.get("tab_size") or user_settings.get("tab_size", 4)
     return render_template("code-editor-execution/editor.html",
                            snippet=snippet, font_size=font_size,
-                           tab_size=tab_size, user=user)
+                           tab_size=tab_size, user=user,
+                           stdout=share.get("stdout", "") if share else "")
 
 
 @blueprint.route("/snippet/<int:snippet_id>")
@@ -558,18 +562,27 @@ def api_export():
     return jsonify(snippets)
 
 
-@blueprint.route("/api/share/<int:snippet_id>")
+@blueprint.route("/api/share/<int:snippet_id>", methods=["GET", "POST"])
 def api_share(snippet_id):
     """Generate a shareable link for a snippet."""
     snippet = _get_snippet(snippet_id)
     if snippet is None:
         abort(404)
-    share_token = uuid.uuid5(uuid.NAMESPACE_URL, f"snippet-{snippet_id}").hex[:12]
+    snapshot = {}
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        code = data.get("code")
+        stdout = data.get("stdout", "")
+        if not isinstance(code, str) or not code.strip() or len(code) > 200000 or not isinstance(stdout, str) or len(stdout) > 200000:
+            return jsonify({"error": "Valid editor code and output required"}), 400
+        snapshot = {"code": code, "stdout": stdout}
+    share_token = uuid.uuid4().hex[:12] if snapshot else uuid.uuid5(uuid.NAMESPACE_URL, f"snippet-{snippet_id}").hex[:12]
     # Persist the token -> snippet mapping in the (overlay-aware) shares collection
     # so it can be resolved later via /s/<token> or ?share=<token>.
     db.save_item(SITE, "shares", share_token, {
         "id": share_token,
         "snippet_id": snippet_id,
+        **snapshot,
     })
     share_url = url_for("code-editor-execution.resolve_share", token=share_token)
     return jsonify({
@@ -577,6 +590,7 @@ def api_share(snippet_id):
         "title": snippet["title"],
         "share_token": share_token,
         "share_url": share_url,
+        **snapshot,
     })
 
 
@@ -586,8 +600,7 @@ def resolve_share(token):
     share = db.get_item(SITE, "shares", token)
     if not share:
         abort(404)
-    return redirect(url_for("code-editor-execution.editor",
-                            snippet_id=share["snippet_id"]))
+    return redirect(url_for("code-editor-execution.editor", share=token))
 
 
 # ---------------------------------------------------------------------------

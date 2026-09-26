@@ -123,6 +123,8 @@
       curEl.textContent = fmt(t); seek.setAttribute('aria-valuenow', Math.round(frac * 100));
       // persist position on the root so it survives a reload / trajectory replay
       el.setAttribute('data-mp-pos', Math.round(t));
+      el.setAttribute('data-mp-playing', playing ? 'true' : 'false');
+      el.setAttribute('data-mp-speed', speed);
       if (!streamSegs) fetchStream();
       renderStream();
     }
@@ -134,7 +136,7 @@
       requestAnimationFrame(loop);
     }
     function play() { if (t >= duration && duration > 0) { t = 0; postSeek(); } playing = true; pp.innerHTML = '❚❚'; if (!rafOn) { rafOn = true; requestAnimationFrame(loop); } }
-    function pause() { playing = false; pp.innerHTML = '▶'; }
+    function pause() { playing = false; pp.innerHTML = '▶'; render(); }
 
     var seekTimer = null;
     function postSeek() {

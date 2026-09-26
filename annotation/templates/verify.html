@@ -10,7 +10,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .top-bar a { color: #2563eb; font-size: .85rem; text-decoration: none; }
 .container { display: flex; height: calc(100vh - 45px); }
 .sidebar { width: 320px; background: #fff; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: .8rem; }
-.main { flex: 1; overflow-y: auto; padding: 1rem; }
+.main { min-width: 0; flex: 1; overflow-y: auto; padding: 1rem; }
 
 .task-card { padding: .5rem; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .4rem; cursor: pointer; font-size: .78rem; }
 .task-card:hover { background: #f1f5f9; }
@@ -58,6 +58,16 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 .tv-any { color:#94a3b8; font-style:italic; }
 .tv-raw { margin-top:.35rem; } .tv-raw summary { font-size:.66rem; color:#94a3b8; cursor:pointer; }
 .tv-raw textarea { width:100%; font-family:monospace; font-size:.7rem; border:1px solid #cbd5e1; border-radius:.25rem; padding:.35rem; min-height:110px; margin-top:.25rem; }
+.quality-pills { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.3rem; }
+.quality-pill { border-radius:.3rem; padding:.15rem .35rem; background:#e2e8f0; color:#334155; font-size:.65rem; }
+.quality-pill[data-state="needs_repair"], .quality-pill[data-state="suggest_delete"], .quality-pill[data-state="fail"] { background:#fee2e2; color:#991b1b; }
+.quality-pill[data-state="stale"], .quality-pill[data-state="unreviewed"] { background:#fef3c7; color:#92400e; }
+.quality-pill[data-state="repaired"], .quality-pill[data-state="keep"], .quality-pill[data-state="pass"] { background:#e0f2fe; color:#075985; }
+.quality-filter { width:100%;padding:.3rem;margin-top:.3rem;border:1px solid #cbd5e1;border-radius:.25rem;background:white;font-size:.74rem; }
+#quality-panel p, #quality-panel li { font-size:.78rem; line-height:1.5; }
+#quality-panel ul { padding-left:1.2rem; margin:.3rem 0; }
+#quality-panel table { width:100%; border-collapse:collapse; font-size:.75rem; margin:.5rem 0; }
+#quality-panel th, #quality-panel td { text-align:left; padding:.3rem; border-bottom:1px solid #e2e8f0; }
 </style>
 </head>
 <body>
@@ -79,36 +89,50 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 {% endfor %}
             </select>
             <input type="text" id="task-search" placeholder="Search tasks..." style="width:100%;padding:.3rem .5rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem" oninput="filterTasks(this.value)">
-            <div id="tag-filter-row" style="display:flex;gap:.25rem;margin-top:.3rem">
+            <div id="tag-filter-row" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.3rem">
                 <button onclick="toggleSortOrder()" id="sort-order-btn"
                     title="Toggle task sort order"
                     style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #93c5fd;background:#eff6ff;color:#2563eb">
                     {{ '↓ Newest' if sort == 'newest' else '↑ Oldest' }}
                 </button>
                 <button class="tagf active" data-tagf="" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#1e293b;color:#fff">All</button>
-                <button class="tagf" data-tagf="verified" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #86efac;border-radius:.6rem;cursor:pointer;background:#f0fdf4;color:#16a34a">&#10003; Verified</button>
+                <button class="tagf" data-tagf="verified" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #86efac;border-radius:.6rem;cursor:pointer;background:#f0fdf4;color:#16a34a">&#10003; Human verified</button>
                 <button class="tagf" data-tagf="stale" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #fdba74;border-radius:.6rem;cursor:pointer;background:#fff7ed;color:#ea580c">Stale</button>
-                <button class="tagf" data-tagf="untagged" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#f8fafc;color:#64748b">Unreviewed</button>
+                <button class="tagf" data-tagf="untagged" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#f8fafc;color:#64748b">Human unreviewed</button>
             </div>
         </div>
+        <select id="ai-filter" class="quality-filter" aria-label="AI review filter" onchange="filterTasks(document.getElementById('task-search').value)">
+            <option value="">All AI recommendations</option>
+            {% for value, label in [('unreviewed','Not reviewed'),('keep','Keep candidate'),('repaired','Repaired'),('needs_repair','Needs repair'),('suggest_delete','Deletion suggested'),('stale','Review outdated')] %}
+            <option value="{{ value }}">{{ label }} ({{ tasks|selectattr('quality.ai', 'equalto', value)|list|length }})</option>
+            {% endfor %}
+        </select>
+        <select id="evidence-filter" class="quality-filter" aria-label="Evidence filter" onchange="filterTasks(document.getElementById('task-search').value)">
+            <option value="">All validation evidence</option>
+            <option value="attention">Needs attention</option><option value="unrun">Fresh walk not tested</option>
+            <option value="pass">Saved fresh walk passed</option><option value="fail">Saved fresh walk failed</option>
+            <option value="stale">Fresh-walk result outdated</option>
+        </select>
+        <p style="font-size:.65rem;color:#64748b;margin:.3rem 0">AI recommendations and test results do not grant human approval.</p>
         <div id="task-search-empty" style="font-size:.75rem;color:#94a3b8"></div>
         <div id="task-list">
             {% for t in tasks %}
             {% set t_tag = t.review_tag.tag if t.review_tag else '' %}
-            {% set t_sites = t.sites|map(attribute='id')|join(' ') if t.sites else '' %}
+            {% set t_sites = t.sites|join(' ') if t.sites else '' %}
             <div class="task-card{% if task and t.task_id == task.task_id %} active{% endif %}"
-                 data-tag="{{ t_tag }}"
+                 data-tag="{{ t_tag }}" data-ai="{{ t.quality.ai }}" data-walk="{{ t.quality.walk }}" data-attention="{{ 'yes' if t.quality.attention else 'no' }}"
                  data-annotator="{{ t.annotator|default('') }}"
-                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag)|lower }}"
+                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag ~ ' ' ~ t.quality.ai_label ~ ' ' ~ t.quality.review.get('note', ''))|lower }}"
                  onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}&sort={{ sort }}'">
                 <div class="tc-id">{{ t.task_id }}
-                    {% if t_tag == 'verified' %}<span class="verified-pill" data-by="{{ t.review_tag.by|default('') }}" data-at="{{ t.review_tag.at|default('') }}" style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; verified</span>
+                    {% if t_tag == 'verified' %}<span class="verified-pill" data-by="{{ t.review_tag.by|default('') }}" data-at="{{ t.review_tag.at|default('') }}" style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; human verified</span>
                     {% elif t_tag == 'stale' %}<span style="font-size:.58rem;background:#ffedd5;color:#ea580c;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">stale</span>{% endif %}
                     {% if t.has_feedback %}<span style="font-size:.58rem;background:#ede9fe;color:#7c3aed;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#9998; feedback</span>{% endif %}
                     {% if not t.has_verifier %}<span style="font-size:.58rem;background:#f1f5f9;color:#94a3b8;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">no verifier</span>{% endif %}
                 </div>
+                <div class="quality-pills"><span class="quality-pill ai-pill" data-state="{{ t.quality.ai }}">AI: {{ t.quality.ai_label }}</span><span class="quality-pill walk-pill" data-state="{{ t.quality.walk }}">Walk: {{ {'unrun':'not tested','pass':'passed','fail':'failed','stale':'outdated'}[t.quality.walk] }}</span></div>
                 <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
-                <div class="tc-meta">{{ t.annotator|default('?') }} · {{ t.sites[0].id if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
+                <div class="tc-meta">{{ t.annotator|default('?') }} · {{ (t.sites[0].id if t.sites[0] is mapping else t.sites[0]) if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
             </div>
             {% endfor %}
         </div>
@@ -121,14 +145,15 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
             <p class="hint">Pick a completed annotation task to build verifiers for it.</p>
         </div>
         {% else %}
+        <div class="section" id="quality-panel" aria-label="AI review and validation evidence"></div>
         <!-- Task info -->
         <div class="section">
             <div style="display:flex;align-items:center;gap:.6rem">
                 <h3 style="flex:1;margin:0">{{ task.task_id }}</h3>
                 {% set cur_tag = task.review_tag.tag if task.review_tag else '' %}
-                <button onclick="setReviewTag('verified')" id="tag-verified-btn" title="Mark as reviewed: proper, achievable task"
+                <button onclick="setReviewTag('verified')" id="tag-verified-btn" title="Human editorial decision; separate from verifier validation"
                     style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #86efac;{{ 'background:#16a34a;color:#fff' if cur_tag == 'verified' else 'background:#f0fdf4;color:#16a34a' }}">
-                    &#10003; Verified
+                    &#10003; Human verified
                 </button>
                 <span id="verified-meta" style="font-size:.68rem;color:#16a34a;white-space:nowrap;"></span>
                 <button onclick="setReviewTag('stale')" id="tag-stale-btn" title="Mark as stale: outdated against current site/data"
@@ -162,7 +187,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 </div>
                 <div>
                     <label>Macros</label>
-                    <span>{% for m in task.macros %}{{ (macro_descriptions.get(m, {}).get('description', m))[:30] }}{% if task.macro_operations and task.macro_operations.get(m) %} <b style="color:#4338ca">[{{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}]</b>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                    <span>{% for m in task.macro_instances or task.macros %}{{ (macro_descriptions.get(m.split('#')[0], {}).get('description', m))[:30] }}{% if task.macro_operations and task.macro_operations.get(m) %} <b style="color:#4338ca">[{{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}]</b>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
                 </div>
                 <div>
                     <label>Expected Answer</label>
@@ -233,7 +258,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                     <select id="tv-which" class="param-input" style="width:auto;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.76rem">
                         <option value="gold">Gold (human)</option>
                         <option value="walk">Verification walk</option>
-                        <option value="agent">Agent attempt</option>
+                        <option value="empty">Empty trajectory (must reject)</option><option value="answer_only">Answer without actions (must reject)</option><option value="agent">Agent attempt</option>
                     </select>
                     <button onclick="runTaskVerifier()" id="tv-run" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run</button>
                     <button onclick="runBoth()" id="tv-runboth" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run Gold + Walk</button>
@@ -246,6 +271,13 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
         <!-- Trajectory Playback -->
         <div class="section">
             <h3>Trajectory Playback</h3>
+            {% if task.macro_ai_review %}
+            <div style="font-size:.75rem;background:#eff6ff;padding:.6rem;margin-bottom:.5rem;border-radius:.4rem">
+                <b>AI macro review: {{ 'outdated' if task.quality.ai == 'stale' else task.macro_ai_review.status }}</b>
+                · <a href="{{ url_for('annotation.api_review_document', path=task.macro_ai_review.document) }}">Task review and changes</a>
+                <div>{{ task.macro_ai_review.span_status }}</div>
+            </div>
+            {% endif %}
             <details open style="margin-bottom:.6rem;border:1px solid #e2e8f0;border-radius:.4rem;background:#fcfcfd;padding:.35rem .55rem">
             <summary style="cursor:pointer;font-size:.8rem;font-weight:600;color:#334155">Macros ({{ task.macros|length }}) — spans highlighted in the action list below</summary>
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
@@ -255,9 +287,10 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                 </button>
                 <span id="suggest-tags-status" style="font-size:.65rem;color:#94a3b8"></span>
             </div>
-            {% for m in task.macros %}
+            {% for m in task.macro_instances or task.macros %}
+            {% set macro_base = m.split('#')[0] %}
             <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
-                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(m, {}).get('description', m) }}
+                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(macro_base, {}).get('description', m) }}
                     {% if task.macro_operations and task.macro_operations.get(m) %}
                     <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase;vertical-align:middle">op: {{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}</span>
                     {% endif %}
@@ -326,12 +359,12 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                         style="padding:.35rem .9rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">
                     Stop &amp; Compare
                 </button>
-                <input id="vw-answer" placeholder="Answer from this walk (for QA tasks)"
-                       style="flex:1;min-width:200px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem">
+                <textarea id="vw-answer" rows="2" placeholder="Answer from this walk (for QA tasks)"
+                          style="flex:1;min-width:200px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem"></textarea>
                 <span id="vw-count" style="font-size:.75rem;color:#94a3b8"></span>
             </div>
 
-            <iframe id="vw-iframe" src="about:blank"
+            <iframe id="vw-iframe" src="about:blank" allow="clipboard-read; clipboard-write"
                     style="width:100%;height:420px;border:1px solid #e2e8f0;border-radius:.3rem;display:none"></iframe>
 
             <div id="vw-compare" style="display:none;margin-top:.6rem"></div>
@@ -506,6 +539,45 @@ function playbackAuto() {
     }, 2000);
 }
 
+function renderQuality(q) {
+    var panel = document.getElementById('quality-panel');
+    if (!panel || !q) return;
+    panel.replaceChildren();
+    function add(tag, text, parent) { var node = document.createElement(tag); node.textContent = text; (parent || panel).appendChild(node); return node; }
+    add('h3', 'AI review and validation evidence');
+    var badge = add('span', 'AI: ' + q.ai_label); badge.className = 'quality-pill'; badge.dataset.state = q.ai;
+    var r = q.review || {};
+    add('p', (r.reviewer || 'No AI reviewer recorded') + (r.reviewed_at ? ' · ' + r.reviewed_at : '') + (q.legacy ? ' · Legacy review; validation not imported yet' : ''));
+    if (q.ai === 'stale') add('p', 'Task, verifier, or recording changed after this review. The previous recommendation needs another review.');
+    if (r.note) add('p', r.note);
+    [['issues','Open issues'],['changes','Repairs made'],['limitations','Validation limits']].forEach(function(pair) {
+        if (!(r[pair[0]] || []).length) return;
+        add('b', pair[1]); var ul = add('ul', ''); r[pair[0]].forEach(function(text) { add('li', text, ul); });
+    });
+    if ((r.documents || []).length) {
+        var docs = add('details', ''); add('summary', 'Review documents', docs);
+        r.documents.forEach(function(path) { var line = add('p', '', docs); var a = add('a', path, line); a.href = '/annotate/api/review_document?path=' + encodeURIComponent(path); a.target = '_blank'; a.rel = 'noopener'; });
+    }
+    var table = add('table', ''), head = add('tr', '', table);
+    ['Evidence', 'Result', 'Checked at'].forEach(function(text) { add('th', text, head); });
+    var names = {gold:'Original recording', walk:'Fresh verification walk', agent:'Agent attempt', empty:'Empty trajectory', answer_only:'Answer without actions'};
+    Object.keys(names).forEach(function(source) {
+        var run = (q.runs || []).find(function(x) { return x.source === source; });
+        var row = add('tr', '', table); add('td', names[source], row); add('td', run ? run.label : 'Not tested', row); add('td', run ? run.run_at : '—', row);
+    });
+    add('p', 'These results test saved recordings. Original-recording QA uses the saved expected answer. Empty and answer-only rejection are basic checks; alternative valid paths and plausible wrong completions still need testing.');
+    add('p', 'Human tags and approval below are independent decisions. A deletion suggestion keeps the task and recording intact.');
+    var card = document.querySelector('.task-card.active');
+    if (card) { card.dataset.ai = q.ai; card.dataset.walk = q.walk; card.dataset.attention = q.attention ? 'yes' : 'no';
+        var ai = card.querySelector('.ai-pill'); ai.textContent = 'AI: ' + q.ai_label; ai.dataset.state = q.ai;
+        var walk = card.querySelector('.walk-pill'); walk.textContent = 'Walk: ' + ({unrun:'not tested',pass:'passed',fail:'failed',stale:'outdated'}[q.walk]); walk.dataset.state = q.walk;
+    }
+}
+function refreshQuality() {
+    var key = {{ ((task.annotator ~ '/' ~ task.task_id) if task else '')|tojson }};
+    if (key) fetch('/annotate/api/task_quality/' + key.split('/').map(encodeURIComponent).join('/')).then(r => r.json()).then(renderQuality);
+}
+renderQuality({{ (task.quality if task else none)|tojson }});
 var _tagFilter = '';
 var _annFilter = '';
 
@@ -534,12 +606,14 @@ function filterTasks(q) {
         var tagOk = !_tagFilter
             || (_tagFilter === 'untagged' ? !c.dataset.tag : c.dataset.tag === _tagFilter);
         var annOk = !_annFilter || c.dataset.annotator === _annFilter;
-        var hit = tagOk && annOk && terms.every(t => hay.includes(t));
+        var ai = document.getElementById('ai-filter').value, ev = document.getElementById('evidence-filter').value;
+        var qualityOk = (!ai || c.dataset.ai === ai) && (!ev || (ev === 'attention' ? c.dataset.attention === 'yes' : c.dataset.walk === ev));
+        var hit = tagOk && annOk && qualityOk && terms.every(t => hay.includes(t));
         c.style.display = hit ? '' : 'none';
         if (hit) visible++;
     });
     document.getElementById('task-search-empty').textContent =
-        visible === 0 ? 'No tasks match "' + q + '"' : '';
+        visible + ' matching tasks';
     saveSidebarState();
 }
 
@@ -551,6 +625,8 @@ function saveSidebarState() {
     try {
         sessionStorage.setItem(SB_KEY, JSON.stringify({
             q: document.getElementById('task-search').value,
+            ai: document.getElementById('ai-filter').value,
+            evidence: document.getElementById('evidence-filter').value,
             tag: _tagFilter,
             ann: _annFilter,
             sort: _sortOrder,
@@ -587,6 +663,8 @@ function restoreSidebarState() {
         sel.value = st.ann;
         if (sel.value === st.ann) _annFilter = st.ann;
     }
+    document.getElementById('ai-filter').value = st.ai || '';
+    document.getElementById('evidence-filter').value = st.evidence || '';
     if (st.q) document.getElementById('task-search').value = st.q;
     filterTasks(document.getElementById('task-search').value);
 
@@ -784,6 +862,7 @@ function saveInstruction(taskId, annotator, value) {
         body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'instruction', value: value})
     }).then(r => r.json()).then(d => {
         if (d.status === 'ok') {
+            refreshQuality();
             if (el) { el.style.borderColor = '#86efac'; setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500); }
             if (st) { st.textContent = '✓ saved'; st.style.color = '#16a34a'; setTimeout(function() { if (st) st.textContent = ''; }, 2000); }
         } else if (st) { st.textContent = 'save failed'; st.style.color = '#dc2626'; }
@@ -1475,6 +1554,7 @@ function saveTaskVerifier() {
         body: JSON.stringify({macros: TV_MACROS})
     }).then(function(r){ return r.json(); }).then(function(d){
         status.textContent = d.error ? ('error: '+d.error) : 'saved ✓';
+        if (!d.error) refreshQuality();
     });
 }
 
@@ -1506,6 +1586,8 @@ function runTaskVerifier(which, container) {
     }).then(function(r){ return r.json(); }).then(function(d){
         msg.textContent = '';
         renderRunResult(d, which, container);
+        if (d.quality) renderQuality(d.quality);
+        if (!d.error) msg.textContent = d.evidence_saved ? 'Saved validation evidence updated.' : 'Draft result only — save this verifier to record validation evidence.';
         return d;
     });
 }
@@ -1519,8 +1601,11 @@ function runBoth() {
 function renderRunResult(d, which, container) {
     var el = container || document.getElementById('tv-run-result');
     if (d.error) { el.innerHTML = '<div style="font-size:.74rem;color:#b45309">'+which+': '+d.error+'</div>'; return; }
+    var negative = which === 'empty' || which === 'answer_only';
+    var expectedResult = negative ? !d.passed : d.passed;
+    var verdict = negative ? (d.passed ? 'INCORRECTLY ACCEPTED' : 'CORRECTLY REJECTED') : (d.passed ? 'PASS' : 'FAIL');
     var head = '<div style="display:flex;align-items:center;gap:.4rem;margin:.3rem 0">'+
-        '<span class="badge '+(d.passed?'badge-pass':'badge-fail')+'">'+(d.passed?'PASS':'FAIL')+'</span>'+
+        '<span class="badge '+(expectedResult?'badge-pass':'badge-fail')+'">'+verdict+'</span>'+
         '<b style="font-size:.78rem">'+d.source+'</b>'+
         '<span style="font-size:.68rem;color:#94a3b8">'+d.action_count+' actions</span></div>';
     var rows = '';

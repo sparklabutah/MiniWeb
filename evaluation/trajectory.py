@@ -94,6 +94,9 @@ def merge_server_log(traj: list, server_log) -> list:
             "url": url,
             "status": e.get("status"),
             "requestBody": e.get("body"),
+            "responseBody": e.get("response"),
+            "responseHeaders": e.get("response_headers", {}),
+            "timestamp": e.get("timestamp"),
             "_source": "server_log",
         })
     return out

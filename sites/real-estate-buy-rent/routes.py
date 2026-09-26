@@ -69,11 +69,13 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
     if status:
         clauses.append("[status] = ?")
         params.append(status)
+    # Match the price shown on each card: monthly rent for rental listings.
+    display_price = "CASE WHEN [status] IN ('for_rent', 'rented') THEN [rent_monthly] ELSE [price] END"
     if price_min is not None:
-        clauses.append("[price] >= ?")
+        clauses.append(f"({display_price}) >= ?")
         params.append(price_min)
     if price_max is not None:
-        clauses.append("[price] <= ?")
+        clauses.append(f"({display_price}) <= ?")
         params.append(price_max)
     if beds_min is not None:
         clauses.append("[bedrooms] >= ?")
@@ -90,8 +92,8 @@ def _query_listings(q="", prop_type="", status="", price_min=None, price_max=Non
 
     sort_map = {
         "date": "[listed_date] DESC",
-        "price_low": "[price] ASC",
-        "price_high": "[price] DESC",
+        "price_low": f"({display_price}) ASC, [id] ASC",
+        "price_high": f"({display_price}) DESC, [id] ASC",
         "rent_low": "[rent_monthly] ASC",
         "rent_high": "[rent_monthly] DESC",
         "sqft": "[sqft] DESC",
@@ -260,6 +262,9 @@ def listings_page():
     status = request.args.get("status", "").strip()
     price_min = request.args.get("price_min", type=int)
     price_max = request.args.get("price_max", type=int)
+    # Match the range control's explicit "Any" endpoint.
+    if price_max is not None and price_max >= 25000000:
+        price_max = None
     beds_min = request.args.get("beds", type=int)
     baths_min = request.args.get("baths", type=int)
     sqft_min = request.args.get("sqft_min", type=int)

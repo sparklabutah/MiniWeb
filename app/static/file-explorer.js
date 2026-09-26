@@ -391,7 +391,7 @@
         .then(grabName)
         .then(function (blob) {
           var mime = blob.type || '';
-          var textish = (/^text\/|json|csv|xml|svg|javascript|x-www-form/.test(mime) || mime === '');
+          var textish = /^(text\/|application\/(?:json|xml|javascript|x-www-form-urlencoded)(?:;|$)|image\/svg\+xml(?:;|$))/.test(mime);
           if (textish && blob.size < 500000) {
             blob.text().then(function (t) { openSave({ content: t, mime: mime }); });
           } else {
@@ -417,7 +417,7 @@
         .then(grabName)
         .then(function (blob) {
           var mime = blob.type || '';
-          var textish = (/^text\/|json|csv|xml|svg|javascript|x-www-form/.test(mime) || mime === '');
+          var textish = /^(text\/|application\/(?:json|xml|javascript|x-www-form-urlencoded)(?:;|$)|image\/svg\+xml(?:;|$))/.test(mime);
           if (textish && blob.size < 500000) {
             blob.text().then(function (t) { save({ content: t, mime: mime }); });
           } else {

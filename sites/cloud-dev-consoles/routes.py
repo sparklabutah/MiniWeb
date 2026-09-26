@@ -651,23 +651,28 @@ def form_delete_instance(instance_id):
 @blueprint.route("/instances/create", methods=["POST"])
 def form_create_instance():
     """Launch a new instance from the Instances page form (create_by_form)."""
-    instances = _get_instances()
+    import uuid
     region = request.form.get("region", "us-west-2").strip() or "us-west-2"
-    instances.append({
-        "id": f"i-user{len(instances) + 1:012d}",
-        "name": request.form.get("name", "").strip() or f"new-instance-{len(instances) + 1}",
-        "type": request.form.get("type", "t3.medium").strip() or "t3.medium",
-        "vcpus": request.form.get("vcpus", 2, type=int) or 2,
-        "memory_gb": request.form.get("memory_gb", 4, type=int) or 4,
+    instance_type = request.form.get("type", "t3.medium").strip() or "t3.medium"
+    sizes = {"t3.medium": (2, 4), "t3.large": (2, 8), "c5.xlarge": (4, 8),
+             "c5.2xlarge": (8, 16), "r6g.xlarge": (4, 32)}
+    vcpus, memory_gb = sizes.get(instance_type, (2, 4))
+    instance_id = "i-user" + uuid.uuid4().hex[:12]
+    instance = {
+        "id": instance_id,
+        "name": request.form.get("name", "").strip() or "new-instance",
+        "type": instance_type,
+        "vcpus": request.form.get("vcpus", vcpus, type=int) or vcpus,
+        "memory_gb": request.form.get("memory_gb", memory_gb, type=int) or memory_gb,
         "status": "running", "region": region, "availability_zone": f"{region}a",
-        "private_ip": f"10.0.9.{(len(instances) % 250) + 1}", "public_ip": "",
+        "private_ip": "", "public_ip": "",
         "os": request.form.get("os", "Amazon Linux 2023").strip() or "Amazon Linux 2023",
         "service_id": "", "monthly_cost": 0.0,
         "launched": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "tags": {"env": request.form.get("env", "development").strip() or "development"},
-    })
-    db.save_collection(SITE, "instances", instances)
-    return redirect(url_for("cloud-dev-consoles.instances_page"))
+    }
+    db.save_item(SITE, "instances", instance_id, instance)
+    return redirect(url_for("cloud-dev-consoles.instance_detail", instance_id=instance_id))
 
 
 @blueprint.route("/instance/<instance_id>/edit", methods=["POST"])
@@ -1003,48 +1008,40 @@ def billing_page():
 
 @blueprint.route("/logs")
 def logs_page():
-    logs = _get_logs()
-    now = datetime.now(timezone.utc)
     q = request.args.get("q", "").strip()
     level = request.args.get("level", "").strip()
     category = request.args.get("category", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
     sort = request.args.get("sort", "time").strip()
-
-    # Relativize timestamps so logs look fresh
-    results = _relativize_log_timestamps(logs, now)
-
+    # Logs retain their recorded timestamps. Re-dating every row on every
+    # request makes historical filtering and incident reports unreliable.
+    clauses, params = [], []
     if q:
-        results = _search_resources(results, q, ["message", "service", "source", "trace_id"])
-    if level:
-        results = [l for l in results if l["level"] == level]
-    if category:
-        results = [l for l in results if l["category"] == category]
+        clauses.append("(message LIKE ? OR service LIKE ? OR source LIKE ? OR trace_id LIKE ?)")
+        params.extend(["%" + q + "%"] * 4)
+    for column, value in (("level", level), ("category", category)):
+        if value:
+            clauses.append(column + " = ?")
+            params.append(value)
     if date_from:
-        results = [l for l in results if l["timestamp"] >= date_from]
+        clauses.append("timestamp >= ?")
+        params.append(date_from + (":00Z" if len(date_from) == 16 else ""))
     if date_to:
-        results = [l for l in results if l["timestamp"] <= date_to]
-
-    if sort == "time":
-        results.sort(key=lambda l: l["timestamp"], reverse=True)
-    elif sort == "level":
-        level_order = {"ERROR": 0, "WARN": 1, "INFO": 2}
-        results.sort(key=lambda l: level_order.get(l["level"], 3))
-    elif sort == "service":
-        results.sort(key=lambda l: l["service"])
-
-    levels = sorted(set(l["level"] for l in logs))
-    log_categories = sorted(set(l["category"] for l in logs))
-
-    # Pagination — the logs table now holds thousands of entries
+        clauses.append("timestamp <= ?")
+        params.append(date_to + (":59Z" if len(date_to) == 16 else ""))
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    table = "cloud_dev_consoles_logs"
+    total_results = db.execute("SELECT COUNT(*) FROM " + table + where, tuple(params), fetch="val")
     per_page = 100
-    page = max(1, request.args.get("page", 1, type=int) or 1)
-    total_results = len(results)
     total_pages = max(1, (total_results + per_page - 1) // per_page)
-    page = min(page, total_pages)
-    results = results[(page - 1) * per_page: page * per_page]
-
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), total_pages)
+    order = {"level": "CASE level WHEN 'ERROR' THEN 0 WHEN 'WARN' THEN 1 ELSE 2 END, timestamp DESC",
+             "service": "service, timestamp DESC"}.get(sort, "timestamp DESC")
+    results = db.execute("SELECT * FROM " + table + where + " ORDER BY " + order + " LIMIT ? OFFSET ?",
+                         tuple(params) + (per_page, (page - 1) * per_page))
+    levels = [r["level"] for r in db.execute("SELECT DISTINCT level FROM " + table + " ORDER BY level LIMIT 20")]
+    log_categories = [r["category"] for r in db.execute("SELECT DISTINCT category FROM " + table + " ORDER BY category LIMIT 100")]
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])

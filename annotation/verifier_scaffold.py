@@ -166,9 +166,18 @@ def reduce_trajectory_for_llm(traj: list) -> list:
 def leaf_macros(task: dict) -> set:
     """Terminal macros — those with no outgoing edge in the task's macro graph.
     A leaf QA macro's answer is the deliverable; a non-leaf feeds the next macro."""
+    from annotation.macros import canon
+
+    def base(node):
+        return canon(node.split("#", 1)[0])
+
+    nodes = task.get("macro_instances") or task.get("macros") or []
     edges = task.get("macro_edges") or []
-    sources = {e.get("from") for e in edges if isinstance(e, dict)}
-    return {m for m in (task.get("macros") or []) if m not in sources}
+    sources = {e.get("from") for e in edges if isinstance(e, dict)
+               and e.get("from") in nodes and e.get("to") in nodes}
+    # Saved verifiers are keyed by base macro, while graph nodes can identify
+    # individual occurrences. Only real terminal occurrences contribute leaves.
+    return {base(m) for m in nodes if m not in sources}
 
 
 def _all_leaves(node):
@@ -229,14 +238,15 @@ def refresh_expected(macros_spec: dict, task: dict) -> list:
 # ---------------------------------------------------------------------------
 
 def _span_indices(span, n):
-    """A macro span is [start, end] inclusive over the action list (occasionally
-    a single [i]). Return the concrete action indices it covers."""
+    """Convert the UI's 1-based inclusive action span to Python indices.
+
+    Invalid ranges are ignored, rather than silently tagging different actions.
+    """
     if not isinstance(span, (list, tuple)) or not span:
         return []
-    if len(span) == 1:
-        return [span[0]] if isinstance(span[0], int) and 0 <= span[0] < n else []
-    lo, hi = span[0], span[-1]
-    if not (isinstance(lo, int) and isinstance(hi, int)):
+    if len(span) not in (1, 2):
         return []
-    lo, hi = max(0, min(lo, hi)), min(n - 1, max(lo, hi))
-    return list(range(lo, hi + 1))
+    lo, hi = span[0], span[-1]
+    if not (type(lo) is int and type(hi) is int and 1 <= lo <= hi <= n):
+        return []
+    return list(range(lo - 1, hi))

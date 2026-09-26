@@ -1197,13 +1197,24 @@ def api_export():
     source_lang = request.args.get("source_lang", "").strip()
     target_lang = request.args.get("target_lang", "").strip()
 
-    history = _load_history()
-    if user_id:
-        history = [h for h in history if h["user_id"] == user_id]
+    user, _ = _get_browsing_user()
+    # Export the signed-in account's history, including all pages.
+    if user_id is not None and user_id != user["id"]:
+        abort(403)
+    where = {"user_id": user["id"]}
     if source_lang:
-        history = [h for h in history if h["source_lang"] == source_lang]
+        where["source_lang"] = source_lang
     if target_lang:
-        history = [h for h in history if h["target_lang"] == target_lang]
+        where["target_lang"] = target_lang
+    def history_rows():
+        offset = 0
+        while True:
+            batch = db.query(SITE, "history", where=where, sort="-timestamp", limit=50, offset=offset)
+            yield from batch
+            if len(batch) < 50:
+                break
+            offset += 50
+    history = history_rows()
 
     if fmt == "csv":
         buf = io.StringIO()
@@ -1225,7 +1236,7 @@ def api_export():
                         headers={"Content-Disposition": "attachment; filename=translations.txt"})
     else:
         # Default: JSON
-        return jsonify(history)
+        return jsonify(list(history))
 
 
 # ---------------------------------------------------------------------------

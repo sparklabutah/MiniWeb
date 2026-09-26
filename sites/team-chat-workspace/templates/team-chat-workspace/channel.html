@@ -211,6 +211,7 @@
                                     <span class="msg-time">{{ msg.timestamp[11:16] }}</span>
                                 </div>
                                 <div class="msg-text">{{ msg.text }}</div>
+                                {% if msg.attachment %}<a href="{{ msg.attachment.data_uri }}" download="{{ msg.attachment.filename }}">{{ msg.attachment.filename }}</a>{% endif %}
                                 {% if current_user and msg.user_id == current_user.id %}
                                 <form class="msg-edit-form" data-message-id="{{ msg.id }}" onsubmit="return saveEdit(event, this)" style="display:none;gap:6px;margin-top:4px;">
                                     <input type="text" name="text" value="{{ msg.text }}" style="flex:1;background:#222529;border:1px solid #3f3f42;color:#d1d2d3;padding:5px 8px;border-radius:4px;font-size:13px;">
@@ -323,6 +324,16 @@
     function sendMessage(e) {
         e.preventDefault();
         var text = document.getElementById('msg-input').value.trim();
+        var upload = document.querySelector('input[type="file"][name="file"]');
+        if (upload && upload.files.length) {
+            var data = new FormData(upload.form);
+            data.set('text', text);
+            fetch(upload.form.action, {method: 'POST', body: data}).then(function(r) {
+                if (!r.ok) throw new Error('Upload failed');
+                location.reload();
+            }).catch(function() { alert('The attachment could not be sent. Please try again.'); });
+            return false;
+        }
         if (!text) return false;
         fetch('{{ url_for("team-chat-workspace.api_channel_send_message", channel_id=active_channel.id) }}', {
             method: 'POST',

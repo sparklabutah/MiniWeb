@@ -35,9 +35,9 @@ def _parse_price(pricing_str):
     Takes the first price found. Returns 0.0 if unparseable."""
     if not pricing_str:
         return 0.0
-    m = re.search(r'\$(\d+(?:\.\d{1,2})?)', str(pricing_str))
+    m = re.search(r'\$(\d[\d,]*(?:\.\d{1,2})?)', str(pricing_str))
     if m:
-        return float(m.group(1))
+        return float(m.group(1).replace(',', ''))
     return 0.0
 
 
@@ -431,6 +431,8 @@ def index():
     brand = request.args.get("brand", "").strip()
     min_price = request.args.get("min_price", type=float)
     max_price = request.args.get("max_price", type=float)
+    if max_price is not None and max_price >= 2000:
+        max_price = None  # The catalog slider labels its upper endpoint "Any".
     min_rating = request.args.get("min_rating", type=float)
     sort = request.args.get("sort", "").strip()
 

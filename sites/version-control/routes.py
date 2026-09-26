@@ -2472,6 +2472,8 @@ def api_upload_file(repo_id):
         return jsonify({"error": "No file provided"}), 400
 
     file_path = request.form.get("path", file.filename)
+    if not file_path or file_path.endswith("/"):
+        file_path = (file_path or "") + file.filename.rsplit("/", 1)[-1]
     commit_msg = request.form.get("commit_message", f"Upload {file_path}")
     branch = request.form.get("branch", repo["default_branch"])
     content = file.read().decode("utf-8", errors="replace")
@@ -2488,11 +2490,9 @@ def api_upload_file(repo_id):
         "commit_message": commit_msg,
         "author": _session_author()["username"],
         "uploaded_at": _now(),
+        "content": content,
     }
     db.save_item(SITE, "uploads", new_id, upload_entry)
-
-    # Also index the content for code search (search index, not per-session state)
-    _FILE_CONTENTS.setdefault(repo["name"], {})[file_path] = content
 
     return jsonify(upload_entry), 201
 
@@ -2679,6 +2679,11 @@ def api_repo_file_content(repo_id):
     if not path:
         return jsonify({"error": "File path required (?path=src/main.py)"}), 400
 
+    uploaded = db.merge_overlay(SITE, "uploads", [],
+                                match=lambda u: u.get("repo_id") == repo_id and u.get("path") == path,
+                                sort="-uploaded_at", limit=1)
+    if uploaded:
+        return jsonify({"repo": repo["name"], "path": path, "content": uploaded[0].get("content", "")})
     contents = _FILE_CONTENTS.get(repo["name"], {})
     if path not in contents:
         return jsonify({"error": f"File not found: {path}"}), 404

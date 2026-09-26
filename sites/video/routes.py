@@ -13,6 +13,8 @@ follow_by_toggle, subscribe_by_toggle, share_by_dropdown, save_by_toggle,
 report_by_form, authenticate_by_form
 """
 import json
+import base64
+import hashlib
 import pathlib
 from datetime import datetime, timezone
 
@@ -830,10 +832,18 @@ def api_video_create():
     if not data.get("title"):
         return jsonify({"error": "Missing required field: title"}), 400
 
-    # A video file may ride along as a multipart part; record a reference.
+    # Retain the uploaded bytes so a published video is more than a filename.
     up = request.files.get("file") or request.files.get("video")
-    if up and up.filename and not data.get("video_url"):
-        data["video_url"] = f"uploaded://{up.filename}"
+    attachment = None
+    if up and up.filename:
+        content = up.read(20 * 1024 * 1024 + 1)
+        if not content or len(content) > 20 * 1024 * 1024:
+            return jsonify({"error": "Choose a nonempty video under 20 MiB"}), 400
+        encoded = base64.b64encode(content).decode("ascii")
+        attachment = {"filename": up.filename, "size": len(content),
+                      "sha256": hashlib.sha256(content).hexdigest(),
+                      "content_type": up.mimetype, "content_b64": encoded}
+        data["video_url"] = f"data:{up.mimetype or 'video/webm'};base64,{encoded}"
 
     channel_id = data.get("channel_id") or _current_user_id()
     if channel_id is None:                      # browse-only fallback
@@ -845,9 +855,8 @@ def api_video_create():
     except (TypeError, ValueError):
         duration = 0
 
-    videos = _videos()
     new_video = {
-        "id": _next_id(videos),
+        "id": db.next_id(SITE, "videos"),
         "title": data["title"],
         "channel_id": channel_id,
         "user_id": data.get("user_id", channel_id),
@@ -864,8 +873,9 @@ def api_video_create():
         "status": data.get("status") or "published",
     }
 
-    videos.append(new_video)
-    db.save_collection(SITE, "videos", videos)
+    if attachment:
+        new_video["source_attachment"] = attachment
+    db.save_item(SITE, "videos", new_video["id"], new_video)
     return jsonify(new_video), 201
 
 

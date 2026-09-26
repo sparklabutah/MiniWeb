@@ -206,13 +206,14 @@
             btn.className = 'copy-code';
             btn.textContent = 'Copy';
             btn.addEventListener('click', function() {
-                var code = pre.querySelector('code');
-                var text = code ? code.textContent : pre.textContent;
+                var blocks = pre.querySelectorAll('code');
+                var text = blocks.length
+                    ? Array.from(blocks).map(function(code) { return code.textContent; }).join('\n\n')
+                    : pre.textContent;
                 navigator.clipboard.writeText(text).then(function() {
                     btn.textContent = 'Copied!';
                     setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
                 });
-                fetch('/sites/documentation-api-docs/api/track/copy_code', {method: 'POST'}).catch(function(){});
             });
             pre.appendChild(btn);
         });

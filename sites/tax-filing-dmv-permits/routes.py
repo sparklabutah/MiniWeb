@@ -13,6 +13,7 @@ select_by_dropdown, select_by_date_range, export_by_dropdown, upload_by_upload,
 book_by_date_range, pay_by_form, authenticate_by_form, verify_identity_by_code
 """
 import csv
+import base64
 import hashlib
 import io
 import json
@@ -1350,8 +1351,10 @@ def api_permits_get():
 @blueprint.route("/api/permits", methods=["POST"])
 def api_permits_post():
     data = request.get_json(force=True)
-    permits = _load_permits()
-    new_id = max((p["id"] for p in permits), default=0) + 1
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Sign in required"}), 401
+    new_id = db.next_id(SITE, "permits")
     today = datetime.now().strftime("%Y-%m-%d")
     permit_num = f"PRM-{datetime.now().year}-{new_id:04d}"
 
@@ -1359,8 +1362,8 @@ def api_permits_post():
         "id": new_id,
         "permit_id": permit_num,
         "agency_portal_permit_id": None,
-        "user_id": data.get("user_id", 1),
-        "root_user_id": data.get("root_user_id", 1),
+        "user_id": user["id"],
+        "root_user_id": user.get("root_user_id", user["id"]),
         "applicant_name": data.get("applicant_name", ""),
         "type": data.get("type", "Building"),
         "address": data.get("address", ""),
@@ -1375,8 +1378,7 @@ def api_permits_post():
         "description": data.get("description", ""),
         "notes": None,
     }
-    permits.append(new_permit)
-    _save_permits(permits)
+    db.save_item(SITE, "permits", new_id, new_permit)
     return jsonify(new_permit), 201
 
 
@@ -1623,12 +1625,30 @@ def api_upload():
         return jsonify({"error": "No file selected"}), 400
     filename = f.filename
     content_length = 0
-    content = f.read()
+    content = f.read(10 * 1024 * 1024 + 1)
     content_length = len(content)
+    if not content or content_length > 10 * 1024 * 1024:
+        return jsonify({"error": "Choose a nonempty file under 10 MiB"}), 400
+    permit_id = request.form.get("permit_id", type=int)
+    if permit_id is not None:
+        user = _get_current_user()
+        permit = db.get_item(SITE, "permits", permit_id)
+        if not user or not permit or permit.get("user_id") != user["id"]:
+            return jsonify({"error": "Permit not found"}), 404
+        attachment = {
+            "filename": filename, "size": content_length,
+            "content_type": f.content_type, "sha256": hashlib.sha256(content).hexdigest(),
+            "content_b64": base64.b64encode(content).decode("ascii"),
+        }
+        permit.setdefault("attachments", []).append(attachment)
+        db.save_item(SITE, "permits", permit_id, permit)
     return jsonify({
         "status": "uploaded",
         "filename": filename,
         "size": content_length,
+        "permit_id": permit_id,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "attached": permit_id is not None,
         "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     })
 

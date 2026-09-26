@@ -772,10 +772,21 @@ def api_resolve(short_code):
 def api_export():
     """Export all links -- supports export_by_dropdown.
     ?format=csv or ?format=json.  ?owner_id=N to filter by owner."""
-    links = _load_links()
-    owner_id = request.args.get("owner_id", type=int)
-    if owner_id:
-        links = [l for l in links if l["owner_id"] == owner_id]
+    user = _get_current_user()
+    if not user:
+        return jsonify({"error": "Not logged in"}), 401
+    # Export the same user's filtered rows shown by My Links. Fetch bounded
+    # pages so exporting does not load the entire site's links table.
+    links = []
+    offset = 0
+    sort = {"clicks": "-clicks", "oldest": "created_at"}.get(request.args.get("sort"), "-created_at")
+    while True:
+        batch = db.query(SITE, "links", where={"owner_id": user["id"]}, sort=sort,
+                         limit=500, offset=offset)
+        links.extend(_filter_links(batch, request.args))
+        if len(batch) < 500:
+            break
+        offset += 500
     fmt = request.args.get("format", "json").lower()
 
     if fmt == "csv":

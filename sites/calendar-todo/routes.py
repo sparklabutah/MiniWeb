@@ -631,13 +631,11 @@ def form_create_event():
         "color": request.form.get("color", "#4285f4"),
         "created_at": datetime.now().isoformat(),
     }
-    events = _load_events()
-    events.append(event)
-    _save_events(events)
+    db.save_item(SITE, "events", event["id"], event)
     _add_email(user_id, "noreply@calendar-todo.lakeport.local",
                "New event created",
                f'Your event "{title}" has been created and added to your calendar.')
-    return redirect(url_for("calendar-todo.index"))
+    return redirect(url_for("calendar-todo.event_detail", event_id=event["id"]))
 
 
 @blueprint.route("/event/<int:event_id>/edit", methods=["GET"])

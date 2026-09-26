@@ -2297,6 +2297,7 @@ def api_spreadsheet_export(sid):
 
     if fmt == "xlsx":
         import io
+        from hashlib import sha256
         from openpyxl import Workbook
         wb = Workbook()
         wb.remove(wb.active)
@@ -2306,11 +2307,13 @@ def api_spreadsheet_export(sid):
                 ws.append([_cell_value(c) for c in row])
         buf = io.BytesIO()
         wb.save(buf)
+        content = buf.getvalue()
         filename = f"{ss['title'].replace(' ', '_')}.xlsx"
         return Response(
-            buf.getvalue(),
+            content,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": f"attachment; filename={filename}",
+                     "ETag": '"' + sha256(content).hexdigest() + '"'},
         )
 
     grid = sheets[sheet_idx]["data"]
@@ -2460,4 +2463,3 @@ def api_export_all():
                         headers={"Content-Disposition": "attachment; filename=sheetdeck_export.csv"})
 
     return jsonify(files)
-

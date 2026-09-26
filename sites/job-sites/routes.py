@@ -248,57 +248,75 @@ def _normalize_job_type(job_type):
     return _JOB_TYPE_ALIASES.get(jt, jt)
 
 
+def _ensure_job_search():
+    """Index job titles and descriptions, which the generic text index omits."""
+    conn = db._get_conn()
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='job_sites_search'").fetchone():
+        return
+    columns = "job_title, company, job_description, role, skills, location, country"
+    conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS job_sites_search USING fts5(" +
+                 columns + ", content=job_sites_jobs, content_rowid=row_id)")
+    conn.execute("INSERT INTO job_sites_search(job_sites_search) VALUES ('rebuild')")
+    new_values = ', '.join('new.' + c.strip() for c in columns.split(','))
+    old_values = ', '.join('old.' + c.strip() for c in columns.split(','))
+    conn.execute("CREATE TRIGGER IF NOT EXISTS job_sites_search_insert AFTER INSERT ON job_sites_jobs BEGIN "
+                 "INSERT INTO job_sites_search(rowid, " + columns + ") VALUES (new.row_id, " + new_values + "); END")
+    conn.execute("CREATE TRIGGER IF NOT EXISTS job_sites_search_delete AFTER DELETE ON job_sites_jobs BEGIN "
+                 "INSERT INTO job_sites_search(job_sites_search, rowid, " + columns + ") VALUES ('delete', old.row_id, " + old_values + "); END")
+    conn.execute("CREATE TRIGGER IF NOT EXISTS job_sites_search_update AFTER UPDATE ON job_sites_jobs BEGIN "
+                 "INSERT INTO job_sites_search(job_sites_search, rowid, " + columns + ") VALUES ('delete', old.row_id, " + old_values + "); "
+                 "INSERT INTO job_sites_search(rowid, " + columns + ") VALUES (new.row_id, " + new_values + "); END")
+    conn.commit()
+
+
 def _search_and_filter_jobs(q="", location="", job_type="", company="",
                             salary_min=None, salary_max=None,
                             date_from="", date_to="", sort="date",
-                            tags=""):
-    """Search, filter, and sort jobs."""
-    jobs = list(_get_jobs())
-
-    # search_by_query / filter_by_query
+                            tags="", limit=40, offset=0, count_only=False):
+    """Filter and rank the complete catalog in SQL, then fetch one page."""
+    conn = db._get_conn()
+    conn.create_function("job_salary_min", 1, _parse_min_salary, deterministic=True)
+    conn.create_function("job_salary_max", 1, _parse_max_salary, deterministic=True)
+    clauses, params = [], []
+    if q or tags:
+        _ensure_job_search()
     if q:
-        jobs = [j for j in jobs if _keyword_score(q, _job_search_text(j)) > 0]
+        clauses.append("row_id IN (SELECT rowid FROM job_sites_search WHERE job_sites_search MATCH ?)")
+        params.append(" ".join('"' + term.replace('"', '""') + '"*' for term in q.split()))
     if job_type:
-        jt = _normalize_job_type(job_type)
-        jobs = [j for j in jobs if j.get("work_type", j.get("job_type", "")).lower() == jt]
+        clauses.append("LOWER(REPLACE(work_type, '-', '')) = ?")
+        params.append(_normalize_job_type(job_type).replace('-', ''))
     if location:
-        jobs = [j for j in jobs if location.lower() in j["location"].lower()]
+        clauses.append("LOWER(location) LIKE ?")
+        params.append('%' + location.lower() + '%')
     if company:
-        jobs = [j for j in jobs if j["company"].lower() == company.lower()]
+        clauses.append("LOWER(company) = ?")
+        params.append(company.lower())
     if salary_min is not None:
-        jobs = [j for j in jobs
-                if _parse_min_salary(j.get("salary_range", "")) >= salary_min
-                and _parse_min_salary(j.get("salary_range", "")) > 0]
+        clauses.append("job_salary_min(salary_range) >= ? AND job_salary_min(salary_range) > 0")
+        params.append(salary_min)
     if salary_max is not None:
-        jobs = [j for j in jobs
-                if _parse_min_salary(j.get("salary_range", "")) <= salary_max
-                and _parse_min_salary(j.get("salary_range", "")) > 0]
+        clauses.append("job_salary_max(salary_range) <= ? AND job_salary_max(salary_range) > 0")
+        params.append(salary_max)
     if date_from:
-        jobs = [j for j in jobs if j.get("job_posting_date", j.get("posted_date", "")) >= date_from]
+        clauses.append("job_posting_date >= ?")
+        params.append(date_from)
     if date_to:
-        jobs = [j for j in jobs if j.get("job_posting_date", j.get("posted_date", "")) <= date_to]
+        clauses.append("job_posting_date <= ?")
+        params.append(date_to)
     if tags:
-        tag_list = [t.strip().lower() for t in tags.split(",")]
-        jobs = [
-            j for j in jobs
-            if any(t in [tg.lower() for tg in j.get("tags", [])] for t in tag_list)
-        ]
-
-    # sort_by_ranking
-    if sort == "date":
-        jobs.sort(key=lambda j: j.get("job_posting_date", j.get("posted_date", "")), reverse=True)
-    elif sort == "salary_desc":
-        jobs.sort(key=lambda j: _parse_min_salary(j.get("salary_range", "")), reverse=True)
-    elif sort == "salary_asc":
-        jobs.sort(key=lambda j: _parse_min_salary(j.get("salary_range", "")))
-    elif sort == "relevance" and q:
-        jobs.sort(key=lambda j: -_keyword_score(q, _job_search_text(j)))
-    elif sort == "company":
-        jobs.sort(key=lambda j: j.get("company", "").lower())
-    elif sort == "title":
-        jobs.sort(key=lambda j: j.get("job_title", "").lower())
-
-    return jobs
+        clauses.append("row_id IN (SELECT rowid FROM job_sites_search WHERE job_sites_search MATCH ?)")
+        params.append(" OR ".join('"' + tag.strip().replace('"', '""') + '"' for tag in tags.split(',') if tag.strip()))
+    where_sql = ' AND '.join(clauses) or '1=1'
+    if count_only:
+        return db.execute('SELECT COUNT(*) FROM job_sites_jobs WHERE ' + where_sql,
+                          tuple(params), fetch='val') or 0
+    order = {'date': 'job_posting_date DESC', 'salary_desc': 'job_salary_min(salary_range) DESC',
+             'salary_asc': 'job_salary_min(salary_range) ASC', 'company': 'company COLLATE NOCASE',
+             'title': 'job_title COLLATE NOCASE'}.get(sort, 'job_posting_date DESC')
+    return db.execute('SELECT * FROM job_sites_jobs WHERE ' + where_sql +
+                      ' ORDER BY ' + order + ', row_id ASC LIMIT ? OFFSET ?',
+                      tuple(params) + (max(1, min(int(limit), 100)), max(0, int(offset))))
 
 
 # ---------------------------------------------------------------------------
@@ -346,11 +364,14 @@ def jobs_page():
     sort = request.args.get("sort", "date").strip()
     company = request.args.get("company", "").strip()
 
-    jobs = _search_and_filter_jobs(
-        q=q, location=location, job_type=job_type, company=company,
-        salary_min=salary_min, salary_max=salary_max,
-        date_from=date_from, date_to=date_to, sort=sort,
-    )
+    filters = dict(q=q, location=location, job_type=job_type, company=company,
+                   salary_min=salary_min, salary_max=salary_max,
+                   date_from=date_from, date_to=date_to, sort=sort)
+    total = _search_and_filter_jobs(**filters, count_only=True)
+    pages = max(1, (total + 39) // 40)
+    page = max(1, min(request.args.get('page', 1, type=int), pages))
+    jobs = _search_and_filter_jobs(**filters, limit=40, offset=(page - 1) * 40)
+    pagination_args = {k: v for k, v in request.args.items() if k != 'page'}
 
     # Collect unique companies for dropdown
     companies = _get_companies()
@@ -362,6 +383,7 @@ def jobs_page():
         salary_min=salary_min, salary_max=salary_max,
         date_from=date_from, date_to=date_to,
         sort=sort, company=company, companies=companies,
+        total=total, page=page, pages=pages, pagination_args=pagination_args,
     )
 
 
@@ -535,12 +557,8 @@ def _apply_flow(user, logged_in, job):
         )
 
     # POST: process form
-    applications = _load_applications()
-    already = any(
-        a for a in applications
-        if a["user_id"] == user["id"] and a["job_title"] == job["job_title"]
-        and a["company"] == job["company"]
-    )
+    already = db.count(SITE, "applications", where={
+        "user_id": user["id"], "job_title": job["job_title"], "company": job["company"]}) > 0
     if already:
         return render_template(
             "job-sites/apply.html",
@@ -561,18 +579,26 @@ def _apply_flow(user, logged_in, job):
     # Handle resume upload (upload_by_upload)
     resume_filename = f"{user['username']}_resume.pdf"
     resume_file = request.files.get("resume")
+    resume_attachment = None
     if resume_file and resume_file.filename:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        safe_name = re.sub(r'[^\w.\-]', '_', resume_file.filename)
-        resume_filename = f"{user['id']}_{safe_name}"
-        resume_file.save(str(UPLOAD_DIR / resume_filename))
+        import base64
+        import hashlib
+        raw = resume_file.read(3 * 1024 * 1024 + 1)
+        if not raw or len(raw) > 3 * 1024 * 1024:
+            return render_template("job-sites/apply.html", user=user, logged_in=logged_in,
+                                   job=job, success=False, error="Choose a nonempty resume up to 3 MB."), 400
+        resume_filename = re.sub(r'[^\w.\-]', '_', resume_file.filename)
+        resume_attachment = {"filename": resume_filename, "size": len(raw),
+                             "content_type": resume_file.mimetype,
+                             "sha256": hashlib.sha256(raw).hexdigest(),
+                             "data_base64": base64.b64encode(raw).decode("ascii")}
     elif posted_resume_name:
         # No file bytes reached the server, but the applicant named a resume in
         # the form -- record that name so the attachment is still tracked.
         resume_filename = re.sub(r'[^\w.\-]', '_', posted_resume_name)
 
     new_app = {
-        "id": max(a["id"] for a in applications) + 1 if applications else 1,
+        "id": db.next_id(SITE, "applications"),
         "user_id": user["id"],
         "root_user_id": user.get("root_user_id", user["id"]),
         "job_title": job["job_title"],
@@ -584,12 +610,12 @@ def _apply_flow(user, logged_in, job):
         "status_history": [{"status": "applied", "date": now}],
         "cover_letter_submitted": bool(cover_letter),
         "resume_version": resume_filename,
+        "resume_attachment": resume_attachment,
         "recruiter_name": "",
         "recruiter_email": "",
         "notes": cover_letter,
     }
-    applications.append(new_app)
-    db.save_collection(SITE, "applications", applications)
+    db.save_item(SITE, "applications", new_app["id"], new_app)
     _add_email(user["id"], "noreply@job-sites.lakeport.local",
                "Application submitted",
                f'Your application to "{job["job_title"]}" at {job["company"]} has been submitted.')

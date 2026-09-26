@@ -103,6 +103,8 @@ def _get_user_settings(user_id):
 
 def _get_app(app_id):
     app = db.get_item(SITE, "apps", app_id)
+    if app:
+        app["price"] = _numeric_price(app.get("price"))
     if app and isinstance(app.get("genres"), str):
         try:
             app["genres"] = json.loads(app["genres"])
@@ -225,6 +227,17 @@ def _get_genres_from_db():
 # SQL query builders for apps
 # ---------------------------------------------------------------------------
 
+def _numeric_price(value):
+    try:
+        return float(str(value).strip().lstrip("$"))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+_PRICE_SQL = ("CASE WHEN typeof(price) IN ('integer','real') THEN price "
+              "WHEN trim(price) GLOB '$[0-9]*' THEN CAST(substr(trim(price),2) AS REAL) "
+              "WHEN trim(price) GLOB '[0-9]*' THEN CAST(price AS REAL) ELSE NULL END")
+
 def _build_sort_clause(sort_key):
     """Map sort key to SQL ORDER BY clause."""
     sort_map = {
@@ -233,8 +246,8 @@ def _build_sort_clause(sort_key):
         "reviews": "reviews_count DESC",
         "name": "name ASC",
         "newest": "last_updated DESC",
-        "price_asc": "price ASC",
-        "price_desc": "price DESC",
+        "price_asc": f"({_PRICE_SQL}) ASC, id ASC",
+        "price_desc": f"({_PRICE_SQL}) DESC, id ASC",
         "installs": "reviews_count DESC",  # proxy for popularity
     }
     return sort_map.get(sort_key, "reviews_count DESC")
@@ -256,12 +269,12 @@ def _query_apps(category=None, genre=None, min_rating=None, max_price=None,
         where_clauses.append("rating >= ?")
         params.append(min_rating)
     if max_price is not None:
-        where_clauses.append("price <= ?")
+        where_clauses.append(f"({_PRICE_SQL}) <= ?")
         params.append(max_price)
     if price_type == "free":
-        where_clauses.append("price = 0")
+        where_clauses.append(f"({_PRICE_SQL}) = 0")
     elif price_type == "paid":
-        where_clauses.append("price > 0")
+        where_clauses.append(f"({_PRICE_SQL}) > 0")
     if q:
         # Use LIKE for keyword search across name, category, developer, description
         like = f"%{q}%"
@@ -284,6 +297,8 @@ def _query_apps(category=None, genre=None, min_rating=None, max_price=None,
     )
     params.extend([limit, offset])
     apps = db.execute(data_sql, tuple(params), fetch="all")
+    for app in apps:
+        app["price"] = _numeric_price(app.get("price"))
 
     return apps, total
 
@@ -383,6 +398,9 @@ def apps_list():
     genre = request.args.get("genre", "").strip()
     min_rating = request.args.get("min_rating", type=float)
     max_price = request.args.get("max_price", type=float)
+    # The slider labels its maximum position "Any" and always submits it.
+    if max_price is not None and max_price >= 10:
+        max_price = None
     price_type = request.args.get("price", "").strip()
     sort = request.args.get("sort", "").strip() or "reviews"
 

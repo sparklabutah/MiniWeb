@@ -51,15 +51,17 @@
         };
         fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/permits', {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            document.getElementById('success-msg').style.display = 'block';
-            document.getElementById('success-msg').textContent = 'Permit application ' + d.permit_id + ' submitted successfully!';
+        }).then(function(r) { if (!r.ok) throw Error('Could not submit permit'); return r.json(); }).then(async function(d) {
             var fileInput = document.getElementById('doc-upload');
             if (fileInput.files.length > 0) {
                 var fd = new FormData(); fd.append('file', fileInput.files[0]);
-                fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/upload', {method:'POST', body: fd});
+                fd.append('permit_id', d.id);
+                var uploaded = await fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/upload', {method:'POST', body: fd});
+                if (!uploaded.ok) throw Error('Permit created, but the attachment could not be saved.');
             }
-        });
+            document.getElementById('success-msg').style.display = 'block';
+            document.getElementById('success-msg').textContent = 'Permit application ' + d.permit_id + ' submitted successfully!';
+        }).catch(function(error) { alert(error.message); });
         return false;
     }
     </script>

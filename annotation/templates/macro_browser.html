@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Macro Browser — MiniWeb Annotation</title>
+    <style>
+        :root { --bg:#f6f7f9; --panel:#fff; --ink:#1d2330; --muted:#6b7385; --line:#dfe3ea; --accent:#e8742a; --focus:#2f6fd6; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg:#14171d; --panel:#1c2028; --ink:#e6e9ef; --muted:#8d95a6; --line:#2e3440; --accent:#f08a45; --focus:#5b93ec; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
+        .top { background: #1e293b; color: #fff; padding: .55rem 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .top a { color: #94a3b8; text-decoration: none; font-size: .82rem; }
+        .top a:hover, .top a.here { color: #fff; }
+        .top .brand { color: #fff; font-weight: 700; }
+        header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+        select, button, input { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+        select { padding: 4px 6px; max-width: min(460px, 100%); }
+        button { padding: 3px 10px; cursor: pointer; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+        .seg button { border: 0; border-radius: 0; }
+        .seg button.on { background: var(--focus); color: #fff; }
+        .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+        .pos { color: var(--muted); font-size: 12px; min-width: 70px; }
+        label.chk { font-size: 12px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+        main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); gap: 16px; padding: 16px; }
+        main > section { min-width: 0; }
+        .stage pre { color: #cbd5e1; font: 12px/1.45 ui-monospace, monospace; margin: 0; padding: 12px 14px; white-space: pre-wrap; }
+        @media (max-width: 960px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .hint { display: none; } }
+        .stage { position: relative; background: #0b0d13; border-radius: 8px; overflow: auto; max-height: 64vh; min-height: 240px; }
+        .stage img { display: block; width: 100%; }
+        .stage .empty { color: #8d95a6; padding: 40px; text-align: center; }
+        .caption { margin-top: 8px; font-size: 13px; }
+        .caption code { font-size: 12px; }
+        .tl { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; overflow-x: auto; }
+        .tl-row { display: grid; align-items: center; gap: 2px; margin: 2px 0; }
+        .tl-label { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; cursor: pointer; }
+        .tl-label.focus { color: var(--ink); font-weight: 600; }
+        .cell { height: 14px; border-radius: 2px; background: var(--line); cursor: pointer; opacity: .35; }
+        .cell.in { opacity: .9; }
+        .cell.cur { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+        .actcell { height: 18px; border-radius: 2px; background: var(--line); cursor: pointer; font-size: 9px; text-align: center; color: var(--muted); line-height: 18px; overflow: hidden; }
+        .actcell.inspan { background: color-mix(in srgb, var(--focus) 35%, var(--line)); color: var(--ink); }
+        .actcell.cur { background: var(--accent); color: #fff; }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+        .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+        .title { font-size: 18px; font-weight: 600; margin: 4px 0 2px; }
+        .row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; padding: 3px 0; border-top: 1px solid var(--line); font-size: 13px; }
+        .row .k { color: var(--muted); }
+        .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+        .list { max-height: 34vh; overflow: auto; margin-top: 6px; }
+        .item { padding: 5px 6px; border-radius: 5px; cursor: pointer; font-size: 12.5px; display: flex; gap: 8px; align-items: baseline; }
+        .item:hover { background: color-mix(in srgb, var(--focus) 10%, transparent); }
+        .item.on { background: color-mix(in srgb, var(--focus) 20%, transparent); }
+        .item .meta { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
+        .op { font-size: 11px; padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+        .warn { color: var(--accent); font-size: 12px; }
+        a { color: var(--focus); }
+        .muted { color: var(--muted); font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="top">
+    <a href="/annotate/" class="brand">MiniWeb Annotation</a>
+    <a href="/annotate/task">Annotate</a>
+    <a href="/annotate/verify">Verifier Builder</a>
+    <a href="/annotate/playback">Playback Facts</a>
+    <a href="/annotate/macro-browser" class="here">Macro Browser</a>
+</div>
+<header>
+    <span class="seg"><button id="m-macro" class="on">By macro</button><button id="m-task">By task</button></span>
+    <button id="prev" title="Previous (p)">&lt;</button>
+    <select id="pick" aria-label="Macro or task"></select>
+    <button id="next" title="Next (n)">&gt;</button>
+    <select id="f-op" aria-label="Operation filter"></select>
+    <select id="f-ann" aria-label="Annotator filter"></select>
+    <label class="chk"><input type="checkbox" id="whole"> whole task</label>
+    <span class="pos" id="pos"></span>
+    <span class="hint">n / p occurrence · ← / → step · space play</span>
+</header>
+<main>
+    <section>
+        <div class="stage" id="stage"><div class="empty">Loading…</div></div>
+        <div class="caption" id="caption"></div>
+        <div class="tl" id="tl"></div>
+    </section>
+    <section>
+        <div class="card">
+            <div class="eyebrow" id="c-eyebrow">Occurrence</div>
+            <div class="title" id="c-title">—</div>
+            <div class="muted" id="c-subtask"></div>
+            <div class="row"><span class="k">Task</span><span id="c-task"></span></div>
+            <div class="row"><span class="k">Span</span><span id="c-span"></span></div>
+            <div class="row"><span class="k">Instruction</span><span id="c-instr"></span></div>
+            <div class="row"><span class="k">AI review</span><span id="c-rec"></span></div>
+        </div>
+        <div class="card">
+            <div class="eyebrow">Task macros</div>
+            <div class="list" id="c-tags"></div>
+        </div>
+        <div class="card">
+            <div class="eyebrow" id="l-title">Occurrences</div>
+            <div class="list" id="c-list"></div>
+        </div>
+    </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hue = (name) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const color = (name) => `hsl(${hue(name)} 60% 52%)`;
+
+let IDX = null, mode = 'macro', occ = [], cur = 0, detail = null, frame = 0, timer = null, ownHash = '', goSeq = 0;
+const cache = new Map();
+
+async function taskDetail(key) {
+    if (!cache.has(key)) {
+        const [a, t] = [key.slice(0, key.indexOf('/')), key.slice(key.indexOf('/') + 1)];
+        cache.set(key, fetch(`/annotate/api/macro_browser/task/${encodeURIComponent(a)}/${encodeURIComponent(t)}`).then((r) => r.json()));
+    }
+    return cache.get(key);
+}
+
+async function init() {
+    IDX = await (await fetch('/annotate/api/macro_browser/index')).json();
+    const anns = [...new Set(IDX.tasks.map((t) => t.annotator))].sort();
+    $('f-ann').innerHTML = '<option value="">all annotators</option>' + anns.map((a) => `<option>${esc(a)}</option>`).join('');
+    $('f-ann').onchange = () => { refill(); go(0, true); };
+    $('f-op').onchange = () => { go(0, true); };
+    $('m-macro').onclick = () => setMode('macro');
+    $('m-task').onclick = () => setMode('task');
+    $('pick').onchange = () => { mode === 'macro' ? go(0, true) : go(+$('pick').value); };
+    $('prev').onclick = () => step(-1);
+    $('next').onclick = () => step(1);
+    $('whole').onchange = () => { frame = range()[0]; render(); };
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get('task')) { mode = 'task'; }
+    setMode(mode, h);
+}
+
+function setMode(m, h) {
+    mode = m; stop();
+    $('m-macro').classList.toggle('on', m === 'macro'); $('m-task').classList.toggle('on', m === 'task');
+    $('f-op').hidden = m !== 'macro'; $('whole').parentElement.hidden = m !== 'macro';
+    refill();
+    if (h && m === 'macro' && h.get('macro')) { $('pick').value = h.get('macro'); go(0, true, h.get('key')); }
+    else if (h && m === 'task' && h.get('task')) { const i = occ.findIndex((o) => o.key === h.get('task')); go(Math.max(0, i)); }
+    else go(0, true);
+}
+
+function refill() {
+    const ann = $('f-ann').value;
+    if (mode === 'macro') {
+        const keep = $('pick').value;
+        $('pick').innerHTML = Object.entries(IDX.macros).map(([m, list]) => {
+            const n = list.filter((o) => !ann || o.annotator === ann).length;
+            return n ? `<option value="${esc(m)}">${esc(m)} (${n})</option>` : '';
+        }).join('');
+        if (keep && [...$('pick').options].some((o) => o.value === keep)) $('pick').value = keep;
+    } else {
+        occ = IDX.tasks.filter((t) => !ann || t.annotator === ann);
+        $('pick').innerHTML = occ.map((t, i) => `<option value="${i}">${esc(t.key)}</option>`).join('');
+    }
+}
+
+function macroOccurrences() {
+    const ann = $('f-ann').value, list = IDX.macros[$('pick').value] || [];
+    const ops = [...new Set(list.map((o) => o.op || '(none)'))].sort();
+    const keepOp = $('f-op').value;
+    $('f-op').innerHTML = '<option value="">any op</option>' + ops.map((o) => `<option>${esc(o)}</option>`).join('');
+    if (ops.includes(keepOp)) $('f-op').value = keepOp;
+    const op = $('f-op').value;
+    return list.filter((o) => (!ann || o.annotator === ann) && (!op || (o.op || '(none)') === op));
+}
+
+async function go(i, rebuild, key) {
+    stop();
+    if (mode === 'macro' && rebuild) {
+        occ = macroOccurrences();
+        if (key) i = Math.max(0, occ.findIndex((o) => o.key === key));
+    }
+    if (!occ.length) { ++goSeq; detail = null; render(); return; }
+    cur = Math.max(0, Math.min(i, occ.length - 1));
+    if (mode === 'task') $('pick').value = String(cur);
+    const seq = ++goSeq, next = await taskDetail(occ[cur].key);
+    if (seq !== goSeq) return;          // a newer navigation superseded this one
+    detail = next;
+    frame = range()[0];
+    ownHash = '#' + (mode === 'macro' ? `macro=${encodeURIComponent($('pick').value)}&key=${encodeURIComponent(occ[cur].key)}`
+                                      : `task=${encodeURIComponent(occ[cur].key)}`);
+    location.hash = ownHash;
+    render();
+    const on = $('c-list').querySelector('.item.on'); if (on) on.scrollIntoView({block: 'nearest'});
+}
+
+function step(d) { if (occ.length) go((cur + d + occ.length) % occ.length); }
+
+function focusTag() {
+    if (!detail) return null;
+    return mode === 'macro' ? detail.tags.find((t) => t.instance === occ[cur].instance) : null;
+}
+
+function range() {
+    const n = detail ? detail.actions.length : 0, t = focusTag();
+    if (!n) return [0, -1];
+    if (t && t.span && !$('whole').checked) return [Math.max(0, t.span[0] - 1), Math.min(n - 1, t.span[1] - 1)];
+    return [0, n - 1];
+}
+
+function render() {
+    $('pos').textContent = occ.length ? `${cur + 1} / ${occ.length}` : '0 / 0';
+    renderList();
+    if (!detail) { $('stage').innerHTML = '<div class="empty">No occurrences for this filter.</div>'; $('tl').innerHTML = ''; return; }
+    const t = focusTag(), a = detail.actions[frame];
+    const [ann, tid] = [detail.key.slice(0, detail.key.indexOf('/')), detail.key.slice(detail.key.indexOf('/') + 1)];
+    $('stage').innerHTML = a && a.frame
+        ? `<img alt="Screenshot for action ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(ann)}/${encodeURIComponent(tid)}/${a.frame}">`
+        : a && a.outline ? `<pre aria-label="Page outline (no screenshot recorded)">${esc(a.outline)}</pre>`
+        : '<div class="empty">No screenshot recorded for this action.</div>';
+    const [lo, hi] = range();
+    $('caption').innerHTML = a ? `<b>Action ${a.index}</b> of ${detail.actions.length} · <code>${esc(a.action)}</code> ${esc(a.target)}${a.value ? ` = <code>${esc(a.value)}</code>` : ''}<div class="muted">${esc(a.url)} · showing ${lo + 1}–${hi + 1}</div>`
+                             : '<span class="muted">This recording has no actions.</span>';
+    // card
+    $('c-eyebrow').textContent = mode === 'macro' ? 'Occurrence' : 'Task';
+    $('c-title').innerHTML = t ? `<span class="sw" style="background:${color(t.macro)}"></span>${esc(t.instance)}${t.op ? ` <span class="op">${esc(t.op)}</span>` : ''}` : esc(detail.key);
+    $('c-subtask').textContent = t ? (t.subtask || '') : `${detail.tags.length} macro instance(s)`;
+    $('c-task').innerHTML = `<a href="/annotate/verify?annotator=${encodeURIComponent(ann)}&task_id=${encodeURIComponent(tid)}" target="_blank">${esc(detail.key)}</a>`;
+    $('c-span').innerHTML = t ? (t.span ? `actions ${t.span[0]}–${t.span[1]} of ${detail.actions.length}` : '<span class="warn">no span recorded — showing the whole task</span>')
+                              : `${detail.actions.length} actions`;
+    $('c-instr').textContent = detail.instruction;
+    $('c-rec').textContent = (occ[cur] && occ[cur].recommendation) || '—';
+    $('c-tags').innerHTML = detail.tags.map((g) => `<div class="item ${t && g.instance === t.instance ? 'on' : ''}" data-inst="${esc(g.instance)}">
+        <span class="sw" style="background:${color(g.macro)}"></span>${esc(g.instance)}${g.op ? ` <span class="op">${esc(g.op)}</span>` : ''}
+        <span class="meta">${g.span ? g.span.join('–') : 'no span'}</span></div>`).join('');
+    $('c-tags').querySelectorAll('.item').forEach((el) => el.onclick = () => jumpToInstance(el.dataset.inst));
+    renderTimeline(lo, hi);
+}
+
+function renderTimeline(lo, hi) {
+    const n = detail.actions.length, cols = `140px repeat(${n}, minmax(16px, 1fr))`;
+    const num = (i) => (n <= 30 || (i + 1) % 5 === 0 || i === 0) ? i + 1 : '';
+    const t = focusTag();
+    let html = `<div class="tl-row" style="grid-template-columns:${cols}"><span class="tl-label">actions</span>` +
+        detail.actions.map((a, i) => `<div class="actcell ${i >= lo && i <= hi ? 'inspan' : ''} ${i === frame ? 'cur' : ''}" data-i="${i}" title="${a.index}. ${esc(a.action)} ${esc(a.target)}">${num(i)}</div>`).join('') + '</div>';
+    for (const g of detail.tags) {
+        const focus = t && g.instance === t.instance;
+        html += `<div class="tl-row" style="grid-template-columns:${cols}"><span class="tl-label ${focus ? 'focus' : ''}" data-inst="${esc(g.instance)}">${esc(g.instance)}${g.op ? '.' + esc(g.op) : ''}</span>` +
+            detail.actions.map((_, i) => {
+                const inside = g.span && i >= g.span[0] - 1 && i <= g.span[1] - 1;
+                return `<div class="cell ${inside ? 'in' : ''} ${inside && i === frame ? 'cur' : ''}" data-i="${i}" style="${inside ? `background:${color(g.macro)}` : ''}"></div>`;
+            }).join('') + '</div>';
+    }
+    $('tl').innerHTML = html;
+    $('tl').querySelectorAll('[data-i]').forEach((el) => el.onclick = () => { stop(); frame = +el.dataset.i; render(); });
+    $('tl').querySelectorAll('.tl-label[data-inst]').forEach((el) => el.onclick = () => jumpToInstance(el.dataset.inst));
+}
+
+function renderList() {
+    $('l-title').textContent = mode === 'macro' ? `Occurrences of ${$('pick').value}` : 'Tasks';
+    $('c-list').innerHTML = occ.map((o, i) => mode === 'macro'
+        ? `<div class="item ${i === cur ? 'on' : ''}" data-i="${i}">${esc(o.key)}${o.op ? ` <span class="op">${esc(o.op)}</span>` : ''}<span class="meta">${o.span ? `${o.span[1] - o.span[0] + 1} act` : 'no span'}</span></div>`
+        : `<div class="item ${i === cur ? 'on' : ''}" data-i="${i}">${esc(o.key)}<span class="meta">${o.tags.length} tags</span></div>`).join('');
+    $('c-list').querySelectorAll('.item').forEach((el) => el.onclick = () => go(+el.dataset.i));
+}
+
+function jumpToInstance(inst) {
+    if (!detail) return;
+    const g = detail.tags.find((x) => x.instance === inst);
+    if (!g) return;
+    const key = detail.key;
+    if (mode === 'task') { mode = 'macro'; $('m-macro').classList.add('on'); $('m-task').classList.remove('on'); $('f-op').hidden = false; $('whole').parentElement.hidden = false; refill(); }
+    $('pick').value = g.macro; $('f-op').value = '';
+    occ = macroOccurrences();
+    const i = occ.findIndex((o) => o.key === key && o.instance === inst);
+    go(Math.max(0, i));
+}
+
+function play() {
+    if (timer) return stop();
+    const [lo, hi] = range();
+    if (frame >= hi) frame = lo;
+    timer = setInterval(() => { const [, h] = range(); if (frame >= h) return stop(); frame++; render(); }, 1100);
+}
+function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    const [lo, hi] = range();
+    if (e.key === 'n') step(1);
+    else if (e.key === 'p') step(-1);
+    else if (e.key === 'ArrowRight') { stop(); frame = Math.min(hi, frame + 1); render(); }
+    else if (e.key === 'ArrowLeft') { stop(); frame = Math.max(lo, frame - 1); render(); }
+    else if (e.key === ' ') { e.preventDefault(); play(); }
+    else return;
+});
+
+// a pasted/edited link (#macro=…&key=… or #task=…) re-targets the view
+window.addEventListener('hashchange', () => {
+    if (!IDX || location.hash === ownHash) return;
+    const h = new URLSearchParams(location.hash.slice(1));
+    setMode(h.get('task') ? 'task' : 'macro', h);
+});
+
+init();
+</script>
+</body>
+</html>

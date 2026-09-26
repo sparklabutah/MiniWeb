@@ -4,6 +4,7 @@ Serves meetings, recordings, call logs, and user profiles from JSON data
 files in the data_sources directory.
 """
 import csv
+import base64
 import hashlib
 import io
 import json
@@ -900,12 +901,16 @@ def api_meetings_create():
     # Persist an attachment metadata record if a file was provided so the
     # upload interaction is real and surfaced on the meeting detail page.
     if uploaded is not None and uploaded.filename:
-        content = uploaded.read()
+        content = uploaded.read(5 * 1024 * 1024 + 1)
+        if not content or len(content) > 5 * 1024 * 1024:
+            return jsonify({"error": "Choose a nonempty attachment under 5 MiB"}), 400
         new_meeting["attachment"] = {
             "filename": uploaded.filename,
             "size_bytes": len(content),
             "content_type": uploaded.mimetype or "application/octet-stream",
             "uploaded_at": datetime.now().isoformat(),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "content_b64": base64.b64encode(content).decode("ascii"),
         }
 
     meetings.append(new_meeting)
@@ -1507,4 +1512,3 @@ def api_login():
 def api_users_list():
     users = _load_users()
     return jsonify({"users": users, "count": len(users)})
-

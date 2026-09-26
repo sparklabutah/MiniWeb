@@ -373,6 +373,9 @@ def book_detail(book_id):
     book = db.get_item(SITE, "books", book_id)
     if book is None:
         abort(404)
+    book = dict(book)
+    book["chapters"] = db.execute("SELECT chapter_num AS chapter, title FROM books_comics_chapters WHERE book_id = ? ORDER BY chapter_num LIMIT 500", (book_id,))
+    book["num_chapters"] = len(book["chapters"])
     related = db.query(SITE, "books", where={"category": book["category"]}, limit=6)
     related = [b for b in related if b["id"] != book_id][:5]
     reviews = _load_reviews(book_id=book_id)
@@ -404,9 +407,27 @@ def read_book(book_id):
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
+    progress = (user or {}).get("reading_progress", {}).get(str(book_id))
+    if progress is None:
+        progress = int(chapter / len(chapters) * 100) if chapters else 0
     return render_template("books-comics/reader.html", book=book,
                            chapters=chapters, current=current,
-                           chapter_num=chapter, user=user)
+                           chapter_num=chapter, user=user, progress=progress)
+
+
+@blueprint.route("/book/<int:book_id>/progress", methods=["POST"])
+def save_reading_progress(book_id):
+    user = _get_user(session.get("user_id")) if session.get("user_id") else None
+    if not user:
+        return jsonify({"error": "Sign in to save reading progress"}), 401
+    if db.get_item(SITE, "books", book_id) is None:
+        abort(404)
+    progress = (request.get_json(silent=True) or {}).get("progress")
+    if isinstance(progress, bool) or not isinstance(progress, int) or not 0 <= progress <= 100:
+        return jsonify({"error": "Progress must be a whole percentage from 0 to 100"}), 400
+    user.setdefault("reading_progress", {})[str(book_id)] = progress
+    db.save_item(SITE, "users", user["id"], user)
+    return jsonify({"book_id": book_id, "progress": progress, "saved": True})
 
 
 @blueprint.route("/category/<slug>")
@@ -451,37 +472,35 @@ def checkout_page():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
         card = request.form.get("card", "").strip()
-        if not name or not email or not card:
+        if not cart_items or not name or not email or (total > 0 and not card):
             return render_template("books-comics/checkout.html", user=user,
                                    cart_items=cart_items, total=total,
-                                   error="All fields are required.")
+                                   error="Add books to your cart and complete the required fields.")
         # Loose charge: any card number is accepted, but a recognized SecureBank
         # card must carry the correct CVV (else declined).
         from app.bank_charges import charge_card
         pay = charge_card(card, request.form.get("cvv", ""), "", total, "BookVerse",
                           category="shopping", description=f"{len(cart_items)} book(s)",
-                          strict=False)
+                          strict=False) if total > 0 else {"ok": True}
         if not pay["ok"]:
             return render_template("books-comics/checkout.html", user=user,
                                    cart_items=cart_items, total=total,
                                    error=pay["error"])
-        account_type = request.form.get("account_type", "checking")
+        account_type = request.form.get("account_type", "checking") if total > 0 else "free"
         # Record the purchase as an order (receipt) BEFORE clearing the cart, so
         # there is a persistent transaction record distinct from the library.
         order = _create_order(user, cart_items, payment_method=account_type,
                               card=card, name=name, email=email)
         # Clear cart after checkout
-        users = _load_users()
-        u = next((u for u in users if u["id"] == user["id"]), None)
-        if u:
-            purchased = u.get("cart", [])
-            u["cart"] = []
-            reading = u.setdefault("reading_list", [])
-            for pid in purchased:
-                if pid not in reading:
-                    reading.append(pid)
-            _save_users(users)
+        user["cart"] = []
+        reading = user.setdefault("reading_list", [])
+        for book in cart_items:
+            if book["id"] not in reading:
+                reading.append(book["id"])
+        db.save_item(SITE, "users", user["id"], user)
         session["last_order_id"] = order["id"]
+        if total == 0:
+            return redirect(url_for("books-comics.dashboard"))
         from app.events import request_2fa
         verify_url = request_2fa("purchase",
                                  return_url=url_for("books-comics.dashboard"),

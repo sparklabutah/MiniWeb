@@ -1159,24 +1159,35 @@ def api_upload():
     f = request.files["file"]
     if not f.filename:
         return jsonify({"error": "No file selected"}), 400
-    content = f.read()
+    content = f.read(3 * 1024 * 1024 + 1)
+    f.seek(0)
+    if not content or len(content) > 3 * 1024 * 1024:
+        return jsonify({"error": "Choose a nonempty file up to 3 MB"}), 400
     channel_id = request.form.get("channel_id", "ch-general")
     current_user = _current_user()
+    if not current_user:
+        return jsonify({"error": "Sign in to upload"}), 401
+    if not db.get_item(SITE, "channels", channel_id):
+        return jsonify({"error": "Channel not found"}), 404
 
     # Create a message about the upload
-    all_msgs = _messages()
+    import base64
+    import hashlib
+    import uuid
     new_msg = {
-        "id": f"msg-{len(all_msgs) + 1:03d}",
+        "id": "msg-" + uuid.uuid4().hex[:12],
         "channel_id": channel_id,
         "user_id": current_user["id"] if current_user else "tc-u001",
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "text": f"[File uploaded: {f.filename} ({len(content)} bytes)]",
+        "text": request.form.get("text", "").strip() or f"[File uploaded: {f.filename} ({len(content)} bytes)]",
+        "attachment": {"filename": f.filename, "size": len(content),
+                       "sha256": hashlib.sha256(content).hexdigest(),
+                       "data_uri": "data:" + (f.mimetype or "application/octet-stream") + ";base64," + base64.b64encode(content).decode("ascii")},
         "edited": False,
         "reactions_count": 0,
         "thread_count": 0,
     }
-    all_msgs.append(new_msg)
-    db.save_collection(SITE, "messages", all_msgs)
+    db.save_item(SITE, "messages", new_msg["id"], new_msg)
 
     # If this is a form submission (not API), redirect back to channel
     if request.content_type and "multipart/form-data" in request.content_type:
@@ -1475,4 +1486,3 @@ def api_export():
         return Response("\n".join(lines), mimetype="text/csv",
                         headers={"Content-Disposition": f"attachment; filename={data_type}.csv"})
     return jsonify(data)
-

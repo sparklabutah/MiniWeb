@@ -163,12 +163,20 @@ def index():
     sort = request.args.get("sort", "updated").strip()
     folder_filter = request.args.get("folder_id", "", type=str).strip()
     owner_filter = request.args.get("owner_id", "", type=str).strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
 
     uid = user["id"] if user else None
 
     # Only documents the current user owns or has been shared with are listed.
     access_frag, params = _accessible_where(uid)
     where = ["is_trashed = 0", access_frag]
+    if date_from:
+        where.append("substr(created_at, 1, 10) >= ?")
+        params.append(date_from)
+    if date_to:
+        where.append("substr(created_at, 1, 10) <= ?")
+        params.append(date_to)
 
     if q:
         where.append("(LOWER(title) LIKE ? OR LOWER(content) LIKE ?)")
@@ -220,6 +228,11 @@ def index():
         if fid is not None and d.get("folder_id") != fid:
             return False
         if oid is not None and d.get("owner_id") != oid:
+            return False
+        created = str(d.get("created_at", ""))[:10]
+        if date_from and created < date_from:
+            return False
+        if date_to and created > date_to:
             return False
         return True
 
@@ -700,11 +713,33 @@ def form_upload_document():
     user = _current_user()
     if not user:
         return redirect(url_for("documents.login_page"))
+    import base64, hashlib, io, zipfile
+    from xml.etree import ElementTree
     f = request.files.get("file")
-    title = f.filename if f and f.filename else "Uploaded Document"
-    content = f"[Uploaded file: {title}]"
-    docs = _load_documents()
-    new_id = max((d["id"] for d in docs), default=0) + 1
+    if not f or not f.filename:
+        return jsonify({"error": "Choose a document"}), 400
+    raw = f.read(3 * 1024 * 1024 + 1)
+    if not raw or len(raw) > 3 * 1024 * 1024:
+        return jsonify({"error": "Choose a nonempty document up to 3 MiB"}), 400
+    title = pathlib.Path(f.filename).name
+    content = ""
+    if title.lower().endswith(".docx") and raw.startswith(b"PK"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                info = archive.getinfo("word/document.xml")
+                if info.file_size > 3 * 1024 * 1024:
+                    return jsonify({"error": "Document text exceeds 3 MiB"}), 400
+                tree = ElementTree.fromstring(archive.read(info))
+            ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+            content = "\n".join("".join(p.itertext()) for p in tree.iter(ns + "p"))
+        except (KeyError, zipfile.BadZipFile, ElementTree.ParseError):
+            return jsonify({"error": "Invalid DOCX document"}), 400
+    else:
+        try:
+            content = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            content = f"[Uploaded file: {title}]"
+    new_id = db.next_id(SITE, "documents")
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     new_doc = {
         "id": new_id, "title": title, "content": content,
@@ -712,9 +747,11 @@ def form_upload_document():
         "collaborators": [], "word_count": len(content.split()),
         "is_starred": False, "is_trashed": False,
         "created_at": now, "updated_at": now,
+        "source_attachment": {"filename": title, "content_type": f.mimetype,
+                              "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
+                              "data_b64": base64.b64encode(raw).decode("ascii")},
     }
-    docs.append(new_doc)
-    _save_documents(docs)
+    db.save_item(SITE, "documents", new_id, new_doc)
     emit("file_created", user_id=user["id"], filename=title, file_type="document", source_site="documents", source_id=new_id)
     return redirect(url_for("documents.editor", doc_id=new_id))
 

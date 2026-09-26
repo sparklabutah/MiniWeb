@@ -438,6 +438,41 @@ def _sort_phones(phones, sort_key):
 # HTML routes
 # ---------------------------------------------------------------------------
 
+def _phone_results_page(q, brand, os_family, price_min, price_max, battery_min,
+                        features, sort, page):
+    """Filter/count the complete catalog in SQL, then load one visible page."""
+    conn = db.get_conn()
+    conn.create_function("phone_price", 1, lambda v: _parse_price_usd(v) or _parse_price_eur(v), deterministic=True)
+    conn.create_function("phone_number", 1, _parse_numeric, deterministic=True)
+    conn.create_function("phone_year", 1, _extract_year, deterministic=True)
+    os_sql = ("CASE WHEN instr(os,'Android')>0 THEN 'Android' "
+              "WHEN instr(os,'iOS')>0 OR substr(os,1,5)='Apple' THEN 'iOS' "
+              "WHEN instr(os,'Windows')>0 THEN 'Windows' "
+              "WHEN instr(os,'Symbian')>0 THEN 'Symbian' "
+              "WHEN instr(os,'BlackBerry')>0 THEN 'BlackBerry' "
+              "WHEN os IN ('','Feature phone') THEN 'Feature phone' ELSE 'Other' END")
+    clauses, params = ["1=1"], []
+    for value, clause in [(brand, "brand=?"), (os_family, f"({os_sql})=?"),
+                          (price_min, "phone_price(price)>=?"),
+                          (price_max, "phone_price(price)<=?"),
+                          (battery_min, "phone_number(battery_size)>=?")]:
+        if value is not None and value != "":
+            clauses.append(clause)
+            params.append(value)
+    clauses.extend(FEATURE_FILTERS[f][0] for f in features if f in FEATURE_FILTERS)
+    if q:
+        terms = ['"' + t.replace('"', '""') + '"*' for t in q.split()]
+        clauses.append("id IN (SELECT rowid FROM fts_comparison_aggregators_phones WHERE fts_comparison_aggregators_phones MATCH ?)")
+        params.append(" ".join(terms))
+    where = " AND ".join(clauses)
+    orders = {"name": "name COLLATE NOCASE, id", "price_low": "phone_price(price) IS NULL, phone_price(price), id",
+              "price_high": "phone_price(price) DESC, id", "battery": "phone_number(battery_size) DESC, id",
+              "newest": "phone_year(released_at) DESC, name, id"}
+    total = db.execute(f"SELECT COUNT(*) FROM comparison_aggregators_phones WHERE {where}", tuple(params), fetch="val") or 0
+    rows = db.execute(f"SELECT * FROM comparison_aggregators_phones WHERE {where} ORDER BY {orders.get(sort, orders['newest'])} LIMIT ? OFFSET ?",
+                      tuple(params) + (40, (page - 1) * 40))
+    return [_interpret_record(row, row['id']) for row in rows], total
+
 @blueprint.route("/")
 def index():
     brands = _get_brands()
@@ -464,18 +499,19 @@ def index():
     if battery_min is not None and battery_min <= 0:
         battery_min = None
 
-    results = _db_query_phones(
-        q=q, brand=brand or None, os_family=os_fam or None,
-        sort=sort, price_min=price_min, price_max=price_max,
-        battery_min=battery_min, features=features,
-    )
+    page = max(1, request.args.get("page", 1, type=int))
+    results, total = _phone_results_page(q, brand, os_fam, price_min, price_max,
+                                        battery_min, features, sort, page)
+    query = request.args.to_dict(flat=False)
+    prev_url = url_for("comparison-aggregators.index", **{**query, "page": page - 1}) if page > 1 else None
+    next_url = url_for("comparison-aggregators.index", **{**query, "page": page + 1}) if page * 40 < total else None
 
     user = None
     if "user_id" in session:
         user = _get_user(session["user_id"])
 
     return render_template("comparison-aggregators/index.html",
-                           phones=results, brands=brands,
+                           phones=results, total=total, prev_url=prev_url, next_url=next_url, brands=brands,
                            os_families=os_families,
                            q=q, brand=brand, os_fam=os_fam, sort=sort,
                            price_min=price_min, price_max=price_max,
