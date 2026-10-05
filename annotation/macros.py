@@ -76,6 +76,9 @@ def register_macro(name, group, description, span_start="", span_end="", example
     unknown. The YAML file is edited by appending under the `macros:` block
     (which is last in the file), so existing comments/formatting are preserved.
     """
+    from annotation import final_set
+    if final_set.locked():
+        raise ValueError("the macro set is locked to the paper's final set (data/final_set.yaml)")
     name = (name or "").strip()
     if not name:
         raise ValueError("macro name required")

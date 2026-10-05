@@ -14,6 +14,13 @@ when unset, the local defaults in `_DEFAULT_ANNOTATORS` (`annotation/app.py`) ap
 `/annotate/api/*` returns a JSON 401. Only `/annotate/login`, `/annotate/api/auto_login` and
 `/annotate/api/auto_logout` are open.
 
+## Final-set lock
+
+`data/final_set.yaml` (written by `scripts/make_final_set.py`) holds the paper's 37 primitives and 376 tasks. With
+`locked: true` the tool is read-only: write routes return 403, macro registration is refused, the task list shows
+only the final tasks and the macro pickers only the final primitives. Sessions and the Grader Audit labels stay
+open. `MINIWEB_UNLOCK=1` lifts the lock (the tests set it in `tests/conftest.py`).
+
 ## Pages
 
 | Route | Page |
@@ -23,6 +30,7 @@ when unset, the local defaults in `_DEFAULT_ANNOTATORS` (`annotation/app.py`) ap
 | `/annotate/verify` | **Verifier Builder**: task list with quality pills, the task's recording, and the verifier editor and sandbox. |
 | `/annotate/task-review` | **Task Review**: review queues and a before/now comparison of each task. |
 | `/annotate/macro-browser` | **Macro Browser**: step through every recorded span of one macro across tasks, or every macro of one task. |
+| `/annotate/grader-audit` | **Grader Audit**: blind labels (pass/fail/unsure per primitive) of sampled agent episodes, to check the verifier and the judge. |
 | `/annotate/review` | Website review: browse each site and leave feedback. |
 | `/annotate/graph` | Site affinity graph for cross-site task flows. |
 | `/annotate/playback` | Playback Facts: the facts hidden in each video/audio player and when they are visible (JSON at `/annotate/api/playback_facts`). |
@@ -109,6 +117,8 @@ Review reports under `data/task_review_*`, `data/task_repairs_*`, `data/verifier
 | `quality.py` | AI recommendations, versioned verifier evidence and hashes (above). |
 | `review_mode.py` | Data for Task Review: queues, urgency, before/now diff, `before_review.json`. |
 | `macro_browser.py` | Data for the Macro Browser: every tagged instance with its gold span, and a task's actions paired with screenshots (or a page outline). Spans are 1-based inclusive action indices. |
+| `final_set.py` | The final-set lock (above). |
+| `grader_audit.py` | Grader Audit cases (`<annotations>/.grader_audit/<case>/`, built by `scripts/build_grader_audit.py`, uploaded with `scripts/upload_db_railway.py --grader-audit data/grader_audit/cases`) and labels (`<annotations>/.grader_audit_labels/<labeler>.jsonl`, last label wins; scored by `scripts/grader_audit_report.py`). |
 | `site_affinities.py` | Cross-site groups used to sample multi-site tasks, and per-site login defaults. |
 | `observations.py` | Starts observation completion in a background thread when a task is saved. |
 | `process_annotations.py` | The observation pipeline: repair form state, then derive axtree and full-page screenshots. |

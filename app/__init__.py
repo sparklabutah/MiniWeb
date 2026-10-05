@@ -510,6 +510,14 @@ def _register_recovery_routes(app):
         return jsonify({"replaced": True, "tables": n_tables,
                         "restarting": _req.args.get("restart", "1") != "0"})
 
+    @app.route("/recovery/grader_audit/labels", methods=["GET"])
+    def _recovery_grader_audit_labels():
+        """Every labeler's grader-audit labels, for scripts/grader_audit_report.py --url."""
+        if not _authed():
+            return "not found", 404
+        from annotation import grader_audit
+        return jsonify(grader_audit.all_labels())
+
     @app.route("/recovery/annotations/complete", methods=["POST"])
     def _recovery_annotations_complete():
         """Extract an uploaded tar.gz of task dirs into ANNOTATIONS_DIR.

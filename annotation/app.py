@@ -20,6 +20,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 
 from annotation.macro_locations import MACRO_LOCATIONS
 from annotation import macros as _registry
+from annotation import final_set as _final_set
 from annotation.storage import ANNOTATIONS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -770,11 +771,26 @@ def _require_annotator_login():
     if request.path in _AUTH_EXEMPT:
         return None
     if session.get("annotator_authenticated"):
+        if (request.method not in ("GET", "HEAD", "OPTIONS") and _final_set.locked()
+                and not _final_set.write_allowed(request.path)):
+            return jsonify({"error": "The annotation tool is locked to the paper's final set "
+                                     "(data/final_set.yaml); edits are disabled."}), 403
         return None
     # API routes get JSON 401, HTML routes get redirect
     if request.path.startswith("/annotate/api/"):
         return jsonify({"error": "Not authenticated"}), 401
     return redirect(url_for("annotation.annotator_login"))
+
+
+@annotation_bp.after_request
+def _final_set_banner(resp):
+    """Mark every annotation page as read-only while the final set is locked."""
+    if (_final_set.locked() and resp.mimetype == "text/html" and resp.status_code == 200
+            and not resp.direct_passthrough):
+        html = resp.get_data(as_text=True)
+        if "</body>" in html:
+            resp.set_data(html.replace("</body>", _final_set.banner() + "</body>", 1))
+    return resp
 
 
 @annotation_bp.route("/login", methods=["GET", "POST"])
@@ -995,7 +1011,7 @@ def api_macro_sheet_csv():
     w = csv.writer(buf)
     w.writerow(["category", "group", "tag", "description", "span_start", "span_end", "warning"])
     group_order = list(_registry.groups().keys())
-    for m in sorted(_registry.all_canonical(),
+    for m in sorted(_final_set.keep_primitives(_registry.all_canonical()),
                     key=lambda m: (group_order.index(_registry.group_of(m)), m)):
         e = _registry.entry(m)
         w.writerow(["base macro", e.get("group", ""), m, e.get("description", ""),
@@ -1354,7 +1370,11 @@ def api_task_verifier(annotator, task_id):
 def api_list_tasks():
     from annotation.storage import list_tasks
     annotator = request.args.get("annotator")
-    return jsonify(list_tasks(annotator))
+    tasks = list_tasks(annotator)
+    if _final_set.locked():
+        keep = _final_set.tasks()
+        tasks = [t for t in tasks if t.get("task_id") in keep]
+    return jsonify(tasks)
 
 
 @annotation_bp.route("/api/screenshot/<annotator>/<task_id>/<path:filename>")
@@ -1557,7 +1577,7 @@ def api_sites():
 
 @annotation_bp.route("/api/macros")
 def api_macros():
-    return jsonify(_load_macros())
+    return jsonify(_final_set.keep_primitives(_load_macros()))
 
 
 @annotation_bp.route("/api/macro_descriptions")
@@ -1613,6 +1633,8 @@ def api_macro_search():
     data = request.get_json(silent=True) or {}
     query = (data.get("query") or "").strip()
     exclude = set(data.get("exclude") or [])
+    if _final_set.locked():
+        exclude |= set(_MACRO_DESCRIPTIONS) - _final_set.primitives()
     try:
         limit = max(1, min(15, int(data.get("limit", 8))))
     except (ValueError, TypeError):
@@ -1726,7 +1748,7 @@ def api_macro_locations(site_id):
 
 @annotation_bp.route("/api/site_macros/<site_id>")
 def api_site_macros(site_id):
-    return jsonify(_load_site_macros(site_id))
+    return jsonify(_final_set.keep_primitives(_load_site_macros(site_id)))
 
 
 @annotation_bp.route("/api/coverage")
@@ -2510,6 +2532,60 @@ def api_playback_facts():
 def macro_browser_page():
     """Step through every task's sub-trajectory for one macro (or one task's macros)."""
     return render_template("macro_browser.html")
+
+
+@annotation_bp.route("/grader-audit")
+def grader_audit_page():
+    """Blind labeling of agent episodes for the grader audit (annotation/grader_audit.py)."""
+    return render_template("grader_audit.html")
+
+
+@annotation_bp.route("/api/grader_audit/cases")
+def api_grader_audit_cases():
+    from annotation import grader_audit
+    me = session.get("annotator_name", "anonymous")
+    ids, overlap = grader_audit.order()
+    mine = grader_audit.labels(me)
+    return jsonify({"labeler": me, "cases": [{"id": c, "overlap": c in overlap, "labeled": c in mine} for c in ids]})
+
+
+@annotation_bp.route("/api/grader_audit/case/<case_id>")
+def api_grader_audit_case(case_id):
+    from annotation import grader_audit
+    c = grader_audit.case(case_id)
+    if c is None:
+        return jsonify({"error": "unknown case"}), 404
+    c["my_label"] = grader_audit.labels(session.get("annotator_name", "anonymous")).get(case_id)
+    return jsonify(c)
+
+
+@annotation_bp.route("/api/grader_audit/img/<case_id>/<name>")
+def api_grader_audit_img(case_id, name):
+    import re
+    from flask import send_from_directory
+    from annotation import grader_audit
+    d = grader_audit.case_dir(case_id)
+    if d is None or not re.fullmatch(r"s\d{2,3}\.jpg", name):
+        return "not found", 404
+    return send_from_directory(str(d), name, max_age=86400)
+
+
+@annotation_bp.route("/api/grader_audit/label", methods=["POST"])
+def api_grader_audit_label():
+    from annotation import grader_audit
+    data = request.get_json(silent=True) or {}
+    try:
+        rec = grader_audit.save(session.get("annotator_name", "anonymous"), data.get("case_id"),
+                                data.get("primitives"), data.get("notes", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"status": "ok", "label": rec})
+
+
+@annotation_bp.route("/api/grader_audit/labels.json")
+def api_grader_audit_labels():
+    from annotation import grader_audit
+    return jsonify(grader_audit.all_labels())
 
 
 @annotation_bp.route("/api/macro_browser/index")

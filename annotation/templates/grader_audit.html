@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grader Audit — MiniWeb Annotation</title>
+    <style>
+        :root { --bg:#f6f7f9; --panel:#fff; --ink:#1d2330; --muted:#6b7385; --line:#dfe3ea; --accent:#e8742a; --focus:#2f6fd6;
+                --pass:#1f9d55; --fail:#d64545; --unsure:#b7791f; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg:#14171d; --panel:#1c2028; --ink:#e6e9ef; --muted:#8d95a6; --line:#2e3440; --accent:#f08a45; --focus:#5b93ec;
+                    --pass:#38c172; --fail:#ef6b6b; --unsure:#e3a33b; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
+        .top { background: #1e293b; color: #fff; padding: .55rem 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .top a { color: #94a3b8; text-decoration: none; font-size: .82rem; }
+        .top a:hover, .top a.here { color: #fff; }
+        .top .brand { color: #fff; font-weight: 700; }
+        header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+        select, button, input, textarea { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+        select { padding: 4px 6px; max-width: min(360px, 100%); }
+        button { padding: 3px 10px; cursor: pointer; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+        .seg button { border: 0; border-radius: 0; }
+        .seg button.on { background: var(--focus); color: #fff; }
+        .pos { color: var(--muted); font-size: 12px; }
+        .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+        main { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, 1fr); gap: 16px; padding: 16px; }
+        main > section { min-width: 0; }
+        @media (max-width: 960px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .hint { display: none; } }
+        .stage { position: relative; background: #0b0d13; border-radius: 8px; overflow: auto; max-height: 62vh; min-height: 240px; }
+        .stage img { display: block; width: 100%; }
+        .stage .empty { color: #8d95a6; padding: 40px; text-align: center; }
+        .strip { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 8px; }
+        .strip button { padding: 0 6px; font-size: 11px; min-width: 26px; }
+        .strip button.cur { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+        .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+        .title { font-size: 17px; font-weight: 600; margin: 4px 0 6px; }
+        .row { display: grid; grid-template-columns: 112px 1fr; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 13px; }
+        .row .k { color: var(--muted); }
+        .log { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 34vh; overflow: auto; }
+        .ev { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 3px 10px; font: 12px/1.45 ui-monospace, monospace; border-top: 1px solid var(--line); word-break: break-word; }
+        .ev:first-child { border-top: 0; }
+        .ev .kd { font-family: system-ui, sans-serif; font-size: 11px; color: var(--muted); }
+        .ev.action .kd { color: var(--accent); font-weight: 600; }
+        .ev.request .kd { color: var(--focus); }
+        .ev.page { color: var(--muted); }
+        .prim { border-top: 1px solid var(--line); padding: 10px 0 8px; }
+        .prim:first-of-type { border-top: 0; }
+        .prim .name { font-weight: 600; font-family: ui-monospace, monospace; }
+        .prim .fam { font-size: 11px; color: var(--muted); margin-left: 6px; }
+        .prim .sub { font-size: 13px; margin: 3px 0; }
+        .prim .ref { font: 12px ui-monospace, monospace; color: var(--muted); word-break: break-all; }
+        .prim details { font-size: 12.5px; margin: 4px 0; }
+        .prim details ul { margin: 2px 0 4px 18px; padding: 0; }
+        .vote { display: inline-flex; gap: 6px; margin-top: 6px; }
+        .vote button { min-width: 72px; }
+        .vote button.on[data-v=pass] { background: var(--pass); border-color: var(--pass); color: #fff; }
+        .vote button.on[data-v=fail] { background: var(--fail); border-color: var(--fail); color: #fff; }
+        .vote button.on[data-v=unsure] { background: var(--unsure); border-color: var(--unsure); color: #fff; }
+        textarea { width: 100%; min-height: 56px; padding: 6px 8px; resize: vertical; }
+        .save { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+        .save button.primary { background: var(--focus); color: #fff; border-color: var(--focus); padding: 5px 14px; }
+        .status { font-size: 12px; color: var(--muted); }
+        .status.err { color: var(--fail); }
+        .answer { white-space: pre-wrap; font-size: 13px; }
+        .guide { font-size: 13px; }
+        .guide li { margin: 2px 0; }
+        .tag { font-size: 11px; padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    </style>
+</head>
+<body>
+<div class="top">
+    <a href="/annotate/" class="brand">MiniWeb Annotation</a>
+    <a href="/annotate/task">Annotate</a>
+    <a href="/annotate/verify">Verifier Builder</a>
+    <a href="/annotate/playback">Playback Facts</a>
+    <a href="/annotate/macro-browser">Macro Browser</a>
+    <a href="/annotate/task-review">Task Review</a>
+    <a href="/annotate/grader-audit" class="here">Grader Audit</a>
+</div>
+<header>
+    <span class="seg"><button data-f="todo" class="on">To label</button><button data-f="overlap">Overlap</button><button data-f="all">All</button></span>
+    <button id="prev" title="Previous case ([)">&lt;</button>
+    <select id="pick" aria-label="Case"></select>
+    <button id="next" title="Next case (])">&gt;</button>
+    <span class="pos" id="progress"></span>
+    <span class="hint">← → screenshots · [ ] cases · Ctrl+Enter save &amp; next</span>
+</header>
+<main>
+    <section>
+        <div class="stage" id="stage"><div class="empty">Loading…</div></div>
+        <div class="strip" id="strip"></div>
+        <div class="log" id="log"></div>
+    </section>
+    <section>
+        <details class="card guide" id="guide">
+            <summary><b>How to label</b></summary>
+            <ul>
+                <li>Judge each primitive from the screenshots, the action log and the requests: did the agent carry out <i>this step</i> as the instruction asks (right item, right values)?</li>
+                <li>The reference is the request the annotator's own walk made. An equivalent request counts; the rubric says what must match and what may differ.</li>
+                <li><code>report_information</code>: pass when the agent's final answer gives the expected information.</li>
+                <li>A later step that undoes an earlier one fails it. Steps the instruction did not ask for do not fail a primitive unless the rubric says so.</li>
+                <li><b>Unsure</b> when the evidence cannot tell (e.g. the screenshots stop before the result). Explain in the notes.</li>
+                <li>Cases marked <span class="tag">overlap</span> are labeled by every labeler; please do those first.</li>
+            </ul>
+        </details>
+        <div class="card" id="task"></div>
+        <div class="card" id="prims"></div>
+    </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let CASES = [], filter = 'todo', cur = null, img = 0, votes = {};
+
+async function api(url, opts) {
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+}
+
+function visible() {
+    if (filter === 'overlap') return CASES.filter(c => c.overlap);
+    if (filter === 'todo') {
+        const todo = CASES.filter(c => !c.labeled);
+        return [...todo.filter(c => c.overlap), ...todo.filter(c => !c.overlap)];
+    }
+    return CASES;
+}
+
+function renderPicker() {
+    const list = visible();
+    $('#pick').innerHTML = list.map(c =>
+        `<option value="${c.id}">${c.labeled ? '✓ ' : ''}${c.id}${c.overlap ? ' · overlap' : ''}</option>`).join('');
+    if (cur && list.some(c => c.id === cur.id)) $('#pick').value = cur.id;
+    const n = CASES.filter(c => c.labeled).length, no = CASES.filter(c => c.overlap && c.labeled).length,
+          to = CASES.filter(c => c.overlap).length;
+    $('#progress').textContent = `${n} / ${CASES.length} labeled · overlap ${no}/${to}`;
+}
+
+async function loadCases(keep) {
+    const d = await api('/annotate/api/grader_audit/cases');
+    CASES = d.cases;
+    renderPicker();
+    const list = visible();
+    if (!keep || !cur) {
+        if (list.length) await openCase(list[0].id);
+        else { $('#stage').innerHTML = '<div class="empty">Nothing to label in this view.</div>';
+               $('#task').innerHTML = ''; $('#prims').innerHTML = ''; $('#log').innerHTML = ''; $('#strip').innerHTML = ''; }
+    }
+}
+
+function showImg(i) {
+    if (!cur || !cur.images.length) { $('#stage').innerHTML = '<div class="empty">No screenshots were recorded for this episode — use the action log.</div>'; return; }
+    img = Math.max(0, Math.min(cur.images.length - 1, i));
+    $('#stage').innerHTML = `<img alt="screenshot ${img + 1}" src="/annotate/api/grader_audit/img/${cur.id}/${cur.images[img]}">`;
+    document.querySelectorAll('#strip button').forEach((b, k) => b.classList.toggle('cur', k === img));
+}
+
+function rubric(r) {
+    if (!r || typeof r !== 'object') return '';
+    const li = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    return `<details><summary>Rubric</summary>
+        ${r.done ? `<div><b>Done when:</b> ${esc(r.done)}</div>` : ''}
+        ${r.evidence ? `<div><b>Evidence:</b> ${esc(r.evidence)}</div>` : ''}
+        ${(r.must_match || []).length ? `<div><b>Must match</b><ul>${li(r.must_match)}</ul></div>` : ''}
+        ${(r.may_differ || []).length ? `<div><b>May differ</b><ul>${li(r.may_differ)}</ul></div>` : ''}
+        ${(r.fail_if || []).length ? `<div><b>Fail if</b><ul>${li(r.fail_if)}</ul></div>` : ''}
+    </details>`;
+}
+
+async function openCase(id) {
+    cur = await api(`/annotate/api/grader_audit/case/${id}`);
+    $('#pick').value = id;
+    votes = Object.assign({}, cur.my_label ? cur.my_label.primitives : {});
+    $('#strip').innerHTML = cur.images.map((_, k) => `<button data-i="${k}">${k + 1}</button>`).join('');
+    showImg(0);
+    $('#log').innerHTML = cur.events.map(e =>
+        `<div class="ev ${e.kind}"><span class="kd">${e.kind}</span><span>${esc(e.text)}</span></div>`).join('')
+        || '<div class="ev"><span class="kd"></span><span>No recorded events.</span></div>';
+    const meta = CASES.find(c => c.id === id) || {};
+    $('#task').innerHTML = `
+        <div class="eyebrow">Case ${esc(id)} ${meta.overlap ? '<span class="tag">overlap</span>' : ''}</div>
+        <div class="title">${esc(cur.instruction)}</div>
+        <div class="row"><span class="k">Site</span><span>${esc((cur.sites || []).join(', '))}</span></div>
+        ${cur.expected_answer ? `<div class="row"><span class="k">Expected answer</span><span class="answer">${esc(cur.expected_answer)}</span></div>` : ''}
+        <div class="row"><span class="k">Agent's answer</span><span class="answer">${esc(cur.agent_answer) || '<i>none</i>'}</span></div>`;
+    $('#prims').innerHTML = `<div class="eyebrow">Primitives (${cur.primitives.length})</div>` +
+        cur.primitives.map(p => `
+        <div class="prim" data-k="${esc(p.instance)}">
+            <div><span class="name">${esc(p.instance)}</span><span class="fam">${esc(p.family)}</span></div>
+            ${p.subtask ? `<div class="sub">${esc(p.subtask)}</div>` : ''}
+            <div class="sub" style="color:var(--muted)">${esc(p.description)}</div>
+            ${p.reference ? `<div class="ref">reference: ${esc(p.reference)}</div>` : ''}
+            ${rubric(p.rubric)}
+            <div class="vote">${['pass', 'fail', 'unsure'].map(v =>
+                `<button data-v="${v}" class="${votes[p.instance] === v ? 'on' : ''}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>
+        </div>`).join('') + `
+        <div style="margin-top:10px"><textarea id="notes" placeholder="Notes (why fail or unsure; anything a grader would miss)">${esc(cur.my_label ? cur.my_label.notes : '')}</textarea></div>
+        <div class="save"><button class="primary" id="save">Save &amp; next</button><span class="status" id="status">${cur.my_label ? 'Saved ' + esc(cur.my_label.at) : ''}</span></div>`;
+}
+
+async function save() {
+    const missing = cur.primitives.filter(p => !votes[p.instance]);
+    if (missing.length) { $('#status').className = 'status err'; $('#status').textContent = `Label every primitive (${missing.map(p => p.instance).join(', ')}).`; return; }
+    try {
+        await api('/annotate/api/grader_audit/label', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({case_id: cur.id, primitives: votes, notes: $('#notes').value})});
+    } catch (e) { $('#status').className = 'status err'; $('#status').textContent = e.message; return; }
+    const was = cur.id, list = visible(), at = list.findIndex(c => c.id === was);
+    const c = CASES.find(c => c.id === was); if (c) c.labeled = true;
+    const after = visible();
+    const nxt = filter === 'todo' ? after[0] : list[at + 1];
+    renderPicker();
+    if (nxt) await openCase(nxt.id); else { $('#status').className = 'status'; $('#status').textContent = 'Saved. That was the last case in this view.'; }
+}
+
+function step(d) {
+    const list = visible(), at = list.findIndex(c => c.id === (cur && cur.id));
+    const nxt = list[at + d]; if (nxt) openCase(nxt.id);
+}
+
+document.addEventListener('click', e => {
+    const v = e.target.closest('.vote button');
+    if (v) { const k = v.closest('.prim').dataset.k; votes[k] = v.dataset.v;
+             v.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === v)); return; }
+    const s = e.target.closest('#strip button'); if (s) { showImg(+s.dataset.i); return; }
+    const f = e.target.closest('.seg button');
+    if (f) { filter = f.dataset.f; document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b === f)); renderPicker();
+             const list = visible(); if (list.length && !list.some(c => c.id === (cur && cur.id))) openCase(list[0].id); return; }
+    if (e.target.id === 'save') save();
+});
+$('#pick').addEventListener('change', e => openCase(e.target.value));
+$('#prev').onclick = () => step(-1);
+$('#next').onclick = () => step(1);
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); return; }
+    if (/^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (e.key === 'ArrowLeft') showImg(img - 1);
+    else if (e.key === 'ArrowRight') showImg(img + 1);
+    else if (e.key === '[') step(-1);
+    else if (e.key === ']') step(1);
+});
+loadCases().catch(e => { $('#stage').innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

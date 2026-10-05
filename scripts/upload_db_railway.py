@@ -40,6 +40,9 @@ def main():
                     "replaces those task dirs in its ANNOTATIONS_DIR (additive; "
                     "tasks absent from the archive are untouched).")
     ap.add_argument("--annotations-dir", default="data/annotations")
+    ap.add_argument("--grader-audit", metavar="DIR",
+                    help="Upload grader-audit cases (scripts/build_grader_audit.py writes data/grader_audit/cases) "
+                    "into the server's annotations/.grader_audit; labels are kept")
     ap.add_argument("--prune", action="store_true",
                     help="With --annotations: also move remote tasks that no "
                     "longer exist locally into the server's .trash, so local "
@@ -53,8 +56,21 @@ def main():
     if not args.token:
         sys.exit("No token: pass --token or set MINIWEB_RECOVERY_TOKEN")
 
+    if args.grader_audit:
+        args.annotations, args.prune = True, False
     target = "annotations" if args.annotations else "db"
-    if args.annotations:
+    if args.grader_audit:
+        import tarfile
+        import tempfile
+        fd, tar_path = tempfile.mkstemp(suffix=".tar.gz")
+        os.close(fd)
+        with tarfile.open(tar_path, "w:gz") as tf:
+            for case in sorted(os.listdir(args.grader_audit)):
+                if os.path.isdir(os.path.join(args.grader_audit, case)):
+                    tf.add(os.path.join(args.grader_audit, case), arcname=f".grader_audit/{case}")
+        print(f"packed grader-audit cases -> {tar_path} ({os.path.getsize(tar_path) / 1e6:.1f} MB)")
+        args.db = tar_path
+    elif args.annotations:
         # tar the task dirs (skip any nested 'annotations' duplicate dir)
         import tarfile
         import tempfile
