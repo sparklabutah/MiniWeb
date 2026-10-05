@@ -1,0 +1,46 @@
+# WebVoyager scaling (make_scaling.py --config docs/figures/scaling/scaling_wv_config.yaml), 2026-10-05 (user: "show some
+# scaling with the WebVoyager plot"). One panel: the 98-task site-stratified WebVoyager sample (7 tasks x 14 sites, seed
+# 20261003). The planner with one adapter trained on growing nested subsets of the generated data (line), on InSTA's
+# task-centric trajectories at matched size (diamond), and untrained (dashed). One run per point (the paper's one run per
+# benchmark). The 100 / 300 / 1K / 7K points are runs on the sample; untrained, 3.1K and InSTA are the full 536-task runs
+# of the skill- vs task-centric figure restricted to the sample's tasks (an earlier InSTA run on the sample alone, mostly
+# rerun after the server-overload timeouts, scored 48.0: webvoyager100_agent_insta_sub98_wvjudge).
+
+out: docs/figures/scaling/scaling_wv
+model: Qwen3.5-4B
+model_logo: docs/figures/logos/qwen.png
+title: More practice
+subtitle: "Qwen3.5-4B planner"
+header_logo: true
+width: 3.5                     # paired with skill_vs_task (3.25 in) in one full-width figure, stretched (user, 2026-10-05)
+plot_height: 1.565                # matches skill_vs_task's height (2.84 in)
+legend_split: false
+legend: {untrained: "Planner, untrained", miniweb: "+ skill-centric, MiniWeb data", insta: "+ task-centric, InSTA data",
+         references: "Published agents (reference only)"}
+colors: {untrained: "#7D8798", miniweb: "#2B5C9E", insta: "#A8520F"}
+steps: {"100": 647, "300": 2140, "1K": 7021, "3.1K": 27644, "7K": 56416, insta: 26368}
+panels:
+  - title: "WebVoyager sample (98 tasks)"
+    kind: webvoyager
+    tasks: data/webmix/webvoyager/WebVoyager_sub98_20261003.jsonl
+    ylim: [30, 80]
+    xlim: [450, 3000000]
+    untrained: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge]
+    miniweb:
+      "100": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled100_sub98_wvjudge]
+      # "300": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled300_sub98_wvjudge]     # left out for now (user, 2026-10-05): 73.5
+      "1K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled1k_sub98_wvjudge]
+      # "3.1K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge]           # left out for now (user, 2026-10-05): 67.3
+      "7K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled7k_sub98_wvjudge]
+    insta: [data/webmix/om2w/runs/granite/webvoyager100_agent_insta_wvjudge]
+    # Published data-scaling curves on WebVoyager, for reference only (user, 2026-10-05): other base models, harnesses,
+    # task sets, judges and step caps, so not comparable point for point.
+    #  Fara-7B: Fig. 7 of arXiv 2511.19663v1 (p. 21), read off the plot (1% / 10% / 100% of its training data; the x-axis
+    #   is "training data size", all its training examples, ~1.9M at 100%); 100-step cap, GPT-4o judge, avg of 3 runs.
+    #  MolmoWeb: Table 5a of arXiv 2604.08516 (an earlier MolmoWebMix, 134K trajectories at 100%; 30 inference steps);
+    #   x = trajectories x 7.9, the final mix's steps per trajectory (2.2M / 278.5K).
+    references:
+      - {label: "Fara-7B", logo: docs/figures/logos/microsoft.png, color: "#7E68B8", marker: "o", points: [[17000, 37.0], [185000, 57.0], [1900000, 73.5]],
+         label_dy: 0.04}
+      - {label: "MolmoWeb", logo: docs/figures/logos/ai2.png, color: "#3E8088", marker: "s", points: [[10600, 44.5], [106000, 63.2], [1060000, 68.5]],
+         label_at: 0, label_dx: 0.72, label_dy: 0}

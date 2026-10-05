@@ -1,20 +1,48 @@
-# Real estate (buy / rent)
+# Lakeport Real Estate (`real-estate-buy-rent`)
 
-**Category**: Shopping & transactional
-**Reviewer**: Farhan
-**Number of macros**: 22
+A Zillow/Redfin-style home search site for Lakeport, WA. Users search and
+filter homes for sale or rent, save listings, contact agents, schedule tours
+and follow agents.
 
-## Data Source
+- URL: `/sites/real-estate-buy-rent/` (simulated domain `lakeportrealty.com`)
+- Data split: held-out (test) site
 
-1. https://www.kaggle.com/datasets/paultimothymooney/zillow-house-price-data  (need to find license detail)
-2. https://www.kaggle.com/datasets/ahmedshahriarsakib/usa-real-estate-dataset
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Home: search hero, featured sale and rental listings, market stats |
+| `/listings` | Search with type/status/beds/baths dropdowns, max-price slider, feature checkboxes (Garage, Pool, Basement), sort |
+| `/listing/<id>` | Listing detail: facts, agent, Save, inquiry form, Schedule a Tour form |
+| `/agents`, `/agent/<id>` | Agent directory; agent profile with listings and Follow Agent |
+| `/saved` | Saved listings (login required) |
+| `/inquiries` | Sent inquiries (login required) |
+| `/tours` | My Tours with confirm and cancel (login required) |
+| `/login`, `/register` | Sign-in and registration |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_query, filter_by_dropdown, filter_by_checkbox, filter_by_slider, sort_by_ranking, extract_by_dropdown, extract_from_table, extract_by_route, extract_by_ranking, extract_by_extremum, compute_by_slider, compare_by_dropdown, submit_by_query, select_by_ranking, select_by_extremum, follow_by_toggle, save_by_toggle, book_by_form
+JSON endpoints under `/api/` cover listings, agents, saved items, inquiries and market stats.
 
-## Site Description
+## Interactions and macros
 
-A Zillow/Redfin-style residential real estate platform for Lakeport, WA. Users browse, search, and filter 30 property listings (houses, condos, apartments, townhouses) for sale or rent. Features include saving listings, sending inquiries to agents, viewing market statistics, and an agents directory. 5 registered users, 8 agents across 3 agencies. Modeled after Zillow.com. No temporal simulation required.
+- Search by address, feature or keyword: `search`
+- Filter by type, status, beds, baths, price, features: `filter_by_dropdown`, `filter_by_slider`, `filter_by_options`
+- Sort by newest, price, size or bedrooms: `sort_by_form`
+- Send an inquiry to the listing agent: `create_by_form`, `book_by_form`
+- Save a listing, follow an agent: `toggle_relationship`
+- Open listings and agents: `navigate_by_route`
+- Read listing facts, agent pages and the cheapest or largest match: `report_information`
 
-See `desc.md` for full details.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `real-estate-buy-rent`.
+
+## Data
+
+- Tables: `real_estate_buy_rent_listings`, `_agents`, `_users`, `_saved`,
+  `_inquiries`, `_listings_raw`, and `_tours` (created at runtime on first use).
+  Listings were derived from public US real-estate datasets (Kaggle Zillow
+  house-price data and the USA Real Estate dataset).
+- Rentals carry `rent_monthly` (with `price` = 0); sorting and price filters
+  use the monthly rent for them. `scripts/seed_real_estate_rentals.py` creates
+  the rental listings; re-run it after a DB rebuild.
+- Login reads `session["user_id"]`, so the global auto-login signs in as user 1.
+- Inquiries and tour requests emit `message` (a note in instant messaging).
+  Registering emits `signup`.

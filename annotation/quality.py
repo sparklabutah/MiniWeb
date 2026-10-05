@@ -15,6 +15,24 @@ TASK_FIELDS = ('instruction', 'instruction_ambiguous', 'expected_answer', 'answe
                'alternatives', 'expected_outcome', 'macros', 'macro_instances', 'macro_edges',
                'macro_subtasks', 'macro_operations', 'qa_answers', 'starting_url', 'sites', 'requires_login')
 _LOCK = threading.RLock()
+AI_ACTORS = {'codex-review', 'claude-review'}   # annotation-API sessions that are AI reviewers
+
+
+def walk_author(directory, task):
+    """Who recorded the fresh verification walk: {by, at, ai} or None."""
+    if not (directory / 'verification_walk.json').exists():
+        return None
+    info = dict(task.get('verification_walk_by') or {})
+    if not info.get('by'):   # walk files are large; only open one when task.json has no stamp
+        walk = read_json(directory / 'verification_walk.json')
+        info = {'by': walk.get('recorded_by') or 'unknown', 'at': walk.get('recorded_at')}
+    info['ai'] = info['by'] in AI_ACTORS
+    return info
+
+
+def rerecorded(task):
+    """Human re-recording of the original (Re-record in the builder): {by, at} or None."""
+    return {'by': task.get('rerecorded_by'), 'at': task.get('rerecorded_at')} if task.get('rerecorded_at') else None
 
 
 def digest(value):
@@ -145,6 +163,7 @@ def summary(directory, task):
     walk = next((r for r in runs if r['source'] == 'walk'), None)
     attention = state in ('unreviewed', 'needs_repair', 'suggest_delete', 'stale') or any(not r['ok'] or r['stale'] for r in runs)
     return {'ai': state, 'recommendation': decision, 'ai_label': LABELS[state], 'legacy': not bool(ai) and bool(legacy),
+            'walk_by': walk_author(directory, task), 'rerecorded': rerecorded(task),
             'review': ai or {'note': legacy.get('note', ''), 'reviewer': legacy.get('reviewer', '')},
             'runs': runs, 'walk': 'unrun' if not walk else 'stale' if walk['stale'] else 'pass' if walk['ok'] else 'fail',
             'attention': attention, 'has_verifier': bool(spec)}

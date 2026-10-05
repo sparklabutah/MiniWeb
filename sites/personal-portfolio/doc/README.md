@@ -1,46 +1,46 @@
-# Personal Portfolio -- Alex Rivera
+# Alex Rivera (`personal-portfolio`)
 
-**Category**: Static / informational
-**Reviewer**: Minh
-**Number of macros**: 10
+The personal developer portfolio of Alex Rivera, the shared MiniWeb persona,
+in the style of a GitHub Pages / Vercel personal site. It shows a profile,
+project gallery, structured resume, skills table and blog links, with a
+contact form and site-wide search.
 
-## Data Source
+- URL: `/sites/personal-portfolio/` (simulated domain `alexrivera.dev`)
+- Data split: training site
 
-Few-shot synthesised persona. Profile, projects, resume, and blog link data are generated to represent a realistic mid-career software engineer's personal portfolio site.
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Home: profile, featured projects (sort dropdown, "Export CSV" link), contact form |
+| `/contact` | Home page scrolled to the contact form |
+| `/projects`, `/project/<id>` | Project gallery (search, category / tech / status filters) and project detail |
+| `/resume` | Experience, education, skills, certifications |
+| `/skills` | Skills table (name, level, years, category) |
+| `/blog` | Links to external blog posts |
+| `/search` | Search across projects, resume, blog and profile |
+| `/admin` | Owner-only overview including contact messages (redirects to `/login` otherwise) |
+| `/login` | Sign-in form |
 
-1. **navigate_by_semantic** -- Use the site-wide semantic search (fuzzy word-overlap) to find content across projects, blog posts, resume, and profile. HTML page at `/search?q=...`, API at `/api/search?q=...`.
-2. **navigate_by_dropdown** -- Use the project type, technology, and status dropdown filters on the `/projects` page to navigate to filtered project listings.
-3. **navigate_by_route** -- Navigate directly to specific pages by URL: project detail (`/project/<id>`), resume (`/resume`), blog (`/blog`), skills table (`/skills`).
-4. **extract_by_query** -- Search projects via the API (`/api/projects?q=...`) and extract information from results.
-5. **extract_by_semantic** -- Use semantic search API (`/api/search?q=...`) to find and extract specific information across all content types.
-6. **extract_from_table** -- Extract data from the HTML skills table on the `/skills` page, or via the `/api/skills` endpoint which returns tabular skill data with name, level, years, and category.
-7. **extract_by_route** -- Access specific data by direct API route: `/api/profile`, `/api/resume`, `/api/projects/<id>`, `/api/blog-links`.
-8. **submit_by_query** -- Submit a contact message via the form on the homepage or the POST API at `/api/contact`.
-9. **export_by_dropdown** -- Export projects or resume skills as CSV or JSON via `/api/export?type=projects|resume&format=csv|json`. Supports optional category filtering for projects.
-10. **subscribe_by_toggle** -- Toggle newsletter subscription via POST to `/api/subscribe` with `{"email": "..."}`. Repeated calls toggle between subscribed/unsubscribed states.
+JSON endpoints under `/api/` cover profile, projects, resume, blog links, skills, search, export (`?type=projects|resume&format=csv|json`), contact and newsletter subscribe.
 
-## Site Description
+## Interactions and macros
 
-This site models **Alex Rivera's personal developer portfolio**, similar to sites built on GitHub Pages, Vercel, or personal domains. It is a single-person portfolio showcasing:
+- Open projects, resume and blog from the nav or search results: `navigate_by_route`
+- Sort the projects section: `sort_by_form`
+- Send a message through the contact form: `create_by_form`
+- Export the project list as CSV: `export`
+- Read projects, skills, resume and search results: `report_information`
 
-- **Profile**: Name, tagline, bio, location, skills, interests, and contact info.
-- **Projects** (6): Side projects, open-source tools, and personal configs with technologies, status, collaborators, and GitHub/live links.
-- **Resume**: Full structured resume with experience, education, skills by category, certifications, and selected projects.
-- **Blog Links** (5): External blog post links categorised by topic (Technology, Photography, Outdoors, Gaming).
-- **Contact Form**: Sends messages stored in `contact_messages.json`.
-- **Newsletter Subscriptions**: Toggle-based subscription stored in `subscriptions.json`.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `personal-portfolio`.
 
-**Real-world model**: Personal portfolio sites like those on dev.to profiles, GitHub Pages, or custom-built developer portfolios.
+## Data
 
-**Data files** (in `data_sources/personal-portfolio/`):
-- `profile.json` -- Owner profile with skills, education, work experience, contact
-- `projects.json` -- Array of 6 projects with tech stacks, collaborators, status
-- `resume.json` -- Structured resume with experience, education, skills, certs
-- `blog_links.json` -- Array of 5 blog post links with categories and tags
-- `users.json` -- Single owner user (alex_rivera)
-- `contact_messages.json` -- Submitted contact messages (starts empty)
-- `subscriptions.json` -- Newsletter subscriptions
-
-**Temporal/dynamic data**: Minimal. Contact messages and subscriptions grow over time through user interaction. Project `last_updated` dates are static but represent a realistic timeline.
+- Tables: `personal_portfolio_profile`, `personal_portfolio_projects`,
+  `personal_portfolio_resume`, `personal_portfolio_blog_links`,
+  `personal_portfolio_subscriptions`, `personal_portfolio_users`.
+- Login goes through `helpers.auth` on `session["user_id"]`, so the global
+  auto-login signs in user 1. Visitors browse as user 1.
+- Contact messages are saved to a `contact_messages` collection that has no base
+  table, so `db.query` cannot read them back. Graders see the submission in the
+  request log. Newsletter subscribe exists only as an API (`POST /api/subscribe`).

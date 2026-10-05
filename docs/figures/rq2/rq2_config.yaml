@@ -1,0 +1,44 @@
+# RQ2 figure (make_rq2.py): does training on MiniWeb fix the skills, and do they compose into tasks?
+# Every arm lists its runs (one directory per seed, relative to the repo root) on each task set.
+# Add a seed by appending a directory; an empty list draws the bar as "pending".
+#
+# Panel (a) compares the arms named in `family_arms` per skill family on the single-primitive set.
+# Panel (b) shows every arm on both task sets.
+
+out: docs/figures/rq2/rq2_skills
+model: Qwen3.5-4B
+model_logo: docs/figures/logos/qwen.png
+task_sets:
+  validation:
+    label: "single primitive\n103 tasks"
+    primitives: well_covered          # tasks of well-covered primitives only (docs/figures/common/results.py)
+  heldout:
+    label: "multi-step tasks\n63 tasks"
+family_set: validation
+family_arms: ["Single agent, untrained", "Single agent, trained"]
+instance_set: heldout                 # panel (b): primitive verdicts inside the multi-step tasks of this set
+instance_primitives: well_covered     # ...counting the instances of well-covered primitives only
+
+arms:
+  - label: Single agent, untrained
+    color: "#7D8798"   # style.UNTRAINED
+    style: solid
+    validation: [data/webmix/eval/val2_rq2_base, data/webmix/eval/val2_rq2_base_s2, data/webmix/eval/val2_rq2_base_s3]
+    heldout: [data/webmix/eval/human_base, data/webmix/eval/seeds/base_s2, data/webmix/eval/seeds/base_s3]
+  - label: Single agent, trained
+    color: "#2B5C9E"
+    style: solid
+    validation: [data/webmix/eval/val2_rq2_pooled, data/webmix/eval/val2_rq2_pooled_s2, data/webmix/eval/val2_rq2_pooled_s3]
+    heldout: [data/webmix/eval/human_pooled_v4, data/webmix/eval/seeds/pooled_v4_s2, data/webmix/eval/seeds/pooled_v4_s3]
+  - label: Planner, untrained
+    color: "#7D8798"   # style.UNTRAINED
+    style: hatched
+    validation: [data/webmix/eval/val2_rq2_planner_base, data/webmix/eval/val2_rq2_planner_base_s2,
+                 data/webmix/eval/val2_rq2_planner_base_s3]
+    heldout: [data/webmix/eval/seeds/pagent_v6_baseexec_s1, data/webmix/eval/seeds/pagent_v6_baseexec_s2,
+              data/webmix/eval/seeds/pagent_v6_baseexec_s3]
+  - label: Planner + pooled (MiniWebAgent)
+    color: "#2B5C9E"
+    style: hatched
+    validation: [data/webmix/eval/val2_pagent_pooled_s1, data/webmix/eval/val2_pagent_pooled_s2, data/webmix/eval/val2_pagent_pooled_s3]
+    heldout: [data/webmix/eval/pagent_pooled_s1, data/webmix/eval/pagent_pooled_s2, data/webmix/eval/pagent_pooled_s3]

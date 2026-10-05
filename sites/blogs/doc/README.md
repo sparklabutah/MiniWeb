@@ -1,22 +1,44 @@
-# Blogs
+# TumblrVibe Blogging Platform (`blogs`)
 
-**Category**: Dynamic info / feeds
-**Reviewer**: Minh
-**Number of macros**: 18
+A Tumblr-style blogging platform with posts (articles, tips, stories,
+tutorials), comments, tags, likes and reblogs. Users browse and filter the feed,
+write posts, comment, follow authors, save posts and subscribe to tags.
 
-## Data Source
+- URL: `/sites/blogs/` (simulated domain `tumblevibe.com`)
+- Data split: training site
 
-Synthesize
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Post feed with search (`q`), From/To dates, Sort (Newest, Oldest, Popular) and pagination |
+| `/category/<name>`, `/tag/<name>` | Feed narrowed to a category or tag |
+| `/post/<id>` | Post with comments; Like, Reblog, Save, Follow Author, Subscribe to Tag, Share and Report |
+| `/compose` | New-post form (title, body, category, tags) |
+| `/report/<id>` | Report-a-post form |
+| `/dashboard` | Saved posts, my posts, followed blogs and subscribed tags (login required) |
+| `/login`, `/register` | Sign-in and sign-up forms |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, filter_by_date_range, sort_by_date_range, extract_by_query, extract_by_dropdown, extract_by_route, create_from_free_text, submit_by_route, post_from_free_text, follow_by_dropdown, follow_by_toggle, subscribe_by_toggle, share_by_dropdown, save_by_toggle, report_by_form
+JSON endpoints under `/api/` cover posts, search, categories, tags, comments,
+authors and reports.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search posts: `search`
+- Filter by date range or category: `filter_by_date_range`, `filter_by_dropdown`
+- Sort the feed: `sort_by_form`
+- Write a post or a comment: `create_by_form`
+- Follow an author, save a post, subscribe to a tag: `toggle_relationship`
+- Share a post to another MiniWeb site: `share_by_form`
+- Open posts and nav pages: `navigate_by_route`
+- Read post content, authors and comments: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `blogs`.
+
+## Data
+
+- Tables: `blogs_posts`, `blogs_comments`, `blogs_users`, `blogs_reports`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+- Registering emits a `signup` event (password-vault entry and welcome email).
+  Publishing a post sends a "Your post has been published" email to WebMail.
+- Share uses the shared cross-site share dialog (`app/static/miniweb-share.js`).

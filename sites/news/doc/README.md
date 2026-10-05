@@ -1,53 +1,51 @@
-# News (Lakeport Tribune)
+# Lakeport Tribune (`news`)
 
-**Category**: Dynamic info / feeds
-**Reviewer**: Minh
-**Number of macros**: 20
+A local newspaper site for the fictional city of Lakeport in Cascadia County,
+modeled on Patch.com and small-city news portals. Readers browse category
+pages, search articles, listen to articles, comment, bookmark, share, follow
+authors or categories, and report articles.
 
-## Data Source
+- URL: `/sites/news/` (simulated domain `lakeporttimes.com`)
+- Data split: training site
 
-Hand-authored local news articles for the fictional city of Lakeport in Cascadia County.
-Files: `data_sources/news/articles.json`, `categories.json`, `users.json`, `bookmarks.json`
+## Pages
 
-Mutable state files (written at runtime): `comments.json`, `follows.json`, `shares.json`, `reports.json`
+| Route | Page |
+|---|---|
+| `/` | Front page with Featured Stories and the latest articles by category |
+| `/category/<slug>` | Category page with sort (date, popularity), topic chips, From/To date filter and pagination |
+| `/article/<id>` | Article: full text, author, tags, Listen to Article, Share, Bookmark, follow author or category, comments |
+| `/article/<id>/report` | Report-an-article form |
+| `/search` | Keyword search with a date filter, plus a "Smart Search" natural-language box |
+| `/bookmarks` | The user's bookmarked articles |
+| `/login`, `/register` | Sign-in and registration (with newsletter toggles) |
 
-### Data Format
+JSON endpoints under `/api/` cover articles, semantic search, categories,
+bookmarks, comments and upvotes, follows, subscriptions, sharing, reports and
+playback.
 
-- **articles.json** -- JSON array. Each record: id, title, author, date (YYYY-MM-DD), category (slug), body (full text), tags (list), source, image_url, word_count, comments_count.
-- **categories.json** -- JSON array. Each record: id, slug, name, description, color, article_count. Seven categories: local, business, sports, arts, weather, politics, community.
-- **users.json** -- JSON array. Each record: id, root_user_id, username, display_name, email, subscription_tier (free/digital/premium), newsletter_preferences (daily_digest, breaking_news, weekly_roundup, categories), notification_settings, reading_history_count, bookmarks_count, comments_count.
-- **bookmarks.json** -- JSON array. Each record: id, user_id, root_user_id, article_id, article_title, bookmarked_at, note.
+## Interactions and macros
 
-### Sampling
+- Search articles, including Smart Search: `search`
+- Filter search or category results by date: `filter_by_date_range`
+- Open articles from the front page or a category: `navigate_by_route`
+- Comment on an article, register an account: `create_by_form`
+- Sign in: `authenticate_by_form`
+- Bookmark or unbookmark, follow, newsletter toggles: `toggle_relationship`
+- Share an article to another MiniWeb site: `share_by_form`
+- Listen to an article: `play_by_playback`
+- Read article text, authors, dates and comments: `report_information`
 
-25 articles across 7 categories, 3 authors, 4 users. All records loaded (num_data_points=-1).
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `news`.
 
-## Real-World Model
+## Data
 
-**Patch.com / local newspaper websites** -- clean, category-driven local news interface. Key UI elements:
-- Header with category navigation dropdown/links
-- Search bar in header
-- Homepage with featured articles, latest articles, category sections
-- Article detail page with full text, author, date, tags, comments
-- Category pages with sort options
-- User features: login/register, bookmark articles, comment on articles, follow categories/authors, newsletter subscriptions, share articles, report articles
-- Audio playback button for text-to-speech article reading
-
-## Target Macros
-
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_dropdown, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_by_route, play_by_playback, post_from_free_text, follow_by_dropdown, subscribe_by_toggle, share_by_dropdown, save_by_toggle, report_by_form, authenticate_by_form, register_by_form
-
-## Temporal Dynamics
-
-Not applicable for this implementation. Articles are a static corpus. News freshness is simulated via date ordering but no real-time feed updates. Data is a static snapshot of 25 articles spanning 2025-2026.
-
-## Domain-Specific Notes
-
-- Search: keyword substring match over title, body, author, tags (search_by_query); bag-of-words overlap scoring for semantic search (search_by_semantic)
-- Authentication: any valid username from users.json + password "password" (demo site)
-- Comments, follows, shares, reports are persisted to data_sources/news/ JSON files at runtime
-- Bookmarks (save_by_toggle) use a toggle API endpoint; re-posting the same article un-bookmarks it
-- Subscriptions (subscribe_by_toggle) toggle newsletter preferences on the user record
-- Share (share_by_dropdown) records the chosen platform (email, twitter, facebook, linkedin, copy_link)
-- Play (play_by_playback) returns audio metadata with estimated duration based on word count
-- Report (report_by_form) requires a reason category and optional details text
+- Tables: `news_articles`, `news_categories`, `news_users`, `news_bookmarks`,
+  `news_comments`. The comments table is created and registered on first use
+  if it is missing (`_ensure_comments_table`).
+- Login reads `session["user_id"]`, so the global auto-login signs the user in
+  as user 1. The login form accepts any existing username with the password
+  `password`.
+- Articles are a static, dated corpus and are never date-shifted.
+- Posting a comment emits a `message` event (a notification in instant
+  messaging). Logging in emits `signup`.

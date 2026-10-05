@@ -1,22 +1,50 @@
-# Dating
+# HeartLink (`dating`)
 
-**Category**: Communication
-**Reviewer**: Reaz
-**Number of macros**: 30
+A Tinder, Bumble or Hinge-style dating app. Users swipe through discovery cards,
+browse and filter the profile directory, like or pass, chat with matches and
+edit their own profile and preferences.
 
-## Data Source
+- URL: `/sites/dating/` (simulated domain `sparkconnect.app`)
+- Data split: held-out (test) site
 
-Synthesize
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Discover cards with like/pass, a discovery filter bar (age, looking for, interest, joined date range) and sort |
+| `/profiles` | Paginated profile directory with search, gender/looking-for dropdowns, interest checkboxes and sort (Nearest needs login) |
+| `/profile/<id>` | Profile detail: photo gallery, bio, interests, Like/Pass, Report, Block |
+| `/likes` | "Likes You": pending likes with Like back / Pass |
+| `/matches` | Match list |
+| `/conversation/<match_id>` | Chat with a match, including photo attachments |
+| `/edit-profile` | Edit bio, location, interests, preferences and photos |
+| `/login`, `/register` | Sign-in and sign-up |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_proximity, filter_by_dropdown, filter_by_checkbox, filter_by_date_range, filter_by_proximity, sort_by_ranking, sort_by_proximity, extract_by_query, extract_by_semantic, extract_by_dropdown, compare_from_table, create_from_free_text, submit_by_route, edit_by_query, configure_by_dropdown, upload_by_upload, react_by_toggle, react_by_gesture, follow_by_toggle, save_by_toggle, report_by_form, block_by_toggle, message_from_free_text, subscribe_by_toggle, authenticate_by_form, register_by_query, verify_identity_by_code
+JSON endpoints under `/api/` cover profiles, discovery, likes, matches,
+messages, stats and export.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Sign in or register: `authenticate_by_form`, `create_by_form`
+- Search the directory: `search`
+- Filter by dropdowns, interest checkboxes or join date: `filter_by_dropdown`, `filter_by_options`, `filter_by_date_range`
+- Sort discovery cards or the directory: `sort_by_form`
+- Like or pass, like back: `feedback_by_react`, `toggle_relationship`
+- Block a profile: `toggle_relationship`
+- Message a match, attach a photo: `message_from_free_text`, `upload_file`
+- Edit the profile and set preferences: `edit_by_form`, `configure_by_form`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `dating`.
+
+## Data
+
+- Tables: `dating_users`, `dating_likes`, `dating_matches`, `dating_messages`.
+- Login reads `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs the user in as user 1.
+- Gallery photos are SVGs rendered on the fly by `sites/dating/photos.py` at
+  `/photo/<user_id>/<idx>.svg`. `scripts/seed_dating_photos.py` writes the
+  4-photo gallery URLs into `dating_users`. Re-run it after a DB rebuild.
+- Sending a message emails the recipient a notification and mirrors the message
+  into instant messaging (`on_message`). A message that mentions meeting up
+  ("dinner", "coffee", "tomorrow", ...) also adds a "Date planned" calendar
+  event. Login and registration emit `signup`.

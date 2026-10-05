@@ -1,59 +1,52 @@
-# Job Sites
+# JobQuest (`job-sites`)
 
-**Category**: Shopping & transactional
-**Reviewer**: Farhan
-**Number of macros**: 22
+An Indeed or LinkedIn Jobs-style job board and application tracker. Users
+search and filter job listings, save jobs, follow companies, apply with a
+resume and cover letter, track applications and manage job alerts.
 
-## Data Source
+- URL: `/sites/job-sites/` (simulated domain `jobscout.careers`)
+- Data split: training site
+- Source data: Kaggle Indeed job postings, with synthetic user activity
 
-Kaggle Indeed Job Posting Dataset (augmented with synthetic user activity).
-Directory: `data_sources/indeed-jobs-augment/`
+## Pages
 
-### Data Files
+| Route | Page |
+|---|---|
+| `/` | Landing page with keyword and location search and a category menu |
+| `/jobs` | All Jobs: search, company dropdown, job-type radios, min/max salary sliders, posted-date range, sort |
+| `/job/<id>` | Job detail: description, requirements, salary, Save Job, Follow company, Apply |
+| `/company/<name>` | All jobs from one company |
+| `/apply/<job_id>`, `/apply/saved/<saved_id>` | Application form (name, email, resume upload, cover letter) |
+| `/saved`, `/saved/<id>` | Saved jobs and saved-job snapshots |
+| `/applications`, `/application/<id>` | Application tracker with status history |
+| `/alerts` | Job alerts: create, subscribe and unsubscribe |
+| `/profile` | Profile with followed companies, subscriptions and resume upload |
+| `/login` | Sign-in form |
 
-- `users.json` -- 4 user profiles with job search preferences, work history, and account info
-- `saved_jobs.json` -- 8 saved job listings with full posting details (title, company, location, salary, requirements, tags)
-- `applications.json` -- 2 application records with status history timelines
-- `job_alerts.json` -- 2 job alert configurations with filter criteria
-- `search_history.json` -- 5 past search records with query text and filters applied
+JSON endpoints under `/api/` cover jobs, semantic search, saves, applications,
+alerts, companies, follows, resume upload and stats.
 
-### Data Format
+## Interactions and macros
 
-**users.json**: Each user has `id`, `username`, `display_name`, `email`, `profile` (headline, location, experience_years, current_employer, desired_title, preferred_work_mode, resume_uploaded), `activity_status`, `last_active`.
+- Search by keyword and location: `search`
+- Filter by company, job type, salary range or posted date: `filter_by_dropdown`, `filter_by_options`, `filter_by_slider`, `filter_by_date_range`
+- Sort by date, salary, company or title: `sort_by_form`
+- Apply to a job, create a job alert: `create_by_form`
+- Upload a resume: `upload_file`
+- Save a job, follow a company, toggle an alert: `toggle_relationship`
+- Open jobs and the Saved, Applications and Alerts pages: `navigate_by_route`
+- Read job details and search results: `report_information`
 
-**saved_jobs.json**: Each job has `id`, `user_id`, `job_title`, `company`, `location`, `salary_range` (string like "$155,000 - $185,000"), `job_type` (full-time/part-time/contract/internship), `posted_date`, `saved_date`, `description_snippet`, `requirements` (list), `tags` (list), `url`, `company_rating`, `notes`.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `job-sites`.
 
-**applications.json**: Each application has `id`, `user_id`, `job_title`, `company`, `location`, `salary_range`, `applied_date`, `status`, `status_history` (list of {status, date, reason?, note?}), `cover_letter_submitted`, `resume_version`, `recruiter_name`, `recruiter_email`, `notes`.
+## Data
 
-**job_alerts.json**: Each alert has `id`, `user_id`, `alert_name`, `search_query`, `filters` (location, salary_min, job_type, work_mode, experience_level), `frequency`, `email_notifications`, `is_active`, `created_date`, `last_triggered`, `matches_last_period`.
-
-**search_history.json**: Each entry has `id`, `user_id`, `query`, `filters_applied`, `results_count`, `results_clicked`, `searched_at`.
-
-## Real-World Model
-
-**Indeed.com / LinkedIn Jobs** -- job search portal with search bar, filter sidebar, job cards, saved jobs, application tracker. Key UI elements:
-- Search bar with keyword + location fields
-- Filter sidebar with job type radio buttons, salary slider, date range picker
-- Sort dropdown (relevance, date, salary)
-- Company dropdown for browsing by employer
-- Job detail pages with apply button and save toggle
-- Application tracker with status timeline
-- Job alerts with subscribe/unsubscribe toggles
-- Resume upload on application form
-
-## Target Macros
-
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_query, filter_by_semantic, filter_by_dropdown, filter_by_radio, filter_by_slider, filter_by_date_range, sort_by_ranking, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_by_route, create_from_free_text, submit_by_query, upload_by_upload, follow_by_toggle, subscribe_by_toggle, save_by_toggle, apply_by_form
-
-## Temporal Dynamics
-
-Not applicable -- job postings are a static snapshot. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- Salary range is stored as a formatted string ("$155,000 - $185,000"); the interpreter parses min/max integers for slider filtering
-- Job type values: full-time, part-time, contract, internship
-- Semantic search uses weighted keyword overlap across all job fields (title, company, description, tags, requirements)
-- The site supports browse-only mode (defaults to user 1) when not logged in
-- Company pages aggregate all jobs from a single employer
-- Application status values: applied, phone_screen_scheduled, phone_screen_completed, onsite_scheduled, interviewing, offered, withdrawn, rejected, declined, portfolio_review, design_exercise_submitted
+- Tables: `job_sites_jobs`, `job_sites_users`, `job_sites_applications`,
+  `job_sites_saved_jobs`, `job_sites_job_alerts`, `job_sites_search_history`.
+- Login uses the site's own `session["job_sites_user_id"]`. Browsing pages fall
+  back to user 1 in read-only mode, and actions need an explicit login.
+- Uploaded resumes are written to `sites/job-sites/data/uploads/` on disk
+  (gitignored).
+- Applying sends a confirmation email to WebMail. Applying through the JSON API
+  also emits a `booking` event that puts the application on the calendar.
+  Logging in emits `signup`.

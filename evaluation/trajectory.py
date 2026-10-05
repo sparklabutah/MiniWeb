@@ -87,7 +87,7 @@ def merge_server_log(traj: list, server_log) -> list:
         url = e.get("path", "") or ""
         query = e.get("query") or {}
         if query:
-            url = url + "?" + urlencode(query)
+            url = url + "?" + urlencode(query, doseq=True)
         out.append({
             "type": "network",
             "method": e.get("method"),

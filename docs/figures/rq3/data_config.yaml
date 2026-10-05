@@ -1,0 +1,47 @@
+# Skill-centric vs task-centric data at matched size (make_rq3.py --config docs/figures/rq3/data_config.yaml),
+# 2026-10-04 (user: replaces the scaling figure). One Qwen3.5-4B planner; its executor untrained, trained on InSTA's
+# live-web trajectories (task-centric, 3.7K trajectories, 26.4K steps), or on MiniWeb's generated trajectories
+# (skill-centric, 3.1K trajectories, 27.6K steps; = MiniWebAgent). An empty run list draws "pending".
+# One run per arm on every benchmark (user, 2026-10-05: the live-web benchmarks have one run each), so WebArena-Lite
+# uses each arm's first seed (s1).
+
+out: docs/figures/rq3/skill_vs_task
+model: Qwen3.5-4B
+title: Skill-centric vs task-centric data
+subtitle: "matched size"
+model_logo: docs/figures/logos/qwen.png
+
+benchmarks:
+  - key: wa
+    label: "WebArena-\nLite (154)"
+    kind: webarena
+  - key: wv
+    label: "WebVoyager\n(536)"
+    kind: webvoyager
+    tasks: data/webmix/webvoyager/WebVoyager_reduced_536.jsonl
+  - key: om2w
+    label: "Online-\nMind2Web (280)"
+    kind: om2w
+    tasks: data/webmix/om2w/Online_Mind2Web_reduced_280.json
+
+arms:
+  - label: "Planner, untrained"
+    color: "#7D8798"   # style.UNTRAINED
+    style: hatched
+    wa: [data/webmix/wa/seeds/agent_base_s1, data/webmix/wa/seeds/agent_base_s2, data/webmix/wa/seeds/agent_base_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_agent_planner_base_webjudge]
+  - label: "+ task-centric data (InSTA)"
+    color: "#A8520F"
+    style: hatched
+    compare: "Planner, untrained"
+    wa: [data/webmix/wa/seeds/agent_insta_s1, data/webmix/wa/seeds/agent_insta_s2, data/webmix/wa/seeds/agent_insta_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_insta_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_agent_insta_webjudge]
+  - label: "+ skill-centric data (MiniWebAgent)"
+    color: "#2B5C9E"   # style.TRAINED
+    style: hatched
+    compare: "+ task-centric data (InSTA)"
+    wa: [data/webmix/wa/seeds/agent_pooled31k_s1, data/webmix/wa/seeds/agent_pooled31k_s2, data/webmix/wa/seeds/agent_pooled31k_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_agent_pooled31k_webjudge]

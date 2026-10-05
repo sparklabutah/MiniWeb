@@ -1,50 +1,47 @@
-# Spreadsheets & Slides (SheetDeck)
+# SheetDeck (`spreadsheets-slides`)
 
-**Category**: Editing
-**Reviewer**: Reaz
-**Number of macros**: 11
+A Google Sheets / Google Slides-style workspace for a fictional company
+(Meridian Systems). Users browse files, edit spreadsheet cells in a grid, add
+and reorder slides, share files and export them.
 
-## Data Source
+- URL: `/sites/spreadsheets-slides/` (simulated domain `sheetdeck.app`)
+- Data split: training site
 
-JSON files served from `data_sources/spreadsheets-slides/`:
-- `spreadsheets.json` — 15 spreadsheets with grid data (budget reports, sprint metrics, employee directory, sales pipeline, etc.)
-- `presentations.json` — 10 presentations with slides (all-hands, roadmaps, onboarding, sales strategy, etc.)
-- `templates_ss.json` — 6 templates (spreadsheet and presentation)
-- `users.json` — 5 users with roles at a fictional company (Meridian Systems)
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | File dashboard: search, type and owner filters, sort, Delete per file card |
+| `/spreadsheet/<sid>` | Spreadsheet editor: sheet tabs, editable cell grid (A1 references), Add row, Save Changes, Share, export (XLSX/CSV/JSON) |
+| `/presentation/<pid>` | Presentation editor: slide list, edit slide, add, Move Up/Down, delete, export (PPTX/TXT/JSON) |
+| `/create` | New spreadsheet or presentation form |
+| `/shared` | Files shared with the current user |
+| `/templates` | Template gallery |
+| `/login` | Sign-in form |
 
-**Spreadsheets**: Each object has `id`, `title`, `owner_id`, `created_at`, `updated_at`, `shared_with` (list of user IDs), `rows`, `cols`, and `sheets` (list of `{name, data}` where `data` is a 2D array of strings; row 0 is the header).
+JSON endpoints under `/api/` cover files, cells, ranges, rows, batch edits,
+compute, extremum, filter, slides, export and templates.
 
-**Presentations**: Each object has `id`, `title`, `owner_id`, `created_at`, `updated_at`, `shared_with`, `slides_count`, and `slides` (list of `{title, content, notes}`).
+## Interactions and macros
 
-**Users**: `id`, `username`, `name`, `email`, `password`, `avatar_color`, `role`.
+- Create a spreadsheet or presentation: `create_by_form`
+- Edit cells in the grid and save: `edit_by_cell`, `edit_by_form`
+- Reorder slides with Move Up/Move Down: `edit_by_ranking`
+- Delete a file from the dashboard: `delete_from_table`
+- Share a file (copy link or share with a user): `share_by_form`
+- Export a spreadsheet or deck: `export`
+- Open files from the dashboard or sidebar: `navigate_by_route`
+- Read cell values and tables: `report_information`
 
-**Templates**: `id`, `name`, `type` (spreadsheet|presentation), `category`, `description`.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `spreadsheets-slides`.
 
-## Real-World Model
+## Data
 
-**Google Sheets / Google Slides** — cloud-based productivity suite. Key UI elements:
-- Dashboard file list with type icons, sort/filter controls
-- Sidebar for navigation (All Files, Spreadsheets, Presentations, Shared, Templates)
-- Spreadsheet editor with cell grid, sheet tabs, cell references (A1 notation)
-- Presentation editor with slide panels
-- Sharing and collaboration features
-- Export as CSV/JSON
-
-## Target Macros
-
-navigate_by_semantic, navigate_by_route, extract_from_table, compute_by_query, compute_by_extremum, compute_by_slider, create_from_free_text, edit_by_query, edit_by_form, delete_from_table, export_by_dropdown
-
-## Temporal Dynamics
-
-Not applicable. Spreadsheets and presentations are user-created documents with no time-varying simulation needed. Data is a static snapshot of workplace documents.
-
-## Domain-Specific Notes
-
-- Cell references use spreadsheet notation: A1, B3, AA10, etc. Range notation: A1:C5
-- Numeric computations: sum, avg, count, min, max, median on columns (skip header row)
-- Threshold filtering: filter rows by numeric column with min/max bounds
-- Extremum finding: find the row with min/max value in a column
-- Batch cell updates: form-based (cell_<row>_<col>=value) and API-based (JSON array of updates)
-- Export supports CSV (with proper escaping) and JSON (header row becomes keys)
+- Tables: `spreadsheets_slides_spreadsheets` (sheets stored as 2D arrays, row 0
+  is the header), `spreadsheets_slides_presentations`,
+  `spreadsheets_slides_templates_ss`, `spreadsheets_slides_users`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+- XLSX export produces a real workbook with every sheet.
+- Creating a file emits `file_created` (a copy appears in cloud storage and a
+  notification email is sent). Logging in emits `signup` (password-vault entry
+  and welcome email).

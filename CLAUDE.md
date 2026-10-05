@@ -50,8 +50,8 @@ rows = db.execute(
 
 Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical interaction, e.g. `create_by_form`, `filter_by_slider`, `toggle_relationship`) + an optional **reasoning operation** (`read/extremum/count/compute/compare/verify`). Reasoning that the agent must **output to the human** uses the op-only base `report_information` (this REPLACED `reasoning_on_page`, which is now an alias). Intermediate reasoning is NOT its own tag — its op folds onto the base macro it is part of. The canonical registry is `data/macros.yaml` (loaded via `annotation/macros.py`) — the single source of truth; do not duplicate macro facts elsewhere, edit the registry.
 
-- **39 base macros + 6 operations** in `data/macros.yaml` (`groups:` / `operations:` / `macros:`). Retired flat `verb_by_modality` names fold in as `aliases:` so `canon()` migrates them. `compare_by_form` and `report_information` were added during review; `reasoning_on_page` retired into `report_information`'s aliases. Annotators can register new macros from the annotate UI (persisted to `data/macros.yaml` under the `unassigned` group). Download the current set as CSV from the Macro Template Builder.
-- **Op definitions:** `read`=info is on the page · `extremum`=get max/min · `count`=count · `compute`=compute a NEW value from on-page values · `compare`=compare 2 on-page values · `verify`=compare an on-page value against a value in the instruction.
+- **46 base macros + 7 operations** in `data/macros.yaml` (`groups:` / `operations:` / `macros:`). Retired flat `verb_by_modality` names fold in as `aliases:` so `canon()` migrates them. `compare_by_form` and `report_information` were added during review; `reasoning_on_page` retired into `report_information`'s aliases. Annotators can register new macros from the annotate UI (persisted to `data/macros.yaml` under the `unassigned` group). Download the current set as CSV at `/annotate/api/macro_sheet.csv`.
+- **Op definitions:** `read`=info is on the page · `extremum`=get max/min · `count`=count · `compute`=compute a NEW value from on-page values · `compare`=compare 2 on-page values · `verify`=compare an on-page value against a value in the instruction · `spatial`=reason about WHERE something is (region, proximity, coordinates).
 - `_MACRO_DESCRIPTIONS`/`_canon` in `annotation/app.py` derive from `annotation/macros.py` — edit the registry, not those.
 - `tests/test_macro_registry.py` guards registry drift.
 - Per-site macro→UI-location data lives in **`data/macro_locations.yaml`** (canonical-macro-keyed; drives coverage/sampling). `annotation/macro_locations.py` is now just a loader — edit the YAML, not the module.
@@ -62,8 +62,12 @@ Two-axis macro tags (see `docs/macro_system.md`): a **base macro** (physical int
 - **Session isolation**: Mutations go to `session_overlay`, not base tables. Multiple agents can run in parallel.
 - **Auto-login**: `before_request` handler sets `session["user_id"] = 1` on `/sites/*` requests unless `_no_autologin` flag is set.
 - **2FA**: Financial transactions go through `/verify-payment`. Can be disabled via `session["_disable_2fa"]`.
-- **Script injection**: `@app.after_request` injects `recorder.js`, `file-picker.js`, and `export-feedback.js` into all `/sites/*` pages.
+- **Script injection**: `@app.after_request` (`_inject_site_scripts`) injects `dialog-shim.js`, `recorder.js`, `file-explorer.js`, `export-feedback.js` and `miniweb-share.js` (plus player assets and brand-logo CSS) into all `/sites/*` HTML pages.
 - **Annotation auth**: `/annotate/*` routes require `session["annotator_authenticated"]`. Login at `/annotate/login`.
+
+## Documentation map
+
+Start at `README.md`, then `docs/README.md` (index). System design: `docs/ARCHITECTURE.md`; research claims, protocols and results: `docs/RESEARCH.md`; history: `docs/CHANGELOG.md`. Each package has its own README (`app/`, `annotation/`, `datagen/`, `evaluation/`, `webmix/`, `helpers/`, `sites/`, `tests/`, `data/`).
 
 ## NEVER do these
 

@@ -1,54 +1,46 @@
-# Live (StreamHub)
+# PulseLive (`live`)
 
-**Category**: Streaming & media
-**Reviewer**: Reaz
-**Number of macros**: 20
+A Twitch-style live-streaming platform. Viewers browse live and past streams, watch with a seekable player and live
+chat, follow and subscribe to channels, cheer and redeem channel points, and
+browse clips.
 
-## Data Source
+- URL: `/sites/live/` (simulated domain `livestream.tv`)
+- Data split: training site
 
-Custom-generated JSON data in `data_sources/live/`.
+## Pages
 
-### Data Files
+| Route | Page |
+|---|---|
+| `/` | Stream browser: search plus Category, Status, Streamer and Sort By dropdowns, live chat preview |
+| `/stream/<id>` | Player with seek bar and "Jump to" time, live chat, Cheer dropdown, Follow, Share, Report |
+| `/channel/<user_id>` | Channel: past streams, clips, Follow/Subscribe, gift subs, channel-point rewards with Redeem |
+| `/clips`, `/clip/<id>` | Clip gallery (search, channel dropdown) and clip detail |
+| `/subscriptions` | Your active subscriptions |
+| `/login`, `/register` | Sign-in and sign-up forms |
 
-- `streams.json` -- 12 streams across Software Development, Fitness & Health, Gaming, Just Chatting
-- `users.json` -- 5 users: Alex Rivera (viewer), Marcus Chen (coding streamer), Nathan Brooks (fitness), Natalie Kim (coding), Jake Morrison (startup)
-- `chat_messages.json` -- 40 chat messages across streams
-- `clips.json` -- 8 clips from various streams
-- `subscriptions.json` -- 10 active subscriptions
-- `channel_points.json` -- 6 channel point rewards across 3 channels
-- `follows.json` -- 10 follow relationships
-- `shares.json` -- initially empty, populated by share actions
-- `reports.json` -- initially empty, populated by report actions
-- `playback_states.json` -- initially empty, populated by playback/join actions
+JSON endpoints under `/api/` cover streams, search, chat, clips, channels
+(follow, subscribe, gift, redeem), playback state, shares, reports and stats.
 
-### Sampling
+## Interactions and macros
 
-All data loaded by default (`num_data_points: -1`). Data is small enough to serve entirely.
+- Search streams; filter by category, status, streamer or clip channel: `search`, `filter_by_dropdown`
+- Sort streams (Most Viewed, Newest, Oldest, Longest): `sort_by_form`
+- Open a stream, a channel or the clips page: `navigate_by_route`
+- Seek or jump to a timestamp in the player: `play_by_playback`
+- Post a chat message or register an account: `create_by_form`
+- Cheer channel points: `pay_by_form`; redeem a reward: `checkout_by_form`
+- Follow or subscribe to a channel: `toggle_relationship`
+- Share a stream: `share_by_form`; sign in: `authenticate_by_form`
 
-## Real-World Model
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `live`.
 
-**Twitch.tv** -- dark-themed live streaming platform. Key UI elements:
-- Stream browse page with category nav bar and filter/sort dropdowns
-- Stream detail page with video player, chat panel, streamer info
-- Channel pages with stream history, clips, follow/subscribe buttons
-- Clip gallery for highlights
-- Subscription management page
-- Login/register forms
+## Data
 
-## Target Macros
-
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, sort_by_dropdown, select_by_slider, play_by_timestamp, play_by_playback, post_from_free_text, follow_by_toggle, share_by_dropdown, report_by_form, subscribe_by_toggle, join_by_toggle, pay_by_dropdown, redeem_by_dropdown, authenticate_by_form, register_by_form
-
-## Temporal Dynamics
-
-Live streaming is inherently temporal, but for benchmark purposes the data is a static snapshot. Streams have status "live" or "completed" as fixed properties. No temporal simulation is needed -- the benchmark tests interaction patterns, not real-time video delivery.
-
-## Domain-Specific Notes
-
-- Semantic search uses keyword-overlap scoring across stream titles, categories, and tags
-- Categories: Software Development, Fitness & Health, Gaming, Just Chatting
-- Playback state tracks timestamp (seconds), speed, quality, volume per user per stream
-- Channel points are a virtual currency; users start with 5000 points and spend on per-channel rewards
-- Gift subscriptions are a separate action from self-subscribing, using a tier dropdown
-- Chat messages are persisted and displayed chronologically
-- Clips reference a specific stream and a timestamp_seconds within that stream
+- Tables (`live_*`): `streams`, `chat_messages`, `clips`, `channel_points`,
+  `follows`, `subscriptions`, `users`.
+- Auth is site-specific on purpose: login uses `session["live_user_id"]`, so
+  the global auto-login does not apply. Logged-out visitors browse as the
+  first user; follow, subscribe, chat and redeem need an explicit login.
+- The stream and home pages poll `/api/chat/live` without end. That has hung
+  browser-agent harnesses that wait for the network to go idle.
+- Registering emits a `signup` event (password-vault entry and welcome email).

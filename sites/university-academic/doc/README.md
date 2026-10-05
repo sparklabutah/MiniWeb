@@ -1,72 +1,52 @@
-# University Academic (Meridian State University)
+# Meridian State University (`university-academic`)
 
-**Category**: Education / university
-**Reviewer**: Minh
-**Number of macros**: 16
+A university website and student portal: course catalog, faculty directory,
+research areas, events, alumni network, admissions application and a
+"My Schedule" course registration view, plus an editable course gradebook.
 
-## Data Source
+- URL: `/sites/university-academic/` (simulated domain `meridianstate.edu`)
+- Data split: training site
 
-Fictional university CSE department website. Data files in `data_sources/university-academic/`:
-- `courses.json` -- 10 CSE courses (introductory, intermediate, advanced)
-- `faculty.json` -- 8 faculty members with research areas, bios, publications
-- `departments.json` -- Department metadata + 5 research areas (systems, ML, HCI, security, PL)
-- `events.json` -- 5 department events (career fair, hackathon, meetup, lecture, celebration)
-- `alumni.json` -- 5 alumni with graduation info, current positions, achievements
-- `users.json` -- 5 users (alumni, faculty affiliates) with MSU NetIDs
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Home: featured courses, upcoming events, departments |
+| `/courses` | Academics: course catalog with search and department/level dropdowns (also `/courses/level/<level>`, `/courses/area/<area>`, `/courses/search/<query>`) |
+| `/course/<id>` | Course detail with Register/Drop |
+| `/course/<id>/gradebook` | Inline-editable score grid (student x assignment) |
+| `/schedule` | My Schedule: registered and waitlisted courses |
+| `/faculty`, `/faculty/<id>` | Faculty directory with search and area filter; faculty profile |
+| `/departments`, `/research`, `/department/<id>` | Research areas and their faculty and courses |
+| `/events`, `/event/<id>` | Events with date range and type filter; event detail |
+| `/alumni` | Alumni directory with search and year filter |
+| `/compare` | Two course dropdowns and a side-by-side table |
+| `/apply` | Admissions application (name, email, program, statement) |
+| `/subscribe` | Campus Life: subscribe/unsubscribe per research area (portal login required) |
+| `/export` | Resources: download courses or faculty as CSV/JSON |
+| `/contact`, `/login` | Contact form; MyMSU portal sign-in |
 
-All files are JSON. Courses have id, code, title, credits, level, description, prerequisites, instructor, research_area. Faculty have id, name, title, email, office, research_areas (list), bio, publications_count. Events have id, title, type, date (YYYY-MM-DD), time, location, description. Alumni have id, name, graduation_year, degree, advisor, current_position. Users have net_id, display_name, role.
+JSON endpoints under `/api/` mirror courses, faculty, departments, events, alumni and subscriptions.
 
-## Real-World Model
+## Interactions and macros
 
-**Meridian State University CSE department website** -- academic portal with navy/gold branding. Key UI elements:
-- Navigation bar with Courses, Faculty, Research, Events, Alumni links
-- Hero section with department name and stats
-- Course catalog with level/area filters and search
-- Faculty directory with research area filter
-- Research areas with associated faculty and labs
-- Events calendar with date range and type filters
-- Alumni network with year filter and search
-- Student/alumni portal with login
+- Search courses, faculty or alumni: `search`
+- Filter courses, faculty, events or alumni by dropdown: `filter_by_dropdown`
+- Open courses, faculty profiles and events: `navigate_by_route`
+- Submit an application or a contact message: `create_by_form`
+- Edit gradebook cells: `edit_by_cell`
+- Subscribe to a research area: `toggle_relationship`
+- Export courses or faculty: `export`
+- Read course, faculty and event details, compare two courses: `report_information`
 
-## Target Macros (18)
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `university-academic`.
 
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, extract_by_query, extract_by_checkbox, extract_from_table, extract_by_route, extract_by_date_range, compare_from_table, submit_by_query, apply_by_form, export_by_dropdown, subscribe_by_toggle
+## Data
 
-## Macro-to-Route Mapping
-
-| Macro | Route(s) |
-|-------|----------|
-| navigate_by_semantic | Homepage links to research areas, events |
-| navigate_by_dropdown | Header nav dropdown to Courses, Faculty, Research, Events, Alumni |
-| navigate_by_route | /course/<id>, /faculty/<id>, /department/<id>, /event/<id> |
-| search_by_query | /courses?q=, /faculty?q=, /alumni?q= |
-| search_by_semantic | /api/faculty/search?q= (keyword-overlap ranked) |
-| search_by_route | /courses/search/<query> |
-| filter_by_dropdown | /courses?dept=, /courses?level=, /events?type=, /alumni?year= |
-| filter_by_route | /courses/level/<level>, /courses/area/<area> |
-| extract_by_query | /api/courses?q=, /api/faculty?q= |
-| extract_by_checkbox | /courses?levels=introductory&levels=advanced (multi-select) |
-| extract_from_table | /compare?ids= (course comparison table) |
-| extract_by_route | /api/courses/<id>, /api/faculty/<id>, /api/events/<id> |
-| extract_by_date_range | /events?date=YYYY-MM-DD&date_to=YYYY-MM-DD |
-| compare_from_table | /compare?ids=cse-446,cse-473 (side-by-side) |
-| submit_by_query | /contact (POST subject + message) |
-| apply_by_form | /apply (POST applicant_name, email, program, statement) |
-| export_by_dropdown | /api/export?format=csv&type=courses, /api/export?format=json&type=faculty |
-| subscribe_by_toggle | /subscribe/<area_slug> (POST toggle subscription) |
-
-## Temporal Dynamics
-
-Not applicable -- university department websites are relatively static. Course catalogs and faculty directories change quarterly/annually but not in real-time. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- Courses have three levels: introductory, intermediate, advanced
-- Research areas serve as the department grouping mechanism
-- Faculty members are linked to courses they teach and research areas
-- Events have types: career_fair, hackathon, alumni_meetup, lecture, celebration
-- Alumni are linked to faculty advisors and current positions
-- User authentication uses MSU NetID system (simplified)
-- Subscriptions and applications are persisted in users.json
+- Tables: `university_academic_courses`, `_faculty`, `_departments`, `_events`,
+  `_alumni`, `_users`, and `_enrollments` (created at runtime on first use).
+- Course registration uses the root user id in `session["user_id"]`, so it
+  works as user 1 under the global auto-login. Subscriptions and saved
+  applications need a portal login, which sets the site's own `session["ua_user"]` (net id).
+- An application sends a confirmation email to WebMail and emits `booking`
+  (calendar entry). Portal login emits `signup`.

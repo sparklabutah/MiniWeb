@@ -1,22 +1,51 @@
-# Design / creative
+# DesignFlow (`design-creative`)
 
-**Category**: Productivity
-**Reviewer**: Reaz
-**Number of macros**: 26
+A Canva-style design tool. Users browse a template gallery, start projects from
+templates, edit designs in a simplified canvas editor (positioned HTML elements,
+not a real canvas), manage an asset library, invite collaborators and export
+designs as SVG.
 
-## Data Source
+- URL: `/sites/design-creative/` (simulated domain `canvastudio.design`)
+- Data split: training site
 
-https://www.kaggle.com/datasets/onurgunes1993/rico-dataset
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Template gallery with search, category links and Sort (Most Popular, Name A-Z, Newest) |
+| `/template/<id>` | Template detail with "Use This Template" and Favorite/Unfavorite |
+| `/projects` | My Projects: create-project form, sort dropdown, duplicate |
+| `/project/<id>` | Project detail: rename, status (draft/completed), duplicate, invite by email |
+| `/editor/<id>` | Canvas editor: add text, rectangle, ellipse and image elements, drag/resize, edit properties, delete, export |
+| `/project/<id>/export` | Downloads the project as an SVG |
+| `/assets` | Asset library with search, upload and "use in a design" |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_chip, sort_by_ranking, extract_by_image, create_from_free_text, create_from_table, edit_by_toggle, edit_by_form, delete_from_table, select_by_dropdown, select_by_chip, configure_by_dropdown, select_by_radio, play_by_playback, export_by_dropdown, upload_by_upload, post_from_free_text, react_by_toggle, follow_by_toggle, share_by_dropdown, save_by_toggle, invite_by_form
+JSON endpoints under `/api/` cover templates, projects (including adding and
+removing elements), assets, favorites, categories and stats.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search templates or assets: `search`
+- Pick a template category: `filter_by_options`
+- Sort templates or projects: `sort_by_form`, `filter_by_dropdown`
+- Create a project, use a template, invite a collaborator: `create_by_form`
+- Rename a project or change its status: `edit_by_form`, `configure_by_form`
+- Remove an element in the editor: `delete_from_table`
+- Favorite a template: `toggle_relationship`, `feedback_by_react`
+- Upload an asset: `upload_file`
+- Open templates and projects: `navigate_by_route`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `design-creative`.
+
+## Data
+
+- Tables: `design_creative_templates` (read-only), `design_creative_projects`,
+  `design_creative_assets`, `design_creative_users`.
+- `sites/design-creative/seed_assets.py` seeds the stock asset library (inline
+  SVG and `data:` URIs) into the base table; re-run it after a DB rebuild.
+- Login uses `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs in user 1.
+- Signing in emits a `signup` event. Creating a project or inviting a known user
+  sends WebMail email. Marking a project completed or uploading an asset emits
+  `file_created`, which syncs the file to cloud storage and sends an email.

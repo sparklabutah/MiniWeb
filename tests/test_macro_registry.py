@@ -48,6 +48,25 @@ def test_report_information_is_op_only():
     assert R.canon("reasoning_on_page") == "report_information"
 
 
+
+def test_judge_rubrics_complete():
+    """Every assigned macro and every operation carries a judge rubric; unassigned
+    (UI-registered) macros fall back to the generic rubric."""
+    for m in R.all_canonical():
+        r = R.rubric(m)
+        assert r.get("done") and r.get("fail_if") and r.get("must_match"), f"{m} rubric incomplete"
+        if R.group_of(m) != "unassigned":
+            assert R.entry(m).get("rubric"), f"{m} has no rubric in data/macros.yaml"
+    for op in R.operations():
+        assert R.op_rubric(op).get("done") and R.op_rubric(op).get("fail_if"), f"operation {op} rubric incomplete"
+    assert R.rubric_principles().get("evidence_order")
+    for m in R.all_canonical():                      # optional screenshot criteria for the vision judge
+        visual = R.rubric(m).get("visual")
+        assert visual is None or (isinstance(visual, list) and visual and all(isinstance(v, str) and v for v in visual)), m
+    assert R.rubric("sign_by_freeformdrawing").get("visual") and R.op_rubric("spatial").get("visual")
+    assert R.rubric("reasoning_on_page") == R.rubric("report_information")      # alias-resolved
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

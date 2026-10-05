@@ -1,22 +1,38 @@
-# Dictionaries/Language Tools
+# WordRef Dictionary (`dictionaries-language-tools`)
 
-**Category**: Utilities
-**Reviewer**: Kenny
-**Number of macros**: 12
+An English dictionary in the style of Merriam-Webster / Dictionary.com, built
+from Wiktionary entries. Users search words, browse A-Z, read definitions,
+IPA pronunciations, word forms, examples, synonyms and antonyms, and save
+words to a personal list.
 
-## Data Source
+- URL: `/sites/dictionaries-language-tools/` (simulated domain `wordwise.com`)
+- Data split: training site
 
-https://en.wiktionary.org/wiki/Wiktionary:Main_Page
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Search box, word of the day, paginated results |
+| `/browse/<letter>` | Words starting with a letter |
+| `/word/<word>` | Word entry: IPA, part of speech, forms, senses, examples, synonyms; "Save Word" button when signed in |
+| `/dashboard` | Saved words |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, extract_from_free_text, extract_by_semantic, extract_by_dropdown, extract_by_route, select_by_dropdown, play_by_route, save_by_toggle, translate_by_query
+JSON endpoints under `/api/` provide word search (`q`, `pos`, `letter`), word details, synonyms, random word, word of the day and stats.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Look up a word: `search`
+- Open a word from results or the A-Z browser: `navigate_by_route`
+- Save / unsave a word: `toggle_relationship`
+- Read definitions, pronunciation, examples and synonyms: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `dictionaries-language-tools`.
+
+## Data
+
+- Tables: `dictionaries_language_tools_entries` (Wiktionary entries),
+  `dictionaries_language_tools_users`.
+- Source: Wiktionary (https://en.wiktionary.org/).
+- Login uses the shared `session["user_id"]`, so the global auto-login signs in user 1.
+- Pronunciations are IPA text; there is no audio player or translation section.

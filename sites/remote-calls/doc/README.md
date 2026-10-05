@@ -1,55 +1,52 @@
-# Remote Calls (CallHub)
+# CallHub (`remote-calls`)
 
-**Category**: Communication
-**Reviewer**: Farhan
-**Number of macros**: 19
+A Zoom, Teams or Google Meet-style video-calling platform for the fictional
+company Meridian Systems. Users schedule and join meetings, watch recordings
+and read transcripts, review their call log, and chat inside a simulated call
+room.
 
-## Data Source
+- URL: `/sites/remote-calls/` (simulated domain `meetwave.app`)
+- Data split: training site
 
-Synthetic meeting/call data for a fictional company (Meridian Systems). Users, meetings, recordings, and call logs are stored as JSON in data_sources/remote-calls/.
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Dashboard: upcoming and recent meetings, recent calls |
+| `/meetings` | Meetings table with title search, status/type/participant dropdowns and a From/To range |
+| `/meeting/<id>` | Meeting detail: participants, recording link, Share (copy link), invite by email, Cancel Meeting |
+| `/meeting/<id>/call` | Simulated in-call room: mic, camera and chat controls, Leave |
+| `/recordings`, `/recording/<id>` | Recording list with search; recording detail with a player |
+| `/recording/<id>/transcript` | Full transcript |
+| `/call-log` | Call history with type/status/contact dropdowns and a From/To range |
+| `/schedule` | Schedule a Meeting form (title, date and time, duration, type, participant checkboxes, file attachment) |
+| `/join` | Join by meeting code (for example `mtg-005`) |
+| `/settings` | Notification sound, background and language settings |
+| `/login` | Sign-in form |
 
-Four JSON files, each an array of objects:
+JSON endpoints under `/api/` cover meetings, search, recordings and playback,
+call log, sharing, invites, meeting chat, join, settings and export.
 
-- `users.json` -- 8 users with id (rc-u-XXX), root_user_id, display_name, email, username, plan, timezone, status
-- `meetings.json` -- 18 meetings with id (mtg-XXX), title, host_id, participants (list of user ids), date (ISO w/ tz), duration_minutes, type (work/personal), recording_available, status (scheduled/completed/cancelled)
-- `recordings.json` -- 6 recordings with id (rec-XXX), meeting_id, title, recorded_by, date, duration_minutes, file_size_mb, format, transcript_available, access (team/organization), views
-- `call_log.json` -- 25 calls with id (call-XXX), caller_id, callee_id, type (audio/video), date, duration_seconds, status (completed/missed), note
+## Interactions and macros
 
-Additionally, `messages.json` and `settings.json` are created at runtime for chat messages and user settings respectively.
+- Search meetings or recordings: `search`
+- Filter meetings or calls by dropdowns or dates: `filter_by_dropdown`, `filter_by_date_range`
+- Schedule a meeting: `book_by_form`, `create_by_form`, with an attachment via `upload_file`
+- Invite someone by email: `create_by_form`
+- Join a meeting by code: `join_meeting`
+- Chat in the call room: `message_from_free_text`
+- Cancel a meeting, copy its share link: `cancel_by_form`, `share_by_form`
+- Play a recording (reveals exact runtime, resolution and chapters): `play_by_playback`
+- Change settings: `configure_by_form`
 
-### Sampling
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `remote-calls`.
 
-Data is fully synthetic and small (8 users, 18 meetings, 6 recordings, 25 calls). No sampling needed; all records are loaded.
+## Data
 
-## Real-World Model
-
-**Zoom / Microsoft Teams / Google Meet** -- corporate video conferencing platform. Key UI elements:
-- Dashboard with upcoming meetings, recent meetings, recent calls
-- Meetings list page with filters (status, type, participant, date range, search)
-- Meeting detail page with participant list, recording link, share toggle, invite form, chat
-- Recordings list with search and playback
-- Call log with filters (type, status, contact, date range)
-- Schedule meeting form
-- Join by meeting code
-- User settings page (camera, mic, background, notifications)
-
-## Target Macros
-
-navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, extract_by_query, extract_from_table, extract_by_route, submit_by_query, select_by_dropdown, configure_by_dropdown, play_by_playback, export_by_dropdown, share_by_toggle, invite_by_form, message_from_free_text, book_by_form, cancel_by_form, join_by_code
-
-## Temporal Dynamics
-
-Not applicable -- meeting/call data is a synthetic snapshot of a two-week period. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- Semantic search: simple keyword-overlap matching over meeting titles, types, statuses, and participant display names
-- Authentication: session-based login via username; any non-empty password accepted (MiniWeb convention)
-- Share toggle: generates/revokes a share link for a meeting (share_link_active flag)
-- Play recording: increments view count on POST to /api/recordings/<id>/play
-- Meeting chat: stored in messages.json keyed by meeting_id
-- Join by code: meeting ID serves as the join code (e.g., "mtg-005")
-- Cancel: sets meeting status to "cancelled" (cannot cancel completed meetings)
-- Export: supports CSV and JSON for meetings, calls, and recordings
+- Tables: `remote_calls_users`, `remote_calls_meetings`,
+  `remote_calls_recordings`, `remote_calls_call_log`, `remote_calls_messages`.
+- Site user ids look like `rc-u-001`. The session stores the shared root user
+  id, which is mapped to the site user through `root_user_id`, so the global
+  auto-login signs the user in as Alex Rivera.
+- Scheduling a meeting calls `on_booking`, which adds a calendar event and
+  sends a booking email.

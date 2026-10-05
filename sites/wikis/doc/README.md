@@ -1,55 +1,46 @@
-# Wikis (LakeportWiki)
+# LakeportWiki (`wikis`)
 
-**Category**: Search & reference
-**Reviewer**: Minh
-**Number of macros**: 13
+A Wikipedia/MediaWiki-style encyclopedia about the fictional city of
+Lakeport, WA and the Pacific Northwest, mixed with real Wikipedia articles.
+Users read, search, compare, create and edit articles and browse revision
+history, diffs and recent changes.
 
-## Data Source
+- URL: `/sites/wikis/` (simulated domain `lakeportwiki.org`)
+- Data split: training site
 
-Wikimedia-inspired synthetic data. A collaborative wiki encyclopedia covering a fictional city (Lakeport, WA), its people, landmarks, technology companies, and Pacific Northwest geography.
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Main page: featured articles, categories, recent edits, search |
+| `/wiki/<slug>` | Article with infobox, categories and revision history |
+| `/wiki/<slug>/revision/<rev>`, `/wiki/<slug>/diff/<rev>` | One past revision; what that edit changed (with revert) |
+| `/edit/<slug>` | Edit form: content, category dropdown, edit summary |
+| `/create` | New article form (title, content, category) |
+| `/category/<id>` | Articles in one category |
+| `/recent-changes` | Revision feed (editor, timestamp, summary) |
+| `/compare?page1=&page2=` | Two page dropdowns and a side-by-side comparison |
+| `/search?q=` | Search results with snippets |
+| `/login` | Sign-in form |
 
-navigate_by_query, navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, extract_by_query, extract_by_dropdown, extract_from_table, extract_by_route, compare_by_dropdown, verify_from_free_text, create_from_free_text, edit_by_dropdown
+JSON endpoints under `/api/` cover pages, search, semantic search, compare, fact verification (`/api/verify`), categories and stats.
 
-## Site Description
+## Interactions and macros
 
-LakeportWiki is modeled after Wikipedia/MediaWiki. It is a multi-user collaborative encyclopedia with 30 articles across 8 categories. Users can browse, search, create, edit, and compare articles.
+- Search the wiki: `search`
+- Open articles from the main page, categories and recent changes: `navigate_by_route`
+- Create a new article: `create_by_form`
+- Edit an article and its category: `edit_by_form`
+- Read facts from articles and infoboxes, compare two pages, read revision history: `report_information`
 
-### Data files (in data_sources/wikis/)
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `wikis`.
 
-- **pages.json** -- 30 wiki articles with title, slug, content (markdown-ish), category, author_id, dates, view counts, and linked_pages
-- **categories.json** -- 8 categories (Lakeport City, Technology Companies, Landmarks & Places, PNW Geography, Notable People, Education, Culture & Events, Economy & Infrastructure) with page counts
-- **revisions.json** -- 40 revision records tracking edit history (editor, timestamp, summary, diff stats)
-- **users.json** -- 5 registered editors with credentials, roles, and edit counts
+## Data
 
-### Real-world model
-
-Wikipedia / MediaWiki -- article pages with revision history, category navigation, search, side-by-side comparison.
-
-### Temporal/dynamic behavior
-
-Articles accumulate revisions over time. The data spans Feb 2024 to Jun 2026 of edits. No real-time simulation needed; the revision timeline is static but realistic.
-
-### Key routes
-
-| Route | Method | Purpose |
-|---|---|---|
-| `/` | GET | Main page with featured articles, categories, recent edits |
-| `/wiki/<slug>` | GET | Article detail page |
-| `/search?q=` | GET | Full-text search |
-| `/category/<id>` | GET | Category listing |
-| `/compare?page1=&page2=` | GET | Side-by-side comparison via dropdown |
-| `/edit/<slug>` | GET/POST | Edit article (form with category dropdown) |
-| `/create` | GET/POST | Create new article |
-| `/recent-changes` | GET | Revision history feed |
-| `/api/pages` | GET | API: list/filter/sort pages |
-| `/api/pages/<slug>` | GET/PUT | API: get/update single page |
-| `/api/pages` | POST | API: create page |
-| `/api/search?q=` | GET | API: keyword search |
-| `/api/semantic-search?q=` | GET | API: weighted relevance search |
-| `/api/compare?slugs=a,b` | GET | API: compare two pages |
-| `/api/verify` | POST | API: fact-check a claim against a page |
-| `/api/categories` | GET | API: list categories |
-| `/api/categories/<id>/pages` | GET | API: pages in a category |
-| `/api/stats` | GET | API: aggregate statistics |
+- Tables: `wikis_articles` (real Wikipedia articles), `wikis_pages`
+  (Lakeport pages layered on top), `wikis_categories`, `wikis_revisions`, `wikis_users`.
+- Seeded revision timestamps are fixed past dates.
+- Login reads `session["user_id"]`, so the global auto-login signs in as user 1.
+- Edits and reverts emit `edit` (recorded in the event log only; no handler).
+  Creating an article emits `file_created` (cloud-storage file and email).
+  Login emits `signup`.

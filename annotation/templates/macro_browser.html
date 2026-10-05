@@ -68,6 +68,7 @@
     <a href="/annotate/verify">Verifier Builder</a>
     <a href="/annotate/playback">Playback Facts</a>
     <a href="/annotate/macro-browser" class="here">Macro Browser</a>
+    <a href="/annotate/task-review">Task Review</a>
 </div>
 <header>
     <span class="seg"><button id="m-macro" class="on">By macro</button><button id="m-task">By task</button></span>
@@ -215,16 +216,13 @@ function render() {
     if (!detail) { $('stage').innerHTML = '<div class="empty">No occurrences for this filter.</div>'; $('tl').innerHTML = ''; return; }
     const t = focusTag(), a = detail.actions[frame];
     const [ann, tid] = [detail.key.slice(0, detail.key.indexOf('/')), detail.key.slice(detail.key.indexOf('/') + 1)];
-    $('stage').innerHTML = a && a.frame
-        ? `<img alt="Screenshot for action ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(ann)}/${encodeURIComponent(tid)}/${a.frame}">`
-        : a && a.outline ? `<pre aria-label="Page outline (no screenshot recorded)">${esc(a.outline)}</pre>`
-        : '<div class="empty">No screenshot recorded for this action.</div>';
+    drawStage(a, ann, tid);
     const [lo, hi] = range();
     $('caption').innerHTML = a ? `<b>Action ${a.index}</b> of ${detail.actions.length} · <code>${esc(a.action)}</code> ${esc(a.target)}${a.value ? ` = <code>${esc(a.value)}</code>` : ''}<div class="muted">${esc(a.url)} · showing ${lo + 1}–${hi + 1}</div>`
                              : '<span class="muted">This recording has no actions.</span>';
     // card
     $('c-eyebrow').textContent = mode === 'macro' ? 'Occurrence' : 'Task';
-    $('c-title').innerHTML = t ? `<span class="sw" style="background:${color(t.macro)}"></span>${esc(t.instance)}${t.op ? ` <span class="op">${esc(t.op)}</span>` : ''}` : esc(detail.key);
+    $('c-title').innerHTML = t ? `<span class="sw" style="background:${color(t.macro)}"></span>${esc(t.instance)}${t.op ? ` <span class="op">${esc(t.op)}</span>` : ''}${t.required === false ? ' <span class="op" title="performed in the recording, not required by the instruction">incidental</span>' : ''}` : esc(detail.key);
     $('c-subtask').textContent = t ? (t.subtask || '') : `${detail.tags.length} macro instance(s)`;
     $('c-task').innerHTML = `<a href="/annotate/verify?annotator=${encodeURIComponent(ann)}&task_id=${encodeURIComponent(tid)}" target="_blank">${esc(detail.key)}</a>`;
     $('c-span').innerHTML = t ? (t.span ? `actions ${t.span[0]}–${t.span[1]} of ${detail.actions.length}` : '<span class="warn">no span recorded — showing the whole task</span>')
@@ -236,6 +234,14 @@ function render() {
         <span class="meta">${g.span ? g.span.join('–') : 'no span'}</span></div>`).join('');
     $('c-tags').querySelectorAll('.item').forEach((el) => el.onclick = () => jumpToInstance(el.dataset.inst));
     renderTimeline(lo, hi);
+}
+
+// stage: recorded screenshot, or the page outline when none was recorded
+function drawStage(a, ann, tid) {
+    $('stage').innerHTML = a && a.frame
+        ? `<img alt="Screenshot for action ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(ann)}/${encodeURIComponent(tid)}/${a.frame}">`
+        : a && a.outline ? `<pre aria-label="Page outline (no screenshot recorded)">${esc(a.outline)}</pre>`
+        : '<div class="empty">No screenshot recorded for this action.</div>';
 }
 
 function renderTimeline(lo, hi) {

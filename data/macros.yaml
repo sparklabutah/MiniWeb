@@ -38,36 +38,87 @@ operations:
     label: read/memorize
     desc: 'read/memorize: the info is present on the page — locate and read it (baseline / filler)'
     check: answer appears verbatim on a visited page
+    rubric:
+      done: The value was read from the page where it appears.
+      fail_if:
+      - a value from a different entity or page
+      - an invented value
   extremum:
     weight: 3
     label: extremum
     desc: get the max/min among on-page items without using a sort control
     check: chosen item is the argmax/argmin of the candidate set
+    rubric:
+      done: The chosen item is the max/min of the candidate set named by the subtask (the reference item).
+      fail_if:
+      - a non-extreme item chosen
+      - extremum taken over a different set (e.g. unfiltered)
   count:
     weight: 3
     label: count
     desc: count the on-page items that match a condition
     check: count matches the true number of matching items
+    rubric:
+      done: The count equals the number of items matching the condition (the reference count).
+      fail_if:
+      - counted a different set (missing filter/date scope)
+      - off-by-some
   compute:
     weight: 3
     label: compute
     desc: compute a new value from values on the page (a value not itself shown)
     check: recompute from source data and compare
+    rubric:
+      done: The derived value equals the reference value recomputed from the source data.
+      fail_if:
+      - arithmetic error
+      - wrong inputs to the computation
   compare:
     weight: 3
     label: compare
     desc: compare two values on the page against each other
     check: the stated relation holds over the named values
+    rubric:
+      done: The stated relation/choice between the named values matches the reference.
+      fail_if:
+      - relation reversed
+      - compared the wrong values
   verify:
     weight: 2
     label: verify
     desc: compare a value on the page against a value given in the instruction
     check: the on-page value satisfies the instruction's stated value/condition
+    rubric:
+      done: The yes/no (or pass/fail) conclusion about the instruction's condition matches the reference.
+      fail_if:
+      - opposite conclusion
+      - no committed conclusion
   spatial:
     weight: 3
     label: spatial
     desc: 'reason about WHERE something is — locate/position by region, proximity, or coordinates (pan/zoom to reveal off-screen info, pick the item closest to a point, sign/draw in the correct field, scrub to a timestamp)'
     check: the agent acts at the correct location/region/position, not merely with the right value
+    rubric:
+      done: The action happened at the correct location/region/position.
+      fail_if:
+      - right value at the wrong location
+      - location never reached
+      visual:
+      - the action happened at the correct place on screen (region, field, point, or timestamp)
+rubric_principles:
+  scope: 'Judge ONE macro instance: its subtask, the task instruction, and the reference (gold) evidence for that instance.'
+  evidence_order:
+  - server requests the site received (method, URL, body, status) — the authoritative record of state changes
+  - the page the agent saw after acting (URL, visible text/state)
+  - the agent's own messages — never decisive; a claimed success with no matching request or page state is a fail, and a claimed failure does not undo a success the requests or pages show
+  outcome_over_path: A different route (menu vs search vs direct link, another control, another order) passes when it reaches the same end state as the reference — unless the instruction itself names the route or control ("from the sharing options", "using the date filter"); then that route must be used.
+  targets_must_match: Values that identify WHAT was acted on (item/record ID, recipient, amount, date, option, destination) must match the reference or the instruction. Incidental values (timestamps, generated IDs, formatting, free-text wording the instruction does not dictate) may differ.
+  final_state: When the agent changed the same thing several times, judge the LAST state. This is about what the agent changed (saved values, toggles, reactions); opening a page, dialog or menu is done once it was opened, and navigating away afterwards does not undo it.
+  no_collateral: Unrequested destructive side effects fail the instance — deleting, cancelling or overwriting items the instruction did not ask for, even when the requested item was also handled.
+  server_over_screenshot: 'An accepted server response that confirms the state (e.g. a like request answered "liked") outranks a screenshot; screenshots are taken at step time and can lag the page. Use screenshots where the requests are silent or ambiguous.'
+  complete: Every element the subtask names must be done; partial completion fails.
+  accepted: 'A request counts only if the site accepted it: 2xx, or a 3xx redirect after a form submit. 4xx/5xx or a re-rendered form with an error does not count.'
+  reference_gaps: If the reference lacks evidence for something (recorder gap), judge that part from the instruction instead.
 macros:
   create_by_form:
     group: form
@@ -88,6 +139,20 @@ macros:
       - submit_by_ranking
       - submit_by_route
       - submit_form
+    rubric:
+      done: A new record (post, item, application, invite, channel, note, …) was submitted through its form and the site accepted it.
+      evidence: An accepted create request (POST/PUT) carrying the values, or the new record visible afterwards.
+      must_match:
+      - the kind of record and where it lives (subreddit, board, channel, project, …)
+      - every field value the subtask specifies (title, category, recipients; free text in substance)
+      may_differ:
+      - field entry order
+      - optional fields the instruction does not mention
+      fail_if:
+      - form filled but never submitted
+      - submission rejected or re-shown with a validation error
+      - wrong destination or category
+      - a required field left empty or holding a placeholder / pasted path
   edit_by_form:
     group: form
     description: Edit an existing record through a form
@@ -98,12 +163,37 @@ macros:
       - edit_by_date_range
       - edit_by_dropdown
       - edit_by_query
+    rubric:
+      done: An existing record's fields were changed through its edit form and saved.
+      evidence: An accepted update request for that record's ID, or the record shown with the new values.
+      must_match:
+      - the same record as the reference
+      - each changed field's new value (substance for free text)
+      may_differ:
+      - how the edit form was reached
+      fail_if:
+      - a different record edited
+      - editor opened but not saved
+      - the requested change missing from the saved values
+      - unrequested fields wiped
   compare_by_form:
     group: form
     description: Compare items by selecting them through form controls (e.g. dropdowns) that render a side-by-side view
     example: Pick two products in the compare dropdowns and read which has more reviews
     span_start: open/enter the compare view
     span_end: both items selected and the comparison is visible
+    rubric:
+      done: Both reference items are selected in the compare controls and the side-by-side comparison is shown.
+      evidence: Compare-view requests/URL naming both items, or the comparison page listing both.
+      must_match:
+      - both items being compared
+      may_differ:
+      - which slot each item occupies
+      fail_if:
+      - only one item selected
+      - a different item compared
+      visual:
+      - the comparison view shows both reference items side by side
   pay_by_form:
     group: form
     description: Make a payment via a form
@@ -113,6 +203,20 @@ macros:
     aliases:
       - pay_by_dropdown
       - pay_by_query
+    rubric:
+      done: A payment was submitted and confirmed (including any verification/2FA step).
+      evidence: An accepted payment request; the bill/transfer shown as paid.
+      must_match:
+      - payee or bill
+      - amount
+      - source account and date when specified
+      - every bill the subtask covers (e.g. 'all due bills')
+      may_differ:
+      - how the payment form was reached
+      fail_if:
+      - stopped at the review or verification step
+      - wrong bill, payee or amount
+      - only some of the required bills paid
   checkout_by_form:
     group: form
     description: Complete checkout (incl. promo/redeem) via a payment form
@@ -122,6 +226,18 @@ macros:
     aliases:
       - redeem_by_code
       - redeem_by_dropdown
+    rubric:
+      done: 'An order was placed: checkout submitted and accepted.'
+      evidence: An accepted order/checkout request; an order confirmation page.
+      must_match:
+      - items, ticket types and quantities
+      - promo code, shipping or payment options when specified
+      may_differ:
+      - cart editing path
+      fail_if:
+      - items left in the cart without submitting checkout
+      - wrong quantities or ticket tier
+      - requested promo not applied
   book_by_form:
     group: form
     description: Book/reserve by filling a form (incl. dates)
@@ -130,12 +246,35 @@ macros:
     span_end: submit the form
     aliases:
       - book_by_date_range
+    rubric:
+      done: A booking/reservation was created and confirmed.
+      evidence: An accepted booking request; a confirmation page or the booking listed.
+      must_match:
+      - what is booked (provider, room, flight, service type)
+      - date and time slot
+      - party size or duration when specified
+      may_differ:
+      - how the slot was found
+      fail_if:
+      - slot selected but not confirmed
+      - wrong date, time or provider
+      - the agent claims a booking no request shows
   cancel_by_form:
     group: form
     description: Cancel a booking or order via a form
     example: Select a reason and confirm cancellation
     span_start: open the form
     span_end: submit the form
+    rubric:
+      done: The specified booking/order was cancelled and the site accepted the cancellation.
+      evidence: An accepted cancel request for that booking; its status shown as cancelled.
+      must_match:
+      - the booking/order cancelled
+      may_differ:
+      - cancellation reason text unless specified
+      fail_if:
+      - cancel dialog opened but not confirmed
+      - a different booking cancelled
   configure_by_form:
     group: form
     description: Change one or more settings via a form
@@ -147,6 +286,17 @@ macros:
       - configure_by_dropdown
       - configure_by_slider
       - configure_by_toggle
+    rubric:
+      done: The requested settings were changed and saved.
+      evidence: An accepted settings request carrying the new values, or the settings page showing them after reload.
+      must_match:
+      - each named setting and its target value
+      may_differ:
+      - other settings left as they were
+      fail_if:
+      - changed but not saved where saving is required
+      - wrong value
+      - toggled back to the original
   authenticate_by_form:
     group: form
     description: Log in by entering credentials
@@ -156,6 +306,18 @@ macros:
     warning: 'The task must START LOGGED OUT, or logging in isn''t a real step. Turn
       OFF the auto-login toggle before recording, and give the credentials to use in
       the instruction.'
+    rubric:
+      done: The agent is logged in (or registered, then logged in) as the specified account.
+      evidence: An accepted login request (typically a redirect) followed by pages showing that user.
+      must_match:
+      - username/account
+      - the password given in the instruction
+      may_differ:
+      - whether registration was needed first, when the instruction allows it
+      fail_if:
+      - login rejected (error message, re-shown form)
+      - logged in as a different user
+      - the agent says it logged in but no login request was accepted
   share_by_form:
     group: form
     description: Share an item via a share form/dialog
@@ -166,6 +328,18 @@ macros:
       - share_by_dropdown
       - share_by_route
       - share_by_toggle
+    rubric:
+      done: The item was shared to the requested audience/channel and the share was submitted.
+      evidence: An accepted share request naming the item and the recipient/visibility, or a share/link-copied confirmation.
+      must_match:
+      - the item shared
+      - recipient(s), visibility or share method (link, email, public)
+      may_differ:
+      - optional share message wording
+      fail_if:
+      - share dialog opened but not submitted
+      - wrong recipient or visibility
+      - a different item shared
   sort_by_form:
     group: form
     description: Sort a listing by operating a sort control
@@ -179,6 +353,18 @@ macros:
       - sort_by_proximity
       - sort_by_ranking
       - sort_by_toggle
+    rubric:
+      done: The listing is shown sorted by the requested key and direction.
+      evidence: A request/URL carrying the sort parameter (e.g. sort=price_desc), or the listing visibly in that order.
+      must_match:
+      - sort key and direction
+      - the listing sorted (with the filters the reference kept active)
+      may_differ:
+      - whether sorting was done before or after filtering, if the result is the same
+      fail_if:
+      - sorted by another key or direction
+      - the item was found without ever sorting (the sort macro did not happen)
+      - sort applied to a different listing
   filter_by_dropdown:
     group: filter
     description: Narrow results by selecting a dropdown value (incl. category search)
@@ -187,18 +373,56 @@ macros:
     span_end: option selected / results update
     aliases:
       - search_by_dropdown
+    rubric:
+      done: The listing was narrowed by selecting the requested dropdown value(s).
+      evidence: A request/URL carrying the filter parameter(s), or the listing visibly filtered.
+      must_match:
+      - filter field and value (case-insensitive)
+      - other filters the reference had active at that point
+      may_differ:
+      - parameter order in the URL
+      - choosing the option via a link/chip that sets the same filter
+      fail_if:
+      - wrong option
+      - option picked but results never updated
+      - filter applied then cleared before use
   filter_by_date_range:
     group: filter
     description: Narrow results to a date range
     example: Set Jan 1 - Mar 31 to see Q1 items
     span_start: first date input
     span_end: last date / submit
+    rubric:
+      done: The listing was restricted to the requested date range.
+      evidence: A request/URL with the start and end dates, or the listing visibly limited to them.
+      must_match:
+      - start and end dates (inclusive semantics as the site uses them)
+      - which date field is filtered
+      may_differ:
+      - date entry method (typing vs picker)
+      fail_if:
+      - only one bound set when both are required
+      - wrong dates
+      - range entered but not applied
   filter_by_slider:
     group: filter
     description: Narrow results with a range slider
     example: Set the price slider from $50 to $200
     span_start: first drag
     span_end: filter applied
+    rubric:
+      done: A range filter was set with the slider and applied.
+      evidence: A request/URL with the bound value, or the listing visibly limited.
+      must_match:
+      - which bound (min/max) and its value, within the slider's step
+      may_differ:
+      - typing the value into a linked box instead of dragging
+      fail_if:
+      - slider moved but filter not applied
+      - wrong bound or value
+      visual:
+      - the slider handle(s) sit at the requested bound
+      - the listing reflects the filtered range
   filter_by_options:
     group: filter
     description: Narrow results by clicking option fields (chips / checkboxes)
@@ -208,6 +432,16 @@ macros:
     aliases:
       - filter_by_checkbox
       - filter_by_chip
+    rubric:
+      done: The requested option chips/checkboxes are selected and the filter applied.
+      evidence: A request/URL with the option set, or the listing visibly filtered.
+      must_match:
+      - the exact set of options (no missing, no extra)
+      may_differ:
+      - selection order
+      fail_if:
+      - missing or extra options
+      - options ticked but not applied
   search:
     group: search
     description: Find content by typing a text/natural-language query
@@ -226,6 +460,18 @@ macros:
       - navigate_by_query
       - search_by_query
       - search_by_semantic
+    rubric:
+      done: A text query was submitted and its results shown.
+      evidence: A search request/URL carrying the query, then the results page.
+      must_match:
+      - what is searched for (same key terms as the reference or the instruction)
+      - the site/section searched
+      may_differ:
+      - exact wording, case and spacing of the query when it targets the same thing
+      fail_if:
+      - typed but never submitted
+      - searched a different site or section
+      - the target was reached without searching (the search macro did not happen)
   search_by_pan_zoom:
     group: search
     description: Find content by panning/zooming a map
@@ -235,6 +481,18 @@ macros:
     warning: 'SPATIAL macro — the verifier checks that the agent pans/zooms to REVEAL
       the target data. Design the task so the info is off-viewport or illegible until
       panned/zoomed to, and make the instruction depend on that revealed info.'
+    rubric:
+      done: The map was panned/zoomed until the reference region/target is in view.
+      evidence: Map view/tile requests or the final map state (center, zoom) covering the region.
+      must_match:
+      - the region/target brought into view
+      may_differ:
+      - the sequence of pans and zooms
+      fail_if:
+      - no map interaction
+      - stopped before the region is in view
+      visual:
+      - the final map view shows the target region or item
   search_by_playback:
     group: search
     description: Find info by scrubbing/rewinding media (NEW)
@@ -244,6 +502,19 @@ macros:
     warning: 'SPATIAL macro — the verifier checks that the agent uses timestamped
       playback to find the info. Anchor the question to a specific timestamp (info
       that is NOT visible without scrubbing/playing to it).'
+    rubric:
+      done: The media was scrubbed to the moment containing the needed information.
+      evidence: Seek/playback requests or player state at the reference timestamp window.
+      must_match:
+      - the media item
+      - the time window the reference lands in
+      may_differ:
+      - how many seeks it took
+      fail_if:
+      - never scrubbed
+      - stopped in the wrong segment
+      visual:
+      - the player frame/position shows the moment that contains the needed information
   navigate_by_route:
     group: navigate
     description: Go to a page by clicking a link/menu/tab
@@ -254,6 +525,17 @@ macros:
       unambiguous and reachable via a visible link/menu/tab (not only a typed URL).'
     aliases:
       - navigate_by_semantic
+    rubric:
+      done: The destination page was reached.
+      evidence: A visit to the reference destination URL.
+      must_match:
+      - destination page and the entity it shows (same ID)
+      may_differ:
+      - route taken (menu, link, search result, direct URL)
+      - query-parameter order
+      fail_if:
+      - a similar but different entity reached (another product/post/profile)
+      - destination never reached
   toggle_relationship:
     group: relationship
     description: Locate a user/post/item, then toggle a relationship (follow / subscribe / save / join-group
@@ -269,6 +551,22 @@ macros:
       - block_by_toggle
       - follow_by_dropdown
       - toggle_status
+    rubric:
+      done: The relationship with the right target ends in the requested state (followed, subscribed, saved, joined, pinned, blocked, added to cart, …).
+      evidence: Accepted toggle request(s) for that target — judge the LAST one and its resulting state — or the target shown in that state.
+      must_match:
+      - the target entity (user, item, conversation, tag)
+      - the final state
+      - quantity when relevant (e.g. one unit in the cart)
+      may_differ:
+      - where on the site the toggle was clicked
+      fail_if:
+      - toggled back so the final state is wrong
+      - a different target toggled
+      - claimed done with no toggle request
+      - claimed 'already in that state' without page evidence
+      visual:
+      - the target's toggle control shows the requested final state (e.g. 'Following', 'Unsubscribe', 'Pinned', a filled icon)
   feedback_by_react:
     group: feedback
     description: React to content (like / upvote)
@@ -277,6 +575,21 @@ macros:
     span_end: reacted
     aliases:
       - react_by_toggle
+    rubric:
+      done: The requested reaction is registered on the right item.
+      evidence: An accepted react/like/vote request; the item shown reacted.
+      must_match:
+      - the item
+      - reaction type (like, upvote, downvote, emoji)
+      - final state
+      may_differ:
+      - where the item was reacted from (listing vs detail page)
+      fail_if:
+      - reacted then un-reacted
+      - a different item
+      - a different reaction
+      visual:
+      - the reaction control on the right item shows the active (reacted) state
   feedback_by_star:
     group: feedback
     description: Give a star/slider rating
@@ -287,12 +600,37 @@ macros:
       is assertable — an open-ended "rate it" isn''t deterministically gradeable.'
     aliases:
       - rate_by_slider
+    rubric:
+      done: The requested rating was set and submitted.
+      evidence: An accepted rating request with the value; the rating shown.
+      must_match:
+      - the item
+      - the star/score value
+      may_differ:
+      - click vs drag to set it
+      fail_if:
+      - wrong value
+      - rating not submitted
+      visual:
+      - the requested number of stars is filled/selected on the right item
   feedback_by_text:
     group: feedback
     description: Leave a written review/comment (NEW)
     example: Write a review and submit
     span_start: open the review box
     span_end: submit
+    rubric:
+      done: A written review/comment was posted on the right item.
+      evidence: An accepted comment/review request; the comment shown on the item.
+      must_match:
+      - the target item
+      - 'text: exact when the instruction quotes it, otherwise the requested substance'
+      may_differ:
+      - wording not dictated by the instruction
+      fail_if:
+      - posted on a different item
+      - not submitted
+      - empty or placeholder text
   play_by_playback:
     group: media
     description: Operate a media player (play/pause/seek; + at timestamp/quality/subtitle)
@@ -305,6 +643,21 @@ macros:
     aliases:
       - play_by_date_range
       - play_by_timestamp
+    rubric:
+      done: The requested media is playing with the requested settings (speed, start time, quality, subtitles).
+      evidence: Play/playback requests or player state showing playing and each setting.
+      must_match:
+      - the media item
+      - each requested playback setting
+      may_differ:
+      - order in which settings were applied
+      fail_if:
+      - settings changed but playback never started
+      - a different item played
+      - a requested setting missing
+      visual:
+      - the player shows the requested media playing (pause icon or advancing progress)
+      - each requested setting is visible (speed, start time, quality, subtitles)
   upload_file:
     group: content
     description: Upload a file via the file picker
@@ -313,18 +666,55 @@ macros:
     span_end: file attached
     aliases:
       - upload_by_upload
+    rubric:
+      done: The requested file was attached (and submitted with its form when one is required).
+      evidence: An accepted upload request / form submission carrying the file, or the attachment shown.
+      must_match:
+      - the file (name/content)
+      - where it was uploaded to
+      may_differ:
+      - how the file picker was opened
+      fail_if:
+      - picker opened but no file attached
+      - a different file
+      - attached but the carrying form never submitted
   message_from_free_text:
     group: content
     description: Send a message by typing text
     example: Type a message and click Send
     span_start: open the message field
     span_end: send clicked
+    rubric:
+      done: A message was sent to the right recipient/conversation/thread.
+      evidence: An accepted send-message request in that conversation/thread; the message shown in it. A chat the app displays under the recipient's name counts as that recipient's chat.
+      must_match:
+      - recipient, conversation, or thread (a thread reply is not a channel post)
+      - 'content: exact when quoted, otherwise every required fact (links, numbers, names)'
+      may_differ:
+      - greeting and wording not dictated by the instruction
+      fail_if:
+      - sent to another person/channel
+      - posted in the channel instead of the thread (or vice versa)
+      - placeholder content ('https://...', '[link]') or a missing required fact
+      - drafted but not sent
   translate_by_query:
     group: content
     description: Translate entered text
     example: Type "Hello" and translate to Spanish
     span_start: entering text
     span_end: translation received
+    rubric:
+      done: The requested text was translated between the requested languages and a result obtained.
+      evidence: An accepted translate request with the text and language pair; the translation shown.
+      must_match:
+      - source text
+      - source and target language
+      may_differ:
+      - auto-detected source language when it is correct
+      fail_if:
+      - wrong target language
+      - text not submitted
+      - the agent translates it itself without the tool
   sign_by_freeformdrawing:
     group: content
     description: Sign a document by DRAWING your signature freeform on a canvas ("Sign here" field)
@@ -337,6 +727,22 @@ macros:
       directly.'
     aliases:
       - sign_by_signature
+    rubric:
+      done: A signature was drawn in the correct field and adopted/submitted.
+      evidence: An accepted sign request carrying drawn strokes/image; the document shown signed.
+      must_match:
+      - the document and signature field
+      - drawn (not typed) signature
+      may_differ:
+      - the drawing itself
+      fail_if:
+      - typed instead of drawn
+      - empty canvas
+      - wrong document
+      - drawn but not adopted/submitted
+      visual:
+      - the signature field shows hand-drawn strokes, not typed text or an empty box
+      - the document shows as signed/adopted after submission
   sign_by_text:
     group: content
     description: Sign a document by TYPING your name into the signature field (adopt a typed signature)
@@ -349,6 +755,21 @@ macros:
       directly.'
     aliases:
       - sign_by_typed_name
+    rubric:
+      done: A typed signature was adopted/submitted in the right document.
+      evidence: An accepted sign request with the typed name; the document shown signed.
+      must_match:
+      - the document
+      - the name typed
+      may_differ:
+      - font/style choice
+      fail_if:
+      - drawn instead of typed
+      - wrong name
+      - not adopted/submitted
+      visual:
+      - the signature area shows the typed name as the adopted signature
+      - the document shows as signed
   join_meeting:
     group: content
     description: Join a meeting (by code or link)
@@ -358,6 +779,16 @@ macros:
     aliases:
       - join_by_code
       - join_by_route
+    rubric:
+      done: The agent joined the specified meeting.
+      evidence: An accepted join request; the in-meeting view.
+      must_match:
+      - meeting code/link
+      may_differ:
+      - device/audio options
+      fail_if:
+      - stayed in the lobby/preview
+      - joined a different meeting
   reposition_by_drag:
     group: content
     description: Reposition an element by dragging
@@ -366,18 +797,59 @@ macros:
     span_end: finish dragging
     aliases:
       - edit_by_drag
+    rubric:
+      done: The element was moved to the target position and the move committed.
+      evidence: An accepted move/reorder request; the element shown at the new position.
+      must_match:
+      - the element
+      - its destination (column, slot, position)
+      may_differ:
+      - drag path
+      fail_if:
+      - dropped in the wrong place
+      - move not committed
+      visual:
+      - the element appears at its destination position/column after the drag
   edit_by_ranking:
     group: content
     description: Reorder items by a ranking control
     example: Reorder the playlist
     span_start: first reorder
     span_end: order committed
+    rubric:
+      done: Items were reordered into the requested order and the order committed.
+      evidence: An accepted reorder request; the list shown in the new order.
+      must_match:
+      - the resulting order of the items the subtask names
+      may_differ:
+      - order of the individual moves
+      fail_if:
+      - final order differs
+      - reorder not saved
+      visual:
+      - the list appears in the requested order
   edit_by_image:
     group: content
     description: Edit an image via canvas tools
     example: Crop the profile photo and save
     span_start: select tool
     span_end: save
+    rubric:
+      done: The image/canvas was edited with the requested element(s) and saved.
+      evidence: An accepted save request whose content includes the element; the saved design shown.
+      must_match:
+      - the project/image edited
+      - element type (shape, icon, text, stroke) and any specified property (color, text)
+      may_differ:
+      - exact placement and size unless specified
+      fail_if:
+      - not saved
+      - wrong element
+      - a different project edited
+      - nothing actually drawn/added
+      visual:
+      - the canvas/design visibly contains the requested element (drawing, shape, icon, text) with any specified property
+      - the saved or final view still shows it; an empty or unchanged canvas fails
   edit_by_cell:
     group: content
     description: Enter or change data directly in a grid/table cell (incl. adding a row or column to extend the table)
@@ -388,12 +860,39 @@ macros:
       - extend_table
       - edit_by_grid
       - add_by_row
+    rubric:
+      done: The requested cell values were entered/changed in the grid and committed.
+      evidence: Accepted save/update requests carrying the cell values; the grid shown with them.
+      must_match:
+      - the sheet/table
+      - the cells' positions and values (substance of the reference values)
+      may_differ:
+      - entry order
+      - formatting
+      fail_if:
+      - values not saved
+      - values in the wrong cells/rows
+      - rows or columns missing
+      - sheet never created/opened
+      visual:
+      - the grid shows the requested values in the requested cells
   write_executable_program:
     group: content
     description: Write and run code
     example: Write a Python function in the editor
     span_start: open editor
     span_end: run
+    rubric:
+      done: Code was written and run, producing the required behaviour/output.
+      evidence: An accepted run/execute request and its output.
+      must_match:
+      - the program's required behaviour/output
+      may_differ:
+      - code style and approach
+      fail_if:
+      - never run
+      - run errored
+      - output wrong
   copy_content:
     group: content
     description: Copy content via a copy control
@@ -402,6 +901,16 @@ macros:
     span_end: copied
     aliases:
       - copy_by_route
+    rubric:
+      done: The requested content was copied with the site's copy control.
+      evidence: A clipboard-write/copy action or copy request for that content; when the instruction also asks to include it in the response, the content matches.
+      must_match:
+      - which content (the right snippet on the right page)
+      may_differ:
+      - which copy button when several copy the same content
+      fail_if:
+      - a different snippet copied
+      - no copy control used — only retyped into the answer (report_information may still pass)
   get_nav_route:
     group: content
     description: Get directions by entering origin/destination
@@ -410,6 +919,17 @@ macros:
     span_end: submit
     aliases:
       - route_by_query
+    rubric:
+      done: Directions were requested for the right origin, destination and mode, and a route returned.
+      evidence: An accepted route request and its response (distance/duration).
+      must_match:
+      - origin and destination (place names or addresses of the same places)
+      - travel mode
+      may_differ:
+      - how the endpoints were entered (typed, suggestion, map click)
+      fail_if:
+      - wrong endpoint or mode
+      - route never computed
   export:
     group: content
     description: Export data (choose a format and download)
@@ -418,12 +938,35 @@ macros:
     span_end: downloaded
     aliases:
       - export_by_dropdown
+    rubric:
+      done: The requested data was exported in the requested format and downloaded.
+      evidence: An accepted export request with the format/scope; a download received.
+      must_match:
+      - data scope (which records/view)
+      - format (CSV, PDF, SVG, …)
+      may_differ:
+      - file name
+      fail_if:
+      - wrong format or scope
+      - export clicked but nothing downloaded
   delete_from_table:
     group: content
     description: Delete an item from a list/table
     example: Click the trash icon to delete the row
     span_start: delete clicked
     span_end: confirmed
+    rubric:
+      done: The specified item was deleted (confirmed, and the site accepted it).
+      evidence: An accepted delete request for that item (200/204, or a redirect after the form); the item gone from the list.
+      must_match:
+      - the item deleted
+      may_differ:
+      - where delete was triggered (row menu vs detail page)
+      fail_if:
+      - a different item deleted
+      - other items deleted as well (the instruction asked for these items only)
+      - confirmation not given
+      - claimed deleted with no delete request
   compute_by_tool:
     group: content
     description: Use an on-page calculator/tool to compute a result
@@ -432,6 +975,16 @@ macros:
     span_end: result shown
     aliases:
       - compute_by_slider
+    rubric:
+      done: The on-page tool was used with the right inputs and showed the result.
+      evidence: Tool/calculate requests or the tool page showing inputs and result.
+      must_match:
+      - inputs (values, units, options)
+      may_differ:
+      - input order
+      fail_if:
+      - computed without the tool
+      - wrong inputs
   report_information:
     group: reasoning
     description: Report the answer back to the human. Always the terminal tag — span the last action(s) where the answer is on screen; carries the reasoning op. Intermediate reasoning folds onto its own macro instead.
@@ -458,28 +1011,93 @@ macros:
       - select_from_table
       - verify_from_free_text
     op_only: true
+    rubric:
+      done: The final answer to the human states the requested information correctly.
+      evidence: The agent's final answer, checked against the reference answer; the operation (read/count/extremum/…) says how it was derived.
+      must_match:
+      - the reference answer (equivalent phrasing, units and formatting allowed)
+      - one committed answer
+      may_differ:
+      - surrounding explanation
+      fail_if:
+      - hedged or several candidate answers
+      - claims it could not find/do it
+      - wrong value
+      - answer about a different entity
   save_by_form:
     group: unassigned
     description: save a file using a button
     span_start: start to open save file form
     span_end: submit save file form
+    rubric:
+      done: The file was saved through the save-file form.
+      evidence: An accepted save request with the name/location; the file listed afterwards.
+      must_match:
+      - file name and folder when specified
+      may_differ:
+      - how the dialog was opened
+      fail_if:
+      - dialog opened but not submitted
+      - wrong name or folder
   reveal_by_2fa:
     group: unassigned
     description: Reveal a content through 2FA
     span_start: reveal button clicked
     span_end: code is submitted and receive correct response
+    rubric:
+      done: The protected content was revealed after submitting the correct 2FA code.
+      evidence: An accepted code submission; the revealed content shown.
+      must_match:
+      - the item revealed
+      may_differ:
+      - how the code was obtained
+      fail_if:
+      - code rejected
+      - content never revealed
   carry_info_cross_site:
     group: unassigned
     description: to use to indicate carrying of information across different site (base reasoning macro)
     span_start: 1 action before tab_switch
     span_end: at tab switch
+    rubric:
+      done: Information read on one site was used correctly on another.
+      evidence: The downstream action on the second site carries the value read on the first.
+      must_match:
+      - the carried value (name, email, ID, amount)
+      may_differ:
+      - tab/switching mechanics
+      fail_if:
+      - carried value wrong, partial, or invented
   edit_by_textbox:
     group: unassigned
     description: Add text and editing the image by designing that textbox
     span_start: add text clicked
     span_end: last interaction with text
+    rubric:
+      done: A text box with the requested text was added to the design and saved.
+      evidence: An accepted save request whose content includes the text element.
+      must_match:
+      - the text content
+      - styling when specified
+      may_differ:
+      - placement unless specified
+      fail_if:
+      - not saved
+      - wrong text
+      visual:
+      - the design shows a text box containing the requested text
   count_entries:
     group: unassigned
     description: Count and return the number of entries in the page
     span_start: any webpage
     span_end: when the answer is returned
+    rubric:
+      done: The entries matching the condition were counted and the count returned.
+      evidence: The reported count against the reference.
+      must_match:
+      - the count
+      may_differ:
+      - how the entries were enumerated
+      fail_if:
+      - counted a different set
+      - wrong count

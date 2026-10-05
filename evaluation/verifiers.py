@@ -16,7 +16,7 @@ whole task) and naming one check type plus its arguments.
          "action": "select", "target": "Status", "value": "completed"},
 
         {"macro": "extract_by_query", "type": "answer_matches",
-         "expected": "Priya Sharma", "mode": "fuzzy"},
+         "expected": "Priya Sharma"},          # graded by the auto chain (_grade_answer)
 
         {"macro": "extract_by_query", "type": "answer_grounded",
          "url": "/sites/remote-calls/meetings"},
@@ -290,13 +290,36 @@ def _network(traj):
     return [e for e in traj if e.get("type") == "network"]
 
 
+_SIGN_IN = re.compile(r"log-?in|sign-?in", re.I)
+
+
+def _status_matches(want, event):
+    """A pinned status matches exactly; for a submit (non-GET) any success code
+    stands in for another. The same accepted form answers 200 when it renders a
+    page (a dating like that makes a match) and 302 when it redirects, so a
+    status pinned from the reference recording is incidental. A redirect to a
+    sign-in page is a rejection, not a success."""
+    wants = want if isinstance(want, list) else [want]
+    got = event.get("status")
+    if got in wants:
+        return True
+    ok = lambda s: isinstance(s, int) and 200 <= s < 400
+    if (event.get("method") or "GET").upper() == "GET" or not ok(got) or not all(ok(w) for w in wants):
+        return False
+    headers = event.get("responseHeaders") or {}
+    location = (headers.get("location") or headers.get("Location") or "") if isinstance(headers, dict) else str(headers)
+    return not (got >= 300 and _SIGN_IN.search(str(location)))
+
+
 def _url_matches(want, got):
     """Literal routes identify a resource; regexes must opt into prefix matching."""
     from urllib.parse import urlsplit, parse_qs, unquote
     if not want:
         return True
     if want.startswith('re:'):
-        return re.search(want[3:], got) is not None
+        # case-insensitive: sites lower-case slugs (/subreddits/machinelearning) and
+        # agents send option values in either case (status=Live vs status=live)
+        return re.search(want[3:], got, re.I) is not None
     if not (want.startswith('/') or '://' in want):
         return want in got
     expected, actual = urlsplit(want), urlsplit(got)
@@ -352,39 +375,22 @@ class Check:
 class AnswerMatches(Check):
     """The agent's answer matches the expected one.
 
-    mode: "exact" | "includes" (default) | "fuzzy"
-      includes — expected appears inside the answer (normalized)
-      fuzzy    — same, but also accepts any string in `alternatives`
+    Always graded by the auto chain (`_grade_answer`): regex → exact → precise
+    containment/numeric → LLM judge. `mode` no longer narrows it; a legacy
+    `mode: "regex"` only means `expected` doubles as the pattern when there is
+    no separate `pattern`. `alternatives` are equally valid answers.
     """
 
     type = "answer_matches"
 
     def run(self, traj, answer):
         expected = self.arg("expected", "")
-        mode = self.arg("mode", "includes")
         alts = self.arg("alternatives", []) or []
-        # Structured regexes can still contain permissive .* sections. A
-        # prefixed denial/uncertainty is not a valid submitted answer.
-        if re.match(r"(?is)^\s*(?:the\s+answer\s+is\s+not\b|i\s+(?:do\s+not|don't)\s+know\s+whether\b)", str(answer)):
-            return False, "answer denies or does not commit to the expected result"
-        if mode == "regex":
-            ok = bool(str(answer).strip()) and re.fullmatch(str(self.arg("pattern", expected)), str(answer).strip(), re.DOTALL) is not None
-            return ok, "answer matches required format" if ok else "answer does not match required format"
-        got, want = _norm(answer), _norm(expected)
-
-        if not got:
-            return False, "agent gave no answer"
-
-        if mode == "exact":
-            wn, gn = _numeric_value(expected), _numeric_value(answer)
-            ok = _num_close(wn, gn) if wn is not None and gn is not None else _value_norm(answer).rstrip('.!?') == _value_norm(expected).rstrip('.!?')
-        else:
-            if isinstance(alts, str):
-                alts = [a.strip() for a in re.split(r'[;\n]', alts) if a.strip()]
-            candidates = [expected] + alts
-            ok = any(c and _match_answer(answer, c, "fuzzy" if mode == "fuzzy" else "contains")[0] for c in candidates)
-
-        return ok, f"expected {expected!r}, got {answer!r}"
+        if isinstance(alts, str):
+            alts = [a.strip() for a in re.split(r'[;\n]', alts) if a.strip()]
+        pattern = self.arg("pattern") or (expected if self.arg("mode") == "regex" else None)
+        ok, why = _grade_answer(answer, [expected, *alts], pattern)
+        return ok, why if ok else f"{why} (expected {expected!r}, got {str(answer)[:200]!r})"
 
 
 class AnswerGrounded(Check):
@@ -421,6 +427,12 @@ class AnswerGrounded(Check):
 # ---------------------------------------------------------------------------
 
 
+# A value entered into a field is recorded as `type` when a person types it and as
+# `change` when a browser agent fills it (a date input filled by browser-use logs
+# change '2026-01-01' plus an empty type). Both are the same input event.
+_SAME_INPUT = {"type", "change"}
+
+
 class ActionIncluded(Check):
     """An action of the given kind, on the given component, is in the trajectory.
 
@@ -439,7 +451,8 @@ class ActionIncluded(Check):
         want_selector = self.arg("selector", "")
 
         for a in _actions(traj):
-            if want_action and a.get("action") != want_action:
+            if want_action and a.get("action") != want_action and not (
+                    want_action in _SAME_INPUT and a.get("action") in _SAME_INPUT):
                 continue
             if want_target and not re.search(r"(?<![\w])" + re.escape(want_target) + r"(?![\w])", _norm(a.get("target"))):
                 continue
@@ -493,6 +506,14 @@ class RequestMade(Check):
         # (server-emitted detector signals, e.g. {"signed_zone": "taxpayer-signature"})
 
         events = _network(traj)
+        if self.arg('final_view'):
+            # "Show X filtered/sorted": the view the agent LEFT the listing in must carry
+            # the parameters — a filter applied, then cleared or replaced, is not shown.
+            # final_view is a regex for the listing path (query ignored).
+            from urllib.parse import urlsplit
+            views = [e for e in events if (e.get("method") or "GET").upper() == "GET"
+                     and re.search(self.arg('final_view'), urlsplit(e.get("url") or "").path, re.I)]
+            events = views[-1:]
         if self.arg('last_for_resource'):
             # A successful toggle/edit followed by a successful undo is not
             # completion. Identity fields distinguish resources sharing an API.
@@ -513,7 +534,7 @@ class RequestMade(Check):
                 # pinned while a volatile resource id (/note/2/ vs /note/1/) is not.
                 if not _url_matches(want_url, nurl):
                     continue
-            if want_status is not None and n.get("status") not in (want_status if isinstance(want_status, list) else [want_status]):
+            if want_status is not None and not _status_matches(want_status, n):
                 continue
             if want_body and _norm(want_body) not in _norm(n.get("requestBody")):
                 continue
@@ -605,12 +626,41 @@ def _judge_alignment(text, expected, kind="output", question=None):
 from functools import lru_cache
 
 
+JUDGE_VOTES = 3   # best-of-3: the judge is nondeterministic on borderline text even at temperature 0
+
+
 @lru_cache(maxsize=2048)
 def _cached_alignment(text, expected, kind, q):
+    """Majority vote of JUDGE_VOTES judge calls. Two run in parallel; the third runs
+    only when they disagree. Failed/malformed calls abstain; with no valid vote the
+    check fails as "LLM unavailable"."""
+    from concurrent.futures import ThreadPoolExecutor
+    need = JUDGE_VOTES // 2 + 1
+    ask = lambda _=None: _judge_once(text, expected, kind, q)
+
+    def decided(results):
+        votes = [r for r in results if r]
+        return any(sum(v[0] == side for v in votes) >= need for side in (True, False))
+
+    with ThreadPoolExecutor(need) as pool:
+        results = list(pool.map(ask, range(need)))
+    while len(results) < JUDGE_VOTES and not decided(results):
+        results.append(ask())
+    votes = [r for r in results if r]
+    if not votes:
+        return False, "LLM unavailable for fuzzy check"
+    yes = sum(v[0] for v in votes)
+    ok = yes * 2 > len(votes)                      # a tie (one vote lost to an error) fails
+    why = next((v[1] for v in votes if v[0] == ok), votes[0][1])
+    return ok, f"LLM judge ({yes}/{len(votes)} yes): {why}"
+
+
+def _judge_once(text, expected, kind, q):
+    """One judge call -> (match, why), or None when the call fails or is malformed."""
     try:
         from app.llm import call_llm
     except Exception:
-        return False, "LLM unavailable for fuzzy check"
+        return None
     import json as _json
     system = (
         f"You grade an agent's {kind} for a web task. Given the TASK the user asked, the "
@@ -635,12 +685,14 @@ def _cached_alignment(text, expected, kind, q):
     raw = call_llm(prompt, system=system, max_tokens=300, temperature=0.0,
                    json_mode=True, model=judge_model)
     if not raw:
-        return False, "LLM unavailable for fuzzy check"
+        return None
     try:
         d = _json.loads(raw)
-        return d.get("match") is True, "LLM judge: " + str(d.get("why", ""))[:100]
+        if not isinstance(d, dict) or not isinstance(d.get("match"), bool):
+            return None
+        return d["match"], str(d.get("why", ""))[:100]
     except (ValueError, TypeError):
-        return False, "LLM judge returned malformed output"
+        return None
 
 
 def _match_answer(answer, expected, mode):
@@ -706,6 +758,66 @@ def _match_answer(answer, expected, mode):
     return _judge_alignment(got, want, "reported answer")
 
 
+_DENIAL = re.compile(r"(?is)^\s*(?:the\s+answer\s+is\s+not\b|i\s+(?:do\s+not|don't)\s+know\s+whether\b)")
+
+
+def _answer_lines(answer):
+    """The reply's lines without markdown bullets/emphasis, for per-line regex tries."""
+    for line in str(answer).splitlines():
+        line = re.sub(r"^[\s>*\-•\d.)]*", "", line).replace("**", "").replace("`", "").strip()
+        if line:
+            yield line
+
+
+def _grade_answer(answer, candidates, pattern=None):
+    """Auto answer grading — every QA grade uses this chain; the first tier that
+    accepts wins, and the LLM judge is the last gate:
+
+      1. regex    — `pattern` fully matches the reply, or one line of it
+      2. exact    — the reply equals a candidate (case/space-insensitive)
+      3. precise  — `_match_answer` fast paths: URL paths, a single matching number,
+                    the complete value on word boundaries (ambiguous prose skips ahead)
+      4. judge    — task-aware LLM judge against the expected answer (+ alternatives)
+
+    Hard rejections short-circuit the chain: an empty reply, a leading denial, and
+    the precise tier's certain mismatches (a different single number, a different
+    URL, conflicting yes/no, the expected value explicitly negated)."""
+    got = str("" if answer is None else answer).strip()
+    cands = [str(c).strip() for c in candidates if str(c or "").strip()]
+    if not cands and not pattern:
+        return True, "no expected value set"
+    if not got:
+        return False, "agent gave no answer"
+    if _DENIAL.match(got):
+        return False, "answer denies or does not commit to the expected result"
+    if pattern:
+        try:
+            rx = re.compile(str(pattern), re.DOTALL)
+            if rx.fullmatch(got) or any(rx.fullmatch(line) for line in _answer_lines(got)):
+                return True, "regex: answer matches the expected format"
+        except re.error:
+            pass
+    for c in cands:
+        if _value_norm(got).rstrip('.!?') == _value_norm(c).rstrip('.!?'):
+            return True, "exact: answer equals the expected value"
+    if not cands:
+        return False, "answer does not match the expected format"
+    open_, rejected = False, []
+    for c in cands:
+        ok, why = _match_answer(got, c, "contains")
+        if ok:
+            return True, "precise: " + why
+        if why == "expected value absent from reported answer":
+            open_ = True                            # undecided -> the judge decides
+        else:                                       # certain mismatch, or ambiguous prose already judged
+            rejected.append(why if why.startswith("LLM judge") else "precise: " + why)
+    if not open_:
+        return False, rejected[0]
+    want = cands[0] + ("" if len(cands) == 1 else " (equally acceptable: " + "; ".join(cands[1:]) + ")")
+    ok, why = _judge_alignment(got, want, "reported answer")
+    return ok, "judge: " + why
+
+
 class QAAnswer(Check):
     """Conditional QA check, resolved per task by the macro graph:
 
@@ -725,8 +837,8 @@ class QAAnswer(Check):
     type = "qa_answer"
 
     def run(self, traj, answer):
+        # every QA grade uses the auto chain (_grade_answer); a stored `mode` is ignored
         expected = self.arg("expected", "")
-        mode = self.arg("mode", "fuzzy")
         leaf = self.arg("leaf", None)
         alts = self.arg("alternatives", []) or []
         if isinstance(alts, str):
@@ -745,7 +857,7 @@ class QAAnswer(Check):
 
         def reasoning():
             return match_any(lambda c: ReasoningContains(
-                {"expected": c, "mode": mode}).run(traj, answer))
+                {"expected": c, "mode": "auto"}).run(traj, answer))
 
         # chained: the value is never reported — check the reasoning trace.
         if leaf is False:
@@ -759,14 +871,14 @@ class QAAnswer(Check):
         if leaf is True:
             if not str(answer or "").strip():
                 return False, "terminal → no reported answer"
-            ok, why = match_any(lambda c: _match_answer(answer, c, mode))
+            ok, why = _grade_answer(answer, candidates)
             return ok, "terminal → answer: " + why
 
         # leaf unknown: try the reported answer; with none recorded (e.g. a human
         # gold with no saved answer) fall back to reasoning (passes humans by the
         # perfect-trace assumption, checks the agent's reasoning otherwise).
         if str(answer or "").strip():
-            ok, why = match_any(lambda c: _match_answer(answer, c, mode))
+            ok, why = _grade_answer(answer, candidates)
             return ok, "terminal? → answer: " + why
         ok, why = reasoning()
         return ok, "unknown-leaf, no answer → reasoning: " + why
@@ -852,6 +964,11 @@ def verify_task(spec: dict, trajectory: list, answer: str = "", question: str = 
     macro maps to an arbitrarily nested AND/OR tree of checks. Passes when every
     macro's tree passes.
 
+    A macro whose root node is `"advisory": true` was performed in the reference
+    recording but is not required by the instruction: it is evaluated and reported
+    (`advisory_macros`) but does not gate the verdict. If every macro is advisory,
+    all of them gate, so a task cannot pass vacuously.
+
     `question` is the task instruction; when given it is made available to the
     fuzzy answer judge so it can resolve context-dependent equivalence.
     """
@@ -863,11 +980,14 @@ def verify_task(spec: dict, trajectory: list, answer: str = "", question: str = 
             res = _run_node(tree, trajectory, answer)
             results[macro] = res
             by_macro[macro] = res["passed"]
+        advisory = [m for m, tree in macros.items() if isinstance(tree, dict) and tree.get("advisory")]
+        gating = [m for m in by_macro if m not in advisory] or list(by_macro)
         return {
             "task_id": spec.get("task_id", ""),
             "engine_hash": _LOADED_ENGINE_HASH,
-            "passed": all(by_macro.values()) if by_macro else False,
+            "passed": all(by_macro[m] for m in gating) if by_macro else False,
             "by_macro": by_macro,
+            "advisory_macros": advisory,
             "macros": results,
         }
     finally:

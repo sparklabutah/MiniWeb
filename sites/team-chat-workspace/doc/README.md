@@ -1,22 +1,49 @@
-# Team chat / workspace
+# Meridian Chat (`team-chat-workspace`)
 
-**Category**: Communication
-**Reviewer**: Farhan
-**Number of macros**: 24
+A Slack or Microsoft Teams-style workspace for the employees of the fictional
+Meridian Systems. Users read and post in channels, reply in threads, react,
+save and share messages, send direct messages, upload files and manage channel
+membership.
 
-## Data Source
+- URL: `/sites/team-chat-workspace/` (simulated domain `meridianchat.work`)
+- Data split: training site
 
-Do we need dataset?
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Workspace home: channel sidebar with sort, Create Channel and Follow Member forms, default channel view |
+| `/channel/<channel_id>` | Channel: messages with in-channel search and a date filter, composer with file upload, per-message edit/delete/save/react, Follow, Invite, Share |
+| `/threads`, `/thread/<thread_id>` | Threads across channels with channel dropdown and From/To dates; full thread with replies |
+| `/members` | Member directory with a department dropdown and Block toggles |
+| `/dms`, `/dm/<user_id>` | Direct-message hub and 1:1 conversations |
+| `/search` | Message search with a channel dropdown |
+| `/login` | Sign-in form |
 
-navigate_by_route, search_by_query, search_by_dropdown, filter_by_dropdown, filter_by_date_range, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_by_route, create_from_free_text, submit_by_query, edit_by_form, delete_from_table, upload_by_upload, post_from_free_text, follow_by_dropdown, follow_by_toggle, join_by_toggle, share_by_dropdown, save_by_toggle, invite_by_form, block_by_toggle, message_from_free_text, authenticate_by_form
+JSON endpoints under `/api/` cover channels, messages, threads, reactions,
+DMs, search, members, uploads, follow/join/save/block/invite/share and export.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search messages: `search`
+- Filter by channel, department or dates: `filter_by_dropdown`, `filter_by_date_range`
+- Sort the channel list: `sort_by_form`
+- Post a message, reply in a thread, send a DM: `message_from_free_text`
+- Create a channel, invite a member: `create_by_form`
+- Edit or delete your own message: `edit_by_form`, `delete_from_table`
+- Follow a channel or member, save a message, block a member: `toggle_relationship`
+- Upload a file to a channel, copy a channel link: `upload_file`, `share_by_form`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `team-chat-workspace`.
+
+## Data
+
+- Tables: `team_chat_workspace_channels`, `team_chat_workspace_messages`,
+  `team_chat_workspace_threads`, `team_chat_workspace_reactions`,
+  `team_chat_workspace_users`.
+- Site user ids look like `tc-u001`. The session stores the shared root user
+  id, which is mapped through `root_user_id`, so the global auto-login signs the
+  user in as Alex Rivera (`tc-u001`).
+- A channel message that mentions a meeting ("meeting", "standup", "sync",
+  "let's meet", ...) emits a `booking` event that adds a calendar event.
+  Logging in emits `signup`.

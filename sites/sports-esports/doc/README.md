@@ -1,57 +1,53 @@
-# Sports / Esports
+# Lakeport Sports Hub (`sports-esports`)
 
-**Category**: Dynamic info / feeds
-**Reviewer**: Minh
-**Number of macros**: 20
+A multi-sport scoreboard in the style of ESPN / Flashscore covering the NFL,
+NBA, MLB, MLS, Premier League and a local esports league. It shows live,
+final and scheduled matches, standings, team and player pages, a team
+comparison tool, match highlights, comments and a favorites list.
 
-## Data Source
+- URL: `/sites/sports-esports/` (simulated domain `lakeportsports.com`)
+- Data split: training site
 
-Synthetic data inspired by TheSportsDB and real league structures. Six JSON files in `data_sources/sports-esports/`:
-- `leagues.json` -- 6 leagues (NFL, NBA, MLB, MLS, EPL, Lakeport Esports League)
-- `teams.json` -- 20 teams across all leagues, with win/loss/standing records
-- `matches.json` -- 30 matches (live, final, scheduled) with scores and venues
-- `players.json` -- 25 players with position-specific stats
-- `users.json` -- 5 registered users with credentials
-- `favorites.json` -- per-user favorite teams and players
-- `comments.json` -- match comments (initially empty, populated by tasks)
-- `subscriptions.json` -- league notification subscriptions (initially empty)
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Scoreboard with league pills and match cards |
+| `/league/<id>` | League standings, with a subscribe toggle |
+| `/standings` | Standings table (Rank, Team, W, L, Win%) with a "Min Wins" slider |
+| `/team/<id>` | Team roster, record and match history, with a favorite toggle |
+| `/match/<id>` | Match score, rosters and comment form |
+| `/match/<id>/highlights` | Highlight video in the shared mini-player |
+| `/players`, `/player/<id>` | Player search with league/team dropdowns; player stats |
+| `/compare` | Team A vs Team B comparison table |
+| `/favorites` | Favorite teams and players: search and add/remove, matches filtered by From/To dates |
+| `/login` | Sign-in form |
 
-All files are JSON arrays of objects. Teams have `wins`, `losses`, `standing` fields.
-Players have a `stats` dict with sport-specific keys (e.g., `passing_yards` for football,
-`points_per_game` for basketball, `goals` for soccer, `kills`/`kd_ratio` for esports).
+JSON endpoints under `/api/` cover leagues, teams, matches, players, standings, search, compare, favorites, comments and subscriptions.
 
-## Real-World Model
+## Interactions and macros
 
-**ESPN / TheSportsDB / Flashscore** -- multi-sport scoreboard with live scores, standings tables,
-player directories, and fan engagement features. Key UI elements:
-- League pill navigation on homepage
-- Live/recent/upcoming match cards on scoreboard
-- Per-league standings tables (rank, W, L, Win%)
-- Player search with league/team dropdown filters
-- Team detail pages with roster and match history
-- Match detail pages with scoreboard and player rosters
-- Team comparison page with side-by-side stats
-- Favorites system for teams and players
-- Match comments and reactions
-- League subscription notifications
+- Search players, or teams and players on the Favorites page: `search`
+- Filter players by league or team: `filter_by_dropdown`
+- Filter standings with the "Min Wins" slider: `filter_by_slider`
+- Filter favorite teams' matches by date: `filter_by_date_range`
+- Open matches, teams and players: `navigate_by_route`
+- Favorite a team or player, subscribe to a league: `toggle_relationship`, `feedback_by_react`
+- Comment on a match: `create_by_form`
+- Play a match highlight: `play_by_playback`
+- Read standings, rosters, stats and comparisons: `report_information`
 
-## Target Macros
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `sports-esports`.
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_query, extract_from_table, extract_by_route, extract_by_extremum, extract_by_slider, compute_from_table, compare_by_dropdown, play_by_playback, post_from_free_text, react_by_toggle, follow_by_toggle, subscribe_by_toggle, save_by_toggle
+## Data
 
-## Temporal Dynamics
-
-Matches have `status` field (live/final/scheduled) to simulate real-time game progression.
-Live matches include `quarter` and `clock` fields. The data snapshot represents a single
-point in time during a multi-sport day. No active time simulation is needed -- the frozen
-snapshot provides enough variety for task evaluation.
-
-## Domain-Specific Notes
-
-- Semantic search: keyword-overlap scoring across team names, cities, player names, positions
-- Win percentage computed dynamically as `wins / (wins + losses)`
-- Standings are per-league, ordered by the `standing` field
-- Esports players have gamertags in quotes within their names (e.g., Alex 'Phantom' Kim)
-- Comments and subscriptions are mutable state, reset from .pristine between eval runs
+- Tables: `sports_esports_leagues`, `sports_esports_teams`,
+  `sports_esports_matches`, `sports_esports_players`,
+  `sports_esports_favorites`, `sports_esports_users`.
+- The data is a frozen snapshot of one match day. Match `status`
+  (live / final / scheduled), quarter and clock never advance.
+- Login goes through `helpers.auth` on `session["user_id"]`, so the global
+  auto-login signs in user 1.
+- Match comments and league subscriptions are saved to `comments` and
+  `subscriptions` collections that have no base table, so `db.query` cannot
+  read them back. Graders see those writes only in the request log.

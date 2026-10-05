@@ -1,22 +1,52 @@
-# Tax filing / DMV / permits
+# Lakeport Government Services (`tax-filing-dmv-permits`)
 
-**Category**: Government / civic
-**Reviewer**: Kenny
-**Number of macros**: 28
+A state/city services portal combining tax filing, motor-vehicle (DMV)
+records, permits, payments and appointments, in the style of IRS and DMV
+online services. Users file a Form 1040, sign it, register vehicles, apply
+for permits, pay fees, book DMV appointments and track refunds.
 
-## Data Source
+- URL: `/sites/tax-filing-dmv-permits/` (simulated domain `lakeportgov.org`)
+- Data split: training site
 
-Scrape Fed forms
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Dashboard: recent filings (with per-filing notes), permits, stats, awaiting-signature alert, Export Your Data bar |
+| `/tax-filings`, `/tax-filing/<id>` | Filings with year/type/status filters; filing detail |
+| `/file-1040` | Form 1040 income return (filing status, income lines 1-8, line 9 total) |
+| `/sign-document/<id>` | DocuSign-style signing page for a filing (draw or type) |
+| `/wheres-my-refund` | Income-tax returns with refund or amount due |
+| `/vehicles`, `/vehicle/<id>`, `/register-vehicle` | Vehicles with filters; vehicle detail; registration form |
+| `/permits`, `/permit/<id>`, `/apply-permit` | Permits with type/status and date-range filters; detail; application with document upload |
+| `/payments`, `/make-payment` | Payment history with type filter; payment form |
+| `/appointments`, `/my-appointments` | DMV appointment booking; the user's booked appointments |
+| `/forms` | Downloadable government forms with a category filter (`/forms/<id>/pdf`) |
+| `/search`, `/verify-identity`, `/login` | Search; identity code check; sign-in |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_from_table, extract_by_route, compute_from_table, compute_by_extremum, compute_by_slider, verify_by_toggle, submit_by_query, submit_by_form, edit_by_query, apply_by_form, sign_by_signature, select_by_dropdown, select_by_date_range, export_by_dropdown, upload_by_upload, book_by_date_range, pay_by_form, authenticate_by_form, verify_identity_by_code
+JSON endpoints under `/api/` cover filings, vehicles, permits, payments, uploads, appointments, identity verification, signing and export.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search records: `search`
+- Filter filings, vehicles, permits, payments or forms: `filter_by_dropdown`, `filter_by_date_range`
+- File a 1040 (line 9 is computed from lines 1-8), apply for a permit, submit a payment: `create_by_form`, `pay_by_form`
+- Attach supporting documents to a permit: `upload_file`
+- Sign a filing by drawing or typing: `sign_by_freeformdrawing`, `sign_by_text`
+- Book a DMV appointment: `book_by_form`
+- Save a note on a filing: `edit_by_form`
+- Export filings, vehicles, permits or payments as CSV/JSON: `export`
+- Read filings, vehicles, permits and payments: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `tax-filing-dmv-permits`.
+
+## Data
+
+- Tables: `tax_filing_dmv_permits_tax_filings`, `_vehicles`, `_permits`,
+  `_payments`, `_users`, and `_appointments` (created at runtime on first use).
+- Login goes through `helpers.auth` on `session["user_id"]`, so the global
+  auto-login signs in as user 1.
+- Cross-site effects: a payment emits `payment` (banking debit to "City of
+  Lakeport"), a booked appointment emits `booking` (calendar event and email),
+  a filed or signed return emits `file_created` (cloud-storage file and email),
+  and login emits `signup`.

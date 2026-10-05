@@ -1,66 +1,48 @@
-# Weather
+# Lakeport Weather (`weather`)
 
-**Category**: Dynamic info / feeds
-**Reviewer**: Minh
-**Number of macros**: 15
+A local weather portal for the fictional city of Lakeport, WA and nearby Pacific
+Northwest stations, modeled on weather.gov and Weather Underground. It shows
+current conditions, forecasts, a multi-year history archive and active alerts,
+and lets a signed-in user keep a list of saved locations.
 
-## Data Source
+- URL: `/sites/weather/` (simulated domain `lakeportweather.com`)
+- Data split: held-out (test) site
 
-OpenMeteo-inspired synthetic data for Lakeport, WA (fictional Pacific Northwest city).
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Current conditions, 7-day summary, location search, past-weather lookup, two-location compare |
+| `/forecast` | 7-day forecast table (`?location=`), with an "extended details" switch |
+| `/hourly` | 24-hour forecast cards |
+| `/history` | Historical table; defaults to the latest 30 days, `date_from`/`date_to` select a range |
+| `/alerts` | Active alerts with severity toggles and per-alert subscribe switches |
+| `/locations` | Saved locations: add, quick-save by name, remove, station and nearby search (login required) |
+| `/login` | Sign-in form |
 
-navigate_by_query, navigate_by_date_range, navigate_by_pan_zoom, search_by_query, search_by_proximity, filter_by_toggle, extract_by_dropdown, extract_by_toggle, extract_from_table, extract_by_date_range, compare_by_query, verify_by_slider, configure_by_slider, subscribe_by_toggle, save_by_query
+The pages are backed by JSON endpoints under `/api/` (`current`, `forecast`,
+`hourly`, `historical`, `alerts`, `locations`, `search`, `nearby`, `compare`,
+`users/<id>/settings`, `users/<id>/subscribe`).
 
-## Site Description
+## Interactions and macros
 
-Lakeport Weather is a local weather portal serving the fictional city of Lakeport, WA and surrounding PNW locations. It provides current conditions, 7-day forecasts, hourly forecasts, 30-day historical data, weather alerts, and saved-location management. Modeled after weather.gov and Weather Underground.
+- Look up a station by name on the home page or the Locations page: `search`
+- Pick a history date range: `filter_by_date_range`
+- Switch F/C units, toggle alert severities: `filter_by_options`
+- Add a saved location: `create_by_form`
+- Save or remove a location, subscribe to an alert type: `toggle_relationship`
+- Read forecast, hourly, history and compare tables: `report_information`
 
-### Data files (data_sources/weather/)
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `weather`.
 
-- **current.json** -- Current conditions (temp, humidity, wind, UV, etc.)
-- **forecast.json** -- 7-day forecast array
-- **hourly.json** -- 24-hour hourly forecast array
-- **historical.json** -- 30 days of historical weather records
-- **locations.json** -- 10 PNW cities with lat/lng coordinates
-- **alerts.json** -- 3 active weather alerts (Wind Advisory, Air Quality, Flood Watch)
-- **users.json** -- 5 user accounts with saved locations, subscriptions, settings
+## Data
 
-### Temporal / dynamic behavior
-
-The site simulates a weather portal snapshot frozen at 2026-06-27. Historical data covers the prior 30 days. Forecast data covers the next 7 days. Alerts are active and time-bounded.
-
-### Key pages
-
-| Route | Purpose |
-|-------|---------|
-| `/` | Current conditions + 7-day summary |
-| `/forecast` | Extended 7-day forecast table |
-| `/hourly` | 24-hour hourly forecast cards |
-| `/history` | 30-day historical table with stats |
-| `/alerts` | Active weather alerts |
-| `/locations` | Saved locations management (login required) |
-| `/login` | User authentication |
-
-### Key API endpoints
-
-| Endpoint | Macro support |
-|----------|--------------|
-| `GET /api/current?location=...` | navigate_by_query |
-| `GET /api/current/units?units=metric` | filter_by_toggle |
-| `GET /api/forecast?location=...&days=N` | navigate_by_query, extract_by_dropdown |
-| `GET /api/forecast/extended?extended=true` | extract_by_toggle |
-| `GET /api/hourly` | extract_from_table |
-| `GET /api/historical?date_from=...&date_to=...` | extract_by_date_range, navigate_by_date_range |
-| `GET /api/history/date/YYYY-MM-DD` | navigate_by_date_range |
-| `GET /api/search?q=...` | search_by_query |
-| `GET /api/nearby?lat=...&lng=...&radius=...` | search_by_proximity |
-| `GET /api/compare?locations=A,B` | compare_by_query |
-| `GET /api/alerts` | extract_from_table |
-| `GET /api/alerts/filter?severity=...` | filter_by_toggle |
-| `GET /api/locations/all` | navigate_by_pan_zoom |
-| `GET /api/verify_temp?temp_f=...` | verify_by_slider |
-| `POST /api/users/N/settings` | configure_by_slider |
-| `POST /api/users/N/subscribe` | subscribe_by_toggle |
-| `POST /api/users/N/save_location` | save_by_query |
-| `POST /api/login` | authenticate_by_form |
+- Tables: `weather_current`, `weather_forecast`, `weather_hourly`,
+  `weather_historical`, `weather_alerts`, `weather_locations`, `weather_users`.
+- Dates are a fixed snapshot and are never shifted. The history page anchors
+  its default range to the newest archived day.
+- Login uses the site's own `session["weather_user_id"]`, so the global
+  auto-login does not sign the user in here. Saving locations and subscribing
+  need an explicit login.
+- Subscribing to an alert type sends a confirmation email to the WebMail inbox
+  (`app/handlers/email_handler._add_email`).

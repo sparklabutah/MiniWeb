@@ -4,6 +4,7 @@
 Usage:
     python evaluation/run_study.py --config evaluation/configs/study.yaml
     python evaluation/run_study.py --config study.yaml --dry-run
+    python evaluation/run_study.py --config study.yaml --workers 8     # 8 parallel processes
 
 Config (YAML or JSON):
 
@@ -13,6 +14,8 @@ Config (YAML or JSON):
     exclude: ["Minh/live_57395e"]
     resume: true                  # skip tasks that already have a result.json
     repeats: 1                    # episodes per model x task
+    workers: 1                    # parallel worker processes (or --workers N); worker i
+                                  # uses port episode.port + i and every N-th episode
 
     episode:
       max_steps: 30
@@ -21,12 +24,15 @@ Config (YAML or JSON):
       start_from: recorded        # recorded | starting_url
       headless: true
       port: 8099
+      browser: ~/.cache/ms-playwright/chromium-1117/chrome-linux/chrome   # optional; pins the Chromium binary
 
     models:
       - label: qwen3.5-27b
         provider: ollama
         model: qwen3.5:27b
         host: http://localhost:11434      # optional
+        # hosts: [http://127.0.0.1:11435, http://127.0.0.1:11436]   # optional; worker i uses
+        #   hosts[i % len] — for models ollama serves one request at a time (qwen35: n_slots=1)
         temperature: 0.0
       - label: gemini-flash
         provider: gemini                  # GOOGLE_API_KEY / GEMINI_API_KEY
@@ -141,6 +147,7 @@ def build_agent_for(spec, ep):
         timeout=ep["timeout"],
         headless=ep["headless"],
         available_file_paths=ensure_fixtures(),
+        executable_path=ep.get("browser"),
     )
 
 
@@ -150,8 +157,16 @@ EP_DEFAULTS = dict(max_steps=30, timeout=600, obs="visual",
                    start_from="recorded", headless=True, port=8099)
 
 
-async def run_study(cfg, dry_run=False):
+def _episodes(models, tasks, repeats):
+    """Every (model spec, repeat, task) in run order: all tasks of repeat 1 first."""
+    return [(spec, rep, task) for spec in models for rep in range(1, repeats + 1) for task in tasks]
+
+
+async def run_study(cfg, dry_run=False, shard=(0, 1)):
     ep = {**EP_DEFAULTS, **(cfg.get("episode") or {})}
+    ep["port"] += shard[0]
+    if ep.get("browser"):
+        ep["browser"] = os.path.expanduser(ep["browser"])
     models = cfg["models"]
     tasks = _expand_tasks(cfg.get("tasks", "all"))
     exclude = set(cfg.get("exclude") or [])
@@ -172,36 +187,61 @@ async def run_study(cfg, dry_run=False):
         return []
 
     results = []
-    for spec in models:
+    for spec in models:                   # spread workers over several single-slot servers
+        if spec.get("hosts"):
+            spec["host"] = spec["hosts"][shard[0] % len(spec["hosts"])]
+    episodes = _episodes(models, tasks, repeats)
+    for n, (spec, rep, task_id) in enumerate(episodes):
+        if n % shard[1] != shard[0]:
+            continue
         label = spec.get("label") or spec["model"].replace("/", "-")
-        for rep in range(1, repeats + 1):
-            suffix = f"__r{rep}" if repeats > 1 else ""
-            for i, task_id in enumerate(tasks):
-                out = out_root / f"{label}__{task_id.replace('/', '-')}{suffix}"
-                tag = f"{DIM}[{label}{suffix} · {task_id} · {i+1}/{len(tasks)}]{RESET}"
-                if resume and (out / "result.json").exists():
-                    print(f"  {tag} SKIP (done)")
-                    continue
-                try:
-                    agent = build_agent_for(spec, ep)
-                    res = await run_and_grade(
-                        task_id=task_id, model=f"{spec['provider']}/{spec['model']}",
-                        obs=ep["obs"],
-                        max_steps=ep["max_steps"], timeout=ep["timeout"],
-                        headless=ep["headless"], start_from=ep["start_from"],
-                        port=ep["port"], out=out, verbose=False, agent=agent)
-                    res["label"], res["repeat"] = label, rep
-                    results.append(res)
-                    mark = f"{GREEN}PASS{RESET}" if res["passed"] else f"{RED}FAIL{RESET}"
-                    print(f"  {tag} {mark}  {DIM}{res['elapsed_s']:.0f}s{RESET}")
-                except Exception as exc:
-                    print(f"  {tag} {RED}ERROR{RESET} {exc}")
-                    results.append({"label": label, "repeat": rep, "task_id": task_id,
-                                    "passed": False, "error": str(exc)})
+        suffix = f"__r{rep}" if repeats > 1 else ""
+        out = out_root / f"{label}__{task_id.replace('/', '-')}{suffix}"
+        tag = f"{DIM}[{label}{suffix} · {task_id} · {n+1}/{len(episodes)}]{RESET}"
+        if resume and (out / "result.json").exists():
+            print(f"  {tag} SKIP (done)")
+            continue
+        try:
+            agent = build_agent_for(spec, ep)
+            res = await run_and_grade(
+                task_id=task_id, model=f"{spec['provider']}/{spec['model']}",
+                obs=ep["obs"],
+                max_steps=ep["max_steps"], timeout=ep["timeout"],
+                headless=ep["headless"], start_from=ep["start_from"],
+                port=ep["port"], out=out, verbose=False, agent=agent,
+                grader=ep.get("grader", "judge"))
+            res["label"], res["repeat"] = label, rep
+            (out / "result.json").write_text(json.dumps(res, indent=2, default=str))
+            results.append(res)
+            mark = f"{GREEN}PASS{RESET}" if res["passed"] else f"{RED}FAIL{RESET}"
+            print(f"  {tag} {mark}  {DIM}{res['elapsed_s']:.0f}s{RESET}", flush=True)
+        except Exception as exc:
+            print(f"  {tag} {RED}ERROR{RESET} {exc}", flush=True)
+            results.append({"label": label, "repeat": rep, "task_id": task_id,
+                            "passed": False, "error": str(exc)})
 
-    (out_root / "study_results.json").write_text(json.dumps(results, indent=1, default=str))
-    summarize(out_root)
+    name = "study_results.json" if shard[1] == 1 else f"study_results.w{shard[0]}.json"
+    (out_root / name).write_text(json.dumps(results, indent=1, default=str))
+    if shard[1] == 1:
+        summarize(out_root)
     return results
+
+
+def run_workers(config_path, cfg, workers):
+    """Run the study as `workers` separate processes (one MiniWeb server + browser
+    each, on its own port), so a wedged browser only stalls its own worker."""
+    import subprocess
+    out_root = Path(cfg.get("out") or ROOT / "evaluation" / "results" / (cfg.get("name") or "study"))
+    out_root.mkdir(parents=True, exist_ok=True)
+    procs = []
+    for i in range(workers):
+        log = open(out_root / f"worker_{i}.log", "a")
+        procs.append(subprocess.Popen([sys.executable, __file__, "--config", str(config_path),
+                                       "--shard", f"{i}/{workers}"], stdout=log, stderr=subprocess.STDOUT))
+    print(f"{workers} workers started -> {out_root}/worker_*.log")
+    codes = [p.wait() for p in procs]
+    summarize(out_root)
+    return max(codes)
 
 
 # ── summary: overall / per chain length / per macro, per model ───────────────
@@ -275,6 +315,8 @@ def main():
     ap.add_argument("--config")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, run nothing")
     ap.add_argument("--summarize-only", metavar="DIR", help="just re-summarize an existing study dir")
+    ap.add_argument("--workers", type=int, help="parallel worker processes (overrides config `workers`)")
+    ap.add_argument("--shard", metavar="I/N", help=argparse.SUPPRESS)   # set by --workers
     args = ap.parse_args()
 
     if args.summarize_only:
@@ -283,7 +325,14 @@ def main():
     if not args.config:
         ap.error("--config is required (or use --summarize-only DIR)")
     cfg = load_config(args.config)
-    asyncio.run(run_study(cfg, dry_run=args.dry_run))
+    workers = args.workers or int(cfg.get("workers", 1))
+    if args.shard:
+        i, n = (int(x) for x in args.shard.split("/"))
+        asyncio.run(run_study(cfg, shard=(i, n)))
+    elif workers > 1 and not args.dry_run:
+        raise SystemExit(run_workers(args.config, cfg, workers))
+    else:
+        asyncio.run(run_study(cfg, dry_run=args.dry_run))
 
 
 if __name__ == "__main__":

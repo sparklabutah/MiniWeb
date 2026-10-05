@@ -1,22 +1,40 @@
-# Converters / calculators
+# CalcTools (`converters-calculators`)
 
-**Category**: Utilities
-**Reviewer**: Kenny
-**Number of macros**: 15
+A free unit-converter and calculator site modeled on Calculator.net. It offers
+length, weight, temperature, currency, volume, area, speed and number-base
+converters plus BMI, mortgage and tip calculators. Signed-in users can save
+results and see their conversion history.
 
-## Data Source
+- URL: `/sites/converters-calculators/` (simulated domain `convertall.tools`)
+- Data split: training site
 
-(Just ask Claude to code one)
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Tool directory: unit-converter and calculator cards, history export link |
+| `/converter/<tool>` | Converter (`length`, `weight`, `temperature`, `currency`, `volume`, `area`, `speed`, `base`): value, from/to unit dropdowns, result and a save form |
+| `/calculator/<tool>` | Calculator (`bmi`, `mortgage`, `tip`): inputs, result and a save form |
+| `/dashboard` | Saved conversions and conversion history |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, extract_from_table, extract_by_slider, compare_from_table, select_by_slider, configure_by_slider, export_by_dropdown, compute_by_query, compute_by_slider, submit_by_query, translate_by_dropdown, translate_by_slider
+Conversions run server-side through JSON endpoints (`/api/convert/<category>`,
+`/api/calculate/<tool>`); `/api/export` downloads the history as JSON or CSV.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Open a converter or calculator from the directory: `navigate_by_route`
+- Enter a value, pick units and run Convert/Calculate: `compute_by_tool`
+- Save a result to the dashboard: `create_by_form`
+- Read results, unit lists and saved conversions: `report_information`
+- Find a tool through the category links: `search`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `converters-calculators`.
+
+## Data
+
+- Tables: `converters_calculators_conversions` (unit definitions and USD-based
+  exchange rates), `converters_calculators_history`, `converters_calculators_users`.
+- Results are computed with deterministic formulas; currency rates are fixed.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+- No cross-site effects.

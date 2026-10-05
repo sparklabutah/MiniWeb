@@ -1,0 +1,37 @@
+# Scaling figure (make_scaling.py): two line plots side by side, WebArena-Lite and the WebVoyager sample, in the style
+# of the RQ3 figure. In each panel: the planner with one pooled adapter trained on growing subsets of the generated data
+# (line), the same recipe on InSTA's live-web trajectories at matched size (diamond), and the untrained planner (dashed).
+# Runs: one directory per seed (WebArena-Lite run dirs; WebVoyager *_wvjudge dirs), relative to the repo root; points are
+# means over the listed runs (no std, user 2026-10-04). An empty list marks the point "pending": list a run only once it
+# is complete. Steps: rows_trained of each adapter. label: below puts a point's value under it.
+
+out: docs/figures/scaling/scaling
+model: Qwen3.5-4B
+model_logo: docs/figures/logos/qwen.png
+legend: {untrained: "Planner, untrained", miniweb: "+ pooled adapter, MiniWeb data", insta: "+ pooled adapter, InSTA data"}
+colors: {untrained: "#7D8798", miniweb: "#2B5C9E", insta: "#A8520F"}
+steps: {"100": 647, "300": 2140, "1K": 7021, "3.1K": 27644, "7K": 56416, insta: 26368}
+panels:
+  - title: "WebArena-Lite (154)"
+    kind: webarena
+    ylim: [20, 45]
+    untrained: [data/webmix/wa/seeds/agent_base_s1, data/webmix/wa/seeds/agent_base_s2, data/webmix/wa/seeds/agent_base_s3]
+    miniweb:
+      "100": []
+      "300": [data/webmix/wa/seeds/agent_f300_s1]
+      "1K": [data/webmix/wa/seeds/agent_f1k_s1]
+      "3.1K": [data/webmix/wa/seeds/agent_pooled31k_s1, data/webmix/wa/seeds/agent_pooled31k_s2, data/webmix/wa/seeds/agent_pooled31k_s3]
+      "7K": []
+    insta: [data/webmix/wa/seeds/agent_insta_s1]
+  - title: "WebVoyager sample (98)"
+    kind: webvoyager
+    tasks: data/webmix/webvoyager/WebVoyager_sub98_20261003.jsonl
+    ylim: [40, 80]
+    untrained: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge]
+    miniweb:
+      "100": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled100_sub98_wvjudge]
+      "300": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled300_sub98_wvjudge]
+      "1K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled1k_sub98_wvjudge]
+      "3.1K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge]
+      "7K": [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled7k_sub98_wvjudge]
+    insta: [data/webmix/om2w/runs/granite/webvoyager100_agent_insta_sub98_wvjudge]

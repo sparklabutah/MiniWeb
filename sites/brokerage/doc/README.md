@@ -1,22 +1,55 @@
-# Brokerage / crypto
+# TradeVista (`brokerage`)
 
-**Category**: Financial
-**Reviewer**: Farhan
-**Number of macros**: 28
+A Robinhood-style trading app (listed as "Brokerage Platform" in `site.json`) for stocks,
+index funds, crypto, options and futures. Users browse securities, view ticker
+charts, place and cancel orders, manage a watchlist and move cash in and out.
 
-## Data Source
+- URL: `/sites/brokerage/` (simulated domain `tradepulse.com`)
+- Data split: training site
 
-TBD -- no data source specified yet.
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Markets home: search, "All Securities" table with sector/type filters, sort and max-price slider |
+| `/ticker/<symbol>` | Ticker detail: price chart with period buttons, fundamentals, watchlist button |
+| `/trade` | Order form: symbol, side, shares, order type, "Pay With" account |
+| `/portfolio` | Holdings with P&L, cash deposit and withdraw (login required) |
+| `/orders` | Order history with status and From/To date filters, cancel for open orders (login required) |
+| `/watchlist` | Watchlist table (login required) |
+| `/options` | Options chain with underlying and type filters |
+| `/compare` | Side-by-side ticker comparison |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, filter_by_date_range, sort_by_ranking, extract_from_table, extract_by_route, extract_by_extremum, compute_by_extremum, compute_by_slider, compare_by_dropdown, verify_by_slider, submit_by_query, select_by_dropdown, configure_by_radio, configure_by_slider, export_by_dropdown, follow_by_toggle, save_by_toggle, submit_by_form, pay_by_query, cancel_by_form, authenticate_by_form, verify_identity_by_code, compute_by_dropdown
+JSON endpoints under `/api/` cover tickers, price history, options, orders,
+watchlist, funds, rankings and export.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search tickers from the top bar: `search`
+- Filter securities by sector, type or order status: `filter_by_dropdown`
+- Limit securities by price: `filter_by_slider`
+- Sort securities (market cap, price, gainers, name): `sort_by_form`
+- Filter order history by date: `filter_by_date_range`
+- Place an order: `create_by_form`; choose the paying account: `pay_by_form`
+- Cancel an open order: `cancel_by_form`
+- Add or remove a ticker from the watchlist: `toggle_relationship`
+- Read holdings, orders, options chains and comparisons: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `brokerage`.
+
+## Data
+
+- Tables: `brokerage_tickers`, `brokerage_price_history`, `brokerage_price_data`,
+  `brokerage_options`, `brokerage_orders`, `brokerage_portfolios`,
+  `brokerage_watchlists`, `brokerage_users`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+- Prices are simulated: the wall-clock time is mapped into the last trading day
+  in the price history (9:30-16:00), so quotes change between page loads.
+  `?sim_tick=N` pins a 30-minute interval. Stock orders are rejected outside
+  simulated market hours; crypto trades at any time. Settings are in
+  `sites/brokerage/config/config.json`.
+- A filled order emits `trade` (a debit on the banking account for buys) and
+  `message` (a trade notice in instant messaging). Deposits and withdrawals
+  also send a `message`. Logging in emits `signup` (password-vault entry and
+  welcome email).

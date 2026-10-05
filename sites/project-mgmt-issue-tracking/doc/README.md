@@ -1,61 +1,50 @@
-# Project mgmt / issue tracking
+# Meridian Tracker (`project-mgmt-issue-tracking`)
 
-**Category**: Productivity
-**Reviewer**: Reaz
-**Number of macros**: 21
+A Jira-style project tracker for the fictional Meridian Systems. It has
+per-project Kanban boards, issue detail pages with comments and status
+transitions, sprints, a backlog grid and issue export. Issue keys follow Jira
+style (`MF-101`).
 
-## Data Source
+- URL: `/sites/project-mgmt-issue-tracking/` (simulated domain `taskflow.pm`)
+- Data split: held-out (test) site
 
-Jira social repository -- https://github.com/marcoortu/jira-social-repository
+## Pages
 
-Files (in data_sources/project-mgmt-issue-tracking/):
-- `projects.json` -- 5 projects (MeridianFlow, MeridianVault, MeridianLens, Internal Tools, Website Redesign)
-- `issues.json` -- 40 issues across all projects with keys like MF-101, MV-201, etc.
-- `comments.json` -- 30 comments attached to issues
-- `sprints.json` -- 6 sprints across projects
-- `users.json` -- 5 team members (alex.chen, priya.sharma, marcus.johnson, david.kim, natalie.brooks)
+| Route | Page |
+|---|---|
+| `/` | Dashboard: project cards with issue counts and recent activity |
+| `/project/<id>` | Kanban board with search, Sprint/Assignee/Type/Priority dropdowns, "Created from/to" dates, export (CSV/JSON) |
+| `/issue/<id>` | Issue detail: description, metadata, comments, edit form, status transition, Watch, Delete |
+| `/create-issue` | New-issue form (project, title, description, type, priority, assignee, sprint, story points, labels) |
+| `/backlog` | Backlog: search, project/type/priority filters, inline-editable issue grid with add row and Save Changes |
+| `/sprints`, `/sprint/<id>` | Sprint list with create form; sprint board with add/remove issue, Start Sprint, Complete Sprint |
+| `/login` | Sign-in form |
 
-### Data Format
+JSON endpoints under `/api/` cover projects, issues (search, lookup by key,
+bulk update, watch), comments, sprints, users, stats and export.
 
-**projects.json**: `id`, `name`, `key`, `description`, `owner_id`, `status`, `created_at`
-**issues.json**: `id`, `project_id`, `key`, `title`, `description`, `type` (bug/feature/task/story), `status` (open/in_progress/review/done/closed), `priority` (critical/high/medium/low), `assignee_id`, `reporter_id`, `created_at`, `updated_at`, `labels`, `story_points`, `sprint`
-**comments.json**: `id`, `issue_id`, `user_id`, `text`, `created_at`
-**sprints.json**: `id`, `project_id`, `name`, `start_date`, `end_date`, `status`, `goal`
-**users.json**: `id`, `username`, `name`, `email`, `password`, `role`, `avatar_color`
+## Interactions and macros
 
-### Sampling
+- Search issues on a board or the backlog: `search`
+- Filter by assignee, type, priority, project or sprint: `filter_by_dropdown`
+- Filter a board by creation date: `filter_by_date_range`
+- Open a project, an issue or a nav page: `navigate_by_route`
+- Create an issue or add a comment: `create_by_form`
+- Edit an issue or transition its status: `edit_by_form`
+- Edit issues inline in the backlog grid: `edit_by_cell`
+- Delete an issue: `delete_from_table`; watch an issue: `toggle_relationship`
+- Export a project's issues: `export`
 
-All data is loaded by default (num_data_points=-1). The dataset is small (40 issues, 30 comments) and fully usable without sampling.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `project-mgmt-issue-tracking`.
 
-## Real-World Model
+## Data
 
-**Jira / Linear / Asana** -- professional project management tool. Key UI elements:
-- Dashboard with project cards showing issue counts and critical items
-- Kanban board per project with columns: Open, In Progress, Review, Done, Closed
-- Issue detail page with description, sidebar metadata, comments, edit form, status transitions
-- Sprint overview with progress bars and story point tracking
-- Backlog view for unassigned issues
-- Create issue form with project, type, priority, assignee, story points, sprint, labels
-- Search across issues by keyword
-- Filter by project, status, type, priority, assignee, sprint, date range, label
-- Sort by priority, date, status, key, story points
-- Export issues as CSV or JSON
-- Watch/follow toggle on issues
-
-## Target Macros
-
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_from_table, extract_by_route, create_from_free_text, submit_by_query, edit_by_query, edit_by_dropdown, edit_by_form, delete_from_table, post_from_free_text, export_by_dropdown, follow_by_toggle
-
-## Temporal Dynamics
-
-Not applicable -- issue trackers represent a live snapshot of project state. The data is a static snapshot at a point in time. Mutations (create, edit, delete, transition) happen through user actions, not temporal simulation.
-
-## Domain-Specific Notes
-
-- Issue keys follow Jira convention: PROJECT_KEY-NUMBER (e.g., MF-101, MV-201)
-- Status workflow: open -> in_progress -> review -> done -> closed
-- Priority ordering: critical > high > medium > low
-- Story points are optional numeric values per issue
-- Sprints have status: planned, active, closed
-- Watch/follow is a per-issue toggle that tracks which users are watching an issue
-- Comments are append-only per issue; adding a comment updates the issue's updated_at timestamp
+- Source: Jira social repository (github.com/marcoortu/jira-social-repository),
+  adapted to Meridian projects.
+- Tables (`project_mgmt_issue_tracking_*`): `projects`, `issues`, `comments`,
+  `sprints`, `users`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+  Signing in emits a `signup` event.
+- Creating an issue with an assignee emits `booking` (calendar event) and
+  `message` (instant message to the assignee). Editing an assigned issue emails
+  the assignee.

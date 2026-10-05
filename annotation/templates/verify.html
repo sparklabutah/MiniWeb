@@ -62,6 +62,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
 .quality-pill { border-radius:.3rem; padding:.15rem .35rem; background:#e2e8f0; color:#334155; font-size:.65rem; }
 .quality-pill[data-state="needs_repair"], .quality-pill[data-state="suggest_delete"], .quality-pill[data-state="fail"] { background:#fee2e2; color:#991b1b; }
 .quality-pill[data-state="stale"], .quality-pill[data-state="unreviewed"] { background:#fef3c7; color:#92400e; }
+.quality-pill.rerecorded-pill { background:#ede9fe; color:#5b21b6; }
 .quality-pill[data-state="repaired"], .quality-pill[data-state="keep"], .quality-pill[data-state="pass"] { background:#e0f2fe; color:#075985; }
 .quality-filter { width:100%;padding:.3rem;margin-top:.3rem;border:1px solid #cbd5e1;border-radius:.25rem;background:white;font-size:.74rem; }
 #quality-panel p, #quality-panel li { font-size:.78rem; line-height:1.5; }
@@ -75,6 +76,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
     <h1>Verifier Builder</h1>
     <a href="/annotate/">← Annotator</a>
     <a href="/annotate/review">Review</a>
+    <a href="/annotate/task-review">Task Review</a>
     <span style="flex:1"></span>
     <span style="font-size:.75rem;color:#94a3b8">{{ tasks|length }} tasks available</span>
 </div>
@@ -130,7 +132,7 @@ label { display: block; font-size: .75rem; font-weight: 600; text-transform: upp
                     {% if t.has_feedback %}<span style="font-size:.58rem;background:#ede9fe;color:#7c3aed;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#9998; feedback</span>{% endif %}
                     {% if not t.has_verifier %}<span style="font-size:.58rem;background:#f1f5f9;color:#94a3b8;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">no verifier</span>{% endif %}
                 </div>
-                <div class="quality-pills"><span class="quality-pill ai-pill" data-state="{{ t.quality.ai }}">AI: {{ t.quality.ai_label }}</span><span class="quality-pill walk-pill" data-state="{{ t.quality.walk }}">Walk: {{ {'unrun':'not tested','pass':'passed','fail':'failed','stale':'outdated'}[t.quality.walk] }}</span></div>
+                <div class="quality-pills"><span class="quality-pill ai-pill" data-state="{{ t.quality.ai }}">AI: {{ t.quality.ai_label }}</span><span class="quality-pill walk-pill" data-state="{{ t.quality.walk }}"{% if t.quality.walk_by %} title="Fresh walk recorded by {{ t.quality.walk_by.by }} on {{ (t.quality.walk_by.at or '')[:10] }}"{% endif %}>{{ 'AI walk' if t.quality.walk_by and t.quality.walk_by.ai else 'Walk' }}: {{ {'unrun':'not tested','pass':'passed','fail':'failed','stale':'outdated'}[t.quality.walk] }}</span>{% if t.quality.rerecorded %}<span class="quality-pill rerecorded-pill" title="Original recording re-recorded by {{ t.quality.rerecorded.by or 'unknown' }} at {{ t.quality.rerecorded.at }}">&#8634; re-recorded</span>{% endif %}</div>
                 <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
                 <div class="tc-meta">{{ t.annotator|default('?') }} · {{ (t.sites[0].id if t.sites[0] is mapping else t.sites[0]) if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
             </div>
@@ -565,12 +567,19 @@ function renderQuality(q) {
         var run = (q.runs || []).find(function(x) { return x.source === source; });
         var row = add('tr', '', table); add('td', names[source], row); add('td', run ? run.label : 'Not tested', row); add('td', run ? run.run_at : '—', row);
     });
+    if (q.walk_by) add('p', 'Fresh walk recorded by ' + q.walk_by.by + (q.walk_by.ai ? ' (AI reviewer)' : '') + ' on ' + (q.walk_by.at || '').slice(0, 10) + (q.walk_by.source ? ' — ' + q.walk_by.source : '') + '.');
+    if (q.rerecorded) add('p', 'Original recording re-recorded by ' + (q.rerecorded.by || 'unknown') + ' at ' + q.rerecorded.at + '.');
     add('p', 'These results test saved recordings. Original-recording QA uses the saved expected answer. Empty and answer-only rejection are basic checks; alternative valid paths and plausible wrong completions still need testing.');
     add('p', 'Human tags and approval below are independent decisions. A deletion suggestion keeps the task and recording intact.');
     var card = document.querySelector('.task-card.active');
     if (card) { card.dataset.ai = q.ai; card.dataset.walk = q.walk; card.dataset.attention = q.attention ? 'yes' : 'no';
         var ai = card.querySelector('.ai-pill'); ai.textContent = 'AI: ' + q.ai_label; ai.dataset.state = q.ai;
-        var walk = card.querySelector('.walk-pill'); walk.textContent = 'Walk: ' + ({unrun:'not tested',pass:'passed',fail:'failed',stale:'outdated'}[q.walk]); walk.dataset.state = q.walk;
+        var walk = card.querySelector('.walk-pill'); walk.textContent = (q.walk_by && q.walk_by.ai ? 'AI walk: ' : 'Walk: ') + ({unrun:'not tested',pass:'passed',fail:'failed',stale:'outdated'}[q.walk]); walk.dataset.state = q.walk;
+        if (q.walk_by) walk.title = 'Fresh walk recorded by ' + q.walk_by.by + ' on ' + (q.walk_by.at || '').slice(0, 10);
+        if (q.rerecorded && !card.querySelector('.rerecorded-pill')) {
+            var rr = document.createElement('span'); rr.className = 'quality-pill rerecorded-pill'; rr.textContent = '\u21BA re-recorded';
+            rr.title = 'Original recording re-recorded by ' + (q.rerecorded.by || 'unknown') + ' at ' + q.rerecorded.at; walk.after(rr);
+        }
     }
 }
 function refreshQuality() {

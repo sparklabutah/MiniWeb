@@ -155,15 +155,22 @@ class LLMClient:
 
     def complete(self, prompt: str, *, system: str | None = None,
                  json_mode: bool = False, max_tokens: int | None = None,
-                 temperature: float | None = None) -> str | None:
+                 temperature: float | None = None, images: list | None = None) -> str | None:
+        """`images`: optional list of image bytes or file paths, sent before the prompt
+        (Gemini only for now; other providers return None rather than answer blind)."""
         mt = max_tokens if max_tokens is not None else self.max_tokens
         temp = temperature if temperature is not None else self.temperature
         backend = {
             "anthropic": self._anthropic, "openai": self._openai,
             "gemini": self._gemini, "ollama": self._ollama, "groq": self._groq,
         }[self.provider]
+        if images and self.provider != "gemini":
+            return None
         try:
-            text, p, c = backend(prompt, system, mt, temp, json_mode)
+            if images:
+                text, p, c = backend(prompt, system, mt, temp, json_mode, images=images)
+            else:
+                text, p, c = backend(prompt, system, mt, temp, json_mode)
         except Exception:
             return None
         if text is None:
@@ -213,7 +220,7 @@ class LLMClient:
         text = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
         return text, r.usage.input_tokens, r.usage.output_tokens
 
-    def _gemini(self, prompt, system, mt, temp, json_mode):
+    def _gemini(self, prompt, system, mt, temp, json_mode, images=None):
         from google import genai
         from google.genai import types
         if _get_env("GOOGLE_GENAI_USE_VERTEXAI").lower() in ("1", "true", "yes"):
@@ -239,7 +246,10 @@ class LLMClient:
             system_instruction=system or None,
             response_mime_type="application/json" if json_mode else None,
         )
-        r = client.models.generate_content(model=self.model, contents=prompt, config=cfg)
+        contents = prompt
+        if images:
+            contents = [_image_part(types, img) for img in images] + [prompt]
+        r = client.models.generate_content(model=self.model, contents=contents, config=cfg)
         um = r.usage_metadata
         return (r.text, getattr(um, "prompt_token_count", 0) or 0,
                 getattr(um, "candidates_token_count", 0) or 0)
@@ -258,11 +268,20 @@ class LLMClient:
 
 # ── module-level convenience (backward-compatible with the old app.llm) ───────
 
+def _image_part(types, img):
+    """A Gemini Part from image bytes or a file path (PNG/JPEG/WebP/GIF by signature)."""
+    data = img if isinstance(img, (bytes, bytearray)) else open(img, "rb").read()
+    mime = ("image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/gif" if data[:4] == b"GIF8"
+            else "image/webp" if data[8:12] == b"WEBP" else "image/jpeg")
+    return types.Part.from_bytes(data=bytes(data), mime_type=mime)
+
+
 def call_llm(prompt, system=None, max_tokens=500, temperature=0.7,
-             json_mode=False, model=None):
-    """One-shot call. Returns response text (str) or None on failure."""
+             json_mode=False, model=None, images=None):
+    """One-shot call. Returns response text (str) or None on failure.
+    `images`: optional image bytes/paths (Gemini only)."""
     return LLMClient(model, temperature=temperature, max_tokens=max_tokens).complete(
-        prompt, system=system, json_mode=json_mode)
+        prompt, system=system, json_mode=json_mode, images=images)
 
 
 def _provider_configured(provider: str) -> bool:

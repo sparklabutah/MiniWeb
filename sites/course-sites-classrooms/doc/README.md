@@ -1,22 +1,46 @@
-# Course sites & classrooms
+# EduPortal LMS (`course-sites-classrooms`)
 
-**Category**: Education / LMS
-**Reviewer**: Kenny
-**Number of macros**: 26
+A Canvas / Moodle-style learning management system. Students browse and enroll
+in courses, play lectures, submit assignments (text plus an optional file) and
+post in discussion boards. Instructors and admins also grade submissions and
+edit the gradebook. Access is role-based (admin / instructor / student).
 
-## Data Source
+- URL: `/sites/course-sites-classrooms/` (simulated domain `learnhub.edu`)
+- Data split: training site
 
-TBD -- no data source specified yet.
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Dashboard and course catalog with search |
+| `/course/<id>` | Course page: modules, lecture player, assignments, enroll / leave toggle |
+| `/course/<id>/assignment/<aid>` | Assignment instructions, submit form with file upload, submissions table with date filter, grading |
+| `/course/<id>/gradebook` | Inline-editable gradebook grid with "+ Add row", save and CSV export |
+| `/course/<id>/discussions` | Discussion threads, new-thread and reply forms |
+| `/login` | Sign-in form |
 
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, extract_by_query, extract_by_semantic, extract_by_dropdown, extract_by_route, extract_by_slider, extract_by_date_range, create_from_free_text, submit_by_query, submit_by_form, submit_by_route, upload_by_upload, select_by_dropdown, play_by_dropdown, play_by_route, play_by_playback, post_from_free_text, post_by_route, react_by_toggle, follow_by_dropdown, follow_by_toggle, follow_by_route, join_by_toggle
+JSON endpoints under `/api/` expose courses, assignments, submissions, gradebooks, discussions, users and stats; `/api/export/gradebook/<course_id>` returns CSV.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search the course catalog: `search`
+- Open courses and assignments: `navigate_by_route`
+- Enroll in or leave a course: `toggle_relationship`
+- Play a lecture in the lecture player: `play_by_playback`
+- Submit an assignment, grade a submission, start or reply to a discussion: `create_by_form`
+- Attach a file to a submission: `upload_file`
+- Edit gradebook cells: `edit_by_cell`
+- Read course content, assignment details and filtered submissions: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `course-sites-classrooms`.
+
+## Data
+
+- Tables: `course_sites_classrooms_courses`, `_assignments`, `_submissions`,
+  `_discussions`, `_users` (all prefixed `course_sites_classrooms_`).
+- Login uses the shared `session["user_id"]`, so the global auto-login signs in
+  user 1 (Alex Rivera, a student). Grading and gradebook edits need an
+  instructor or admin account.
+- Logging in emits `signup` (password-vault entry + email). Submitting an
+  assignment sends a confirmation email and emits `booking`, which adds the
+  assignment's due date to the calendar.

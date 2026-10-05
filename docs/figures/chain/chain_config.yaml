@@ -1,0 +1,16 @@
+# Success by chain length (make_chain.py), 2026-10-05 (user: "add per macro chain length SR"). Chain length = the number
+# of primitives a human task chains (len(task.json "macros")).
+#  (a) the ten untrained agents of Tab. 2 on all 376 tasks (VLM-judge task success; agents from rq1_config.yaml), with
+#      the mean and what independent primitives would give: each task succeeds with p^n, p = the agents' mean success
+#      on one-primitive tasks, averaged over the tasks of a bin.
+#  (b) the four Qwen3.5-4B arms of Fig. 7 on the 63 held-out tasks (task verifiers), averaged over the three runs
+#      (an analysis on MiniWeb, as the setup states); runs are the named runs of docs/figures/tables/tables_config.yaml.
+out: docs/figures/chain/chain_length
+agents_from: docs/figures/rq1/rq1_config.yaml
+bins_a: [1, 2, 3, 4, 5]            # the last bin is "5+"
+bins_b: [1, 2, 3]                  # the last bin is "3+"
+arms:
+  - {label: "Single agent, untrained", runs: base, color: "#7D8798", ls: solid, marker: o}
+  - {label: "Single agent, trained", runs: pooled, color: "#2B5C9E", ls: solid, marker: o}
+  - {label: "Planner, untrained", runs: planner, color: "#7D8798", ls: dashed, marker: s}
+  - {label: "MiniWebAgent", runs: planner_pooled, color: "#2B5C9E", ls: dashed, marker: s, bold: true}

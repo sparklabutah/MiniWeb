@@ -1,22 +1,40 @@
-# Comparison / aggregators
+# PhoneCompare (`comparison-aggregators`)
 
-**Category**: Search & reference
-**Reviewer**: Minh
-**Number of macros**: 23
+A GSMArena-style phone catalog and comparison site. Users filter and sort
+phones by specs, open spec sheets, compare two phones side by side, and keep a
+favorites list and a compare list.
 
-## Data Source
+- URL: `/sites/comparison-aggregators/` (simulated domain `comparewise.com`)
+- Data split: held-out (test) site
 
-Find some catalog dataset, possibly phones, and build a mock on it
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Phone list: search, brand/OS/sort dropdowns, max-price and min-battery sliders, feature checkboxes (NFC, GPS, Dual SIM, Fingerprint) |
+| `/phone/<id>` | Spec sheet with Favorite and Add to Compare buttons |
+| `/brand/<name>` | One brand's phones |
+| `/compare` | Two phone dropdowns and a side-by-side spec table |
+| `/favorites` | The user's favorite phones |
+| `/dashboard` | Favorites and compare list with remove buttons (login required) |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_checkbox, filter_by_toggle, filter_by_slider, sort_by_ranking, sort_by_slider, extract_by_dropdown, extract_from_table, extract_by_route, extract_by_ranking, extract_by_extremum, compute_from_table, compare_by_dropdown, compare_from_table, verify_by_slider, select_from_table, select_by_extremum, subscribe_by_toggle, save_by_toggle
+JSON endpoints under `/api/` expose phones, brands, compare and stats.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search phones by name: `search`
+- Filter by brand/OS, price/battery, features: `filter_by_dropdown`, `filter_by_slider`, `filter_by_options`
+- Sort by newest, name, price or battery: `sort_by_form`
+- Open a phone or a brand page: `navigate_by_route`
+- Favorite/unfavorite a phone, remove from favorites: `toggle_relationship`
+- Read specs, find the cheapest or longest-lasting phone, compare two phones: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `comparison-aggregators`.
+
+## Data
+
+- Tables: `comparison_aggregators_phones`, `comparison_aggregators_users`.
+  Favorites and the compare list are stored on the user row.
+- Login reads `session["user_id"]`, so the global auto-login signs in as user 1.
+- No cross-site effects.

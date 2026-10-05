@@ -1320,6 +1320,9 @@ def api_task_verifier(annotator, task_id):
             return jsonify(spec)
         return jsonify({"task_id": task_id, "macros": {}})
     data = request.get_json(silent=True) or {}
+    if "macros" in data:
+        from annotation.review_mode import ensure_before
+        ensure_before(vf.parent)
     # Merge-save: only overwrite keys present in the payload, so fields written
     # by other tools (built_by, archetype_v2, ...) survive a partial POST.
     spec = {}
@@ -1336,7 +1339,8 @@ def api_task_verifier(annotator, task_id):
         # a human saving through the builder IS the redesign event — stamp it
         from datetime import datetime as _dt
         actor = session.get("annotator_name", "anonymous")
-        spec["built_by"] = "ai-builder-v2" if actor in ("codex-review", "claude-review") else "human-builder-v2"
+        from annotation.quality import AI_ACTORS
+        spec["built_by"] = "ai-builder-v2" if actor in AI_ACTORS else "human-builder-v2"
         spec["saved_by"] = actor
         spec["saved_at"] = _dt.now().isoformat()
     vf.parent.mkdir(parents=True, exist_ok=True)
@@ -1378,6 +1382,9 @@ def api_update_task_field():
     if not task_file.exists():
         return jsonify({"error": "Task not found"}), 404
 
+    if field != "review_tag":                  # a human decision is not a correction
+        from annotation.review_mode import ensure_before
+        ensure_before(task_file.parent)
     task_data = json.loads(task_file.read_text())
     task_data[field] = value
     task_file.write_text(json.dumps(task_data, indent=2, default=str))
@@ -2514,7 +2521,29 @@ def api_macro_browser_index():
 @annotation_bp.route("/api/macro_browser/task/<annotator>/<task_id>")
 def api_macro_browser_task(annotator, task_id):
     from annotation import macro_browser
-    detail = macro_browser.task_detail(annotator, task_id)
+    source = "walk" if request.args.get("source") == "walk" else "gold"
+    detail = macro_browser.task_detail(annotator, task_id, source)
+    if detail is None:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify(detail)
+
+
+@annotation_bp.route("/task-review")
+def task_review_page():
+    """One-screen task review: queues, before/now comparison, recording, verifier, decisions."""
+    return render_template("task_review.html", reviewer=session.get("annotator_name", "anonymous"))
+
+
+@annotation_bp.route("/api/task_review/index")
+def api_task_review_index():
+    from annotation import review_mode
+    return jsonify(review_mode.index())
+
+
+@annotation_bp.route("/api/task_review/task/<annotator>/<task_id>")
+def api_task_review_task(annotator, task_id):
+    from annotation import review_mode
+    detail = review_mode.detail(annotator, task_id)
     if detail is None:
         return jsonify({"error": "Task not found"}), 404
     return jsonify(detail)
@@ -3188,13 +3217,17 @@ def api_verification_walk():
     seen = set()
     common = [k for k in common if not (k in seen or seen.add(k))]
 
+    walker = session.get("annotator_name", "anonymous")
     payload = {
         "task_id": task_id,
         "answer": data.get("answer", ""),
         "recorded_at": datetime.now().isoformat(),
+        "recorded_by": walker,
         "trajectory": walk,
     }
     (d / "verification_walk.json").write_text(json.dumps(payload, indent=1))
+    task["verification_walk_by"] = {"by": walker, "at": payload["recorded_at"]}
+    (d / "task.json").write_text(json.dumps(task, indent=2, default=str))
 
     def fmt(keys):
         return [{"action": k[0], "target": k[1][:60], "value": k[2][:30]} for k in keys]

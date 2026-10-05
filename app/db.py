@@ -659,6 +659,89 @@ def save_collection(site: str, collection: str, items: list, sid: str = None):
     conn.commit()
 
 
+def _canon(v):
+    """A comparable form of a stored value: base columns come back as text, overlay rows as
+    JSON types (True vs "1", 3 vs "3.0"), so scalars compare as normalized text."""
+    if isinstance(v, bool):
+        return "1" if v else "0"
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)):
+        return str(int(v)) if float(v).is_integer() else repr(float(v))
+    if isinstance(v, (list, tuple)):
+        return [_canon(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _canon(x) for k, x in v.items()}
+    s = str(v)
+    try:
+        f = float(s)
+        return str(int(f)) if f.is_integer() and s.strip().lstrip("-").replace(".", "", 1).isdigit() else s
+    except ValueError:
+        return s
+
+
+def session_changes(sid: str = None, site: str = None, replaced_cap: int = 5000) -> list[dict]:
+    """This session's effective changes against the base tables, smallest first:
+    [{site, collection, item_id, op: insert|update|delete, changed: {field: [before, after]},
+      after: row|None}]. Overlay rows equal to their base row (an undone toggle, the untouched
+    rows of a replaced collection) are not changes. For privileged checks (datagen), never
+    for site code."""
+    if sid is None:
+        sid = _get_session_id()
+    conn = _get_conn()
+    q = "SELECT site, collection, item_id, op, data FROM session_overlay WHERE session_id = ?"
+    args = [sid]
+    if site:
+        q += " AND site = ?"
+        args.append(site)
+    rows = conn.execute(q, args).fetchall()
+    replaced = {(r[0], r[1]) for r in conn.execute(
+        "SELECT site, collection FROM session_collection_replaced WHERE session_id = ?", (sid,)).fetchall()
+        if not site or r[0] == site}
+    out, seen = [], set()
+
+    def base_row(st, coll, item_id):
+        table = get_table_name(st, coll)
+        if not table:
+            return None
+        pk = get_pk_column(st, coll)
+        try:
+            row = conn.execute(f"SELECT * FROM [{table}] WHERE CAST([{pk}] AS TEXT) = ? LIMIT 1", (str(item_id),)).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        return _deserialize_row(row) if row else None
+
+    for st, coll, item_id, op, data in rows:
+        seen.add((st, coll, str(item_id)))
+        before = base_row(st, coll, item_id)
+        if op == "delete":
+            if before is not None:
+                out.append({"site": st, "collection": coll, "item_id": str(item_id), "op": "delete",
+                            "changed": {}, "after": None})
+            continue
+        after = json.loads(data) if data else {}
+        if before is None:
+            out.append({"site": st, "collection": coll, "item_id": str(item_id), "op": "insert",
+                        "changed": {k: [None, v] for k, v in after.items()}, "after": after})
+            continue
+        changed = {k: [before.get(k), after.get(k)] for k in set(before) | set(after)
+                   if _canon(before.get(k)) != _canon(after.get(k))}
+        if changed:
+            out.append({"site": st, "collection": coll, "item_id": str(item_id), "op": "update",
+                        "changed": changed, "after": after})
+    for st, coll in replaced:       # a replaced collection's base rows it dropped were deleted
+        table = get_table_name(st, coll)
+        if not table:
+            continue
+        pk = get_pk_column(st, coll)
+        for (item_id,) in conn.execute(f"SELECT CAST([{pk}] AS TEXT) FROM [{table}] LIMIT ?", (replaced_cap,)).fetchall():
+            if (st, coll, str(item_id)) not in seen:
+                out.append({"site": st, "collection": coll, "item_id": str(item_id), "op": "delete",
+                            "changed": {}, "after": None})
+    conn.commit()
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Raw SQL — for sites that need custom queries
 # ---------------------------------------------------------------------------

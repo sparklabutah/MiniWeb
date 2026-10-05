@@ -169,6 +169,33 @@ def descriptions():
             for c, e in macros.items()}
 
 
+# --- judge rubrics ------------------------------------------------------------
+
+_GENERIC_RUBRIC = {
+    "done": "The macro's intended effect (see its description) happened on the right target and the site accepted it.",
+    "evidence": "Accepted requests and the resulting page state; never the agent's claim alone.",
+    "must_match": ["the target the subtask names", "every value the subtask specifies"],
+    "may_differ": ["the route taken"],
+    "fail_if": ["claimed but not done", "a different target", "not committed/submitted"],
+}
+
+
+def rubric(name):
+    """{done, evidence, must_match, may_differ, fail_if} for judging one instance of
+    a macro (alias-resolved). Macros registered without a rubric get a generic one."""
+    return entry(name).get("rubric") or dict(_GENERIC_RUBRIC)
+
+
+def op_rubric(op):
+    """{done, fail_if} for a reasoning operation, or {} for none/unknown."""
+    return (operations().get(op) or {}).get("rubric") or {}
+
+
+def rubric_principles():
+    """Judge-wide principles (evidence order, outcome over path, final state, …)."""
+    return _data().get("rubric_principles") or {}
+
+
 # --- operations (the reasoning axis, shown behind a base macro) -------------
 
 def operations():

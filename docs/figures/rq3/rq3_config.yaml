@@ -1,0 +1,63 @@
+# RQ3 figure (make_rq3.py): task success on the four benchmarks, same Qwen3.5-4B in every arm.
+# Each arm lists, per benchmark, its runs (one per seed; paths relative to the repo root). An empty list draws
+# "pending". `references` adds dashed reported numbers of other agents (different harness and task set; optional).
+# One run per arm on every benchmark (user, 2026-10-05: the live-web benchmarks have one run each), so the
+# held-out sites and WebArena-Lite use each arm's first seed.
+
+out: docs/figures/rq3/rq3_transfer
+model: Qwen3.5-4B
+model_logo: docs/figures/logos/qwen.png
+
+benchmarks:
+  - key: miniweb
+    label: "MiniWeb\nheld-out (63)"
+    kind: miniweb
+  - key: wa
+    label: "WebArena-\nLite (154)"
+    kind: webarena
+  - key: wv
+    label: "WebVoyager\n(536)"
+    kind: webvoyager
+    tasks: data/webmix/webvoyager/WebVoyager_reduced_536.jsonl
+  - key: om2w
+    label: "Online-\nMind2Web (280)"
+    kind: om2w
+    tasks: data/webmix/om2w/Online_Mind2Web_reduced_280.json
+
+arms:
+  - label: Single agent, untrained
+    color: "#7D8798"   # style.UNTRAINED
+    style: solid
+    miniweb: [data/webmix/eval/human_base, data/webmix/eval/seeds/base_s2, data/webmix/eval/seeds/base_s3]   # MiniWeb: mean of 3 runs (paper Setup; review round 1)
+    wa: [data/webmix/wa/seeds/base_s1, data/webmix/wa/seeds/base_s2, data/webmix/wa/seeds/base_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_base_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_base_webjudge]
+  - label: Single agent, trained
+    color: "#2B5C9E"
+    style: solid
+    compare: Single agent, untrained          # stars: p against this arm (as in paper_stats.py)
+    miniweb: [data/webmix/eval/human_pooled_v4, data/webmix/eval/seeds/pooled_v4_s2, data/webmix/eval/seeds/pooled_v4_s3]
+    wa: [data/webmix/wa/seeds/single_pooled_s1, data/webmix/wa/seeds/single_pooled_s2, data/webmix/wa/seeds/single_pooled_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_single_pooled_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_single_pooled_webjudge]
+  - label: Planner, untrained
+    color: "#7D8798"   # style.UNTRAINED
+    style: hatched
+    compare: Single agent, untrained
+    miniweb: [data/webmix/eval/seeds/pagent_v6_baseexec_s1, data/webmix/eval/seeds/pagent_v6_baseexec_s2, data/webmix/eval/seeds/pagent_v6_baseexec_s3]
+    wa: [data/webmix/wa/seeds/agent_base_s1, data/webmix/wa/seeds/agent_base_s2, data/webmix/wa/seeds/agent_base_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_agent_planner_base_webjudge]
+  - label: MiniWebAgent
+    color: "#2B5C9E"
+    style: hatched
+    compare: Planner, untrained
+    miniweb: [data/webmix/eval/pagent_pooled_s1, data/webmix/eval/pagent_pooled_s2, data/webmix/eval/pagent_pooled_s3]
+    wa: [data/webmix/wa/seeds/agent_pooled31k_s1, data/webmix/wa/seeds/agent_pooled31k_s2, data/webmix/wa/seeds/agent_pooled31k_s3]   # WA: mean of 3 runs (user, 2026-10-05 round 2)
+    wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge]
+    om2w: [data/webmix/om2w/runs/granite/om2w100_agent_pooled31k_webjudge]
+
+references: []
+# references:                       # e.g., reported scores of task-centric agents
+#   - {benchmark: wv, value: 80.8, label: "Fara1.5-4B (reported)"}
+#   - {benchmark: om2w, value: 57.3, label: "Fara1.5-4B (reported)"}

@@ -1,23 +1,56 @@
-# Forums
+# ForumHub (`forums`)
 
-**Category**: Social media
-**Reviewer**: Reaz
-**Number of macros**: 27
+A Reddit-style discussion forum. Users browse communities (subreddits), read
+and write posts and threaded comments, vote, save, share and report content,
+follow or block users, join communities, send direct messages and moderate
+the communities they run.
 
-## Data Source
+- URL: `/sites/forums/` (simulated domain `lakeforum.com`)
+- Data split: training site
 
-data_sources/reddit-augment/ (overlay format: users_overlay.json, posts_overlay.json, comments_overlay.json)
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Feed with Hot/New/Top tabs, subreddit dropdown, From/To date filters |
+| `/r/<name>` | One community's posts, with join/leave |
+| `/post/<id>` | Post and comment thread: vote, comment, edit, delete, save, share (copy link, crosspost), report |
+| `/user/<username>` | Profile with posts, karma and Follow/Block buttons |
+| `/submit` | Create a post (community, title, body) |
+| `/search?q=` | Search results |
+| `/messages` | Direct-message inbox and compose form |
+| `/mod`, `/r/<name>/mod` | Moderator dashboard and per-community report queue |
+| `/login`, `/register` | Sign-in and registration |
 
-navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_semantic, extract_by_dropdown, extract_by_route, create_from_free_text, submit_by_form, submit_by_route, edit_by_form, delete_from_table, react_by_toggle, follow_by_dropdown, follow_by_toggle, join_by_toggle, share_by_dropdown, save_by_toggle, report_by_form, block_by_toggle, message_from_free_text, authenticate_by_form, register_by_form
+JSON endpoints under `/api/` cover posts, comments, votes, social actions, reports, moderation, messages and export.
 
-## Site Description
+## Interactions and macros
 
-A Reddit-style community discussion forum. Users browse subreddits, read and create posts, comment in threaded discussions, vote on content, and interact socially (follow users, join communities, save posts, send direct messages, report/block). Modeled after reddit.com.
+- Search posts: `search`
+- Filter by subreddit or date range: `filter_by_dropdown`, `filter_by_date_range`
+- Sort the feed (Hot, New, Top): `sort_by_form`
+- Create a post or register: `create_by_form`
+- Edit or delete your post: `edit_by_form`, `delete_from_table`
+- Upvote or downvote posts and comments: `feedback_by_react`
+- Save a post, follow or block a user: `toggle_relationship`
+- Share a post (copy link, crosspost): `share_by_form`
+- Send a direct message: `message_from_free_text`
+- Read post threads, profiles and search results: `report_information`
 
-- **Domain**: Social media / forums
-- **Data**: 6 users, 12 posts across 10 subreddits, 15 threaded comments, plus runtime-created messages and reports
-- **Real-world model**: Reddit
-- **Temporal**: No temporal simulation needed; content is static user-generated
-- **Auth**: Users log in by reddit_username; default user is cascadia_coder (root_user_id=1)
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `forums`.
+
+## Data
+
+- Tables: `forums_posts`, `forums_comments`, `forums_users`,
+  `forums_reddit_users`, `forums_subreddits`, plus `forums_reports` and
+  `forums_moderators`, which the site creates on first use. The moderator
+  table is seeded so user 1 moderates r/hiking, r/programming and r/boardgames.
+- Content comes from Reddit-derived data with fixed, past timestamps.
+- Login goes through `helpers.auth` on `session["user_id"]`, which holds the
+  root user id. The global auto-login signs in as user 1, whose forum username
+  is `cascadia_coder`.
+- Direct messages use the `messages` collection (`forums_messages`), which is
+  defined in `schema.py` but missing from the current database. Until that
+  table is seeded, the inbox is empty and sent messages are not kept.
+- Sending a message emits `message`, which mirrors it to instant messaging.
+  Registering emits `signup` (password-vault entry and welcome email).

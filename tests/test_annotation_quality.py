@@ -94,6 +94,24 @@ class QualityTests(unittest.TestCase):
             for path in ['.env','data/task_review_x/../../.env','data/task_review_x/../annotations/Minh/task/task.json']:
                 self.assertEqual(c.get('/annotate/api/review_document',query_string={'path':path}).status_code,404)
 
+    def test_new_walk_records_who_walked_it_without_staling_evidence(self):
+        from flask import Flask
+        from annotation.app import annotation_bp
+        import annotation.storage as storage
+        app=Flask(__name__);app.secret_key='test';app.register_blueprint(annotation_bp,url_prefix='/annotate')
+        c=app.test_client()
+        with c.session_transaction() as s:s.update(annotator_authenticated=True,annotator_name='claude-review')
+        with patch.object(storage,'ANNOTATIONS_DIR',self.d.parent.parent):
+            r=c.post('/annotate/api/verification_walk',json={'annotator':'Minh','task_id':'task','trajectory':[]})
+        self.assertEqual(r.status_code,200)
+        task=json.loads((self.d/'task.json').read_text())
+        self.assertEqual(json.loads((self.d/'verification_walk.json').read_text())['recorded_by'],'claude-review')
+        by=quality.summary(self.d,task)['walk_by'];self.assertEqual((by['by'],by['ai']),('claude-review',True))
+        self.assertEqual(quality.task_hash(task),quality.task_hash(self.task))   # the stamp is not a graded field
+        self.assertIsNone(quality.summary(self.d,task)['rerecorded'])
+        task.update(rerecorded_at='2026-08-15T21:41:34',rerecorded_by='Minh')
+        self.assertEqual(quality.summary(self.d,task)['rerecorded'],{'by':'Minh','at':'2026-08-15T21:41:34'})
+
 
 class FilteredExportTests(unittest.TestCase):
     def test_csv_uses_inclusive_dates_owner_and_all_pages(self):

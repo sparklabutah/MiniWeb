@@ -1,45 +1,53 @@
-# Multimedia posting
+# PixShare (`multimedia-posting`)
 
-**Category**: Social media
-**Reviewer**: Reaz
-**Number of macros**: 29
+An Instagram/Twitter-style social network for photo, video and carousel posts.
+It has a feed of followed accounts, an explore page, stories, profiles, direct
+messages and the usual social actions (like, save, follow, block, share).
 
-## Data Source
+- URL: `/sites/multimedia-posting/` (simulated domain `pixshare.social`)
+- Data split: training site
 
-Synthesize with AI agents
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Feed of posts from followed users |
+| `/explore` | All posts with search, type chips (Photos, Videos, Carousels), tag filter and sort |
+| `/post/<post_id>` | Post detail: media (videos use the shared mini-player), comments, like, save, share, more-actions menu (delete, block, report) |
+| `/profile/<user_id>` | Profile with posts and a Follow/Unfollow button |
+| `/stories` | Stories carousel with playback and prev/next |
+| `/create` | New post: type, caption, tags, location, file upload |
+| `/messages`, `/messages/<other_id>` | DM inbox and conversation thread with reply box |
+| `/settings` | Dark mode, notification and privacy toggles; data export (JSON/CSV) |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, search_by_checkbox, filter_by_radio, sort_by_dropdown, extract_by_semantic, extract_by_dropdown, extract_by_route, create_from_free_text, edit_by_form, delete_from_table, post_by_query, post_from_free_text, select_by_dropdown, configure_by_toggle, play_by_dropdown, play_by_playback, export_by_dropdown, upload_by_upload, react_by_toggle, follow_by_dropdown, follow_by_toggle, subscribe_by_toggle, share_by_dropdown, save_by_toggle, report_by_form, block_by_toggle
+JSON endpoints under `/api/` cover posts, comments, likes, saves, shares,
+follows, blocks, subscriptions, stories, messages, uploads, search and export.
 
-## Site Description
+## Interactions and macros
 
-PixShare is an Instagram/Twitter-inspired multimedia social media platform. Users create and share photo, video, and carousel posts with captions, tags, and locations. The platform supports a feed of posts from followed users, an explore page with search/filter/sort, stories, user profiles, and extensive social interactions.
+- Create a post or comment: `create_by_form` (with `upload_file` for media)
+- Edit a post's caption, tags or location: `edit_by_form`
+- Delete your own post: `delete_from_table`
+- Like a post: `feedback_by_react`
+- Follow, save, block or toggle notifications: `toggle_relationship`
+- Search, filter by type and sort the explore page: `search`, `filter_by_options`, `sort_by_form`
+- Share a post (copy link or send as DM): `share_by_form`
+- Play stories: `play_by_playback`
+- Change settings, export your data: `configure_by_form`, `export`
 
-### Data Files
-- `users.json` -- 9 user profiles with usernames, bios, follower counts
-- `posts.json` -- 40 multimedia posts (photo/video/carousel) with captions, tags, locations
-- `comments.json` -- 50 comments linked to posts
-- `stories.json` -- 18 ephemeral stories with active/expired status
-- `follows.json` -- 50 follower/following relationships
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `multimedia-posting`.
 
-### Key Features
-- Feed (posts from followed users), Explore (all posts with search/filter/sort)
-- Post types: photo, video, carousel
-- Reactions: like (react_by_toggle), save (save_by_toggle)
-- Sharing via dropdown (link, DM, email, embed)
-- User interactions: follow toggle, follow by dropdown, subscribe, block
-- Content management: create posts, edit captions, delete posts
-- Comment system: post comments, delete comments
-- Stories with play/view tracking
-- Search by keyword and semantic multi-word matching
-- Filter by type (radio chips), checkbox multi-type, sort by dropdown
-- Export posts as CSV/JSON, upload media files
-- User settings with toggle controls (dark mode, notifications, privacy)
-- Report posts via form, block users via toggle
+## Data
 
-### Real-World Model
-Modeled after Instagram with elements of Twitter -- photo grid explore, story ring, post detail with side panel, profile with follower stats.
-
-### No Temporal Dynamics
-Stories have `is_active`/`expires_at` fields but no continuous time simulation. Data is static snapshot-based.
+- Tables: `multimedia_posting_users`, `multimedia_posting_posts`,
+  `multimedia_posting_comments`, `multimedia_posting_stories`,
+  `multimedia_posting_follows`, `multimedia_posting_dm_messages`
+  (`dm_messages` is created on first use if missing).
+- Login reads `session["user_id"]`. User ids are strings (`mp-u-001`), so the
+  global auto-login value `1` falls back to `mp-u-001`. This auth is bespoke on
+  purpose; do not switch it to `helpers.auth`.
+- Blocks, subscriptions and settings are kept in the Flask session
+  (`blocked_users`, `subscribed_users`, `user_settings`), not in tables.
+- The shared Share dialog (`miniweb-share.js`) can post a page from any site
+  here. Logging in emits `signup` (password-vault entry and welcome email).

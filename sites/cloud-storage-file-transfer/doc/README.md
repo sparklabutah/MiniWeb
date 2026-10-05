@@ -1,59 +1,51 @@
-# Cloud storage / file transfer
+# MeridianCloud (`cloud-storage-file-transfer`)
 
-**Category**: Productivity
-**Reviewer**: Reaz
-**Number of macros**: 23
+A cloud-drive and file-transfer portal in the style of Google Drive / Dropbox,
+holding a software team's workspace at Meridian Systems. Users browse a folder
+tree, search and filter files, star, rename, move, trash and download them,
+share files with teammates and send file transfers via share links.
 
-## Data Source
+- URL: `/sites/cloud-storage-file-transfer/` (simulated domain `meridiancloud.com`)
+- Data split: training site
 
-GitLab-derived synthetic dataset representing a software engineering team's cloud workspace at Meridian Systems. Five JSON files:
+## Pages
 
-- `files.json` — 40 files with metadata (name, path, size, type, owner, folder, starred, trashed)
-- `folders.json` — 15 folders in a tree hierarchy (Projects, Personal, Shared, Archives with subfolders)
-- `users.json` — 5 team members with credentials, roles, storage quotas
-- `shares.json` — 12 share records linking files to users with permission levels (view/edit/admin)
-- `transfers.json` — 10 file transfer records with status, expiry, download counts
+| Route | Page |
+|---|---|
+| `/` | File browser: search, type filter, sort, From/To dates, bulk select + delete, new folder and upload modals |
+| `/?view=starred\|recent\|shared\|trash` | Sidebar views (`/starred`, `/recent`, `/shared`, `/trash` redirect here) |
+| `/folder/<id>` | Folder contents and subfolders |
+| `/file/<id>` | File detail: metadata, rename, move to folder, star, share / invite, download, transfers |
+| `/transfers`, `/transfers/new` | Sent transfers and the "Send files" form |
+| `/transfers/<id>/sent` | Sender confirmation with the copyable share link |
+| `/t/<id>/<token>` | Recipient download page for a transfer link |
+| `/login` | Sign-in form |
 
-### Data Format
+JSON endpoints under `/api/` cover files, folders, shares, transfers, search, storage usage/quota, export and settings.
 
-**files.json** — Each record has: `id`, `name`, `path`, `size_bytes`, `type` (document/image/spreadsheet/presentation/archive/code), `mime_type`, `owner_id`, `created_at`, `modified_at`, `shared_with` (list of user IDs), `folder_id`, `starred` (bool), `is_trashed` (bool).
+## Interactions and macros
 
-**folders.json** — Each record: `id`, `name`, `parent_id` (null for root), `owner_id`, `created_at`, `color`.
+- Search files ("Search in Drive"): `search`
+- Filter by file type, sort the list, filter by date range: `filter_by_dropdown`, `sort_by_form`, `filter_by_date_range`
+- Open folders and files: `navigate_by_route`
+- Create a folder, invite a collaborator: `create_by_form`
+- Share a file with permission controls: `share_by_form`
+- Star / unstar files: `toggle_relationship`
+- Trash or permanently delete files (single or bulk): `delete_from_table`
+- Upload a file through the upload modal: `upload_file`
+- Download a file: `export`
+- Read file metadata, sharing and transfer records; sign in: `report_information`, `authenticate_by_form`
 
-**users.json** — Each record: `id`, `username`, `password`, `name`, `email`, `role`, `avatar_color`, `storage_quota_gb`, `storage_used_bytes`.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `cloud-storage-file-transfer`.
 
-**shares.json** — Each record: `id`, `file_id`, `shared_by`, `shared_with` (user ID or null for link-share), `permission`, `created_at`, `link`.
+## Data
 
-**transfers.json** — Each record: `id`, `file_id`, `sender_id`, `recipient_email`, `status` (active/completed/expired), `created_at`, `expires_at`, `download_count`.
-
-## Real-World Model
-
-**Google Drive / Dropbox / OneDrive** — cloud file storage UI. Key elements:
-- File browser with table/list view showing name, owner, size, modified date
-- Folder tree navigation with breadcrumbs
-- Search bar with keyword and semantic/fuzzy search
-- File type and date range filters
-- Starred files, recent files, trash views
-- File detail page with sharing, transfer, and metadata
-- Storage usage dashboard with quota visualization
-- Share files with users or via link, set permissions (view/edit/admin)
-- File transfers to external recipients
-- User authentication and settings
-
-## Target Macros
-
-navigate_from_table, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_date_range, sort_by_ranking, extract_by_semantic, extract_by_dropdown, extract_by_route, compute_by_slider, create_from_free_text, edit_by_dropdown, edit_by_form, delete_from_table, configure_by_toggle, export_by_dropdown, upload_by_route, share_by_query, share_by_dropdown, save_by_toggle, invite_by_form, authenticate_by_form
-
-## Temporal Dynamics
-
-Not applicable -- cloud storage is not inherently time-varying. Data is a static snapshot of files, shares, and transfers. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- File types span document, image, spreadsheet, presentation, archive, and code
-- Folder hierarchy: 4 root folders (Projects, Personal, Shared, Archives) with nested subfolders
-- Storage quotas per user (50 GB each); compute_by_slider lets users explore quota scenarios
-- Shares support three permission levels: view, edit, admin
-- Transfers have statuses (active, completed, expired) and download counts
-- Semantic search scores files by weighted keyword matching across name, path, type, and MIME type
-- Login uses username/password from users.json (e.g., alex.chen / meridian111)
+- Tables: `cloud_storage_file_transfer_files`, `_folders`, `_shares`,
+  `_transfers`, `_users` (all prefixed `cloud_storage_file_transfer_`).
+- Login uses the shared `session["user_id"]`, so the global auto-login signs in user 1.
+- Logging in emits `signup` (password-vault entry + email); sharing a file
+  emails the recipient through WebMail.
+- Other sites' `file_created` events add files here
+  (`app/handlers/cloud_storage_handler.py`, ids from 90001).
+- Upload is simulated: the modal records name, type and size, not real bytes.
+  Downloads serve deterministic content generated from the file's metadata.

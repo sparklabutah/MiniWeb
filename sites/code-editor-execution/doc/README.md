@@ -1,22 +1,46 @@
-# Code (Editor) + execution
+# CodeRunner (`code-editor-execution`)
 
-**Category**: Other
-**Reviewer**: Kenny
-**Number of macros**: 10
+An online Python IDE modeled after the GeeksforGeeks IDE: a gallery of example
+snippets, an in-browser editor that really runs Python, and a dashboard of
+saved snippets.
 
-## Data Source
+- URL: `/sites/code-editor-execution/` (simulated domain `codeforge.dev`)
+- Data split: training site
 
-https://huggingface.co/datasets/SWE-bench/SWE-bench
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Snippet gallery with search |
+| `/snippet/<id>` | Snippet detail with code, Share and Save/Unsave |
+| `/editor` | Editor (`?snippet_id=` pre-fills code): Run Code, stdin, font-size slider, Share Snippet |
+| `/dashboard` | Saved snippets and run history (login required) |
+| `/upload` | Create a snippet (title, code, description, category, difficulty) |
+| `/export` | CSV/JSON download of all snippets or one category |
+| `/settings` | Editor preferences: font size, tab size, theme |
+| `/login` | Sign-in form |
+| `/s/<token>` | Share link that opens the snippet in the editor |
 
-navigate_from_table, navigate_by_route, search_by_query, extract_from_table, create_by_code, edit_by_form, configure_by_slider, export_by_dropdown, upload_by_query, share_by_route
+JSON endpoints under `/api/` cover snippets, categories, execute, share,
+export and user settings and history.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search the gallery: `search`
+- Open a snippet from the gallery or dashboard: `navigate_by_route`
+- Write code in the editor and run it: `create_by_form`, `edit_by_form`
+- Change the editor font size: `configure_by_form`
+- Share a snippet link: `share_by_form`
+- Read saved snippets on the dashboard: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `code-editor-execution`.
+
+## Data
+
+- Tables: `code_editor_execution_snippets`, `code_editor_execution_users`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+- Code runs for real in a Python subprocess with a 5-second timeout. Imports
+  of dangerous modules (`os`, `sys`, `subprocess`, `socket`, ...) are rejected.
+- Export links use `data-save-as`, so downloads go through the simulated file
+  explorer's Save As dialog.
+- Logging in emits `signup` (password-vault entry and welcome email).

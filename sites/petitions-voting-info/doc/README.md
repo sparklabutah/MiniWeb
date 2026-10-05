@@ -1,57 +1,51 @@
-# Petitions / Voting Info -- Lakeport Civic Hub
+# Lakeport Civic Hub (`petitions-voting-info`)
 
-**Category**: Government / civic
-**Reviewer**: Kenny
-**Number of macros**: 20
+A civic engagement portal for the fictional City of Lakeport, WA, combining
+Change.org-style petitions (create, sign, share, subscribe) with a county
+elections site (election results, voter registration, polling places).
 
-## Data Source
+- URL: `/sites/petitions-voting-info/` (simulated domain `civicvoice.org`)
+- Data split: held-out (test) site
 
-Generated civic data for the fictional City of Lakeport, Cascadia County, WA.
-Files in `data_sources/petitions-voting/`:
-- `petitions.json` -- 12 community petitions (active, won, closed) across categories: community, infrastructure, transportation, education, environment, health, arts_and_culture
-- `signatures.json` -- 40 petition signatures with comments
-- `elections.json` -- 3 elections (2 completed, 1 upcoming) with races, candidates, ballot measures, turnout
-- `voter_info.json` -- Polling locations (4 with precincts), registration info, voting methods, deadlines, ballot measure explanations
-- `users.json` -- 7 demo users with voter registration data, precincts, party affiliations
+## Pages
 
-## Real-World Model
+| Route | Page |
+|---|---|
+| `/` | Active petitions and upcoming elections |
+| `/petitions` | Petition list: search, category and status filters, sort with asc/desc order |
+| `/petition/<id>` | Petition detail: progress bar, signatures, comments, Sign form (typed signature), Subscribe, Save, Share |
+| `/create-petition` | Start a petition (title, description, goal, category, deadline) |
+| `/elections`, `/election/<id>` | Elections list; races, candidates, ballot measures and results |
+| `/voter-info` | Registration details, precinct check and polling locations |
+| `/register-voter` | Voter registration form |
+| `/dashboard` | Saved and subscribed petitions |
+| `/login` | Sign-in form |
 
-**Change.org** (petitions: create, sign, share, subscribe, progress bars) + **vote.org / county elections sites** (voter registration verification, polling locations, election results, ballot measure info).
+JSON endpoints under `/api/` cover petitions (search, sign, save, subscribe,
+share, comments), categories, elections, voter info and registration.
 
-## Target Macros (20)
+## Interactions and macros
 
-| # | Macro | Implementation |
-|---|-------|---------------|
-| 1 | navigate_by_dropdown | Header nav links (Petitions, Elections, Voter Info) |
-| 2 | navigate_by_route | Direct URL to petition or election detail page |
-| 3 | search_by_query | Text search across petition titles, descriptions, tags |
-| 4 | search_by_semantic | Keyword-overlap ranked search via /api/petitions/semantic |
-| 5 | filter_by_query | Filter petitions by status query parameter |
-| 6 | filter_by_dropdown | Filter petitions by category dropdown |
-| 7 | sort_by_toggle | Sort petitions by date/signatures/title with asc/desc toggle |
-| 8 | extract_by_query | Search petitions and extract first result title |
-| 9 | extract_by_dropdown | View category stats (total signatures, counts) |
-| 10 | extract_by_route | Get petition/election detail via direct URL |
-| 11 | extract_by_date_range | Filter petitions by date_from/date_to created_at range |
-| 12 | verify_by_dropdown | Check voter registration status by precinct dropdown |
-| 13 | create_from_free_text | Create a new petition with title, description, category |
-| 14 | submit_by_query | Submit a comment on a petition |
-| 15 | sign_by_signature | Sign a petition by typing legal name in signature field |
-| 16 | subscribe_by_toggle | Toggle subscription to petition updates |
-| 17 | share_by_dropdown | Share petition via method dropdown (email, twitter, facebook, link) |
-| 18 | save_by_toggle | Toggle save/unsave petition to user favorites |
-| 19 | authenticate_by_form | Log in with username/password form |
-| 20 | register_by_form | Register new voter with full registration form |
+- Search petitions: `search`
+- Filter petitions by category or status: `filter_by_dropdown`
+- Sort petitions by date, signatures or title: `sort_by_form`
+- Start a petition, sign one, register to vote: `create_by_form`
+- Subscribe to or save a petition: `toggle_relationship`
+- Share a petition (email, Twitter, Facebook, link): `share_by_form`
+- Open petitions and elections: `navigate_by_route`
+- Read petition details, election results and precinct status: `report_information`
 
-## Temporal Dynamics
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `petitions-voting-info`.
 
-Not applicable -- petitions and elections are static records with status fields. No temporal simulation needed. Mutable state: signatures, user saved/subscribed lists, new petitions.
+## Data
 
-## Domain-Specific Notes
-
-- All 7 demo users use password "civicpass" (any non-empty password accepted in demo mode)
-- Petitions have status: active, won, closed
-- Elections have status: upcoming, completed
-- Voter precincts: Precinct 1-4, mapped to polling locations
-- Signing a petition requires a typed "signature" (legal name) field -- distinct from comments
-- When a petition reaches its signature goal, status auto-changes to "won"
+- Tables: `petitions_voting_info_petitions`, `petitions_voting_info_signatures`,
+  `petitions_voting_info_elections`, `petitions_voting_info_voter_info`,
+  `petitions_voting_info_users`.
+- Login reads `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs in user 1. The login form accepts any non-empty password
+  for a known username.
+- Signing sends a "Signature confirmed" email to WebMail. A petition flips to
+  `won` once its signature count reaches its goal.
+- Creating a petition with a deadline emits `booking` (calendar event and
+  email). Logging in emits `signup` (password-vault entry and welcome email).

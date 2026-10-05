@@ -36,12 +36,15 @@
     function postToBackend(msg) {
         try {
             var body = JSON.stringify(msg);
-            // keepalive so records survive the navigation that follows a click
+            // keepalive so records survive the navigation that follows a click.
+            // Browsers reject keepalive bodies over 64 KB outright, which
+            // silently dropped every observation of a large page — send those
+            // as a plain fetch instead.
             fetch('/_admin/record', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: body,
-                keepalive: true,
+                keepalive: body.length < 60000,
                 credentials: 'same-origin',
             }).catch(function () {});
         } catch (e) {}

@@ -12,6 +12,7 @@ Built-in:
 from __future__ import annotations
 
 import asyncio
+import os
 import json
 import pathlib
 import re
@@ -73,6 +74,40 @@ def _is_retryable(exc: Exception) -> bool:
     return any(k in text for k in _RETRYABLE_ERRORS)
 
 
+def _route_uploads_through_miniweb_picker():
+    """Let browser-use click <input type=file>, so uploads go through MiniWeb's picker.
+
+    browser-use refuses a click on a file input twice (the click handler and the CDP click both
+    answer "use the upload function"). On MiniWeb that click is exactly how a person picks a file:
+    app/static/file-explorer.js catches it (capture phase, default prevented, so no native chooser
+    opens) and shows the in-page Finder over the simulated file system. For file inputs only, the
+    click handler runs with the node's type masked; everything else is unchanged. Must run before a
+    BrowserSession starts: its watchdogs bind their handlers then. Idempotent."""
+    import functools
+
+    from browser_use.browser.watchdogs.default_action_watchdog import DefaultActionWatchdog as W
+    if getattr(W, "_miniweb_file_clicks", False):
+        return
+    original = W.on_ClickElementEvent
+
+    @functools.wraps(original)
+    async def on_ClickElementEvent(self, event):
+        node = event.node
+        attrs = node.attributes if isinstance(getattr(node, "attributes", None), dict) else None
+        is_file = ((getattr(node, "node_name", "") or "").upper() == "INPUT" and attrs is not None
+                   and str(attrs.get("type", "")).lower() == "file")
+        if not is_file:
+            return await original(self, event)
+        attrs["type"] = "miniweb-file"          # past both guards; the page still has a file input
+        try:
+            return await original(self, event)
+        finally:
+            attrs["type"] = "file"
+
+    W.on_ClickElementEvent = on_ClickElementEvent
+    W._miniweb_file_clicks = True
+
+
 class BrowserUseAgent:
     """AgentRunner backed by the *browser-use* library."""
 
@@ -85,15 +120,23 @@ class BrowserUseAgent:
         timeout: int = 300,
         headless: bool = True,
         available_file_paths: list[str] | None = None,
+        executable_path: str | None = None,
     ):
         self.llm = llm
         self.use_vision = use_vision
         self.max_steps = max_steps
         self.timeout = timeout
         self.headless = headless
-        # real files the agent may attach to <input type=file> — the actual files
-        # from the simulated file system / VFS (see evaluation/generate_fixtures.py),
-        # the same tree the in-page file explorer serves.
+        # Browser binary. Unset, browser-use picks the first Chromium it finds; on this
+        # machine that is Playwright's Chrome for Testing 149 (build 1228), which never
+        # completes a page load in headless mode (2026-09-26), while Chromium 125 does.
+        # MINIWEB_BROWSER pins one for every run.
+        self.executable_path = executable_path or os.environ.get("MINIWEB_BROWSER") or None
+        # Uploads go through MiniWeb's own file picker (app/static/file-explorer.js, the
+        # in-page Finder over the simulated file system), as a person would pick a file:
+        # browser-use's upload_file shortcut is removed and file inputs are clickable (see
+        # _route_uploads_through_miniweb_picker). `available_file_paths` is accepted for
+        # compatibility but no longer handed to the agent (2026-09-28).
         self.available_file_paths = available_file_paths or []
         self._session = None
         self._server_url: str | None = None
@@ -101,17 +144,21 @@ class BrowserUseAgent:
     async def _start_session(self, max_retries: int = 3) -> None:
         from browser_use import BrowserSession
 
+        _route_uploads_through_miniweb_picker()         # before the session binds its handlers
+
         for attempt in range(1, max_retries + 1):
             self._session = BrowserSession(
                 headless=self.headless,
                 keep_alive=True,
                 args=_EXTRA_CHROME_ARGS,
+                **({"executable_path": self.executable_path} if self.executable_path else {}),
                 # agent-level guard: only localhost is navigable (belt to the
                 # host-resolver-rules braces — gives a clean refusal, not a DNS error)
                 allowed_domains=["localhost", "127.0.0.1"],
             )
             try:
                 await self._session.start()
+                await self._enable_clipboard()
                 return
             except Exception as e:
                 if attempt < max_retries and _is_retryable(e):
@@ -127,6 +174,25 @@ class BrowserUseAgent:
                     await asyncio.sleep(3 * attempt)
                 else:
                     raise
+
+    async def _enable_clipboard(self, agent=None) -> None:
+        """Let the site's Copy buttons work headless. A headless page never has
+        focus, and navigator.clipboard.writeText() rejects on an unfocused document
+        ("Document is not focused"), so every copy failed and the recorder never
+        saw a clipboard_write — 8 tasks could not be passed. Grant clipboard access
+        browser-wide and emulate focus on the current tab; re-applied every step
+        (on_step_start) so a tab the agent opens later is covered too."""
+        if not self._session:
+            return
+        try:
+            cdp = await self._session.get_or_create_cdp_session()
+            if agent is None:
+                await cdp.cdp_client.send.Browser.grantPermissions(
+                    params={"permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
+            await cdp.cdp_client.send.Emulation.setFocusEmulationEnabled(
+                params={"enabled": True}, session_id=cdp.session_id)
+        except Exception as e:
+            print(f"    [BrowserUseAgent] clipboard/focus setup failed: {type(e).__name__}: {e}")
 
     async def setup(self, server_url: str) -> None:
         self._server_url = server_url
@@ -164,7 +230,7 @@ class BrowserUseAgent:
         await asyncio.sleep(2)
 
     async def run(self, task: str, server_url: str, task_dir: Path) -> AgentResult:
-        from browser_use import Agent
+        from browser_use import Agent, Tools
 
         instruction = (
             f"You are interacting with a web application at {server_url}. "
@@ -179,13 +245,15 @@ class BrowserUseAgent:
             use_judge=False,  # our verify_task is authoritative; skip browser-use's self-judge LLM call
             save_conversation_path=str(task_dir / "conversations"),
             max_steps=self.max_steps,
-            available_file_paths=self.available_file_paths,
+            # no upload_file shortcut: a file is chosen in MiniWeb's picker, which opens when the
+            # file control is clicked
+            tools=Tools(exclude_actions=["upload_file"]),
         )
 
         timed_out = False
         t0 = time.time()
         try:
-            history = await asyncio.wait_for(agent.run(), timeout=self.timeout)
+            history = await asyncio.wait_for(agent.run(on_step_start=self._enable_clipboard), timeout=self.timeout)
         except asyncio.TimeoutError:
             timed_out = True
             history = agent.history

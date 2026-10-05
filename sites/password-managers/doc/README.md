@@ -1,45 +1,53 @@
-# Password Managers
+# VaultGuard (`password-managers`)
 
-**Category**: Utilities
-**Reviewer**: Kenny
-**Number of macros**: 21
+A password manager in the style of 1Password, LastPass and Bitwarden. Users
+browse vaults, search and filter entries, create, edit, delete, import and
+export entries, reveal a password with a PIN, generate passwords and review a
+security report and audit log.
 
-## Data Source
+- URL: `/sites/password-managers/` (simulated domain `vaultguard.security`)
+- Data split: training site
 
-Synthetic -- all data files (entries.json, vaults.json, users.json, audit_log.json, security_report.json) are pre-generated and stored in DATA_SOURCES_DIR/password-managers/. The routes.py interpreter reads these at runtime without modification.
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | My Vault: security score, vault cards, recently used entries, Import button |
+| `/vault/<id>` | Vault entries with search, Category and Strength dropdowns, export |
+| `/entry/<id>` | Entry detail: masked credentials, Reveal with PIN, tags, notes, audit history, Delete |
+| `/new-entry` | New-entry form (vault, category, credentials, URL, notes, tags, icon image) |
+| `/entry/<id>/edit` | Edit-entry form |
+| `/generator` | Password generator with a length slider and options |
+| `/security-report` | Security analysis computed from the user's entries |
+| `/audit-log` | Audit trail with action and vault filters |
+| `/settings` | Auto-lock, clipboard clear, password length and theme settings |
+| `/login` | Email and master-password sign-in |
 
-- `entries.json` -- list of password entries (logins, secure notes, credit cards). Fields: id, vault_id, title, url, username, password, category, notes, created_at, updated_at, last_used, strength, favorite, tags, card_details (optional).
-- `vaults.json` -- list of vaults/collections. Fields: id, name, type, color, icon, shared, members (list of {user_id, role}).
-- `users.json` -- user profiles. Fields: id, email, display_name, plan, two_factor_enabled, two_factor_codes, two_factor_backup_code, master_password, settings.
-- `audit_log.json` -- access and change audit trail. Fields: timestamp, user_id, action, entry_id, entry_title, vault_id, device, ip_address, details.
-- `security_report.json` -- security analysis. Fields: overall_score, overall_rating, summary, breach_alerts, password_strength, two_factor_coverage, password_age, vault_health, recommendations.
+JSON endpoints under `/api/` cover vaults, entries (search, semantic search,
+share, icon upload), audit log, security report, password generation, settings
+and export.
 
-## Real-World Model
+## Interactions and macros
 
-**1Password / LastPass / Bitwarden** -- dark-themed password vault management interface. Key UI elements:
-- Dashboard with security score, vault cards, and recently used entries
-- Vault detail pages listing entries with category/strength/search filters
-- Entry detail pages showing masked credentials, tags, notes, audit history
-- Password generator with configurable settings
-- Security report with breach alerts, strength analysis, 2FA coverage
-- Audit log with action/vault filters
-- Login with master password + optional 2FA verification
+- Search entries in a vault: `search`
+- Filter by category, strength, action or vault: `filter_by_dropdown`
+- Open a vault, an entry or a nav page: `navigate_by_route`
+- Create an entry: `create_by_form`; edit it: `edit_by_form`; delete it: `delete_from_table`
+- Import a CSV/JSON file or attach an icon image: `upload_file`
+- Set generator length or user settings: `configure_by_form`
+- Export entries: `export`
+- Reveal a password with the PIN, read entry metadata and the audit log: `report_information`
 
-## Target Macros
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `password-managers`.
 
-navigate_by_semantic, navigate_by_route, search_by_query, filter_by_dropdown, extract_by_semantic, extract_by_code, extract_by_dropdown, extract_from_table, extract_by_route, create_from_free_text, create_by_dropdown, submit_by_query, edit_by_form, delete_from_table, select_by_dropdown, configure_by_dropdown, export_by_dropdown, upload_by_image, share_by_dropdown, authenticate_by_code, verify_identity_by_code
+## Data
 
-## Temporal Dynamics
-
-Not applicable -- password vaults are user-managed stores. Entries are created, edited, and deleted by user action. No automatic time-varying simulation needed. Audit log entries are timestamped records of past actions.
-
-## Domain-Specific Notes
-
-- Passwords are stored in plaintext in the data file (synthetic demo data, not real secrets)
-- The "reveal password" API endpoint simulates the copy-to-clipboard action
-- 2FA verification accepts codes listed in the user's two_factor_codes array or their backup code
-- Semantic search uses simple keyword overlap scoring over entry titles, URLs, usernames, notes, and tags
-- The security report is a pre-computed static analysis, not recalculated on the fly
-- Entry sharing records are appended to the entry's "shares" array
+- Tables (`password_managers_*`): `entries`, `vaults`, `audit_log`,
+  `security_report`, `users`. Passwords are synthetic plaintext values.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1.
+  The login form itself takes an email and master password.
+- Revealing a password sends a 6-digit PIN as an instant message from
+  "vaultguard-security" in the instant-messaging site; the agent reads it there
+  and enters it on the entry page.
+- Other sites' `signup` events add a login entry here
+  (`app/handlers/password_handler.add_to_vault`).

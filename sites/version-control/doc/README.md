@@ -1,84 +1,58 @@
-# Version Control
+# MeridianGit (`version-control`)
 
-**Category**: Productivity
-**Reviewer**: Reaz
-**Number of macros**: 20
+A GitHub/GitLab-style code-hosting site for the fictional Meridian Systems
+engineering team, mixed with real GitLab projects, issues and merge requests.
+Users browse repositories (code, commits, issues, merge requests), search code,
+create repositories, issues and merge requests, comment, star repos, upload
+files and merge or close merge requests.
 
-## Data Source
+- URL: `/sites/version-control/` (simulated domain `codehost.dev`)
+- Data split: training site
 
-GitLab-augmented overlay data for Meridian Systems engineering organization.
-Directory: `data_sources/gitlab-augment/`
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Dashboard: recent activity, "Search or jump to..." box, repo sort |
+| `/repos` | Repository list with search and a sort dropdown |
+| `/repo/<id>` | Repo detail tabs: Code (file tree, README, upload form), Commits (compare two commits, open a merge request), Issues (new issue, edit, comment), Star |
+| `/explore` | Discover repositories |
+| `/projects`, `/project/<name>` | GitLab projects; project detail with its issues and merge requests |
+| `/issues`, `/issue/<id>` | All issues with state and project dropdowns; issue detail with comments |
+| `/merge-requests`, `/mr/<id>` | All merge requests with state and project dropdowns; MR detail with comments, Merge and Close |
+| `/members`, `/user/<id>`, `/group/<name>` | Member list, user profile with repos and activity, namespace page |
+| `/activity` | Full activity feed |
+| `/new-repo` | New-repository form (name, description, owner, default branch) |
+| `/login` | Sign-in form |
 
-Three JSON overlay files:
+JSON endpoints under `/api/` cover repos (files, star, fork, settings,
+upload, compare), issues, merge requests, comments, activity, users,
+keyword/semantic/code search, stats and export.
 
-**users_overlay.json** -- 6 developer profiles:
-- `root_user_id` -- unique user ID
-- `gitlab_username` -- login username (e.g., "alex.rivera")
-- `display_name` -- full name
-- `email`, `role`, `groups`, `joined`
+## Interactions and macros
 
-**repos_overlay.json** -- 8 repositories:
-- `id` -- repo ID (1001-1008)
-- `name` -- repo slug (e.g., "meridianflow-api")
-- `namespace` -- GitLab namespace path
-- `description`, `visibility`, `default_branch`
-- `stars`, `forks`, `last_activity`, `owner_user_id`
-- `tech_stack` -- list of languages/frameworks
+- Search repos or code: `search`
+- Filter issues and merge requests by state or project: `filter_by_dropdown`
+- Sort repositories (Updated, Stars, Name): `sort_by_form`
+- Open repos, issues, merge requests and nav pages: `navigate_by_route`
+- Create a repo, issue, merge request or comment: `create_by_form`
+- Edit an issue's title or state: `edit_by_form`
+- Star a repo: `toggle_relationship`
+- Upload a file to a repository: `upload_file`
+- Read file trees, commit history, commit comparisons and issue threads: `report_information`
 
-**activity_overlay.json** -- 15 activity events:
-- `id` -- activity ID
-- `type` -- "push", "merge", or "merge_request_review"
-- `author_root_user_id`, `gitlab_username`
-- `repo`, `branch`, `commit_sha`, `commit_message`
-- For merges: `merge_request_title`, `source_branch`, `target_branch`
-- For reviews: `review_state`, `review_comment`
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `version-control`.
 
-### Synthetic Augmentation
+## Data
 
-Routes.py generates additional data deterministically from the overlay data:
-- File trees per repo (realistic project structures)
-- Commit histories per repo (7 days of commits)
-- README content per repo (Markdown documentation)
-- Issues per repo (bug reports, feature requests)
-- Issue comments (threaded discussion)
-- Merge requests (PRs)
-- File contents (source code for code search)
-
-### Sampling
-
-The dataset is small (8 repos, 6 users, 15 activities). `num_data_points=-1` loads all records. No sampling needed.
-
-## Real-World Model
-
-**GitLab / GitHub** -- project-centric code hosting interface. Key UI elements:
-- Dashboard with recent activity feed
-- Repository listing with search, language filter, sort
-- Repository detail page with file tree, commits, README, issues
-- User profile pages with owned repos and activity
-- Explore/discover page for finding repos
-- Issue tracker with comments
-- Merge request management
-- Code search across repositories
-- Star/unstar repos (follow_by_toggle)
-- Repository creation form
-- File upload to repository
-- Export repo/activity data as CSV/JSON
-
-## Target Macros
-
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, search_by_code, filter_by_dropdown, sort_by_ranking, extract_by_query, extract_by_semantic, extract_from_table, extract_by_route, compare_from_table, create_from_free_text, submit_by_form, edit_by_form, upload_by_upload, select_by_dropdown, export_by_route, post_from_free_text, follow_by_toggle
-
-## Temporal Dynamics
-
-Not applicable -- version control platforms display historical data. Activity timestamps are fixed in the overlay data. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- Login uses gitlab_username (any password accepted for simplicity)
-- Star state is session-based (not persisted across server restarts)
-- Issue creation and comments modify in-memory state (reset on restart)
-- Repo creation/deletion modifies the overlay JSON file on disk
-- Code search operates over synthetic file contents embedded in routes.py
-- Semantic search uses token-overlap scoring (no external ML)
+- Source: real GitLab data (`*_raw` tables: projects, issues, merge requests,
+  notes, labels, users) plus synthetic Meridian repositories with generated
+  file trees, commits and READMEs.
+- Tables (`version_control_*`): `repositories`, `activities`, `users`,
+  `projects_raw`, `issues_raw`, `merge_requests_raw`, `notes_raw`,
+  `labels_raw`, `users_raw`.
+- Login sets the site's own `session["vc_user_id"]` and accepts a blank
+  password. Content created without a login is attributed to
+  `session["user_id"]`, which the global auto-login sets to user 1.
+- Signing in emits `signup`. Opening a merge request sends an email and emits
+  `message` (an instant message).

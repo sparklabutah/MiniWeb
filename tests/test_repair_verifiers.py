@@ -1,5 +1,6 @@
 """Regression checks for task repairs: strict values and genuine linked evidence."""
 import unittest
+from unittest.mock import patch
 from evaluation.verifiers import verify_task, _field_match
 from evaluation.trajectory import merge_server_log
 
@@ -31,9 +32,52 @@ class RepairVerifierTests(unittest.TestCase):
 
     def test_numeric_answer_format(self):
         spec = {'type': 'answer_matches', 'expected': '388', 'mode': 'regex', 'pattern': r'388'}
-        self.assertTrue(run(spec, [], '388'))
-        for answer in ('388 pounds', '388.013581', '389', ''):
-            self.assertFalse(run(spec, [], answer))
+        with patch('evaluation.verifiers._judge_alignment', return_value=(True, 'LLM judge: same value')) as judge:
+            self.assertTrue(run(spec, [], '388'))
+            for answer in ('388.013581', '389', ''):             # certain mismatches never reach the judge
+                self.assertFalse(run(spec, [], answer))
+            judge.assert_not_called()
+            self.assertTrue(run(spec, [], '388 pounds'))          # a unit word is the judge's call
+            judge.assert_called_once()
+
+
+class AutoAnswerGradingTests(unittest.TestCase):
+    """Every QA grade runs regex -> exact -> precise -> LLM judge (_grade_answer)."""
+
+    def setUp(self):
+        self.judge = patch('evaluation.verifiers._judge_alignment', return_value=(False, 'LLM judge: no')).start()
+        self.addCleanup(patch.stopall)
+
+    def test_legacy_exact_mode_accepts_the_value_inside_a_longer_reply(self):
+        spec = {'type': 'answer_matches', 'expected': 'Alex Rivera', 'mode': 'exact'}
+        self.assertTrue(run(spec, [], 'Task completed! The first result is:\n- **Streamer**: Alex Rivera'))
+        self.judge.assert_not_called()
+
+    def test_regex_matches_one_line_of_the_reply(self):
+        spec = {'type': 'answer_matches', 'expected': '4', 'mode': 'regex', 'pattern': r'(?i)(?:4|four)(?: unread chats)?\.?'}
+        self.assertTrue(run(spec, [], 'I checked the inbox.\n- **Four unread chats.**'))
+        self.judge.assert_not_called()
+
+    def test_judge_is_the_last_gate(self):
+        spec = {'type': 'answer_matches', 'expected': 'Alex Rivera', 'mode': 'includes'}
+        self.assertFalse(run(spec, [], 'The top streamer is arivera_live'))
+        self.judge.return_value = (True, 'LLM judge: that is his handle')
+        self.assertTrue(run(spec, [], 'The top streamer is arivera_live'))
+
+    def test_denials_and_wrong_numbers_fail_without_the_judge(self):
+        self.assertFalse(run({'type': 'answer_matches', 'expected': 'Alex Rivera'}, [], 'The answer is not Alex Rivera'))
+        self.assertFalse(run({'type': 'qa_answer', 'expected': '8', 'leaf': True}, [], 'There are 18 faculty members.'))
+        self.judge.assert_not_called()
+
+    def test_alternatives_are_tried_after_a_mismatch(self):
+        spec = {'type': 'qa_answer', 'expected': '5', 'alternatives': ['6'], 'leaf': True, 'mode': 'contains'}
+        self.assertTrue(run(spec, [], 'The count is 6.'))
+
+    def test_qa_answer_contains_mode_now_reaches_the_judge(self):
+        spec = {'type': 'qa_answer', 'expected': 'no', 'leaf': True, 'mode': 'contains'}
+        self.judge.return_value = (True, 'LLM judge: declined means no')
+        self.assertTrue(run(spec, [], 'The request was declined.'))
+        self.judge.assert_called_once()
 
     def test_creation_binding_and_sequence(self):
         spec = {'type': 'request_sequence', 'steps': [
@@ -79,6 +123,84 @@ class RepairVerifierTests(unittest.TestCase):
         merged = merge_server_log([], [event])[0]
         self.assertEqual(merged['responseBody'], {'id': 73})
         self.assertEqual(merged['responseHeaders']['location'], '/note/73')
+
+    def test_utc_request_log_lands_in_the_recorders_window(self):
+        # recorder.js stamps actions in UTC ('Z'); the request log stamps UTC '+00:00'.
+        # A naive local stamp (the old log) is hours off on a non-UTC machine and was dropped.
+        action = {'type': 'action', 'action': 'click', 'timestamp': '2026-09-26T23:34:38.716Z'}
+        entry = {'method': 'POST', 'path': '/sites/e-commerce/cart/add', 'status': 302, 'query': {},
+                 'timestamp': '2026-09-26T23:34:38.740796+00:00'}
+        self.assertEqual(len([e for e in merge_server_log([action], [entry]) if e['type'] == 'network']), 1)
+        entry['timestamp'] = '2026-09-26T17:34:38.740796'           # naive MDT: outside the window
+        self.assertEqual(len([e for e in merge_server_log([action], [entry]) if e['type'] == 'network']), 0)
+
+
+
+class SubmitStatusTests(unittest.TestCase):
+    """A submit's pinned success code is incidental: 200 (rendered page) and 302 (redirect) are both accepted."""
+
+    def check(self, event, status=302, method='POST'):
+        return run({'type': 'request_made', 'method': method, 'url': '/sites/x/item/1/delete', 'status': status}, [event])
+
+    def test_other_success_code_accepted_for_submits(self):
+        self.assertTrue(self.check(net('/sites/x/item/1/delete'), status=302))                  # 200 vs pinned 302
+        self.assertTrue(self.check(net('/sites/x/item/1/delete', status=302,
+                                       responseHeaders={'location': '/sites/x/'}), status=200))
+
+    def test_failures_and_sign_in_redirects_still_fail(self):
+        self.assertFalse(self.check(net('/sites/x/item/1/delete', status=400)))
+        self.assertFalse(self.check(net('/sites/x/item/1/delete', status=302,
+                                        responseHeaders={'location': '/sites/x/login?next=/'}), status=200))
+
+    def test_get_status_stays_pinned(self):
+        self.assertFalse(self.check(dict(net('/sites/x/item/1/delete', status=302), method='GET'), status=200, method='GET'))
+
+
+class DiscreteSelectionRepairTests(unittest.TestCase):
+    """Judge-vs-verifier audit of discrete selection (2026-09-27)."""
+
+    def test_change_counts_as_typing_a_value(self):
+        node = {'type': 'action_included', 'action': 'type', 'target': "input[date] 'date_from'", 'value': '2026-01-01'}
+        filled = [{'type': 'action', 'action': 'change', 'target': "input[date] 'date_from'", 'value': '2026-01-01'}]
+        self.assertTrue(run(node, filled))
+        self.assertFalse(run(node, [dict(filled[0], value='2026-02-01')]))
+
+    def test_regex_urls_ignore_case(self):
+        node = {'type': 'request_made', 'method': 'POST', 'url': 're:/sites/forums/api/subreddits/MachineLearning/join(?:[?#]|$)'}
+        self.assertTrue(run(node, [net('/sites/forums/api/subreddits/machinelearning/join')]))
+
+    def test_final_view_needs_the_last_listing_request(self):
+        node = {'type': 'request_made', 'method': 'GET', 'url': r're:/sites/jobs/list\?(?=.*sort=salary_asc)',
+                'final_view': r'^/sites/jobs/list/?$'}
+        get = lambda q: {'type': 'network', 'method': 'GET', 'url': '/sites/jobs/list' + q, 'status': 200}
+        self.assertTrue(run(node, [get(''), get('?sort=salary_asc'), {'type': 'network', 'method': 'GET', 'url': '/sites/jobs/7', 'status': 200}]))
+        self.assertFalse(run(node, [get('?sort=salary_asc'), get('?sort=date')]))
+
+
+class JudgeVotingTests(unittest.TestCase):
+    """The LLM judge decides by best-of-3; two votes run first, a third only on a split."""
+
+    def vote(self, *replies):
+        from evaluation import verifiers
+        verifiers._cached_alignment.cache_clear()
+        raw = [None if r is None else ('{"match": %s, "why": "r%d"}' % ('true' if r else 'false', i)) for i, r in enumerate(replies)]
+        with patch('app.llm.call_llm', side_effect=raw) as llm:
+            ok, why = verifiers._judge_alignment('agent text', 'expected', 'reported answer', question='q')
+        return ok, why, llm.call_count
+
+    def test_agreeing_votes_stop_after_two_calls(self):
+        self.assertEqual(self.vote(True, True)[::2], (True, 2))
+        self.assertEqual(self.vote(False, False)[::2], (False, 2))
+
+    def test_a_split_is_settled_by_a_third_vote(self):
+        ok, why, calls = self.vote(True, False, True)
+        self.assertEqual((ok, calls), (True, 3)); self.assertIn('2/3 yes', why)
+        self.assertEqual(self.vote(False, True, False)[::2], (False, 3))
+
+    def test_failed_calls_abstain(self):
+        self.assertEqual(self.vote(None, True, True)[::2], (True, 3))
+        self.assertEqual(self.vote(None, None, None)[:1], (False,))
+        self.assertEqual(self.vote(True, None, None)[::2], (True, 3))      # one valid vote decides
 
 
 class CatalogRepairTests(unittest.TestCase):
@@ -538,3 +660,29 @@ class FinalRepairRegressionTests(unittest.TestCase):
         self.assertTrue(check._uses_seek_control(event))
         self.assertFalse(check._uses_seek_control({**event,'action':'keypress','value':'Tab'}))
         self.assertTrue(check._uses_seek_control({**event,'action':'keypress','value':'Enter'}))
+
+
+class AdvisoryMacroTests(unittest.TestCase):
+    """Macros performed in the recording but not required by the instruction are advisory."""
+
+    SEARCH = {'type': 'request_made', 'method': 'GET', 'url': 're:/sites/x/\\?q=', 'advisory': True}
+    SAVE = {'type': 'request_made', 'method': 'POST', 'url': '/sites/x/save'}
+
+    def run_spec(self, macros, traj):
+        from evaluation.verifiers import verify_task
+        return verify_task({'task_id': 't', 'macros': macros}, traj)
+
+    def test_failed_advisory_macro_does_not_fail_the_task(self):
+        r = self.run_spec({'search': self.SEARCH, 'create_by_form': self.SAVE},
+                          [{'type': 'network', 'method': 'POST', 'url': '/sites/x/save', 'status': 302}])
+        self.assertTrue(r['passed'])
+        self.assertFalse(r['by_macro']['search'])            # still reported
+        self.assertEqual(r['advisory_macros'], ['search'])
+
+    def test_required_macro_still_gates(self):
+        r = self.run_spec({'search': self.SEARCH, 'create_by_form': self.SAVE},
+                          [{'type': 'network', 'method': 'GET', 'url': '/sites/x/?q=logo', 'status': 200}])
+        self.assertFalse(r['passed'])
+
+    def test_all_advisory_macros_cannot_pass_vacuously(self):
+        self.assertFalse(self.run_spec({'search': self.SEARCH}, [])['passed'])

@@ -1,0 +1,102 @@
+# Paper tables (make_tables.py). Each table lists columns (benchmarks) and rows (arms). A row cell is either a list
+# of runs (one per seed; paths relative to the repo root; mean ± std over seeds is printed) or a fixed reported value.
+# An empty list prints a dash; `todo: true` on a cell prints a red TODO instead. Re-run after adding runs.
+
+benchmarks:
+  single:   {kind: miniweb,    head: "Single\\\\primitives", primitives: well_covered}
+  heldout:  {kind: miniweb,    head: "Multi-step\\\\tasks"}
+  wa:       {kind: webarena,   head: "WebArena-\\\\Lite"}
+  wv:       {kind: webvoyager, head: "Web-\\\\Voyager", tasks: data/webmix/webvoyager/WebVoyager_reduced_536.jsonl}
+  om2w:     {kind: om2w,       head: "Online-\\\\Mind2Web", tasks: data/webmix/om2w/Online_Mind2Web_reduced_280.json}
+
+runs:                                  # named run lists, reused by several rows
+  base:      {single: [data/webmix/eval/val2_rq2_base, data/webmix/eval/val2_rq2_base_s2, data/webmix/eval/val2_rq2_base_s3],
+              heldout: [data/webmix/eval/human_base, data/webmix/eval/seeds/base_s2, data/webmix/eval/seeds/base_s3],
+              wa: [data/webmix/wa/seeds/base_s1, data/webmix/wa/seeds/base_s2, data/webmix/wa/seeds/base_s3],
+              wv: [data/webmix/om2w/runs/granite/webvoyager100_base_wvjudge],
+              om2w: [data/webmix/om2w/runs/granite/om2w100_base_webjudge]}
+  pooled:    {single: [data/webmix/eval/val2_rq2_pooled, data/webmix/eval/val2_rq2_pooled_s2, data/webmix/eval/val2_rq2_pooled_s3],
+              heldout: [data/webmix/eval/human_pooled_v4, data/webmix/eval/seeds/pooled_v4_s2, data/webmix/eval/seeds/pooled_v4_s3],
+              wa: [data/webmix/wa/seeds/single_pooled_s1, data/webmix/wa/seeds/single_pooled_s2, data/webmix/wa/seeds/single_pooled_s3],
+              wv: [data/webmix/om2w/runs/granite/webvoyager100_single_pooled_wvjudge],
+              om2w: [data/webmix/om2w/runs/granite/om2w100_single_pooled_webjudge]}
+  planner:   {single: [data/webmix/eval/val2_rq2_planner_base, data/webmix/eval/val2_rq2_planner_base_s2,
+                       data/webmix/eval/val2_rq2_planner_base_s3],
+              heldout: [data/webmix/eval/seeds/pagent_v6_baseexec_s1, data/webmix/eval/seeds/pagent_v6_baseexec_s2,
+                        data/webmix/eval/seeds/pagent_v6_baseexec_s3],
+              wa: [data/webmix/wa/seeds/agent_base_s1, data/webmix/wa/seeds/agent_base_s2, data/webmix/wa/seeds/agent_base_s3],
+              wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge],
+              om2w: [data/webmix/om2w/runs/granite/om2w100_agent_planner_base_webjudge]}
+  planner_pooled: {single: [data/webmix/eval/val2_pagent_pooled_s1, data/webmix/eval/val2_pagent_pooled_s2, data/webmix/eval/val2_pagent_pooled_s3],
+                  heldout: [data/webmix/eval/pagent_pooled_s1, data/webmix/eval/pagent_pooled_s2, data/webmix/eval/pagent_pooled_s3],
+                  wa: [data/webmix/wa/seeds/agent_pooled31k_s1, data/webmix/wa/seeds/agent_pooled31k_s2, data/webmix/wa/seeds/agent_pooled31k_s3],
+                  wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge],
+                  om2w: [data/webmix/om2w/runs/granite/om2w100_agent_pooled31k_webjudge]}
+  agent:     {single: [data/webmix/eval/val2_rq2_planner_v5, data/webmix/eval/val2_rq2_planner_v5_s2,
+                       data/webmix/eval/val2_rq2_planner_v5_s3],
+              heldout: [data/webmix/eval/seeds/pagent_v6_v5b_s1, data/webmix/eval/seeds/pagent_v6_v5b_s2,
+                        data/webmix/eval/seeds/pagent_v6_v5b_s3],
+              wa: [data/webmix/wa/seeds/agent_v5b_s1, data/webmix/wa/seeds/agent_v5b_s2, data/webmix/wa/seeds/agent_v5b_s3],
+              wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_v5bspec_wvjudge],
+              om2w: [data/webmix/om2w/runs/granite/om2w100_agent_v5bspec_webjudge]}
+  balanced:  {single: [data/webmix/eval/val2_pagent_balanced],
+              heldout: [data/webmix/eval/seeds/pagent_balanced_s1, data/webmix/eval/seeds/pagent_balanced_s2,
+                        data/webmix/eval/seeds/pagent_balanced_s3]}
+  skewed:    {single: [data/webmix/eval/val2_pagent_skewed],
+              heldout: [data/webmix/eval/seeds/pagent_skewed_s1, data/webmix/eval/seeds/pagent_skewed_s2,
+                        data/webmix/eval/seeds/pagent_skewed_s3],
+              wa: [data/webmix/wa/seeds/agent_skewed_s1, data/webmix/wa/seeds/agent_skewed_s2]}
+  fara:      {single: [data/webmix/eval/val2_rq2_fara_base_s1, data/webmix/eval/val2_rq2_fara_base_s2,
+                       data/webmix/eval/val2_rq2_fara_base_s3],
+              heldout: [data/webmix/eval/rq2_fara_base_s2, data/webmix/eval/rq2_fara_base_s3]}
+  fara_webatoms: {single: [data/webmix/eval/val2_rq2_fara_pooled_s1],
+                  heldout: [data/webmix/eval/rq2_fara_pooled_s1, data/webmix/eval/rq2_fara_pooled_s2,
+                            data/webmix/eval/rq2_fara_pooled_s3]}
+
+tables:
+  # the paper's ablation table (2026-10-04: the RQ1 skill-profile table is now the main results table): one Qwen3.5-4B
+  # in five configurations, same harness everywhere
+  # 2026-10-04: no longer \input in the paper (Fig. 7, docs/figures/rq3, replaces it); kept for the numbers and p-values
+  - out: docs/paper/CVPR/tables/main_results.tex
+    label: tab:main
+    wide: true                           # 2026-10-04 (user): full width, our ablation plus other compact agents
+    caption: >-
+      \textbf{Training and composition, and other compact agents.} Task success (\%). Top: one Qwen3.5-4B in our
+      harness, trained on the 27.6K generated steps; mean over 3 seeds on \miniweb{} and WebArena-Lite, one run on the
+      normalized live-web sets (Sec.~\ref{sec:exp-setup}). Single primitives: 103 generated tasks of 23 primitives on
+      held-out sites; multi-step: the 63 human tasks of those sites. In brackets: the $p$-value against the untrained row
+      of the same group, and for the untrained planner against the untrained single agent (paired permutation test over
+      tasks on \miniweb{} and WebArena-Lite, exact McNemar test on the live web). Bottom: other compact agents; multi-step
+      tasks from one run in their own agent loops (web agents) or our harness (general models), graded by the same task
+      verifiers. External benchmarks as reported by the model's authors ($^\dagger$) or, for UI-TARS-1.5-7B, by the
+      authors of Fara-7B ($^\ddagger$): averages over three or more runs on their own task sets (about 595 WebVoyager
+      and 300 Online-Mind2Web tasks) and in their own harnesses, so they are not directly comparable to our normalized
+      sets; InternVL3.5's WebArena-Lite number uses a 50-step budget. --: not run or not reported. Bold: best of our
+      measurements.
+    columns: [single, heldout, wa, wv, om2w]
+    std: false                           # no std; p-values under the rows instead
+    extra_column: {head: "Size"}
+    column_groups: [{label: "\\miniweb{} held-out", span: 2}, {label: "External benchmarks", span: 3}]
+    bold_best: true
+    groups:
+      - name: "Qwen3.5-4B, single agent"
+        rows:
+          - {label: "Untrained", extra: "4B", runs: base}
+          - {label: "+ training", extra: "4B", runs: pooled, compare_to: base}
+      - name: "Qwen3.5-4B, planner"
+        rows:
+          - {label: "Untrained executor", extra: "4B", runs: planner, compare_to: base}
+          - {label: "+ training (\\miniwebagent{})", extra: "4B", runs: planner_pooled, compare_to: planner}
+      - name: "Other compact agents"
+        rows:
+          - {label: "Qwen3.5-9B", extra: "9B", judge: data/webmix/eval/rq1_qwen35_9b_all/judge.jsonl}
+          - {label: "Qwen3-VL-8B", extra: "8B", judge: data/webmix/eval/rq1_qwen3vl-8b_all/judge.jsonl}
+          - {label: "InternVL3.5-8B", extra: "8B", judge: data/webmix/eval/rq1_internvl35-8b_all/judge.jsonl, values: {wa: "12.3$^\\dagger$"}}
+          - {label: "Fara1.5-4B", extra: "4B", judge: data/webmix/eval/rq1_fara15_4b_all/judge.jsonl, values: {wv: "80.8$^\\dagger$", om2w: "57.3$^\\dagger$"}}
+          - {label: "Fara-7B", extra: "7B", judge: data/webmix/eval/rq1_fara-7b_all/judge.jsonl, values: {wv: "73.5$^\\dagger$", om2w: "34.1$^\\dagger$"}}
+          - {label: "MolmoWeb-4B", extra: "4B", judge: data/webmix/eval/rq1_molmoweb-4b_all/judge.jsonl, values: {wv: "75.2$^\\dagger$", om2w: "31.3$^\\dagger$"}}
+          - {label: "MolmoWeb-8B", extra: "8B", judge: data/webmix/eval/rq1_molmoweb-8b_all/judge.jsonl, values: {wv: "78.2$^\\dagger$", om2w: "35.3$^\\dagger$"}}
+          - {label: "UI-TARS-1.5-7B", extra: "7B", judge: data/webmix/eval/rq1_uitars15-7b_all/judge.jsonl, values: {wv: "66.4$^\\ddagger$", om2w: "31.3$^\\ddagger$"}}
+          - {label: "OpenCUA-7B", extra: "7B", judge: data/webmix/eval/rq1_opencua-7b_all/judge.jsonl}
+# Out of the paper's scope for now (runs kept above for later): the skill mixes (balanced, skewed), Fara1.5-4B with
+# and without MiniWeb training, and the published-agent comparison. Their tables live in docs/paper/scaling_CVPR/.

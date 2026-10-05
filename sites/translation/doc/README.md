@@ -1,41 +1,49 @@
-# Translation (LinguaBridge Translator)
+# LinguaBridge Translate (`translation`)
 
-**Category**: Utilities
-**Reviewer**: Kenny
-**Number of macros**: 7
+A Google Translate / DeepL-style translator with source and target language
+dropdowns, translation history, saved translations, custom glossaries and
+user settings.
 
-## Data Source
+- URL: `/sites/translation/` (simulated domain `linguabridge.app`)
+- Data split: training site
 
-Rule-based machine translation using built-in word-swap dictionaries for 9 language pairs (English to/from Spanish, French, German, Italian, Portuguese, Japanese, Chinese, Korean, Arabic). User data (history, saved translations, glossaries, settings) stored in JSON files under data_sources/translation/.
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Translator: source text, source (with Detect) and target language dropdowns, swap, save, recent history |
+| `/history` | Translation history with search |
+| `/saved` | Saved translations with delete |
+| `/glossaries`, `/glossary/<id>` | Glossary list with create form; glossary entries with add-entry and Delete Glossary |
+| `/settings` | Auto-detect, formal mode and auto-pronounce checkboxes; export (JSON/CSV/TXT) |
+| `/login` | Sign-in form |
 
-- `users.json` -- array of user objects: id, username, password, name, email
-- `languages.json` -- array of supported languages: code, name, native_name
-- `history.json` -- array of translation records: id, user_id, source_lang, target_lang, source_text, translated_text, timestamp
-- `saved.json` -- array of saved/bookmarked translations: id, user_id, source_lang, target_lang, source_text, translated_text, label
-- `glossaries.json` -- array of custom glossaries: id, user_id, name, source_lang, target_lang, entries (array of {source, target})
-- `settings.json` -- dict keyed by user_id string, each value has: auto_detect, formal_mode, auto_pronounce (booleans)
+The translate form posts to `/translate`. JSON endpoints under `/api/` cover
+translate, detect, languages, history, saved, glossaries, settings, export,
+upload and image translation.
 
-## Real-World Model
+## Interactions and macros
 
-**Google Translate / DeepL / Linguee** -- text translation utility with language dropdowns, translation history, saved phrases, custom glossaries, audio playback, file upload for batch translation, and image-based OCR translation.
+- Translate text between two chosen languages: `translate_by_query`
+- Toggle translation settings: `configure_by_form`
+- Export translation history: `export`
+- Move between Translate, History and Saved: `navigate_by_route`
+- Read translations and saved items: `report_information`
 
-## Target Macros
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `translation`.
 
-navigate_by_route, extract_by_query, extract_by_semantic, configure_by_toggle, export_by_dropdown, upload_by_upload, translate_by_query
+## Data
 
-## Temporal Dynamics
-
-Not applicable -- translation is a stateless utility. History and saved translations accumulate over time but the translation engine itself is static.
-
-## Domain-Specific Notes
-
-- Translation uses a word-swap approach: each word is looked up in a dictionary for the given language pair. Unknown words pass through unchanged.
-- Reverse dictionaries are auto-generated so e.g. Spanish-to-English works from the English-to-Spanish dictionary.
-- User glossaries override built-in dictionaries (higher priority).
-- Language detection is keyword-based: counts matches against known words per language.
-- Audio playback is a placeholder (no real TTS); the API returns metadata about what would be spoken.
-- Image OCR translation is a placeholder; it accepts image uploads and returns a mock OCR extraction.
-- File upload translates each line of a .txt file independently.
-- Export supports JSON, CSV, and plain text formats for translation history.
+- Tables: `translation_languages` (11 languages), `translation_history`,
+  `translation_saved`, `translation_glossaries`, `translation_settings`,
+  `translation_users`.
+- Login reads `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs in user 1.
+- Translation engine: the local NLLB-200 model (`models/nllb200-600M-ct2`,
+  override with `MINIWEB_NLLB_MODEL`; fetch it with
+  `scripts/fetch_translation_model.py`) is tried first. Requests that use a
+  glossary go to the configured LLM first. Each result is stored in the
+  `translation_cache` base table, so the same request always returns the same
+  text. If neither engine is available, a word-by-word dictionary answers, and
+  that answer is not cached.
+- The site has no cross-site effects.

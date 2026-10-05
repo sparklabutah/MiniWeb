@@ -1,22 +1,52 @@
-# Ticketing / events
+# Lakeport Events (`ticketing-events`)
 
-**Category**: Shopping & transactional
-**Reviewer**: Farhan
-**Number of macros**: 27
+An Eventbrite/Ticketmaster-style ticketing site for events in Lakeport. Users
+discover events in an infinite-scroll feed, filter and sort them, compare two
+events, buy tickets (with reserved seating and promo codes), save events and
+cancel orders.
 
-## Data Source
+- URL: `/sites/ticketing-events/` (simulated domain `eventpass.live`)
+- Data split: training site
 
-Yelp
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Discover Events: search box, Category and Status dropdowns, Date From/To, Max Price slider, Sort by, heart-save toggles, infinite-scroll feed |
+| `/search` | Search results page (`q`) |
+| `/event/<id>` | Event detail with ticket type and quantity, Buy Now / Reserve Now |
+| `/checkout/<id>` | Checkout: buyer details, seat map for reserved events, promo code |
+| `/my-tickets` | Orders and tickets with Cancel Order |
+| `/cancel/<order_id>` | Cancellation form with a reason |
+| `/compare` | Side-by-side comparison of two events |
+| `/settings` | Location and notification preferences |
+| `/login`, `/register` | Sign-in and sign-up forms |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_query, filter_by_dropdown, filter_by_checkbox, filter_by_slider, filter_by_date_range, sort_by_ranking, extract_by_query, extract_from_table, compare_from_table, submit_by_query, select_by_slider, select_by_date_range, configure_by_dropdown, configure_by_slider, export_by_dropdown, save_by_toggle, add_by_button, checkout_by_form, book_by_form, redeem_by_code, cancel_by_form, authenticate_by_form, register_by_form
+JSON endpoints under `/api/` cover events (feed, semantic search, price and
+date ranges), orders, tickets, wishlist, cart, promo validation, compare,
+feedback, stats and export.
 
-## Site Description
+## Interactions and macros
 
-TODO: Write a description of:
-- What this website is (domain, purpose, target audience)
-- How it uses the data files in data/
-- What real-world website it should be modeled after
-- Whether the domain has temporal/dynamic data (and how it should simulate)
-- Any domain-specific behavior or constraints
+- Search events, venues and organizers: `search`
+- Filter by category or status: `filter_by_dropdown`; by date: `filter_by_date_range`; by max price: `filter_by_slider`
+- Sort by date, price or name: `sort_by_form`
+- Open an event or My Tickets: `navigate_by_route`
+- Book tickets: `book_by_form`; pay at checkout with a promo code: `checkout_by_form`
+- Cancel an order: `cancel_by_form`
+- Save an event with the heart toggle: `toggle_relationship`
+- Change settings: `configure_by_form`, `filter_by_options`
+- Read search results and the compare table: `report_information`
+
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `ticketing-events`.
+
+## Data
+
+- Tables (`ticketing_events_*`): `events`, `tickets`, `orders`, `users`.
+- Login uses `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs in user 1.
+- A completed order calls `on_purchase` (banking debit and confirmation email)
+  and `on_booking` (calendar-todo event and booking email) from `app/bridges.py`.
+  Checkout takes no card; nothing goes through 2FA.
+- Registering emits a `signup` event.
+- Promo codes are defined in `routes.py` (`PROMO_CODES`); booking fees are 12%.

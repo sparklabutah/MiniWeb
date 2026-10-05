@@ -33,13 +33,15 @@ def _tags(task):
     ops = task.get("macro_operations") or {}
     spans = task.get("macro_spans") or {}
     subtasks = task.get("macro_subtasks") or {}
+    required = task.get("macro_required") or {}
     out = []
     for inst, macro in instances(task):
         span = spans.get(inst)
         valid = (isinstance(span, list) and len(span) == 2
                  and all(isinstance(x, int) and not isinstance(x, bool) for x in span) and 1 <= span[0] <= span[1])
         out.append({"instance": inst, "macro": macro, "op": ops.get(inst) or None,
-                    "span": span if valid else None, "subtask": subtasks.get(inst, "")})
+                    "span": span if valid else None, "subtask": subtasks.get(inst, ""),
+                    "required": required.get(inst, True)})
     return out
 
 
@@ -100,13 +102,17 @@ def _outline(observation, limit=140):
     return "\n".join(lines)
 
 
-def task_detail(annotator, task_id):
-    """The task's tags plus every recorded action with its frame."""
+def task_detail(annotator, task_id, source="gold"):
+    """The task's tags plus every recorded action with its frame.
+
+    `source` is the original recording ("gold", trajectory.json) or the fresh
+    verification walk ("walk", verification_walk.json)."""
     d = (ANNOTATIONS_DIR / annotator / task_id).resolve()
     if d.parent.parent != ANNOTATIONS_DIR.resolve() or not (d / "task.json").is_file():
         return None
     task = json.loads((d / "task.json").read_text())
-    trajectory = json.loads((d / "trajectory.json").read_text()) if (d / "trajectory.json").is_file() else []
+    name = "verification_walk.json" if source == "walk" else "trajectory.json"
+    trajectory = json.loads((d / name).read_text()) if (d / name).is_file() else []
     events = trajectory if isinstance(trajectory, list) else trajectory.get("trajectory", [])
     actions, last_shot = [], None
     for i, e in enumerate(events):
@@ -130,7 +136,7 @@ def task_detail(annotator, task_id):
                         "url": str(e.get("url") or "").replace("https://miniweb-production.up.railway.app", ""),
                         "frame": shot or last_shot,
                         "outline": "" if (shot or last_shot) else _outline(seen or {})})
-    return {"key": f"{annotator}/{task_id}", "instruction": task.get("instruction", ""),
+    return {"key": f"{annotator}/{task_id}", "source": source, "instruction": task.get("instruction", ""),
             "expected_answer": task.get("expected_answer", ""), "tags": _tags(task),
             "edges": task.get("macro_edges") or [], "span_source": task.get("macro_span_source"),
             "actions": actions}

@@ -1,48 +1,47 @@
-# URL Shorteners / QR
+# SnapLink URL Shortener (`url-shorteners-qr`)
 
-**Category**: Utilities
-**Reviewer**: Kenny
-**Number of macros**: 13
+A Bitly, TinyURL or Rebrandly-style link manager. Users shorten URLs with
+custom codes, expiry, tags, redirect types and QR codes, manage and export their
+links, and read per-link click statistics.
 
-## Data Source
+- URL: `/sites/url-shorteners-qr/` (simulated domain `snplnk.io`)
+- Data split: held-out (test) site
 
-Synthetic seed data modeled after Bitly/TinyURL link management.
-Files: `data_sources/url-shorteners-qr/links.json`, `click_stats.json`, `users.json`
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | "Shorten a URL" form (long URL, title, custom short code, expiry, tags, redirect type 301/302/307, Generate QR Code) and recent links |
+| `/links` | My Links: search, status filter, sort, From/To dates, tag filter, CSV/JSON export |
+| `/link/<id>` | Link detail: click statistics (countries, devices, referrers), Edit Link card, activate/deactivate, Delete, Sharing toggle, View QR Code |
+| `/qr/<id>` | QR code for the short link |
+| `/login` | Sign-in form |
 
-**users.json** -- JSON array. Each user has: `id`, `username`, `password`, `name`, `email`, `plan` (free/pro/enterprise).
+`/s/<short_code>` redirects to the original URL and records a click. JSON
+endpoints under `/api/` cover links, configure, expiration, stats, stats
+export, share, QR, resolve and export.
 
-**links.json** -- JSON array. Each link has: `id`, `short_code`, `original_url`, `title`, `owner_id`, `created_at`, `clicks`, `is_active`, `expires_at`, `redirect_type` (301/302/307), `tags` (array), `qr_enabled` (bool), `utm_source`, `utm_medium`, `utm_campaign`.
+## Interactions and macros
 
-**click_stats.json** -- JSON array. Each click event: `id`, `link_id`, `timestamp`, `referrer`, `country`, `device`.
+- Create a short link: `create_by_form`
+- Choose the redirect type, or status and sort on My Links: `configure_by_form`
+- Search links, filter by creation date: `search`, `filter_by_date_range`
+- Edit a link's title, destination or tags: `edit_by_form`
+- Delete a link: `delete_from_table`
+- Export links as CSV or JSON: `export`
+- Turn sharing on to reveal the share URL and QR link: `share_by_form`
+- Read click counts and statistics tables: `report_information`
 
-### Sampling
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `url-shorteners-qr`.
 
-All records loaded by default (`num_data_points: -1`). 4 users, 12 links, 30 click events in seed data.
+## Data
 
-## Real-World Model
-
-**Bitly / TinyURL / Rebrandly** -- URL shortener with analytics dashboard. Key UI elements:
-- URL creation form with custom short code, expiration, redirect type dropdown, QR toggle
-- My Links list with search, status filter, date range filter, tag filter, sort options
-- Link detail page with click statistics table (countries, devices, referrers)
-- Export (CSV/JSON), share (email/twitter/linkedin/copy/qr), configure (redirect type, UTM params)
-
-## Target Macros
-
-navigate_by_query, navigate_by_route, search_by_query, filter_by_date_range, extract_by_query, extract_from_table, edit_by_query, delete_from_table, configure_by_dropdown, export_by_dropdown, share_by_dropdown, create_by_query, create_from_free_text
-
-## Temporal Dynamics
-
-Not applicable -- URL shortener data is user-generated and static between interactions. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- Short codes are alphanumeric, 6 chars generated or user-specified custom codes
-- Links can be active/inactive (toggled) and have optional expiration dates
-- Click tracking records country, device, and referrer per click event
-- QR code generation is a per-link toggle (create_by_toggle)
-- Export supports CSV and JSON formats (export_by_dropdown)
-- Share generates platform-specific URLs for email, Twitter, LinkedIn, or copy-to-clipboard (share_by_dropdown)
-- Configure allows changing redirect type (301/302/307) and UTM parameters (configure_by_dropdown)
+- Tables: `url_shorteners_qr_links`, `url_shorteners_qr_click_stats`,
+  `url_shorteners_qr_users`.
+- Login reads `session["user_id"]` (via `helpers.auth`), so the global
+  auto-login signs the user in as user 1.
+- QR codes are real, scannable codes rendered as SVG by the dependency-free
+  encoder in `sites/url-shorteners-qr/qr_encoder.py`.
+- `/s/<short_code>` returns 404 for an inactive or unknown code. Codes that
+  point at a MiniWeb path redirect there. External destinations are shown on an
+  "External Link" page instead, because the sandbox does not leave MiniWeb.

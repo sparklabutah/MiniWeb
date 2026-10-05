@@ -1,244 +1,177 @@
-# MiniWeb Architecture
+# Architecture
 
-## What MiniWeb Is
-
-MiniWeb is a benchmark platform for evaluating web-browsing AI agents. A single Flask process serves 72 realistic websites — banking, forums, e-commerce, email, and more — each backed by real-world data (arxiv, reddit, StackExchange, Wikipedia) totaling 11M+ records in SQLite. Agents receive natural-language instructions and interact with rendered HTML; verifiers check backend state to score success.
-
-## System Overview
+MiniWeb has five parts. They all share one Flask app and one SQLite database:
 
 ```
-                    Browser Agent
-                         |
-                    HTTP requests
-                         v
-+----------------------------------------------------+
-|  Flask App (run.py)                                |
-|  +----------+  +-------------------------------+   |
-|  |  Portal   |  |  72 Site Blueprints           |   |
-|  |  /        |  |  /sites/banking/*             |   |
-|  |           |  |  /sites/forums/*              |   |
-|  |           |  |  /sites/email/*               |   |
-|  +----------+  +-------------+-----------------+   |
-|                               |                    |
-|                        +------v------+             |
-|                        |  app/db.py  |             |
-|                        |  query()    |             |
-|                        |  get_item() |             |
-|                        +------+------+             |
-+-------------------------------+--------------------+
-                                |
-                        +-------v--------+
-                        |  miniweb.db    |
-                        |  (SQLite)      |
-                        |  ~350 tables   |
-                        |  11M+ records  |
-                        +----------------+
+                       agents / annotators / datagen executor (Chromium)
+                                        |  HTTP
+  +-------------------------------------v--------------------------------------+
+  | Flask app (run.py -> app.create_app)                                        |
+  |   /                portal             /annotate/*   annotation tool          |
+  |   /sites/<site>/*  65 site blueprints /_admin/*     request log, recorder,   |
+  |   /_fs/*           simulated files                  data changes, flags      |
+  |   /verify-payment  2FA                /_player/*    media timelines          |
+  |        | app.db (reads merge base + overlay; writes go to the overlay)       |
+  +--------v---------------------------------------------------------------------+
+  | SQLite: per-site base tables  +  session_overlay (one sid per browser session)|
+  +-------------------------------------------------------------------------------+
+        ^ verifier.json / trajectories           ^ verified trajectories
+        |                                        |
+  annotation/ -> data/annotations/        datagen/ -> data/datagen/runs/
+        |                                        |
+  evaluation/ (run_agent_verify, run_study,   webmix/ (replay -> rows -> LoRA train
+   verifiers, macro_judge)                     -> vLLM -> planner agent -> evals)
 ```
 
-## Directory Structure
+Package-level details are in each package's `README.md`. This page explains how the parts
+connect.
 
-```
-MiniWeb/
-|-- run.py                          # Entry point: python run.py
-|-- CLAUDE.md                       # Development rules (read before writing code)
-|-- miniweb.db                      # SQLite database (all site data)
-|
-|-- app/
-|   |-- __init__.py                 # create_app(), blueprint registration, admin API
-|   |-- db.py                       # Database access layer (query, get_item, save_item)
-|   |-- bridges.py                  # Cross-site data connections (banking<->email<->calendar)
-|   |-- portal/                     # Homepage search portal
-|   +-- static/                     # Shared CSS
-|
-|-- sites/<site-id>/                # 72 self-contained sites
-|   |-- site.json                   # Metadata (name, description, category)
-|   |-- schema.py                   # SQLite table definitions (columns, types, indexes, defaults)
-|   |-- routes.py                   # Flask blueprint (routes + SQL queries)
-|   |-- templates/<site-id>/        # Jinja2 HTML templates
-|   |-- config/config.json          # Site config (random seed, etc.)
-|   |-- tasks.json                  # Benchmark tasks for agents
-|   |-- verifiers.py                # Task success verification
-|   |-- macro_verifiers.py          # Per-macro verification
-|   +-- reference_solutions.py      # Known-good solutions
-|
-|-- scripts/
-|   |-- build_db.py                 # Build miniweb.db from data sources
-|   |-- generate_schemas.py         # Auto-generate schema.py from data files
-|   |-- generate_site.py            # Generate a new site from a spec
-|   +-- data_prep/                  # Per-site data preparation scripts
-|
-|-- evaluation/                     # Browser-agent evaluation harness
-|-- annotation/                     # Human annotation interface
-+-- docs/                           # Documentation
-```
+## Web app (`app/`, `sites/`)
 
-## Database Architecture
+`run.py` calls `app.create_app()`, which:
 
-All site data lives in a single SQLite file (`miniweb.db`) with per-site tables.
+1. Loads `.env` from the repo root and opens the database at `MINIWEB_DB`.
+2. Mounts the portal at `/`, and each implemented site in `sites/*/site.json` at
+   `/sites/<site>/`. There are 65 sites; `MINIWEB_SITES=a,b` mounts only some of them.
+3. Mounts the annotation blueprint at `/annotate`, the file system at `/_fs`, and the admin
+   and grading endpoints under `/_admin`.
+4. Installs the request hooks:
+   - **Per-site login.** Each site keeps its own `session["_uid_<site>"]`, so logging in or
+     out on one site does not affect another.
+   - **Auto-login.** A `/sites/*` request with no login state for that site gets
+     `user_id = 1`. A session flag (`_no_autologin`) or `MINIWEB_NO_AUTOLOGIN=1` turns this
+     off for login tasks.
+   - **Payment 2FA.** Sites call `events.request_2fa()`. It emails a 6-digit code to the
+     user's WebMail inbox and sends the browser to `/verify-payment`. The session flag
+     `_disable_2fa` skips this step.
+   - **Script injection.** Every HTML page under `/sites/` gets these scripts before
+     `</body>`: `dialog-shim.js`, `recorder.js`, `file-explorer.js`, `export-feedback.js`,
+     the shared media player, `miniweb-share.js`, and a per-site logo font.
+   - **Request log.** Every `/sites/` request is logged per session with its method, path,
+     query, body, status, response and UTC timestamp.
 
-### Per-Site Tables
+A site is a blueprint: `routes.py` (pages and JSON APIs), `schema.py` (its tables),
+`templates/<site>/`, `site.json` and `doc/README.md`. Sites are linked through an event bus:
+`app/events.py` emits an event, and handlers in `app/handlers/` turn it into records on other
+sites. For example, a purchase adds a bank debit and a confirmation email, and a booking adds
+a calendar event.
 
-Each site has its own tables with real columns, indexes, and NOT NULL defaults. Table names follow the pattern `{site_name}_{collection}` (hyphens replaced with underscores).
+## Data layer (`app/db.py`)
 
-Examples:
-- `banking_users` (id, username, email, phone, ...)
-- `banking_transactions` (id, user_id, date, amount, category, status, ...)
-- `forums_posts` (id, subreddit, title, body, author, score, created_utc, ...)
-- `forums_comments` (id, post_id, body, author, score, ...)
+- **One SQLite file** with per-site tables named `<site>_<collection>`, such as
+  `banking_transactions`. `site_registry` maps (site, collection) to a table and its primary
+  key. Large text collections have FTS5 indexes that `db.search()` uses.
+- **Session overlay.** The first data access in a browser session assigns it an overlay id
+  (`session["_data_overlay_sid"]`). Writes (`save_item`, `delete_item`, `save_collection`) go
+  to `session_overlay` under that id and never touch base tables. Reads merge the overlay into
+  the base rows. As a result:
+  - many agents can run against one server in parallel without seeing each other's changes;
+  - `/_reset_data` returns a session to the pristine dataset;
+  - `db.session_changes()`, served at `/_admin/changes`, lists exactly what a session inserted,
+    updated or deleted. Graders and the datagen gate compare this list.
+- **Query rules.** Filter, sort and paginate in SQL; never load a whole table into Python.
+  The full rules are in [AGENTS.md](../AGENTS.md).
+- **Simulated file system** (`app/vfs.py`). A Finder-style explorer whose base home
+  directory is `filesystem/` on disk. Downloads, saves and uploads from any site are stored in
+  the overlay under `filesystem/files`, so verifiers can check them through
+  `/_admin/data/filesystem/files`.
 
-All columns have `NOT NULL DEFAULT` constraints — no NULLs in the database. Integer columns default to 0, text columns default to '', real columns default to 0.0.
+## Recording
 
-Table schemas are defined in each site's `schema.py` and created by `scripts/build_db.py`.
+Graders and the training pipeline all read the same three streams for a session:
 
-### One Table, One Schema
+| Stream | Source | Endpoint |
+|---|---|---|
+| Actions and observations (clicks, typing, selects, URL, page snapshot) | `recorder.js` in the page | `/_admin/record`, `/_admin/beacon` |
+| Server requests (method, path, query, body, response, redirect target) | Flask request hook | `/_admin/log` |
+| Data changes against the base tables | `db.session_changes()` | `/_admin/changes` |
 
-Synthetic data and real-world raw data are merged into the SAME table at build time. The synthetic JSON files use the same field names as the raw data (e.g., `author` not `reddit_username`, `created_utc` not `created_at`). Route code has one query path — no branching on data source.
+`evaluation/trajectory.py` assembles these into a trajectory in the same schema as a human
+recording (`trajectory.json`).
 
-### Infrastructure Tables
+## Annotation (`annotation/`)
 
-- `site_registry` — maps (site, collection) to SQL table name and primary key column
-- `session_overlay` — per-session mutations (upserts/deletes)
-- `session_collection_replaced` — flags when a session fully replaced a collection
-- `sessions` — session lifecycle tracking
+The `/annotate` blueprint is where humans record tasks, tag macro spans, and build verifiers.
+Tasks are stored as files under `data/annotations/<annotator>/<task_id>/`: `task.json`,
+`trajectory.json`, `verifier.json`, `verifier_runs.json` and `screenshots/`. The macro
+vocabulary comes from `data/macros.yaml` through `annotation/macros.py`. New verifiers start
+from the same scaffold for every macro (`annotation/verifier_scaffold.py`), and each one is
+validated against its gold recording and against negative probes (`annotation/quality.py`).
+The Macro Browser and Task Review pages are read-only views over the same files. See
+[macro_system.md](macro_system.md) and [VERIFIER_DESIGN.md](VERIFIER_DESIGN.md).
 
-### Session Isolation
+## Evaluation (`evaluation/`)
 
-Each browser session gets isolated data mutations. When an agent modifies data (e.g., transfers money), the changes are stored in `session_overlay` and merged at query time. The base tables are never modified. This means:
+`run_agent_verify.py` runs one task:
 
-- Multiple agents can run in parallel without interfering
-- `POST /_reset_data` reverts a session to pristine state
-- Base data survives server restarts
+1. It starts a fresh server.
+2. It starts the agent (browser-use, any model routed by `helpers/llm.py`) on the task's
+   recorded start page. The browser can reach localhost only.
+3. It pulls the three streams above and builds the trajectory.
+4. It grades the trajectory twice:
+   - `verifiers.verify_task`: deterministic, with a pass/fail per macro;
+   - `macro_judge.grade`: one LLM verdict per macro instance against the gold span
+     (gemini-3.5-flash, best of 3 votes).
 
-### Data Access API (app/db.py)
+`run_study.py` runs that loop over N models × M tasks × repeats with parallel workers.
+`xray.py` is a web viewer for the results.
 
-Sites access data through these functions — ALL filtering, sorting, pagination happens in SQL:
+## Training data (`datagen/`)
 
-```python
-from app import db
+A per-macro pipeline that runs only on the 52 training sites:
 
-# Filtered query (SQL WHERE + ORDER BY + LIMIT)
-txns = db.query("banking", "transactions",
-                where={"user_id": 1}, sort="-date", limit=30, offset=0)
+1. Fix the site split.
+2. Crawl the sites and probe each control's backend signature.
+3. Sample parameters.
+4. Write the task instruction and its expected backend check.
+5. A coding LLM with full DOM access writes a script, and a restricted wrapper executes it. It
+   records screenshots and pixel actions.
+6. Keep an attempt only if the backend gate passes (`datagen/checks.py::gate`): the expected
+   backend effect is seen (a request carrying the value, a recorded data change, or the
+   computed answer) AND the `verify_task` spec built for the task passes. An optional LLM
+   judge adds a second check; `--no-judge` turns it off.
 
-# Single item by primary key
-user = db.get_item("banking", "users", 1)
+What a macro's controls look like is defined in `datagen/kinds/`. The full-DOM information
+never enters the training data. See [datagen/README.md](../datagen/README.md).
 
-# Count without loading data
-total = db.count("banking", "transactions", where={"user_id": 1})
+## WebMix (`webmix/`)
 
-# Raw SQL for complex queries (date ranges, LIKE, aggregation)
-rows = db.execute(
-    "SELECT * FROM banking_transactions WHERE user_id=? AND amount>? ORDER BY date DESC LIMIT 30",
-    (uid, 100.0)
-)
+- **Harness** (`harness.py`): one browser-use setup shared by every arm and by replay. Each
+  step sees a DOM element list and a screenshot at 1280×800. Actions include clicks by
+  element index or by coordinate, plus `drag`, `draw` and `macro_done`.
+- **Replay** (`replay.py`, `python -m webmix replay`): runs each kept datagen trajectory
+  through the harness with a scripted model. This records browser-use's exact prompt and the
+  reply for every step as training rows. A row is kept only if the backend gate passes again.
+  `augment.py` adds two variants: recovery (an injected mistake, then the fix) and chain (two
+  macros in one episode).
+- **Training** (`train.py`): LoRA adapters on Qwen3.5-4B, one per skill family plus a pooled
+  adapter. On other families' rows a KL anchor keeps each adapter close to its reference.
+  Training runs in the `webmix` env; multi-GPU runs use `torchrun`.
+- **Serving** (`serve.sh`): one vLLM server for the base model and all adapters. Each request
+  picks an adapter by model name.
+- **Agent** (`planner_agent.py`): a browser-use planner on the untrained base model. It sees
+  the page but cannot act on it. Its tool `delegate(family, instruction)` runs that family's
+  specialist on the same browser, and its `done` action ends the task with an answer.
+- **Evaluations:** `evaluate.py` (MiniWeb held-out tasks, graded by their verifiers), `wa.py`
+  (WebArena-Lite-v2), and `om2w.py` + `om2w_judge.py` (Online-Mind2Web and WebVoyager on the
+  live web, graded by the official judges).
 
-# Mutations (stored in session overlay)
-db.save_item("banking", "transactions", tx_id, updated_tx)
-db.delete_item("banking", "transactions", tx_id)
-```
+The protocols and results are in [RESEARCH.md](RESEARCH.md).
 
-## Data Sources
+## Ports
 
-Site data comes from two sources, merged into the same tables at build time:
+| Port | Used by |
+|---|---|
+| 8080 | `python run.py` (`PORT` / `FLASK_RUN_PORT`) |
+| per config | `run_study.py` workers: the config's `episode.port` + worker index |
+| 8300–8320 | datagen servers |
+| 8310, 8311 / 8318, 8319 | default MiniWeb servers for `webmix replay` / `webmix.evaluate` |
+| 8400 | vLLM (`webmix/serve.sh`) |
 
-### Synthetic Data
-- Created by data prep scripts or hand-written
-- Stored as JSON in `data_sources/<site>/*.json`
-- Uses the SAME field names as the raw data
-- Includes ALL raw data fields (with defaults for fields it doesn't populate)
+## Deployment
 
-### Real-World Data
-- Sourced from public datasets
-- Stored as CSV/JSONL/XML in `data_sources/<raw-source>/`
-- Configured in `scripts/generate_schemas.py` `RAW_DATA_SOURCES`
-
-| Site | Real Data Source | Records |
-|------|-----------------|---------|
-| academic-paper-db | arxiv metadata | 1M papers |
-| forums | reddit CSV | 127K posts, 1M comments, 661K users |
-| qa-knowledge | StackExchange XML | 1M questions, 1M answers |
-| dictionaries | wiktionary JSONL | 1M entries |
-| flights-hotels | kaggle CSV | 246K flights, 1M hotels |
-| job-sites | indeed CSV | 1M jobs |
-| real-estate | realtor CSV | 1M listings |
-| version-control | gitlab CSV | 80K issues, 134K MRs, 303K notes |
-| wikis | wikipedia JSONL | 50K articles |
-| news | enwikinews XML | 20K articles |
-| comparison-aggregators | gsmarena CSV | 10K phones |
-| podcasts-audiobooks | kaggle CSV | 271K books, 1M ratings |
-| software-marketplace | google play CSV | 10K apps, 64K reviews |
-
-### Build Pipeline
-
-```bash
-# 1. Generate schema.py files from data
-python scripts/generate_schemas.py
-
-# 2. Build the database (run on compute node for large datasets)
-salloc -n 4 --mem=32G -t 2:00:00 -p notchpeak-shared -A notchpeak-shared-short
-python scripts/build_db.py --max-raw 1000000
-
-# 3. Run the app
-python run.py
-```
-
-`build_db.py` reads each site's `schema.py`, creates SQL tables with NOT NULL defaults, inserts synthetic JSON data, then streams raw CSV/JSONL/XML in batches.
-
-## Site Architecture
-
-Each site is a Flask Blueprint with:
-
-### routes.py
-- All HTTP routes (HTML pages + JSON API endpoints)
-- Data access through `db.query()`, `db.get_item()`, `db.execute()` — SQL-level filtering only
-- Mutation routes use `db.save_item()` / `db.delete_item()`
-- Template rendering with Jinja2
-
-### schema.py
-- Defines SQLite table schemas (columns, types, indexes, defaults)
-- Auto-generated by `scripts/generate_schemas.py`, then hand-editable
-- All columns have `NOT NULL DEFAULT` — no NULLs
-
-### tasks.json
-- 20 benchmark tasks per site
-- Each task has a natural-language instruction, target macros, and verification criteria
-- Tasks represent realistic user interactions
-
-### verifiers.py / macro_verifiers.py
-- Check whether an agent successfully completed a task
-- Query backend state through the admin API or db module
-
-## Evaluation Flow
-
-```
-1. Agent receives task instruction (natural language)
-2. Agent interacts with site through browser (clicks, types, navigates)
-3. Agent's mutations go to session_overlay (isolated)
-4. Verifier checks backend state via /_admin/data/<site>/<collection>
-5. Score: pass/fail per task, macro coverage per site
-```
-
-## Admin API
-
-- `GET /_admin/data/<site>/<collection>` — query a collection (supports `?user_id=1&_count=1`)
-- `GET /_admin/files/<site>` — list collections for a site
-- `GET /_admin/user/<site>/<user_id>` — aggregate all data for a user
-- `GET /_admin/log` — request log for current session
-- `POST /_reset_data` — reset session to pristine state
-- `GET /_overlay_stats` — session overlay statistics
-
-## Cross-Site Bridges
-
-`app/bridges.py` connects 14 sites through shared data:
-- Banking transfers create email notifications
-- Calendar events link to remote-calls meetings
-- E-commerce orders create banking debits
-- IM messages cross-reference with email
-
-## Environment
-
-- **Platform**: CHPC (University of Utah HPC cluster)
-- **Storage**: `/scratch/general/vast/u1653932/` (VAST filesystem)
-- **Data sources**: `/scratch/general/vast/u1653932/data_sources/`
-- **Python**: 3.11 via miniforge3
-- **DB builds**: Run on compute nodes via `salloc` (large datasets need 32GB+ RAM)
+`Procfile` and `Dockerfile` run `gunicorn run:app`. Annotators add macros by writing to the
+macro YAMLs, so a deployment points `MINIWEB_MACRO_DIR` at a persistent volume. A fresh volume
+is seeded from the repo copies. When `MINIWEB_RECOVERY_TOKEN` is set, `/recovery/*` accepts a
+token-gated upload that replaces the database or the annotations. `scripts/pull_from_railway.py`
+and `scripts/upload_db_railway.py` sync with the hosted instance.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run a browser-use agent against an annotated task and grade it with the
-task's macro verifier (verifier.json + evaluation/verifiers.py::verify_task).
+task. The default grader is the flash macro judge (evaluation/macro_judge.py); the
+task's macro verifier (verifier.json + evaluation/verifiers.py::verify_task) runs too and
+is reported next to it (`verifier_passed`) and stands in when the judge is unavailable.
 .
 Pipeline:
   1. locate the task dir + its verifier.json under data/annotations/*/<task_id>/
@@ -8,7 +10,8 @@ Pipeline:
   3. run the browser-use agent from the task's starting_url
   4. pull the recorder stream (/_admin/record) + request log (/_admin/log)
      -> assemble a trajectory in the human trajectory.json schema
-  5. verify_task(verifier, trajectory, agent_answer)
+  5. verify_task(verifier, trajectory, agent_answer) and, with --grader judge (default),
+     macro_judge.grade(task, trajectory, agent_answer, screenshots)
   6. print PASS/FAIL + per-macro + failed-check reasons; write result.json
 
 Usage:
@@ -122,6 +125,20 @@ def resolve_start_url(base, starting_url, site_id):
     return base + path
 
 
+def app_directory(base, sites):
+    """Multi-site tasks start at the portal home. List the apps the task involves with
+    their exact addresses, so the agent opens them instead of guessing URLs (a 4B model
+    mistyped ports and invented paths, then declared the site down: 0/15 multi-site)."""
+    lines = []
+    for s in sites:
+        try:
+            name = json.loads((ROOT / "sites" / s / "site.json").read_text()).get("name") or s
+        except (OSError, ValueError):
+            name = s
+        lines.append(f"- {name}: {base}/sites/{s}/")
+    return "\n\nApps for this task (open them at these exact addresses):\n" + "\n".join(lines)
+
+
 def fetch(base, path):
     try:
         with urllib.request.urlopen(base + path, timeout=20) as r:
@@ -157,6 +174,21 @@ def build_trajectory(base):
     return traj, recorded, log, beacons
 
 
+def judge_episode(key, traj, answer, episode_dir):
+    """Macro-judge verdict for one graded episode, or None when the judge could not
+    grade it (API down, task without instances) — the verifier then decides."""
+    try:
+        from evaluation.macro_judge import grade, JUDGE_MODEL
+        judged = grade(key, traj, answer, episode_dir=episode_dir)
+    except Exception as exc:
+        print(f"{YELLOW}!! macro judge failed ({type(exc).__name__}: {exc}); grading with the verifier{RESET}")
+        return None
+    inst = judged.get("instances") or {}
+    if not inst or all(v.get("why") == "judge unavailable" for v in inst.values()):
+        return None
+    return dict(judged, model=JUDGE_MODEL)
+
+
 # ── agent factory (shared build_agent — one factory for every runner) ─────────
 
 def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=False):
@@ -171,7 +203,7 @@ def make_agent(model, *, headless, max_steps, timeout, use_vision, native_llm=Fa
 
 async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
                         max_steps=50, timeout=300, headless=True, start_from="recorded",
-                        port=8099, out=None, verbose=True, agent=None):
+                        port=8099, out=None, verbose=True, agent=None, grader="judge"):
     """Run one agent on one task and grade it. Returns a result dict."""
     from server import start_server, stop_server, wait_for_server
     from helpers.llm import LLMClient
@@ -205,11 +237,13 @@ async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
         raise RuntimeError(f"server did not start on port {port}")
     base = f"http://localhost:{port}"
     task_sites = [s["id"] if isinstance(s, dict) else s for s in (task.get("sites") or [])]
+    prompt = instruction
     if len(task_sites) > 1:
-        # Cross-site tasks start at the platform homepage: choosing which app to
-        # open is part of the task, and the recorded start URL (one of the two
-        # sites) would pre-solve that step.
+        # Cross-site tasks start at the platform homepage (the recorded start URL,
+        # one of the sites, would pre-solve the first step) and name the apps
+        # involved with their exact addresses.
         start_url = base + "/"
+        prompt = instruction + app_directory(base, task_sites)
     else:
         rec_url = None if start_from == "starting_url" else recorded_start_url(tdir)
         start_url = resolve_start_url(base, rec_url or task.get("starting_url"), site_id)
@@ -222,7 +256,7 @@ async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
     t0 = datetime.now()
     try:
         await agent.setup(start_url)
-        result = await agent.run(task=instruction, server_url=start_url, task_dir=out)
+        result = await agent.run(task=prompt, server_url=start_url, task_dir=out)
     except asyncio.TimeoutError:
         if verbose: print(f"{YELLOW}!! agent timed out{RESET}")
     except Exception as exc:
@@ -236,20 +270,26 @@ async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
 
     agent_answer = (getattr(result, "final_result", "") or "") if result else ""
     report = verify_task(verifier, traj, agent_answer, question=instruction)
-
+    judge = judge_episode(f"{tdir.parent.name}/{tdir.name}", traj, agent_answer, out) if grader == "judge" else None
 
     g = LLMClient.GLOBAL.as_dict()
     tokens = {k: g[k] - tok0.get(k, 0) for k in g}
 
     res = {
         "task_id": tdir.name, "annotator": tdir.parent.name, "site": site_id,
-        "instruction": instruction, "expected_answer": expected,
+        "instruction": instruction, "prompt_extra": prompt[len(instruction):], "expected_answer": expected,
         "agent_answer": agent_answer, "model": model, "obs": obs,
         "elapsed_s": round(elapsed, 1), "steps": getattr(result, "steps", -1),
         "is_done": getattr(result, "is_done", False),
-        "passed": report["passed"], "by_macro": report["by_macro"],
+        "passed": judge["passed"] if judge else report["passed"],
+        "grader": f"judge:{judge['model']}" if judge else "verifier",
+        "verifier_passed": report["passed"], "by_macro": report["by_macro"],
+        "judge_passed": judge["passed"] if judge else None,
+        "judge_by_macro": {i: v["passed"] for i, v in judge["instances"].items()} if judge else None,
         "llm_tokens": tokens, "artifacts": str(out),
     }
+    if judge:
+        (out / "judge_report.json").write_text(json.dumps(judge, indent=1, default=str))
     (out / "trajectory.json").write_text(json.dumps(traj, indent=1, default=str))
     (out / "server_log.json").write_text(json.dumps(log, indent=1))
     (out / "verify_report.json").write_text(json.dumps(report, indent=1, default=str))
@@ -258,7 +298,8 @@ async def run_and_grade(*, task_id, model, obs="axtree", native_llm=False,
     if verbose:
         n_act = sum(1 for e in traj if e.get("type") == "action")
         n_net = sum(1 for e in traj if e.get("type") == "network")
-        badge = f"{GREEN}{BOLD} PASS {RESET}" if report["passed"] else f"{RED}{BOLD} FAIL {RESET}"
+        badge = f"{GREEN}{BOLD} PASS {RESET}" if res["passed"] else f"{RED}{BOLD} FAIL {RESET}"
+        badge += f"  {DIM}graded by {res['grader']}; verifier {'pass' if report['passed'] else 'fail'}{RESET}"
         print("\n" + "=" * 64)
         print(f"result        : {badge}   {DIM}{elapsed:.0f}s  {n_act} actions  {n_net} requests{RESET}")
         print(f"agent answer  : {agent_answer[:80]!r}\nexpected      : {expected[:80]!r}")
@@ -279,7 +320,7 @@ async def main_async(args):
         task_id=args.task_id, model=args.model, obs=args.obs,
         native_llm=args.native_llm,
         max_steps=args.max_steps, timeout=args.timeout, headless=not args.no_headless,
-        start_from=args.start_from, port=args.port, out=args.out, verbose=True)
+        start_from=args.start_from, port=args.port, out=args.out, verbose=True, grader=args.grader)
     return 0 if res["passed"] else 1
 
 
@@ -347,6 +388,9 @@ def main():
                          "human trajectory (where start-record was actually clicked; default); "
                          "'starting_url' = the task's starting_url field (often empty/stale).")
     ap.add_argument("--port", type=int, default=8099)
+    ap.add_argument("--grader", choices=["judge", "verifier"], default="judge",
+                    help="judge (default): the flash macro judge decides, the verifier is reported alongside; "
+                         "verifier: the deterministic verifier only (no LLM calls)")
     ap.add_argument("--max-steps", type=int, default=50)
     ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--no-headless", action="store_true", help="show the browser")

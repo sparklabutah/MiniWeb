@@ -1,63 +1,48 @@
-# Project Homepages
+# FlowNet Project Homepage (`project-homepages`)
 
-**Category**: Static / informational
-**Reviewer**: Minh
-**Number of macros**: 10
+An academic project landing page for the FlowNet paper (ICML 2025), in the style
+of nerfies.github.io and other paper homepages. It shows the paper sections,
+team, downloadable resources, news updates, statistics and citation export.
 
-## Data Source
+- URL: `/sites/project-homepages/` (simulated domain `flownet.dev`)
+- Data split: training site
+- Source data: modeled on the Paper2Web benchmark
+  (https://huggingface.co/datasets/FrancisChen1/Paper2Web_bench)
 
-https://huggingface.co/datasets/FrancisChen1/Paper2Web_bench
+## Pages
 
-### Data Format
+| Route | Page |
+|---|---|
+| `/` | Hero (title, authors, venue badge, quick links) with a section-navigation dropdown |
+| `/paper` | Abstract, motivation, method and results |
+| `/section/<section_key>` | One paper section |
+| `/team` | Team member cards |
+| `/resources`, `/resource/<id>` | Resource list with a type dropdown; resource detail and download (`/resource/<id>/download`) |
+| `/updates` | Project news updates |
+| `/stats` | Overview, metrics, team and resources tables |
+| `/search` | Search across project content, ranked by relevance |
+| `/export` | Export citations or project data (BibTeX, APA, JSON, CSV) |
+| `/login` | Sign-in form |
 
-Three JSON files in `data_sources/project-homepages/`:
+JSON endpoints under `/api/` expose the project, team, resources, updates,
+citations, stats, search, semantic search, sections and export.
 
-- **project.json** — Single JSON object with project metadata. Fields: `id`, `title`, `short_title`, `venue`, `year`, `status`, `doi`, `arxiv_id`, `authors` (array of {name, affiliation, email, corresponding, orcid}), `sections` (keyed by: abstract, motivation, method, results, citation, code_link, demo_link — each with title and content/content_summary), `keywords` (array of strings), `date_submitted`, `date_accepted`, `date_published`, `last_updated`.
+## Interactions and macros
 
-- **resources.json** — JSON array of downloadable resources. Each: `id`, `type` (paper_pdf, slides, poster, code_repository, dataset, video, supplementary, blog_post), `title`, `url`, `format`, `size_mb`, `description`, `date_added`, optional `license` and `duration_minutes`.
+- Search project content: `search`
+- Move between Paper, Team, Resources, Updates and Stats, or jump to a section: `navigate_by_route`
+- Export a citation or project data in a chosen format: `export`
+- Read section text, resource details and stats tables: `report_information`
 
-- **users.json** — JSON array of team members. Each: `id`, `root_user_id`, `username`, `full_name`, `email`, `role`, `affiliation`, `department`.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `project-homepages`.
 
-## Real-World Model
+## Data
 
-**Academic project homepages** (e.g., projectpage.github.io, nerfies.github.io, institutional paper landing pages). Key UI elements:
-- Hero section with paper title, authors, venue badge, and quick-access links
-- Paper sections (abstract, motivation, method, results) with in-page or routed navigation
-- Team member cards with profiles
-- Resources/downloads list with type badges
-- Citation display (BibTeX, APA) with copy functionality
-- Search bar for project content
-- Section navigation dropdown in the nav bar
-- Export functionality for citations and project data
-- Statistics page with data in HTML tables
-
-## Target Macros
-
-navigate_by_query, navigate_by_semantic, navigate_by_dropdown, navigate_by_route, search_by_query, extract_by_semantic, extract_by_dropdown, extract_from_table, extract_by_route, export_by_dropdown
-
-### Macro Details
-
-- **navigate_by_query**: Navigate to a page/section via query parameter (e.g., `/?section=team`)
-- **navigate_by_semantic**: Find and navigate to content using semantic/keyword-overlap search (`/api/semantic?q=...`)
-- **navigate_by_dropdown**: Use the section dropdown in the nav bar to jump to a paper section
-- **navigate_by_route**: Click direct links (Paper, Team, Resources, Updates, Stats, section pages)
-- **search_by_query**: Use the search bar to find content across all project data (`/search?q=...`, `/api/search?q=...`)
-- **extract_by_semantic**: Extract information from semantic search results (`/api/semantic?q=...`)
-- **extract_by_dropdown**: Extract resource statistics filtered by type dropdown (`/api/resources/stats?type=...`)
-- **extract_from_table**: Read data from HTML tables on the stats page (overview, metrics, team, resources tables)
-- **extract_by_route**: Get section content via direct API route (`/api/sections/<key>`)
-- **export_by_dropdown**: Export project data by selecting a format from the export dropdown (bibtex, apa, json, csv via `/api/export?format=...`)
-
-## Temporal Dynamics
-
-Not applicable. Project homepages are static publications. No temporal simulation needed.
-
-## Domain-Specific Notes
-
-- This is a single-project homepage, not a multi-paper database
-- All content revolves around one paper (FlowNet: Adaptive Workflow Optimization via RL)
-- Navigation is between sections of the project rather than between papers
-- The site has 7 navigable paper sections: abstract, motivation, method, results, citation, code_link, demo_link
-- Resources span 8 types: paper_pdf, slides, poster, code_repository, dataset, video, supplementary, blog_post
-- Updates are stored in session (mutable) with 4 default entries
-- Team has 2 members (Alex Rivera and Aisha Patel)
+- Tables: `project_homepages_project`, `project_homepages_resources`,
+  `project_homepages_users` (team members).
+- The site is mostly read-only. Login reads `session["user_id"]`, so the global
+  auto-login shows user 1 (Alex Rivera, a FlowNet author) as signed in.
+- Project updates start from a built-in list in `routes.py`. Updates added
+  through `POST /api/updates` are kept in the Flask session, not in the
+  database.
+- Dates (submission, acceptance, updates in 2025) are static.

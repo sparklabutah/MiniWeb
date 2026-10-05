@@ -856,9 +856,13 @@ def create_app():
         entry = {
             "method": request.method,
             "path": request.path,
-            "query": dict(request.args),
+            # repeated keys (checkbox groups: ?env=a&env=b) stay lists, like form bodies below
+            "query": {k: (v if len(v) > 1 else v[0]) for k, v in request.args.to_dict(flat=False).items()},
             "status": response.status_code,
-            "timestamp": __import__("datetime").datetime.now().isoformat(),
+            # UTC, like the recorder's action timestamps: graders place requests in
+            # the trajectory's time window, and a naive local time is hours off on a
+            # non-UTC machine (every request got filtered out of local agent runs)
+            "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         }
         # Creation redirects carry the new resource ID; retain them so verifiers
         # can bind later edits/shares to that resource rather than a fixture ID.
@@ -914,6 +918,26 @@ def create_app():
         if len(_request_logs[sid]) > 500:
             _request_logs[sid] = _request_logs[sid][-500:]
         return response
+
+    @app.route("/_admin/session-flags")
+    def _admin_session_flags():
+        """Set privileged flags on the CALLER's session (datagen setup, never a training action):
+        ?disable_2fa=1 (payments execute without the 2FA page), ?logout=1 (start logged out)."""
+        from flask import jsonify
+        db._get_session_id()     # a stable session id now: a logged-out page that reads no data would log under none
+        if request.args.get("disable_2fa") == "1":
+            session["_disable_2fa"] = True
+        if request.args.get("logout") == "1":
+            for k in [k for k in session.keys() if k.endswith("user_id") or k in ("user", "username", "logged_in")]:
+                session.pop(k, None)
+            session["_no_autologin"] = True
+        return jsonify({"flags": {k: session.get(k) for k in ("_disable_2fa", "_no_autologin")}})
+
+    @app.route("/_admin/changes")
+    def _admin_changes():
+        """This session's effective data changes vs the base tables (privileged; datagen checks)."""
+        from flask import jsonify
+        return jsonify({"changes": db.session_changes(site=request.args.get("site") or None)})
 
     @app.route("/_admin/data/<site_id>/<collection>")
     def _admin_data(site_id, collection):

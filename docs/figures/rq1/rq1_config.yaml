@@ -1,0 +1,83 @@
+# RQ1 figure (make_rq1_bars.py): which agents to show and where their results come from.
+# Add, remove or reorder entries under `models` to change the figure; nothing else needs editing.
+#
+# Per model:
+#   label   name in the legend
+#   judge   per-instance macro-judge verdicts of the run over the 376 tasks (written by webmix.judge_runs),
+#           path relative to the repo root
+#   logo    legend icon, relative to the repo root (docs/figures/logos/)
+#   color   bar color (optional: the next unused slot of the validated default palette)
+#   style   solid (default) or hatched, e.g. for a diagnostic run that should recede
+#   note    optional second legend line before the task success rate
+
+out: docs/figures/rq1/rq1_bars                # output path, without extension (.pdf and .png are written)
+primitives: well_covered                      # count instances of well-covered primitives only (common/results.py)
+min_op_instances: 15                          # reasoning operations with fewer instances count as rare
+rare_ops: drop                                # drop rare operations, or pool them into one "other" group
+sort: weakest_first                           # weakest_first (by the mean of solid entries) or fixed
+annotate: true                                # label the weakest family and whether reasoning moves with scale
+
+models:
+  - label: Qwen3.5-4B
+    judge: data/webmix/eval/rq1_qwen35_4b_all/judge.jsonl
+    logo: docs/figures/logos/qwen.png
+    color: "#5B93D9"
+  - label: Qwen3.5-9B
+    judge: data/webmix/eval/rq1_qwen35_9b_all/judge.jsonl
+    logo: docs/figures/logos/qwen.png
+    color: "#23508F"
+  - label: Fara1.5-4B
+    judge: data/webmix/eval/rq1_fara15_4b_all/judge.jsonl
+    logo: docs/figures/logos/microsoft.png
+    color: "#D08A0C"
+  - label: Qwen3-VL-8B
+    judge: data/webmix/eval/rq1_qwen3vl-8b_all/judge.jsonl
+    logo: docs/figures/logos/qwen.png
+    color: "#2A9D8F"                       # teal: the default next slot was too close to Fara1.5's ochre
+  - label: InternVL3.5-8B
+    judge: data/webmix/eval/rq1_internvl35-8b_all/judge.jsonl
+    logo: docs/figures/logos/internvl.png
+    color: "#B5838D"
+  - label: MolmoWeb-4B
+    judge: data/webmix/eval/rq1_molmoweb-4b_all/judge.jsonl
+    logo: docs/figures/logos/ai2.png
+    color: "#6A4C93"
+  - label: UI-TARS-1.5-7B
+    judge: data/webmix/eval/rq1_uitars15-7b_all/judge.jsonl
+    logo: docs/figures/logos/bytedance.png
+    color: "#E76F51"
+  - label: Fara-7B
+    judge: data/webmix/eval/rq1_fara-7b_all/judge.jsonl
+    logo: docs/figures/logos/microsoft.png
+    color: "#E9C46A"
+  - label: OpenCUA-7B
+    judge: data/webmix/eval/rq1_opencua-7b_all/judge.jsonl
+    logo: docs/figures/logos/xlang.png
+    color: "#8AB17D"
+  - label: MolmoWeb-8B
+    judge: data/webmix/eval/rq1_molmoweb-8b_all/judge.jsonl
+    logo: docs/figures/logos/ai2.png
+    color: "#A98BD1"
+  # Qwen2.5-VL-7B (data/webmix/eval/rq1_qwen25vl-7b_all, judged): omitted (user 2026-10-04: an older model known to be
+  # weak; 11.7% task success, loops to the step limit in 154 of 376 episodes)
+  # - label: Fara1.5-4B
+  #   note: our harness
+  #   judge: data/webmix/eval/rq1_fara15_4b_ourharness_all/judge.jsonl
+  #   logo: docs/figures/logos/microsoft.png
+  #   color: "#D08A0C"
+  #   style: hatched
+
+# RQ1 table (make_rq1_table.py, 2026-10-04: the paper shows RQ1 as a benchmark-style table instead of the bars).
+# Rows come from `models` above by label, in these groups; size is the parameter count shown in the table.
+table:
+  out: docs/paper/CVPR/tables/rq1_table.tex
+  label: tab:rq1
+  groups:
+    - name: General VLMs, browser-use harness
+      models: [Qwen3.5-4B, Qwen3.5-9B, Qwen3-VL-8B, InternVL3.5-8B]
+    - name: Web and computer-use agents, own agent loop
+      models: [Fara1.5-4B, Fara-7B, MolmoWeb-4B, MolmoWeb-8B, UI-TARS-1.5-7B, OpenCUA-7B]
+  sizes: {Qwen3.5-4B: 4B, Qwen3.5-9B: 9B, Qwen3-VL-8B: 8B, InternVL3.5-8B: 8B, Fara1.5-4B: 4B, Fara-7B: 7B,
+          MolmoWeb-4B: 4B, MolmoWeb-8B: 8B, UI-TARS-1.5-7B: 7B, OpenCUA-7B: 7B}
+  families: [Navigation, Text entry, Discrete selection, Form transaction, Out-of-page I/O, Drag & gesture, Reasoning base]
+  ops: [read, verify, extremum, count]

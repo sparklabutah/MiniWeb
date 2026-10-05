@@ -1,23 +1,44 @@
-# Rating / review
+# LakeReview (`rating-review`)
 
-**Category**: Social media
-**Reviewer**: Reaz
-**Number of macros**: 24
+A Yelp-style review site for local businesses in the fictional town of
+Lakeport, WA. Users browse and filter businesses, read and write star-rated
+reviews, vote on reviews, follow reviewers and save businesses.
 
-## Data Source
+- URL: `/sites/rating-review/` (simulated domain `ratespot.com`)
+- Data split: held-out (test) site
 
-data_sources/rating-review/ (businesses.json, reviews.json, photos.json, users.json)
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Home: search bar and featured businesses |
+| `/businesses` | Business list: search, category, price and minimum-rating filters, sort links (Rating, Most Reviewed, Name), Save toggles |
+| `/business/<id>` | Business detail: address, hours, photos, reviews with Useful/Funny/Cool votes, Follow buttons and owner responses |
+| `/write-review/<id>` | Review form with star rating and text |
+| `/my-reviews` | Your reviews with Edit and Delete |
+| `/photos` | Photo gallery |
+| `/login` | Sign-in form |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_query, filter_by_dropdown, filter_by_slider, sort_by_dropdown, sort_by_slider, extract_by_query, extract_by_route, extract_by_ranking, extract_by_slider, compute_by_dropdown, compare_by_slider, edit_by_form, delete_from_table, select_by_slider, post_from_free_text, react_by_toggle, rate_by_slider, follow_by_toggle, save_by_toggle, report_by_form
+JSON endpoints under `/api/` cover businesses, reviews (helpful votes, owner
+responses, ratings), photos, search, compare, compute, follows and saves.
 
-## Site Description
+## Interactions and macros
 
-A Yelp-style local business review platform for the fictional town of Lakeport, WA. Users browse 25 local businesses, read/write reviews with star ratings, upload photos, and interact socially.
+- Search businesses: `search`
+- Filter by category or minimum rating: `filter_by_dropdown`
+- Write a review: `create_by_form`
+- Edit or delete your review: `edit_by_form`, `delete_from_table`
+- Vote a review Useful, Funny or Cool: `feedback_by_react`
+- Follow a reviewer or save a business: `toggle_relationship`
+- Open a business from the list or the top nav: `navigate_by_route`
+- Read ratings, reviews and business details: `report_information`
 
-- **Domain**: Social media / rating & review
-- **Data**: 25 businesses, 8 users, ~40 reviews, ~20 photos across multiple categories (Restaurants, Shopping, Health & Fitness, etc.)
-- **Real-world model**: Yelp
-- **Temporal**: No temporal simulation needed; content is static user-generated
-- **Auth**: Users log in by username; default user is alex_r (id=1, root_user_id=1)
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `rating-review`.
+
+## Data
+
+- Tables: `rating_review_businesses`, `rating_review_reviews`,
+  `rating_review_photos`, `rating_review_users`.
+- Login uses `session["user_id"]`, so the global auto-login signs in user 1
+  (`alex_r`). The login form accepts a known username with an empty password.
+- Logging in emits `signup` (password-vault entry and welcome email).

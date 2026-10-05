@@ -1,56 +1,55 @@
-# Health Portals
+# Lakeport Medical Center Patient Portal (`health-portals`)
 
-**Category**: Health
-**Reviewer**: Farhan
-**Number of macros**: 26
+A MyChart-style patient portal for Lakeport Medical Center. Patients manage
+appointments, read medical records (vitals, labs, diagnoses), message their
+care team, request prescription refills, pay bills and e-sign consent forms.
 
-## Data Source
+- URL: `/sites/health-portals/` (simulated domain `lakeportmedical.org`)
+- Data split: training site
 
-Synthetic patient portal data modeled after Epic MyChart.
+## Pages
 
-## Target Macros
+| Route | Page |
+|---|---|
+| `/` | Dashboard, including "forms awaiting signature" notices |
+| `/appointments`, `/appointment/<id>` | Appointments (status, provider, department, From/To filters) and detail |
+| `/schedule` | Schedule an appointment (provider, type, date, time) |
+| `/appointment/<id>/cancel` | Cancellation form with reason |
+| `/records`, `/record/<id>` | Medical records with keyword and "Smart Search"; record detail with vitals and labs |
+| `/messages`, `/message/<id>`, `/compose` | Inbox, thread view, and "Send Message" with a document upload |
+| `/prescriptions` | Prescriptions with "Request Refill" |
+| `/billing`, `/billing/<id>/pay` | Billing table with CSV/JSON export; card payment form |
+| `/forms/<form_id>/sign` | Consent form with Draw / Type signature tabs |
+| `/register`, `/verify`, `/login` | Registration, 6-digit code verification, sign-in |
 
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, search_by_checkbox, filter_by_radio, filter_by_date_range, extract_by_query, extract_by_dropdown, extract_from_table, extract_by_route, compare_by_date_range, submit_by_query, submit_by_route, edit_by_form, export_by_dropdown, upload_by_upload, message_from_free_text, submit_by_form, book_by_form, book_by_date_range, pay_by_form, cancel_by_form, authenticate_by_form, register_by_form, verify_identity_by_code
+JSON endpoints under `/api/` mirror these (appointments, records, messages, prescriptions, billing, search, export, documents, users).
 
-## Site Description
+## Interactions and macros
 
-Lakeport Medical Center Patient Portal is a MyChart-style health portal where patients can manage appointments, view medical records, send messages to providers, track prescriptions, and handle billing.
+- Search records by keyword or natural language: `search`
+- Filter appointments by date: `filter_by_date_range`
+- Open appointments, records and messages: `navigate_by_route`
+- Schedule an appointment: `book_by_form`, `create_by_form`
+- Register or request a refill: `create_by_form`
+- Cancel an appointment: `cancel_by_form`
+- Message the care team and attach a document: `message_from_free_text`, `upload_file`
+- Pay a bill; export billing: `pay_by_form`, `export`
+- Sign a consent form by drawing or typing: `sign_by_freeformdrawing`, `sign_by_text`
+- Sign in: `authenticate_by_form`
+- Read appointments, records, lab results and bills: `report_information`
 
-### Data files in data/
-- **users.json** -- Patient and provider profiles (insurance, emergency contacts, allergies)
-- **appointments.json** -- Appointment records with status, provider, location
-- **medical_records.json** -- Visit records with vitals, lab results, diagnoses
-- **messages.json** -- Threaded patient-provider messages
-- **prescriptions.json** -- Medication prescriptions with refill tracking
-- **billing.json** -- Insurance claims and patient billing
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `health-portals`.
 
-### How macros map to UI
-- **navigate_by_dropdown**: Provider/department dropdown in appointment scheduling
-- **navigate_by_route**: Click appointment/record/message to view detail
-- **search_by_query**: Search medical records and messages
-- **search_by_semantic**: Keyword-relevance search on medical records
-- **search_by_checkbox**: Filter records by type checkboxes
-- **filter_by_radio**: Filter appointments by status radio buttons
-- **filter_by_date_range**: Filter appointments/records by date range
-- **extract_by_query**: Search records and extract specific info
-- **extract_by_dropdown**: Get department-specific appointment stats
-- **extract_from_table**: View billing summary table
-- **extract_by_route**: View specific record/appointment detail
-- **compare_by_date_range**: Compare health metrics across periods
-- **submit_by_query**: Search for provider and submit appointment request
-- **submit_by_route**: Submit prescription refill request
-- **edit_by_form**: Edit appointment details or profile info
-- **export_by_dropdown**: Export records/billing as CSV or JSON
-- **upload_by_upload**: Upload medical documents
-- **message_from_free_text**: Compose and send message to provider
-- **submit_by_form**: Submit appointment scheduling form
-- **book_by_form**: Book new appointment with provider
-- **book_by_date_range**: Book appointment with date range selection
-- **pay_by_form**: Pay medical bill online
-- **cancel_by_form**: Cancel appointment with reason
-- **authenticate_by_form**: Log in with username/password
-- **register_by_form**: Create new patient account
-- **verify_identity_by_code**: Verify account with 6-digit code
+## Data
 
-### Temporal dynamics
-Appointment dates are fixed historical/future dates. No real-time simulation required.
+- Tables: `health_portals_users`, `health_portals_appointments`,
+  `health_portals_medical_records`, `health_portals_messages`,
+  `health_portals_prescriptions`, `health_portals_billing`.
+- Auth (`helpers.auth`) checks `session["health_user_id"]` first, then the
+  shared `user_id`, so the global auto-login signs in user 1. Logged-out
+  visitors browse as user 1.
+- Bill payment validates the card with `app/bank_charges.charge_card` and emits
+  `payment` (banking debit). Scheduling adds a calendar event and email
+  (`on_booking`). Registration emits `signup`.
+- The registration code is generated in memory and shown on `/verify`; it is
+  not emailed.

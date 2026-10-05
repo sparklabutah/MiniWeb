@@ -1,61 +1,52 @@
-# Video
+# StreamHub (`video`)
 
-**Category**: Streaming & media
-**Reviewer**: Reaz
-**Number of macros**: 25
+A YouTube-style video sharing platform. Users browse trending and latest
+videos, search, filter by upload date, watch videos in the shared mini-player,
+like, comment, save, share and report videos, subscribe to or follow channels,
+manage playlists and upload new videos.
 
-## Data Source
+- URL: `/sites/video/` (simulated domain `streamtube.tv`)
+- Data split: training site
 
-Synthesized dataset of 30 videos across 9 channels/users with 50 comments, 10 playlists, and 18 watch history entries.
+## Pages
 
-Files in `data_sources/video/`:
-- `videos.json` -- 30 video records
-- `comments.json` -- 50 comment records (threaded via parent_comment_id)
-- `users.json` -- 9 user/channel records
-- `playlists.json` -- 10 playlists with video items
-- `watch_history.json` -- 18 watch history entries
+| Route | Page |
+|---|---|
+| `/` | Video grid with sort chips (Trending, Latest, Popular, Most Liked), category chips, "Uploaded from/to" dates and "Play Newest in Range" |
+| `/search` | Search results |
+| `/watch/<id>` | Player (play reveals exact duration, quality and chapters), like / dislike, save, share, report, comments |
+| `/channel/<id>` | Channel videos with Subscribe and Follow |
+| `/playlists`, `/playlist/<id>` | Playlists and playlist detail |
+| `/history` | Watch history |
+| `/upload` | Upload form: file, title, description, category, visibility |
+| `/settings` | Default quality, playback speed, autoplay and notifications |
+| `/login` | Sign-in form |
 
-Additionally, `ratings.json` and `reports.json` are created dynamically when users rate or report videos.
+JSON endpoints under `/api/` cover videos, likes, ratings, play/seek/playback, comments, channels, playlists, history, search and settings.
 
-### Data Format
+## Interactions and macros
 
-**videos.json**: Array of objects with fields: id, title, channel_id, user_id, description, duration_seconds, views, likes, dislikes, upload_date, category, tags, thumbnail_url, video_url, status.
+- Search videos: `search`
+- Sort the home grid; filter by upload date: `sort_by_form`, `filter_by_date_range`
+- Open videos, channels and playlists: `navigate_by_route`
+- Play a video: `play_by_playback`
+- Like a video: `feedback_by_react`
+- Comment on a video: `create_by_form`
+- Upload a video, choosing category and visibility: `upload_file`, `create_by_form`, `filter_by_dropdown`
+- Subscribe to or follow a channel, save a video: `toggle_relationship`
+- Share a video to a platform: `share_by_form`
+- Change playback settings: `configure_by_form`
+- Read search results; sign in: `report_information`, `authenticate_by_form`
 
-**comments.json**: Array of objects: id, video_id, user_id, username, display_name, text, timestamp, likes, parent_comment_id.
+The per-macro UI locations are listed in `data/macro_locations.yaml` under `video`.
 
-**users.json**: Array of objects: id, root_user_id, username, display_name, channel_name, email, avatar_url, subscriber_count, videos_count, joined_date, about, links, is_verified.
+## Data
 
-**playlists.json**: Array of objects: id, user_id, username, title, description, visibility, created_date, updated_date, items (array of {video_id, added_date, position}).
-
-**watch_history.json**: Array of objects: id, user_id, video_id, video_title, channel_name, watched_at, progress_percent, duration_seconds.
-
-## Real-World Model
-
-**YouTube** -- the dominant video sharing platform. Key UI elements:
-- Homepage with trending/recent video grid
-- Video player page with comments, like/dislike, share, save, report
-- Channel pages with subscriber counts and video listings
-- Search with filters (category, duration, date, sort)
-- Playlists (public and private)
-- Watch history
-- User settings/preferences (autoplay, quality, playback speed)
-- Login/authentication
-
-## Target Macros
-
-navigate_by_dropdown, navigate_by_route, search_by_query, search_by_semantic, filter_by_dropdown, filter_by_slider, filter_by_date_range, sort_by_ranking, extract_by_query, submit_by_route, upload_by_upload, select_by_dropdown, configure_by_route, play_by_slider, play_by_date_range, play_by_playback, post_from_free_text, react_by_toggle, rate_by_slider, follow_by_toggle, subscribe_by_toggle, share_by_dropdown, save_by_toggle, report_by_form, authenticate_by_form
-
-## Temporal Dynamics
-
-Not applicable -- video platform data is event-driven (uploads, comments, views) rather than time-varying. No temporal simulation needed. Data is a static snapshot of video metadata and user interactions.
-
-## Domain-Specific Notes
-
-- Semantic search: multi-word keyword overlap scoring over titles, descriptions, tags, and channel names
-- Categories: Travel & Outdoors, Education, Gaming, Food & Cooking, Sports, Science & Technology, Entertainment, Pets & Animals
-- Video durations range from ~600s to ~2500s
-- Authentication uses username/password matching against user records (password defaults to username if not set)
-- Ratings are 1-5 stars, stored in a separate ratings.json
-- Reports use predefined reason categories: spam, harassment, misinformation, copyright, inappropriate, violence, other
-- Share supports platforms: link, twitter, facebook, reddit, email, embed
-- Playback settings: speed (0.25x-2.0x), quality (144p-2160p)
+- Tables: `video_videos`, `video_comments`, `video_playlists`,
+  `video_watch_history`, `video_users`.
+- Login uses the shared `session["user_id"]`, so the global auto-login signs in
+  user 1. Logging in emits `signup` (password-vault entry + email).
+- Ratings and reports are saved to `ratings` and `reports` collections that have
+  no base table, so `db.query` cannot read them back. Graders see those writes
+  only in the request log. Clicking "Report" also posts a placeholder report
+  (reason `other`) as it opens the report form.
