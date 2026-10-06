@@ -6,7 +6,7 @@ links read from the site code: an event a site emits and the hub whose handler r
 WebMail) and the share button (every page -> ForumHub, PixShare, QuickChat) are noted, not drawn. Blue links are the site
 sets of the cross-site human tasks (data/annotations).
 Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)"). (b) shows the supplement's
-screenshots of six sites from six domains.
+screenshots of six visually distinct sites.
 (c) Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
 """
 import glob, json, math, os, re, sys
@@ -250,8 +250,10 @@ A.text(1.35, ly, "cross-site task", fontsize=5.3, color=INK, va="center")
 #        fontsize=4.9, color=MUTED, va="center", style="italic")
 
 # ── (b) a gallery of visually distinct sites (user, 2026-10-06: replaces the list of all sites by domain) ──────────
-# Six domains, two held-out sites; the screenshots are the supplement's gallery (docs/figures/supp/figures/sites).
-GALLERY = ["map-services", "calendar-todo", "e-commerce", "health-fitness-tracking", "music", "weather"]
+# The user's picks (2026-10-06: sports, cloud, spreadsheet, design) and two held-out sites; the screenshots are the
+# supplement's gallery (docs/figures/supp/figures/sites).
+GALLERY = ["design-creative", "sports-esports", "spreadsheets-slides",
+           "cloud-storage-file-transfer", "crowdfunding-donations", "rating-review"]
 DOMAIN_OF = {s: short for _, short, ss in DOMAINS for s in ss}   # the ring's short domain labels
 from PIL import Image
 bx0, bx1 = 3.12, W - 0.03
