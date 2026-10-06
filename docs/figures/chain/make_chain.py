@@ -27,6 +27,21 @@ def binned(outcomes, length, bins):
     return by
 
 
+def ten_agents(cfg, length):
+    """Panel (a): each untrained agent's VLM-judge success by primitives per task, their mean, and the independent-
+    primitives prediction p^n (p: the mean success on one-primitive tasks), per bin of cfg['bins_a']."""
+    ba = cfg["bins_a"]
+    agents = []
+    for m in yaml.safe_load(open(os.path.join(ROOT, cfg["agents_from"])))["models"]:
+        rs = [json.loads(l) for l in open(os.path.join(ROOT, m["judge"])) if l.strip()]
+        by = binned([(r["task_id"], float(bool(r["passed"]))) for r in rs if r["task_id"] in length], length, ba)
+        agents.append((m["label"], [100 * st.mean(by[k]) for k in ba]))
+    mean = [st.mean(v[i] for _, v in agents) for i in range(len(ba))]
+    p = mean[0] / 100                                    # independent primitives: a task succeeds with p^n
+    indep = [100 * st.mean(p ** n for n in length.values() if min(n, ba[-1]) == k) for k in ba]
+    return agents, mean, indep
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=os.path.join(HERE, "chain_config.yaml"))
@@ -35,15 +50,8 @@ def main():
     ba, bb = cfg["bins_a"], cfg["bins_b"]
 
     # (a) the ten untrained agents
-    agents = []
-    for m in yaml.safe_load(open(os.path.join(ROOT, cfg["agents_from"])))["models"]:
-        rs = [json.loads(l) for l in open(os.path.join(ROOT, m["judge"])) if l.strip()]
-        by = binned([(r["task_id"], float(bool(r["passed"]))) for r in rs if r["task_id"] in length], length, ba)
-        agents.append((m["label"], [100 * st.mean(by[k]) for k in ba]))
-    mean = [st.mean(v[i] for _, v in agents) for i in range(len(ba))]
-    p = mean[0] / 100                                    # independent primitives: a task succeeds with p^n
+    agents, mean, indep = ten_agents(cfg, length)
     n_a = collections.Counter(min(n, ba[-1]) for n in length.values())
-    indep = [100 * st.mean(p ** n for n in length.values() if min(n, ba[-1]) == k) for k in ba]
 
     # (b) the four arms on the held-out tasks
     runs = yaml.safe_load(open(os.path.join(ROOT, "docs", "figures", "tables", "tables_config.yaml")))["runs"]

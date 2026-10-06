@@ -96,6 +96,13 @@ def main():
     print("wrote", out)
     for a in arms:
         print(f"  {a['label']:36s}", {k: [round(x, 1) for x in v] for k, v in a["rates"].items()})
+    # per family, untrained -> trained (the caption's gap closure: the share of the distance to 100% that training closes)
+    u, t = fa[0], fa[-1]
+    for f in fams:
+        bu = 100 * u["fam"][f][0] / u["fam"][f][1]
+        bt = 100 * t["fam"][f][0] / t["fam"][f][1]
+        print(f"  {f:20s} {bu:5.1f} -> {bt:5.1f}  gain {bt - bu:+5.1f}  closes {100 * (bt - bu) / (100 - bu):5.1f}% of the gap"
+              f"  (n {u['fam'][f][1]})")
 
 
 if __name__ == "__main__":

@@ -268,8 +268,11 @@ def conditional_profiles():
 
 # ── 7. p^n ─────────────────────────────────────────────────────────────────────
 def compounding():
-    mean = [60.6, 37.3, 21.1, 12.1, 4.4]          # Fig. 6 left (chain/make_chain.py), printed there
-    indep = [60.6, 36.7, 22.2, 13.4, 7.1]
+    sys.path.insert(0, os.path.join(ROOT, "docs", "figures", "chain"))
+    from make_chain import HERE as CHAIN, ten_agents                 # Fig. 6 left
+    cfg = yaml.safe_load(open(os.path.join(CHAIN, "chain_config.yaml")))
+    _, mean, indep = ten_agents(cfg, {t["task_id"]: len(t["macros"]) for t in human_tasks()})
+    mean, indep = [round(v, 1) for v in mean], [round(v, 1) for v in indep]
     dev = [round(a - b, 1) for a, b in zip(mean, indep)]
     OUT["pn"] = {"mean": mean, "indep": indep, "dev": dev, "max_abs_dev": max(abs(x) for x in dev)}
     print("\n== 7. observed mean vs p^n by chain length 1..5+:", mean, indep, "dev", dev)
@@ -277,7 +280,7 @@ def compounding():
 
 # ── 8. drag & gesture training data: does it drag? ─────────────────────────────
 def drag_modality():
-    ids = set(open(os.path.join(ROOT, "data", "webmix", "review_round1", "v4set_plain_ids.txt")).read().split())
+    ids = set(open(os.path.join(ROOT, "experiments", "pools", "pool3k_plain_ids.txt")).read().split())
     c = collections.defaultdict(collections.Counter)
     for tid in ids:
         hits = glob.glob(os.path.join(ROOT, "data", "datagen", "runs", "*", "accepted", tid, "trajectory.json"))

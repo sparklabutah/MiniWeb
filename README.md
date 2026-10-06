@@ -3,41 +3,41 @@
 MiniWeb is a set of **65 synthetic websites** (banking, email, forums, shopping, maps, code
 editors, and more) served by one Flask app, built to diagnose and train web agents by skill.
 
-- **Skill-level grading.** Every human-annotated task is tagged with **macros**: reusable
-  interaction skills such as `filter_by_slider`, `create_by_form` or `report_information`.
-  Each task has a deterministic verifier with one check tree per macro, so a run reports which
-  skills an agent has, not just a single pass rate.
-- **Verifiable synthetic training data.** `datagen/` generates training trajectories per macro
-  on the training sites. A trajectory is kept only if the backend shows the intended change.
-- **WebMix**, an agent trained on that data. A browser-use planner hands each step to a
-  LoRA specialist for one skill family, all on Qwen3.5-4B. It improves on the untrained model
-  on MiniWeb's held-out sites and on real websites (see [Results](#results)).
+- **Skill-level grading.** Every human-annotated task is tagged with **primitives** (called macros in the code):
+  reusable interaction skills such as `filter_by_slider`, `create_by_form` or `report_information`. Each task has a
+  deterministic verifier with one check tree per primitive, so a run reports which skills an agent has, not just a
+  single pass rate.
+- **MiniWebGen** (`datagen/`): verifiable single-primitive training trajectories, generated on the training sites. A
+  trajectory is kept only if the backend shows the intended change.
+- **MiniWebAgent** (`webmix/`): an untrained Qwen3.5-4B planner that hands each primitive-level step to one LoRA
+  executor trained on MiniWebGen's trajectories (see [Results](#results)).
 
 | | |
 |---|---|
 | Sites | 65 (`sites/<site>/`): 52 training sites, 13 held-out sites (`data/datagen/site_split.json`) |
 | Human tasks | 376 (`data/annotations/<annotator>/<site>_<hash>/`): 63 on held-out sites (the test set), 310 on training sites only (development). The other 3 start on a training site but also use a held-out site, so neither split uses them. |
-| Macros | 46 base macros in 10 groups + 7 reasoning operations (`data/macros.yaml`) |
-| Grading | per-task verifiers (`evaluation/verifiers.py`) and an LLM macro judge (`evaluation/macro_judge.py`) |
-| Training data | verified datagen trajectories replayed into 27.6K training steps (`data/webmix/replay_v4/`) |
+| Primitives | 37 well-covered primitives in 7 skill families (`data/final_set.yaml`), from 46 base macros + 7 reasoning operations (`data/macros.yaml`) |
+| Grading | per-task verifiers (`evaluation/verifiers.py`) and a VLM primitive judge (`evaluation/macro_judge.py`) |
+| Training data | 3,128 generated trajectories replayed into 27.6K training steps (`experiments/pools/`) |
 
 ## Results
 
-The WebMix agent (planner + v5 specialists) against the untrained Qwen3.5-4B, both in the same
-browser-use harness. Success rate in %:
+One Qwen3.5-4B in the same browser-use harness, as a single agent or as MiniWebAgent's planner, with the executor
+untrained or trained on the 27.6K generated steps. Task success in %:
 
-| Benchmark | Tasks | Runs | Qwen3.5-4B | WebMix |
-|---|---|---|---|---|
-| MiniWeb held-out | 63 | 3 | 37.0 | **51.3** |
-| WebArena-Lite-v2 | 154 | 3 | 27.1 | **34.2** (paired permutation p = 0.019) |
-| WebVoyager | 536, normalized | 1 | 45.5 | **69.2** |
-| Online-Mind2Web | 280, normalized | 1 | 17.9 | **26.1** |
+| Benchmark | Tasks | Runs | Single, untrained | Single, trained | Planner, untrained | **MiniWebAgent** |
+|---|---|---|---|---|---|---|
+| MiniWeb single primitives (held-out sites) | 103 | 3 | 55.3 | 80.3 | 54.0 | 71.5 |
+| MiniWeb held-out tasks | 63 | 3 | 37.0 | 37.0 | 42.3 | **54.5** |
+| WebArena-Lite | 154 | 3 | 27.1 | 20.3 | 30.7 | **36.4** |
+| WebVoyager | 536, normalized | 1 | 45.5 | 32.8 | 59.9 | **65.5** |
+| Online-Mind2Web | 280, normalized | 1 | 17.9 | 8.6 | 21.8 | **33.9** |
 
-"Normalized" leaves out impossible and outdated tasks and sites that block our network. For
-comparison, the published scores on WebVoyager / Online-Mind2Web are Fara-7B 73.5 / 34.1 and
-MolmoWeb-4B 75.2 / 31.3. Those agents trained on 36–80× more steps, but they report under
-their own protocols. [docs/RESEARCH.md](docs/RESEARCH.md) gives the protocols, the research
-questions and the paper plan.
+Practice raises single primitives, but alone it does not raise task success: the trained single agent learns to stop
+after one primitive. With the planner, the trained executor adds to what planning alone achieves. "Normalized" leaves
+out impossible and outdated tasks and sites that block our network. Every number, figure and table of the paper
+regenerates with [`python reproduce.py`](experiments/README.md); [docs/RESEARCH.md](docs/RESEARCH.md) gives the
+protocols and research questions.
 
 ## Quickstart
 
@@ -133,36 +133,20 @@ browser can reach localhost only, and each task starts in a fresh session. See
 [evaluation/README.md](evaluation/README.md) and
 [docs/VERIFIER_DESIGN.md](docs/VERIFIER_DESIGN.md).
 
-### 6. Generate training data and train/evaluate WebMix
+### 6. Reproduce the paper (MiniWebGen, MiniWebAgent, figures)
 
 ```bash
-# datagen: verified trajectories per macro on the training sites (starts its own servers on 8300-8320)
-python -m datagen.pipeline run --run-id myrun --target 50 --no-judge
-
-# replay kept trajectories through the browser-use harness -> training rows (data/webmix/replay_v4/);
-# --memory-model writes each step's memory and needs the base model served (webmix/serve.sh, below)
-python -m webmix replay --workers 6 --ports 8310,8311 --memory-model qwen35-4b
-python -m webmix replay --augment recovery          # optional augmentations: recovery | chain
-
-# train a LoRA adapter (webmix env: torch, transformers, peft, vllm)
-~/.conda/envs/webmix/bin/python -m webmix.train --adapter pooled --rank 64 --alpha 128 --epochs 1 --beta 0 \
-    --out data/webmix/adapters/pooled_v4
-
-# serve Qwen3.5-4B + adapters with vLLM on port 8400 (keeps running; use a second shell), then evaluate
-M=$PWD/data/webmix/adapters
-MAX_LORA_RANK=64 MAX_LORAS=6 LORA_MODULES="drag=$M/drag_v5b io=$M/io_v5b select=$M/select_v5b rest=$M/rest_v5b reasoning=$M/reasoning_v4 pooled_v4=$M/pooled_v4" \
-    bash webmix/serve.sh
-AG="--agent-version v6 --timeout 2400 --planner-name qwen35-4b --adapters drag,io,select,rest,reasoning --fallback pooled_v4"
-python -m webmix.evaluate --human --verifier-only --arm agent_planner $AG --out data/webmix/eval/heldout_agent
-python -m webmix.evaluate --human --verifier-only --arm base --out data/webmix/eval/heldout_base
-python -m webmix.wa --router planner_agent $AG --split all --out data/webmix/wa/agent   # needs the WebArena-Lite-v2 instances
-python -m webmix.om2w --arm agent --bench webvoyager --max-steps 100 --planner-turns 60 --timeout 7200 \
-    --tasks data/webmix/webvoyager/WebVoyager_reduced_536.jsonl --out data/webmix/om2w/runs/wv_agent       # live web
-python -m webmix.om2w_judge data/webmix/om2w/runs/wv_agent --bench webvoyager
+python reproduce.py status                  # every run, RQ1 run and adapter the paper reads: present and complete?
+python reproduce.py show planner_pooled     # MiniWebAgent: model server, run and grading commands per benchmark
+python reproduce.py show rq1                # the ten untrained agents of Table 2
+python reproduce.py train pooled_v4         # the executor: training folder from its id list + the torchrun line
+python reproduce.py figures                 # regenerate every figure and table into the paper source
 ```
 
-Each of these modules documents its flags in its own docstring and `--help`. See
-[datagen/README.md](datagen/README.md) and [webmix/README.md](webmix/README.md).
+[experiments/README.md](experiments/README.md) explains the registry (`experiments/paper.yaml`), the training-set id
+lists, the cluster and WebArena scripts, the exact environments (`experiments/envs/`) and the grading. Each module
+documents its flags in its docstring and `--help`; see [datagen/README.md](datagen/README.md) and
+[webmix/README.md](webmix/README.md).
 
 ### 7. Tests
 

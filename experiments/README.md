@@ -31,6 +31,18 @@
 - **WebArena-Lite.** `experiments/webarena/ready.sh` resets the four instances and waits until every site serves
   (`WA_RESET_TOKEN`, `WA_HOST`).
 
+## Environments
+
+`experiments/envs/` pins the three environments the paper's runs used (`pip list --format=freeze`):
+
+- `miniweb.txt` (Python 3.11): the app, annotation tool, MiniWebGen, the browser-use harness, grading, figures.
+  Playwright 1.44 with Chromium build 1117.
+- `webmix.txt` (Python 3.12): vLLM 0.30 serving (`webmix/serve.sh`) and LoRA training (torch 2.13, transformers
+  5.17, peft 0.21).
+- `fara.txt` (Python 3.11): Fara1.5-4B's released loop (`microsoft/fara` at a675d6d).
+
+The repo's `requirements.txt` is the minimal install for running the app; these files are what produced the numbers.
+
 ## Grading
 
 - MiniWeb: the task verifiers (`evaluation/verifiers.py`); their answer checks fall back to Gemini 3.5 Flash-Lite
