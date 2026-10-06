@@ -1,4 +1,4 @@
-"""Websites figure (double column): (a) the site graph, (b) six visually distinct sites, (c) the data mix.
+"""Websites figure (double column): (a) the site graph, (b) all 65 sites as a collage, (c) the data mix.
 
 (a) The ring holds the 59 non-hub sites, grouped by domain; the centre holds the six hub sites. Gray edges are event-bus
 links read from the site code: an event a site emits and the hub whose handler records it (app/handlers), plus 2FA codes
@@ -6,7 +6,7 @@ links read from the site code: an event a site emits and the hub whose handler r
 WebMail) and the share button (every page -> ForumHub, PixShare, QuickChat) are noted, not drawn. Blue links are the site
 sets of the cross-site human tasks (data/annotations).
 Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)"). (b) shows the supplement's
-screenshots of six visually distinct sites.
+screenshots of all 65 sites.
 (c) Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
 """
 import glob, json, math, os, re, sys
@@ -249,36 +249,39 @@ A.text(1.35, ly, "cross-site task", fontsize=5.3, color=INK, va="center")
 # A.text(0.02, H - 0.36, f"Not drawn: sign-up on {len(SIGNUP)} sites → VaultGuard, WebMail; share button on every page.",
 #        fontsize=4.9, color=MUTED, va="center", style="italic")
 
-# ── (b) a gallery of visually distinct sites (user, 2026-10-06: replaces the list of all sites by domain) ──────────
-# The user's picks (2026-10-06: sports, cloud, spreadsheet, design) and two held-out sites; the screenshots are the
-# supplement's gallery (docs/figures/supp/figures/sites).
-GALLERY = ["design-creative", "sports-esports", "spreadsheets-slides",
-           "cloud-storage-file-transfer", "crowdfunding-donations", "rating-review"]
-DOMAIN_OF = {s: short for _, short, ss in DOMAINS for s in ss}   # the ring's short domain labels
+# ── (b) all 65 sites as a collage (user, 2026-10-06: show the benchmark's scale; replaces the list by domain) ────────
+# An 11 x 8 grid of cells: DesignFlow over 3 x 3 cells, the user's other picks (sports, spreadsheet, cloud) and two
+# held-out sites over 2 x 2, every other site in one cell (88 cells = 9 + 5 x 4 + 59). Held-out sites get a pink frame,
+# a deeper shade of the ring's halo. The screenshots are the supplement's gallery (docs/figures/supp/figures/sites).
+import random
 from PIL import Image
+FEATURED = {"design-creative": (0, 0, 3), "sports-esports": (0, 6, 2), "spreadsheets-slides": (2, 9, 2),   # (row, col,
+            "cloud-storage-file-transfer": (3, 4, 2), "crowdfunding-donations": (5, 1, 2),             # span)
+            "rating-review": (6, 7, 2)}
+NCOL, NROW, GAP = 11, 8, 0.022
+HELD_FRAME = "#D9528A"
 bx0, bx1 = 3.12, W - 0.03
-title(bx0, 0.1, "(b)", f"{len(SITES)} websites in {len(DOMAINS)} domains, e.g.")
-ncol, gx, gy, lab_h = 3, 0.08, 0.06, 0.15              # columns; gaps; label height under each screenshot (inches)
-tw = (bx1 - bx0 - gx * (ncol - 1)) / ncol
-th = tw * 800 / 1280                                     # the screenshots are 1280 x 800
-y0 = 0.2
-for i, s in enumerate(GALLERY):
-    x, y = bx0 + (i % ncol) * (tw + gx), y0 + (i // ncol) * (th + lab_h + gy)
-    im = Image.open(os.path.join(HERE, "..", "supp", "figures", "sites", s + ".jpg")).convert("RGB")
-    im = im.resize((600, round(600 * 800 / 1280)), Image.LANCZOS)   # about twice the print resolution
-    ia = fig.add_axes([x / W, 1 - (y + th) / H, tw / W, th / H]); ia.imshow(im, interpolation="lanczos"); ia.axis("off")
-    A.add_patch(FancyBboxPatch((x, y), tw, th, boxstyle="round,pad=0,rounding_size=0.01", fc="none", ec=EDGE, lw=0.6,
-                               zorder=6))
-    held = s in HELD_OUT
-    glyph = ("■" if s in DATASET else "□") if held else ("●" if s in DATASET else "○")
-    ly = y + th + lab_h / 2 + 0.005
-    g = A.text(x + 0.02, ly, glyph, fontsize=4.6, family=GLYPH, color=INK, va="center")
-    t = A.text(x + 0.02 + width(g) + 0.03, ly, name(s), fontsize=5.3, color=INK, weight="bold", va="center")
-    A.text(x + 0.02 + width(g) + 0.03 + width(t) + 0.05, ly, DOMAIN_OF[s], fontsize=5.3, color=MUTED, va="center")
-    if held:                                           # held-out sites highlighted as on the ring
-        A.add_patch(FancyBboxPatch((x, ly - 0.038), width(g) + width(t) + 0.1, 0.076,
-                                   boxstyle="round,pad=0,rounding_size=0.02", fc=HALO, ec="none", zorder=0.5))
-y_b_end = y0 + 2 * (th + lab_h) + gy
+cw = (bx1 - bx0 - GAP * (NCOL - 1)) / NCOL
+ch = cw * 800 / 1280                                     # the screenshots are 1280 x 800
+title(bx0, 0.1, "(b)", f"All {len(SITES)} websites")
+taken = set()
+for r0, c0, k in FEATURED.values():
+    taken |= {(r0 + i, c0 + j) for i in range(k) for j in range(k)}
+rest = sorted(set(SITES) - set(FEATURED)); random.Random(0).shuffle(rest)   # a fixed mix of looks
+free = [(r, c) for r in range(NROW) for c in range(NCOL) if (r, c) not in taken]
+assert len(free) == len(rest), (len(free), len(rest))
+place = {s: (r, c, 1) for s, (r, c) in zip(rest, free)} | FEATURED
+y0 = 0.2                                                 # below the heading strip that save() trims
+for s_, (r, c, k) in place.items():
+    x, y = bx0 + c * (cw + GAP), y0 + r * (ch + GAP)
+    w, h = k * cw + (k - 1) * GAP, k * ch + (k - 1) * GAP
+    im = Image.open(os.path.join(HERE, "..", "supp", "figures", "sites", s_ + ".jpg")).convert("RGB")
+    px = round(w * 450)                                  # about 1.5x the print resolution of each tile
+    im = im.resize((px, round(px * 800 / 1280)), Image.LANCZOS)
+    ia = fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H]); ia.imshow(im, interpolation="lanczos"); ia.axis("off")
+    held = s_ in HELD_OUT
+    A.add_patch(Rectangle((x, y), w, h, fc="none", ec=HELD_FRAME if held else EDGE, lw=1.1 if held else 0.4, zorder=6))
+y_b_end = y0 + NROW * (ch + GAP)
 
 # ── (c) data mix ────────────────────────────────────────────────────────────
 pub = [s for s in SITES if s in DATASET]
