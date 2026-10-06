@@ -306,7 +306,7 @@ def _site_name(site):
         return site
 
 
-async def run_chain(chain, base, out_root, headless=True, budget=100, turns_cap=60, log=print):
+async def run_chain(chain, base, out_root, headless=True, budget=H.MAX_STEPS, turns_cap=25, log=print):
     cid = chain_key(chain)
     out_root = Path(out_root)
     res = {"task_id": cid, "site": chain[0][0]["site"], "parts": [r["id"] for r, _ in chain],
@@ -434,10 +434,12 @@ def main(argv=None):
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--ports", type=lambda s: [int(p) for p in s.split(",")], default=[8320, 8321])
-    # The WebVoyager evaluation's settings (experiments/paper.yaml, eval_flags.live: --max-steps 100 --planner-turns 60):
-    # the prompt shows the planner's step count and each report the specialist steps left.
-    ap.add_argument("--budget", type=int, default=100, help="specialist steps the reports count down from")
-    ap.add_argument("--planner-turns", type=int, default=60, help="the planner's step cap its prompt shows")
+    # The evaluation's settings: the prompt shows the planner's step cap and each report the specialist steps left.
+    # MiniWeb and WebArena-Lite (the default): 40 steps, v6's 25 planner turns; the live web (experiments/paper.yaml,
+    # eval_flags.live): --budget 100 --planner-turns 60 (planner_rows/v1_wvsettings, 2026-10-06).
+    ap.add_argument("--budget", type=int, default=H.MAX_STEPS, help="specialist steps the reports count down from")
+    ap.add_argument("--planner-turns", type=int, default=PA.VERSIONS[VERSION]["max_turns"],
+                    help="the planner's step cap its prompt shows")
     ap.add_argument("--memory-model", default="qwen35-4b")
     ap.add_argument("--memory-url", default="http://127.0.0.1:8400/v1")
     ap.add_argument("--headful", action="store_true")
