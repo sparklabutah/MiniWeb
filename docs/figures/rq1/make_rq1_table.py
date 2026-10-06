@@ -147,11 +147,11 @@ def main():
         L.append(f"{r['label']} & " + (f"{r['size']} & " if size_col else "") + " & ".join(cells) + " \\\\")
     paper_caption = (
         "\\caption{\\textbf{Skill profiles of untrained agents on all 376 \\miniweb{} tasks.} Task success, then the share of "
-        "primitive instances passed (\\%) per skill family and reasoning operation, all judged by the VLM judge (Gemini 3.5 "
-        "Flash)" + ("; the number of tasks or instances is under each column" if args.counts else "") + ". One run per agent; "
-        "in brackets: standard error over 1,000 bootstrap resamples of the tasks. Red: each agent's weakest skill family; "
-        "green: its strongest. Bold: best per column. The two groups run in different harnesses (browser-use, or the "
-        "agent's own loop), so their action spaces differ. }")
+        "primitive instances passed (\\%) per skill family and reasoning operation (VLM judge, Gemini 3.5 "
+        "Flash)" + ("; the number of tasks or instances is under each column" if args.counts else "") + ", one run per agent "
+        "(in brackets: bootstrap standard error over tasks). Red: each agent's weakest skill family; green: its strongest; "
+        "bold: best per column. \\textbf{Takeaway:} drag \\& gesture is the weakest family of all ten agents, and none "
+        "passes more than 22\\% of its instances.}")
     L += ["\\bottomrule", "\\end{tabular}}"] + ([paper_caption] if not variant else [
           ("\\captionof{table}{" if args.minipage else "\\caption{") + "\\textbf{Main results: drag \\& gesture is the weakest skill family of every agent, and task success hides where agents differ.} Skill profiles of ten untrained agents on all 376 \\miniweb{} tasks: task success, then the share of primitive instances passed (\\%) " +
           ("per skill family and reasoning operation, all judged by the VLM judge (Gemini 3.5 Flash); the number of tasks or instances is under each column. One run per agent; "
