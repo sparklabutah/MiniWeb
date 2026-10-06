@@ -388,6 +388,7 @@ class Replayer:
         self.response_format = None
         self.mistake = None           # what the last injected mistake did (recovery episodes)
         self.slider_clicks = 0
+        self.memory_steps = "all"     # "done": the memory model writes only the final report (webmix.plan_data)
 
     # element -> (index | None, projected viewport point | None)
     async def _cdp(self):
@@ -592,8 +593,11 @@ class Replayer:
         if not op.get("inject"):
             self._event(op, action)
         note = await self._slider_note(op, action) if op["op"] == "click" and not op.get("inject") else None
-        memory, final = await write_memory(messages, action, op, first=not self.rows,
-                                           hint=self.mistake if op.get("recover") else None, note=note)
+        if self.memory_steps == "done" and op["op"] != "done":   # webmix.plan_data: only the final report matters
+            memory, final = None, None
+        else:
+            memory, final = await write_memory(messages, action, op, first=not self.rows,
+                                               hint=self.mistake if op.get("recover") else None, note=note)
         if final and "done" in action:
             action = {"done": {**action["done"], "text": final}}
         target = canonical({"memory": memory or memory_for(op, action), "action": [action]}, response_format)

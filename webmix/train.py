@@ -56,6 +56,9 @@ ADAPTERS = {
     # reasoning steps and final answers (user, 2026-09-30): rows from rejection sampling on the train-site human
     # reasoning tasks (webmix.evaluate --record-rows), KL-anchored on the synthetic families' rows
     "reasoning": ["Reasoning base"],
+    # the planner (user, 2026-10-06: "lets try to train our planner"): its own rows by construction (webmix.plan_data),
+    # trained with --rows-dir on them and --beta 0 (no executor rows to anchor on)
+    "planner": ["planner"],
 }
 TARGET_LEAVES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 TARGET_RE = r".*language_model.*\.(" + "|".join(TARGET_LEAVES) + r")$"
@@ -242,6 +245,7 @@ def main(argv=None):
     ap.add_argument("--limit", type=int, default=0, help="cap CE rows (smoke tests)")
     ap.add_argument("--max-steps", type=int, default=0, help="stop after this many rows (smoke tests)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--rows-dir", default=None, help="rows to train on (default: the executor replay, REPLAY_DIR)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--wandb-project", default="webmix-pilot", help="wandb project ('' = no wandb)")
     ap.add_argument("--ce-on", choices=["all", "action"], default="all",
@@ -270,7 +274,7 @@ def main(argv=None):
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     fams = set(ADAPTERS[args.adapter])
-    rows = load_rows()
+    rows = load_rows(Path(args.rows_dir)) if args.rows_dir else load_rows()
     if args.exclude_variants:
         drop = set(args.exclude_variants.split(","))
         rows = [r for r in rows if _variant(r["task_id"]) not in drop]

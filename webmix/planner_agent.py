@@ -176,6 +176,10 @@ class Team:
             return await self.run_step(params.family, params.instruction, browser_session)
         return tools
 
+    def specialist_llm(self, family, instruction, model):
+        """The specialist's model for one delegation (webmix.plan_data replaces it with a scripted replay)."""
+        return H.make_llm(model, base_url=self.vllm_url, temperature=self.temperature)
+
     async def run_step(self, family, instruction, bs):
         left = self.budget - self.used
         if left <= 0:
@@ -208,8 +212,7 @@ class Team:
         step = (f"Overall task (for context only): {self.overall}\nYour step now: {instruction}\n"
                 "Do only this step, then call done.") if self.cfg["overall"] else (
                 f"{instruction}\nDo only this, then call done and report what you did and what the page shows.")
-        agent = Agent(task=H.instruction(step + self.context, url),
-                      llm=H.make_llm(model, base_url=self.vllm_url, temperature=self.temperature),
+        agent = Agent(task=H.instruction(step + self.context, url), llm=self.specialist_llm(family, instruction, model),
                       browser_session=bs, tools=H.make_tools(guard_text=self.overall if v7 else None),
                       max_failures=3, **H.AGENT_KWARGS)
         H.use_normalized_coordinates(bs)
@@ -304,6 +307,15 @@ async def _title(bs):
         return ""
 
 
+def planner_agent(bs, task_text, start_url, llm, team, version):
+    """The planner as a browser-use Agent, as every evaluation runs it (webmix.plan_data runs the same Agent with a
+    scripted model to record training rows)."""
+    return Agent(task=H.instruction(task_text, start_url), llm=llm, browser_session=bs, tools=team.tools(),
+                 extend_system_message=VERSIONS[version]["prompt"], max_failures=3, use_vision=True,
+                 flash_mode=VERSIONS[version]["flash"], use_thinking=False, use_judge=False, enable_planning=False,
+                 message_compaction=False, max_actions_per_step=1, directly_open_url=False, step_timeout=STEP_TIMEOUT)
+
+
 async def run_planner_agent(bs, task_text, start_url, pick_model, vllm_url, planner_model, *, context="", sub_cap=15,
                             budget=H.MAX_STEPS, max_turns=12, on_end=None, temperature=0.0, version="v1",
                             expose=None, turns=None):
@@ -314,13 +326,8 @@ async def run_planner_agent(bs, task_text, start_url, pick_model, vllm_url, plan
     team = Team(pick_model, vllm_url, task_text, context, sub_cap, budget, on_end, temperature, version)
     if expose is not None:
         expose["team"] = team
-    planner = Agent(task=H.instruction(task_text + context, start_url),
-                    llm=H.make_llm(planner_model, base_url=vllm_url, temperature=temperature),
-                    browser_session=bs, tools=team.tools(), extend_system_message=VERSIONS[version]["prompt"],
-                    max_failures=3, use_vision=True, flash_mode=VERSIONS[version]["flash"], use_thinking=False,
-                    use_judge=False, enable_planning=False,
-                    message_compaction=False, max_actions_per_step=1, directly_open_url=False,
-                    step_timeout=STEP_TIMEOUT)
+    planner = planner_agent(bs, task_text + context, start_url,
+                            H.make_llm(planner_model, base_url=vllm_url, temperature=temperature), team, version)
     if expose is not None:
         expose["planner"] = planner          # v7: its observations go into the live-web trajectory
     H.use_normalized_coordinates(bs)
