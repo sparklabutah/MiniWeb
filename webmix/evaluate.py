@@ -225,8 +225,15 @@ async def human_trajectory(bs, base):
     return merge_server_log([e for e in rec if e.get("type") != "network"], log)
 
 
+# The LLM tier of the verifier's answer checks (regex, exact and precise matchers come first) for every paper number:
+# flash-lite (user, 2026-09-28). Set here, where every grading path passes (evaluate, fara_rq1 grade, grader_agreement),
+# so no entry point falls back to the repo default (gemini-3.5-flash, kept for the annotation tool).
+QA_MODEL = "gemini-3.5-flash-lite"
+
+
 def grade_human(task, traj, answer):
     from evaluation.verifiers import verify_task
+    os.environ.setdefault("VERIFIER_JUDGE_MODEL", QA_MODEL)
     report = verify_task(task["verifier"], traj, answer or "", question=task["instruction"])
     return bool(report.get("passed")), str(report.get("summary") or report.get("by_macro") or "")[:300]
 
@@ -630,8 +637,7 @@ def main(argv=None):
                          "exact, precise, then the LLM tier), never the flash macro judge. webmix runs never use the "
                          "macro judge; the flag records the intent")
     args = ap.parse_args(argv)
-    # the QA tier chain's LLM tier: flash-lite for our validation runs (user, 2026-09-28); repo default untouched
-    os.environ.setdefault("VERIFIER_JUDGE_MODEL", "gemini-3.5-flash-lite")
+    os.environ.setdefault("VERIFIER_JUDGE_MODEL", QA_MODEL)       # see grade_human
     if args.human:
         tasks = human_tasks(split=args.human_split, macros=args.human_macros)
     else:
