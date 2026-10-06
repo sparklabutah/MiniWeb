@@ -19,9 +19,14 @@ FAM = {"Drag & gesture": "#6B4C9A", "Discrete selection": "#2B5C9E", "Text entry
        "Form transaction": "#A8520F", "Navigation": "#8A6D0B", "Out-of-page I/O": "#A33B4C", "Reasoning base": "#14213D"}
 UNTRAINED, TRAINED = "#7D8798", BLUE     # the arms: grey before MiniWeb training (a shade darker than EDGE, so it
                                          # holds up in print), the diagrams' blue after it
-# Print sizes (pt), 2026-10-05 (user: the plots were hard to read on paper): a column-wide plot is read at 1:1, next to
-# 9 pt captions, so no text below 6 pt.
-FS = dict(title=8.5, sub=7.2, legend=6.8, label=7.0, tick=6.5, value=6.3, small=6.0)
+# Print sizes (pt). 2026-10-06 (user): no text in a figure smaller than the captions, which are \small in the 10 pt
+# CVPR template, so 9 pt. A figure is drawn at its printed width, so a size here is its size on paper:
+# COL_W for a column figure (included at 0.95\linewidth of a 236.25 pt column), FULL_W for a full-width one (495 pt).
+# Check a figure with `python docs/figures/common/text_size.py <pdf> --width <inches>`.
+# Exceptions (user, 2026-10-06): the sites and method diagrams keep their earlier, denser layout and smaller text.
+MIN_PT = 9.0
+COL_W, FULL_W = 0.95 * 236.25 / 72, 495.0 / 72
+FS = dict(title=10.0, sub=9.5, legend=9.0, label=9.0, tick=9.0, value=9.0, small=9.0)
 # Figure headings (bold title + muted subtitle) are off since 2026-10-05: the user moves them into the captions.
 # HEADINGS = True draws them again; save() then keeps the heading strip instead of trimming it.
 HEADINGS = False

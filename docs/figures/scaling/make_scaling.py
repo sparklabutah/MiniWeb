@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "common"))
 from results import ROOT, task_rates  # noqa: E402
 
-from style import INK, MUTED, GRID, FS, rc, header, logo, style_axes, panel as legend_panel, save  # noqa: E402  (the diagrams' look)
+from style import INK, MUTED, GRID, FS, COL_W, HEAD_STRIP, rc, header, logo, style_axes, panel as legend_panel, save  # noqa: E402
 rc()
 ORDER = ["100", "300", "1K", "3.1K", "7K"]
 LW, MS = 1.8, 4.2                                        # our curve: line width, marker size (pt)
@@ -48,8 +48,13 @@ def panel(ax, p, cfg):
     b0 = rate(p["untrained"])
     if b0 is not None:
         ax.axhline(b0, color=col["untrained"], lw=1.3, ls=(0, (4, 2.5)), zorder=1)
-        ax.text(1600, b0 - (yhi - ylo) * 0.015, f"planner, untrained: {b0:.1f}", fontsize=FS["value"], color=MUTED,
-                ha="left", va="top")             # under the line, clear of the curve and the reference markers (review round 3)
+        # Its value, next to the line (`untrained_label`: text, x, above or under it). Default: under the line from
+        # x = 1600, clear of the curve and the reference markers (review round 3).
+        ul = p.get("untrained_label", {})
+        above = ul.get("above", False)
+        ax.text(ul.get("x", 1600), b0 + (yhi - ylo) * (0.012 if above else -0.015),
+                ul.get("text", "planner, untrained: {:.1f}").format(b0), fontsize=FS["value"], color=MUTED, ha="left",
+                va="bottom" if above else "top")
     pts = [(steps[k], rate(p["miniweb"].get(k) or []), k) for k in ORDER if k in p["miniweb"]]   # absent key: not drawn
     have = [(x, y) for x, y, _ in pts if y is not None]
     best = max([y for _, y in have] + [rate(p["insta"]) or 0])
@@ -60,8 +65,10 @@ def panel(ax, p, cfg):
             continue
         below = (b0 is not None and y < b0) or k in p.get("label_below", [])   # under the dashed line, or asked:
                                                                             # label it below
-        ax.text(x * 1.15, y + (yhi - ylo) * (-0.035 if below else 0.035), f"{y:.1f}", fontsize=FS["value"], color=INK,
-                ha="left", va="top" if below else "bottom", weight="bold" if y == best else "normal", zorder=5,
+        left = k in p.get("label_left", [])              # asked: above-left, clear of the rising curve
+        ax.text(x / 1.15 if left else x * 1.15, y + (yhi - ylo) * (-0.035 if below else 0.035), f"{y:.1f}",
+                fontsize=FS["value"], color=INK, ha="right" if left else "left", va="top" if below else "bottom",
+                weight="bold" if y == best else "normal", zorder=5,
                 bbox=dict(fc="white", ec="none", pad=0.4) if k in p.get("label_below", []) else None)
     if have:
         ax.plot(*zip(*have), color=col["miniweb"], lw=LW, marker="o", ms=MS, zorder=3)
@@ -89,7 +96,7 @@ def main():
     cfg = yaml.safe_load(open(ap.parse_args().config))
     col, leg = cfg["colors"], cfg["legend"]
 
-    W = cfg.get("width", 3.25)                           # inches; a narrower figure keeps the same font sizes
+    W = cfg.get("width", COL_W)                          # drawn at its printed width: every size is its size on paper
     fig = plt.figure(figsize=(W, 1.78))
     A = fig.add_axes([0, 0, 1, 1]); A.axis("off")
     entries = [(leg["untrained"], dict(color=col["untrained"], lw=1.3, ls=(0, (4, 2.5)))),
@@ -112,7 +119,7 @@ def main():
     legend_panel(A, 0.04, 0.22, W - 0.08, lh)
     top, ph, left, gap = 0.22 + lh + (0.32 if any(p.get("title") for p in cfg["panels"]) else 0.2), \
         cfg.get("plot_height", 1.25), 0.4, 0.3
-    H = top + ph + 0.36
+    H = top + ph + 0.4
     fig.set_size_inches(W, H); A.set_xlim(0, W); A.set_ylim(H, 0)
     ax_at = lambda x, y, w, h: fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H])
     header(fig, A, 0.04, 0.1, cfg.get("title", "Scaling"), cfg.get("subtitle", cfg["model"] + ", planner + one pooled adapter"),
@@ -122,12 +129,12 @@ def main():
     for i, p in enumerate(cfg["panels"]):
         panel(ax_at(left + i * (pw + gap), top, pw, ph), p, cfg)
     A.text(0.08, top + ph / 2, "task success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center", va="center")
-    A.text(left + (W - left - 0.06) / 2, top + ph + 0.16, "training steps (log scale)", fontsize=FS["label"],
+    A.text(left + (W - left - 0.06) / 2, top + ph + 0.215, "training steps (log scale)", fontsize=FS["label"],
            color=MUTED, ha="center", va="top")
 
     out = os.path.join(ROOT, cfg["out"])
     save(fig, out)                                        # style.save: trims the heading strip
-    print("wrote", out)
+    print("wrote", out, f"({W:.3f} x {H - HEAD_STRIP:.3f} in)")
     for p in cfg["panels"]:
         r = lambda runs: round(st.mean(task_rates(p["kind"], runs, p.get("tasks"))), 1) if runs else "pending"
         print(f"  {p['title']:24s} untrained {r(p['untrained'])}", {k: r(p['miniweb'].get(k) or []) for k in ORDER},

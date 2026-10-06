@@ -14,7 +14,7 @@ from matplotlib.lines import Line2D
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "common"))
 from results import ROOT, _records, human_tasks  # noqa: E402
-from style import INK, MUTED, BAD, FS, rc, header, panel, style_axes, tint, save  # noqa: E402  (the diagrams' look)
+from style import INK, MUTED, BAD, FS, COL_W, rc, header, panel, style_axes, tint, save, _w  # noqa: E402  (the diagrams' look)
 rc()
 LS = {"solid": "-", "dashed": (0, (3.2, 1.6))}
 
@@ -64,36 +64,56 @@ def main():
         arms.append((a, [100 * st.mean(by[k]) for k in bb]))
     n_b = collections.Counter(min(length[t], bb[-1]) for t in held)
 
-    W = 3.25
+    # Drawn at its printed width (style.COL_W) so every size is its size on paper: no text below style.MIN_PT (9 pt).
+    W = COL_W
     fig = plt.figure(figsize=(W, 2.6))
     A = fig.add_axes([0, 0, 1, 1]); A.axis("off")
-    lh = 0.5
-    top, ph = 0.22 + lh + 0.3, cfg.get("plot_height", 1.2)   # plot_height: to match a paired panel
-    H = top + ph + 0.47
+    rp, rpad = 0.17, 0.07                                # legend row pitch and padding (inches)
+    lh = 2 * rpad + 4 * rp + 0.13                        # five legend rows: two for the left panel, three for the right
+    tit = 0.3                                            # two-line panel titles
+    top, ph = 0.22 + lh + 0.12 + tit, cfg.get("plot_height", 1.2)   # plot_height: to match a paired panel
+    H = top + ph + 0.56
     fig.set_size_inches(W, H); A.set_xlim(0, W); A.set_ylim(H, 0)
     ax_at = lambda x, y, w, h: fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H])
     header(fig, A, 0.04, 0.1, cfg.get("title", "Failures compound"), cfg.get("subtitle", "success by primitives per task"))
     panel(A, 0.04, 0.22, W - 0.08, lh)
-    ent_a = [("each agent", dict(color=tint(INK, 0.3), lw=0.8)), ("mean", dict(color=INK, lw=1.8, marker="o", ms=3.6)),
-             (r"$p^n$: independent primitives", dict(color=BAD, lw=1.4, ls=(0, (1.0, 1.1))))]
-    x = 0.1                                              # row 1: the left panel; row 2: the right panel (no panel letters)
-    t = A.text(x, 0.33, "left:", fontsize=FS["legend"], color=MUTED, va="center", style="italic")
-    x += t.get_window_extent(fig.canvas.get_renderer()).width / fig.dpi + 0.08
-    for lab, kw in ent_a:
-        A.add_line(Line2D([x, x + 0.08, x + 0.16], [0.33] * 3, markevery=[1], zorder=3, **kw))
-        t = A.text(x + 0.21, 0.33, lab, fontsize=FS["legend"], color=INK, va="center")
-        x += 0.21 + t.get_window_extent(fig.canvas.get_renderer()).width / fig.dpi + 0.12
-    A.text(0.1, 0.5, "right:", fontsize=FS["legend"], color=MUTED, va="center", style="italic")
-    for i, (a, _) in enumerate(arms):
-        x, y = 0.42 + (i % 2) * 1.42, 0.5 + (i // 2) * 0.14
-        A.add_line(Line2D([x, x + 0.08, x + 0.16], [y] * 3, markevery=[1], color=a["color"], ls=LS[a["ls"]],
-                          lw=1.8 if a.get("bold") else 1.2, marker=a["marker"], ms=3.4, zorder=3))
-        A.text(x + 0.21, y, a["label"], fontsize=FS["legend"], color=a["color"] if a.get("bold") else INK, va="center",
-               weight="bold" if a.get("bold") else "normal")
+    row = lambda k: 0.22 + rpad + 0.065 + k * rp         # centre of legend row k
+    gw, gg = 0.16, 0.05                                  # line glyph width, glyph-to-text gap
 
-    left, gap = 0.4, 0.3
-    pw = (W - left - gap - 0.06) / 2
-    axa, axb = ax_at(left, top, pw, ph), ax_at(left + pw + gap, top, pw, ph)
+    def entry(x, y, kw, lab, **tkw):
+        """A legend line glyph and its label; returns the label's right edge."""
+        A.add_line(Line2D([x, x + gw / 2, x + gw], [y] * 3, markevery=[1], zorder=3, **kw))
+        return x + gw + gg + _w(fig, A.text(x + gw + gg, y, lab, fontsize=FS["legend"], va="center", **tkw))
+
+    # rows 1-2: the left panel; rows 3-5: the right panel (no panel letters). p^n in Unicode (U+207F), not mathtext,
+    # whose superscript would print at ~70% of 9 pt.
+    x0 = 0.1
+    A.text(x0, row(0), "left:", fontsize=FS["legend"], color=MUTED, va="center", style="italic")
+    A.text(x0, row(2), "right:", fontsize=FS["legend"], color=MUTED, va="center", style="italic")
+    xe = x0 + _w(fig, A.text(0, -1, "right:", fontsize=FS["legend"], style="italic")) + 0.1   # entries start here
+    x = entry(xe, row(0), dict(color=tint(INK, 0.3), lw=0.8), "each agent", color=INK) + 0.16
+    entry(x, row(0), dict(color=INK, lw=1.8, marker="o", ms=3.6), "mean", color=INK)
+    A.add_line(Line2D([xe, xe + gw], [row(1)] * 2, color=BAD, lw=1.4, ls=(0, (1.0, 1.1)), zorder=3))
+    x = xe + gw + gg + _w(fig, A.text(xe + gw + gg, row(1), "p\u207f", fontsize=FS["legend"], color=INK, va="center",
+                                      style="italic"))
+    A.text(x, row(1), ": independent primitives", fontsize=FS["legend"], color=INK, va="center")
+    cw = max(_w(fig, A.text(0, -1, a["label"], fontsize=FS["legend"])) for a, _ in arms[0::2])   # right group: 2 x 2
+    cw2 = max(_w(fig, A.text(0, -1, a["label"], fontsize=FS["legend"], weight="bold" if a.get("bold") else "normal"))
+              for a, _ in arms[1::2])
+    cg = (W - 0.1 - x0 - 2 * (gw + gg) - cw - cw2)       # the columns fill the panel, 0.06 in from its right edge
+    for i, (a, _) in enumerate(arms):
+        x, y = x0 + (i % 2) * (gw + gg + cw + cg), row(3 + i // 2)
+        entry(x, y, dict(color=a["color"], ls=LS[a["ls"]], lw=1.8 if a.get("bold") else 1.2, marker=a["marker"],
+                         ms=3.4), a["label"], color=a["color"] if a.get("bold") else INK,
+              weight="bold" if a.get("bold") else "normal")
+
+    # the two panels share the x scale (inches per primitive), so the left one, with more bins, is wider. Bin counts at
+    # 9 pt need all the width: the left panel's first label may overhang into the margin under the y ticks.
+    left, gap, right = 0.56, 0.14, 0.1                   # room for the y ticks; between the panels; for the last label
+    lim_a, lim_b = (-0.15, len(ba) - 0.75), (-0.25, len(bb) - 0.7)
+    span_a, span_b = lim_a[1] - lim_a[0], lim_b[1] - lim_b[0]
+    u = (W - left - gap - right) / (span_a + span_b)
+    axa, axb = ax_at(left, top, u * span_a, ph), ax_at(left + u * span_a + gap, top, u * span_b, ph)
     xa = list(range(len(ba)))
     for lab, v in agents:
         axa.plot(xa, v, color=tint(INK, 0.3), lw=0.8, zorder=1)
@@ -109,24 +129,27 @@ def main():
     v = arms[-1][1]
     for i, y in enumerate(v):
         axb.text(i + 0.1, y + 3, f"{y:.0f}", fontsize=FS["value"], color=arms[-1][0]["color"], ha="left", va="bottom",
-                 weight="bold")
-    for ax, bins, n, title in ((axa, ba, n_a, "Ten untrained agents, all sites"),
-                               (axb, bb, n_b, "Qwen3.5-4B, held-out sites")):
-        ax.set_xlim(-0.3, len(bins) - 0.7); ax.set_ylim(0, 100)
+                 weight="bold", clip_on=False)
+    for ax, bins, n, lim, title in ((axa, ba, n_a, lim_a, "Ten untrained agents,\nall sites"),
+                                    (axb, bb, n_b, lim_b, "Qwen3.5-4B,\nheld-out sites")):
+        ax.set_xlim(*lim); ax.set_ylim(0, 100)
         ax.set_xticks(range(len(bins)))
         ax.set_xticklabels([f"{k}{'+' if k == bins[-1] else ''}\n({n[k]})" for k in bins], linespacing=0.95)
         ax.set_yticks([0, 25, 50, 75, 100]); ax.set_yticklabels(["0", "25", "50", "75", "100%"])
         style_axes(ax); ax.tick_params(axis="x", labelsize=FS["small"])
-        ax.set_title(title, fontsize=FS["small"], color=INK, pad=3, loc="left")
+        ax.set_title(title, fontsize=FS["small"], color=INK, pad=3, loc="left", linespacing=1.05)
     axb.set_yticklabels([])
-    A.text(0.08, top + ph / 2, "task success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center", va="center")
-    A.text(left + (W - left - 0.06) / 2, top + ph + 0.33, "primitives in the task (number of tasks)", fontsize=FS["label"], color=MUTED,
-           ha="center", va="top")
+    A.text(0.1, top + ph / 2, "task success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center", va="center")
+    A.text(left + (W - left - right) / 2, top + ph + 0.38, "primitives in the task (number of tasks)",
+           fontsize=FS["label"], color=MUTED, ha="center", va="top")
+    for t in [t for t in A.texts if t.get_position()[1] == -1]:
+        t.remove()                                       # the width probes
 
     out = os.path.join(ROOT, cfg["out"])
     save(fig, out)                                        # style.save: trims the heading strip
     print("wrote", out)
-    print("  (a) mean", [round(v, 1) for v in mean], "independent p^n", [round(v, 1) for v in indep], "p", round(p, 3),
+    print("  (a) mean", [round(v, 1) for v in mean], "independent p^n", [round(v, 1) for v in indep], "p",
+          round(mean[0] / 100, 3),
           "n", [n_a[k] for k in ba])
     for a, v in arms:
         print(f"  (b) {a['label']:24s}", [round(x, 1) for x in v], "n tasks", [n_b[k] for k in bb])

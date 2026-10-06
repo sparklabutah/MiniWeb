@@ -25,7 +25,7 @@ sys.path.insert(0, HERE)
 from make_rq1_bars import ROOT, FAMILY_OF, primitive_filter  # noqa: E402  (also chdirs to the repo root)
 
 sys.path.insert(0, os.path.join(HERE, "..", "common"))
-from style import INK, MUTED, EDGE, OK, FAM, FS, rc, header, panel, tint, save  # noqa: E402  (the diagrams' look)
+from style import INK, MUTED, EDGE, OK, FAM, FS, COL_W, rc, header, panel, tint, save, _w  # noqa: E402  (the diagrams' look)
 rc()
 CACHE = os.path.join(HERE, "drag_failures_cache.json")
 MODES = ["passed", "imprecise", "not committed", "bypassed", "no action", "not reached"]
@@ -81,19 +81,33 @@ def main():
         json.dump(cache, open(CACHE, "w"), indent=0)
     rows.sort(key=lambda r: -r[1]["passed"])
 
-    W, rh = 3.25, 0.165                                  # width, row pitch per agent (inches)
-    lg = 0.22 + 0.36 + 0.14                              # legend panel (two rows of three) ends here, then a gap
-    top, bot = lg, 0.4
+    # Drawn at its printed width (style.COL_W) so every size is its size on paper: no text below style.MIN_PT (9 pt).
+    W, rh = COL_W, 0.18                                  # width, row pitch per agent (inches)
+    lg_y, lg_h, lg_dy = 0.22, 0.42, 0.2                  # legend panel (two rows of three): top, height, row pitch
+    top, bot = lg_y + lg_h + 0.12, 0.57                  # the bars start under the legend; ticks + a two-line label
     H = top + rh * len(rows) + bot
     fig = plt.figure(figsize=(W, H))
     A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off")
     header(fig, A, 0.04, 0.1, "Where drag fails", "drag & gesture instances, ten untrained agents")
-    panel(A, 0.04, 0.22, W - 0.08, 0.36)                 # legend in a light panel, as the diagrams group things
+    panel(A, 0.04, lg_y, W - 0.08, lg_h)                 # legend in a light panel, as the diagrams group things
+    sw, gap = 0.15, 0.05                                 # swatch width, swatch-to-text gap
+    tw = [max(_w(fig, A.text(0, 0, MODES[c + 3 * r], fontsize=FS["legend"])) for r in (0, 1)) for c in range(3)]
+    for t in A.texts[-6:]:
+        t.remove()
+    pad = 0.1                                            # columns spread evenly inside the panel
+    colgap = (W - 0.08 - 2 * pad - sum(sw + gap + t for t in tw)) / 2
     for k, mo in enumerate(MODES):
-        x, y = 0.12 + (k % 3) * 1.02, 0.31 + (k // 3) * 0.17
-        A.add_patch(Rectangle((x, y - 0.05), 0.15, 0.1, fc=COLORS[mo], ec="none", zorder=3))
-        A.text(x + 0.2, y, mo, fontsize=FS["legend"], color=INK, va="center")
-    ax = fig.add_axes([0.27, bot / H, 0.675, rh * len(rows) / H])
+        c = k % 3
+        x, y = 0.04 + pad + sum(sw + gap + t + colgap for t in tw[:c]), lg_y + lg_h / 2 + (k // 3 - 0.5) * lg_dy
+        A.add_patch(Rectangle((x, y - 0.05), sw, 0.1, fc=COLORS[mo], ec="none", zorder=3))
+        A.text(x + sw + gap, y, mo, fontsize=FS["legend"], color=INK, va="center")
+    sz = 0.135                                           # logo size; the agent names end before the bars start
+    name_x = 0.03 + sz + 0.05
+    bar_x = name_x + max(_w(fig, fig.text(0, 0, lab, fontsize=FS["value"])) for lab, _, _ in rows) + 0.07
+    for t in fig.texts[-len(rows):]:
+        t.remove()
+    bar_r = W - 0.2                                      # room for the "100%" tick label
+    ax = fig.add_axes([bar_x / W, bot / H, (bar_r - bar_x) / W, rh * len(rows) / H])
     for i, (lab, c, _) in enumerate(rows):
         n, x = sum(c.values()), 0
         for mo in MODES:
@@ -107,14 +121,17 @@ def main():
     ax.set_xlim(0, 100); ax.set_ylim(len(rows) - 0.5, -0.5)
     to_fig = lambda y: fig.transFigure.inverted().transform(ax.transData.transform((0, y)))[1]
     for i, (lab, _, logo) in enumerate(rows):            # logo, then name, as in the RQ1 figure legend
-        yf, sz = to_fig(i), 0.135
+        yf = to_fig(i)
         la = fig.add_axes([0.03 / W, yf - sz / 2 / H, sz / W, sz / H])
         la.imshow(Image.open(os.path.join(ROOT, logo)).convert("RGBA"), interpolation="lanczos"); la.axis("off")
-        fig.text((0.03 + sz + 0.05) / W, yf, lab, fontsize=FS["value"], color=INK, ha="left", va="center")
+        fig.text(name_x / W, yf, lab, fontsize=FS["value"], color=INK, ha="left", va="center")
     ax.set_xticks([0, 25, 50, 75, 100]); ax.set_xticklabels(["0", "25", "50", "75", "100%"])
     ax.set_yticks([]); ax.tick_params(labelsize=FS["tick"], length=2.5, width=0.8, pad=2, colors=MUTED)
-    ax.set_xlabel("drag & gesture instances (12 slider + 6 signature tasks per agent)", fontsize=FS["small"], color=MUTED,
-                  labelpad=2)
+    # the axis label on two lines, centred under the bars unless that would run off the right edge
+    xl = "drag & gesture instances\n(12 slider + 6 signature tasks per agent)"
+    t = A.text(0, 0, xl, fontsize=FS["small"], color=MUTED, ha="center", va="top", linespacing=1.15)
+    cx = min((bar_x + bar_r) / 2, W - 0.06 - _w(fig, t) / 2)
+    t.set_position((cx, top + rh * len(rows) + 0.21))
     for sp in ("top", "right", "left"): ax.spines[sp].set_visible(False)
     ax.spines["bottom"].set_linewidth(0.8); ax.spines["bottom"].set_color(MUTED)
 

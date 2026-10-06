@@ -20,7 +20,7 @@ from results import ROOT, task_rates, family_counts, instance_family_counts, pri
 sys.path.insert(0, ROOT)
 from datagen.viewer import FAMILY_OF  # noqa: E402
 
-from style import INK, MUTED, GRID, FAM, FS, rc, header, panel, swatch, bar as sbar, style_axes as sstyle, save  # noqa: E402
+from style import INK, MUTED, GRID, FAM, FS, COL_W, rc, header, panel, swatch, bar as sbar, style_axes as sstyle, save  # noqa: E402
 rc()
 LABEL = {"Drag & gesture": "Drag", "Discrete selection": "Select", "Text entry": "Text",   # as in Tab. 2's header
          "Form transaction": "Form", "Navigation": "Nav.", "Out-of-page I/O": "I/O", "Reasoning base": "Reason",
@@ -57,23 +57,29 @@ def main():
         a["inst"] = instance_family_counts(a.get(iset) or [], dict(FAMILY_OF, report_information="Reasoning base"),
                                            only=primitive_filter(cfg.get("instance_primitives")))
 
-    top, ph = cfg.get("top", 0.24 + 0.26 + 0.2), cfg.get("plot_height", 1.2)   # plot area under header + legend (in)
-    W, H = 3.25, top + ph + cfg.get("bottom", 0.3)      # top/plot_height/bottom: to pair it with another panel
+    # Drawn at its printed width (style.COL_W) so every size is its size on paper: no text below style.MIN_PT (9 pt).
+    # At 9 pt the two arms' legend entries need a row each, and the family names under the bars are rotated: level,
+    # "Drag" and "Reason" would run into each other.
+    lg_y, lg_dy = 0.22, 0.19                             # legend panel top, row pitch (inches)
+    lg_h = 0.1 * 2 + lg_dy * (len(fa) - 1) + 0.03
+    top, ph = cfg.get("top", lg_y + lg_h + 0.24), cfg.get("plot_height", 1.2)   # plot area under the legend (in)
+    W, H = COL_W, top + ph + cfg.get("bottom", 0.43)    # top/plot_height/bottom: to pair it with another panel
     fig = plt.figure(figsize=(W, H))
     A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off")
     ax_at = lambda x, y, w, h: fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H])
 
     # the diagrams' header, then the legend in a light panel
     header(fig, A, 0.04, 0.1, cfg.get("title", "Practice"), cfg.get("subtitle", cfg["model"] + ", single primitives, held-out sites"))
-    panel(A, 0.04, 0.22, W - 0.08, 0.26)
+    panel(A, 0.04, lg_y, W - 0.08, lg_h)
     for i, a in enumerate(fa):
-        x = 0.14 + i * 1.55
-        swatch(A, x, 0.35, a["color"], hatched=a.get("style") == "hatched")
-        A.text(x + 0.21, 0.35, a["label"], fontsize=FS["legend"], color=INK, va="center",
+        x, y = 0.14, lg_y + 0.115 + i * lg_dy
+        swatch(A, x, y, a["color"], hatched=a.get("style") == "hatched")
+        A.text(x + 0.21, y, a["label"], fontsize=FS["legend"], color=INK, va="center",
                weight="bold" if i == len(fa) - 1 else "normal")
 
     # per family
-    ax = ax_at(0.42, top, W - 0.45, ph)
+    left = 0.58                                          # the y label and the "100%" ticks
+    ax = ax_at(left, top, W - left - 0.08, ph)            # right: room for the last gain label
     bw = 0.38
     for gi, f in enumerate(fams):
         vals = []
@@ -84,12 +90,12 @@ def main():
             bar(ax, gi + (j - 0.5) * bw, v, bw * 0.9, a)
         d = vals[-1] - vals[0]
         ax.text(gi + 0.5 * bw, vals[-1] + 2.5, f"{d:+.0f}", fontsize=FS["value"], weight="bold", ha="center",
-                va="bottom", color=fa[-1]["color"] if d >= 3 else MUTED)
-        ax.text(gi, -5, LABEL[f], fontsize=FS["label"], weight="bold", color=FAM[f], ha="center", va="top",
-                linespacing=1.0, clip_on=False)
-    ax.set_xlim(-0.55, len(fams) - 0.45)
+                va="bottom", color=fa[-1]["color"] if d >= 3 else MUTED, clip_on=False)
+        ax.text(gi + 0.12, -4, LABEL[f], fontsize=FS["label"], weight="bold", color=FAM[f], ha="right", va="top",
+                rotation=30, rotation_mode="anchor", clip_on=False)
+    ax.set_xlim(-0.45, len(fams) - 0.55)
     style_axes(ax)
-    A.text(0.08, top + ph / 2, "success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center", va="center")
+    A.text(0.1, top + ph / 2, "success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center", va="center")
 
     out = os.path.join(ROOT, cfg["out"])
     save(fig, out)                                        # style.save: trims the heading strip
