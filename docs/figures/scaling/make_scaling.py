@@ -35,6 +35,11 @@ def panel(ax, p, cfg):
         xs, ys = zip(*r["points"])
         ax.plot(xs, ys, color=r["color"], lw=1.2, ls=(0, (1.5, 1.3)), marker=r.get("marker", "o"), ms=3.6,
                 mfc="white", mew=1.0, zorder=2)
+        if r.get("logo_at"):                             # a narrow panel: the logo alone at (x, y) in data coordinates,
+            fig.canvas.draw()                            # the caption names the curve
+            px, py = ax.transData.transform(r["logo_at"])
+            logo(fig, px / fig.dpi, fig.get_size_inches()[1] - py / fig.dpi, os.path.join(ROOT, r["logo"]), size=0.12)
+            continue
         dy = (yhi - ylo) * r.get("label_dy", 0.04)
         i = r.get("label_at", -1)                        # which point carries the name
         t = ax.text(xs[i] * r.get("label_dx", 1.0), ys[i] + dy, r["label"], fontsize=FS["small"], color=r["color"],
@@ -60,6 +65,8 @@ def panel(ax, p, cfg):
     have = [(x, y) for x, y, _ in pts if y is not None]
     best = max([y for _, y in have] + [rate(p["insta"]) or 0])
     for x, y, k in pts:
+        if y is not None and k not in p.get("value_labels", [k]):   # value_labels: which points carry their value
+            continue
         if y is None:
             ax.text(x, ylo + (yhi - ylo) * 0.05, "pending", rotation=90, fontsize=FS["small"], color=MUTED, ha="center",
                     va="bottom")
