@@ -69,7 +69,7 @@ def main():
     W = COL_W
     left, gap, right = 0.4, 0.12, 0.04                   # room for the y ticks; between the plots; right margin
     s_ = (W - left - gap - right) / 2                    # each plot is square
-    leg, top = 0.24, 0.26                                # legend row; plots start below it
+    leg, top = 0.24, 0.38                                # legend panel height; plots start below it
     H = top + s_ + 0.48
     fig = plt.figure(figsize=(W, H))
     A = fig.add_axes([0, 0, 1, 1]); A.axis("off"); A.set_xlim(0, W); A.set_ylim(H, 0)
@@ -81,7 +81,8 @@ def main():
         A.add_line(Line2D([x, x + gw], [y] * 2, zorder=3, **kw))
         return x + gw + gg + _w(fig, A.text(x + gw + gg, y, lab, fontsize=FS["legend"], va="center", color=INK, **tkw))
 
-    y0 = leg / 2 + 0.02                                  # the legend: above each plot, its own line kinds
+    panel(A, 0.02, 0.02, W - 0.04, leg)                  # a light panel, as the other figures' legends (user,
+    y0 = leg / 2 + 0.02                                  # 2026-10-06); above each plot, its own line kinds
     x = entry(left, y0, dict(color=INK, lw=1.8), "mean") + 0.14
     entry(x, y0, dict(color=BAD, lw=1.4, ls=(0, (1.0, 1.1))), "p\u207f", style="italic")
     x = entry(left + s_ + gap - 0.08, y0, dict(color=INK, lw=1.4), "single") + 0.1
