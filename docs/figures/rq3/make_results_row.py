@@ -125,13 +125,15 @@ def main():
 
     practice(axes[0], rq2)
     style_axes(axes[0])
-    axes[0].set_ylim(0, 100); axes[0].set_yticks([0, 25, 50, 75, 100]); axes[0].set_xticks([])
-    axes[0].set_yticklabels(["0", "25", "50", "75", "100%"])
+    axes[0].set_xticks([])
     p = {k: v for k, v in sc["panels"][0].items() if k != "title"}
     p.update(cfg.get("scaling_panel") or {})
     p["references"] = [dict(r, **(cfg.get("reference_labels") or {}).get(r["label"], {}))   # label positions for
                        for r in p.get("references", [])]                                    # the narrow panel
     scaling_panel(axes[1], p, sc)
+    for ax in axes:                                      # one 0-100% axis, labelled on (a) only (user, 2026-10-06)
+        ax.set_ylim(0, 100); ax.set_yticks([0, 25, 50, 75, 100])
+        ax.set_yticklabels(["0", "25", "50", "75", "100%"] if ax is axes[0] else [])
 
     for x, t in zip(xs, cfg["titles"]):
         A.text(x, top - 0.1, t, fontsize=FS["label"], weight="bold", color=INK, va="baseline")
