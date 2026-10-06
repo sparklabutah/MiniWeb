@@ -253,5 +253,7 @@ def write_viewer():
 
 
 if __name__ == "__main__":
+    import argparse
+    argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     p, n = write_viewer()
     print(f"{n} runs -> {p}")

@@ -389,11 +389,83 @@ def stop_early_control():
         res["median_steps"] = steps[len(steps) // 2]
         res["fail_with_done_pct"] = round(100 * fail_done / max(1, fails), 1)
         res["at_cap_40_pct"] = round(100 * sum(x >= 40 for x in steps) / len(steps), 1)
+        if bench == "heldout":
+            # answer tasks need a final answer, which a trained `done` step would carry; the action-only tasks do not,
+            # so on them the control cannot be hurt by the missing done steps
+            tasks = {t["task_id"]: t for t in human_tasks()}
+            report = {i for i, t in tasks.items()
+                      if any(g["macro"] == "report_information" and g.get("required", True) for g in t["macro_tags"])}
+            split = {}
+            for name, keep in (("answer", lambda i: i in report), ("action_only", lambda i: i not in report)):
+                sel = lambda d: {i: v for i, v in d.items() if keep(i)}  # noqa: E731
+                row = {"n": len(sel(nd)), "nodone": round(100 * st.mean(sel(nd).values()), 1)}
+                for other in ("base", "pooled", "planner_pooled"):
+                    n, a_, b_, p_ = permutation(sel(per_task(other)), sel(nd))
+                    row[other] = round(a_, 1)
+                    row[f"p_vs_{other}"] = p_
+                split[name] = row
+            res["by_task_kind"] = split
         out[bench] = res
     OUT["stop_early_control"] = out
     print("\n== 12. stop-early control (trained without final done steps):")
     for k, v in out.items():
         print(f"  {k}: {v}")
+
+
+# ── 13. the RQ1 skill profiles graded by the task verifiers instead of the judge ───────────────────────────────
+def verifier_profiles():
+    """Tab. 2's families with each instance graded by the task's verifier (results detail; regraded when present)."""
+    sys.path.insert(0, os.path.join(ROOT, "docs", "figures", "rq1"))
+    from text_numbers import family
+    rq1 = yaml.safe_load(open(os.path.join(ROOT, "docs", "figures", "rq1", "rq1_config.yaml")))
+    only = primitive_filter(rq1.get("primitives"))
+    fams = rq1["table"]["families"]
+    pooled, agents = collections.defaultdict(lambda: [0, 0]), {}
+    for m in rq1["models"]:
+        judge = {r["task_id"]: r for r in (json.loads(l) for l in open(os.path.join(ROOT, m["judge"])) if l.strip())}
+        f = collections.defaultdict(lambda: [0, 0])
+        for tid, r in _records(os.path.dirname(m["judge"])).items():
+            d = r.get("detail") or {}
+            if isinstance(d, str):
+                try:
+                    d = ast.literal_eval(d)
+                except (ValueError, SyntaxError):
+                    d = {}
+            inst = (judge.get(tid) or {}).get("instances") or {}
+            for k, v in (d.items() if isinstance(d, dict) else []):
+                macro = inst.get(k, {}).get("macro") or k.split("#")[0]
+                if only is not None and macro not in only:
+                    continue
+                for acc in (f[family(macro)], pooled[family(macro)]):
+                    acc[0] += bool(v)
+                    acc[1] += 1
+        rates = {x: 100 * f[x][0] / f[x][1] for x in fams if f[x][1]}
+        ranked = sorted(rates, key=rates.get)
+        agents[m["label"]] = {"drag": round(rates["Drag & gesture"], 1), "weakest": ranked[0],
+                              "weakest_rate": round(rates[ranked[0]], 1), "drag_rank": ranked.index("Drag & gesture") + 1}
+    pr = {x: round(100 * pooled[x][0] / pooled[x][1], 1) for x in fams}
+    OUT["verifier_profiles"] = {"agents": agents, "pooled": pr,
+                                "drag_weakest_for": sum(a["weakest"] == "Drag & gesture" for a in agents.values()),
+                                "max_gap_when_not": max([a["drag"] - a["weakest_rate"] for a in agents.values()
+                                                         if a["weakest"] != "Drag & gesture"] or [0])}
+    print("\n== 13. skill profiles by the task verifiers:", OUT["verifier_profiles"]["drag_weakest_for"], "of",
+          len(agents), "agents have drag weakest; pooled", pr)
+
+
+# ── 14. MiniWebGen's yield over the generation runs of the training pool ─────────────────────────────────────────
+def datagen_yield():
+    reg = yaml.safe_load(open(os.path.join(ROOT, "experiments", "paper.yaml")))
+    keys = ["proposed", "feasible (dry run)", "tasks (worded)", "executed", "passed backend", "kept (dedup + site cap)",
+            "final (trajectory written)", "attempts", "first-attempt successes"]
+    tot, fails = collections.Counter(), collections.Counter()
+    for run in reg["data"]["runs"]:
+        for v in json.load(open(os.path.join(ROOT, "data", "datagen", "runs", run, "yield.json"))).values():
+            for k in keys:
+                tot[k] += v.get(k, 0)
+            fails.update(v.get("failure reasons", {}))
+    pool = len(open(os.path.join(ROOT, "experiments", "pools", "pool3k_plain_ids.txt")).read().split())
+    OUT["datagen_yield"] = {"funnel": dict(tot), "in_pool": pool, "failure_reasons": dict(fails.most_common())}
+    print("\n== 14. MiniWebGen yield:", dict(tot), "-> pool", pool, "| failures", fails.most_common(6))
 
 
 if __name__ == "__main__":
@@ -409,5 +481,7 @@ if __name__ == "__main__":
     heldout_overlap()
     fara_heldout()
     stop_early_control()
+    verifier_profiles()
+    datagen_yield()
     json.dump(OUT, open(os.path.join(HERE, "round1_numbers.json"), "w"), indent=1, default=str)
     print("\nwrote", os.path.join(HERE, "round1_numbers.json"))

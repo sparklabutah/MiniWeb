@@ -171,7 +171,7 @@ def show_rq1(reg):
         print(f"#   {m['model']} via {m['loop']} (experiments/cluster/ownloop.sh)")
         print(f"python -m webmix.fara_rq1 grade --out {out} --arm {m['served']}")
     print("\n# VLM judge for every RQ1 run (judge.jsonl):")
-    print("python -m webmix.judge_runs --runs " + " ".join(m["run"] for g in ("browser_use", "own_loop")
+    print("python -m webmix.judge_runs --runs " + ",".join(m["run"] for g in ("browser_use", "own_loop")
                                                          for m in reg["rq1"][g]) + " --parallel 4")
 
 

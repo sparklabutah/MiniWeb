@@ -111,7 +111,8 @@ def main():
         L.append(r"\addlinespace[2pt]")
     L += [r"\bottomrule", r"\end{tabular}",
           r"\caption{Every comparison of the paper. Paired permutation test over tasks on \miniweb{} and WebArena-Lite "
-          r"(per-task means over three runs); exact McNemar test on the live web. Holm $p$: corrected within each question.}",
+          r"(per-task means over three runs); exact McNemar test on the live web. Holm $p$: corrected within each question. "
+          r"The specialist, 7K-executor and stop-early comparisons are exploratory.}",
           r"\label{tab:supp-tests}", r"\end{table}", ""]
 
     # ── primitives inside the held-out tasks
@@ -135,7 +136,7 @@ def main():
 
     # ── why practice alone fails on tasks
     fm = N["failure_modes"]
-    L += [r"\paragraph{Why practice alone does not raise task success.} Trained on episodes that end after one primitive, the "
+    L += [r"\paragraph{Why practice alone does not raise task success.} Trained on episodes of one or two primitives, the "
           r"single agent ends whole tasks early: its median episode shrinks from "
           f"{fm['base/heldout']['median_steps']} to {fm['pooled/heldout']['median_steps']} steps on the held-out tasks, from "
           f"{fm['base/wa']['median_steps']} to {fm['pooled/wa']['median_steps']} on WebArena-Lite, from "
@@ -158,6 +159,13 @@ def main():
               f"{cw['vs_pooled']['pooled']:.1f}\\% ($p={cw['vs_pooled']['p']:.2f}$), far below \\miniwebagent{{}} "
               f"({ch['vs_planner_pooled']['planner_pooled']:.1f}\\% and {cw['vs_planner_pooled']['planner_pooled']:.1f}\\%; "
               f"$p<10^{{-3}}$ for both). Removing the early stop alone does not chain primitives into tasks.")
+    k = ch["by_task_kind"]
+    L[-1] += (f" Without trained \\texttt{{done}} steps it answers worse: on the {k['answer']['n']} held-out tasks that end in "
+              f"an answer it passes {k['answer']['nodone']:.1f}\\% against {k['answer']['pooled']:.1f}\\% with them. On the "
+              f"{k['action_only']['n']} tasks that need no answer, which the missing steps cannot cost it, it passes "
+              f"{k['action_only']['nodone']:.1f}\\% against {k['action_only']['pooled']:.1f}\\% "
+              f"($p={k['action_only']['p_vs_pooled']:.2f}$) and {k['action_only']['planner_pooled']:.1f}\\% for "
+              f"\\miniwebagent{{}} ($p={k['action_only']['p_vs_planner_pooled']:.3f}$).")
     L.append("")
 
     # ── WebArena-Lite per site
@@ -200,6 +208,7 @@ def main():
 
     # ── diagnosis robustness and data details
     dm = N["drag_modality"]
+    Y = N["datagen_yield"]
     L += [r"\paragraph{Robustness of the skill profiles.} Counting only the primitive instances whose earlier primitives in "
           r"the task all passed, so that a family is not penalized for failures upstream of it, drag \& gesture remains the "
           r"weakest family for each of the ten agents. Averaged over the agents, success by chain length stays within "
@@ -207,7 +216,12 @@ def main():
           r"(Fig.~\ref{fig:chain}, left). Among the six agents with their own loops, five have a drag action in their released "
           r"action spaces (Fara1.5-4B: \texttt{left\_click\_drag}; MolmoWeb: \texttt{drag\_and\_drop}; UI-TARS-1.5-7B: "
           r"\texttt{drag}; OpenCUA-7B: \texttt{dragTo}) and still pass at most 17\% of drag instances; Fara-7B's has none, so "
-          r"its 0\% is by construction.", "",
+          r"its 0\% is by construction. "
+          f"Graded by the task verifiers instead of the judge, drag \\& gesture is the weakest family of "
+          f"{['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'all'][N['verifier_profiles']['drag_weakest_for']]} of the ten agents and within "
+          f"{N['verifier_profiles']['max_gap_when_not']:.1f} points of the weakest for the other; pooled over the agents, the "
+          f"verifiers pass {N['verifier_profiles']['pooled']['Drag & gesture']:.1f}\\% of drag instances against "
+          f"{sorted(N['verifier_profiles']['pooled'].values())[1]:.1f}\\% for the next-weakest family.", "",
           r"\paragraph{The drag \& gesture training data.} Of the drag \& gesture trajectories in the training set, "
           f"{dm['sign_by_freeformdrawing'].get('drag/draw', 0)} draw signatures, "
           f"{dm['reposition_by_drag'].get('drag/draw', 0)} reposition items, and "
@@ -220,6 +234,17 @@ def main():
           r"$10^{-4}$ with a cosine schedule and a batch of 8 steps. The InSTA executor uses the same recipe on 26,368 steps "
           r"from 3,691 trajectories of InSTA's released SFT set: its text-only steps are mapped to our prompt template and "
           r"action schema (click, input, select, scroll, navigate, back, done), and carry no screenshot.", "",
+          r"\paragraph{\miniwebgen{} yield.} Over the generation runs that produced the training pool, "
+          f"{Y['funnel']['proposed']:,} candidate tasks were proposed, {Y['funnel']['feasible (dry run)']:,} passed a dry run "
+          f"on the site's state, {Y['funnel']['tasks (worded)']:,} were worded into instructions, and "
+          f"{Y['funnel']['passed backend']:,} were executed with the backend showing the intended change, in "
+          f"{Y['funnel']['attempts']:,} attempts ({Y['funnel']['first-attempt successes']:,} first-attempt successes). After "
+          f"removing near-duplicates and capping trajectories per site, {Y['funnel']['final (trajectory written)']:,} were "
+          f"kept; {Y['in_pool']:,} of them form the training pool (the rest were retired in review or did not replay in "
+          f"the agent harness). Failed attempts were mostly a scripted action the page did not accept, such as a hidden, "
+          f"covered or stale element ({Y['failure_reasons'].get('action_refused', 0)}), and a failed scripted check on the "
+          f"page ({Y['failure_reasons'].get('script_assert', 0)}); the backend check rejected "
+          f"{Y['failure_reasons'].get('backend_fail', 0)}.", "",
           r"\paragraph{Held-out sites.} The 13 held-out sites were fixed once, before any trajectory was generated. Three of "
           r"the 63 held-out tasks also use a training site (email, team chat, or the code editor) for a cross-site step.", ""]
     open(out, "w").write("\n".join(L) + "\n")
