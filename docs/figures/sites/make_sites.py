@@ -8,8 +8,13 @@ sets of the cross-site human tasks (data/annotations).
 (b) Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)").
 (c) Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
 """
-import glob, json, math, os, re
+import glob, json, math, os, re, sys
 from collections import Counter, defaultdict
+
+# The ring layout iterates sets of site names, whose order follows Python's per-process string-hash seed: pin it so
+# every run draws the same figure (the paper's version up to 2026-10-05 came from one unrecorded seed).
+if os.environ.get("PYTHONHASHSEED") != "0":
+    os.execve(sys.executable, [sys.executable] + sys.argv, {**os.environ, "PYTHONHASHSEED": "0"})
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

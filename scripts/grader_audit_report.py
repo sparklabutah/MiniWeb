@@ -8,6 +8,7 @@ the inter-labeler agreement and Cohen's kappa.
 
     python scripts/grader_audit_report.py --url https://miniweb-production.up.railway.app   # token: MINIWEB_RECOVERY_TOKEN
     python scripts/grader_audit_report.py --labels labels.json [--primary Minh]
+    python scripts/grader_audit_report.py --url ... --pull-only     # back up the labels without scoring them
 """
 import argparse, json, os, random, sys, urllib.request
 from collections import defaultdict
@@ -68,11 +69,16 @@ def main():
     ap.add_argument("--url", help="deployment to fetch labels from (token in MINIWEB_RECOVERY_TOKEN)")
     ap.add_argument("--labels", help="a labels JSON list instead (as /annotate/api/grader_audit/labels.json gives)")
     ap.add_argument("--primary", help="labeler whose labels are scored (default: the one with most labels)")
+    ap.add_argument("--pull-only", action="store_true",
+                    help="only save the labels to data/grader_audit/labels.json (no scores, so labeling stays blind)")
     args = ap.parse_args()
     key = json.loads((OUT / "key.json").read_text())
     pop, cases = key["population"], key["cases"]
     labels = fetch(args.url, os.environ.get("MINIWEB_RECOVERY_TOKEN", "")) if args.url else json.load(open(args.labels))
     (OUT / "labels.json").write_text(json.dumps(labels, indent=1, ensure_ascii=False))
+    if args.pull_only:
+        print(f"{len(labels)} labels by {sorted({r['labeler'] for r in labels})} -> {OUT / 'labels.json'}")
+        return
     by_labeler = defaultdict(dict)
     for r in labels:
         if r["case_id"] in cases:
