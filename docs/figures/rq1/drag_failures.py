@@ -82,9 +82,9 @@ def main():
     rows.sort(key=lambda r: -r[1]["passed"])
 
     # Drawn at its printed width (style.COL_W) so every size is its size on paper: no text below style.MIN_PT (9 pt).
-    W, rh = COL_W, 0.18                                  # width, row pitch per agent (inches)
+    W, rh = COL_W, 0.165                                 # width, row pitch per agent (inches)
     lg_y, lg_h, lg_dy = 0.22, 0.42, 0.2                  # legend panel (two rows of three): top, height, row pitch
-    top, bot = lg_y + lg_h + 0.12, 0.57                  # the bars start under the legend; ticks + a two-line label
+    top, bot = lg_y + lg_h + 0.12, 0.42                  # the bars start under the legend; ticks + the axis label
     H = top + rh * len(rows) + bot
     fig = plt.figure(figsize=(W, H))
     A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off")
@@ -127,8 +127,9 @@ def main():
         fig.text(name_x / W, yf, lab, fontsize=FS["value"], color=INK, ha="left", va="center")
     ax.set_xticks([0, 25, 50, 75, 100]); ax.set_xticklabels(["0", "25", "50", "75", "100%"])
     ax.set_yticks([]); ax.tick_params(labelsize=FS["tick"], length=2.5, width=0.8, pad=2, colors=MUTED)
-    # the axis label on two lines, centred under the bars unless that would run off the right edge
-    xl = "drag & gesture instances\n(12 slider + 6 signature tasks per agent)"
+    # the axis label, centred under the bars unless that would run off the right edge; the task counts are in the
+    # caption (2026-10-06: one line, so Fig. 5 is no taller than Fig. 6 beside it)
+    xl = "drag & gesture instances"
     t = A.text(0, 0, xl, fontsize=FS["small"], color=MUTED, ha="center", va="top", linespacing=1.15)
     cx = min((bar_x + bar_r) / 2, W - 0.06 - _w(fig, t) / 2)
     t.set_position((cx, top + rh * len(rows) + 0.21))
