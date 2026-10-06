@@ -1,4 +1,4 @@
-"""Websites figure (double column): (a) the site graph, (b) all 65 sites as a collage, (c) the data mix.
+"""Websites figure (double column): (a) the site graph, (b) all 65 sites as a collage grouped by data source.
 
 (a) The ring holds the 59 non-hub sites, grouped by domain; the centre holds the six hub sites. Gray edges are event-bus
 links read from the site code: an event a site emits and the hub whose handler records it (app/handlers), plus 2FA codes
@@ -7,7 +7,7 @@ WebMail) and the share button (every page -> ForumHub, PixShare, QuickChat) are 
 sets of the cross-site human tasks (data/annotations).
 Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)"). (b) shows the supplement's
 screenshots of all 65 sites.
-(c) Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
+Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
 """
 import glob, json, math, os, re, sys
 from collections import Counter, defaultdict
@@ -249,84 +249,61 @@ A.text(1.35, ly, "cross-site task", fontsize=5.3, color=INK, va="center")
 # A.text(0.02, H - 0.36, f"Not drawn: sign-up on {len(SIGNUP)} sites → VaultGuard, WebMail; share button on every page.",
 #        fontsize=4.9, color=MUTED, va="center", style="italic")
 
-# ── (b) all 65 sites as a collage (user, 2026-10-06: show the benchmark's scale; replaces the list by domain) ────────
-# An 11 x 8 grid of cells: DesignFlow over 3 x 3 cells, the user's other picks (sports, spreadsheet, cloud) and two
-# held-out sites over 2 x 2, every other site in one cell (88 cells = 9 + 5 x 4 + 59). Held-out sites get a pink frame,
-# a deeper shade of the ring's halo. The screenshots are the supplement's gallery (docs/figures/supp/figures/sites).
+# ── (b) all 65 sites, grouped by data source (user, 2026-10-06: show the benchmark's scale, and real vs synthetic data) ─
+# Two blocks of a 12-column grid, each on a light panel: the sites seeded from public data (blue tint) and the synthetic
+# ones (grey), each label led by the ring's glyph for its source (filled, hollow). Each block names its site and record counts, so the data-mix bars are gone.
+# Featured sites span 2 x 2 or 3 x 3 cells: ShopHub (WebShop products) among the public ones; the user's picks (design,
+# sports, spreadsheet, cloud) and two held-out sites among the synthetic ones. Every other site takes one cell, in a
+# fixed shuffle. Held-out sites have a pink frame, a deeper shade of the ring's halo. Screenshots: the supplement's
+# gallery (docs/figures/supp/figures/sites).
 import random
 from PIL import Image
-FEATURED = {"design-creative": (0, 0, 3), "sports-esports": (0, 6, 2), "spreadsheets-slides": (2, 9, 2),   # (row, col,
-            "cloud-storage-file-transfer": (3, 4, 2), "crowdfunding-donations": (5, 1, 2),             # span)
-            "rating-review": (6, 7, 2)}
-NCOL, NROW, GAP = 11, 8, 0.022
+pub = [s for s in SITES if s in DATASET]
+syn = [s for s in SITES if s not in DATASET]
+rec_pub, rec_syn = sum(REC[s] for s in pub), sum(REC[s] for s in syn)
+BLOCKS = [("Public data", f"{len(pub)} sites, {rec_pub / 1e6:.1f}M records", pub, 2, tint(BLUE, 0.17),
+           {"e-commerce": (0, 5, 2)}),                                                        # (row, col, span)
+          ("Synthetic data", f"{len(syn)} sites, {rec_syn / 1e6:.1f}M records", syn, 6, PANEL,
+           {"design-creative": (0, 0, 3), "sports-esports": (3, 9, 3), "spreadsheets-slides": (0, 7, 2),
+            "cloud-storage-file-transfer": (3, 4, 2), "crowdfunding-donations": (1, 10, 2), "rating-review": (4, 1, 2)})]
+NCOL, GAP, PAD, LAB = 12, 0.022, 0.04, 0.15             # columns; gap between tiles; panel padding; block label height
 HELD_FRAME = "#D9528A"
 bx0, bx1 = 3.12, W - 0.03
-cw = (bx1 - bx0 - GAP * (NCOL - 1)) / NCOL
+cw = (bx1 - bx0 - 2 * PAD - GAP * (NCOL - 1)) / NCOL
 ch = cw * 800 / 1280                                     # the screenshots are 1280 x 800
-title(bx0, 0.1, "(b)", f"All {len(SITES)} websites")
-taken = set()
-for r0, c0, k in FEATURED.values():
-    taken |= {(r0 + i, c0 + j) for i in range(k) for j in range(k)}
-rest = sorted(set(SITES) - set(FEATURED)); random.Random(0).shuffle(rest)   # a fixed mix of looks
-free = [(r, c) for r in range(NROW) for c in range(NCOL) if (r, c) not in taken]
-assert len(free) == len(rest), (len(free), len(rest))
-place = {s: (r, c, 1) for s, (r, c) in zip(rest, free)} | FEATURED
-y0 = 0.2                                                 # below the heading strip that save() trims
-for s_, (r, c, k) in place.items():
-    x, y = bx0 + c * (cw + GAP), y0 + r * (ch + GAP)
-    w, h = k * cw + (k - 1) * GAP, k * ch + (k - 1) * GAP
-    im = Image.open(os.path.join(HERE, "..", "supp", "figures", "sites", s_ + ".jpg")).convert("RGB")
-    px = round(w * 450)                                  # about 1.5x the print resolution of each tile
-    im = im.resize((px, round(px * 800 / 1280)), Image.LANCZOS)
-    ia = fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H]); ia.imshow(im, interpolation="lanczos"); ia.axis("off")
-    held = s_ in HELD_OUT
-    A.add_patch(Rectangle((x, y), w, h, fc="none", ec=HELD_FRAME if held else EDGE, lw=1.1 if held else 0.4, zorder=6))
-y_b_end = y0 + NROW * (ch + GAP)
-
-# ── (c) data mix ────────────────────────────────────────────────────────────
-pub = [s for s in SITES if s in DATASET]
-rec_pub, rec_syn = sum(REC[s] for s in pub), sum(REC[s] for s in SITES if s not in DATASET)
-cy0 = y_b_end + (0.3 if HEADINGS else 0.2)
-title(bx0, cy0, "(c)", "Data mix")
-bh = 0.2
-
-
-def mbar(x0, w, label, a, b, fa, fb):
-    t = A.text(x0, cy0, label, fontsize=5.3, color=INK, va="center")
-    x0 += width(t) + 0.05
-    w -= width(t) + 0.05
-    wa = w * a / (a + b)
-    A.add_patch(FancyBboxPatch((x0, cy0 - bh / 2), wa - 0.012, bh, boxstyle="round,pad=0,rounding_size=0.015", fc=INK,
-                               ec="none"))
-    A.add_patch(FancyBboxPatch((x0 + wa + 0.012, cy0 - bh / 2), w - wa - 0.012, bh,
-                               boxstyle="round,pad=0,rounding_size=0.015", fc=tint(INK, 0.14), ec=INK, lw=0.5))
-    A.text(x0 + 0.04, cy0 + 0.003, fa, fontsize=5.0, color="white", va="center")
-    tb = A.text(x0 + w - 0.04, cy0 + 0.003, fb, fontsize=5.0, color=INK, va="center", ha="right")
-    if width(tb) + 0.06 > w - wa:                     # too narrow: label just past the bar
-        tb.set_position((x0 + w + 0.04, cy0 + 0.003)); tb.set_ha("left")
-
-
-from style import HEADINGS
-mx = 0.72 if HEADINGS else 0                             # without the "Data mix" heading the bars start at the panel edge
-mbar(bx0 + mx, 1.45 + (0 if HEADINGS else 0.3), "sites", len(pub), len(SITES) - len(pub), f"{len(pub)} public",
-     f"{len(SITES) - len(pub)} synthetic")
-mbar(bx0 + (2.35 if HEADINGS else 1.95), 1.3 + (0 if HEADINGS else 0.3), "records", rec_pub, rec_syn,
-     f"{rec_pub / 1e6:.1f}M", f"{rec_syn / 1e6:.1f}M")
-ds = sorted({p.strip() for v in DATASET.values() for p in v.split(",")}, key=str.lower)
-# words, lines, cur = ("Public datasets: " + ", ".join(ds)).split(" "), [], ""
-# for wd in words:                                       # wrap to the panel width
-#     probe = A.text(0, 0, (cur + " " + wd).strip(), fontsize=5.0)
-#     if width(probe) > bx1 - bx0 - 0.02 and cur:
-#         lines.append(cur); cur = wd
-#     else:
-#         cur = (cur + " " + wd).strip()
-#     probe.remove()
-# lines.append(cur)
-# A.text(bx0, cy0 + 0.09, "\n".join(lines), fontsize=5.0, color=MUTED, va="top", linespacing=1.25)
+y = 0.2                                                  # below the heading strip that save() trims
+for head, counts, sites, nrow, fc, featured in BLOCKS:
+    bh = LAB + nrow * ch + (nrow - 1) * GAP + 2 * PAD
+    A.add_patch(FancyBboxPatch((bx0, y), bx1 - bx0, bh, boxstyle="round,pad=0,rounding_size=0.03", fc=fc, ec="none",
+                               zorder=0.4))
+    g = A.text(bx0 + PAD, y + PAD + LAB / 2 - 0.01, "●" if sites is pub else "○", fontsize=5.0, family=GLYPH, color=INK,
+               va="center")
+    t = A.text(bx0 + PAD + width(g) + 0.04, y + PAD + LAB / 2 - 0.01, head, fontsize=5.6, weight="bold", color=INK,
+               va="center")
+    A.text(bx0 + PAD + width(g) + 0.04 + width(t) + 0.06, y + PAD + LAB / 2 - 0.01, counts, fontsize=5.6, color=MUTED, va="center")
+    taken = set()
+    for r0, c0, k in featured.values():
+        taken |= {(r0 + i, c0 + j) for i in range(k) for j in range(k)}
+    rest = sorted(set(sites) - set(featured)); random.Random(0).shuffle(rest)   # a fixed mix of looks
+    free = [(r, c) for r in range(nrow) for c in range(NCOL) if (r, c) not in taken]
+    assert len(free) == len(rest), (head, len(free), len(rest))
+    gy = y + PAD + LAB
+    for s_, (r, c, k) in ({x: (r, c, 1) for x, (r, c) in zip(rest, free)} | featured).items():
+        x, yy = bx0 + PAD + c * (cw + GAP), gy + r * (ch + GAP)
+        w, h = k * cw + (k - 1) * GAP, k * ch + (k - 1) * GAP
+        im = Image.open(os.path.join(HERE, "..", "supp", "figures", "sites", s_ + ".jpg")).convert("RGB")
+        px = round(w * 450)                              # about 1.5x the print resolution of each tile
+        im = im.resize((px, round(px * 800 / 1280)), Image.LANCZOS)
+        ia = fig.add_axes([x / W, 1 - (yy + h) / H, w / W, h / H]); ia.imshow(im, interpolation="lanczos"); ia.axis("off")
+        held = s_ in HELD_OUT
+        A.add_patch(Rectangle((x, yy), w, h, fc="none", ec=HELD_FRAME if held else MUTED, lw=1.4 if held else 0.8,
+                              zorder=6))
+    y += bh + 0.06
+y_b_end = y - 0.06
 
 out = os.path.join(HERE, "sites")
 from style import save
-y_end = max(y_leg_end, cy0 + bh / 2) + 0.04              # lowest content (inches from the top)
+y_end = max(y_leg_end, y_b_end) + 0.04                  # lowest content (inches from the top)
 save(fig, out, strip=0.18, bottom=0 if HEADINGS else max(0.0, H - y_end))   # trims the heading strip and empty bottom
 print("wrote", out, f"| edges {len(EDGES)} from {len({s for s, _ in EDGES})} sites | signup {len(SIGNUP)} | linked {len(linked)}"
       f" | linked non-hub {len(linked - set(HUBS))} | cross pairs {len(cross)} tasks {n_cross_tasks} | public {len(pub)} rec {rec_pub:,}/{rec_syn:,} | b ends {y_b_end:.2f}")
