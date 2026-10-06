@@ -21,11 +21,9 @@ SHORT = {"Navigation": "Nav.", "Text entry": "Text", "Discrete selection": "Sele
 def per_task(path, only=None):
     """[(judge pass, verifier pass, [(family, op or None, passed), ...]), ...]: one entry per task, from a judge.jsonl."""
     from make_rq1_bars import MJ, FAMILY_OF
+    from results import judge_rows
     out = []
-    for line in open(path):
-        if not line.strip():
-            continue
-        r = json.loads(line)
+    for r in judge_rows(path):
         _, task, _ = MJ._load(r["key"])
         ops = task.get("macro_operations") or {}
         inst = []

@@ -42,10 +42,11 @@ def episodes():
     """Every judged RQ1 episode with both graders' verdicts: the population of the paper's agreement numbers."""
     eps = []
     for agent, run in RUNS.items():
-        jf, rf = EVAL / run / "judge.jsonl", EVAL / run / "results.jsonl"
+        jf = EVAL / run / "judge.jsonl"
+        rf = next(EVAL / run / n for n in ("results_regraded.jsonl", "results.jsonl") if (EVAL / run / n).exists())
         if not jf.exists():
             continue
-        ver = {}
+        ver, ver_ok = {}, {}
         for line in rf.read_text().splitlines():
             if line.strip():
                 r = json.loads(line)
@@ -56,13 +57,17 @@ def episodes():
                     except (ValueError, SyntaxError):
                         d = {}
                 ver[r["task_id"]] = d if isinstance(d, dict) else {}
+                ver_ok[r["task_id"]] = bool(r.get("ok"))
         for line in jf.read_text().splitlines():
             r = json.loads(line) if line.strip() else {}
             if r.get("passed") is None or r.get("verifier") is None:
                 continue
-            j, v = bool(r["passed"]), bool(r["verifier"])
+            # strata come from the verdicts judge.jsonl stored when the judge ran (fixed, so a rerun redraws the same
+            # sample); the key records the verifier's current verdict (a later regrade can change it) for scoring
+            j, v0 = bool(r["passed"]), bool(r["verifier"])
+            v = ver_ok.get(r["task_id"], v0)
             stratum = {(True, True): "both_pass", (False, False): "both_fail",
-                       (True, False): "judge_only", (False, True): "verifier_only"}[(j, v)]
+                       (True, False): "judge_only", (False, True): "verifier_only"}[(j, v0)]
             inst = {k: x for k, x in r["instances"].items() if x.get("required", True)}
             eps.append({"agent": agent, "run": run, "task_id": r["task_id"], "key": r["key"], "stratum": stratum,
                         "judge": j, "verifier": v, "instances": inst,

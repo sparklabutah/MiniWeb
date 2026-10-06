@@ -30,6 +30,16 @@ def _records(run):
     return {r["task_id"]: r for r in _jl(path)}
 
 
+def judge_rows(path):
+    """The rows of a run's judge.jsonl with `verifier` taken from the run's current results (regraded when present):
+    judge.jsonl keeps the verdict it saw when the judge ran, which a later regrade can change."""
+    ok = {t: bool(r.get("ok")) for t, r in _records(os.path.dirname(_p(path))).items()}
+    for r in _jl(_p(path)):
+        if r["task_id"] in ok:
+            r["verifier"] = ok[r["task_id"]]
+        yield r
+
+
 def human_tasks():
     return [json.load(open(f)) for f in glob.glob(os.path.join(ROOT, "data", "annotations", "*", "*", "task.json"))]
 

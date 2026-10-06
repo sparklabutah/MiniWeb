@@ -21,7 +21,7 @@ os.chdir(ROOT)
 from datagen.viewer import FAMILY_OF  # noqa: E402
 from evaluation import macro_judge as MJ  # noqa: E402
 sys.path.insert(0, os.path.join(ROOT, "docs", "figures", "common"))
-from results import primitive_filter  # noqa: E402
+from results import judge_rows, primitive_filter  # noqa: E402
 
 plt.rcParams.update({"font.family": "Nimbus Sans", "font.size": 6.5, "pdf.fonttype": 42, "ps.fonttype": 42,
                      "hatch.linewidth": 0.5})
@@ -42,10 +42,7 @@ def collect(path, only=None):
     `only`: count the instances of these primitives (task success always uses the whole task)."""
     fam, op = collections.defaultdict(lambda: [0, 0]), collections.defaultdict(lambda: [0, 0])
     n = task_j = task_v = 0
-    for line in open(path):
-        if not line.strip():
-            continue
-        r = json.loads(line)
+    for r in judge_rows(path):
         n += 1
         task_j += bool(r.get("passed"))
         task_v += bool(r.get("verifier"))

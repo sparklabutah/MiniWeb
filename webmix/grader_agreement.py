@@ -46,8 +46,14 @@ def agent_agreement():
         if not f.exists():
             continue
         j, v = [], []
+        # the verifier's current verdict: judge.jsonl keeps the one it saw when the judge ran, which a regrade can change
+        res = next((EVAL / run / n for n in ("results_regraded.jsonl", "results.jsonl") if (EVAL / run / n).exists()), None)
+        now = {} if res is None else {json.loads(l)["task_id"]: bool(json.loads(l).get("ok"))
+                                      for l in res.read_text().splitlines() if l.strip()}
         for line in f.read_text().splitlines():
             r = json.loads(line) if line.strip() else {}
+            if r.get("task_id") in now:
+                r["verifier"] = now[r["task_id"]]
             if r.get("passed") is not None and r.get("verifier") is not None:
                 j.append(bool(r["passed"]))
                 v.append(bool(r["verifier"]))
