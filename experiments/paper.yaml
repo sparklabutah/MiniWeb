@@ -107,7 +107,8 @@ rq1:
 # ── trained adapters ────────────────────────────────────────────────────────────────────────────────────────────────
 # torchrun --standalone --nproc_per_node <gpus> -m webmix.train --out data/webmix/adapters/<name> <args>, with
 # WEBMIX_REPLAY_DIR = a folder of the replayed episodes listed in <pool> (reproduce.py train builds it as symlinks).
-# Recipe for all: LoRA rank 64, alpha 128, lr 1e-4, one epoch, gradient accumulation 8 per GPU, no KL anchor (beta 0).
+# Recipe for all: LoRA rank 64, alpha 128, lr 1e-4, one epoch, a global batch of 8 rows (--grad-accum is global:
+# webmix.train divides it by the GPU count, so the GPU count changes speed, not the recipe), no KL anchor (beta 0).
 recipe: "--adapter pooled --epochs 1 --lr 1e-4 --rank 64 --alpha 128 --grad-accum 8 --beta 0 --seed 0"
 adapters:
   pooled_v4:     {pool: experiments/pools/pool3k_dirs.txt, gpus: 4, rows: 27646,

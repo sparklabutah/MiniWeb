@@ -208,8 +208,8 @@ def train(args):
     cmd = (f"CUDA_VISIBLE_DEVICES={gpus} WEBMIX_REPLAY_DIR={rows} torchrun --standalone --nproc_per_node {n} "
            f"-m webmix.train --out data/webmix/adapters/{args.adapter} {reg['recipe']} {a.get('args', '')}").strip()
     if n != a["gpus"]:
-        print(f"# note: the paper's {args.adapter} trained on {a['gpus']} GPU(s); gradient accumulation is per GPU, "
-              f"so {n} GPU(s) change the effective batch")
+        print(f"# note: the paper's {args.adapter} trained on {a['gpus']} GPU(s); --grad-accum is the global batch, so "
+              f"{n} GPU(s) keep the recipe (each rank sees a different share of the shuffled rows)")
     for c in [build, cmd]:
         if c:
             print(c)

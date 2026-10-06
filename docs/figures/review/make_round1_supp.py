@@ -14,7 +14,8 @@ ARM = {"base": "Single agent, untrained", "pooled": "Single agent, trained", "pl
        "planner_pooled": r"\miniwebagent{} (planner + trained executor)", "insta": "Planner + InSTA executor (26.4K steps)",
        "agent": "Planner + family specialists", "pooled7k": "Planner + 7K-trajectory executor (56.4K steps)",
        "base9b": "Qwen3.5-9B single agent, untrained", "planner9b": "Qwen3.5-9B planner, untrained executor",
-       "fara": "Fara1.5-4B weights in our harness"}
+       "fara": "Fara1.5-4B weights in our harness",
+       "nodone": r"Single agent, trained without the final \texttt{done} steps"}
 FAMS = [("Navigation", "Nav."), ("Text entry", "Text"), ("Discrete selection", "Select"), ("Form transaction", "Form"),
         ("Out-of-page I/O", "I/O"), ("Drag & gesture", "Drag"), ("Reasoning base", "Reason")]
 
@@ -68,7 +69,7 @@ def main():
         if b in ("wv", "om2w"):
             return f"{x['seed1']:.1f}"
         return f"{x['mean']:.1f} $\\pm$ {x['se'] or 0:.1f}" if len(x["runs"]) > 1 else f"{x['mean']:.1f}"
-    for arm in ("base", "pooled", "planner", "planner_pooled", "insta", "agent", "pooled7k"):
+    for arm in ("base", "pooled", "planner", "planner_pooled", "insta", "agent", "pooled7k", "nodone"):
         L.append(f"{ARM[arm]} & " + " & ".join(cell(arm, b) for b in ("single", "heldout", "wa", "wv", "om2w")) + r" \\")
     L.append(r"\midrule")
     L.append(r"\multicolumn{6}{@{}l}{\textit{Other models on the 63 held-out tasks}} \\")
@@ -78,8 +79,8 @@ def main():
     L.append(f"Fara1.5-4B, its own agent loop (one run) & -- & {o['Fara1.5-4B own loop']['verifier']:.1f} & -- & -- & -- \\\\")
     L += [r"\bottomrule", r"\end{tabular}",
           r"\caption{Task success (\%) of every configuration. Means $\pm$ standard error over runs where there are several "
-          r"(three for \miniweb{} and WebArena-Lite, two for the Qwen3.5-9B single agent, whose two greedy runs score the "
-          r"same). The main text's figures use the first five rows.}", r"\label{tab:supp-all}", r"\end{table}", ""]
+          r"(three for \miniweb{} and WebArena-Lite; two for the Qwen3.5-9B single agent, whose two greedy runs score the "
+          r"same, and for Fara1.5-4B's held-out tasks). The main text's figures use the first five rows.}", r"\label{tab:supp-all}", r"\end{table}", ""]
 
     # ── tests
     groups = {}
@@ -98,7 +99,9 @@ def main():
              "trained executor": "Trained executor (over the planner)", "MiniWebAgent vs single": r"\miniwebagent{} vs.\ single agent",
              "InSTA executor": "InSTA executor (over the planner)", "ours vs InSTA": "Our executor vs.\ InSTA's",
              "specialists vs pooled": "Specialists vs.\ pooled executor", "7K vs 3.1K executor": "7K vs.\ 3.1K executor",
-             "MiniWebAgent vs trained single": r"\miniwebagent{} vs.\ trained single agent"}
+             "MiniWebAgent vs trained single": r"\miniwebagent{} vs.\ trained single agent",
+             "stop-early control": r"Trained without the final \texttt{done} steps (vs.\ with them)",
+             "MiniWebAgent vs stop-early control": r"\miniwebagent{} vs.\ that control"}
     bn = {"single": "Single primitives", "heldout": "Held-out tasks", "wa": "WebArena-Lite", "wv": "WebVoyager", "om2w": "Online-Mind2Web"}
     for g, ts in groups.items():
         adj = holm([t["p"] for t in ts])
@@ -141,7 +144,21 @@ def main():
           f"agent reaches its action budget in {fm['base/wa']['at_cap_40_pct']:.0f}\\% of WebArena-Lite episodes. The trained "
           r"agent's WebVoyager run used a 40-action budget instead of 100; "
           f"{fm['pooled/wv']['at_cap_40_pct']:.0f}\\% of its episodes reached it, so its WebVoyager number may be "
-          r"slightly low, but its median episode (9 steps) is far below either budget.", ""]
+          r"slightly low, but its median episode (9 steps) is far below either budget."]
+    c = N["stop_early_control"]
+    ch, cw = c["heldout"], c["wa"]
+    L[-1] += (r" \textbf{Stop-early control.} Trained on the same steps without each episode's final \texttt{done} step, the "
+              r"single agent no longer stops early: its median episode runs the whole "
+              f"{ch['median_steps']}-action budget on the held-out tasks and on WebArena-Lite, which it reaches in "
+              + (f"{ch['at_cap_40_pct']:.0f}\\% of episodes on both" if round(ch['at_cap_40_pct']) == round(cw['at_cap_40_pct'])
+                 else f"{ch['at_cap_40_pct']:.0f}\\% and {cw['at_cap_40_pct']:.0f}\\% of episodes") +
+              ". Its task success does not rise: "
+              f"{ch['mean']:.1f}\\% on the held-out tasks against {ch['vs_pooled']['pooled']:.1f}\\% with the \\texttt{{done}} "
+              f"steps ($p={ch['vs_pooled']['p']:.2f}$) and {cw['mean']:.1f}\\% on WebArena-Lite against "
+              f"{cw['vs_pooled']['pooled']:.1f}\\% ($p={cw['vs_pooled']['p']:.2f}$), far below \\miniwebagent{{}} "
+              f"({ch['vs_planner_pooled']['planner_pooled']:.1f}\\% and {cw['vs_planner_pooled']['planner_pooled']:.1f}\\%; "
+              f"$p<10^{{-3}}$ for both). Removing the early stop alone does not chain primitives into tasks.")
+    L.append("")
 
     # ── WebArena-Lite per site
     W = N["wa_domains"]

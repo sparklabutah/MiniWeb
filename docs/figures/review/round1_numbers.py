@@ -13,7 +13,7 @@ import yaml
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "common"))
 sys.path.insert(0, os.path.join(HERE, "..", "tables"))
-from results import ROOT, task_outcomes, primitive_filter, _records, human_tasks  # noqa: E402
+from results import ROOT, task_outcomes, primitive_filter, _records, human_tasks, judge_rows  # noqa: E402
 from paper_stats import permutation, mcnemar, no_reddit_gitlab  # noqa: E402
 sys.path.insert(0, ROOT)
 from datagen.viewer import FAMILY_OF  # noqa: E402
@@ -25,12 +25,14 @@ RUNS["insta"] = {"heldout": [f"{E}/pagent_insta_s1", f"{E}/pagent_insta_s2", f"{
                  "wa": [f"{WA}/agent_insta_s1", f"{WA}/agent_insta_s2", f"{WA}/agent_insta_s3"],
                  "wv": [f"{G}/webvoyager100_agent_insta_wvjudge"], "om2w": [f"{G}/om2w100_agent_insta_webjudge"]}
 RUNS["pooled7k"] = {"heldout": [f"{E}/pagent_7k_s1", f"{E}/pagent_7k_s2", f"{E}/pagent_7k_s3"]}
+RUNS["nodone"] = {"heldout": [f"{E}/r1_control_nodone_s1", f"{E}/r1_control_nodone_s2", f"{E}/r1_control_nodone_s3"],
+                  "wa": [f"{WA}/nodone_s1", f"{WA}/nodone_s2", f"{WA}/nodone_s3"]}
 RUNS["base9b"] = {"heldout": [f"{E}/seeds/base9b_s2", f"{E}/seeds/base9b_s3"]}
 RUNS["planner9b"] = {"heldout": [f"{E}/seeds/pagent9b_base_s1", f"{E}/seeds/pagent9b_base_s2", f"{E}/seeds/pagent9b_base_s3"]}
 ARMS = {"base": "single, untrained", "pooled": "single, trained", "planner": "planner, untrained",
         "planner_pooled": "MiniWebAgent", "insta": "planner + InSTA executor", "agent": "planner + family specialists",
         "pooled7k": "planner + 7K executor", "base9b": "Qwen3.5-9B single, untrained", "planner9b": "Qwen3.5-9B planner, untrained",
-        "fara": "Fara1.5-4B in our harness"}
+        "fara": "Fara1.5-4B in our harness", "nodone": "single, trained without final done steps"}
 OUT = {}
 
 
@@ -101,6 +103,9 @@ TESTS = [  # (bench, A, B, label); B against A
     ("wv", "planner_pooled", "agent", "specialists vs pooled: WV"), ("om2w", "planner_pooled", "agent", "specialists vs pooled: OM2W"),
     ("heldout", "planner_pooled", "pooled7k", "7K vs 3.1K executor: held-out"),
     ("single", "pooled", "planner_pooled", "MiniWebAgent vs trained single: single primitives"),
+    ("heldout", "pooled", "nodone", "stop-early control: held-out"), ("wa", "pooled", "nodone", "stop-early control: WA"),
+    ("heldout", "nodone", "planner_pooled", "MiniWebAgent vs stop-early control: held-out"),
+    ("wa", "nodone", "planner_pooled", "MiniWebAgent vs stop-early control: WA"),
 ]
 
 
@@ -345,13 +350,50 @@ def fara_heldout():
     out = {}
     for name, path in (("Fara1.5-4B own loop", f"{E}/rq1_fara15_4b_all/judge.jsonl"), ("Qwen3.5-9B", f"{E}/rq1_qwen35_9b_all/judge.jsonl"),
                        ("Qwen3.5-4B", f"{E}/rq1_qwen35_4b_all/judge.jsonl")):
-        rs = [json.loads(l) for l in open(os.path.join(ROOT, path)) if l.strip()]
+        rs = list(judge_rows(path))                            # the verifier's current verdict (regrades included)
         sub = [r for r in rs if r["task_id"] in held_ids]
         ver = [r.get("verifier") for r in sub if r.get("verifier") is not None]
         out[name] = {"n": len(sub), "judge": round(100 * st.mean(bool(r["passed"]) for r in sub), 1) if sub else None,
                      "verifier": round(100 * st.mean(bool(v) for v in ver), 1) if ver else None}
     OUT["heldout_other_agents"] = out
     print("\n== 11. other agents on the 63 held-out tasks (one RQ1 run each):", out)
+
+
+# ── 12. stop-early control: the single agent trained without each episode's final done step ─────────────────────
+def stop_early_control():
+    """AC item 2 (review round 1): does dropping the trained `done` steps let the single agent finish tasks?
+    Per-task means over the three runs, paired permutation tests against the untrained and trained single agents and
+    MiniWebAgent; episode length and how failures end (as failure_modes, all three runs)."""
+    out = {}
+    for bench, kind in (("heldout", "miniweb"), ("wa", "webarena")):
+        def per_task(arm):
+            runs = [task_outcomes(kind, r) for r in RUNS[arm][bench]]
+            ids = set.intersection(*(set(r) for r in runs))
+            return {i: st.mean(r[i] for r in runs) for i in ids}
+        nd = per_task("nodone")
+        res = {"runs": [round(100 * st.mean(task_outcomes(kind, r).values()), 1) for r in RUNS["nodone"][bench]]}
+        res["mean"] = round(100 * st.mean(nd.values()), 1)
+        for other in ("base", "pooled", "planner_pooled"):
+            n, a, b, p = permutation(per_task(other), nd)
+            res[f"vs_{other}"] = {"n": n, other: round(a, 1), "nodone": round(b, 1), "diff": round(b - a, 1), "p": p}
+        steps, fail_done, fails = [], 0, 0
+        for run in RUNS["nodone"][bench]:
+            for r in _records(run).values():
+                steps.append(r.get("steps") or 0)
+                ok = r.get("ok") if bench == "heldout" else float(r.get("score", 0)) > 0
+                if not ok:
+                    fails += 1
+                    fail_done += bool(r.get("done"))
+        steps.sort()
+        res["episodes"] = len(steps)
+        res["median_steps"] = steps[len(steps) // 2]
+        res["fail_with_done_pct"] = round(100 * fail_done / max(1, fails), 1)
+        res["at_cap_40_pct"] = round(100 * sum(x >= 40 for x in steps) / len(steps), 1)
+        out[bench] = res
+    OUT["stop_early_control"] = out
+    print("\n== 12. stop-early control (trained without final done steps):")
+    for k, v in out.items():
+        print(f"  {k}: {v}")
 
 
 if __name__ == "__main__":
@@ -366,5 +408,6 @@ if __name__ == "__main__":
     planner_caps()
     heldout_overlap()
     fara_heldout()
+    stop_early_control()
     json.dump(OUT, open(os.path.join(HERE, "round1_numbers.json"), "w"), indent=1, default=str)
     print("\nwrote", os.path.join(HERE, "round1_numbers.json"))
