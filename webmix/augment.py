@@ -207,76 +207,6 @@ def home_chain_candidates(items, per_second=3, limit=None, seed=0):
     return out[:limit] if limit else out
 
 
-def task_chain_candidates(items, lengths=(2, 3, 4), n_chains=2400, max_uses=2, seed=0):
-    """Review round 1, A2 (2026-10-05, user-approved): TASK-CENTRIC episodes built from the same kept trajectories as
-    the skill-centric set, to compare skill- and task-centric data with the sites, pipeline and states held fixed.
-    One episode = k (2-4) trajectories of one site under one merged instruction. A part may follow the previous one
-    when, as in the two-part chains, either (same page) both start on the same page, the previous one stays on it
-    and is an on-page change (CHAIN_FIRST) and this one is a CHAIN_SECOND macro, or (home) this one starts fresh on
-    the site's home page with no special session (the student clicks the site's own home link first, see
-    replay_chain(always_home=True)). No part answers a question; parts act on different controls and watch disjoint
-    (site, collection) scopes, differing in macro where possible. A trajectory joins at most `max_uses` episodes.
-    items as for chain_candidates -> [tuple of dirs]."""
-    recs = defaultdict(list)
-    for tid, d in items:
-        try:
-            traj = json.loads((d / "trajectory.json").read_text())
-        except OSError:
-            continue
-        task = R.load_task(d.parent.parent.name, tid)
-        if _answers(traj) or task["check"].get("kind") == "answer" or task["start"]["kind"] == "mid_chain":
-            continue
-        start = _path(task["start"]["url"])
-        ctrl = task["control"]
-        home = (task["start"]["kind"] == "fresh" and start == f"/sites/{traj['site']}" and not task["start"].get("keep")
-                and ctrl.get("role") not in _FLAGGED and not (ctrl.get("prep") or {}))
-        page = (task["start"]["kind"] == "fresh" and not task["start"].get("keep") and not traj.get("history_macro"))
-        query = bool(urlsplit(task["start"]["url"] or "").query)
-        linkable = (page and not home and not query and ctrl.get("role") not in _FLAGGED and not (ctrl.get("prep") or {}))
-        recs[traj["site"]].append({"dir": d, "traj": traj, "task": task, "start": start, "home": home,
-                                   "page": page, "stays": page and _stays(traj, start), "linkable": linkable})
-
-    def can_follow(a, b):
-        if b["home"]:
-            return True
-        if (b["page"] and a["stays"] and a["start"] == b["start"] and a["traj"]["macro"] in CHAIN_FIRST
-                and b["traj"]["macro"] in CHAIN_SECOND):
-            return True
-        # (link) b starts fresh on another page of the site: the student clicks the home link, then the home page's
-        # own link to b's page (replay_chain; an episode whose page has no such link fails its replay and is dropped)
-        return b["linkable"]
-
-    rng, uses, out, seen = random.Random(seed), defaultdict(int), [], set()
-    sites = sorted(recs)
-    fails = 0
-    while len(out) < n_chains and fails < 50000:
-        site = rng.choice(sites)
-        k = rng.choice(lengths)
-        pool = [a for a in recs[site] if uses[a["traj"]["id"]] < max_uses]
-        if len(pool) < k:
-            fails += 1
-            continue
-        chain = [rng.choice(pool)]
-        for _ in range(k - 1):
-            cand = [b for b in pool if can_follow(chain[-1], b)
-                    and all(b["traj"]["id"] != c["traj"]["id"]
-                            and b["task"]["control"].get("control_id") != c["task"]["control"].get("control_id")
-                            and not _scope(b["task"]) & _scope(c["task"]) for c in chain)]
-            if not cand:
-                break
-            other = [b for b in cand if b["traj"]["macro"] not in {c["traj"]["macro"] for c in chain}]
-            chain.append(rng.choice(other or cand))
-        key = tuple(c["traj"]["id"] for c in chain)
-        if len(chain) < k or key in seen:
-            fails += 1
-            continue
-        seen.add(key)
-        for c in chain:
-            uses[c["traj"]["id"]] += 1
-        out.append(tuple(c["dir"] for c in chain))
-    return out
-
-
 def _values(text):
     """Names and values an instruction must keep: numbers, quoted strings, Capitalized word runs."""
     vals = set(re.findall(r"\d[\d,.:/-]*\d|\d", text))
@@ -304,19 +234,17 @@ async def merge_instructions(a, b):
 
 
 def chain_id(dirs, prefix="chain"):
-    """accepted/<task id> dirs -> the chain episode's id ("tchain-..." for the task-centric episodes of round 1 A2)."""
+    """accepted/<task id> dirs -> the chain episode's id."""
     ids = [d.name for d in dirs]
     site = json.loads((dirs[0] / "trajectory.json").read_text())["site"]
     return f"{prefix}-{site}-" + hashlib.sha1("+".join(ids).encode()).hexdigest()[:10]
 
 
-async def replay_chain(dirs, base, out_root=R.OUT_DIR, headless=True, log=print, always_home=False, variant="chain"):
-    """Replay kept trajectories one after another as one episode (see chain_candidates). always_home (task-centric
-    chains): the student clicks the site's home link before every later part that starts on the home page, even when
-    the part before also started there (it may end anywhere); a part on the previous one's page needs no link."""
+async def replay_chain(dirs, base, out_root=R.OUT_DIR, headless=True, log=print):
+    """Replay kept trajectories one after another as one episode (see chain_candidates)."""
     parts = [R.load_part(d, base) for d in dirs]
     ids = [p["traj"]["id"] for p in parts]
-    eid = chain_id(dirs, "tchain" if variant == "taskchain" else "chain")
+    eid = chain_id(dirs)
     plan, seg0 = [], 0
     try:
         for k, p in enumerate(parts):
@@ -324,26 +252,19 @@ async def replay_chain(dirs, base, out_root=R.OUT_DIR, headless=True, log=print,
             if k < len(parts) - 1:
                 ops = [op for op in ops if op["op"] != "done"]
             ops = [dict(op, segment=op["segment"] + seg0) for op in ops]
-            start, prev = _path(p["task"]["start"]["url"]), parts[k - 1] if k else None
-            starts_home = start == f"/sites/{p['traj']['site']}"
-            same_page = prev is not None and start == _path(prev["task"]["start"]["url"]) and _stays(prev["traj"], start)
-            if k and always_home and not starts_home and not same_page:
-                # task-centric chains: back to the home page, then the site's own link to this part's page
-                ops = [{"op": "home", "segment": ops[0]["segment"], "macro": ops[0]["macro"], "site": p["traj"]["site"]},
-                       {"op": "link", "segment": ops[0]["segment"], "macro": ops[0]["macro"], "path": start}] + ops
-            elif k and ((always_home and starts_home) or (not always_home and start
-                                                          != _path(parts[k - 1]["task"]["start"]["url"]))):
+            start = _path(p["task"]["start"]["url"])
+            if k and start != _path(parts[k - 1]["task"]["start"]["url"]):
                 # the next part starts on the site's home page: its own home link gets there
                 ops.insert(0, {"op": "home", "segment": ops[0]["segment"], "macro": ops[0]["macro"],
                                "site": p["traj"]["site"]})
             plan += ops
             seg0 = max(op["segment"] for op in plan) + 1
     except R.Unsupported as e:
-        return {"task_id": eid, "variant": variant, "parts": ids, "ok": False, "error": f"unsupported: {e}", "steps": 0}
+        return {"task_id": eid, "variant": "chain", "parts": ids, "ok": False, "error": f"unsupported: {e}", "steps": 0}
     instruction = parts[0]["task"]["instruction"]
     for p in parts[1:]:
         instruction, how = await merge_instructions(instruction, p["task"]["instruction"])
-    spec = {"id": eid, "variant": variant, "parts": parts, "instruction": instruction, "plan": plan}
+    spec = {"id": eid, "variant": "chain", "parts": parts, "instruction": instruction, "plan": plan}
     res = await R.replay_episode(spec, base, out_root, headless, log)
     res["instruction_by"] = how
     return res

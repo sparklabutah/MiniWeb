@@ -2,9 +2,9 @@
 of the RQ3 figure.
 In each panel, the planner with one pooled adapter trained on growing subsets of the generated data, the same recipe on
 InSTA's live-web trajectories at matched size, and the untrained planner as a dashed reference; task success against
-training steps. Panels, runs and step counts are set in scaling_config.yaml; points are means over the listed runs.
+training steps. Panels, runs and step counts are set in scaling_wv_config.yaml; points are means over the listed runs.
 
-    python docs/figures/scaling/make_scaling.py [--config docs/figures/scaling/scaling_config.yaml]
+    python docs/figures/scaling/make_scaling.py [--config docs/figures/scaling/scaling_wv_config.yaml]
 """
 import argparse, os, statistics as st, sys
 import yaml
@@ -85,7 +85,7 @@ def panel(ax, p, cfg):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=os.path.join(HERE, "scaling_config.yaml"))
+    ap.add_argument("--config", default=os.path.join(HERE, "scaling_wv_config.yaml"))
     cfg = yaml.safe_load(open(ap.parse_args().config))
     col, leg = cfg["colors"], cfg["legend"]
 

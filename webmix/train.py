@@ -450,8 +450,7 @@ def _base_task(task_id):
 
 
 def _variant(task_id):
-    return ("recovery" if task_id.endswith("~rec") else "chain" if task_id.startswith("chain-")
-            else "taskchain" if task_id.startswith("tchain-") else "plain")
+    return "recovery" if task_id.endswith("~rec") else "chain" if task_id.startswith("chain-") else "plain"
 
 
 def evaluate(model, processor, rows, device):

@@ -30,8 +30,8 @@ from webmix import replay as R
 NOT_REPLAYED = {"report_information", "count_entries"}
 
 
-def _passed(out_dir=None):
-    res_path = Path(out_dir or R.OUT_DIR) / "results.jsonl"
+def _passed():
+    res_path = Path(R.OUT_DIR) / "results.jsonl"
     done = set()
     if res_path.exists():
         for line in res_path.read_text().split("\n"):
@@ -61,18 +61,9 @@ def _selected(args):
     done = set() if args.redo else _passed()
     if args.augment:
         from webmix import augment as A
-        plain = _passed(args.plain_from)
+        plain = _passed()
         items = [x for x in items if x[0] in plain]          # variants of trajectories that replay cleanly
-        if args.ids_file:                                    # e.g. the 3.1K set that trained MiniWebAgent's executor
-            keep = set(Path(args.ids_file).read_text().split())
-            items = [x for x in items if x[0] in keep]
-        if args.augment == "taskchain":                      # review round 1, A2: task-centric episodes
-            chains = A.task_chain_candidates(items, lengths=tuple(int(v) for v in args.chain_lengths.split(",")),
-                                             n_chains=args.n_chains, max_uses=args.max_uses)
-            items = [(A.chain_id(c, "tchain"),
-                      (lambda c: lambda base, hl: A.replay_chain(c, base, headless=hl, always_home=True,
-                                                                 variant="taskchain"))(c)) for c in chains]
-        elif args.augment == "recovery":
+        if args.augment == "recovery":
             pick = lambda tid: int(hashlib.sha1(f"rec:{tid}".encode()).hexdigest(), 16) % 1000 < args.share * 1000  # noqa: E731
             items = [(tid + "~rec", (lambda d: lambda base, hl: R.replay_one(d, base, headless=hl, variant="recovery"))(d))
                      for tid, d in items if pick(tid)]
@@ -127,13 +118,7 @@ def main(argv=None):
     rp.add_argument("--shard", default=None, help="k/n: one of n processes (each with its own --ports)")
     rp.add_argument("--memory-model", default=None, help="served model that writes each step's memory (e.g. qwen35-4b)")
     rp.add_argument("--memory-url", default="http://127.0.0.1:8400/v1")
-    rp.add_argument("--augment", choices=["recovery", "chain", "taskchain"], default=None)
-    rp.add_argument("--plain-from", default=None, help="--augment: the replay dir whose results.jsonl lists the plain "
-                    "replays that passed (default: this replay dir)")
-    rp.add_argument("--ids-file", default=None, help="--augment: only trajectories listed here (one task id per line)")
-    rp.add_argument("--chain-lengths", default="2,3,4", help="--augment taskchain: parts per episode")
-    rp.add_argument("--n-chains", type=int, default=2400, help="--augment taskchain: episodes to build")
-    rp.add_argument("--max-uses", type=int, default=2, help="--augment taskchain: episodes a trajectory may join")
+    rp.add_argument("--augment", choices=["recovery", "chain"], default=None)
     rp.add_argument("--share", type=float, default=0.35, help="--augment recovery: share of trajectories to vary")
     rp.add_argument("--per-page", type=int, default=3,
                     help="--augment chain: pairs per start page, and first parts per home-page second part")

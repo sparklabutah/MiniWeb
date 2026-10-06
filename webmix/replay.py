@@ -533,13 +533,6 @@ class Replayer:
                 raise Unsupported("no indexed link to the site's home page")
             op["el"] = {"css_path": css, "tag": "a", "text": "home"}
             return [({"click": {"index": idx}}, f"index:{how}")]
-        if k == "link":                           # task-centric chains (review round 1, A2): the site's own link to a page
-            css = await H.evaluate(self.bs, _HOME_LINK, op["path"])
-            idx, node, how = await self._index({"css_path": css}) if css else (None, None, None)
-            if idx is None:
-                raise Unsupported(f"no indexed link to {op['path']}")
-            op["el"] = {"css_path": css, "tag": "a", "text": op["path"]}
-            return [({"click": {"index": idx}}, f"index:{how}")]
         if k == "macro_done":
             return [({"macro_done": {}}, "")]
         if k == "done":

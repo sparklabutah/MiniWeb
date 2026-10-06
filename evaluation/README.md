@@ -19,9 +19,8 @@ Gemini judge calls need Vertex credentials in `.env`.
 | `trajectory.py` | `merge_server_log` (adds the server request log to the recorder stream), `filter_log_to_window`, `extract_final_reasoning`. |
 | `server.py` | Start, wait for and stop a MiniWeb server on a port. |
 | `xray.py` | Web viewer for result folders. |
-| `action_vocabulary.py` | The canonical recorded action types. |
 | `generate_fixtures.py` | Lists the real files of the simulated file system (`filesystem/`) that uploads use. |
-| `configs/` | Study configs. `qwen35_4b_all_x3.json` is the current reference config. `example.yaml` uses the old `run_agent_verify --config` format and no longer runs. |
+| `configs/` | Study configs. `qwen35_4b_all_x3.json` is the current reference config. |
 | `results/` | Run outputs (git-ignored). |
 
 ## One task
