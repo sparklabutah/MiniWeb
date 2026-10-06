@@ -31,7 +31,7 @@ some tests are plain strings, not live requests.
 | `test_datagen_kinds.py` | `datagen/kinds/` control kinds (forms, buttons, filters, sliders, date ranges, grids, maps, playback, signatures, clipboard, QA) and the state and request checks built from a dry run. |
 | `test_webmix_replay.py` | `webmix/replay.py::build_plan`: recorded datagen pixel actions become a browser-use action plan. |
 | `test_webmix_augment.py` | `webmix/augment.py`: recovery variants (an injected, then corrected mistake) and chain variants (two trajectories in one episode). |
-| `test_webmix_evaluate.py` | `webmix/evaluate.py` routing: the planner-routed arm switches adapters at each `macro_done`, gates a premature `done`, and falls back when an adapter is not loaded. |
+| `test_webmix_evaluate.py` | `webmix/evaluate.py` routing: the oracle router switches adapters at each `macro_done` and gates a premature `done`; the planner agent's specialist choice sends reasoning to its adapter or the base and falls back when an adapter is not loaded. |
 
 ## Beyond unit tests
 

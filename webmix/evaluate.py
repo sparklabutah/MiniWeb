@@ -3,11 +3,10 @@
     python -m webmix.evaluate --tasks data/webmix/valgen/runs/val1/tasks.jsonl --arm base --out data/webmix/eval/base
     python -m webmix.evaluate --tasks ... --arm oracle --adapters drag,io,select,rest
 
-Arms (design doc "Routing"): `base` (no adapter), `pooled` (one adapter for every step), `oracle` (the
-adapter of the task's own family; for a task with a prefix macro, the prefix family first, switched at
-the model's macro_done), `planned` (the planner adapter picks the family at the start and after every
-macro_done, from the current screen). The model name of each request picks the adapter on the vLLM server
-(webmix/serve.sh). Each episode starts like a replay (webmix.harness.prepare) and is graded by the same
+Arms: `base` (no adapter), `pooled` (one adapter for every step), `oracle` (the adapter of the task's own family;
+for a task with a prefix macro, the prefix family first, switched at the model's macro_done; data validation),
+`agent_planner` (the planner agent, webmix.planner_agent, delegating each step to a family specialist). The model
+name of each request picks the adapter on the vLLM server (webmix/serve.sh). Each episode starts like a replay (webmix.harness.prepare) and is graded by the same
 backend gate the datagen trajectories passed (datagen.checks.gate); the flash macro judge can be run on
 the saved episodes later.
 
@@ -139,9 +138,9 @@ def action_events(trace):
 
 
 def history_actions(hist):
-    """The model's actions from browser-use histories, in the router-trace form ({name: params}). For the subtask arms
-    (oracle_sub, planned_sub, agent_planner), whose trace holds one record per subtask without per-step actions
-    (2026-10-02: grading those arms on generated tasks raised KeyError 'action' before grade_inputs.json was written)."""
+    """The model's actions from browser-use histories, in the router-trace form ({name: params}). For agent_planner,
+    whose trace holds one record per delegated step without per-step actions (2026-10-02: grading such arms on
+    generated tasks raised KeyError 'action' before grade_inputs.json was written)."""
     acts = []
     for item in getattr(hist, "history", []) or []:
         for a in getattr(getattr(item, "model_output", None), "action", None) or []:
@@ -259,120 +258,6 @@ class _Hist:
             x.save_to_file(Path(path).with_name(f"history_{i}.json"))
 
 
-RETRY_HINT = " (A previous attempt at this step did not complete it: check the page and finish it.)"
-
-
-async def run_subtasks(bs, llm, subtasks, pick_model, on_end, planner=None, context="", sub_cap=15, overall=None,
-                       end_on_macro_done=False, last_step_budget=False, outcome_feedback=False):
-    """Hierarchical execution (user, 2026-09-30: "the planner has to output the subtask for the specialist"): each
-    subtask runs as its own browser-use episode on the live session (the specialists were trained on one-macro
-    episodes with one instruction), the next starting from the page the last one left. `subtasks`: the gold
-    (family, instruction) list, or None with `planner` (async () -> [(family, instruction), ...] for the steps
-    still left, from the current screen). The final answer is the last reasoning subtask's answer (else the last
-    subtask's final message). Each subtask gets at most `sub_cap` of the 40 steps and `context` (a cross-site
-    task's app directory). Specialists claim done without the effect (2026-09-30: "sorted by Most Clicks" with no sort
-    request sent), so the planner's re-plan from the screen is the check: a step it re-issues is retried once with
-    RETRY_HINT, a second repeat stops the run (at most 8 subtasks). `overall`: the whole task, given to each subtask
-    as background. `last_step_budget`: the last planned step gets all the steps left, not `sub_cap` (the cap only
-    protects later steps; WebArena's one-step plans were cut at 15 of 40, 2026-09-30). `outcome_feedback`: the
-    planner gets each finished step as "instruction -> result: <its final message>" (closed loop). -> (_Hist, trace)."""
-    from browser_use import Agent
-    hists, answers, trace, left, i = [], [], [], H.MAX_STEPS, 0
-    queue = list(subtasks or [])
-    while left > 0 and len(hists) < 8:
-        if planner is not None:
-            queue = await planner([f"{t['subtask']} -> result: {str(t['answer'] or 'no result')[:300]}"
-                                   if outcome_feedback else t["subtask"] for t in trace])
-        if not queue:
-            break
-        last = len(queue) == 1
-        fam, text = queue.pop(0) if planner is None else queue[0]
-        tries = sum(t["subtask"] == text for t in trace)
-        if planner is not None and tries >= 2:
-            break                                          # re-issued twice: no progress left
-        llm.model = pick_model(fam)
-        url = await bs.get_current_page_url()
-        step = text + (RETRY_HINT if tries else "")
-        if overall:
-            step = f"Overall task (for context only): {overall}\nYour step now: {step}\nDo only this step, then call done."
-        # a reasoning step's answer is its done text, so only action steps may end at macro_done
-        agent = Agent(task=H.instruction(step + context, url), llm=llm, browser_session=bs,
-                      tools=H.make_tools(end_on_macro_done and fam != REASONING), max_failures=3, **H.AGENT_KWARGS)
-        H.use_normalized_coordinates(bs)
-        cap = left if (last_step_budget and last) else min(sub_cap, left)
-        h = await agent.run(max_steps=cap, on_step_start=lambda a: H.enable_clipboard(bs, a),
-                            on_step_end=on_end)
-        hists.append(h)
-        left -= max(1, len(h.history))
-        trace.append({"subtask": text, "family": fam, "model": llm.model, "steps": len(h.history), "done": h.is_done(),
-                      "answer": h.final_result()})
-        if fam == REASONING and h.final_result():
-            answers.append(h.final_result())
-        i += 1
-        if planner is None and not queue:
-            break
-    final = answers[-1] if answers else (hists[-1].final_result() if hists else None)     # the last report is the answer
-    return _Hist(hists, final), trace
-
-
-class Planned:
-    """Routes by the planner adapter (design doc "Routing"): the remaining family plan comes from the planner at the
-    start and again after each macro_done (instruction + families done + the current screen, the planner rows'
-    format); every step goes to the first remaining family's adapter, else to `fallback` (adapter not loaded, or
-    an empty plan). The trace records each plan."""
-
-    def __init__(self, llm, bs, instruction, planner_url, planner_name, adapters, fallback, base_name="qwen35-4b",
-                 gate=False, reasoning_to_fallback=False, note=False):
-        from openai import AsyncOpenAI
-        self.llm, self.bs, self.instruction, self.adapters, self.fallback = llm, bs, instruction, adapters, fallback
-        self.base_name, self.gates, self.reasoning_to_fallback, self.seg = base_name, 0, reasoning_to_fallback, 0
-        self.client, self.planner_name = AsyncOpenAI(base_url=planner_url, api_key="EMPTY"), planner_name
-        self.done, self.plans, self.trace, self.fam, self.current, self.pending = [], [], [], None, fallback, True
-        inner = llm.ainvoke
-
-        async def ainvoke(messages, output_format=None, **kw):
-            if self.pending:
-                await self.replan()
-                self.pending = False
-            llm.model = self.current
-            out = await inner(messages, output_format, **kw)
-            plan = next((x["plan"] for x in reversed(self.plans) if "plan" in x), [])
-            gated = gate and gate_done(out, premature(len(plan), self.seg, self.fam), self.gates)
-            self.gates += gated
-            if gated and note:
-                H.ROUTER_NOTES[id(self.bs)] = router_note(plan)
-            acts = [a.model_dump(exclude_none=True) for a in getattr(out.completion, "action", []) or []]
-            self.trace.append({"model": llm.model, "family": self.fam, "action": acts, **({"gated": True} if gated else {})})
-            if any("macro_done" in a for a in acts):
-                self.done.append(self.fam or "unplanned")
-                self.pending = True
-                self.seg = 0
-            else:
-                self.seg += sum(1 for a in acts if not {"done", "macro_done"} & set(a))
-            return out
-        llm.ainvoke = ainvoke
-
-    async def replan(self):
-        import base64
-        from webmix import planner as P
-        plan = []
-        try:
-            png = await self.bs.take_screenshot()
-            msgs = P.prompt_messages(self.instruction, self.done, "data:image/png;base64," + base64.b64encode(png).decode())
-            r = await self.client.chat.completions.create(model=self.planner_name, messages=msgs, temperature=0,
-                                                          max_tokens=120)
-            plan = P.parse_plan(r.choices[0].message.content or "")
-        except Exception as e:
-            self.plans.append({"error": f"{type(e).__name__}: {str(e)[:120]}"})
-        self.plans.append({"done": list(self.done), "plan": plan})
-        self.fam = plan[0] if plan else None
-        name = ADAPTER_OF_FAMILY.get(self.fam)
-        if name in self.adapters:
-            self.current = name
-        else:                                      # reasoning without its adapter: the base model (unless told otherwise)
-            self.current = self.base_name if self.fam == REASONING and not self.reasoning_to_fallback else self.fallback
-
-
 def sub_model(fam, args):
     """The specialist for one subtask: its family's adapter when served, else --fallback (reasoning: its own adapter,
     else the base model unless --reasoning-to-fallback)."""
@@ -433,11 +318,7 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
         llm = H.make_llm(args.base_name, base_url=args.vllm, temperature=args.temperature, max_tokens=args.max_tokens)
         if args.record_rows:
             _record_client(llm, rec)
-        if arm == "planned":
-            router = Planned(llm, bs, task["instruction"], args.vllm, args.planner_name, args.adapters,
-                             args.fallback or args.base_name, args.base_name, gate=args.gate_done or args.gate_note,
-                             reasoning_to_fallback=args.reasoning_to_fallback, note=args.gate_note)
-        elif arm in ("oracle_sub", "planned_sub", "agent_planner"):
+        if arm == "agent_planner":
             router = SimpleNamespace(trace=[], plans=[])
         else:
             router = Routed(llm, arm_models(arm, task, args.base_name, args.adapters, args.pooled_name),
@@ -452,40 +333,7 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
             except Exception:
                 pass
         seen.append(await H.evaluate(bs, _VISIBLE_TEXT) or "")
-        if arm == "oracle_sub":
-            if not task.get("subtasks"):
-                raise ValueError("no gold subtasks for this task")
-            hist, sub_trace = await asyncio.wait_for(
-                run_subtasks(bs, llm, task["subtasks"], lambda f: sub_model(f, args), after_step,
-                             context=prompt[len(task["instruction"]):], sub_cap=args.sub_cap,
-                             overall=task["instruction"] if args.sub_context else None,
-                             end_on_macro_done=args.end_on_macro_done,
-                             last_step_budget=args.last_step_budget,
-                             outcome_feedback=args.planner_prompt == "closed"), timeout=args.timeout)
-            router.trace = sub_trace
-        elif arm == "planned_sub":
-            import base64
-            from openai import AsyncOpenAI
-            from webmix import planner as P
-            pclient, examples = AsyncOpenAI(base_url=args.vllm, api_key="EMPTY"), (P.fewshot_examples() if args.prompted_planner or args.planner_prompt in ("defined", "closed") else None)
-            plans = []
-
-            async def replan(done_texts):
-                png = await bs.take_screenshot()
-                steps = await P.plan_steps(pclient, args.planner_name, task["instruction"], done_texts,
-                                           "data:image/png;base64," + base64.b64encode(png).decode(), examples,
-                                           defined=args.planner_prompt == "defined", closed=args.planner_prompt == "closed")
-                plans.append({"done": list(done_texts), "steps": steps})
-                return steps
-            hist, sub_trace = await asyncio.wait_for(
-                run_subtasks(bs, llm, None, lambda f: sub_model(f, args), after_step, planner=replan,
-                             context=prompt[len(task["instruction"]):], sub_cap=args.sub_cap,
-                             overall=task["instruction"] if args.sub_context else None,
-                             end_on_macro_done=args.end_on_macro_done,
-                             last_step_budget=args.last_step_budget,
-                             outcome_feedback=args.planner_prompt == "closed"), timeout=args.timeout)
-            router.trace, router.plans = sub_trace, plans
-        elif arm == "agent_planner":
+        if arm == "agent_planner":
             from webmix.planner_agent import run_planner_agent
             hist, sub_trace, phist = await asyncio.wait_for(
                 run_planner_agent(bs, task["instruction"], start, lambda f: sub_model(f, args), args.vllm,
@@ -537,10 +385,7 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
                                         "target": st["content"]}, ensure_ascii=False) + "\n")
             (ep / "episode.json").write_text(json.dumps({"task_id": epn, "instruction": task["instruction"],
                                                          "macros": task.get("macros"), "variant": "rejection_sampling"}))
-        if arm == "planned":
-            (ep / "plans.json").write_text(json.dumps(router.plans, indent=1))
-            res["plans"] = [x.get("plan") for x in router.plans if "plan" in x]
-        if arm in ("oracle_sub", "planned_sub", "agent_planner"):
+        if arm == "agent_planner":
             (ep / "subtasks.json").write_text(json.dumps({"trace": router.trace, "plans": router.plans}, indent=1,
                                                          default=str, ensure_ascii=False))
             res["subtasks"] = [(t["family"], t["subtask"], t["steps"]) for t in router.trace]
@@ -591,28 +436,19 @@ def main(argv=None):
                     help="--human: only tasks with one of these macros")
     ap.add_argument("--record-rows", action="store_true", help="write passing episodes as training rows")
     ap.add_argument("--record-family", default=None, help="--record-rows: the rows' family (default: the task macro's)")
-    ap.add_argument("--arm", required=True, choices=["base", "pooled", "oracle", "planned", "oracle_sub", "planned_sub", "agent_planner"])
-    ap.add_argument("--planner-name", default="planner", help="planned arm: the planner adapter's served name")
-    ap.add_argument("--sub-cap", type=int, default=15, help="oracle_sub/planned_sub: steps per subtask (of the 40)")
+    ap.add_argument("--arm", required=True, choices=["base", "pooled", "oracle", "agent_planner"])
+    ap.add_argument("--planner-name", default="qwen35-4b", help="agent_planner: the planner's served model name")
+    ap.add_argument("--sub-cap", type=int, default=15, help="agent_planner: steps per delegated step (of the 40)")
     ap.add_argument("--planner-turns", type=int, default=12, help="agent_planner: the planner agent's own turns")
     ap.add_argument("--agent-version", default="v1", help="agent_planner: planner_agent version (v1, v2, ...)")
-    ap.add_argument("--sub-context", action="store_true", help="oracle_sub/planned_sub: each subtask sees the whole task")
-    ap.add_argument("--last-step-budget", action="store_true",
-                    help="oracle_sub/planned_sub: the last planned step gets all remaining steps (not --sub-cap)")
-    ap.add_argument("--end-on-macro-done", action="store_true",
-                    help="oracle_sub/planned_sub: a non-reasoning subtask ends at its macro_done (not only at done)")
-    ap.add_argument("--planner-prompt", default="", choices=["", "defined", "closed"],
-                    help="planned_sub: an untrained planner with the family-definitions prompt: 'defined' (SYSTEM_DEF) or "
-                         "'closed' (SYSTEM_DEF_CLOSED, step results fed back)")
-    ap.add_argument("--prompted-planner", action="store_true",
-                    help="planned_sub: an untrained planner prompted with worked examples (planner.fewshot_examples)")
     ap.add_argument("--reasoning-to-fallback", action="store_true",
-                    help="planned arm: reasoning steps go to --fallback too (e.g. planner + pooled_v4 only)")
+                    help="agent_planner: reasoning steps go to --fallback too (default: the reasoning adapter, else the base)")
     ap.add_argument("--gate-note", action="store_true",
                     help="done-gating that also tells the specialist the planned steps still left (implies --gate-done)")
     ap.add_argument("--gate-done", action="store_true",
-                    help="oracle/planned arms: the router turns a premature done into macro_done (gate_done)")
-    ap.add_argument("--fallback", default=None, help="planned arm: model for an unplanned family (default: the base)")
+                    help="oracle arm: the router turns a premature done into macro_done (gate_done)")
+    ap.add_argument("--fallback", default=None,
+                    help="agent_planner: model for a family without its adapter (default: the base)")
     ap.add_argument("--adapters", type=lambda s: set(s.split(",")), default=set(), help="adapters loaded on the server")
     ap.add_argument("--base-name", default="qwen35-4b")
     ap.add_argument("--vllm", default="http://127.0.0.1:8400/v1")

@@ -73,7 +73,7 @@ training rows are therefore the harness's exact prompts.
 - **Results and resume:** every result is appended to `results.jsonl`. Passed episodes are
   skipped unless `--redo` is set.
 - **Output dir:** `webmix.REPLAY_DIR` (default `data/webmix/replay_v4`, override with
-  `WEBMIX_REPLAY_DIR`). Training and the planner read the same variable.
+  `WEBMIX_REPLAY_DIR`). Training reads the same variable.
 
 Start the base model first (`bash webmix/serve.sh`). Then replay in shards, giving each shard
 its own MiniWeb ports:
@@ -147,9 +147,8 @@ the passing `rs_reasoning` episodes. Train the `reasoning` adapter with
 - **Multi-GPU:** `torchrun --nproc_per_node N -m webmix.train …` takes the same flags and
   all-reduces the LoRA gradients.
 
-`--adapter` takes one of these names: `pooled` (all families), `drag`, `io`, `select`, `rest`,
-`reasoning` and `planner`. The last one trains on rows built by `webmix.planner build` for the
-older screenshot planner.
+`--adapter` takes one of these names: `pooled` (all families), `drag`, `io`, `select`, `rest`
+and `reasoning`.
 
 The adapters behind the reported results (from their `webmix_meta.json`):
 
@@ -224,8 +223,10 @@ Other arms in `webmix.evaluate`:
 - `base`: the untrained model as one agent.
 - `pooled`: one adapter for every step.
 - `oracle`: the task's own family adapter, for single-macro validation.
-- `planned`, `oracle_sub`, `planned_sub`: the older screenshot planner and subtask routers
-  (`planner.py`), superseded by `agent_planner`.
+
+`agent_planner` is the planner agent above (`webmix.wa --router planner_agent`, `webmix.om2w --arm agent`
+on the other benchmarks). The older screenshot planner and subtask routers (`planned`, `oracle_sub`,
+`planned_sub`) were removed on 2026-10-06; no reported run used them.
 
 ## 7. Evaluate
 
@@ -387,7 +388,7 @@ commands.
 | `valgen/` | the validation-task datagen tree (`val_v2.jsonl`) |
 | `wa/`, `wa_lite_v2/` | WebArena runs (`wa/seeds/`), the split, the vendored benchmark |
 | `om2w/`, `webvoyager/` | live-web task files, official judges, exclusion lists, runs (`om2w/runs/`) |
-| `planner/` | rows for the trained screenshot planners |
+| `planner/` | rows of the retired screenshot planners (their code was removed 2026-10-06) |
 | `viewer/`, `logs/`, `*.sh` | eval viewer, logs, launchers |
 
 ## Tests

@@ -1,8 +1,8 @@
 """The planner as a browser-use Agent (user, 2026-09-30: "The planner has to go through sth like browser use, or browser
 use itself").
 
-The screenshot-only planner (webmix.planner.plan_steps) planned blind: no URL, no element list, no page text, and no
-say in when the task ends. On WebArena that cost 16 of the 18 tasks base solved and it did not: steps for controls
+The earlier screenshot-only planner (the planned_sub router, removed 2026-10-06) planned blind: no URL, no element list,
+no page text, and no say in when the task ends. On WebArena that cost 16 of the 18 tasks base solved and it did not: steps for controls
 that do not exist, wandering, answers written into the plan, and tasks solved mid-way then undone by later steps
 (the router had no stop decision and took the last step's message as the answer).
 

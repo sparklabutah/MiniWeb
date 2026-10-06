@@ -53,12 +53,10 @@ ADAPTERS = {
     "io": ["Out-of-page I/O"],
     "select": ["Discrete selection"],
     "rest": ["Text entry", "Form transaction", "Navigation", "Reasoning base"],
-    "planner": ["planner"],          # the macro planner (webmix.planner rows), no anchor
     # reasoning steps and final answers (user, 2026-09-30): rows from rejection sampling on the train-site human
     # reasoning tasks (webmix.evaluate --record-rows), KL-anchored on the synthetic families' rows
     "reasoning": ["Reasoning base"],
 }
-PLANNER_ROWS = ROOT / "data" / "webmix" / "planner" / "rows.jsonl"
 TARGET_LEAVES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 TARGET_RE = r".*language_model.*\.(" + "|".join(TARGET_LEAVES) + r")$"
 
@@ -249,7 +247,6 @@ def main(argv=None):
     ap.add_argument("--ce-on", choices=["all", "action"], default="all",
                     help="CE on the whole target (memory + action) or on the action tokens only")
     ap.add_argument("--exclude-variants", default="", help="comma list of replay variants to leave out (recovery,chain)")
-    ap.add_argument("--planner-rows", default=None, help="--adapter planner: rows file (default data/webmix/planner/rows.jsonl)")
     ap.add_argument("--frac", type=float, default=1.0,
                     help="scaling: train on this fraction of the generated episodes (whole episodes, nested)")
     ap.add_argument("--episode-ids", default=None,
@@ -273,24 +270,18 @@ def main(argv=None):
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     fams = set(ADAPTERS[args.adapter])
-    if args.adapter == "planner":                # its own rows, split fixed at build time (webmix.planner)
-        rows = [json.loads(line) for line in Path(args.planner_rows or PLANNER_ROWS).read_text().split("\n") if line.strip()]
-        train = [r for r in rows if r["split"] == "train"]
-        val = [r for r in rows if r["split"] == "val"]
-        args.beta = 0.0
-    else:
-        rows = load_rows()
-        if args.exclude_variants:
-            drop = set(args.exclude_variants.split(","))
-            rows = [r for r in rows if _variant(r["task_id"]) not in drop]
-        if args.drop_done:
-            n0 = len(rows)
-            rows = [r for r in rows if r.get("op") != "done"]
-            if main0:
-                print(f"--drop-done: left out {n0 - len(rows)} final done steps", flush=True)
-        ids = set(Path(args.episode_ids).read_text().split()) if args.episode_ids else None
-        train = [r for r in rows if not row_is_val(r) and in_frac(r, args.frac) and in_ids(r, ids)]
-        val = [r for r in rows if row_is_val(r)]
+    rows = load_rows()
+    if args.exclude_variants:
+        drop = set(args.exclude_variants.split(","))
+        rows = [r for r in rows if _variant(r["task_id"]) not in drop]
+    if args.drop_done:
+        n0 = len(rows)
+        rows = [r for r in rows if r.get("op") != "done"]
+        if main0:
+            print(f"--drop-done: left out {n0 - len(rows)} final done steps", flush=True)
+    ids = set(Path(args.episode_ids).read_text().split()) if args.episode_ids else None
+    train = [r for r in rows if not row_is_val(r) and in_frac(r, args.frac) and in_ids(r, ids)]
+    val = [r for r in rows if row_is_val(r)]
     ce_rows = [r for r in train if r["family"] in fams]
     kl_pool = [r for r in train if r["family"] not in fams] if args.beta > 0 else []
     if args.limit:

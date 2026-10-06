@@ -219,9 +219,7 @@ async def run_task(cfg, args, out_dir, states):
         await set_cookies(bs, [states[s] for s in cfg["sites"] if s in states])
         await H.goto(bs, cfg["start_url"])
         llm = H.make_llm(args.model, base_url=args.vllm, temperature=args.temperature)
-        if args.router == "planned_sub":
-            hist = await asyncio.wait_for(routed_run(bs, llm, cfg, args, ep), timeout=args.timeout)
-        elif args.router == "planner_agent":
+        if args.router == "planner_agent":
             hist = await asyncio.wait_for(agent_run(bs, cfg, args, ep), timeout=args.timeout)
         else:
             agent = Agent(task=H.instruction(cfg["intent"], cfg["start_url"]), llm=llm, browser_session=bs,
@@ -251,39 +249,6 @@ async def run_task(cfg, args, out_dir, states):
             pass
     (ep / "result.json").write_text(json.dumps(res, indent=1, default=str))
     return res
-
-
-async def routed_run(bs, llm, cfg, args, ep):
-    """The WebMix router (webmix.evaluate planned_sub): the subtask planner lists the remaining steps (family +
-    instruction) from the current screen; each step runs as its own episode on its family's specialist, with the whole
-    task as background; the planner re-plans after each. Reasoning steps go to the base model (E3 stage 1)."""
-    import base64
-    from types import SimpleNamespace
-    from openai import AsyncOpenAI
-    from webmix import planner as P
-    from webmix.evaluate import run_subtasks, sub_model
-    pclient, plans = AsyncOpenAI(base_url=args.vllm, api_key="EMPTY"), []
-    margs = SimpleNamespace(adapters=set(args.adapters.split(",")) - {"none", ""}, fallback=args.fallback,
-                            base_name=args.model, reasoning_to_fallback=False)
-
-    async def replan(done_texts):
-        png = await bs.take_screenshot()
-        steps = await P.plan_steps(pclient, args.planner_name, cfg["intent"], done_texts,
-                                   "data:image/png;base64," + base64.b64encode(png).decode(),
-                                   P.fewshot_examples() if args.planner_prompt in ("defined", "closed") else None,
-                                   defined=args.planner_prompt == "defined", closed=args.planner_prompt == "closed")
-        plans.append({"done": list(done_texts), "steps": steps})
-        return steps
-    try:
-        hist, trace = await run_subtasks(bs, llm, None, lambda f: sub_model(f, margs), None, planner=replan,
-                                         sub_cap=args.sub_cap, overall=cfg["intent"],
-                                         last_step_budget=args.last_step_budget,
-                                         outcome_feedback=args.planner_prompt == "closed")
-    finally:
-        (ep / "plans.json").write_text(json.dumps(plans, indent=1, ensure_ascii=False))
-    (ep / "subtasks.json").write_text(json.dumps({"trace": trace, "plans": plans}, indent=1, default=str,
-                                                 ensure_ascii=False))
-    return hist
 
 
 async def agent_run(bs, cfg, args, ep):
@@ -350,17 +315,15 @@ def main(argv=None):
                     help="WebArena-Lite-v2 half (data/webmix/wa/split_5050.json): dev for development runs, test only for "
                          "the final comparison")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--router", default="none", choices=["none", "planned_sub", "planner_agent"],
-                    help="planned_sub: the WebMix router (subtask planner + family specialists, webmix.evaluate)")
-    ap.add_argument("--planner-name", default="planner5")
+    ap.add_argument("--router", default="none", choices=["none", "planner_agent"],
+                    help="planner_agent: the planner agent (webmix.planner_agent) delegating to family specialists; "
+                         "none: one agent with --model")
+    ap.add_argument("--planner-name", default="qwen35-4b", help="planner_agent: the planner's served model name")
     ap.add_argument("--planner-turns", type=int, default=12, help="planner_agent: the planner agent's own turns")
     ap.add_argument("--agent-version", default="v1", help="planner_agent: version (v1, v2, ...)")
-    ap.add_argument("--adapters", default="drag,io,select,rest", help="router: family adapters served")
-    ap.add_argument("--fallback", default="pooled_v4", help="router: a family without its adapter")
-    ap.add_argument("--sub-cap", type=int, default=15, help="router: steps per subtask (of the 40)")
-    ap.add_argument("--last-step-budget", action="store_true", help="router: the last planned step gets all steps left")
-    ap.add_argument("--planner-prompt", default="", choices=["", "defined", "closed"],
-                    help="router: 'defined' = the base model planning with the family-definitions prompt (planner.SYSTEM_DEF)")
+    ap.add_argument("--adapters", default="drag,io,select,rest", help="planner_agent: family adapters served")
+    ap.add_argument("--fallback", default="pooled_v4", help="planner_agent: a family without its adapter")
+    ap.add_argument("--sub-cap", type=int, default=15, help="planner_agent: steps per delegated step (of the 40)")
     ap.add_argument("--judge", default="gemini-3.5-flash-lite",
                     help="fuzzy-match judge (user, 2026-09-28: flash-lite for our validation runs; the benchmark's own "
                          "is gpt-4o-2024-11-20)")
@@ -383,10 +346,6 @@ def main(argv=None):
                "--temperature", str(args.temperature), "--timeout", str(args.timeout), "--out", args.out,
                "--judge", args.judge, "--split", args.split, "--router", args.router, "--planner-name",
                args.planner_name, "--adapters", args.adapters, "--fallback", args.fallback, "--sub-cap", str(args.sub_cap)]
-        if args.last_step_budget:
-            cmd += ["--last-step-budget"]
-        if args.planner_prompt:
-            cmd += ["--planner-prompt", args.planner_prompt]
         cmd += ["--planner-turns", str(args.planner_turns), "--agent-version", args.agent_version]
         if args.max_steps:
             cmd += ["--max-steps", str(args.max_steps)]
