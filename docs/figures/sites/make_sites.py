@@ -1,11 +1,12 @@
-"""Websites figure (double column): (a) the site graph, (b) the 65 sites by domain, (c) the data mix.
+"""Websites figure (double column): (a) the site graph, (b) six visually distinct sites, (c) the data mix.
 
 (a) The ring holds the 59 non-hub sites, grouped by domain; the centre holds the six hub sites. Gray edges are event-bus
 links read from the site code: an event a site emits and the hub whose handler records it (app/handlers), plus 2FA codes
 (request_2fa), card charges (charge_card) and direct emails (_add_email). Sign-ups (nearly every site -> VaultGuard and
 WebMail) and the share button (every page -> ForumHub, PixShare, QuickChat) are noted, not drawn. Blue links are the site
 sets of the cross-site human tasks (data/annotations).
-(b) Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)").
+Domains come from docs/MiniWeb-brainstorm-sheet.xlsx ("Website Sheet (refined)"). (b) shows the supplement's
+screenshots of six sites from six domains.
 (c) Data sources come from each site's doc/README.md and the database build; record counts from site_records.json.
 """
 import glob, json, math, os, re, sys
@@ -248,34 +249,34 @@ A.text(1.35, ly, "cross-site task", fontsize=5.3, color=INK, va="center")
 # A.text(0.02, H - 0.36, f"Not drawn: sign-up on {len(SIGNUP)} sites → VaultGuard, WebMail; share button on every page.",
 #        fontsize=4.9, color=MUTED, va="center", style="italic")
 
-# ── (b) sites by domain ─────────────────────────────────────────────────────
+# ── (b) a gallery of visually distinct sites (user, 2026-10-06: replaces the list of all sites by domain) ──────────
+# Six domains, two held-out sites; the screenshots are the supplement's gallery (docs/figures/supp/figures/sites).
+GALLERY = ["map-services", "calendar-todo", "e-commerce", "health-fitness-tracking", "music", "weather"]
+DOMAIN_OF = {s: short for _, short, ss in DOMAINS for s in ss}   # the ring's short domain labels
+from PIL import Image
 bx0, bx1 = 3.12, W - 0.03
-title(bx0, 0.1, "(b)", f"{len(SITES)} websites in {len(DOMAINS)} domains: {len(SITES) - len(HELD_OUT)} train, "
-                      f"{len(HELD_OUT)} held-out for evaluation")
-dcol, row_h, fs = 1.1, 0.087, 5.3
-y = 0.27
-for d, _, ss in DOMAINS:
-    A.text(bx0 + dcol - 0.06, y, d, fontsize=fs, weight="bold", color=INK, ha="right", va="center")
-    x = bx0 + dcol
-    for s in sorted(ss, key=lambda s: name(s).lower()):
-        held = s in HELD_OUT
-        glyph = ("■" if s in DATASET else "□") if held else ("●" if s in DATASET else "○")
-        g = A.text(0, y, glyph, fontsize=4.6, family=GLYPH, color=INK, va="center")
-        t = A.text(0, y, name(s), fontsize=fs, color=INK, weight="bold" if s in HUBS else "normal", va="center")
-        sw = 0.075 if s in HUBS else 0                 # hub swatch after the name
-        w = width(g) + 0.03 + width(t) + sw
-        if x + w > bx1:
-            x, y = bx0 + dcol, y + row_h
-        g.set_position((x, y)); t.set_position((x + width(g) + 0.03, y))
-        if held:                                       # highlight held-out sites like their ring halo
-            A.add_patch(FancyBboxPatch((x - 0.025, y - 0.038), w + 0.05, 0.076, boxstyle="round,pad=0,rounding_size=0.02",
-                                       fc=HALO, ec="none", zorder=0.5))
-        if sw:
-            A.add_patch(FancyBboxPatch((x + w - 0.045, y - 0.024), 0.045, 0.048, boxstyle="round,pad=0,rounding_size=0.01",
-                                       fc=HUB_COLOR[s], ec="none"))
-        x += w + 0.085
-    y += row_h + 0.011
-y_b_end = y
+title(bx0, 0.1, "(b)", f"{len(SITES)} websites in {len(DOMAINS)} domains, e.g.")
+ncol, gx, gy, lab_h = 3, 0.08, 0.06, 0.15              # columns; gaps; label height under each screenshot (inches)
+tw = (bx1 - bx0 - gx * (ncol - 1)) / ncol
+th = tw * 800 / 1280                                     # the screenshots are 1280 x 800
+y0 = 0.2
+for i, s in enumerate(GALLERY):
+    x, y = bx0 + (i % ncol) * (tw + gx), y0 + (i // ncol) * (th + lab_h + gy)
+    im = Image.open(os.path.join(HERE, "..", "supp", "figures", "sites", s + ".jpg")).convert("RGB")
+    im = im.resize((600, round(600 * 800 / 1280)), Image.LANCZOS)   # about twice the print resolution
+    ia = fig.add_axes([x / W, 1 - (y + th) / H, tw / W, th / H]); ia.imshow(im, interpolation="lanczos"); ia.axis("off")
+    A.add_patch(FancyBboxPatch((x, y), tw, th, boxstyle="round,pad=0,rounding_size=0.01", fc="none", ec=EDGE, lw=0.6,
+                               zorder=6))
+    held = s in HELD_OUT
+    glyph = ("■" if s in DATASET else "□") if held else ("●" if s in DATASET else "○")
+    ly = y + th + lab_h / 2 + 0.005
+    g = A.text(x + 0.02, ly, glyph, fontsize=4.6, family=GLYPH, color=INK, va="center")
+    t = A.text(x + 0.02 + width(g) + 0.03, ly, name(s), fontsize=5.3, color=INK, weight="bold", va="center")
+    A.text(x + 0.02 + width(g) + 0.03 + width(t) + 0.05, ly, DOMAIN_OF[s], fontsize=5.3, color=MUTED, va="center")
+    if held:                                           # held-out sites highlighted as on the ring
+        A.add_patch(FancyBboxPatch((x, ly - 0.038), width(g) + width(t) + 0.1, 0.076,
+                                   boxstyle="round,pad=0,rounding_size=0.02", fc=HALO, ec="none", zorder=0.5))
+y_b_end = y0 + 2 * (th + lab_h) + gy
 
 # ── (c) data mix ────────────────────────────────────────────────────────────
 pub = [s for s in SITES if s in DATASET]
