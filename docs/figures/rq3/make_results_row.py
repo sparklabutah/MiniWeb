@@ -40,7 +40,7 @@ def cfg_of(path):
 
 
 def practice(ax, cfg):
-    """(a): per family, the untrained and the trained single agent; the gain above each pair."""
+    """(a): per family, the untrained and the trained single agent."""
     sets, fa = cfg["task_sets"], [a for l in cfg["family_arms"] for a in cfg["arms"] if a["label"] == l]
     only = primitive_filter(sets[cfg["family_set"]].get("primitives"))
     for a in fa:
@@ -51,18 +51,17 @@ def practice(ax, cfg):
         vals = [100 * a["fam"][f][0] / a["fam"][f][1] for a in fa]
         for j, (a, v) in enumerate(zip(fa, vals)):
             bar(ax, gi + (j - 0.5) * bw, v, bw * 0.9, a["color"])
-        d = vals[-1] - vals[0]
-        ax.text(gi, max(vals) + 2.5, f"{d:+.0f}", fontsize=FS["value"], weight="bold", ha="center", va="bottom",
-                color=fa[-1]["color"] if d >= 3 else MUTED)
-        ax.text(gi + 0.15, -3, FAMILY[f], fontsize=FS["label"], weight="bold", color=FAM[f], ha="right", va="top",
-                rotation=45, rotation_mode="anchor")
+        d = vals[-1] - vals[0]                           # the gains are read off the bars (the caption gives them)
+        ax.text(gi + 0.1, -3, FAMILY[f], fontsize=FS["label"], weight="bold", color=FAM[f], ha="right", va="top",
+                rotation=60, rotation_mode="anchor")    # 60 degrees: at 45 the bold names touch their neighbours
         print(f"  (a) {f:20s} {vals[0]:5.1f} -> {vals[-1]:5.1f}  gain {d:+5.1f}  (n {fa[0]['fam'][f][1]})")
     ax.set_xlim(-0.5, len(fams) - 0.5)
 
 
 def benches(ax, cfg, short, valued):
-    """(b), (c): per benchmark, every arm of an RQ3-style config. Above a bar, reading upwards: its value (arms in
-    `valued`) and its stars against the arm it is compared with."""
+    """(b), (c): per benchmark, every arm of an RQ3-style config. Only the arms in `valued` are labelled: the value and
+    its stars against the arm it is compared with, right-aligned over the bar so it stays inside its group (user,
+    2026-10-06: fewer numbers, less clutter)."""
     arms = cfg["arms"]
     by = {a["label"]: a for a in arms}
     n, fill = len(arms), 0.86
@@ -76,11 +75,12 @@ def benches(ax, cfg, short, valued):
                 continue
             m = st.mean(task_rates(b["kind"], runs, b.get("tasks")))
             bar(ax, x, m, bw * 0.84, a["color"], hatched=a.get("style") == "hatched")
-            last = j == n - 1
-            s = (f"{m:.1f}" if a["label"] in valued else "") + (stars(b, by[a["compare"]], a) if a.get("compare") else "")
-            if s:
-                ax.text(x, m + 1.5, s, fontsize=FS["value"], rotation=90, rotation_mode="anchor", ha="left",
-                        va="center_baseline", color=a["color"] if last else INK, weight="bold" if last else "normal")
+            s = ""
+            if a["label"] in valued:
+                sig = stars(b, by[a["compare"]], a) if a.get("compare") else ""
+                s = (sig + "\n" if sig else "") + f"{m:.1f}"    # the stars on a line of their own: as wide as the value
+                ax.text(x + bw * 0.42, m + 1.5, s, fontsize=FS["value"], ha="right", va="bottom", color=a["color"],
+                        weight="bold", linespacing=0.85, multialignment="center")
             print(f"  {b['key']:8s} {a['label']:36s} {m:5.1f} {s}")
         ax.text(gi, -3, short[b["key"]], fontsize=FS["label"], color=INK, ha="center", va="top")
     ax.set_xlim(-0.5, len(cfg["benchmarks"]) - 0.5)
@@ -148,7 +148,8 @@ def main():
              (lab["references"], [line_glyph(color=MUTED, lw=1.2, ls=(0, (1.5, 1.3)), marker="o", ms=3.6, mfc="white",
                                              mew=1.0)], False, INK)]]
 
-    widths = [L["a"], L["b"], L["c"], L["d"]]
+    sq = (W - L["left"] - 2 * L["gap"] - L["gap_d"] - L["right"]) / 4   # four square panels (user, 2026-10-06)
+    widths = [sq] * 4
     xs = [L["left"]]
     for w, g in zip(widths[:-1], [L["gap"], L["gap"], L["gap_d"]]):
         xs.append(xs[-1] + w + g)
@@ -157,7 +158,7 @@ def main():
     A = fig.add_axes([0, 0, 1, 1]); A.axis("off")
     A.set_xlim(0, W); A.set_ylim(4, 0)
     lh = legend(A, rows, 0.02, 0.02, W - 0.02)
-    top, ph = 0.02 + lh + L["title_h"], L["plot_height"]
+    top, ph = 0.02 + lh + L["title_h"], sq
     H = top + ph + L["bottom"]
     fig.set_size_inches(W, H); A.set_ylim(H, 0)
     ax_at = lambda x, w: fig.add_axes([x / W, 1 - (top + ph) / H, w / W, ph / H])
@@ -165,7 +166,7 @@ def main():
 
     practice(axes[0], rq2)
     benches(axes[1], rq3, cfg["short"], {rq3["arms"][-1]["label"]})
-    benches(axes[2], data, cfg["short"], {a["label"] for a in data["arms"]})
+    benches(axes[2], data, cfg["short"], {data["arms"][-1]["label"]})
     for ax in axes[:3]:
         style_axes(ax)
         ax.set_ylim(0, 100); ax.set_yticks([0, 25, 50, 75, 100]); ax.set_xticks([])
