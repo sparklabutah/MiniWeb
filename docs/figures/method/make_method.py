@@ -46,10 +46,16 @@ FAMSHORT = {"Navigation": "nav", "Text entry": "text", "Discrete selection": "se
             "Out-of-page I/O": "io", "Drag & gesture": "drag", "Reasoning base": "reason"}
 assert len(SHORT) == len(trace)
 
-W, H = 7.0, 2.78
+# 2026-10-06 (user): the MiniWebAgent half had room to spare, so MiniWebGen is drawn larger. Its part keeps the layout of
+# the 3.45 x 2.78 in original (L's data coordinates) and is scaled by K as a whole, text included; MiniWebAgent is laid out
+# in the remaining width, in inches (A's data coordinates).
+K, LW0, H0 = 1.22, 3.45, 2.78
+W, H = 7.0, H0 * K
 fig = plt.figure(figsize=(W, H))
-A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off")
+L = fig.add_axes([0, 0, LW0 * K / W, 1]); L.set_xlim(0, LW0); L.set_ylim(H0, 0); L.axis("off")
+A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off"); A.patch.set_alpha(0)
 R = fig.canvas.get_renderer()
+A_FULL, A = A, L                                         # the helpers draw on A: MiniWebGen first, on L
 
 
 def width(t):
@@ -149,7 +155,7 @@ cy = ey + 0.1
 for i, (s, (bxy, label)) in enumerate(zip(traj["steps"], CROP)):
     x0, y0, x1, y1 = bxy
     x = 0.04 + i * (cw + cg)
-    ax = fig.add_axes([x / W, 1 - (cy + ch) / H, cw / W, ch / H]); ax.set_zorder(3)
+    ax = fig.add_axes([x * K / W, 1 - (cy + ch) * K / H, cw * K / W, ch * K / H]); ax.set_zorder(3)
     im = Image.open(os.path.join(GEN_RUN, "accepted", GEN_TASK, s["screenshot"])).convert("RGB")
     k = im.width / 1280
     ax.imshow(im.crop((int(x0 * k), int(y0 * k), int(x1 * k), int(y1 * k))), extent=(x0, x1, y1, y0), interpolation="lanczos")
@@ -186,59 +192,67 @@ A.text(0.04, oy, "3,128 kept trajectories · 52 training sites · ≈$0.04 each"
        fontsize=5.5, color=INK, va="center", weight="bold")
 A.text(0.04, oy + 0.13, "A trajectory holds only screenshots and pixel actions; failed attempts are kept as negatives.",
        fontsize=4.9, color=MUTED, va="center", style="italic")
+for t in L.texts:                                        # MiniWebGen's text scales with its part
+    t.set_fontsize(t.get_fontsize() * K)
+A = A_FULL
+FR = 1.12                                                 # MiniWebAgent's text, a little larger than before
+GATE = ((sx[3] + sw) * K, (sy + sh / 2) * K)              # the Gate box's right edge, in inches
 # divider
-A.plot([3.5, 3.5], [0.05, H - 0.05], color="#D5DAE1", lw=0.6)
+XD = LW0 * K + 0.04
+A.plot([XD, XD], [0.05, H - 0.05], color="#D5DAE1", lw=0.6)
 
 # ── (b) MiniWebAgent ───────────────────────────────────────────────────────
-X0, X1 = 3.62, W - 0.02
+X0, X1 = XD + 0.1, W - 0.02
 title(X0, 0.1, "MiniWebAgent", "one base model: planner + one trained executor", BLUE)
-box(X0 + 0.55, 0.21, 2.25, 0.33, fc="white", ec=INK, lw=0.8)
-image(A, X0 + 0.27, 0.355, 0.26, QWEN)                                # the planner (Qwen3.5-4B)
-A.text(X0 + 0.55 + 1.125, 0.29, "Planner $\\pi_0$ (untrained base model)", fontsize=5.6, weight="bold", color=INK,
+py = 0.21 * K
+box(X0 + 0.34, py, X1 - X0 - 0.34, 0.42, fc="white", ec=INK, lw=0.8)
+image(A, X0 + 0.16, py + 0.21, 0.26, QWEN)                            # the planner (Qwen3.5-4B)
+pcx = X0 + 0.34 + (X1 - X0 - 0.34) / 2
+A.text(pcx, py + 0.09, "Planner $\\pi_0$ (untrained base model)", fontsize=5.6 * FR, weight="bold", color=INK,
        ha="center", va="center", zorder=4)
-A.text(X0 + 0.55 + 1.125, 0.43, "sees $o$ (URL, elements, screenshot), cannot act;\neach turn emits $u_n = (\\gamma, \\iota)$ to delegate, or done($\\alpha$)",
-       fontsize=4.7, color=MUTED, ha="center", va="center", linespacing=1.1, zorder=4)
+A.text(pcx, py + 0.27, "sees $o$ (URL, elements, screenshot), cannot act;\neach turn emits $u_n = (\\gamma, \\iota)$ to delegate, or done($\\alpha$)",
+       fontsize=4.7 * FR, color=MUTED, ha="center", va="center", linespacing=1.15, zorder=4)
 ACTION = ["Navigation", "Text entry", "Discrete selection", "Form transaction", "Out-of-page I/O", "Drag & gesture"]
-ay, aw = sy + sh / 2, 1.7
-ax0 = X1 - aw - 0.35
+ay, aw = GATE[1], 1.62
+ax0 = X1 - aw
 for j, f in enumerate(ACTION):                           # one adapter for every action family: a stripe per family
-    A.add_patch(Rectangle((ax0 + j * aw / len(ACTION), ay - 0.06), aw / len(ACTION), 0.12, fc=FAM[f], ec="none", zorder=3))
-A.add_patch(FancyBboxPatch((ax0, ay - 0.06), aw, 0.12, boxstyle="round,pad=0,rounding_size=0.02", fc="none", ec="white",
+    A.add_patch(Rectangle((ax0 + j * aw / len(ACTION), ay - 0.075), aw / len(ACTION), 0.15, fc=FAM[f], ec="none", zorder=3))
+A.add_patch(FancyBboxPatch((ax0, ay - 0.075), aw, 0.15, boxstyle="round,pad=0,rounding_size=0.02", fc="none", ec="white",
                            lw=0.8, zorder=4))
-A.text(ax0 + aw / 2, ay + 0.002, "pooled adapter $\\Delta_{\\mathrm{pool}}$", fontsize=5.2, color="white", ha="center",
+A.text(ax0 + aw / 2, ay + 0.002, "pooled adapter $\\Delta_{\\mathrm{pool}}$", fontsize=5.2 * FR, color="white", ha="center",
        va="center", zorder=5, weight="bold")
-image(A, ax0 + aw / 2, ay - 0.125, 0.14, QWEN)                         # the executor: Qwen3.5-4B + the adapter
-arrow((X0 + 0.55 + 1.125, 0.545), (ax0 + aw / 2, ay - 0.225), color=EDGE, lw=0.5, ms=4)
-A.text(ax0 + aw / 2, ay + 0.085, "every action family: navigation, text, selection, forms, I/O, drag", fontsize=4.5,
-       color=MUTED, ha="center", va="top")
-A.text(ax0 + aw / 2, ay + 0.3, "executor $\\pi_0 + \\Delta_{\\mathrm{pool}}$, trained on all of $\\mathcal{D}$; reasoning steps run on $\\pi_0$",
-       fontsize=4.8, color=MUTED, style="italic", ha="center", va="center")
+image(A, ax0 + aw / 2, ay - 0.16, 0.15, QWEN)                         # the executor: Qwen3.5-4B + the adapter
+arrow((pcx, py + 0.425), (ax0 + aw / 2, ay - 0.245), color=EDGE, lw=0.5, ms=4)
+A.text(X0, ay + 0.2, "every action family: navigation, text, selection, forms, I/O, drag", fontsize=4.5 * FR,
+       color=MUTED, va="center")
+A.text(X0, ay + 0.35, "executor $\\pi_0 + \\Delta_{\\mathrm{pool}}$, trained on all of $\\mathcal{D}$; reasoning steps run on $\\pi_0$",
+       fontsize=4.8 * FR, color=MUTED, style="italic", va="center")
 # data from (a) into the executor
-arrow((sx[3] + sw + 0.012, sy + sh / 2), (ax0 - 0.03, ay), color=OK, lw=1.0, ms=6)
-mx = (sx[3] + sw + ax0) / 2 - 0.05
-A.text(mx, ay - 0.075, "$\\mathcal{D}$: 27.6K steps", fontsize=5.2, weight="bold", color=OK, ha="center", va="center")
-A.text(mx, ay + 0.085, "replayed +\naugmented", fontsize=4.6, color=MUTED, ha="center", va="top", linespacing=1.05)
+arrow((GATE[0] + 0.015, ay), (ax0 - 0.03, ay), color=OK, lw=1.0, ms=6)
+mx = (GATE[0] + ax0) / 2
+A.text(mx, ay - 0.09, "$\\mathcal{D}$: 27.6K steps", fontsize=5.2 * FR, weight="bold", color=OK, ha="center", va="center")
+A.text(mx, ay + 0.06, "replayed + augmented", fontsize=4.6 * FR, color=MUTED, ha="center", va="top")
 # the solved held-out task
-ty = 1.37
-A.text(X0, ty, "Held-out SnapLink task, solved in " + f"{result['steps']} steps:", fontsize=5.0, color=MUTED,
+ty = ay + 0.62
+A.text(X0, ty, "Held-out SnapLink task, solved in " + f"{result['steps']} steps:", fontsize=5.0 * FR, color=MUTED,
        style="italic", va="center")
-instr = human["instruction"].replace(" Then", "\nThen")
-A.text(X0, ty + 0.16, "“" + instr + "”", fontsize=5.4, style="italic", color=INK, va="center", linespacing=1.15)
-ry, rp = ty + 0.36, 0.105
+instr = human["instruction"].replace(" and delete", "\nand delete").replace(" Then", "\nThen")
+A.text(X0, ty + 0.25, "“" + instr + "”", fontsize=5.4 * FR, style="italic", color=INK, va="center", linespacing=1.15)
+ry, rp = ty + 0.56, 0.135
 for i, (t, s) in enumerate(zip(trace, SHORT)):
     y = ry + i * rp
-    A.text(X0 + 0.02, y, f"{i + 1}", fontsize=4.8, color=MUTED, va="center", ha="left")
-    cwid = chip(X0 + 0.12, y, FAMSHORT[t["family"]], FAM[t["family"]])
-    A.text(X0 + 0.12 + 0.55, y, s, fontsize=5.0, color=INK, va="center")
-    A.text(X1, y, f"{t['steps']} step" + ("s" if t["steps"] > 1 else ""), fontsize=4.6, color=MUTED, ha="right",
+    A.text(X0 + 0.02, y, f"{i + 1}", fontsize=4.8 * FR, color=MUTED, va="center", ha="left")
+    chip(X0 + 0.12, y, FAMSHORT[t["family"]], FAM[t["family"]], fs=4.8 * FR)
+    A.text(X0 + 0.12 + 0.6, y, s, fontsize=5.0 * FR, color=INK, va="center")
+    A.text(X1, y, f"{t['steps']} step" + ("s" if t["steps"] > 1 else ""), fontsize=4.6 * FR, color=MUTED, ha="right",
            va="center")
 y = ry + len(trace) * rp
-image(A, X0 + 0.07, y + 0.01, 0.11, QWEN)                              # the planner, done
-A.text(X0 + 0.2, y, "done", fontsize=4.8, family=MONO, color=INK, va="center", weight="bold")
-A.text(X0 + 0.5, y, "✓", fontsize=6, family=GLYPH, color=OK, va="center", weight="bold")
-A.text(X0 + 0.63, y, "verifier: links deleted, new link created", fontsize=4.9, color=OK, va="center")
+image(A, X0 + 0.07, y + 0.01, 0.12, QWEN)                              # the planner, done
+A.text(X0 + 0.2, y, "done", fontsize=4.8 * FR, family=MONO, color=INK, va="center", weight="bold")
+A.text(X0 + 0.52, y, "✓", fontsize=6 * FR, family=GLYPH, color=OK, va="center", weight="bold")
+A.text(X0 + 0.66, y, "verifier: links deleted, new link created", fontsize=4.9 * FR, color=OK, va="center")
 
 out = os.path.join(HERE, "method")
 from style import save
-save(fig, out, strip=0.17)                               # trims the heading strip (the content starts at 0.21 in)
+save(fig, out, strip=0.17 * K)                           # trims the heading strip (the content starts at 0.21 K in)
 print("wrote", out, "| agent steps", result["steps"], [t["model"] for t in trace])

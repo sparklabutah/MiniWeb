@@ -105,8 +105,9 @@ def main():
     if leg.get("references"):                           # one entry for the published curves
         entries.append((leg["references"], dict(color=MUTED, lw=1.2, ls=(0, (1.5, 1.3)), marker="o", ms=3.6,
                                                  mfc="white", mew=1.0)))
+    show_legend = cfg.get("legend_shown", True)          # false when a figure shares one legend (paper Fig. 8)
     x, y, rows = 0.12, 0.33, 1                           # legend in a light panel; entries wrap onto new rows
-    for lab, kw in entries:
+    for lab, kw in (entries if show_legend else []):
         t = A.text(0, 0, lab.replace(", ", ",\n") if cfg.get("legend_split", True) else lab, fontsize=FS["legend"],
                    color=INK, va="center", linespacing=1.0)
         w = 0.25 + t.get_window_extent(fig.canvas.get_renderer()).width / fig.dpi
@@ -115,8 +116,9 @@ def main():
         A.add_line(Line2D([x, x + 0.09, x + 0.18], [y] * 3, markevery=[1], zorder=3, **kw))
         t.set_position((x + 0.25, y))
         x += w + 0.22
-    lh = 0.22 + 0.155 * (rows - 1)
-    legend_panel(A, 0.04, 0.22, W - 0.08, lh)
+    lh = 0.22 + 0.155 * (rows - 1) if show_legend else 0.0
+    if show_legend:
+        legend_panel(A, 0.04, 0.22, W - 0.08, lh)
     top, ph, left, gap = 0.22 + lh + (0.32 if any(p.get("title") for p in cfg["panels"]) else 0.2), \
         cfg.get("plot_height", 1.25), 0.4, 0.3
     H = top + ph + 0.4

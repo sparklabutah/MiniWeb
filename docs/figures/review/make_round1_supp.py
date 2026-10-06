@@ -117,7 +117,7 @@ def main():
 
     # ── primitives inside the held-out tasks
     F = N["family_inside_heldout"]
-    L += [r"\paragraph{Primitives inside the human tasks.} The generated single-primitive tasks of Fig.~\ref{fig:rq2} share "
+    L += [r"\paragraph{Primitives inside the human tasks.} The generated single-primitive tasks of Fig.~\ref{fig:rq2}, left, share "
           r"\miniwebgen{}'s instruction style. Tab.~\ref{tab:supp-inside} measures practice on the human tasks instead: the "
           r"share of primitive instances passed inside the 63 held-out multi-step tasks. Trained alone, the agent passes as "
           r"many as before; with the planner, the trained executor passes more than the untrained one in every family. The "

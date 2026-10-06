@@ -62,7 +62,8 @@ def main():
     # "Drag" and "Reason" would run into each other.
     lg_y, lg_dy = 0.22, 0.19                             # legend panel top, row pitch (inches)
     lg_h = 0.1 * 2 + lg_dy * (len(fa) - 1) + 0.03
-    top, ph = cfg.get("top", lg_y + lg_h + 0.24), cfg.get("plot_height", 1.2)   # plot area under the legend (in)
+    show_legend = cfg.get("legend", True)                # legend: false when a figure shares one legend (paper Fig. 7)
+    top, ph = cfg.get("top", lg_y + lg_h + 0.24 if show_legend else 0.42), cfg.get("plot_height", 1.2)
     W, H = COL_W, top + ph + cfg.get("bottom", 0.43)    # top/plot_height/bottom: to pair it with another panel
     fig = plt.figure(figsize=(W, H))
     A = fig.add_axes([0, 0, 1, 1]); A.set_xlim(0, W); A.set_ylim(H, 0); A.axis("off")
@@ -70,8 +71,9 @@ def main():
 
     # the diagrams' header, then the legend in a light panel
     header(fig, A, 0.04, 0.1, cfg.get("title", "Practice"), cfg.get("subtitle", cfg["model"] + ", single primitives, held-out sites"))
-    panel(A, 0.04, lg_y, W - 0.08, lg_h)
-    for i, a in enumerate(fa):
+    for i, a in enumerate(fa if show_legend else []):
+        if i == 0:
+            panel(A, 0.04, lg_y, W - 0.08, lg_h)
         x, y = 0.14, lg_y + 0.115 + i * lg_dy
         swatch(A, x, y, a["color"], hatched=a.get("style") == "hatched")
         A.text(x + 0.21, y, a["label"], fontsize=FS["legend"], color=INK, va="center",

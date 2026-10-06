@@ -55,7 +55,8 @@ def main():
     rows = (n + 1) // 2 if two else n
     pitch = 0.165                                        # legend row pitch (inches)
     lh = 0.1 + pitch * rows                              # legend panel height
-    top, ph = cfg.get("top", 0.22 + lh + 0.16), cfg.get("plot_height", 1.75)   # plot area: top edge and height (inches)
+    show_legend = cfg.get("legend", True)                # legend: false when a figure shares one legend (paper Figs. 7, 8)
+    top, ph = cfg.get("top", 0.22 + lh + 0.16 if show_legend else 0.42), cfg.get("plot_height", 1.75)
     left, right = 0.39, 0.02                             # room for the axis title and the "80%" tick; right margin
     W = cfg.get("width", COL_W)
     H = top + ph + 0.1 + 0.155 * max(b["label"].count("\n") + 1 for b in benches)
@@ -64,7 +65,8 @@ def main():
     ax_at = lambda x, y, w, h: fig.add_axes([x / W, 1 - (y + h) / H, w / W, h / H])
     rnd = fig.canvas.get_renderer()
     header(fig, A, 0.04, 0.1, cfg.get("title", "Training and composition"), cfg.get("subtitle", cfg["model"] + ", task success"))
-    panel(A, 0.04, 0.22, W - 0.08, lh)                   # legend in a light panel, as the diagrams group things
+    if show_legend:
+        panel(A, 0.04, 0.22, W - 0.08, lh)               # legend in a light panel, as the diagrams group things
     sw, tg, cg = 0.13, 0.05, 0.1                         # swatch width, swatch-to-text gap, gap between the columns
     texts = []
     for i, a in enumerate(arms):
@@ -78,8 +80,11 @@ def main():
     for i, a in enumerate(arms):
         x = x0 + (cols[i % 2] if two else 0)
         y = 0.22 + 0.05 + pitch * ((i // 2 if two else i) + 0.5)
-        swatch(A, x, y, a["color"], hatched=a.get("style") == "hatched", w=sw)
-        texts[i].set_position((x + sw + tg, y))
+        if show_legend:
+            swatch(A, x, y, a["color"], hatched=a.get("style") == "hatched", w=sw)
+            texts[i].set_position((x + sw + tg, y))
+        else:
+            texts[i].remove()
 
     aw = W - left - right
     ax = ax_at(left, top, aw, ph)
