@@ -1,12 +1,12 @@
-"""The paper's training results as one full-width row of four panels with one legend (user, 2026-10-06: "merge fig 7
-and 8 into a row of 4 plots"), drawn at the printed width (style.FULL_W), 9 pt:
+"""The paper's training results as one full-width row of three square panels with one legend (user, 2026-10-06), drawn at
+the printed width (style.FULL_W), 9 pt:
 
   (a) practice     success per skill family on the generated single-primitive tasks, single agent untrained / trained
-  (b) composition  task success on the four benchmarks: single agent and planner, each untrained or trained
-  (c) data         the planner's executor untrained, trained on InSTA's task-centric data, or on ours (matched size)
-  (d) scaling      the planner on the WebVoyager sample against training steps
+  (b) benchmarks   task success on the four benchmarks: single agent and planner, each untrained or trained, and the
+                   planner's executor trained on InSTA's task-centric data at matched size (composition and data merged)
+  (c) scaling      the planner on the WebVoyager sample against training steps
 
-(a)-(c) share one 0-100% axis. The runs come from the panels' own configs (rq2_config, rq3_config, data_config,
+(a) and (b) share one 0-100% axis. The runs come from the panels' own configs (rq2_config, rq3_config, data_config,
 scaling_wv_config), so this figure cannot drift from them; results_row_config.yaml holds the layout and the labels.
 
     python docs/figures/rq3/make_results_row.py
@@ -53,7 +53,7 @@ def practice(ax, cfg):
             bar(ax, gi + (j - 0.5) * bw, v, bw * 0.9, a["color"])
         d = vals[-1] - vals[0]                           # the gains are read off the bars (the caption gives them)
         ax.text(gi + 0.1, -3, FAMILY[f], fontsize=FS["label"], weight="bold", color=FAM[f], ha="right", va="top",
-                rotation=60, rotation_mode="anchor")    # 60 degrees: at 45 the bold names touch their neighbours
+                rotation=45, rotation_mode="anchor")
         print(f"  (a) {f:20s} {vals[0]:5.1f} -> {vals[-1]:5.1f}  gain {d:+5.1f}  (n {fa[0]['fam'][f][1]})")
     ax.set_xlim(-0.5, len(fams) - 0.5)
 
@@ -148,10 +148,10 @@ def main():
              (lab["references"], [line_glyph(color=MUTED, lw=1.2, ls=(0, (1.5, 1.3)), marker="o", ms=3.6, mfc="white",
                                              mew=1.0)], False, INK)]]
 
-    sq = (W - L["left"] - 2 * L["gap"] - L["gap_d"] - L["right"]) / 4   # four square panels (user, 2026-10-06)
-    widths = [sq] * 4
+    sq = (W - L["left"] - L["gap"] - L["gap_d"] - L["right"]) / 3   # three square panels (user, 2026-10-06)
+    widths = [sq] * 3
     xs = [L["left"]]
-    for w, g in zip(widths[:-1], [L["gap"], L["gap"], L["gap_d"]]):
+    for w, g in zip(widths[:-1], [L["gap"], L["gap_d"]]):
         xs.append(xs[-1] + w + g)
     assert abs(xs[-1] + widths[-1] + L["right"] - W) < 0.02, f"panels end at {xs[-1] + widths[-1]:.3f} in"
     fig = plt.figure(figsize=(W, 4))
@@ -165,9 +165,9 @@ def main():
     axes = [ax_at(x, w) for x, w in zip(xs, widths)]
 
     practice(axes[0], rq2)
-    benches(axes[1], rq3, cfg["short"], {rq3["arms"][-1]["label"]})
-    benches(axes[2], data, cfg["short"], {data["arms"][-1]["label"]})
-    for ax in axes[:3]:
+    insta = next(a for a in data["arms"] if a["label"] == cfg["insta_arm"])   # before MiniWebAgent, as in the legend
+    benches(axes[1], dict(rq3, arms=rq3["arms"][:-1] + [insta, rq3["arms"][-1]]), cfg["short"], {rq3["arms"][-1]["label"]})
+    for ax in axes[:2]:
         style_axes(ax)
         ax.set_ylim(0, 100); ax.set_yticks([0, 25, 50, 75, 100]); ax.set_xticks([])
         ax.set_yticklabels(["0", "25", "50", "75", "100%"] if ax is axes[0] else [])
@@ -175,13 +175,13 @@ def main():
     p.update(cfg.get("scaling_panel") or {})
     p["references"] = [dict(r, **(cfg.get("reference_labels") or {}).get(r["label"], {}))   # label positions for
                        for r in p.get("references", [])]                                    # the narrow panel
-    scaling_panel(axes[3], p, sc)
+    scaling_panel(axes[2], p, sc)
 
     for x, w, t in zip(xs, widths, cfg["titles"]):
         A.text(x, top - 0.1, t, fontsize=FS["label"], weight="bold", color=INK, va="baseline")
     A.text(0.08, top + ph / 2, "task success", fontsize=FS["label"], color=MUTED, rotation=90, ha="center",
            va="center")
-    A.text(xs[3] + widths[3] / 2, top + ph + 0.2, "training steps", fontsize=FS["label"], color=MUTED, ha="center",
+    A.text(xs[2] + widths[2] / 2, top + ph + 0.2, "training steps", fontsize=FS["label"], color=MUTED, ha="center",
            va="top")
     out = os.path.join(ROOT, cfg["out"])
     save(fig, out, strip=0.0)

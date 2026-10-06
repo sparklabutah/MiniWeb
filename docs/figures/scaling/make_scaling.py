@@ -52,9 +52,10 @@ def panel(ax, p, cfg):
         # x = 1600, clear of the curve and the reference markers (review round 3).
         ul = p.get("untrained_label", {})
         above = ul.get("above", False)
-        ax.text(ul.get("x", 1600), b0 + (yhi - ylo) * (0.012 if above else -0.015),
-                ul.get("text", "planner, untrained: {:.1f}").format(b0), fontsize=FS["value"], color=MUTED, ha="left",
-                va="bottom" if above else "top")
+        if ul.get("text", "") is not None:                # text: null draws the line without its value
+            ax.text(ul.get("x", 1600), b0 + (yhi - ylo) * (0.012 if above else -0.015),
+                    ul.get("text", "planner, untrained: {:.1f}").format(b0), fontsize=FS["value"], color=MUTED,
+                    ha="left", va="bottom" if above else "top")
     pts = [(steps[k], rate(p["miniweb"].get(k) or []), k) for k in ORDER if k in p["miniweb"]]   # absent key: not drawn
     have = [(x, y) for x, y, _ in pts if y is not None]
     best = max([y for _, y in have] + [rate(p["insta"]) or 0])
@@ -66,8 +67,13 @@ def panel(ax, p, cfg):
         below = (b0 is not None and y < b0) or k in p.get("label_below", [])   # under the dashed line, or asked:
                                                                             # label it below
         left = k in p.get("label_left", [])              # asked: above-left, clear of the rising curve
-        ax.text(x / 1.15 if left else x * 1.15, y + (yhi - ylo) * (-0.035 if below else 0.035), f"{y:.1f}",
-                fontsize=FS["value"], color=INK, ha="right" if left else "left", va="top" if below else "bottom",
+        at = dict(x=x / 1.15 if left else x * 1.15, y=y + (yhi - ylo) * (-0.035 if below else 0.035),
+                  ha="right" if left else "left", va="top" if below else "bottom")
+        if k in p.get("label_at", {}):                   # or anywhere: dx multiplies x, dy is a share of the y range
+            o = p["label_at"][k]
+            at = dict(x=x * o.get("dx", 1.15), y=y + (yhi - ylo) * o.get("dy", 0), ha=o.get("ha", "left"),
+                      va=o.get("va", "center"))
+        ax.text(at["x"], at["y"], f"{y:.1f}", fontsize=FS["value"], color=INK, ha=at["ha"], va=at["va"],
                 weight="bold" if y == best else "normal", zorder=5,
                 bbox=dict(fc="white", ec="none", pad=0.4) if k in p.get("label_below", []) else None)
     if have:
