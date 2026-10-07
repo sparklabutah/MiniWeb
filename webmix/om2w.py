@@ -136,6 +136,7 @@ async def run_task(task, args, out_dir):
     res = {"task_id": tid, "arm": args.arm, "website": task["website"], "level": task.get("level")}
     bs = H.make_session(online=True)
     hists, answer, planner_hist = [], None, None
+    sink = []                                      # --record-rows: every model call of the base agent
     box, agent = {}, None                          # what ran so far, kept when the safety timeout cuts an episode
     try:
         await bs.start()
@@ -153,11 +154,16 @@ async def run_task(task, args, out_dir):
             ph.save_to_file(ep / "planner_history.json")
             (ep / "subtasks.json").write_text(json.dumps({"trace": trace}, indent=1, default=str, ensure_ascii=False))
         else:
-            agent = Agent(task=H.instruction(task["confirmed_task"], task["website"]),
-                          llm=H.make_llm(args.model, base_url=args.vllm, temperature=args.temperature),
+            # --hint-field (webmix.insta_regen, 2026-10-07): a privileged hint appended to the task while acting, and
+            # stripped from every recorded prompt (--record-rows), as MiniWebGen keeps privileged inputs out of rows
+            hint = task.get(args.hint_field) if args.hint_field else None
+            text = task["confirmed_task"] + (f"\n\n{hint}" if hint else "")
+            llm = (recording_llm(args.model, args.vllm, args.temperature, sink) if args.record_rows else
+                   H.make_llm(args.model, base_url=args.vllm, temperature=args.temperature))
+            agent = Agent(task=H.instruction(text, task["website"]), llm=llm,
                           browser_session=bs, tools=H.make_tools(), max_failures=3, **H.AGENT_KWARGS)
             H.use_normalized_coordinates(bs)
-            h = await asyncio.wait_for(agent.run(max_steps=args.max_steps,
+            h = await asyncio.wait_for(agent.run(max_steps=task.get("max_steps") or args.max_steps,
                                                  on_step_start=lambda a: H.enable_clipboard(bs, a)),
                                        timeout=args.timeout)
             hists, answer = [h], h.final_result()
@@ -204,7 +210,74 @@ async def run_task(task, args, out_dir):
             pass
     res.update(steps=sum(len(h.history) for h in hists), actions=len(actions), screenshots=len(shots) + bool(final_png),
                answer=(answer or "")[:500], duration_s=round(time.time() - t0, 1))
+    if args.record_rows and sink:
+        hint = task.get(args.hint_field) if args.hint_field else None
+        res["rows"], res["hint_left"] = write_rows(ep / "rows", task, sink, hint)
     return res
+
+
+# ── --record-rows (webmix.insta_regen) ────────────────────────────────────────
+
+ROW_FAMILY = {"input": "Text entry", "send_keys": "Text entry", "select_dropdown": "Discrete selection",
+              "done": "Reasoning base"}           # the rest (click, navigate, scroll, go_back, tabs ...): Navigation
+
+
+def recording_llm(model, base_url, temperature, sink):
+    """The eval's model client, recording each call's messages, response format and reply into `sink`."""
+    llm = H.make_llm(model, base_url=base_url, temperature=temperature)
+    real = llm.get_client()
+
+    async def create(model=None, messages=None, response_format=None, **params):
+        r = await real.chat.completions.create(model=model, messages=messages, response_format=response_format,
+                                               **params)
+        sink.append({"messages": messages, "response_format": response_format,
+                     "content": r.choices[0].message.content})
+        return r
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    llm.get_client = lambda: client
+    return llm
+
+
+def _strip(messages, full, short):
+    """Messages with the task-plus-hint text replaced by the task alone."""
+    import copy
+    out = copy.deepcopy(messages)
+    for m in out:
+        c = m.get("content")
+        if isinstance(c, str):
+            m["content"] = c.replace(full, short)
+        elif isinstance(c, list):
+            for part in c:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    part["text"] = part["text"].replace(full, short)
+    return out
+
+
+def write_rows(rows_dir, task, sink, hint):
+    """<ep>/rows/{rows.jsonl, step_*.png, episode.json} in webmix.train's format, the hint stripped from every prompt.
+    -> (rows written, whether any hint text is left in a prompt)."""
+    from webmix import replay as R
+    rows_dir.mkdir(parents=True, exist_ok=True)
+    short = task["confirmed_task"]
+    full = short + (f"\n\n{hint}" if hint else "")
+    rows, left = [], False
+    for i, rec in enumerate(x for x in sink if x["response_format"]):
+        msgs = _strip(rec["messages"], full, short)
+        if hint and hint[:60] in json.dumps(msgs, ensure_ascii=False):
+            left = True
+        try:
+            act = json.loads(rec["content"]).get("action") or [{}]
+            name = next(iter(act[0])) if act and act[0] else ""
+        except (ValueError, AttributeError, TypeError):
+            name = ""
+        rows.append({"task_id": task["task_id"], "step": i, "segment": 0, "macro": None, "op": name,
+                     "family": ROW_FAMILY.get(name, "Navigation"), "messages": R.save_images(msgs, rows_dir, i),
+                     "target": rec["content"]})
+    (rows_dir / "rows.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    (rows_dir / "episode.json").write_text(json.dumps(
+        {"task_id": task["task_id"], "instruction": short, "start_url": task["website"], "steps": len(rows),
+         "source": task.get("source", ""), "hint_left": left}, indent=1, ensure_ascii=False))
+    return len(rows), left
 
 
 def _domain(url):
@@ -308,6 +381,9 @@ def main(argv=None):
                                                          "across nodes; the other node runs the rest)")
     ap.add_argument("--slot", type=int, default=None)          # internal: one worker
     ap.add_argument("--n-workers", type=int, default=1)
+    ap.add_argument("--hint-field", default=None, help="base arm: a task field appended to the task as a privileged hint")
+    ap.add_argument("--record-rows", action="store_true",
+                    help="base arm: record every step as a training row (the hint stripped), in <episode>/rows")
     args = ap.parse_args(argv)
     if args.slot is not None:
         return worker(args)

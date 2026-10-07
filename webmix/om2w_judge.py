@@ -15,20 +15,26 @@ ROOT = Path(__file__).resolve().parent.parent
 OFFICIAL = ROOT / "data" / "webmix" / "om2w" / "official" / "src"
 
 
-def judge_webvoyager(run_dir, model_name, img_num=15, workers=16):
+def judge_webvoyager(run_dir, model_name, img_num=15, workers=16, suffix="_wvjudge"):
     """WebVoyager episodes, judged exactly as the official evaluation/auto_eval.py (vendored in data/webmix/webvoyager):
     its SYSTEM_PROMPT/USER_PROMPT, the last `img_num` screenshots (15, evaluation/run_eval.sh), max_tokens 1000, seed 42,
     temperature 0, verdict 'NOT SUCCESS' -> 0 / 'SUCCESS' -> 1 / neither -> None, and no answer -> 0 without a call.
     Only the model differs: the official gpt-4-vision-preview is retired. -> {"tasks", "success", "rate"}; per-task
-    labels in <run>_wvjudge."""
+    labels in <run><suffix> (default _wvjudge). A gemini-* model (2026-10-07: the Flash-Lite gate of the regenerated
+    InSTA episodes, webmix.insta_regen) goes through helpers.llm (Vertex), with the same prompt and screenshots."""
     import json
     import re
     from concurrent.futures import ThreadPoolExecutor
     from openai import OpenAI
     sys.path.insert(0, str(ROOT / "data" / "webmix" / "webvoyager"))
     import auto_eval as official                                 # noqa: E402  (official prompts + encode_image)
-    client = OpenAI()
-    out = Path(str(run_dir) + "_wvjudge")
+    gemini = model_name.startswith("gemini")
+    if gemini:
+        from helpers.llm import LLMClient
+        g = LLMClient(model_name, temperature=0)
+    else:
+        client = OpenAI()
+    out = Path(str(run_dir) + suffix)
     out.mkdir(parents=True, exist_ok=True)
     dirs = sorted(d for d in Path(run_dir).iterdir() if d.is_dir() and (d / "result.json").exists())
 
@@ -51,8 +57,14 @@ def judge_webvoyager(run_dir, model_name, img_num=15, workers=16):
                          + [{"type": "text", "text": "Your verdict:\n"}]}]
             for attempt in range(6):
                 try:
-                    text = client.chat.completions.create(model=model_name, messages=messages, max_tokens=1000,
-                                                          seed=42, temperature=0).choices[0].message.content
+                    if gemini:
+                        text = g.complete(prompt + "\nYour verdict:\n", system=official.SYSTEM_PROMPT,
+                                          max_tokens=1000, temperature=0, images=[str(p) for p in shots])
+                        if not text:
+                            raise RuntimeError("empty reply")
+                    else:
+                        text = client.chat.completions.create(model=model_name, messages=messages, max_tokens=1000,
+                                                              seed=42, temperature=0).choices[0].message.content
                     break
                 except Exception as e:                           # noqa: BLE001  (rate limits: retry, as official)
                     text = f"ERROR {type(e).__name__}: {e}"
@@ -82,12 +94,13 @@ def main(argv=None):
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--threshold", type=int, default=3)
     ap.add_argument("--img-num", type=int, default=15, help="webvoyager: final screenshots attached (official 15)")
+    ap.add_argument("--suffix", default="_wvjudge", help="webvoyager: the labels' directory is <run_dir><suffix>")
     a = ap.parse_args(argv)
     from webmix.wa import _load_openai_env
     _load_openai_env()
     sys.path.insert(0, str(OFFICIAL))
     if a.bench == "webvoyager":
-        return judge_webvoyager(a.run_dir, a.model or "gpt-4o", a.img_num, a.workers)
+        return judge_webvoyager(a.run_dir, a.model or "gpt-4o", a.img_num, a.workers, a.suffix)
     a.model = a.model or "o4-mini"
     import run as official                                       # noqa: E402  (the vendored src/run.py)
     run_dir = Path(a.run_dir)
