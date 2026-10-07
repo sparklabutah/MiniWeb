@@ -16,6 +16,7 @@ ends the task with `done`, whose text is the answer. It may also scroll to read.
 Budget: specialist actions (the steps that touch the site) share the single agent's 40; each delegation gets at most
 `sub_cap` of them; planner turns are capped separately (`max_turns`).
 """
+import os
 from typing import Literal
 
 from browser_use import Agent, BrowserSession, Tools
@@ -318,16 +319,20 @@ def planner_agent(bs, task_text, start_url, llm, team, version):
 
 async def run_planner_agent(bs, task_text, start_url, pick_model, vllm_url, planner_model, *, context="", sub_cap=15,
                             budget=H.MAX_STEPS, max_turns=12, on_end=None, temperature=0.0, version="v1",
-                            expose=None, turns=None):
+                            expose=None, turns=None, planner_url=None):
     """-> (_Hist over the specialist episodes with the planner's answer, trace, the planner's own history).
     expose: a dict that receives the Team, so a caller whose wait_for times out can still save what was done.
-    turns: overrides the version's planner-turn cap (2026-10-01: the 100-step Online-Mind2Web runs use 60)."""
+    turns: overrides the version's planner-turn cap (2026-10-01: the 100-step Online-Mind2Web runs use 60).
+    planner_url: the planner's own server (2026-10-07: a 9B planner on another GPU over the 4B specialists); default
+    vllm_url, the specialists' server. Its API key, if any, comes from WEBMIX_PLANNER_KEY."""
     from webmix.evaluate import _Hist
     team = Team(pick_model, vllm_url, task_text, context, sub_cap, budget, on_end, temperature, version)
     if expose is not None:
         expose["team"] = team
     planner = planner_agent(bs, task_text + context, start_url,
-                            H.make_llm(planner_model, base_url=vllm_url, temperature=temperature), team, version)
+                            H.make_llm(planner_model, base_url=planner_url or vllm_url, temperature=temperature,
+                                       api_key=os.environ.get("WEBMIX_PLANNER_KEY", "EMPTY") if planner_url else "EMPTY"),
+                            team, version)
     if expose is not None:
         expose["planner"] = planner          # v7: its observations go into the live-web trajectory
     H.use_normalized_coordinates(bs)

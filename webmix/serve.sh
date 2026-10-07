@@ -21,7 +21,9 @@ PORT="${PORT:-8400}"
 LORA_MODULES="${LORA_MODULES:-}"
 EAGER="${EAGER:-1}"                  # 1 = no CUDA-graph capture (fast start; the pilot restarts often)
 
-args=(serve "$MODEL" --host 127.0.0.1 --port "$PORT" --served-model-name "$SERVED"
+# HOST: 127.0.0.1 (default); 0.0.0.0 to serve another machine over the cluster network, then with API_KEY set
+# (2026-10-07: a 9B planner on granite for the local WebArena-Lite runs; the key lives only in the environment).
+args=(serve "$MODEL" --host "${HOST:-127.0.0.1}" --port "$PORT" --served-model-name "$SERVED"
       --max-model-len "${MAX_MODEL_LEN:-32768}" --gpu-memory-utilization "${GPU_UTIL:-0.85}"
       --limit-mm-per-prompt "${MM_LIMIT:-{\"image\": 1, \"video\": 0\}}"
       --attention-backend FLASH_ATTN --gdn-prefill-backend triton
@@ -35,6 +37,7 @@ args=(serve "$MODEL" --host 127.0.0.1 --port "$PORT" --served-model-name "$SERVE
 # defaults (Fara1.5 as released, 2026-10-02). MM_LIMIT: images per prompt (Fara sends up to 3).
 CHAT_KWARGS="${CHAT_KWARGS:-{\"enable_thinking\": false\}}"
 [ "$CHAT_KWARGS" != "none" ] && args+=(--default-chat-template-kwargs "$CHAT_KWARGS")
+[ -n "${API_KEY:-}" ] && args+=(--api-key "$API_KEY")
 [ "$EAGER" = "1" ] && args+=(--enforce-eager)
 if [ -n "$LORA_MODULES" ]; then
   args+=(--lora-modules)

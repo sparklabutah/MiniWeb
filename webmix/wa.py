@@ -261,7 +261,7 @@ async def agent_run(bs, cfg, args, ep):
     hist, trace, ph = await run_planner_agent(bs, cfg["intent"], cfg["start_url"], lambda f: sub_model(f, margs),
                                               args.vllm, args.planner_name, sub_cap=args.sub_cap,
                                               max_turns=args.planner_turns, temperature=args.temperature,
-                                              version=args.agent_version)
+                                              version=args.agent_version, planner_url=args.planner_vllm)
     ph.save_to_file(ep / "planner_history.json")
     (ep / "subtasks.json").write_text(json.dumps({"trace": trace}, indent=1, default=str, ensure_ascii=False))
     return hist
@@ -319,6 +319,8 @@ def main(argv=None):
                     help="planner_agent: the planner agent (webmix.planner_agent) delegating to family specialists; "
                          "none: one agent with --model")
     ap.add_argument("--planner-name", default="qwen35-4b", help="planner_agent: the planner's served model name")
+    ap.add_argument("--planner-vllm", default=None,
+                    help="planner_agent: the planner's own server (default --vllm; e.g. a 9B planner over 4B specialists)")
     ap.add_argument("--planner-turns", type=int, default=12, help="planner_agent: the planner agent's own turns")
     ap.add_argument("--agent-version", default="v1", help="planner_agent: version (v1, v2, ...)")
     ap.add_argument("--adapters", default="drag,io,select,rest", help="planner_agent: family adapters served")
@@ -347,6 +349,8 @@ def main(argv=None):
                "--judge", args.judge, "--split", args.split, "--router", args.router, "--planner-name",
                args.planner_name, "--adapters", args.adapters, "--fallback", args.fallback, "--sub-cap", str(args.sub_cap)]
         cmd += ["--planner-turns", str(args.planner_turns), "--agent-version", args.agent_version]
+        if args.planner_vllm:
+            cmd += ["--planner-vllm", args.planner_vllm]
         if args.max_steps:
             cmd += ["--max-steps", str(args.max_steps)]
         if args.limit:
