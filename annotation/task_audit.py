@@ -84,6 +84,35 @@ def case(task_id):
             "recordings": {"gold": gold.get("actions", []), "walk": (walk or {}).get("actions")}}
 
 
+def snapshot(task_id, source, index):
+    """The page a recording saw at action `index` (1-based) as its HTML snapshot: the observation recorded with the
+    action, else the last one before it (as macro_browser.task_detail pairs frames). For recordings made before the
+    recorder took screenshots."""
+    row = entry(task_id)
+    if row is None or source not in ("gold", "walk"):
+        return None
+    f = ANNOTATIONS_DIR / row["folder"] / task_id / ("verification_walk.json" if source == "walk" else "trajectory.json")
+    if not f.is_file():
+        return None
+    t = json.loads(f.read_text())
+    events = t if isinstance(t, list) else t.get("trajectory", [])
+    k, last = 0, None
+    for i, e in enumerate(events):
+        if e.get("type") == "observation" and e.get("snapshot"):
+            last = e["snapshot"]
+        if e.get("type") != "action":
+            continue
+        k += 1
+        if k == index:
+            for nxt in events[i + 1:]:
+                if nxt.get("type") == "action":
+                    break
+                if nxt.get("type") == "observation" and nxt.get("snapshot"):
+                    return nxt["snapshot"]
+            return last
+    return None
+
+
 def _from_file(f):
     out = {}
     for line in f.read_text().splitlines():

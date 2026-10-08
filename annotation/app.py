@@ -784,9 +784,10 @@ def _require_annotator_login():
 
 @annotation_bp.after_request
 def _final_set_banner(resp):
-    """Mark every annotation page as read-only while the final set is locked."""
+    """Mark every annotation page as read-only while the final set is locked (not API responses, such as a recorded
+    page the Task Audit shows in a frame)."""
     if (_final_set.locked() and resp.mimetype == "text/html" and resp.status_code == 200
-            and not resp.direct_passthrough):
+            and not resp.direct_passthrough and "/api/" not in request.path):
         html = resp.get_data(as_text=True)
         if "</body>" in html:
             resp.set_data(html.replace("</body>", _final_set.banner() + "</body>", 1))
@@ -2611,6 +2612,22 @@ def api_task_audit_task(task_id):
         return jsonify({"error": "unknown task"}), 404
     c["my_label"] = task_audit.labels(session.get("annotator_name", "anonymous")).get(task_id)
     return jsonify(c)
+
+
+@annotation_bp.route("/api/task_audit/snapshot/<task_id>/<source>/<int:index>")
+def api_task_audit_snapshot(task_id, source, index):
+    """A step's page as recorded (HTML), shown in a sandboxed frame for recordings without screenshots; scripts are
+    stripped and blocked."""
+    import re
+    from flask import make_response
+    from annotation import task_audit
+    html = task_audit.snapshot(task_id, source, index)
+    if html is None:
+        return "No page snapshot was recorded for this step.", 404
+    resp = make_response(re.sub(r"(?is)<script\b.*?</script\s*>", "", html))
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    resp.headers["Content-Security-Policy"] = "script-src 'none'; object-src 'none'"
+    return resp
 
 
 @annotation_bp.route("/api/task_audit/label", methods=["POST"])

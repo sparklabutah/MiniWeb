@@ -80,6 +80,21 @@ class TaskAuditTests(unittest.TestCase):
         self.assertTrue(c.get("/annotate/api/task_audit/tasks").get_json()["tasks"][0]["labeled"])
         self.assertEqual(len(c.get("/annotate/api/task_audit/labels.json").get_json()), 1)
 
+    def test_snapshot_for_recordings_without_screenshots(self):
+        c = self.client()
+        tr = task_audit.ANNOTATIONS_DIR / "alice" / "news_0001" / "trajectory.json"
+        tr.write_text(json.dumps([
+            {"type": "action", "action": "type", "target": "input 'Search'", "value": "x"},
+            {"type": "observation", "snapshot": "<html><body>results<script>alert(1)</script></body></html>"},
+            {"type": "action", "action": "click", "target": "button 'Post'"}]))
+        r = c.get("/annotate/api/task_audit/snapshot/news_0001/gold/2")       # no observation after: the last one
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("results", r.get_data(as_text=True))
+        self.assertNotIn("<script", r.get_data(as_text=True))
+        self.assertIn("script-src 'none'", r.headers["Content-Security-Policy"])
+        self.assertEqual(c.get("/annotate/api/task_audit/snapshot/news_0001/gold/9").status_code, 404)
+        self.assertEqual(c.get("/annotate/api/task_audit/snapshot/news_0001/other/1").status_code, 404)
+
     def test_labels_stay_writable_under_the_lock(self):
         self.assertTrue(final_set.write_allowed("/annotate/api/task_audit/label"))
 
