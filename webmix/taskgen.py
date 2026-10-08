@@ -256,6 +256,12 @@ def _shots(ep, k=10):
     return shots[:head] + shots[-(k - head):]
 
 
+def _last_seen(seen):
+    """The text of the last page the agent saw; a JSON page (an API response) is kept as JSON text."""
+    last = (seen or [""])[-1] or ""
+    return last if isinstance(last, str) else json.dumps(last, ensure_ascii=False, default=str)
+
+
 def judge_episode(ep, instruction, out_dir, model=MODEL):
     dst = out_dir / f"{ep.name}.json"
     if dst.exists():
@@ -268,7 +274,7 @@ def judge_episode(ep, instruction, out_dir, model=MODEL):
     prompt = PROMPT_JUDGE.format(task=instruction, n_act=len(acts), actions="\n".join(acts) or "(none)",
                                  answer=(g.get("answer") or "(none)")[:1500], log=_fmt_log(g.get("log")),
                                  changes=_fmt_changes(g.get("changes")),
-                                 seen=((g.get("seen") or [""])[-1] or "")[:2500])
+                                 seen=_last_seen(g.get("seen"))[:2500])
     from helpers.llm import LLMClient
     resp = None
     for _ in range(3):
@@ -306,12 +312,24 @@ def cmd_judge(a):
     ins = _instructions(run)
     eps = [p for p in sorted(run.iterdir()) if p.is_dir() and p.name in ins]
     print(f"judging {len(eps)} episodes of {run} with {a.model} -> {out}", flush=True)
+    errors = []
+
+    def one(p):          # one episode's failure is reported, not the end of the run
+        try:
+            return judge_episode(p, ins[p.name], out, a.model)
+        except Exception as e:  # noqa: BLE001
+            errors.append(p.name)
+            print(f"judge error on {p.name}: {type(e).__name__}: {e}", flush=True)
+            return None
     with ThreadPoolExecutor(a.workers) as ex:
-        recs = list(ex.map(lambda p: judge_episode(p, ins[p.name], out, a.model), eps))
+        recs = list(ex.map(one, eps))
     recs = [r for r in recs if r]
     k = sum(r["predicted_label"] for r in recs)
     print(json.dumps({"episodes": len(recs), "success": k, "rate": round(k / max(1, len(recs)), 4),
-                      "no_verdict": sum(not r["verdict"] for r in recs), "judge": a.model}), flush=True)
+                      "no_verdict": sum(not r["verdict"] for r in recs), "errors": len(errors), "judge": a.model}),
+          flush=True)
+    if errors:
+        sys.exit(f"{len(errors)} episodes not judged; rerun to retry them (judged ones are kept)")
 
 
 def cmd_validate(a):
