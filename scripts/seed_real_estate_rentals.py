@@ -4,7 +4,7 @@ rent, but 0 listings had status=for_rent, so the Rent tab was empty).
 Deterministic + idempotent: flips condo/townhouse/multi-family listings whose id%4==0
 to status=for_rent with a realistic monthly rent (~0.5% of price/mo, $1200-$4800).
 Re-run safe (same set every time). Writes the base listings table.
-Run: ~/.conda/envs/miniweb/bin/python scratchpad/seed_real_estate_rentals.py
+Run: ~/.conda/envs/miniweb/bin/python scripts/seed_real_estate_rentals.py
 """
 import sys
 import pathlib

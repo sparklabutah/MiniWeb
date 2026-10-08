@@ -2,7 +2,7 @@
 
 Idempotent — drops any previously-appended /photo/ URLs and re-appends, so it can
 be re-run safely (e.g. after a DB rebuild). Writes to the base dating_users table.
-Run: ~/.conda/envs/miniweb/bin/python scratchpad/seed_dating_photos.py
+Run: ~/.conda/envs/miniweb/bin/python scripts/seed_dating_photos.py
 """
 import json
 import sys

@@ -5,7 +5,7 @@
 
 Tasks, per-instance URL maps and the evaluator are ScaleCUA's WebArenaLiteV2 (OpenGVLab/ScaleCUA,
 evaluation/WebArenaLiteV2), copied from the host's checkout into data/webmix/wa_lite_v2. Four
-deployments run on 155.98.68.29 (instance i: sites at 8081+100(i-1).., homepage 4398+i; map and
+deployments run on one host, WA_HOST or the URL maps' (instance i: sites at 8081+100(i-1).., homepage 4398+i; map and
 wikipedia shared); each instance runs its share of the tasks in order, as the benchmark recommends
 (tasks are not fully independent). Reset the instances first (reset API, one per instance on 8090+i).
 
@@ -32,7 +32,6 @@ from webmix import harness as H
 ROOT = Path(__file__).resolve().parent.parent
 WA_DIR = ROOT / "data" / "webmix" / "wa_lite_v2"
 TASK_DIR = WA_DIR / "config" / "envs" / "webarena" / "tasks"
-HOST = "155.98.68.29"
 SPLIT = ROOT / "data" / "webmix" / "wa" / "split_5050.json"   # dev = development evals, test = final (2026-09-29)
 URL_KEYS = ("SHOPPING_URL", "SHOPPING_ADMIN_URL", "REDDIT_URL", "GITLAB_URL", "MAP_URL", "WIKIPEDIA_URL", "HOMEPAGE_URL")
 
@@ -40,6 +39,12 @@ URL_KEYS = ("SHOPPING_URL", "SHOPPING_ADMIN_URL", "REDDIT_URL", "GITLAB_URL", "M
 def instance_urls(i):
     name = "webarena_url.json" if i == 1 else f"webarena_url_{i}.json"
     return json.loads((WA_DIR / "config" / "envs" / "webarena" / "init" / name).read_text())
+
+
+def wa_host():
+    """The WebArena deployments' host: WA_HOST, else the one instance 1's URL map points at (browsing is limited to it)."""
+    from urllib.parse import urlsplit
+    return os.environ.get("WA_HOST") or urlsplit(instance_urls(1)["HOMEPAGE_URL"]).hostname
 
 
 def load_tasks():
@@ -212,7 +217,7 @@ async def run_task(cfg, args, out_dir, states):
     res = {"task_id": tid, "sites": cfg["sites"], "arm": args.arm, "instance": args.instance, "score": 0.0}
     ep = out_dir / str(tid)
     ep.mkdir(parents=True, exist_ok=True)
-    bs = H.make_session(allowed_domains=(HOST, "localhost", "127.0.0.1"))
+    bs = H.make_session(allowed_domains=(wa_host(), "localhost", "127.0.0.1"))
     try:
         await bs.start()
         await H.enable_clipboard(bs)

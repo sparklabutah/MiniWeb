@@ -122,6 +122,23 @@ The rows directory `data/webmix/replay_rs/` contains symlinks to every `replay_v
 the passing `rs_reasoning` episodes. Train the `reasoning` adapter with
 `WEBMIX_REPLAY_DIR=data/webmix/replay_rs`.
 
+## Task-centric data (`taskgen.py`, `insta_regen.py`)
+
+Two arms for comparing skill-centric data with task-centric data at the same size (27.6K steps):
+
+- **`taskgen.py`, task-centric MiniWeb data** (InSTA's recipe on MiniWeb's 52 training sites, so only
+  the unit of data differs). `propose`: Gemini 3.5 Flash writes goal-level tasks per site from its
+  pages, controls and page text; every task starts at the home page. Attempts: the base model as
+  one agent with no hint, `evaluate --tasks <tasks> --arm base --record-rows` (task kind
+  `proposed`). `judge`: Gemini 3.5 Flash checks each part of the task against the screenshots and
+  the server record (requests, data changes) and returns JSON per part; `validate` scores the
+  judge against the task verifiers on human-task runs. `rows`: the judged successes, sites
+  interleaved, up to the step budget.
+- **`insta_regen.py`, InSTA regenerated through this harness.** `tasks`: InSTA's tasks with its
+  own trajectory as a privileged hint; the base model attempts them (`om2w --hint-field hint
+  --record-rows`), a judge gates them, and `rows` rewrites each memory from the hint-free prompt
+  (leaks dropped) and selects to the step budget.
+
 ## 4. Train (`train.py`)
 
 - **Model:** LoRA on `Qwen/Qwen3.5-4B`, language model only. q/k/v/o on the full-attention
@@ -239,6 +256,8 @@ on the other benchmarks). The older screenshot planner and subtask routers (`pla
 - **Dev sets** for agent development are two disjoint sets of 60 train-site tasks:
   `data/webmix/eval/pagent_devset.txt` and `pagent_devset2.txt` (comma-separated ids for
   `--task-ids`). The held-out 63 are used only to measure.
+- `--tasks FILE` with `"kind": "proposed"` tasks (`taskgen.py`): no check at run time; every episode
+  saves its backend evidence, a final screenshot and, with `--record-rows`, its rows for the judge.
 - `--tasks FILE`: generated single-macro tasks, graded by the datagen gate. Validation v2 is
   `data/webmix/valgen/val_v2.jsonl`: 115 tasks generated on the held-out sites with
   `datagen run --stop-after suggest`, never executed or trained on.
@@ -249,6 +268,8 @@ on the other benchmarks). The older screenshot planner and subtask routers (`pla
 - **Other flags:** `--repeats`, `--temperature`, `--timeout`, `--workers`, `--ports`.
 
 ### WebArena-Lite-v2 (`wa.py`)
+
+The deployments' host is `WA_HOST`, else the host instance 1's URL map points at; browsing is limited to it.
 
 - **Tasks:** ScaleCUA's 154 tasks with their evaluator, vendored in
   `data/webmix/wa_lite_v2/`. They run on four deployments, whose URL maps are in
