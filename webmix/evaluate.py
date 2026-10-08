@@ -26,6 +26,7 @@ runs grade without the QA chain's LLM tier (no credentials there), and are re-gr
 from __future__ import annotations
 
 import argparse
+import base64
 import asyncio
 import json
 import os
@@ -215,6 +216,41 @@ async def prepare_human(bs, base, task):
     return prompt, start
 
 
+async def prepare_proposed(bs, base, task):
+    """webmix.taskgen's proposed tasks (task-centric MiniWeb data, 2026-10-08): the default (logged-in) session on the
+    task's start page. -> (prompt, start url)."""
+    await H.goto(bs, f"{base}/_admin/session-flags")
+    start = base + task["start_path"]
+    await H.goto(bs, start)
+    await asyncio.sleep(1.0)
+    return task["instruction"], start
+
+
+def write_proposed_rows(rows_dir, task, rec):
+    """A proposed task's episode as training rows, whatever its outcome (webmix.taskgen's judge picks the kept ones):
+    <ep>/rows/{rows.jsonl, step_*.png, episode.json}, the layout of webmix.om2w --record-rows. Only the agent's step
+    calls (a JSON reply with an action) become rows; a row's family follows its first action (om2w.ROW_FAMILY)."""
+    from webmix.om2w import ROW_FAMILY
+    from webmix.replay import save_images
+    rows_dir.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for st in rec:
+        try:
+            act = json.loads(st["content"]).get("action") or [{}]
+        except (ValueError, TypeError, AttributeError):
+            continue
+        name = next(iter(act[0]), "") if act and isinstance(act[0], dict) else ""
+        i = len(rows)
+        rows.append({"task_id": task["task_id"], "step": i, "segment": 0, "macro": None, "op": name,
+                     "family": ROW_FAMILY.get(name, "Navigation"), "messages": save_images(st["messages"], rows_dir, i),
+                     "target": st["content"]})
+    (rows_dir / "rows.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    (rows_dir / "episode.json").write_text(json.dumps(
+        {"task_id": task["task_id"], "instruction": task["instruction"], "site": task["site"],
+         "start_path": task["start_path"], "steps": len(rows), "source": "taskgen"}, indent=1, ensure_ascii=False))
+    return len(rows)
+
+
 async def human_trajectory(bs, base):
     """verify_task's trajectory for this session: the recorder stream (actions + observations) with the server's
     request log merged in as network events (as evaluation.run_agent_verify.build_trajectory, per session)."""
@@ -298,7 +334,8 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
     from browser_use import Agent
     from webmix.replay import _rebase
     human = task.get("kind") == "human"
-    if not human:
+    proposed = task.get("kind") == "proposed"          # webmix.taskgen: no check here, judged afterwards
+    if not (human or proposed):
         task = _rebase(task, base)       # values recorded with the generating server's origin -> this server's
         task["check"] = checks.relax_recorded_dates(task["check"], [task["instruction"], json.dumps(task.get("option"))])
     t0 = time.time()
@@ -312,6 +349,8 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
         await H.enable_clipboard(bs)
         if human:
             prompt, start = await prepare_human(bs, base, task)
+        elif proposed:
+            prompt, start = await prepare_proposed(bs, base, task)
         else:
             await H.prepare(bs, base, task)
             prompt, start = task["instruction"], base + task["start"]["url"]
@@ -357,8 +396,18 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
         try:
             if human:
                 traj = await human_trajectory(bs, base)
-                (ep / "grade_inputs.json").write_text(json.dumps({"base": base, "traj": traj, "answer": answer}, default=str))
+                # + the backend evidence webmix.taskgen's judge reads, so the judge can be validated on human tasks
+                log, changes, clip = await H.backend_state(bs, base)
+                (ep / "grade_inputs.json").write_text(json.dumps(
+                    {"base": base, "traj": traj, "answer": answer, "log": log, "changes": changes, "clip": clip,
+                     "seen": seen, "actions": history_actions(hist)}, default=str))
                 ok, detail = grade_human(task, traj, answer)
+            elif proposed:
+                log, changes, clip = await H.backend_state(bs, base)
+                (ep / "grade_inputs.json").write_text(json.dumps(
+                    {"base": base, "answer": answer, "log": log, "changes": changes, "clip": clip, "seen": seen,
+                     "actions": history_actions(hist)}, default=str))
+                ok, detail = False, "pending: webmix.taskgen judge"
             else:
                 log, changes, clip = await H.backend_state(bs, base)
                 steps = router.trace if all("action" in t for t in router.trace) else [{"action": history_actions(hist)}]
@@ -375,7 +424,15 @@ async def run_episode(task, base, arm, args, out_dir, rep=0):
                    done=hist.is_done(), models=[t["model"] for t in router.trace], errors=[e for e in hist.errors() if e][:5])
         hist.save_to_file(ep / "history.json")
         (ep / "trace.json").write_text(json.dumps(router.trace, indent=1, default=str))
-        if args.record_rows and ok and rec:           # a passing episode's steps, as training rows
+        if human or proposed:                        # the state after the last action, for webmix.taskgen's judge
+            try:
+                png = await bs.take_screenshot()
+                (ep / "final.png").write_bytes(base64.b64decode(png) if isinstance(png, str) else png)
+            except Exception:
+                pass
+        if args.record_rows and proposed and rec:
+            res["rows"] = write_proposed_rows(ep / "rows", task, rec)
+        if args.record_rows and ok and rec and not proposed:   # a passing episode's steps, as training rows
             from webmix.replay import save_images
             fam = args.record_family or FAMILY_OF.get(task["macro"], "Other")
             with open(ep / "rows.jsonl", "w") as f:

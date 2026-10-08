@@ -72,10 +72,13 @@ arms:
                    runs: {heldout: [data/webmix/eval/r1_control_nodone_s1, data/webmix/eval/r1_control_nodone_s2, data/webmix/eval/r1_control_nodone_s3],
                           wa: [data/webmix/wa/seeds/nodone_s1, data/webmix/wa/seeds/nodone_s2, data/webmix/wa/seeds/nodone_s3]}}
 
-# The extra benchmark used only by the scaling curve: the WebVoyager sample of the scaling runs.
+# The scaling curve's 100 / 1K / 7K points ran WebVoyager in two parts, the 98-task sample and the other 438 tasks; each
+# point is the two runs "+"-joined (scaling_wv_config.yaml), scored on all 536 tasks (2026-10-07).
 extra_benchmarks:
   wv_sub98: {kind: webvoyager, n: 98, base: wv, tasks: data/webmix/webvoyager/WebVoyager_sub98_20261003.jsonl,
              runner: "-m webmix.om2w --bench webvoyager --tasks data/webmix/webvoyager/WebVoyager_sub98_20261003.jsonl"}
+  wv_rest438: {kind: webvoyager, n: 438, base: wv, tasks: data/webmix/webvoyager/WebVoyager_rest438_20261007.jsonl,
+               runner: "-m webmix.om2w --bench webvoyager --tasks data/webmix/webvoyager/WebVoyager_rest438_20261007.jsonl"}
 
 # Protocol deviations, kept as they ran (the paper or its supplement states each):
 deviations:
@@ -149,7 +152,7 @@ figures:
   - {cmd: docs/figures/rq1/make_rq1_table.py, copy: {docs/figures/rq1/rq1_table.tex: tables/rq1_table.tex}}
   - {cmd: docs/figures/rq1/drag_failures.py, copy: {docs/figures/rq1/drag_failures.pdf: figures/drag_failures.pdf}}
   - {cmd: docs/figures/chain/make_chain.py, copy: {docs/figures/chain/chain_length.pdf: figures/chain_length.pdf}}
-  - {cmd: docs/figures/rq3/make_results_row.py, copy: {docs/figures/rq3/results_row.pdf: figures/results_row.pdf}}   # Fig. 7: (a) practice, (b) scaling
+  - {cmd: docs/figures/rq3/make_results_row.py, copy: {docs/figures/rq3/results_row.pdf: figures/results_row.pdf}}   # Fig. 7: practice per skill family
   - {cmd: docs/figures/rq3/make_rq3_table.py, copy: {docs/figures/rq3/rq3_table.tex: tables/rq3_table.tex}}        # Tab. 3: the four benchmarks
   - {cmd: docs/figures/supp/make_supp.py, copy: {docs/figures/supp/supp_primitives.tex: tables/supp_primitives.tex,
                                                  docs/figures/supp/supp_ops.tex: tables/supp_ops.tex,
@@ -161,6 +164,11 @@ figures:
   - {cmd: docs/figures/review/compute_budget.py}
   - {cmd: docs/figures/review/make_round1_supp.py --out docs/figures/review/supp_results.tex,
      copy: {docs/figures/review/supp_results.tex: sections/supp/supp_results.tex}}
+  - {cmd: docs/figures/mining/mining_stats.py}                    # Supp. A: the mining stage, from the brainstorm sheet
+  - {cmd: docs/figures/mining/make_mining_supp.py --out docs/figures/mining/supp_mining.tex,
+     copy: {docs/figures/mining/supp_mining.tex: sections/supp/supp_mining.tex}}
+  - {cmd: docs/figures/review/make_graders_supp.py --out docs/figures/review/supp_graders.tex,      # Supp. grader validation
+     copy: {docs/figures/review/supp_graders.tex: sections/supp/supp_graders.tex}}
 
 # Analyses quoted in the text (Sec. 3 grader validity; review round 1 grader audit):
 analyses:
