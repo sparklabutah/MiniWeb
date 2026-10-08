@@ -136,8 +136,8 @@
             <ul>
                 <li><b>Task</b>: is the instruction clear, solvable on the site and gradeable as written? <i>Needs fix</i> for a wording, tag or
                     answer problem you can name; <i>Broken</i> when it cannot be done or graded as intended. Say what in the notes.</li>
-                <li><b>Primitives</b>: step through the demonstration. Pass when the steps in a primitive's span carry it out as its subtask says
-                    (right item, right values). A primitive the task does not actually need is <i>Unsure</i>, with a note, not Fail.</li>
+                <li>Step through the demonstration; each primitive's span is colored in the steps and the action log, and its
+                    "steps a–b" link jumps there. Note a recording that does not do what its primitive or the task says.</li>
                 <li><b>Review changes</b>: compare the original definition, verifier and recording with the current ones. Accept when the
                     changes fix or keep the task without changing what it asks; Reject when they introduce a mistake.</li>
                 <li>Test tasks (held-out sites) come first: they are the benchmark's evaluation set.</li>
@@ -154,7 +154,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const COLORS = ['#2f6fd6', '#e8742a', '#1f9d55', '#9b51e0', '#d64545', '#0e9aa7', '#b7791f', '#d1468c'];
 const STATUS = {valid: 'demonstration valid', stale: 'demonstration stale', verifier_rejected: 'demonstration rejected by verifier'};
-let TASKS = [], filter = 'todo', cur = null, rec = 'gold', step = 0, votes = {}, verdict = null, changes = null;
+let TASKS = [], filter = 'todo', cur = null, rec = 'gold', step = 0, verdict = null, changes = null;
 
 async function api(url, opts) {
     const r = await fetch(url, opts);
@@ -266,7 +266,7 @@ async function openTask(id) {
     cur = await api(`/annotate/api/task_audit/task/${encodeURIComponent(id)}`);
     $('#pick').value = id;
     const my = cur.my_label;
-    votes = Object.assign({}, my ? my.steps : {}); verdict = my ? my.task : null; changes = my ? my.changes : null;
+    verdict = my ? my.task : null; changes = my ? my.changes : null;
     rec = 'gold';
     renderRecording();
     const sites = (cur.sites || []).join(', ');
@@ -301,7 +301,6 @@ async function openTask(id) {
             <div><span class="name">${esc(p.instance)}</span><span class="fam">${esc(p.family)}${p.op ? ' · ' + esc(p.op) : ''}${p.required === false ? ' · optional' : ''}</span></div>
             ${p.subtask ? `<div class="sub">${esc(p.subtask)}</div>` : ''}
             ${p.span ? `<span class="span" data-s="${p.span[0]}">steps ${p.span[0]}–${p.span[1]}</span>` : '<span class="status">no span marked</span>'}
-            <div>${vote('step:' + p.instance, [['pass', 'Pass'], ['fail', 'Fail'], ['unsure', 'Unsure']], votes[p.instance])}</div>
         </div>`).join('');
     $('#verdict').innerHTML = `<div class="q" style="margin-top:0">The task as it stands</div>
         ${vote('task', [['ok', 'OK'], ['fix', 'Needs fix'], ['broken', 'Broken']], verdict)}
@@ -312,12 +311,10 @@ async function openTask(id) {
 async function save() {
     const err = m => { $('#status').className = 'status err'; $('#status').textContent = m; };
     if (!verdict) return err('Give the task a verdict (OK, Needs fix or Broken).');
-    const missing = cur.primitives.filter(p => !votes[p.instance]);
-    if (missing.length && verdict !== 'broken') return err(`Label every primitive (${missing.map(p => p.instance).join(', ')}).`);
     if (cur.modified && !changes) return err("Give the review's changes a verdict.");
     try {
         await api('/annotate/api/task_audit/label', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({task_id: cur.task_id, task: verdict, steps: votes, changes, notes: $('#notes').value})});
+            body: JSON.stringify({task_id: cur.task_id, task: verdict, changes, notes: $('#notes').value})});
     } catch (e) { return err(e.message); }
     const was = cur.task_id, list = visible(), at = list.findIndex(t => t.task_id === was);
     const t = TASKS.find(t => t.task_id === was); if (t) t.labeled = true;
@@ -340,7 +337,7 @@ document.addEventListener('click', e => {
     const v = e.target.closest('.vote button');
     if (v) {
         const g = v.parentNode.dataset.g;
-        if (g === 'task') verdict = v.dataset.v; else if (g === 'changes') changes = v.dataset.v; else votes[g.slice(5)] = v.dataset.v;
+        if (g === 'task') verdict = v.dataset.v; else if (g === 'changes') changes = v.dataset.v;
         v.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === v)); return;
     }
     const s = e.target.closest('#strip button, #log .ev'); if (s) { showStep(+s.dataset.i); return; }

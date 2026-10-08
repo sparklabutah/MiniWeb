@@ -15,7 +15,6 @@ from annotation import macro_browser
 from annotation.storage import ANNOTATIONS_DIR
 
 TASK_VERDICTS = {"ok", "fix", "broken"}
-STEP_VALUES = {"pass", "fail", "unsure"}
 CHANGE_VERDICTS = {"accept", "reject", "unsure"}
 CONTENT_KEYS = ("instruction", "sites", "macros", "macro_edges", "macro_subtasks", "macro_spans", "macro_operations",
                 "macro_required", "expected_answer", "answer_type", "alternatives", "expected_outcome", "starting_url",
@@ -113,24 +112,16 @@ def all_labels():
     return out
 
 
-def save(labeler, task_id, task_verdict, steps=None, changes=None, notes=""):
-    """Validate and append one review. Every primitive of the demonstration gets pass / fail / unsure (optional for a
-    task marked broken); a task the review modified also gets a verdict on the changes."""
+def save(labeler, task_id, task_verdict, changes=None, notes=""):
+    """Validate and append one review: a verdict on the task and, for a task the review modified, on the changes."""
     row = entry(task_id)
     if row is None:
         raise ValueError(f"unknown task {task_id!r}")
     if task_verdict not in TASK_VERDICTS:
         raise ValueError(f"task verdict must be one of {sorted(TASK_VERDICTS)}")
-    task = _read(ANNOTATIONS_DIR / row["folder"] / task_id / "task.json")
-    want = {inst for inst, _ in macro_browser.instances(task)}
-    steps = {k: v for k, v in (steps or {}).items() if k in want}
-    if any(v not in STEP_VALUES for v in steps.values()):
-        raise ValueError(f"primitive labels must be one of {sorted(STEP_VALUES)}")
-    if task_verdict != "broken" and set(steps) != want:
-        raise ValueError("label every primitive of the demonstration")
     if modified(row) and changes not in CHANGE_VERDICTS:
         raise ValueError(f"give the review's changes a verdict: one of {sorted(CHANGE_VERDICTS)}")
-    rec = {"labeler": labeler, "task_id": task_id, "task": task_verdict, "steps": steps,
+    rec = {"labeler": labeler, "task_id": task_id, "task": task_verdict,
            "changes": changes if modified(row) else None, "notes": (notes or "")[:4000],
            "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     f = _labeler_file(labeler)

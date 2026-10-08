@@ -70,12 +70,11 @@ class TaskAuditTests(unittest.TestCase):
     def test_label_rules_and_last_wins(self):
         c = self.client()
         post = lambda **b: c.post("/annotate/api/task_audit/label", json={"task_id": "news_0001", **b})  # noqa: E731
-        steps = {"search": "pass", "create_by_form": "fail"}
-        self.assertEqual(post(task="great", steps=steps, changes="accept").status_code, 400)
-        self.assertEqual(post(task="ok", steps={"search": "pass"}, changes="accept").status_code, 400)
-        self.assertEqual(post(task="ok", steps=steps).status_code, 400)                 # a modified task needs it
-        self.assertEqual(post(task="fix", steps=steps, changes="accept", notes="a").status_code, 200)
-        self.assertEqual(post(task="broken", changes="reject").status_code, 200)        # broken: steps optional
+        self.assertEqual(post(task="great", changes="accept").status_code, 400)
+        self.assertEqual(post(task="ok").status_code, 400)                              # a modified task needs it
+        self.assertEqual(post(task="ok", changes="maybe").status_code, 400)
+        self.assertEqual(post(task="fix", changes="accept", notes="a").status_code, 200)
+        self.assertEqual(post(task="broken", changes="reject").status_code, 200)
         mine = task_audit.labels("alice")
         self.assertEqual((mine["news_0001"]["task"], mine["news_0001"]["changes"]), ("broken", "reject"))
         self.assertTrue(c.get("/annotate/api/task_audit/tasks").get_json()["tasks"][0]["labeled"])

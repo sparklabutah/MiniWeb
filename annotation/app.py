@@ -2619,7 +2619,7 @@ def api_task_audit_label():
     data = request.get_json(silent=True) or {}
     try:
         rec = task_audit.save(session.get("annotator_name", "anonymous"), data.get("task_id"), data.get("task"),
-                              data.get("steps"), data.get("changes"), data.get("notes", ""))
+                              data.get("changes"), data.get("notes", ""))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"status": "ok", "label": rec})
