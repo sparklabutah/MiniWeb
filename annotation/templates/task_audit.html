@@ -144,9 +144,9 @@
             </ul>
         </details>
         <div class="card" id="task"></div>
+        <div class="card" id="verdict"></div>
         <div class="card" id="changes"></div>
         <div class="card" id="prims"></div>
-        <div class="card" id="verdict"></div>
     </section>
 </main>
 <script>
@@ -292,9 +292,7 @@ async function openTask(id) {
     $('#changes').style.display = cur.modified ? '' : 'none';
     $('#changes').innerHTML = `<div class="eyebrow">What the review changed</div>
         ${fields || '<div class="field" style="color:var(--muted)">The task definition is unchanged.</div>'}${ver}${notes}
-        ${cur.rerecorded ? '<div class="field" style="font-size:12.5px;color:var(--muted)">The demonstration was re-recorded; the replaced recording was not kept.</div>' : ''}
-        <div class="q">Are the review's changes right?</div>
-        ${vote('changes', [['accept', 'Accept'], ['reject', 'Reject'], ['unsure', 'Unsure']], changes)}`;
+        ${cur.rerecorded ? '<div class="field" style="font-size:12.5px;color:var(--muted)">The demonstration was re-recorded; the replaced recording was not kept.</div>' : ''}`;
     $('#prims').innerHTML = `<div class="eyebrow">Primitives in the demonstration (${cur.primitives.length})</div>` +
         cur.primitives.map((p, k) => `
         <div class="prim" data-k="${esc(p.instance)}" style="border-left-color:${COLORS[k % COLORS.length]}">
@@ -304,6 +302,8 @@ async function openTask(id) {
         </div>`).join('');
     $('#verdict').innerHTML = `<div class="q" style="margin-top:0">The task as it stands</div>
         ${vote('task', [['ok', 'OK'], ['fix', 'Needs fix'], ['broken', 'Broken']], verdict)}
+        ${cur.modified ? `<div class="q">Are the review's changes right? <span class="status">(what changed is below)</span></div>
+        ${vote('changes', [['accept', 'Accept'], ['reject', 'Reject'], ['unsure', 'Unsure']], changes)}` : ''}
         <div style="margin-top:10px"><textarea id="notes" placeholder="Notes: what is wrong, what to change">${esc(my ? my.notes : '')}</textarea></div>
         <div class="save"><button class="primary" id="save">Save &amp; next</button><span class="status" id="status">${my ? 'Saved ' + esc(my.at) : ''}</span></div>`;
 }
