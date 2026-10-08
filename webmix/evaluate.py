@@ -472,7 +472,15 @@ async def _run(tasks, bases, args):
     async def worker(w):
         while not q.empty():
             t, rep = q.get_nowait()
-            res = await run_episode(t, bases[w % len(bases)], args.arm, args, out, rep)
+            try:
+                res = await run_episode(t, bases[w % len(bases)], args.arm, args, out, rep)
+            except asyncio.CancelledError as e:
+                # 2026-10-08: browser-use's event bus can cancel an episode's own tasks (a DOM-watchdog screenshot
+                # interrupted), and CancelledError is not an Exception: it escaped run_episode and ended the whole run
+                # (taskgen shard 2 after 63 of 455 episodes). Nothing here cancels workers, so record it and go on.
+                res = {"task_id": t["task_id"], "episode": t["task_id"] + (f"~r{rep}" if args.repeats > 1 else ""),
+                       "macro": t.get("macro"), "site": t.get("site"), "arm": args.arm, "ok": False,
+                       "error": f"CancelledError: {str(e)[:200]}", "duration_s": 0}
             res["repeat"] = rep
             tally["ok" if res["ok"] else "fail"] += 1
             with open(out / "results.jsonl", "a") as f:
