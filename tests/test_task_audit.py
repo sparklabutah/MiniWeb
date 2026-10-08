@@ -95,6 +95,23 @@ class TaskAuditTests(unittest.TestCase):
         self.assertEqual(c.get("/annotate/api/task_audit/snapshot/news_0001/gold/9").status_code, 404)
         self.assertEqual(c.get("/annotate/api/task_audit/snapshot/news_0001/other/1").status_code, 404)
 
+    def test_the_page_after_the_last_step_is_a_result_step(self):
+        c = self.client()
+        tr = task_audit.ANNOTATIONS_DIR / "alice" / "news_0001" / "trajectory.json"
+        tr.write_text(json.dumps([
+            {"type": "action", "action": "click", "target": "button 'Filter'", "url": "/sites/news/"},
+            {"type": "observation", "screenshot": "screenshots/step_000.png", "snapshot": "<html>before</html>"},
+            {"type": "observation", "url": "https://host.example/sites/news/?f=1", "snapshot": "<html>filtered</html>"}]))
+        acts = c.get("/annotate/api/task_audit/task/news_0001").get_json()["recordings"]["gold"]
+        self.assertEqual([(a["index"], a["action"], a["frame"]) for a in acts],
+                         [(1, "click", "screenshots/step_000.png"), (2, "result", None)])
+        self.assertEqual(acts[-1]["url"], "/sites/news/?f=1")
+        self.assertIn("filtered", c.get("/annotate/api/task_audit/snapshot/news_0001/gold/2").get_data(as_text=True))
+        tr.write_text(json.dumps([{"type": "action", "action": "click", "target": "x"},
+                                  {"type": "observation", "screenshot": "screenshots/step_000.png"}]))
+        acts = c.get("/annotate/api/task_audit/task/news_0001").get_json()["recordings"]["gold"]
+        self.assertEqual([a["action"] for a in acts], ["click"])                 # nothing later: no result step
+
     def test_labels_stay_writable_under_the_lock(self):
         self.assertTrue(final_set.write_allowed("/annotate/api/task_audit/label"))
 

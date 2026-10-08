@@ -239,9 +239,10 @@ function showStep(k) {
         ? `<img alt="Screenshot after step ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(cur.folder)}/${encodeURIComponent(cur.task_id)}/${a.frame}">`
         : `<iframe class="snap" sandbox title="Recorded page after step ${a.index}" src="/annotate/api/task_audit/snapshot/${encodeURIComponent(cur.task_id)}/${rec}/${a.index}"></iframe>`;
     const p = cur.primitives[primOf(a.index)];
-    $('#caption').innerHTML = `Step ${a.index}/${acts.length} · <span class="act">${esc(a.action)}</span> ${esc(a.target)}` +
+    $('#caption').innerHTML = (a.result ? `<span class="act">Result</span> · the page after step ${a.index - 1}` + (a.url ? ` · <span style="color:var(--muted)">${esc(a.url)}</span>` : '')
+        : `Step ${a.index}/${acts.filter(x => !x.result).length} · <span class="act">${esc(a.action)}</span> ${esc(a.target)}` +
         (a.value ? ` = <b>${esc(a.value)}</b>` : '') + (a.url ? ` · <span style="color:var(--muted)">${esc(a.url)}</span>` : '') +
-        (p ? ` · <b>${esc(p.instance)}</b>` : '') + (a.frame ? '' : ' · <i>recorded page (this recording has no screenshots)</i>');
+        (p ? ` · <b>${esc(p.instance)}</b>` : '')) + (a.frame ? '' : ' · <i>recorded page (no screenshot for this step)</i>');
     document.querySelectorAll('#strip button').forEach((b, i) => b.classList.toggle('cur', i === step));
     document.querySelectorAll('#log .ev').forEach((e, i) => e.classList.toggle('cur', i === step));
     const ev = document.querySelectorAll('#log .ev')[step]; if (ev) ev.scrollIntoView({block: 'nearest'});
@@ -251,7 +252,7 @@ function renderRecording() {
         (cur.recordings.walk ? `<button data-r="walk" class="${rec === 'walk' ? 'on' : ''}">Reviewer's walk-through</button>` : '');
     const acts = actions();
     const col = i => { const k = primOf(i); return k < 0 ? 'transparent' : COLORS[k % COLORS.length]; };
-    $('#strip').innerHTML = acts.map((a, i) => `<button data-i="${i}" style="border-bottom-color:${col(a.index)}">${a.index}</button>`).join('');
+    $('#strip').innerHTML = acts.map((a, i) => `<button data-i="${i}" style="border-bottom-color:${col(a.index)}"${a.result ? ' title="The page after the last step"' : ''}>${a.result ? 'result' : a.index}</button>`).join('');
     $('#log').innerHTML = acts.map((a, i) => `<div class="ev" data-i="${i}" style="border-left-color:${col(a.index)}">
         <span class="n">${a.index}</span><span><span class="a">${esc(a.action)}</span> ${esc(a.target)}${a.value ? ` = <b>${esc(a.value)}</b>` : ''}
         ${a.url ? `<span class="u"> · ${esc(a.url)}</span>` : ''}</span></div>`).join('');
