@@ -2588,6 +2588,49 @@ def api_grader_audit_labels():
     return jsonify(grader_audit.all_labels())
 
 
+@annotation_bp.route("/task-audit")
+def task_audit_page():
+    """A reviewer's pass over every final task, its demonstration and the review's changes (annotation/task_audit.py)."""
+    return render_template("task_audit.html")
+
+
+@annotation_bp.route("/api/task_audit/tasks")
+def api_task_audit_tasks():
+    from annotation import task_audit
+    mine = task_audit.labels(session.get("annotator_name", "anonymous"))
+    rows = [{k: r[k] for k in ("task_id", "site", "split", "status", "changed_fields", "verifier_repaired", "rerecorded",
+                               "walk")} | {"labeled": r["task_id"] in mine} for r in task_audit.entries()]
+    return jsonify({"labeler": session.get("annotator_name", "anonymous"), "tasks": rows})
+
+
+@annotation_bp.route("/api/task_audit/task/<task_id>")
+def api_task_audit_task(task_id):
+    from annotation import task_audit
+    c = task_audit.case(task_id)
+    if c is None:
+        return jsonify({"error": "unknown task"}), 404
+    c["my_label"] = task_audit.labels(session.get("annotator_name", "anonymous")).get(task_id)
+    return jsonify(c)
+
+
+@annotation_bp.route("/api/task_audit/label", methods=["POST"])
+def api_task_audit_label():
+    from annotation import task_audit
+    data = request.get_json(silent=True) or {}
+    try:
+        rec = task_audit.save(session.get("annotator_name", "anonymous"), data.get("task_id"), data.get("task"),
+                              data.get("steps"), data.get("changes"), data.get("notes", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"status": "ok", "label": rec})
+
+
+@annotation_bp.route("/api/task_audit/labels.json")
+def api_task_audit_labels():
+    from annotation import task_audit
+    return jsonify(task_audit.all_labels())
+
+
 @annotation_bp.route("/api/macro_browser/index")
 def api_macro_browser_index():
     from annotation import macro_browser

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Audit — MiniWeb Annotation</title>
+    <style>
+        :root { --bg:#f6f7f9; --panel:#fff; --ink:#1d2330; --muted:#6b7385; --line:#dfe3ea; --accent:#e8742a; --focus:#2f6fd6;
+                --pass:#1f9d55; --fail:#d64545; --unsure:#b7791f; --del:#fde2e2; --ins:#dcf5e3; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg:#14171d; --panel:#1c2028; --ink:#e6e9ef; --muted:#8d95a6; --line:#2e3440; --accent:#f08a45; --focus:#5b93ec;
+                    --pass:#38c172; --fail:#ef6b6b; --unsure:#e3a33b; --del:#4a2225; --ins:#1f3d2a; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
+        .top { background: #1e293b; color: #fff; padding: .55rem 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .top a { color: #94a3b8; text-decoration: none; font-size: .82rem; }
+        .top a:hover, .top a.here { color: #fff; }
+        .top .brand { color: #fff; font-weight: 700; }
+        header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+        select, button, input, textarea { font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+        select { padding: 4px 6px; max-width: min(380px, 100%); }
+        button { padding: 3px 10px; cursor: pointer; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+        .seg button { border: 0; border-radius: 0; }
+        .seg button.on { background: var(--focus); color: #fff; }
+        .pos { color: var(--muted); font-size: 12px; }
+        .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+        main { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); gap: 16px; padding: 16px; }
+        main > section { min-width: 0; }
+        @media (max-width: 960px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .hint { display: none; } }
+        .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+        .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .stage { position: relative; background: #0b0d13; border-radius: 8px; overflow: auto; max-height: 58vh; min-height: 240px; }
+        .stage img { display: block; width: 100%; }
+        .stage .empty { color: #8d95a6; padding: 40px; text-align: center; }
+        .stage pre { color: #c9d1dc; margin: 0; padding: 12px 14px; font-size: 12px; white-space: pre-wrap; }
+        .caption { font: 12.5px/1.45 ui-monospace, monospace; padding: 6px 2px; word-break: break-word; }
+        .caption .act { color: var(--accent); font-weight: 600; }
+        .strip { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+        .strip button { padding: 0 6px; font-size: 11px; min-width: 26px; border-bottom-width: 3px; }
+        .strip button.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+        .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+        .title { font-size: 17px; font-weight: 600; margin: 4px 0 6px; }
+        .row { display: grid; grid-template-columns: 112px 1fr; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 13px; }
+        .row .k { color: var(--muted); }
+        .log { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: 30vh; overflow: auto; }
+        .ev { display: grid; grid-template-columns: 34px 1fr; gap: 8px; padding: 3px 10px; font: 12px/1.45 ui-monospace, monospace;
+              border-top: 1px solid var(--line); word-break: break-word; cursor: pointer; border-left: 4px solid transparent; }
+        .ev:first-child { border-top: 0; }
+        .ev .n { color: var(--muted); }
+        .ev .a { color: var(--accent); font-weight: 600; }
+        .ev .u { color: var(--muted); }
+        .ev.cur { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+        .badge { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 9px; margin-right: 4px; border: 1px solid var(--line); }
+        .badge.valid { background: color-mix(in srgb, var(--pass) 20%, transparent); }
+        .badge.stale { background: color-mix(in srgb, var(--unsure) 24%, transparent); }
+        .badge.verifier_rejected { background: color-mix(in srgb, var(--fail) 20%, transparent); }
+        .badge.test { background: color-mix(in srgb, var(--focus) 22%, transparent); }
+        .field { border-top: 1px solid var(--line); padding: 8px 0; }
+        .field .k { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+        .diff { font-size: 13px; white-space: pre-wrap; word-break: break-word; margin-top: 3px; }
+        .diff.code { font: 11.5px/1.45 ui-monospace, monospace; max-height: 260px; overflow: auto; background: var(--bg); padding: 6px 8px; border-radius: 6px; }
+        .diff del { background: var(--del); text-decoration: line-through; text-decoration-color: var(--fail); }
+        .diff ins { background: var(--ins); text-decoration: none; }
+        .ba { display: grid; grid-template-columns: 52px 1fr; gap: 6px; font-size: 13px; margin-top: 3px; }
+        .ba .lab { font-size: 11px; color: var(--muted); padding-top: 2px; }
+        .field summary { cursor: pointer; }
+        .notes-list { font-size: 12.5px; margin: 4px 0 0 18px; padding: 0; color: var(--muted); }
+        .prim { border-top: 1px solid var(--line); padding: 10px 0 8px; border-left: 4px solid transparent; padding-left: 8px; }
+        .prim .name { font-weight: 600; font-family: ui-monospace, monospace; }
+        .prim .fam { font-size: 11px; color: var(--muted); margin-left: 6px; }
+        .prim .sub { font-size: 13px; margin: 3px 0; }
+        .prim .span { font-size: 12px; color: var(--focus); cursor: pointer; text-decoration: underline; }
+        .vote { display: inline-flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+        .vote button { min-width: 72px; }
+        .vote button.on[data-v=pass], .vote button.on[data-v=ok], .vote button.on[data-v=accept] { background: var(--pass); border-color: var(--pass); color: #fff; }
+        .vote button.on[data-v=fail], .vote button.on[data-v=broken], .vote button.on[data-v=reject] { background: var(--fail); border-color: var(--fail); color: #fff; }
+        .vote button.on[data-v=unsure], .vote button.on[data-v=fix] { background: var(--unsure); border-color: var(--unsure); color: #fff; }
+        textarea { width: 100%; min-height: 64px; padding: 6px 8px; resize: vertical; }
+        .save { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+        .save button.primary { background: var(--focus); color: #fff; border-color: var(--focus); padding: 5px 14px; }
+        .status { font-size: 12px; color: var(--muted); }
+        .status.err { color: var(--fail); }
+        .answer { white-space: pre-wrap; font-size: 13px; }
+        .guide { font-size: 13px; }
+        .guide li { margin: 2px 0; }
+        .q { font-weight: 600; font-size: 13px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="top">
+    <a href="/annotate/" class="brand">MiniWeb Annotation</a>
+    <a href="/annotate/task">Annotate</a>
+    <a href="/annotate/verify">Verifier Builder</a>
+    <a href="/annotate/playback">Playback Facts</a>
+    <a href="/annotate/macro-browser">Macro Browser</a>
+    <a href="/annotate/task-review">Task Review</a>
+    <a href="/annotate/grader-audit">Grader Audit</a>
+    <a href="/annotate/task-audit" class="here">Task Audit</a>
+</div>
+<header>
+    <span class="seg"><button data-f="todo" class="on">To review</button><button data-f="all">All</button></span>
+    <select id="split" aria-label="Split">
+        <option value="">All splits</option><option value="test">Test (held-out sites)</option>
+        <option value="train">Train</option><option value="excluded">Excluded</option>
+    </select>
+    <select id="kind" aria-label="Show">
+        <option value="">Every task</option>
+        <option value="rerecorded">Re-recorded demonstration</option>
+        <option value="original_rec">Original recording</option>
+        <option value="verifier_repaired">Verifier changed</option>
+        <option value="valid">Demonstration valid</option>
+        <option value="stale">Demonstration stale</option>
+        <option value="verifier_rejected">Demonstration rejected by verifier</option>
+        <option value="walk">Has a walk-through</option>
+    </select>
+    <button id="prev" title="Previous task ([)">&lt;</button>
+    <select id="pick" aria-label="Task"></select>
+    <button id="next" title="Next task (])">&gt;</button>
+    <span class="pos" id="progress"></span>
+    <span class="hint">← → steps · [ ] tasks · Ctrl+Enter save &amp; next</span>
+</header>
+<main>
+    <section>
+        <div class="tabs" id="tabs"></div>
+        <div class="stage" id="stage"><div class="empty">Loading…</div></div>
+        <div class="caption" id="caption"></div>
+        <div class="strip" id="strip"></div>
+        <div class="log" id="log"></div>
+    </section>
+    <section>
+        <details class="card guide" id="guide">
+            <summary><b>How to review</b></summary>
+            <ul>
+                <li><b>Task</b>: is the instruction clear, solvable on the site and gradeable as written? <i>Needs fix</i> for a wording, tag or
+                    answer problem you can name; <i>Broken</i> when it cannot be done or graded as intended. Say what in the notes.</li>
+                <li><b>Primitives</b>: step through the demonstration. Pass when the steps in a primitive's span carry it out as its subtask says
+                    (right item, right values). A primitive the task does not actually need is <i>Unsure</i>, with a note, not Fail.</li>
+                <li><b>Review changes</b>: compare the original definition, verifier and recording with the current ones. Accept when the
+                    changes fix or keep the task without changing what it asks; Reject when they introduce a mistake.</li>
+                <li>Test tasks (held-out sites) come first: they are the benchmark's evaluation set.</li>
+            </ul>
+        </details>
+        <div class="card" id="task"></div>
+        <div class="card" id="changes"></div>
+        <div class="card" id="prims"></div>
+        <div class="card" id="verdict"></div>
+    </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COLORS = ['#2f6fd6', '#e8742a', '#1f9d55', '#9b51e0', '#d64545', '#0e9aa7', '#b7791f', '#d1468c'];
+const STATUS = {valid: 'demonstration valid', stale: 'demonstration stale', verifier_rejected: 'demonstration rejected by verifier'};
+let TASKS = [], filter = 'todo', cur = null, rec = 'gold', step = 0, votes = {}, verdict = null, changes = null;
+
+async function api(url, opts) {
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+}
+
+function visible() {
+    const sp = $('#split').value, k = $('#kind').value;
+    return TASKS.filter(t => (filter === 'all' || !t.labeled) && (!sp || t.split === sp) && (
+        !k || (k === 'rerecorded' && t.rerecorded) || (k === 'original_rec' && !t.rerecorded) ||
+        (k === 'verifier_repaired' && t.verifier_repaired) || (k === 'walk' && t.walk) || t.status === k));
+}
+
+function renderPicker() {
+    const list = visible();
+    $('#pick').innerHTML = list.map(t =>
+        `<option value="${t.task_id}">${t.labeled ? '✓ ' : ''}${t.split === 'test' ? '[test] ' : ''}${t.task_id}</option>`).join('');
+    if (cur && list.some(t => t.task_id === cur.task_id)) $('#pick').value = cur.task_id;
+    const n = TASKS.filter(t => t.labeled).length, test = TASKS.filter(t => t.split === 'test');
+    $('#progress').textContent = `${n} / ${TASKS.length} reviewed · test ${test.filter(t => t.labeled).length}/${test.length} · ${list.length} in view`;
+}
+
+async function loadTasks(keep) {
+    const d = await api('/annotate/api/task_audit/tasks');
+    TASKS = d.tasks;
+    renderPicker();
+    if (!TASKS.length) { $('#stage').innerHTML = '<div class="empty">No task-audit index on this server yet (scripts/build_task_audit.py, then upload it).</div>'; return; }
+    const list = visible();
+    if (!keep || !cur) {
+        if (list.length) await openTask(list[0].task_id);
+        else $('#stage').innerHTML = '<div class="empty">Nothing to review in this view.</div>';
+    }
+}
+
+// ── diff (word-level for text, line-level for structures) ────────────────────
+function lcsDiff(a, b) {
+    const n = a.length, m = b.length;
+    if (n * m > 400000) return [['-', a.join('')], ['+', b.join('')]];
+    const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+        dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const out = []; let i = 0, j = 0;
+    while (i < n && j < m) {
+        if (a[i] === b[j]) { out.push(['=', a[i]]); i++; j++; }
+        else if (dp[i + 1][j] >= dp[i][j + 1]) out.push(['-', a[i++]]);
+        else out.push(['+', b[j++]]);
+    }
+    while (i < n) out.push(['-', a[i++]]);
+    while (j < m) out.push(['+', b[j++]]);
+    return out;
+}
+const pretty = v => typeof v === 'string' ? v : JSON.stringify(v ?? null, null, 1);
+function beforeAfter(before, after) {   // a sentence: the old one with deletions marked, the new one with insertions
+    const d = lcsDiff(pretty(before).split(/(\s+)/), pretty(after).split(/(\s+)/));
+    const side = keep => d.filter(([op]) => op === '=' || op === keep).map(([op, t]) =>
+        op === '=' ? esc(t) : op === '-' ? `<del>${esc(t)}</del>` : `<ins>${esc(t)}</ins>`).join('');
+    return `<div class="ba"><span class="lab">Before</span><span class="diff">${side('-') || '<i>none</i>'}</span></div>
+            <div class="ba"><span class="lab">Now</span><span class="diff">${side('+') || '<i>none</i>'}</span></div>`;
+}
+function diffHtml(before, after) {
+    const text = typeof before === 'string' && typeof after === 'string' && !before.includes('\n');
+    const split = s => text ? s.split(/(\s+)/) : s.split('\n').map(x => x + '\n');
+    return lcsDiff(split(pretty(before)), split(pretty(after))).map(([op, t]) =>
+        op === '=' ? esc(t) : op === '-' ? `<del>${esc(t)}</del>` : `<ins>${esc(t)}</ins>`).join('');
+}
+
+// ── recording ────────────────────────────────────────────────────────────────
+function actions() { return (cur.recordings[rec] || []); }
+function primOf(i) {   // the primitive whose span holds 1-based action i (gold recording only)
+    if (rec !== 'gold') return -1;
+    return cur.primitives.findIndex(p => p.span && p.span[0] <= i && i <= p.span[1]);
+}
+function showStep(k) {
+    const acts = actions();
+    if (!acts.length) { $('#stage').innerHTML = '<div class="empty">No recorded actions.</div>'; $('#caption').innerHTML = ''; return; }
+    step = Math.max(0, Math.min(acts.length - 1, k));
+    const a = acts[step];
+    $('#stage').innerHTML = a.frame
+        ? `<img alt="Screenshot after step ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(cur.folder)}/${encodeURIComponent(cur.task_id)}/${a.frame}">`
+        : `<pre>${esc(a.outline || 'No screenshot for this step.')}</pre>`;
+    const p = cur.primitives[primOf(a.index)];
+    $('#caption').innerHTML = `Step ${a.index}/${acts.length} · <span class="act">${esc(a.action)}</span> ${esc(a.target)}` +
+        (a.value ? ` = <b>${esc(a.value)}</b>` : '') + (a.url ? ` · <span style="color:var(--muted)">${esc(a.url)}</span>` : '') +
+        (p ? ` · <b>${esc(p.instance)}</b>` : '');
+    document.querySelectorAll('#strip button').forEach((b, i) => b.classList.toggle('cur', i === step));
+    document.querySelectorAll('#log .ev').forEach((e, i) => e.classList.toggle('cur', i === step));
+    const ev = document.querySelectorAll('#log .ev')[step]; if (ev) ev.scrollIntoView({block: 'nearest'});
+}
+function renderRecording() {
+    $('#tabs').innerHTML = `<button data-r="gold" class="${rec === 'gold' ? 'on' : ''}">Demonstration · ${cur.rerecorded ? 're-recorded' : 'original recording'}</button>` +
+        (cur.recordings.walk ? `<button data-r="walk" class="${rec === 'walk' ? 'on' : ''}">Reviewer's walk-through</button>` : '');
+    const acts = actions();
+    const col = i => { const k = primOf(i); return k < 0 ? 'transparent' : COLORS[k % COLORS.length]; };
+    $('#strip').innerHTML = acts.map((a, i) => `<button data-i="${i}" style="border-bottom-color:${col(a.index)}">${a.index}</button>`).join('');
+    $('#log').innerHTML = acts.map((a, i) => `<div class="ev" data-i="${i}" style="border-left-color:${col(a.index)}">
+        <span class="n">${a.index}</span><span><span class="a">${esc(a.action)}</span> ${esc(a.target)}${a.value ? ` = <b>${esc(a.value)}</b>` : ''}
+        ${a.url ? `<span class="u"> · ${esc(a.url)}</span>` : ''}</span></div>`).join('');
+    showStep(0);
+}
+
+// ── task, changes, primitives, verdict ───────────────────────────────────────
+function vote(group, options, current) {
+    return `<div class="vote" data-g="${group}">${options.map(([v, label]) =>
+        `<button data-v="${v}" class="${current === v ? 'on' : ''}">${label}</button>`).join('')}</div>`;
+}
+async function openTask(id) {
+    cur = await api(`/annotate/api/task_audit/task/${encodeURIComponent(id)}`);
+    $('#pick').value = id;
+    const my = cur.my_label;
+    votes = Object.assign({}, my ? my.steps : {}); verdict = my ? my.task : null; changes = my ? my.changes : null;
+    rec = 'gold';
+    renderRecording();
+    const sites = (cur.sites || []).join(', ');
+    $('#task').innerHTML = `
+        <div class="eyebrow"><span class="badge ${cur.split}">${esc(cur.split)}</span>${esc(cur.task_id)}</div>
+        <div class="title">${esc(cur.instruction)}</div>
+        <div><span class="badge ${cur.status}">${esc(STATUS[cur.status] || cur.status)}</span>
+             <span class="badge">${cur.rerecorded ? 're-recorded ' + esc((cur.rerecorded_at || '').slice(0, 10)) : 'original recording'}</span>
+             ${cur.walk ? '<span class="badge">walk-through</span>' : ''}</div>
+        <div class="row"><span class="k">Site${(cur.sites || []).length > 1 ? 's' : ''}</span><span>${esc(sites)}</span></div>
+        ${cur.starting_url ? `<div class="row"><span class="k">Starts at</span><span>${esc(cur.starting_url)}</span></div>` : ''}
+        ${cur.expected_answer ? `<div class="row"><span class="k">Expected answer</span><span class="answer">${esc(pretty(cur.expected_answer))}</span></div>` : ''}`;
+    const was = k => cur.original ? cur.original[k] : '';
+    const isText = k => typeof cur.current[k] === 'string' && !cur.current[k].includes('\n') && typeof (was(k) ?? '') === 'string';
+    const changed = cur.changed_fields || [];   // sentences inline, before and now; structures folded, as a diff
+    const fields = changed.filter(isText).map(k => `<div class="field"><div class="k">${esc(k)}</div>${beforeAfter(was(k) ?? '', cur.current[k])}</div>`).join('') +
+        changed.filter(k => !isText(k)).map(k => `<details class="field"><summary class="k">${esc(k)}</summary>
+        <div class="diff code">${diffHtml(was(k), cur.current[k])}</div></details>`).join('');
+    const ver = cur.verifier_repaired ? `<details class="field"><summary class="k">verifier</summary>
+        <div class="diff code">${diffHtml(cur.verifier_original, cur.verifier)}</div></details>` : '';
+    const notes = (cur.review.changes || []).length ? `<div class="field"><div class="k">review notes${cur.review.recommendation ? ' · ' + esc(cur.review.recommendation) : ''}</div>
+        <ul class="notes-list">${cur.review.changes.map(c => `<li>${esc(typeof c === 'string' ? c : pretty(c))}</li>`).join('')}</ul></div>` : '';
+    $('#changes').style.display = cur.modified ? '' : 'none';
+    $('#changes').innerHTML = `<div class="eyebrow">What the review changed</div>
+        ${fields || '<div class="field" style="color:var(--muted)">The task definition is unchanged.</div>'}${ver}${notes}
+        ${cur.rerecorded ? '<div class="field" style="font-size:12.5px;color:var(--muted)">The demonstration was re-recorded; the replaced recording was not kept.</div>' : ''}
+        <div class="q">Are the review's changes right?</div>
+        ${vote('changes', [['accept', 'Accept'], ['reject', 'Reject'], ['unsure', 'Unsure']], changes)}`;
+    $('#prims').innerHTML = `<div class="eyebrow">Primitives in the demonstration (${cur.primitives.length})</div>` +
+        cur.primitives.map((p, k) => `
+        <div class="prim" data-k="${esc(p.instance)}" style="border-left-color:${COLORS[k % COLORS.length]}">
+            <div><span class="name">${esc(p.instance)}</span><span class="fam">${esc(p.family)}${p.op ? ' · ' + esc(p.op) : ''}${p.required === false ? ' · optional' : ''}</span></div>
+            ${p.subtask ? `<div class="sub">${esc(p.subtask)}</div>` : ''}
+            ${p.span ? `<span class="span" data-s="${p.span[0]}">steps ${p.span[0]}–${p.span[1]}</span>` : '<span class="status">no span marked</span>'}
+            <div>${vote('step:' + p.instance, [['pass', 'Pass'], ['fail', 'Fail'], ['unsure', 'Unsure']], votes[p.instance])}</div>
+        </div>`).join('');
+    $('#verdict').innerHTML = `<div class="q" style="margin-top:0">The task as it stands</div>
+        ${vote('task', [['ok', 'OK'], ['fix', 'Needs fix'], ['broken', 'Broken']], verdict)}
+        <div style="margin-top:10px"><textarea id="notes" placeholder="Notes: what is wrong, what to change">${esc(my ? my.notes : '')}</textarea></div>
+        <div class="save"><button class="primary" id="save">Save &amp; next</button><span class="status" id="status">${my ? 'Saved ' + esc(my.at) : ''}</span></div>`;
+}
+
+async function save() {
+    const err = m => { $('#status').className = 'status err'; $('#status').textContent = m; };
+    if (!verdict) return err('Give the task a verdict (OK, Needs fix or Broken).');
+    const missing = cur.primitives.filter(p => !votes[p.instance]);
+    if (missing.length && verdict !== 'broken') return err(`Label every primitive (${missing.map(p => p.instance).join(', ')}).`);
+    if (cur.modified && !changes) return err("Give the review's changes a verdict.");
+    try {
+        await api('/annotate/api/task_audit/label', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({task_id: cur.task_id, task: verdict, steps: votes, changes, notes: $('#notes').value})});
+    } catch (e) { return err(e.message); }
+    const was = cur.task_id, list = visible(), at = list.findIndex(t => t.task_id === was);
+    const t = TASKS.find(t => t.task_id === was); if (t) t.labeled = true;
+    const after = visible();
+    const nxt = filter === 'todo' ? after.find(t => t.task_id !== was) : list[at + 1];
+    renderPicker();
+    if (nxt) await openTask(nxt.task_id); else { $('#status').className = 'status'; $('#status').textContent = 'Saved. That was the last task in this view.'; }
+}
+
+function go(d) {
+    const list = visible(), at = list.findIndex(t => t.task_id === (cur && cur.task_id));
+    const nxt = list[at + d]; if (nxt) openTask(nxt.task_id);
+}
+function refilter() {
+    renderPicker();
+    const list = visible(); if (list.length && !list.some(t => t.task_id === (cur && cur.task_id))) openTask(list[0].task_id);
+}
+
+document.addEventListener('click', e => {
+    const v = e.target.closest('.vote button');
+    if (v) {
+        const g = v.parentNode.dataset.g;
+        if (g === 'task') verdict = v.dataset.v; else if (g === 'changes') changes = v.dataset.v; else votes[g.slice(5)] = v.dataset.v;
+        v.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === v)); return;
+    }
+    const s = e.target.closest('#strip button, #log .ev'); if (s) { showStep(+s.dataset.i); return; }
+    const sp = e.target.closest('.span'); if (sp) { if (rec !== 'gold') { rec = 'gold'; renderRecording(); }
+        showStep(actions().findIndex(a => a.index === +sp.dataset.s)); return; }
+    const tb = e.target.closest('#tabs button'); if (tb) { rec = tb.dataset.r; renderRecording(); return; }
+    const f = e.target.closest('.seg button');
+    if (f) { filter = f.dataset.f; document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b === f)); refilter(); return; }
+    if (e.target.id === 'save') save();
+});
+$('#pick').addEventListener('change', e => openTask(e.target.value));
+$('#split').addEventListener('change', refilter);
+$('#kind').addEventListener('change', refilter);
+$('#prev').onclick = () => go(-1);
+$('#next').onclick = () => go(1);
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); return; }
+    if (/^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (e.key === 'ArrowLeft') showStep(step - 1);
+    else if (e.key === 'ArrowRight') showStep(step + 1);
+    else if (e.key === '[') go(-1);
+    else if (e.key === ']') go(1);
+});
+loadTasks().catch(e => { $('#stage').innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

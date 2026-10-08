@@ -13,10 +13,10 @@ import yaml
 PATH = os.environ.get("MINIWEB_FINAL_SET") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "final_set.yaml")
 
-# write routes that stay open under the lock: sessions, read-only search and the grader-audit labels
+# write routes that stay open under the lock: sessions, read-only search and the grader- and task-audit labels
 OPEN_WRITES = {"/annotate/login", "/annotate/logout", "/annotate/api/auto_login", "/annotate/api/auto_logout",
                "/annotate/api/toggle_2fa", "/annotate/api/macro_search"}
-OPEN_PREFIXES = ("/annotate/api/grader_audit/",)
+OPEN_PREFIXES = ("/annotate/api/grader_audit/", "/annotate/api/task_audit/")
 
 
 @lru_cache(maxsize=1)
